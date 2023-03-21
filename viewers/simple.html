@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Simple html data viewer</h2>
+
+<div id="CSVTable"></div>
+<script src="js/jquery.min.js"></script>
+<script type="text/javascript" src="js/jquery.csvToTable.js"></script>
+
+<script>
+$(function() {
+    $.get('query.csv', function(data) {
+			$('#CSVSource').html('<pre>' + data + '</pre>');
+    });
+    $('#CSVTable').CSVToTable('query.csv');
+});
+</script>
+
+<!--
+<br>
+Debug original csv data of <a href="test_data.csv">test_data.csv</a>:<br>
+<div id="CSVSource" class="source"> </div>
+<br>
+-->
+
+</body>
+</html>
