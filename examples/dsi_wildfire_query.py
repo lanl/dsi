@@ -1,7 +1,11 @@
 #from asyncio.windows_events import NULL
 import os
 import urllib.request
+import sys
 
+# Temporary until DSI becomes a module
+# Path to root dsi folder
+sys.path.insert(1, '../')
 
 from dsi.utils import utils
 from dsi.sql.fs import fs
