@@ -22,13 +22,14 @@ The final portion of the driver gives a few examples on how to perform queries u
 
 To run, simply execute:
 
+```
 git clone https://github.com/lanl/dsi.git
-
+cd dsi
 python3 examples/dsi_wildfire.py
-
-
+```
 
 -------------------------------------------
+# License
 
 This program is open source under the BSD-3 License.
 Redistribution and use in source and binary forms, with or without modification, are permitted
