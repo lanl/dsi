@@ -24,6 +24,11 @@ store = fs.store(dbpath)
 #Control verbosity of debug prints
 fs.isVerbose = 1
 
+#List the data in the database
+anames = store.get_artifact_list()
+for name in anames:
+    print( name[0] )
+
 data_type = fs.data_type()
 data_type.name = "simulation"
 
