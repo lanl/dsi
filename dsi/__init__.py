@@ -1,6 +1,16 @@
 name = "dsi"
 """
-The DSI module provides an abstraction layer to developers to interface with databases such as SQLite and GUFI, to easily create a custom database with customizable schemas/tables.
+© 2023. Triad National Security, LLC. All rights reserved.
+This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
+National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S.
+Department of Energy/National Nuclear Security Administration. All rights in the program are
+reserved by Triad National Security, LLC, and the U.S. Department of Energy/National Nuclear
+Security Administration. The Government is granted for itself and others acting on its behalf a
+nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare
+derivative works, distribute copies to the public, perform publicly and display publicly, and to permit
+others to do so.
+
+The **DSI** module provides an abstraction layer to developers to interface with databases such as SQLite and GUFI, to easily create a custom database with customizable schemas/tables.
 
 The Filesystem crawler captures file properties and attributes into an SQL database using the library above, and provides helper functions to easily parse the data ingested into the database.
 
@@ -15,17 +25,16 @@ The final portion of the driver gives a few examples on how to perform queries u
 
 # Requirements
 
-* python3
-* access a yellow HPC system, i.e. sn-fey
-* member of dsi_re group
+* python3 (3.8 Recommended)
 
 # How-to-run
 
 To run, simply execute:
 
-ssh user@sn-fey.lanl.gov
+git clone https://github.com/lanl/dsi.git
+cd dsi/
+cd examples/
+python3 dsi_wildfire.py
+python3 dsi_wildfire_query.py
 
-git clone https://re-git.lanl.gov/dsi/fssql.git
-
-python3 fs_test.py
 """
