@@ -22,15 +22,13 @@ The final portion of the driver gives a few examples on how to perform queries u
 
 To run, simply execute:
 
+```
 git clone https://github.com/lanl/dsi.git
-
 cd dsi/
-
 cd examples/
-
 python3 dsi_wildfire.py
-
 python3 dsi_wildfire_query.py
+```
 
 # Copyright and License
 
