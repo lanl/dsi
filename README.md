@@ -16,15 +16,17 @@ The final portion of the driver gives a few examples on how to perform queries u
 
 # Requirements
 
-* python3
+* python3 (3.8 recommended)
 
 # How-to-run
 
 To run, simply execute:
 
 git clone https://github.com/lanl/dsi.git
-
-python3 examples/dsi_wildfire.py
+cd dsi/
+cd examples/
+python3 dsi_wildfire.py
+python3 dsi_wildfire_query.py
 
 # Copyright and License
 
