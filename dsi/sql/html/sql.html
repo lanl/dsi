@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>sql API documentation</title>
-<meta name="description" content="dsi.sql is the abstraction layer that enables a sqlite backend database for metadata.
-Sets of generic helper functions are included throughout this …" />
+<meta name="description" content="© 2023. Triad National Security, LLC. All rights reserved.
+This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
+…" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -23,7 +24,16 @@ Sets of generic helper functions are included throughout this …" />
 <h1 class="title">Module <code>sql</code></h1>
 </header>
 <section id="section-intro">
-<p>dsi.sql is the abstraction layer that enables a sqlite backend database for metadata.
+<p>© 2023. Triad National Security, LLC. All rights reserved.
+This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
+National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S.
+Department of Energy/National Nuclear Security Administration. All rights in the program are
+reserved by Triad National Security, LLC, and the U.S. Department of Energy/National Nuclear
+Security Administration. The Government is granted for itself and others acting on its behalf a
+nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare
+derivative works, distribute copies to the public, perform publicly and display publicly, and to permit
+others to do so.</p>
+<p><strong>dsi.sql</strong> is the abstraction layer that enables a sqlite backend database for metadata.
 Sets of generic helper functions are included throughout this dsi module.</p>
 <p><code>isVerbose</code>: boolean if true enables printing of raw SQL queries alongside helpful logging outputs
 when helper functions are called</p>
@@ -33,7 +43,17 @@ when helper functions are called</p>
 </summary>
 <pre><code class="python">#!/user/bin/python
 &#34;&#34;&#34;
-dsi.sql is the abstraction layer that enables a sqlite backend database for metadata. 
+© 2023. Triad National Security, LLC. All rights reserved.
+This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
+National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S.
+Department of Energy/National Nuclear Security Administration. All rights in the program are
+reserved by Triad National Security, LLC, and the U.S. Department of Energy/National Nuclear
+Security Administration. The Government is granted for itself and others acting on its behalf a
+nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare
+derivative works, distribute copies to the public, perform publicly and display publicly, and to permit
+others to do so.
+
+**dsi.sql** is the abstraction layer that enables a sqlite backend database for metadata. 
 Sets of generic helper functions are included throughout this dsi module.
 
 `isVerbose`: boolean if true enables printing of raw SQL queries alongside helpful logging outputs
@@ -43,6 +63,7 @@ Sets of generic helper functions are included throughout this dsi module.
 import sys
 import os
 import sqlite3
+import csv
 
 isVerbose = 0
 
@@ -53,7 +74,7 @@ class SQLstore(object):
     and interface
     &#34;&#34;&#34;
 
-    filename = &#34;fs.db&#34;
+    filename = &#34;database.db&#34;
     types = None
     con = None
     cur = None
@@ -177,10 +198,16 @@ class SQLstore(object):
 
     # Returns results from query
     def get_artifacts(self,query):
+        &#34;&#34;&#34;
+        Sample function to query contents of the database.
+        &#34;&#34;&#34;
         print(&#34;test&#34;)
 
     # Closes connection to server
     def close(self):
+        &#34;&#34;&#34;
+        Function to manually close the connection to the sqlite server.
+        &#34;&#34;&#34;
         self.con.close()</code></pre>
 </details>
 </section>
@@ -215,7 +242,7 @@ and interface</p>
     and interface
     &#34;&#34;&#34;
 
-    filename = &#34;fs.db&#34;
+    filename = &#34;database.db&#34;
     types = None
     con = None
     cur = None
@@ -339,10 +366,16 @@ and interface</p>
 
     # Returns results from query
     def get_artifacts(self,query):
+        &#34;&#34;&#34;
+        Sample function to query contents of the database.
+        &#34;&#34;&#34;
         print(&#34;test&#34;)
 
     # Closes connection to server
     def close(self):
+        &#34;&#34;&#34;
+        Function to manually close the connection to the sqlite server.
+        &#34;&#34;&#34;
         self.con.close()</code></pre>
 </details>
 <h3>Class variables</h3>
@@ -370,12 +403,15 @@ and interface</p>
 <span>def <span class="ident">close</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Function to manually close the connection to the sqlite server.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def close(self):
+    &#34;&#34;&#34;
+    Function to manually close the connection to the sqlite server.
+    &#34;&#34;&#34;
     self.con.close()</code></pre>
 </details>
 </dd>
@@ -383,12 +419,15 @@ and interface</p>
 <span>def <span class="ident">get_artifacts</span></span>(<span>self, query)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Sample function to query contents of the database.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_artifacts(self,query):
+    &#34;&#34;&#34;
+    Sample function to query contents of the database.
+    &#34;&#34;&#34;
     print(&#34;test&#34;)</code></pre>
 </details>
 </dd>

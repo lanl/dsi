@@ -16,7 +16,7 @@ The final portion of the driver gives a few examples on how to perform queries u
 
 # Requirements
 
-* python3
+* python3 (3.8 recommended)
 
 # How-to-run
 
@@ -24,17 +24,22 @@ To run, simply execute:
 
 ```
 git clone https://github.com/lanl/dsi.git
-cd dsi
-python3 examples/dsi_wildfire.py
+cd dsi/
+cd examples/
+python3 dsi_wildfire.py
+python3 dsi_wildfire_query.py
 ```
 
--------------------------------------------
-# License
+# Copyright and License
 
 This program is open source under the BSD-3 License.
+
+© 2023. Triad National Security, LLC. All rights reserved.
+
 Redistribution and use in source and binary forms, with or without modification, are permitted
 provided that the following conditions are met:
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and
+
+1.Redistributions of source code must retain the above copyright notice, this list of conditions and
 the following disclaimer.
  
 2.Redistributions in binary form must reproduce the above copyright notice, this list of conditions

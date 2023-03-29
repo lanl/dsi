@@ -1,7 +1,11 @@
 #from asyncio.windows_events import NULL
 import os
 import urllib.request
+import sys
 
+# Temporary until DSI becomes a module
+# Path to root dsi folder
+sys.path.insert(1, '../')
 
 from dsi.utils import utils
 from dsi.sql.fs import fs
@@ -19,6 +23,11 @@ store = fs.store(dbpath)
 
 #Control verbosity of debug prints
 fs.isVerbose = 1
+
+#List the data in the database
+anames = store.get_artifact_list()
+for name in anames:
+    print( name[0] )
 
 data_type = fs.data_type()
 data_type.name = "simulation"

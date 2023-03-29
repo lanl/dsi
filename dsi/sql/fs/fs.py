@@ -1,5 +1,15 @@
 """
-dsi.sql.fs is the filesystem abstraction layer, derived from the sql class that enables 
+© 2023. Triad National Security, LLC. All rights reserved.
+This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
+National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S.
+Department of Energy/National Nuclear Security Administration. All rights in the program are
+reserved by Triad National Security, LLC, and the U.S. Department of Energy/National Nuclear
+Security Administration. The Government is granted for itself and others acting on its behalf a
+nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare
+derivative works, distribute copies to the public, perform publicly and display publicly, and to permit
+others to do so.
+
+**dsi.sql.fs** is the filesystem abstraction layer, derived from the sql class that enables 
 filesystem related metadata gathering into a sqlite backend database. Specialized
 helper functions are included relating to filesystem specific metadata
 
@@ -169,7 +179,27 @@ class store:
             if isVerbose:        
                 print("Read " + str(line_count) + " rows.")
 
-    # Returns results from query
+    # Returns text list from query
+    def get_artifact_list(self):
+        """
+        Function that returns a list of all of the artifact names (represented as sql tables)
+
+        `return`: list of artifact names
+        """
+        str_query = "SELECT name FROM sqlite_master WHERE type='table';"
+        if isVerbose:
+            print(str_query)
+
+        self.cur = self.con.cursor()
+        self.res = self.cur.execute(str_query)
+        resout = self.res.fetchall()
+
+        if isVerbose:
+            print(resout)
+
+        return resout
+
+    # Returns reference from query
     def get_artifacts(self,query):
         print("test")
 
