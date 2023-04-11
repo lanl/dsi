@@ -30,6 +30,13 @@ python3 dsi_wildfire.py
 python3 dsi_wildfire_query.py
 ```
 
+# How to install in an active Python virtual environment
+If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command:
+```
+cd dsi # The directory where setup.py is located.
+python -m pip install .
+```
+
 # Copyright and License
 
 This program is open source under the BSD-3 License.
