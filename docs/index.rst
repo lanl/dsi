@@ -10,8 +10,8 @@ Welcome to DSI's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   usage/installation
-   usage/quickstart
+   installation
+   quickstart
 
 Indices and tables
 ==================
