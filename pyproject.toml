@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[dsi]
+name="dsi"
+license="BSD-3"
+version="0.0.0"
+description="A Data Science Infrastructure Metadatabase"
+author='Terry Turton'
+author_email='tlturton@lanl.gov'
+classifiers=[
+    "Programming Language :: Python"
+]
+
