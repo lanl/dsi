@@ -47,3 +47,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Misc
+.vscode
+docs/_build
