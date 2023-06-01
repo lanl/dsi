@@ -7,14 +7,18 @@ BUILDDIR      = _build
 
 all: html
 
-#
+# Build HTML
+html:
+	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
 # This creates a git repository and commits generated html docs.
 # It them pushes the new branch into THIS repository as gh-pages.
 #
 # github for some reason runs jekyll automatically on gh-pages
 # files, but we don't want that.  'touch .nojekyll' takes care
 # of it.
-#
 gh-pages: _build/html
 	root="$$(git rev-parse --show-toplevel)" && \
 	cd _build/html && \
@@ -26,9 +30,11 @@ gh-pages: _build/html
 	git push -f $$root master:gh-pages && \
 	rm -rf .git
 
+# Push to external docs site
 publish:
 	git push -f origin gh-pages
 
+# Print usage
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  html       to make standalone HTML files"
@@ -36,9 +42,4 @@ help:
 	@echo "  publish    upload documentation to github"
 
 clean:
-	-rm -rf $(BUILDDIR)/*
-
-html:
-	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
-	@echo
-	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+	-rm -rf $(BUILDDIR)/* 
