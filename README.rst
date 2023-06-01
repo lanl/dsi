@@ -1,4 +1,6 @@
-# DSI / DSIpy
+=============
+DSI / DSIpy
+=============
 
 DSIpy is part of LANL's Data Science Infrastructure project providing several purposes:
 
@@ -14,30 +16,37 @@ Once fs information is captured, an instance of the DSI class is created and exa
 
 The final portion of the driver gives a few examples on how to perform queries using the abstraction layer. Users can use a sqlite command passthrough for raw queries, or helper functions that relate to filesystem properties and sample operators.
 
-# Requirements
-
+=============
+Requirements
+=============
 * python3 (3.8 recommended)
 
-# How-to-run
+=============
+How-to-run
+=============
 
-To run, simply execute:
+To run, simply execute: ::
 
-```
-git clone https://github.com/lanl/dsi.git
-cd dsi/
-cd examples/
-python3 dsi_wildfire.py
-python3 dsi_wildfire_query.py
-```
+	git clone https://github.com/lanl/dsi.git
+	cd dsi/
+	cd examples/
+	python3 dsi_wildfire.py
+	python3 dsi_wildfire_query.py
 
-# How to install in an active Python virtual environment
-If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command:
-```
-cd dsi # The directory where setup.py is located.
-python -m pip install .
-```
 
-# Copyright and License
+=============
+How to install in an active Python virtual environment
+=============
+
+If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command: ::
+
+  cd dsi # The directory where setup.py is located.
+  python -m pip install .
+
+
+=============
+Copyright and License
+=============
 
 This program is open source under the BSD-3 License.
 
