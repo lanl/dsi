@@ -8,7 +8,9 @@ The DSI module provides an abstraction layer to developers to interface with SQL
 
 The Filesystem crawler captures file properties and attributes into an SQL database using the library above, and provides helper functions to easily parse the data ingested into the database.
 
-# Demo
+=============
+Demo
+=============
 
 The driver for this project with examples on how to use the DSI library can be found in dsi_wildfire and fs_test.py. This driver script first file-crawls a root directory of an example dataset and captures filesystem information using the os.stat command. The os.stat python command captures filesystem properties such as file-permissions, file creation and modification dates, and file sizes.
 
