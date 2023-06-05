@@ -13,9 +13,10 @@ How to build documentation
 ====================================================
 † How to create and activate a virtual environment
 ====================================================
-Any virtual environment manager should work. `Miniconda https://docs.conda.io/en/latest/miniconda.html`_ is an effective option. To create and activate a Miniconda virtual environment:  
-1. Download and install the appropriate Miniconda installer for your platform.  
-2. If this is the first time creating a DSI virtual environment: ``conda env conda env create -n dsi --python=3.11``. The ``-n`` name argument can be anything you like.  
-3. Once the virtual environment is created, activate it with ``conda activate dsi``  
-4. Proceed with Step 2 in the "How to build documentation" section.  
-5. When you've completed work, deativate the conda environment with ``conda deactivate``.  
+Any virtual environment manager should work. Miniconda `https://docs.conda.io/en/latest/miniconda.html` is an effective option. To create and activate a Miniconda virtual environment:
+
+1. Download and install the appropriate Miniconda installer for your platform.
+2. If this is the first time creating a DSI virtual environment: ``conda env conda env create -n dsi --python=3.11``. The ``-n`` name argument can be anything you like.
+3. Once the virtual environment is created, activate it with ``conda activate dsi``
+4. Proceed with Step 2 in the "How to build documentation" section.
+5. When you've completed work, deativate the conda environment with ``conda deactivate``.
