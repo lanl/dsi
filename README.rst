@@ -21,7 +21,7 @@ The final portion of the driver gives a few examples on how to perform queries u
 =============
 Requirements
 =============
-* python3 (3.8 recommended)
+* python3 (3.11 recommended)
 
 =============
 How-to-run
