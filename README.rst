@@ -42,8 +42,7 @@ How to install in an active Python virtual environment
 
 If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command: ::
 
-  cd dsi # The directory where setup.py is located.
-  python -m pip install .
+  python -m pip install .  # In directory where pyproject.toml is located
 
 
 =============
