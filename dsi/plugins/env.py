@@ -28,7 +28,7 @@ class EnvPluginDriver(PluginDriver):
         # Plugin output collector
         self.output_collector = OrderedDict()
         
-class HostnamePluginDriver(EnvPluginDriver):
+class HostnamePlugin(EnvPluginDriver):
     """An example Plugin implementation.
 
     This plugin collects the hostname of the machine,
@@ -36,7 +36,7 @@ class HostnamePluginDriver(EnvPluginDriver):
     the Unix time of the collected information.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Load valid environment plugin file.
 
         Environment plugin files assume a POSIX-compliant
@@ -45,11 +45,12 @@ class HostnamePluginDriver(EnvPluginDriver):
         super().__init__()
 
     def add_row(self) -> None:
-        row = list(self.posix_info.values) + [socket.gethostname()])
+        row = list(self.posix_info.values()) + [socket.gethostname()]
         for key,row_elem in zip(self.output_collector, row):
-            self.output_collector[key] = row_elem 
+            self.output_collector[key].append(row_elem) 
 
     def parse(self) -> None:
+        for key in self.posix_info:
+            self.output_collector[key] = []
         self.output_collector['hostname'] = []
-        self.regular_schema_header.append('hostname')
         self.add_row()

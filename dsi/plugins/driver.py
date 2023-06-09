@@ -5,9 +5,8 @@ from abc import ABC, abstractmethod
 class PluginDriver(ABC):
     """Plugin driver for DSI core product.
 
-    A driver object must implement an __init__ method that
-    prepares a user-defined plugin to convert arbitrary input
-    to Python built-in data structures.
+    A Plugin connects a data producer to a compatible middleware
+    data structure.
     """
 
     @abstractmethod
