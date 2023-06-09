@@ -3,25 +3,30 @@
 A home for environment plugin parsers.
 """
 
+from collections import OrderedDict
 import os
+import socket
 
 from dsi.plugins.driver import PluginDriver
 
 class EnvPluginDriver(PluginDriver):
 
-    def __init__(self, path):
+    def __init__(self, path=None) -> None:
         """Load valid environment plugin file.
 
         Environment plugin files assume a POSIX-compliant
         filesystem and always collect UID/GID information.
         """
         # Get POSIX info
-        self.posix_info = {}
+        self.posix_info = OrderedDict()
         self.posix_info['uid'] = os.getuid()
         self.posix_info['effective_gid'] = os.getgid()
+        egid = self.posix_info['effective_gid']
         self.posix_info['moniker'] = os.getlogin()
-        self.posix_info['gid_list'] = os.getgrouplist(os.getlogin(),
-                                                      os.getgid())
+        moniker = self.posix_info['moniker']
+        self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
+        # Plugin output collector
+        self.output_collector = OrderedDict()
         
 class HostnamePluginDriver(EnvPluginDriver):
     """An example Plugin implementation.
@@ -31,9 +36,20 @@ class HostnamePluginDriver(EnvPluginDriver):
     the Unix time of the collected information.
     """
 
-    def __init__(self, path):
+    def __init__(self):
         """Load valid environment plugin file.
 
         Environment plugin files assume a POSIX-compliant
         filesystem and always collect UID/GID information.
         """
+        super().__init__()
+
+    def add_row(self) -> None:
+        row = list(self.posix_info.values) + [socket.gethostname()])
+        for key,row_elem in zip(self.output_collector, row):
+            self.output_collector[key] = row_elem 
+
+    def parse(self) -> None:
+        self.output_collector['hostname'] = []
+        self.regular_schema_header.append('hostname')
+        self.add_row()
