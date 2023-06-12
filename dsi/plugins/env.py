@@ -7,9 +7,9 @@ from collections import OrderedDict
 import os
 import socket
 
-from dsi.plugins.driver import PluginDriver
+from dsi.plugins.structured_metadata import Plugin
 
-class EnvPluginDriver(PluginDriver):
+class EnvPlugin(Plugin):
 
     def __init__(self, path=None) -> None:
         """Load valid environment plugin file.
@@ -28,7 +28,7 @@ class EnvPluginDriver(PluginDriver):
         # Plugin output collector
         self.output_collector = OrderedDict()
         
-class HostnamePlugin(EnvPluginDriver):
+class HostnamePlugin(EnvPlugin):
     """An example Plugin implementation.
 
     This plugin collects the hostname of the machine,
