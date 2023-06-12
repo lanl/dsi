@@ -12,6 +12,9 @@ Welcome to DSI's documentation!
 
    installation
    quickstart
+   util
+   fs
+
 
 Indices and tables
 ==================

@@ -1,4 +1,6 @@
-# DSI / DSIpy
+=============
+DSI / DSIpy
+=============
 
 DSIpy is part of LANL's Data Science Infrastructure project providing several purposes:
 
@@ -6,7 +8,9 @@ The DSI module provides an abstraction layer to developers to interface with SQL
 
 The Filesystem crawler captures file properties and attributes into an SQL database using the library above, and provides helper functions to easily parse the data ingested into the database.
 
-# Demo
+=============
+Demo
+=============
 
 The driver for this project with examples on how to use the DSI library can be found in dsi_wildfire and fs_test.py. This driver script first file-crawls a root directory of an example dataset and captures filesystem information using the os.stat command. The os.stat python command captures filesystem properties such as file-permissions, file creation and modification dates, and file sizes.
 
@@ -14,30 +18,36 @@ Once fs information is captured, an instance of the DSI class is created and exa
 
 The final portion of the driver gives a few examples on how to perform queries using the abstraction layer. Users can use a sqlite command passthrough for raw queries, or helper functions that relate to filesystem properties and sample operators.
 
-# Requirements
+=============
+Requirements
+=============
+* python3 (3.11 recommended)
 
-* python3 (3.8 recommended)
+=============
+How-to-run
+=============
 
-# How-to-run
+To run, simply execute: ::
 
-To run, simply execute:
+	git clone https://github.com/lanl/dsi.git
+	cd dsi/
+	cd examples/
+	python3 dsi_wildfire.py
+	python3 dsi_wildfire_query.py
 
-```
-git clone https://github.com/lanl/dsi.git
-cd dsi/
-cd examples/
-python3 dsi_wildfire.py
-python3 dsi_wildfire_query.py
-```
 
-# How to install in an active Python virtual environment
-If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command:
-```
-cd dsi # The directory where setup.py is located.
-python -m pip install .
-```
+=============
+How to install in an active Python virtual environment
+=============
 
-# Copyright and License
+If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command: ::
+
+  python -m pip install .  # In directory where pyproject.toml is located
+
+
+=============
+Copyright and License
+=============
 
 This program is open source under the BSD-3 License.
 

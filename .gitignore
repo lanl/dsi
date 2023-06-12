@@ -51,3 +51,4 @@ cover/
 # Misc
 .vscode
 docs/_build
+dsi.egg-info/
