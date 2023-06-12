@@ -2,7 +2,6 @@ import os
 import sqlite3
 import csv
 from dsi.drivers.filesystem_driver import FsStore
-from dsi.utils import utils
 
 # Holds table name and data properties 
 class DataType:
@@ -33,6 +32,22 @@ class SqlStore(FsStore):
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
+
+    def check_type(self, text):
+      """
+      Tests input text and returns a predicted compatible SQL Type
+      `text`: text string
+      `return`: string description of a SQL data type
+      """
+      try:
+        value = int(text)
+        return " INT"
+      except ValueError:
+          try:
+              value = float(text)
+              return " FLOAT"
+          except ValueError:
+              return " VARCHAR"
 
     # Adds columns to table and their types
     def put_artifact_type(self,types, isVerbose=False):
@@ -112,7 +127,7 @@ class SqlStore(FsStore):
                 if line_count == 0:
                     str_query = "CREATE TABLE IF NOT EXISTS " + str(tname) + " ( "
                     for columnd,columnh in zip(row,header):
-                        DataType = utils.check_type(columnd)
+                        DataType = self.check_type(columnd)
                         str_query = str_query + str(columnh) + str(DataType) + ","
 
                     str_query = str_query.rstrip(',')
