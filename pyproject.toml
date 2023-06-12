@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name="dsi"
+license={text = "BSD-3-Clause"}
+version="0.0.0"
+description="A Data Science Infrastructure Metadatabase"
+authors=[
+	{name = 'James Ahrens', email = 'ahrens@lanl.gov'},
+	{name = 'Divya Banesh', email = 'dbanesh@lanl.gov'},
+	{name = 'Hugh Greenberg', email = 'hng@lanl.gov'},
+	{name = 'Jesus Pulido', email = 'pulido@lanl.gov'},
+	{name = 'Ben Sims', email = 'bsims@lanl.gov'},
+	{name = 'Christine Sweeney', email = 'cahrens@lanl.gov'},
+	{name = 'Terry Turton', email = 'tlturton@lanl.gov'},
+	{name = 'Quincy Wofford', email = 'qwofford@lanl.gov'},
+]
+classifiers=[
+    "Programming Language :: Python"
+]
+

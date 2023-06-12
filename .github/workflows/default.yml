@@ -1,0 +1,19 @@
+name: Public CI
+
+on:
+  push:
+    branches:
+    - gh-pages
+
+
+jobs:
+  build:
+    runs-on: debian-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Sphinx Build
+      uses: ammaraskar/sphinx-action@0.4
+      with:
+        docs-folder: "docs/"
+
