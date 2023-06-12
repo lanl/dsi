@@ -7,7 +7,7 @@ from collections import OrderedDict
 import os
 import socket
 
-from dsi.plugins.structured_metadata import Plugin
+from dsi.plugins.structured_metadata_plugin import Plugin
 
 class EnvPlugin(Plugin):
 
