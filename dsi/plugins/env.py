@@ -83,20 +83,20 @@ class EnvProvPlugin(EnvPluginDriver):
         Parses environment provenance data and stores the
         key-value pairs in self.output_collector
         """
-        k_ver = self.get_kernel_version()
-        self.output_collector["kernel version"] = k_ver
+        self.update_output(self.get_kernel_version())
         
-        k_ct_conf = self.get_kernel_ct_config()
-        self.output_collector.update(k_ct_conf)
+        self.update_output(self.get_kernel_ct_config())
 
-        k_bt_conf = self.get_kernel_bt_config()
-        self.output_collector.update(k_bt_conf)
+        self.update_output(self.get_kernel_ct_config())
 
-        #k_rt_conf = self.get_kernel_rt_config()
-        #TODO: modules
-        #TODO: containers
+        self.update_output(self.get_kernel_rt_config())
+
+        self.update_output(self.get_kernel_mod_config())
+
+        self.update_output(self.get_container_config())
+
         for key in self.output_collector:
-            print(key, ": ", self.output_collector[key])
+            print(key, ":", self.output_collector[key])
         print(len(self.output_collector))
 
 
@@ -105,11 +105,11 @@ class EnvProvPlugin(EnvPluginDriver):
         pass
 
 
-    def get_kernel_version(self) -> str:
+    def get_kernel_version(self) -> dict:
         """
-        Kernel version is obtained by the "uname -r" command as a str
+        Kernel version is obtained by the "uname -r" command, returns it in a dict
         """
-        return self.get_cmd_output(["uname -r"])
+        return {"kernel version": self.get_cmd_output(["uname -r"])}
 
 
     def get_kernel_ct_config(self) -> dict:
@@ -156,7 +156,7 @@ class EnvProvPlugin(EnvPluginDriver):
             sysctl: permission denied ...
         The option = value pairs are added to the output dict.
         """
-        command = ["sysctl -a"]
+        command = ["sysctl -a 2>&1"]
         res = self.get_cmd_output(command)
         lines = res.split("\n")
         rt_config = {}
@@ -166,6 +166,23 @@ class EnvProvPlugin(EnvPluginDriver):
                 rt_config[option] = value
             # What to do when sysctl: permission denied?
         return rt_config
+
+    
+    def get_kernel_mod_config(self) -> dict:
+        #TODO: Implement
+        return {}
+
+
+    def get_container_config(self) -> dict:
+        #TODO: Implement
+        return {}
+
+
+    def update_output(self, pairs: dict) -> None:
+        """
+        Merges a given dict with the output collector
+        """
+        self.output_collector.update(pairs)
 
 
     @staticmethod
