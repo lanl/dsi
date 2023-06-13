@@ -58,7 +58,7 @@ class HostnamePlugin(EnvPlugin):
 
 
 
-class EnvProvPlugin(EnvPluginDriver):
+class EnvProvPlugin(EnvPlugin):
     """
     Plugin for reading environment provenance data:
     1. System Kernel Version
