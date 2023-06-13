@@ -18,7 +18,7 @@ class Plugin(ABC):
 
     @abstractmethod
     def pack_header(self):
-        """Convert input to Python built-in data structure.
+        """Establish column names for structured metadata Plugin.
 
         Initial Plugin design supports file post-processing and
         regular schema data only.
@@ -26,7 +26,7 @@ class Plugin(ABC):
 
     @abstractmethod
     def add_row(self, collection):
-        """Add to the plugin's collection.
+        """Add a sample to the plugin's row collection.
 
         Initial Plugin design supports adding rows to an existing
         object, and throws an error if columns don't match previous.
