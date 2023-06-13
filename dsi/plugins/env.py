@@ -27,6 +27,10 @@ class EnvPlugin(Plugin):
         self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
         # Plugin output collector
         self.output_collector = OrderedDict()
+        # class bool to track whether header has been written.
+        self.header_exist = False
+        # Once we start writing structured data, the column count is fixed
+        self.column_cnt = None
         
 class HostnamePlugin(EnvPlugin):
     """An example Plugin implementation.
@@ -44,13 +48,16 @@ class HostnamePlugin(EnvPlugin):
         """
         super().__init__()
 
-    def add_row(self) -> None:
-        row = list(self.posix_info.values()) + [socket.gethostname()]
-        for key,row_elem in zip(self.output_collector, row):
-            self.output_collector[key].append(row_elem) 
-
-    def parse(self) -> None:
+    def pack_header(self) -> None:
         for key in self.posix_info:
             self.output_collector[key] = []
         self.output_collector['hostname'] = []
-        self.add_row()
+        self.column_cnt = len(self.output_collector.keys())
+
+    def add_row(self) -> None:
+        if not self.header_exist:
+            self.pack_header()
+            self.header_exist = True
+        row = list(self.posix_info.values()) + [socket.gethostname()]
+        for key,row_elem in zip(self.output_collector, row):
+            self.output_collector[key].append(row_elem) 

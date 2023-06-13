@@ -17,7 +17,7 @@ class Plugin(ABC):
         """
 
     @abstractmethod
-    def parse(self):
+    def pack_header(self):
         """Convert input to Python built-in data structure.
 
         Initial Plugin design supports file post-processing and
