@@ -28,7 +28,6 @@ class Plugin(ABC):
     def add_row(self, collection):
         """Add a sample to the plugin's row collection.
 
-        Initial Plugin design supports adding rows to an existing
-        object, and well fail tests if column count differ from 
-        previous.
+        A call to add_row should fail tests if column count differs
+        from previous.
         """
