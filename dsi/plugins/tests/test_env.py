@@ -2,7 +2,7 @@ import collections
 
 from dsi.plugins.env import HostnamePlugin, EnvProvPlugin
 
-def test_hostnameplugin_type():
+def test_hostname_plugin_type():
     a = HostnamePlugin()
     a.parse()
     a.add_row()

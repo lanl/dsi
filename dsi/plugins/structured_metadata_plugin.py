@@ -2,8 +2,8 @@
 
 from abc import ABC, abstractmethod
 
-class PluginDriver(ABC):
-    """Plugin driver for DSI core product.
+class Plugin(ABC):
+    """Plugin abstract class for DSI core product.
 
     A Plugin connects a data producer to a compatible middleware
     data structure.

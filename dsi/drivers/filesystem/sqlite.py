@@ -1,63 +1,25 @@
-"""
-© 2023. Triad National Security, LLC. All rights reserved.
-This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
-National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S.
-Department of Energy/National Nuclear Security Administration. All rights in the program are
-reserved by Triad National Security, LLC, and the U.S. Department of Energy/National Nuclear
-Security Administration. The Government is granted for itself and others acting on its behalf a
-nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare
-derivative works, distribute copies to the public, perform publicly and display publicly, and to permit
-others to do so.
-
-**dsi.sql.fs** is the filesystem abstraction layer, derived from the sql class that enables 
-filesystem related metadata gathering into a sqlite backend database. Specialized
-helper functions are included relating to filesystem specific metadata
-
-  `isVerbose`: boolean if true enables printing of raw SQL queries alongside helpful logging outputs
-                when helper functions are called
-
-"""
 import os
 import sqlite3
 import csv
-
-from dsi.utils import utils
-
-isVerbose = 0
-#class fs:
-#    name = ""
-#    properties = {}
-#    def greet(self):
-#        print('Hello')
-
-# Declare named types for sql
-DOUBLE = "DOUBLE"
-STRING = "VARCHAR"
-FLOAT = "FLOAT"
-INT = "INT"
-
-# Declare comparison types for sql
-GT = ">"
-LT = "<"
-EQ = "="
+from dsi.drivers.filesystem_driver import FsStore
 
 # Holds table name and data properties 
-class data_type:
+class DataType:
     name = "DEFAULT"
     properties = {}
     units = {}
 
 # Holds the main data
-class artifact:
+class Artifact:
     """
-        Primary artifact class that holds database schema in memory. 
-        An artifact is a generic construct that defines the schema for metadata that
+        Primary Artifact class that holds database schema in memory. 
+        An Artifact is a generic construct that defines the schema for metadata that
         defines the tables inside of SQL
     """
     properties = {}
 
 # Main storage class, interfaces with SQL
-class store:
+class SqlStore(FsStore):
     """
         Primary storage class, inherits sql class
     """
@@ -71,12 +33,28 @@ class store:
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
 
-    # Adds columns to table and their types
-    def put_artifact_type(self,types):
-        """
-        Primary class for defining metadata artifact schema.
+    def check_type(self, text):
+      """
+      Tests input text and returns a predicted compatible SQL Type
+      `text`: text string
+      `return`: string description of a SQL data type
+      """
+      try:
+        value = int(text)
+        return " INT"
+      except ValueError:
+          try:
+              value = float(text)
+              return " FLOAT"
+          except ValueError:
+              return " VARCHAR"
 
-        `types`: data_type derived class that defines the string name, properties (named SQL type), and units for each column in the schema
+    # Adds columns to table and their types
+    def put_artifact_type(self,types, isVerbose=False):
+        """
+        Primary class for defining metadata Artifact schema.
+
+        `types`: DataType derived class that defines the string name, properties (named SQL type), and units for each column in the schema
 
         `return`: none
         """
@@ -97,11 +75,11 @@ class store:
         self.types = types
 
     # Adds rows to the columns defined previously
-    def put_artifacts(self,artifacts):
+    def put_artifacts(self,artifacts, isVerbose=False):
         """
-        Primary class for insertion of artifact metadata into a defined schema
+        Primary class for insertion of Artifact metadata into a defined schema
 
-        `artifacts`: data_type derived class that has a regular structure of a defined schema, filled with rows to insert.
+        `Artifacts`: DataType derived class that has a regular structure of a defined schema, filled with rows to insert.
 
         `return`: none
         """
@@ -124,9 +102,9 @@ class store:
         self.con.commit()
 
     # Adds columns and rows automaticallly based on a csv file
-    def put_artifacts_csv(self, fname, tname):
+    def put_artifacts_csv(self, fname, tname, isVerbose=False):
         """
-        Function for insertion of artifact metadata into a defined schema by using a CSV file, where the first row of the CSV
+        Function for insertion of Artifact metadata into a defined schema by using a CSV file, where the first row of the CSV
         contains the column names of the schema. Any rows thereafter contain data to be inserted. Data types are automatically
         assigned based on typecasting and default to a string type if none can be found.
 
@@ -139,6 +117,7 @@ class store:
         if isVerbose:
             print("Opening " + fname)
 
+        print('Entering csv method')
         with open(fname) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             header = next(csv_reader)
@@ -148,8 +127,8 @@ class store:
                 if line_count == 0:
                     str_query = "CREATE TABLE IF NOT EXISTS " + str(tname) + " ( "
                     for columnd,columnh in zip(row,header):
-                        data_type = utils.check_type(columnd)
-                        str_query = str_query + str(columnh) + str(data_type) + ","
+                        DataType = self.check_type(columnd)
+                        str_query = str_query + str(columnh) + str(DataType) + ","
 
                     str_query = str_query.rstrip(',')
                     str_query = str_query + " )"
@@ -180,11 +159,11 @@ class store:
                 print("Read " + str(line_count) + " rows.")
 
     # Returns text list from query
-    def get_artifact_list(self):
+    def get_artifact_list(self, isVerbose=False):
         """
-        Function that returns a list of all of the artifact names (represented as sql tables)
+        Function that returns a list of all of the Artifact names (represented as sql tables)
 
-        `return`: list of artifact names
+        `return`: list of Artifact names
         """
         str_query = "SELECT name FROM sqlite_master WHERE type='table';"
         if isVerbose:
@@ -201,7 +180,7 @@ class store:
 
     # Returns reference from query
     def get_artifacts(self,query):
-        print("test")
+        self.get_artifacts_list()
 
     # Closes connection to server
     def close(self):
@@ -209,7 +188,7 @@ class store:
 
     # ------- Query related functions -----
     # Raw sql query
-    def sqlquery(self,query):
+    def sqlquery(self,query, isVerbose=False):
         """
         Function that provides a direct sql query passthrough to the database.
 
@@ -230,7 +209,7 @@ class store:
         return resout
 
     # Given an output of a sql query, reformat and write a csv of the subset data
-    def export_csv(self,query,fname):
+    def export_csv(self,query,fname, isVerbose=False):
         """
         Function that outputs a csv file of a return query, given an initial query.
 
@@ -261,7 +240,7 @@ class store:
         return 1
 
     # Query file name
-    def query_fname(self, name ):
+    def query_fname(self, name, isVerbose=False):
         """
         Function that queries filenames within the filesystem metadata store
 
@@ -285,7 +264,7 @@ class store:
 
 
     # Query file size
-    def query_fsize(self, operator, size ):
+    def query_fsize(self, operator, size, isVerbose=False):
         """
         Function that queries ranges of file sizes within the filesystem metadata store
 
@@ -309,7 +288,7 @@ class store:
         return resout
 
     # Query file creation time
-    def query_fctime(self, operator, ctime ):
+    def query_fctime(self, operator, ctime, isVerbose=False):
         """
         Function that queries file creation times within the filesystem metadata store
 
@@ -332,4 +311,4 @@ class store:
 
         return resout
 
-        
+
