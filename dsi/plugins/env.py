@@ -1,22 +1,25 @@
-"""Environment Plugin drivers.
+"""
+Environment Plugin drivers.
+###########################
 
-A home for environment plugin parsers.
+Environment Plugins are currently a sub-class of structured
+metadata Plugins.
 """
 
 from collections import OrderedDict
 import os
 import socket
 
-from dsi.plugins.structured_metadata_plugin import Plugin
+from dsi.plugins.structured_metadata import Plugin
 
 class EnvPlugin(Plugin):
+    """Environment Plugins inspect the calling process' context.
+    
+    Environment plugin files assume a POSIX-compliant
+    filesystem and always collect UID/GID information.
+    """
 
     def __init__(self, path=None):
-        """Load valid environment plugin file.
-
-        Environment plugin files assume a POSIX-compliant
-        filesystem and always collect UID/GID information.
-        """
         # Get POSIX info
         self.posix_info = OrderedDict()
         self.posix_info['uid'] = os.getuid()
@@ -31,7 +34,14 @@ class EnvPlugin(Plugin):
         self.header_exist = False
         # Once we start writing structured data, the column count is fixed
         self.column_cnt = None
-        
+
+"""
+Hostname Plugin driver.
+#######################
+
+The Hostname Plugin is an implementation of an EnvPlugin, and exists
+as a simple example implementation of Plugins generally.
+""" 
 class HostnamePlugin(EnvPlugin):
     """An example Plugin implementation.
 

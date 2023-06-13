@@ -1,7 +1,7 @@
 Plugins
 ===================
 
-.. automodule:: dsi.plugins.structured_metadata_plugin
+.. automodule:: dsi.plugins.structured_metadata
    :members:
 
 .. automodule:: dsi.plugins.env
