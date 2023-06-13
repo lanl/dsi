@@ -1,6 +1,9 @@
-FS
+Drivers
 ========================
 
-.. automodule:: dsi.sql.fs.fs
+.. automodule:: dsi.drivers.filesystem_driver
+   :members:
+
+.. automodule:: dsi.drivers.filesystem.sqlite
    :members:
 
