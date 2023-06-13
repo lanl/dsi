@@ -3,7 +3,7 @@
 A home for environment plugin parsers.
 """
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import os
 import socket
 import subprocess
@@ -76,9 +76,14 @@ class EnvProvPlugin(EnvPluginDriver):
         filesystem and always collect UID/GID information.
         """
         super().__init__()
+        self.output = defaultdict(list) 
 
 
     def parse(self) -> None:
+        pass
+
+
+    def add_row(self) -> None:
         """
         Parses environment provenance data and stores the
         key-value pairs in self.output_collector
@@ -87,7 +92,7 @@ class EnvProvPlugin(EnvPluginDriver):
         
         self.update_output(self.get_kernel_ct_config())
 
-        self.update_output(self.get_kernel_ct_config())
+        self.update_output(self.get_kernel_bt_config())
 
         self.update_output(self.get_kernel_rt_config())
 
@@ -95,15 +100,7 @@ class EnvProvPlugin(EnvPluginDriver):
 
         self.update_output(self.get_container_config())
 
-        for key in self.output_collector:
-            print(key, ":", self.output_collector[key])
-        print(len(self.output_collector))
-
-
-    def add_row(self) -> None:
-        #TODO: What would add_row do in this context?
-        pass
-
+        self.output_collector.update(self.output)
 
     def get_kernel_version(self) -> dict:
         """
@@ -131,21 +128,12 @@ class EnvProvPlugin(EnvPluginDriver):
     def get_kernel_bt_config(self) -> dict:
         """
         Kernel boot-time configuration is collected by looking at
-        /proc/cmdline. The output of this is space-delimited option=value pairs
-        and potentially standalone options, namely "ro".
-        Standalone options are given the value True in the output dict.
+        /proc/cmdline. The output of this command is one string of 
+        boot-time parameters. This string is returned in a dict.
         """
         command = ["cat /proc/cmdline"]
         res = self.get_cmd_output(command)
-        lines = res.split(" ")
-        bt_config = {}
-        for line in lines: # each line is either "option=value" or "option"
-            if "=" in line:
-                option, value = line.split("=", maxsplit=1)
-                bt_config[option] = value
-            else:
-                bt_config[line] = True # standalone option
-        return bt_config
+        return {"cat /proc/cmdline": res}
 
 
     def get_kernel_rt_config(self) -> dict:
@@ -164,13 +152,24 @@ class EnvProvPlugin(EnvPluginDriver):
             if "=" in line: # if the line is not permission denied
                 option, value = line.split(" = ", maxsplit=1) # note the spaces
                 rt_config[option] = value
-            # What to do when sysctl: permission denied?
+            # If the line is permission denied, ignore it :(
         return rt_config
 
     
     def get_kernel_mod_config(self) -> dict:
-        #TODO: Implement
-        return {}
+        """
+        Kernel module configuration is collected with the "lsmod" and "modinfo" commands.
+        Each module and modinfo are stored as a key-value pair in the returned dict.
+        """
+        command = ["lsmod | tail -n +2 | awk '{print $1}'"]
+        modules = self.get_cmd_output(command)
+        mod_list = modules.split("\n")
+        mod_configs = {}
+        for module in mod_list:
+            modinfo_cmd = f"modinfo {module}"
+            modinfo = self.get_cmd_output([modinfo_cmd])
+            mod_configs[modinfo_cmd] = modinfo
+        return mod_configs
 
 
     def get_container_config(self) -> dict:
@@ -180,9 +179,10 @@ class EnvProvPlugin(EnvPluginDriver):
 
     def update_output(self, pairs: dict) -> None:
         """
-        Merges a given dict with the output collector
+        Appends a given dict's values to the output under the same key.
         """
-        self.output_collector.update(pairs)
+        for key, val in pairs.items():
+            self.output[key].append(val)
 
 
     @staticmethod
