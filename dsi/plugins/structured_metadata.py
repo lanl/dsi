@@ -21,7 +21,10 @@ class Plugin(ABC):
         """Establish column names for a structured metadata Plugin.
 
         Initial Plugin design supports file post-processing and
-        regular schema data only.
+        regular schema data only. pack_header should only be executed once,
+        along with the first call of add_row. This allows supplemental methods
+        to alter the column structure up the last possible moment, when metadata
+        are prepared for movement to the middleware.
         """
 
     @abstractmethod
