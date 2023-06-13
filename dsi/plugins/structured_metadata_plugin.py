@@ -13,12 +13,12 @@ class Plugin(ABC):
     def __init__(self, path):
         """Initialize Plugin setup.
 
-        Read a Plugin file. Return a Plugin object or throw error.
+        Read a Plugin file. Return a Plugin object.
         """
 
     @abstractmethod
     def pack_header(self):
-        """Establish column names for structured metadata Plugin.
+        """Establish column names for a structured metadata Plugin.
 
         Initial Plugin design supports file post-processing and
         regular schema data only.
@@ -29,5 +29,6 @@ class Plugin(ABC):
         """Add a sample to the plugin's row collection.
 
         Initial Plugin design supports adding rows to an existing
-        object, and throws an error if columns don't match previous.
+        object, and well fail tests if column count differ from 
+        previous.
         """

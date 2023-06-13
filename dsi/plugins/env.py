@@ -11,7 +11,7 @@ from dsi.plugins.structured_metadata_plugin import Plugin
 
 class EnvPlugin(Plugin):
 
-    def __init__(self, path=None) -> None:
+    def __init__(self, path=None):
         """Load valid environment plugin file.
 
         Environment plugin files assume a POSIX-compliant
@@ -36,8 +36,8 @@ class HostnamePlugin(EnvPlugin):
     """An example Plugin implementation.
 
     This plugin collects the hostname of the machine,
-    the UID and effective GID of the plugin collector, and
-    the Unix time of the collected information.
+    and couples this with the POSIX information gathered
+    by the Plugin base class.
     """
 
     def __init__(self) -> None:
