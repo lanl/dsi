@@ -26,6 +26,8 @@ class EnvPlugin(Plugin):
         self.header_exist = False
         # Once we start writing structured data, the column count is fixed
         self.column_cnt = None
+        # Set whether we strictly enforce Structured format
+        self.strict_structure = True
 
 class HostnamePlugin(EnvPlugin):
     """An example EnvPlugin implementation.
