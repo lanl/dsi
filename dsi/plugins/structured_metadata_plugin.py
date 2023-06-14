@@ -1,5 +1,3 @@
-"""Abstract base class for the handling plugins."""
-
 from abc import ABC, abstractmethod
 
 class Plugin(ABC):
