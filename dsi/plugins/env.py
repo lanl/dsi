@@ -82,14 +82,14 @@ class EnvProvPlugin(EnvPlugin):
             self.pack_header()
 
         pairs = self.get_prov_info()
-        self.add_to_output(list(pairs.values))
+        self.add_to_output(list(pairs.values()))
         
 
     def get_prov_info(self) -> dict:
         """ collect and return the different categories of provenance info  """
         prov_info = {}
         prov_info.update(self.get_kernel_version())
-        prov_info.update(self.get_kernel_ct_vondif())
+        prov_info.update(self.get_kernel_ct_config())
         prov_info.update(self.get_kernel_bt_config())
         prov_info.update(self.get_kernel_rt_config())
         prov_info.update(self.get_kernel_mod_config())
