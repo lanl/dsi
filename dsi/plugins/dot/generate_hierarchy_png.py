@@ -28,11 +28,12 @@ class ClassTreeNode:
 
     def export_png(self, name: str) -> None:
         """ Generate a dotfile and export class hierarchy to png """
-        dot = graphviz.Digraph(name, format="png")
+        dot = graphviz.Digraph(name, format="png", strict=True)
         root = self
         dot.node(root.clas.__name__)
         
         def process_children(r):
+            print(r.clas.__name__)
             for ch in r.subclasses:
                 dot.node(ch.clas.__name__)
                 dot.edge(r.clas.__name__, ch.clas.__name__)

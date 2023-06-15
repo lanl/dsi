@@ -1,4 +1,4 @@
-digraph PluginClassHierarchy {
+strict digraph PluginClassHierarchy {
 	Plugin
 	StructuredDataPlugin
 	Plugin -> StructuredDataPlugin
