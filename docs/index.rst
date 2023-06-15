@@ -12,8 +12,8 @@ Welcome to DSI's documentation!
 
    installation
    quickstart
-   util
-   fs
+   plugins
+   drivers
 
 
 Indices and tables

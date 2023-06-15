@@ -4,26 +4,29 @@ from dsi.plugins.env import HostnamePlugin, EnvProvPlugin
 
 def test_hostname_plugin_type():
     a = HostnamePlugin()
-    a.parse()
     a.add_row()
     a.add_row()
     assert type(a.output_collector)==collections.OrderedDict
 
 def test_hostname_plugin_col_shape():
     a = HostnamePlugin()
-    a.parse()
     a.add_row()
     a.add_row()
     assert len(a.output_collector.keys())==len(a.output_collector.values())
 
+def test_hostname_plugin_row_shape():
+    for row_cnt in range(1,10):
+        a = HostnamePlugin()
+        for _ in range(row_cnt):
+            a.add_row()
+        column_values = list(a.output_collector.values())
+        row_shape = len(column_values[0])
+        for col in column_values[1:]:
+            assert len(col) == row_shape == row_cnt
+
 def test_envprov_plugin_type():
     plug = EnvProvPlugin()
     plug.add_row()
-
-    #for key in plug.output_collector:
-    #    print(key, ":", plug.output_collector[key])
-    #print(len(plug.output_collector))
-
     assert type(plug.output_collector) == collections.OrderedDict
 
 def test_envprov_plugin_kver_type():

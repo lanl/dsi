@@ -3,21 +3,22 @@
 A home for environment plugin parsers.
 """
 
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict 
 import os
 import socket
 import subprocess
 
-from dsi.plugins.structured_metadata_plugin import Plugin
+from dsi.plugins.structured_data import StructuredDataPlugin
 
-class EnvPlugin(Plugin):
+class EnvPlugin(StructuredDataPlugin):
+    """Environment Plugins inspect the calling process' context.
+    
+    EnvPlugins assume a POSIX-compliant filesystem and always collect UID/GID
+    information.
+    """
 
-    def __init__(self, path=None) -> None:
-        """Load valid environment plugin file.
-
-        Environment plugin files assume a POSIX-compliant
-        filesystem and always collect UID/GID information.
-        """
+    def __init__(self, path=None):
+        super().__init__()
         # Get POSIX info
         self.posix_info = OrderedDict()
         self.posix_info['uid'] = os.getuid()
@@ -26,35 +27,27 @@ class EnvPlugin(Plugin):
         self.posix_info['moniker'] = os.getlogin()
         moniker = self.posix_info['moniker']
         self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
-        # Plugin output collector
-        self.output_collector = OrderedDict()
-        
-class HostnamePlugin(EnvPlugin):
-    """An example Plugin implementation.
 
-    This plugin collects the hostname of the machine,
-    the UID and effective GID of the plugin collector, and
-    the Unix time of the collected information.
+class HostnamePlugin(EnvPlugin):
+    """An example EnvPlugin implementation.
+
+    This plugin collects the hostname of the machine, and couples this with the POSIX
+    information gathered by the EnvPlugin base class.
     """
 
     def __init__(self) -> None:
-        """Load valid environment plugin file.
-
-        Environment plugin files assume a POSIX-compliant
-        filesystem and always collect UID/GID information.
-        """
         super().__init__()
 
-    def add_row(self) -> None:
-        row = list(self.posix_info.values()) + [socket.gethostname()]
-        for key,row_elem in zip(self.output_collector, row):
-            self.output_collector[key].append(row_elem) 
+    def pack_header(self) -> None:
+        column_names = list(self.posix_info.keys()) + ["hostname"]
+        self.set_schema(column_names)
 
-    def parse(self) -> None:
-        for key in self.posix_info:
-            self.output_collector[key] = []
-        self.output_collector['hostname'] = []
-        self.add_row()
+    def add_row(self) -> None:
+        if not self.schema_is_set():
+            self.pack_header()
+
+        row = list(self.posix_info.values()) + [socket.gethostname()]
+        self.add_to_output(row)
 
 
 
@@ -70,37 +63,39 @@ class EnvProvPlugin(EnvPlugin):
     """
 
     def __init__(self) -> None:
-        """Load valid environment plugin file.
-
-        Environment plugin files assume a POSIX-compliant
-        filesystem and always collect UID/GID information.
-        """
+        """ Initialize EnvProvPlugin with inital provenance info """
         super().__init__()
-        self.output = defaultdict(list) 
+        self.prov_info = self.get_prov_info()
 
 
-    def parse(self) -> None:
-        pass
+    def pack_header(self) -> None:
+        """ Set schema with keys of prov_info """
+        column_names = list(self.prov_info.keys())
+        self.set_schema(column_names)
 
 
     def add_row(self) -> None:
         """
-        Parses environment provenance data and stores the
-        key-value pairs in self.output_collector
+        Parses environment provenance data and adds the row
         """
-        self.update_output(self.get_kernel_version())
+        if not self.schema_is_set():
+            self.pack_header()
+
+        pairs = self.get_prov_info()
+        self.add_to_output(list(pairs.values))
         
-        self.update_output(self.get_kernel_ct_config())
 
-        self.update_output(self.get_kernel_bt_config())
+    def get_prov_info(self) -> dict:
+        """ collect and return the different categories of provenance info  """
+        prov_info = {}
+        prov_info.update(self.get_kernel_version())
+        prov_info.update(self.get_kernel_ct_vondif())
+        prov_info.update(self.get_kernel_bt_config())
+        prov_info.update(self.get_kernel_rt_config())
+        prov_info.update(self.get_kernel_mod_config())
+        prov_info.update(self.get_container_config())
+        return prov_info
 
-        self.update_output(self.get_kernel_rt_config())
-
-        self.update_output(self.get_kernel_mod_config())
-
-        self.update_output(self.get_container_config())
-
-        self.output_collector.update(self.output)
 
     def get_kernel_version(self) -> dict:
         """
@@ -173,7 +168,7 @@ class EnvProvPlugin(EnvPlugin):
 
 
     def get_container_config(self) -> dict:
-        #TODO: Implement
+        # Not yet implemented
         return {}
 
 
