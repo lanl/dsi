@@ -2,9 +2,9 @@ from collections import OrderedDict
 import os
 import socket
 
-from dsi.plugins.structured_metadata import Plugin
+from dsi.plugins.structured_data import StructuredDataPlugin
 
-class EnvPlugin(Plugin):
+class EnvPlugin(StructuredDataPlugin):
     """Environment Plugins inspect the calling process' context.
     
     EnvPlugins assume a POSIX-compliant filesystem and always collect UID/GID
@@ -12,6 +12,7 @@ class EnvPlugin(Plugin):
     """
 
     def __init__(self, path=None):
+        super().__init__()
         # Get POSIX info
         self.posix_info = OrderedDict()
         self.posix_info['uid'] = os.getuid()
@@ -20,14 +21,6 @@ class EnvPlugin(Plugin):
         self.posix_info['moniker'] = os.getlogin()
         moniker = self.posix_info['moniker']
         self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
-        # Plugin output collector
-        self.output_collector = OrderedDict()
-        # class bool to track whether header has been written.
-        self.header_exist = False
-        # Once we start writing structured data, the column count is fixed
-        self.column_cnt = None
-        # Set whether we strictly enforce Structured format
-        self.strict_structure = True
 
 class HostnamePlugin(EnvPlugin):
     """An example EnvPlugin implementation.
@@ -40,15 +33,12 @@ class HostnamePlugin(EnvPlugin):
         super().__init__()
 
     def pack_header(self) -> None:
-        for key in self.posix_info:
-            self.output_collector[key] = []
-        self.output_collector['hostname'] = []
-        self.column_cnt = len(self.output_collector.keys())
+        column_names = list(self.posix_info.keys()) + ["hostname"]
+        self.set_schema(column_names)
 
     def add_row(self) -> None:
-        if not self.header_exist:
+        if not self.schema_is_set():
             self.pack_header()
-            self.header_exist = True
+
         row = list(self.posix_info.values()) + [socket.gethostname()]
-        for key,row_elem in zip(self.output_collector, row):
-            self.output_collector[key].append(row_elem) 
+        self.add_to_output(row)

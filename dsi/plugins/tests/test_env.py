@@ -17,12 +17,9 @@ def test_hostname_plugin_col_shape():
 def test_hostname_plugin_row_shape():
     for row_cnt in range(1,10):
         a = HostnamePlugin()
-        if a.strict_structure:
-            for _ in range(row_cnt):
-                a.add_row()
-            column_values = list(a.output_collector.values())
-            row_shape = len(column_values[0])
-            for col in column_values[1:]:
-                if len(col) != row_shape:
-                    assert False 
-    assert True
+        for _ in range(row_cnt):
+            a.add_row()
+        column_values = list(a.output_collector.values())
+        row_shape = len(column_values[0])
+        for col in column_values[1:]:
+            assert len(col) == row_shape == row_cnt
