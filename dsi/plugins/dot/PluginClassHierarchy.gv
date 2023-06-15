@@ -1,0 +1,11 @@
+digraph PluginClassHierarchy {
+	Plugin
+	StructuredDataPlugin
+	Plugin -> StructuredDataPlugin
+	EnvPlugin
+	StructuredDataPlugin -> EnvPlugin
+	HostnamePlugin
+	EnvPlugin -> HostnamePlugin
+	StructuredDataPlugin
+	Plugin -> StructuredDataPlugin
+}
