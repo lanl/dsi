@@ -161,7 +161,7 @@ class EnvProvPlugin(EnvPlugin):
         mod_list = modules.split("\n")
         mod_configs = {}
         for module in mod_list:
-            modinfo_cmd = f"modinfo {module}"
+            modinfo_cmd = f"/sbin/modinfo {module}"
             modinfo = self.get_cmd_output([modinfo_cmd])
             mod_configs[modinfo_cmd] = modinfo
         return mod_configs
