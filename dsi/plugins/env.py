@@ -8,9 +8,9 @@ import os
 import socket
 import subprocess
 
-from dsi.plugins.structured_data import StructuredDataPlugin
+from dsi.plugins.metadata import StructuredMetaPlugin
 
-class EnvPlugin(StructuredDataPlugin):
+class EnvPlugin(StructuredMetadataPlugin):
     """Environment Plugins inspect the calling process' context.
     
     EnvPlugins assume a POSIX-compliant filesystem and always collect UID/GID
