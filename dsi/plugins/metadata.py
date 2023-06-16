@@ -15,6 +15,13 @@ class Plugin(ABC):
         Read a Plugin file. Return a Plugin object.
         """
 
+    @abstractmethod
+    def add_to_output(self, path):
+        """Initialize Plugin setup.
+
+        Read a Plugin file. Return a Plugin object.
+        """
+
 class StructuredMetadataPlugin(Plugin):
     """ plugin superclass that provides handy methods for structured data """
     
