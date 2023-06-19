@@ -11,7 +11,8 @@ import subprocess
 from dsi.plugins.metadata import StructuredMetadataPlugin
 
 class EnvPlugin(StructuredMetadataPlugin):
-    """Environment Plugins inspect the calling process' context.
+    """
+    Environment Plugins inspect the calling process' context.
     
     EnvPlugins assume a POSIX-compliant filesystem and always collect UID/GID
     information.
@@ -29,7 +30,8 @@ class EnvPlugin(StructuredMetadataPlugin):
         self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
 
 class HostnamePlugin(EnvPlugin):
-    """An example EnvPlugin implementation.
+    """
+    An example EnvPlugin implementation.
 
     This plugin collects the hostname of the machine, and couples this with the POSIX
     information gathered by the EnvPlugin base class.
@@ -53,7 +55,9 @@ class HostnamePlugin(EnvPlugin):
 
 class EnvProvPlugin(EnvPlugin):
     """
-    Plugin for reading environment provenance data:
+    Plugin for reading environment provenance data.
+
+    An environment provenance plugin which does the following:
     1. System Kernel Version
     2. Kernel compile-time config
     3. Kernel boot config
@@ -63,21 +67,19 @@ class EnvProvPlugin(EnvPlugin):
     """
 
     def __init__(self) -> None:
-        """ Initialize EnvProvPlugin with inital provenance info """
+        """Initialize EnvProvPlugin with inital provenance info."""
         super().__init__()
         self.prov_info = self.get_prov_info()
 
 
     def pack_header(self) -> None:
-        """ Set schema with keys of prov_info """
+        """Set schema with keys of prov_info."""
         column_names = list(self.prov_info.keys())
         self.set_schema(column_names)
 
 
     def add_row(self) -> None:
-        """
-        Parses environment provenance data and adds the row
-        """
+        """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
@@ -86,7 +88,7 @@ class EnvProvPlugin(EnvPlugin):
         
 
     def get_prov_info(self) -> dict:
-        """ collect and return the different categories of provenance info  """
+        """Collect and return the different categories of provenance info."""
         prov_info = {}
         prov_info.update(self.get_kernel_version())
         prov_info.update(self.get_kernel_ct_config())
@@ -98,16 +100,14 @@ class EnvProvPlugin(EnvPlugin):
 
 
     def get_kernel_version(self) -> dict:
-        """
-        Kernel version is obtained by the "uname -r" command, returns it in a dict
-        """
+        """Kernel version is obtained by the "uname -r" command, returns it in a dict. """
         return {"kernel version": self.get_cmd_output(["uname -r"])}
 
 
     def get_kernel_ct_config(self) -> dict:
         """
-        Kernel compile-time configuration is collected by looking at 
-        /boot/config-(kernel version) and removing comments and empty lines. 
+        Kernel compile-time configuration is collected by looking at /boot/config-(kernel version) and removing comments and empty lines.
+
         The output of said command is newline-delimited option=value pairs.
         """
         command = ["cat /boot/config-$(uname -r) | sed -e '/#/d' -e '/^$/d'"]
@@ -122,8 +122,9 @@ class EnvProvPlugin(EnvPlugin):
 
     def get_kernel_bt_config(self) -> dict:
         """
-        Kernel boot-time configuration is collected by looking at
-        /proc/cmdline. The output of this command is one string of 
+        Kernel boot-time configuration is collected by looking at /proc/cmdline.
+
+        The output of this command is one string of 
         boot-time parameters. This string is returned in a dict.
         """
         command = ["cat /proc/cmdline"]
@@ -132,13 +133,7 @@ class EnvProvPlugin(EnvPlugin):
 
 
     def get_kernel_rt_config(self) -> dict:
-        """
-        Kernel run-time configuration is collected with the "sysctl -a" command.
-        The output of this command is lines consisting of two possibilities:
-            option = value (note the spaces)
-            sysctl: permission denied ...
-        The option = value pairs are added to the output dict.
-        """
+        """Foo. bar."""
         command = ["sysctl -a 2>&1"]
         res = self.get_cmd_output(command)
         lines = res.split("\n")
@@ -147,13 +142,14 @@ class EnvProvPlugin(EnvPlugin):
             if "=" in line: # if the line is not permission denied
                 option, value = line.split(" = ", maxsplit=1) # note the spaces
                 rt_config[option] = value
-            # If the line is permission denied, ignore it :(
+            # If line is permission denied, ignore it.
         return rt_config
 
-    
+
     def get_kernel_mod_config(self) -> dict:
         """
         Kernel module configuration is collected with the "lsmod" and "modinfo" commands.
+
         Each module and modinfo are stored as a key-value pair in the returned dict.
         """
         command = ["lsmod | tail -n +2 | awk '{print $1}'"]
@@ -173,9 +169,7 @@ class EnvProvPlugin(EnvPlugin):
 
 
     def update_output(self, pairs: dict) -> None:
-        """
-        Appends a given dict's values to the output under the same key.
-        """
+        """Appends a given dict's values to the output under the same key."""
         for key, val in pairs.items():
             self.output[key].append(val)
 
@@ -184,11 +178,11 @@ class EnvProvPlugin(EnvPlugin):
     def get_cmd_output(cmd: list) -> str:
         """
         Runs a given command and returns the stdout if successful.
+
         If stderr is not empty, an exception is raised with the stderr text.
         """
         proc = subprocess.run(cmd, capture_output=True, shell=True)
         if proc.stderr != b"":
             raise Exception(proc.stderr)
         return proc.stdout.strip().decode("utf-8")
-
 
