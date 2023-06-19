@@ -1,8 +1,3 @@
-"""Environment Plugin drivers.
-
-A home for environment plugin parsers.
-"""
-
 from collections import OrderedDict 
 import os
 import socket
