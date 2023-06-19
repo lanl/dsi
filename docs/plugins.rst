@@ -2,7 +2,7 @@ Plugins
 ===================
 .. image:: PluginClassHierarchy.png
 
-.. automodule:: dsi.plugins._metadata
+.. automodule:: dsi.plugins.metadata
    :members:
 
 .. automodule:: dsi.plugins.env
