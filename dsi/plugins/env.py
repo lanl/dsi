@@ -156,14 +156,19 @@ class EnvProvPlugin(EnvPlugin):
         Kernel module configuration is collected with the "lsmod" and "modinfo" commands.
         Each module and modinfo are stored as a key-value pair in the returned dict.
         """
-        command = ["lsmod | tail -n +2 | awk '{print $1}'"]
-        modules = self.get_cmd_output(command)
-        mod_list = modules.split("\n")
+        lsmod_command = ["lsmod | tail -n +2 | awk '{print $1}'"]
+        modules = self.get_cmd_output(lsmod_command).split("\n")
+
+        sep = "END MODINFO"
+        modinfo_command = ["/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}') | "
+                            f"sed -e 's/filename:/{sep}filename:/g'"]
+        modinfos = self.get_cmd_output(modinfo_command).split("\n" + sep)
+
+        assert len(modules) == len(modinfos)
+
         mod_configs = {}
-        for module in mod_list:
-            modinfo_cmd = f"/sbin/modinfo {module}"
-            modinfo = self.get_cmd_output([modinfo_cmd])
-            mod_configs[modinfo_cmd] = modinfo
+        for mod, info in zip(modules, modinfos):
+            mod_configs["/sbin/modinfo " + mod] = info
         return mod_configs
 
 
