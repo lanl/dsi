@@ -1,5 +1,5 @@
 from abc import ABC
-from dsi.plugins.structured_metadata import Plugin
+from dsi.plugins.metadata import Plugin
 
 import os
 import sys

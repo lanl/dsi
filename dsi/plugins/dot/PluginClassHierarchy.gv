@@ -1,13 +1,11 @@
 strict digraph PluginClassHierarchy {
 	Plugin
-	StructuredDataPlugin
-	Plugin -> StructuredDataPlugin
+	StructuredMetadataPlugin
+	Plugin -> StructuredMetadataPlugin
 	EnvPlugin
-	StructuredDataPlugin -> EnvPlugin
+	StructuredMetadataPlugin -> EnvPlugin
 	HostnamePlugin
 	EnvPlugin -> HostnamePlugin
 	EnvProvPlugin
 	EnvPlugin -> EnvProvPlugin
-	StructuredDataPlugin
-	Plugin -> StructuredDataPlugin
 }
