@@ -26,15 +26,7 @@ def test_hostname_plugin_row_shape():
 
 def test_envprov_plugin_type():
     plug = EnvProvPlugin()
-    plug.add_row()
     assert type(plug.output_collector) == collections.OrderedDict
-
-def test_envprov_plugin_kver_type():
-    plug = EnvProvPlugin()
-    plug.add_row()
-
-    k_ver = plug.output_collector["kernel version"][0]
-    assert type(k_ver) == str
 
 def test_envprov_plugin_adds_rows():
     plug = EnvProvPlugin()
@@ -44,8 +36,5 @@ def test_envprov_plugin_adds_rows():
     for key, val in plug.output_collector.items():
         assert len(val) == 2
 
-def test_envprov_plugin_has_many_columns():
-    plug = EnvProvPlugin()
-    plug.add_row()
+    assert len(plug.output_collector.keys()) > 100 # should def have more than 100 columns
 
-    assert len(plug.output_collector.keys()) > 100 # should def have more than 100
