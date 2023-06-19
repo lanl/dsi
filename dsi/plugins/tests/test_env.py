@@ -1,22 +1,22 @@
 import collections
 
-from dsi.plugins.env import HostnamePlugin, EnvProvPlugin
+from dsi.plugins.env import Hostname, SystemKernel
 
 def test_hostname_plugin_type():
-    a = HostnamePlugin()
+    a = Hostname()
     a.add_row()
     a.add_row()
     assert type(a.output_collector)==collections.OrderedDict
 
 def test_hostname_plugin_col_shape():
-    a = HostnamePlugin()
+    a = Hostname()
     a.add_row()
     a.add_row()
     assert len(a.output_collector.keys())==len(a.output_collector.values())
 
 def test_hostname_plugin_row_shape():
     for row_cnt in range(1,10):
-        a = HostnamePlugin()
+        a = Hostname()
         for _ in range(row_cnt):
             a.add_row()
         column_values = list(a.output_collector.values())
@@ -25,11 +25,11 @@ def test_hostname_plugin_row_shape():
             assert len(col) == row_shape == row_cnt
 
 def test_envprov_plugin_type():
-    plug = EnvProvPlugin()
+    plug = SystemKernel()
     assert type(plug.output_collector) == collections.OrderedDict
 
 def test_envprov_plugin_adds_rows():
-    plug = EnvProvPlugin()
+    plug = SystemKernel()
     plug.add_row()
     plug.add_row()
 

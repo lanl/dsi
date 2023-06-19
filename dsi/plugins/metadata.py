@@ -22,7 +22,7 @@ class Plugin(ABC):
         Read a Plugin file. Return a Plugin object.
         """
 
-class StructuredMetadataPlugin(Plugin):
+class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
     
     def __init__(self):

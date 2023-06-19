@@ -8,13 +8,13 @@ import os
 import socket
 import subprocess
 
-from dsi.plugins.metadata import StructuredMetadataPlugin
+from dsi.plugins.metadata import StructuredMetadata
 
-class EnvPlugin(StructuredMetadataPlugin):
+class Environment(StructuredMetadata):
     """
     Environment Plugins inspect the calling process' context.
     
-    EnvPlugins assume a POSIX-compliant filesystem and always collect UID/GID
+    Environments assume a POSIX-compliant filesystem and always collect UID/GID
     information.
     """
 
@@ -29,12 +29,12 @@ class EnvPlugin(StructuredMetadataPlugin):
         moniker = self.posix_info['moniker']
         self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
 
-class HostnamePlugin(EnvPlugin):
+class Hostname(Environment):
     """
-    An example EnvPlugin implementation.
+    An example Environment implementation.
 
     This plugin collects the hostname of the machine, and couples this with the POSIX
-    information gathered by the EnvPlugin base class.
+    information gathered by the Environment base class.
     """
 
     def __init__(self) -> None:
@@ -53,7 +53,7 @@ class HostnamePlugin(EnvPlugin):
 
 
 
-class EnvProvPlugin(EnvPlugin):
+class SystemKernel(Environment):
     """
     Plugin for reading environment provenance data.
 
@@ -67,7 +67,7 @@ class EnvProvPlugin(EnvPlugin):
     """
 
     def __init__(self) -> None:
-        """Initialize EnvProvPlugin with inital provenance info."""
+        """Initialize SystemKernel with inital provenance info."""
         super().__init__()
         self.prov_info = self.get_prov_info()
 
