@@ -9,7 +9,9 @@ all: html
 
 # Build HTML
 html:
+	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
+	mv ./plugins/PluginClassHierarchy.gv* $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
