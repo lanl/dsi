@@ -8,7 +8,7 @@ import os
 import socket
 import subprocess
 
-from dsi.plugins.metadata import StructuredMetaPlugin
+from dsi.plugins.metadata import StructuredMetadataPlugin
 
 class EnvPlugin(StructuredMetadataPlugin):
     """Environment Plugins inspect the calling process' context.
