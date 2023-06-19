@@ -5,10 +5,10 @@ import os
 import sys
 import graphviz
 
-# This is a hacky way to import all modules in the parent directory
+# This is a hacky way to import all modules in a given directory
 sys.path.insert(0, sys.argv[1])
 modules = []
-for module in os.listdir(os.path.dirname(os.path.dirname(__file__))):
+for module in os.listdir(sys.argv[1]):
     if module[-3:] == ".py":
         modules.append(module[:-3]) 
         __import__(module[:-3], locals(), globals())
