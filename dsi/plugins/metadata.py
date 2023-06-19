@@ -1,9 +1,28 @@
-from dsi.plugins.structured_metadata import Plugin
-
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 
-class StructuredDataPlugin(Plugin):
+class Plugin(ABC):
+    """Plugin abstract class for DSI core product.
+
+    A Plugin connects a data producer to a compatible middleware
+    data structure.
+    """
+
+    @abstractmethod
+    def __init__(self, path):
+        """Initialize Plugin setup.
+
+        Read a Plugin file. Return a Plugin object.
+        """
+
+    @abstractmethod
+    def add_to_output(self, path):
+        """Initialize Plugin setup.
+
+        Read a Plugin file. Return a Plugin object.
+        """
+
+class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
     
     def __init__(self):
