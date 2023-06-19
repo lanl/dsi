@@ -133,7 +133,12 @@ class EnvProvPlugin(EnvPlugin):
 
 
     def get_kernel_rt_config(self) -> dict:
-        """Foo. bar."""
+        """
+        Kernel run-time configuration is collected with the "sysctl -a" command.
+
+        The output of this command is lines consisting of two possibilities:            option = value (note the spaces), and sysctl: permission denied ...
+        The option = value pairs are added to the output dict.
+        """
         command = ["sysctl -a 2>&1"]
         res = self.get_cmd_output(command)
         lines = res.split("\n")

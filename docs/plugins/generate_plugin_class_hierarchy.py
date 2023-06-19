@@ -49,5 +49,5 @@ class ClassTreeNode:
 
 if __name__ == "__main__":
     ct = ClassTreeNode(Plugin)  # generate class hierarchy for Plugin
-    ct.export_png(name="plugins/PluginClassHierarchy")
+    ct.export_png(name="PluginClassHierarchy")
 
