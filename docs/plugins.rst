@@ -1,6 +1,6 @@
 Plugins
 ===================
-.. image:: PluginClassHierarchy.gv.png
+.. image:: PluginClassHierarchy.png
 
 .. automodule:: dsi.plugins.structured_metadata
 
