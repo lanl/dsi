@@ -6,10 +6,10 @@ import sys
 import graphviz
 
 # This is a hacky way to import all modules in the parent directory
-sys.path.insert(0, "../")
+sys.path.insert(0, sys.argv[1])
 modules = []
 for module in os.listdir(os.path.dirname(os.path.dirname(__file__))):
-    if module[-3:] == ".py" and module != "generate_hierarchy_png.py":
+    if module[-3:] == ".py":
         modules.append(module[:-3]) 
         __import__(module[:-3], locals(), globals())
 print("Imported the following modules to find class hierarchy:", ", ".join(modules), "\n")
