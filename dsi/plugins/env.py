@@ -36,10 +36,12 @@ class Hostname(Environment):
         super().__init__()
 
     def pack_header(self) -> None:
+        """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
         self.set_schema(column_names)
 
     def add_row(self) -> None:
+        """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
