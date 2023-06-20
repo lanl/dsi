@@ -7,7 +7,7 @@ The goal of the Data Science Infrastructure Project (DSI) is to provide a flexib
 .. image:: data_lifecycle.png
    :scale: 50%
 
-DSI system design is driven by experiences which satisfy User Stories. DSI uses Object Oriented design principles to encourage modularity and support contributions by the user community. 
+DSI system design is driven by experiences which satisfy User Stories. DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community. 
 
 
 Implementation
