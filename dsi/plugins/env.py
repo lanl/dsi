@@ -48,7 +48,40 @@ class Hostname(Environment):
         row = list(self.posix_info.values()) + [socket.gethostname()]
         self.add_to_output(row)
 
+class Bueno(Environment):
+    """
+    A Plugin to capture performance data from Bueno (github.com/lanl/bueno)
 
+    Bueno outputs performance data in keyvalue pairs in a file. Keys and values
+    are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.bueno_data = OrderedDict()
+
+    def pack_header(self) -> None:
+        """Set schema with POSIX and Bueno data."""
+        column_names = list(self.posix_info.keys()) + list(self.bueno_data.keys())
+        self.set_schema(column_names)
+
+    def add_row(self,path) -> None:
+        """Parses environment provenance data and adds the row."""
+        if not self.schema_is_set():
+            with open(path,'r') as fh:
+                file_content=(fh.read())
+            rows = file_content.split('\n')
+            drop_rows = [row for row in rows if row is not '']
+            rows = drop_rows
+            for row in rows:
+                colon_split = row.split(':')
+                if len(colon_split)!=2:
+                    raise TypeError
+                self.bueno_data[colon_split[0]] = colon_split[1]
+            self.pack_header()
+
+        row = list(self.posix_info.values()) + list(self.bueno_data.values())
+        self.add_to_output(row)
 
 class SystemKernel(Environment):
     """
