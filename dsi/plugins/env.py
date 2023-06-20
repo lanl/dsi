@@ -13,7 +13,7 @@ class Environment(StructuredMetadata):
     information.
     """
 
-    def __init__(self, path=None):
+    def __init__(self,):
         super().__init__()
         # Get POSIX info
         self.posix_info = OrderedDict()
