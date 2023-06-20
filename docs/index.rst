@@ -10,6 +10,7 @@ Welcome to DSI's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   introduction
    installation
    quickstart
    plugins

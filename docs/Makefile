@@ -36,6 +36,13 @@ gh-pages: _build/html
 publish:
 	git push -f origin gh-pages
 
+# Make a PDF
+latexpdf:
+	$(SPHINXBUILD) -b latex . $(BUILDDIR)/latex
+	@echo "Running LaTeX files through pdflatex..."
+	$(MAKE) -C $(BUILDDIR)/latex all-pdf
+	@echo "pdflatex finished; the PDF files are in $(BUILDDIR)/latex."
+
 # Print usage
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
