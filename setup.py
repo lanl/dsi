@@ -1,4 +1,3 @@
-import atexit
 import fileinput
 import re
 from setuptools import setup
