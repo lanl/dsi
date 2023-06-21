@@ -2,71 +2,66 @@ import os
 import sqlite3
 import csv
 import subprocess
-from dsi.drivers.filesystem_driver import fsstore
 
-from abc import (
-  ABC,
-  abstractmethod,
-)
+from dsi.drivers.filesystem_driver import FsStore
 
 # Holds table name and data properties 
-class data_type:
+class DataType:
     name = "DEFAULT"
     properties = {}
     units = {}
 
-class store(fsstore):
-    #GUFI Entries table
-    #CREATE TABLE entries(name TEXT, type TEXT, inode INT64, mode INT64, nlink INT64, uid INT64, gid INT64, size INT64, blksize INT64, blocks INT64, atime INT64, mtime INT64, ctime INT64, linkname TEXT, xattr_names BLOB, crtime INT64, ossint1 INT64, ossint2 INT64, ossint3 INT64, ossint4 INT64, osstext1 TEXT, osstext2 TEXT);
-
-    #Prefix to GUFI commands
+class GUFIStore(FsStore):
     prefix = ""
-    #Index we are querying
     index = ""
-    isVerbose = 0
+    dbfile = ""
+    table = ""
+    column = ""
+    isVerbose = False
 
-    def __init__(self, prefix, index):
-        super().__init__(fsstore.GUFI_STORE)
+    """ 
+    prefix: prefix to GUFI commands
+    index: directory with GUFI indexes
+    dbfile: sqlite db file from DSI
+    table: table name from the DSI db we want to join on
+    column: column name from the DSI db to join on
+    """
+    def __init__(self, prefix, index, dbfile, table, column, verbose=False):
+        super().__init__(dbfile)
+        # prefix is the prefix to the GUFI installation
         self.prefix = prefix
+        # index is the directory where the GUFI indexes are stored
         self.index = index
+        # dbfile is the dsi database file that we wish to use
+        self.dbfile = dbfile
+        # table is the dsi database table name that we wish to use
+        self.table = table
+        # column is the dsi column name for a file's inode
+        self.column = column
 
-    # Query file name
-    def query_fname(self, name ):
-        str_query = "SELECT * FROM entries WHERE name LIKE '%" + str(name) +"%'"
-        if self.isVerbose:
-            print(str_query)
-
-        resout = self._run_gufi_query(str_query)
-        if self.isVerbose:
-            print(resout)
-
-        return resout
-
-    # Query file size
-    def query_fsize(self, operator, size ):
-        str_query = "SELECT * FROM entries where size " + str(operator) + " " + str(size)
-        print(str_query)
-        if self.isVerbose:
-            print(str_query)
-
-        resout = self._run_gufi_query(str_query)
+        self.isVerbose = verbose
+        
+    # Query GUFI and DSI db
+    def get_artifacts(self, query):
+        resout = self._run_gufi_query(query)
         if self.isVerbose:
             print(resout)
 
         return resout
 
-    # Query file creation time
-    def query_fctime(self, operator, size ):
-        str_query = "SELECT * FROM entries where ctime " + str(operator) + " " + str(size)
-        if self.isVerbose:
-            print(str_query)
+    def put_artifacts(self, query):
+        pass
 
-        resout = self._run_gufi_query(str_query)
-        if self.isVerbose:
-            print(resout)
-
-        return resout
-
+    # Runs the gufi query command
     def _run_gufi_query(self, sqlstring):
-        result = subprocess.run([self.prefix + "gufi_query", "-d", "|", "-E", sqlstring, self.index], capture_output=True, text=True)
+        #Create the string for the -Q option that specifies the dsi db file, 
+        #the dsi db table name, and the dsi db inode column name.
+        qstr = self.dbfile + " " + self.table + " " + self.column + " inode"
+
+        #Run the GUFI query command
+        result = subprocess.run([self.prefix + "/gufi_query", "-d", "'|'", "-Q", self.dbfile, self.table, self.column, "inode", "-E", 
+                                 sqlstring, self.index], capture_output=True, text=True)
         return result.stdout
+
+    def close(self):
+        pass
