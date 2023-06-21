@@ -13,7 +13,7 @@ class Environment(StructuredMetadata):
     information.
     """
 
-    def __init__(self,):
+    def __init__(self):
         super().__init__()
         # Get POSIX info
         self.posix_info = OrderedDict()
@@ -71,7 +71,7 @@ class Bueno(Environment):
             with open(path,'r') as fh:
                 file_content=(fh.read())
             rows = file_content.split('\n')
-            drop_rows = [row for row in rows if row is not '']
+            drop_rows = [row for row in rows if row != '']
             rows = drop_rows
             for row in rows:
                 colon_split = row.split(':')
