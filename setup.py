@@ -26,15 +26,9 @@ git_root = get_cmd_output(cmd=['git rev-parse --show-toplevel'])
 # String replace git_sha_commit placeholder in Plugin implementations
 replacement_target='/'.join([git_root,'dsi/plugins/metadata.py'])
 
-def sha_insert():
-    insert_git_commit(replacement_target, sha)
-    #subprocess.check_call("ls -altrh {}".format(replacement_target))
-    #subprocess.check_call("sed -i s/a-box-of-one-dozen-starving-crazed-weasels/20b7f740224b8bb6f6c33493856573c2bd0bc98c/g {}".format(replacement_target))
-
-
 class SetupWrapper(install):
     def run(self):
-        sha_insert()
+        insert_git_commit(replacement_target, sha)
         install.run(self)
 
 setup(cmdclass={'install':SetupWrapper})
