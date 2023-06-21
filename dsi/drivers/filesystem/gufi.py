@@ -59,7 +59,7 @@ class GUFIStore(FsStore):
         qstr = self.dbfile + " " + self.table + " " + self.column + " inode"
 
         #Run the GUFI query command
-        result = subprocess.run([self.prefix + "/gufi_query", "-d", "'|'", "-Q", self.dbfile, self.table, self.column, "inode", "-E", 
+        result = subprocess.run([self.prefix + "/gufi_query", "-d", "|", "-Q", self.dbfile, self.table, self.column, "inode", "-E", 
                                  sqlstring, self.index], capture_output=True, text=True)
         return result.stdout
 
