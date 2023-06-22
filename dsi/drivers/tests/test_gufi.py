@@ -1,4 +1,4 @@
-from dsi.drivers.filesystem.gufi import GUFIStore, DataType
+from dsi.drivers.gufi import Gufi, DataType
 
 isVerbose=False
 
@@ -14,7 +14,7 @@ def test_artifact_query():
     prefix = "/usr/local/gufi"
     table = "sample"
     column = "sample_col"
-    store = GUFIStore(prefix, index, dbpath, table, column, isVerbose)
+    store = Gufi(prefix, index, dbpath, table, column, isVerbose)
     sqlstr = "select * from dsi_entries"
     rows = store.get_artifacts(sqlstr)
     print( rows )

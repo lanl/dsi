@@ -1,9 +1,14 @@
 Drivers
 ========================
 
-.. automodule:: dsi.drivers.filesystem_driver
+.. image:: DriverClassHierarchy.png
+
+.. automodule:: dsi.drivers.filesystem
    :members:
 
-.. automodule:: dsi.drivers.filesystem.sqlite
+.. automodule:: dsi.drivers.sqlite
+   :members:
+
+.. automodule:: dsi.drivers.gufi
    :members:
 

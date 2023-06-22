@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import csv
-from dsi.drivers.filesystem_driver import FsStore
+from dsi.drivers.filesystem import Filesystem
 
 # Holds table name and data properties 
 class DataType:
@@ -19,7 +19,7 @@ class Artifact:
     properties = {}
 
 # Main storage class, interfaces with SQL
-class SqlStore(FsStore):
+class Sql(Filesystem):
     """
         Primary storage class, inherits sql class
     """

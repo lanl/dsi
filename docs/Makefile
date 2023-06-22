@@ -10,7 +10,9 @@ all: html
 # Build HTML
 html:
 	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
+	python ./drivers/generate_driver_class_hierarchy.py ../dsi/drivers/
 	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
+	mv DriverClassHierarchy.gv.png DriverClassHierarchy.png
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -51,4 +53,4 @@ help:
 	@echo "  publish    upload documentation to github"
 
 clean:
-	-rm -rf $(BUILDDIR)/* PluginClassHierarchy.gv	PluginClassHierarchy.png 
+	-rm -rf $(BUILDDIR)/* *ClassHierarchy.gv *Hierarchy.png 

@@ -3,7 +3,7 @@ import sqlite3
 import csv
 import subprocess
 
-from dsi.drivers.filesystem_driver import FsStore
+from dsi.drivers.filesystem import Filesystem
 
 # Holds table name and data properties 
 class DataType:
@@ -11,7 +11,7 @@ class DataType:
     properties = {}
     units = {}
 
-class GUFIStore(FsStore):
+class Gufi(Filesystem):
     prefix = ""
     index = ""
     dbfile = ""
