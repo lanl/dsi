@@ -23,11 +23,13 @@ sha = get_cmd_output(cmd=['git rev-parse HEAD'])
 git_root = get_cmd_output(cmd=['git rev-parse --show-toplevel'])
 
 # String replace git_sha_commit placeholder in Plugin implementations
-replacement_target='/'.join([git_root,'dsi/plugins/metadata.py'])
+metadata='/'.join([git_root,'dsi/plugins/metadata.py'])
+filesystem='/'.join([git_root,'dsi/drivers/filesystem.py'])
 
 class SetupWrapper(install):
     def run(self):
-        insert_git_commit(replacement_target, sha)
+        insert_git_commit(metadata, sha)
+        insert_git_commit(filesystem, sha)
         install.run(self)
 
 setup(cmdclass={'install':SetupWrapper})
