@@ -2,7 +2,14 @@ from importlib import import_module
 from itertools import product
 import os
 
-class Terminal:
+class Terminal():
+    """
+    An instantiated Terminal is the DSI human/machine interface.
+
+    Terminals are a home for Plugins and an interface for Drivers. Drivers may be
+    front-ends or back-ends. Plugins may be producers or consumers. See documentation
+    for more information.
+    """
     DRIVER_PREFIX=['dsi.drivers']
     DRIVER_IMPLEMENTATIONS=['gufi','sqlite']
     PLUGIN_PREFIX=['dsi.plugins']
@@ -26,10 +33,16 @@ class Terminal:
             self.plugins.append(import_module(module))
 
     def list_available_modules(self,mod_type):
+        """
+        List available modules of an arbitrary module type.
+
+        This method is useful for interactive Core Terminal setup. Plugin and Driver
+        type modules are supported, but this getter can be extended to support any
+        new modules which are added.
+        """
         # Helper function to determine if module is in a collection
         mod_is_present = lambda modname, mod_collection: \
         sum([modname in dir(mod) for mod in mod_collection])
-
         valid_mods=[]
         if mod_type=='plugin':
             for valid_plugin in self.VALID_PLUGINS:

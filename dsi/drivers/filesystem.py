@@ -24,7 +24,7 @@ class Driver(metaclass=ABCMeta):
         pass
 
 class Filesystem(Driver):
-    git_commit_sha='d07ed8acecb7388b1d92f81dcc9fd37371cf57ee'
+    git_commit_sha='a202b4e6c3460b59dffd0238f370a4e20e8ffcd8'
     # Declare named types for sql
     DOUBLE = "DOUBLE"
     STRING = "VARCHAR"

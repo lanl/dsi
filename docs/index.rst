@@ -14,6 +14,7 @@ The Data Science Infrastructure Project (DSI)
    introduction
    installation
    quickstart
+   core
    plugins
    drivers
 
