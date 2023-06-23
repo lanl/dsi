@@ -11,7 +11,7 @@ def test_query():
 def test_artifact_query():
     dbpath = "db.db"
     index = "gufi_indexes"
-    prefix = "/usr/local/gufi"
+    prefix = "/usr/projects/dsi_re/GUFI/build/src"
     table = "sample"
     column = "sample_col"
     store = Gufi(prefix, index, dbpath, table, column, isVerbose)

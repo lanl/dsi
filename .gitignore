@@ -48,8 +48,8 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Test artifacts
-query.csv
+# Testing artifacts
+*query.csv
 
 # Misc
 .vscode
