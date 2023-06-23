@@ -3,7 +3,7 @@ DSI / DSIpy
 =============
 
 .. image:: coverage.svg
-      :target: https://lanl.github.io/htmlcov/index.html
+      :target: https://lanl.github.io/dsi/htmlcov/index.html
 
 DSIpy is part of LANL's Data Science Infrastructure project providing several purposes:
 

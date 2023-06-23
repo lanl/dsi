@@ -4,7 +4,8 @@ Installation
 1. Create or activate a DSI virtual environment. 
 2. ``cd`` into the project space root
 3. ``python -m pip install .``
-4. [Optional] If you are running DSI Unit tests ``python -m pip install pytest gitpython coverage-badge pytest-cov``. [Optional] If you are HTML documentation ``python -m pip install sphinx sphinx_rtd_theme 
+4. [Optional] If you are running DSI Unit tests ``python -m pip install pytest gitpython coverage-badge pytest-cov``. 
+5. [Optional] If you are HTML documentation ``python -m pip install sphinx sphinx_rtd_theme``
 
 How to create and activate a virtual environment
 --------------------------------------------------

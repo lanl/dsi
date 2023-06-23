@@ -14,8 +14,9 @@ html:
 	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
 	mv DriverClassHierarchy.gv.png DriverClassHierarchy.png
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
+	rm -rf $(BUILDDIR)/html/htmlcov
 	pytest --cov --cov-report=html ../
-	mv ./htmlcov ./$(BUILDDIR)/html/htmlcov
+	mv ./htmlcov $(BUILDDIR)/html
 	rm ../coverage.svg
 	coverage-badge -o ../coverage.svg
 	git add ../coverage.svg
@@ -35,6 +36,7 @@ gh-pages: _build/html
 	touch .nojekyll && \
 	git init && \
 	git add . && \
+	git add --force ./htmlcov && \
 	git commit -m "DSI Documentation" && \
 	git push -f $$root master:gh-pages && \
 	rm -rf .git
