@@ -11,7 +11,7 @@ A Core Terminal is a home for Plugins, and an interface for Drivers. A Core Term
 >>> a.list_available_modules('driver')
 >>> # Loadable drivers: Gufi, Sqlite
 >>> a.load_module('plugin', 'Bueno')
->>> a.load_module('driver', 'Gufi')
+>>> a.load_module('driver', 'Sqlite')
 
 .. automodule:: dsi.core
       :members:
