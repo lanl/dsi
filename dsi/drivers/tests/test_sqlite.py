@@ -3,7 +3,7 @@ import os
 import urllib.request
 import sys
 
-from dsi.drivers.sqlite import Sql, DataType, Artifact
+from dsi.drivers.sqlite import Sqlite, DataType, Artifact
 
 isVerbose=True
 
@@ -15,21 +15,21 @@ def get_git_root(path):
 def test_wildfire_data_sql_artifact():
     csvpath = '/'.join([get_git_root('.'),'dsi/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
-    store = Sql(dbpath)
+    store = Sqlite(dbpath)
     store.close()
 
     
 def test_wildfire_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'),'dsi/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
-    store = Sql(dbpath)
+    store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath,"simulation", isVerbose=isVerbose)
     store.close()
     
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'),'dsi/data/yosemite5.csv'])
     dbpath = "yosemite.db"
-    store = Sql(dbpath)
+    store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath,"vision", isVerbose=isVerbose)
     store.close()
 
@@ -43,7 +43,7 @@ def test_query():
 def test_artifact_query():
     csvpath = '/'.join([get_git_root('.'),'dsi/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
-    store = Sql(dbpath)
+    store = Sqlite(dbpath)
     anames = store.get_artifact_list(isVerbose=isVerbose)
     for name in anames:
         print( name[0] )

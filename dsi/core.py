@@ -1,3 +1,6 @@
+
+from dsi.plugins import *
+
 # Core capability requirements:
 # 	Init plugin, parse data
 # 	Store backend

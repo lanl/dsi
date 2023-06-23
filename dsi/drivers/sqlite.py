@@ -19,7 +19,7 @@ class Artifact:
     properties = {}
 
 # Main storage class, interfaces with SQL
-class Sql(Filesystem):
+class Sqlite(Filesystem):
     """
         Primary storage class, inherits sql class
     """

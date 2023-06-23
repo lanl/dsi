@@ -30,6 +30,7 @@ class SetupWrapper(install):
     def run(self):
         insert_git_commit(metadata, sha)
         insert_git_commit(filesystem, sha)
+        print(get_cmd_output(cmd=['git add {} {}'.format(metadata,filesystem)]))
         install.run(self)
 
 setup(cmdclass={'install':SetupWrapper})
