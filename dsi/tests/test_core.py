@@ -1,4 +1,9 @@
-from dsi import core
+from dsi.core import Terminal
+
+def test_terminal_module_getter():
+    a = Terminal()
+    a.get_available_modules('plugin')
+    a.get_available_modules('driver')
 
 ## Use fluentd as inspiration
 #core.add_plugin('my_plugin.py')
