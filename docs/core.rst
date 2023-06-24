@@ -7,11 +7,25 @@ A Core Terminal is a home for Plugins, and an interface for Drivers. A Core Term
 >>> from dsi.core import Terminal
 >>> a = Terminal()
 >>> a.list_available_modules('plugin')
->>> # Loadable plugins: Hostname, SystemKernel, Bueno
+>>> # [ Hostname, SystemKernel, Bueno ]
 >>> a.list_available_modules('driver')
->>> # Loadable drivers: Gufi, Sqlite
->>> a.load_module('plugin', 'Bueno')
->>> a.load_module('driver', 'Sqlite')
+>>> # [ Gufi, Sqlite ]
+>>> a.load_module('plugin', 'Bueno','consumer')
+>>> # Bueno plugin consumer loaded successfully.
+>>> a.load_module('driver', 'Sqlite','front-end', filename='bogus') # Filename param requirement will be removed.
+>>> # Sqlite driver front-end loaded successfully.
+>>> a.load_module('driver', 'Sqlite','back-end',filename='yadda')
+>>> # Sqlite driver back-end loaded successfully.
+>>> a.list_loaded_modules()
+>>> {
+>>>  'producer': [], 
+>>>  'consumer': [<dsi.plugins.env.Bueno object at 0x2b028dbde250>], 
+>>>  'front-end': [<dsi.drivers.sqlite.Sqlite object at 0x2b028d8f7fd0>], 
+>>>  'back-end': [<dsi.drivers.sqlite.Sqlite object at 0x2b028d914250>]
+>>> }
+>>> a.execute() # Not yet implemented
+
+It is the Plugin contributor's responsibility to make sure consumer or producer functions succeed or report ``NotImplementedError``. It is the Driver contributor's responsiblity to make sure the front-end or back-end functions succeed or report ``NotImplementedError``. 
 
 .. automodule:: dsi.core
       :members:
