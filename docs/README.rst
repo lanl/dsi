@@ -4,7 +4,7 @@ How to build documentation
 
 1. Create or activate a DSI virtual environment †
 2. ``cd`` into the project space root
-3. ``python -m pip install sphinx sphinx_rtd_theme .``
+3. ``python -m pip install sphinx sphinx_rtd_theme pytest-cov coverage-badge gitpython graphviz .``
 4. ``cd ./docs``
 5. ``make html``
 6. ``make gh-pages``
