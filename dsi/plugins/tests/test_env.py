@@ -47,7 +47,7 @@ def test_envprov_plugin_adds_rows():
 def test_bueno_plugin_type():
     plug = Bueno()
     path = '/'.join([get_git_root('.'),'dsi/data','bueno.data'])
-    plug.add_row(path)
+    plug.add_row(filename=path)
     assert type(plug.output_collector) == collections.OrderedDict
 
 def test_bueno_plugin_adds_rows():

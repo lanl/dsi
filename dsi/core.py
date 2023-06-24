@@ -122,8 +122,13 @@ class Terminal():
         self.transload_lock=True
 
 
-    def query(self):
-        """Query is the user-facing query interface to a DSI Core Terminal."""
+    def user_handler(self, **kwargs):
+        """
+        The user_handler prepares a human/machine interface.
+
+        A Driver implements the user_handler experience, defining how the user interacts with the
+        `self.active_metadata` currently loaded in the DSI Core Terminal.
+        """
         pass
 
     def artifact_handler(self,interaction_type,**kwargs):
@@ -131,7 +136,8 @@ class Terminal():
         Store or retrieve using all loaded DSI Drivers with back-end functionality.
 
         A DSI Core Terminal may load zero or more Drivers with back-end storage functionality.
-        Calling store will execute all back-end functionality currently loaded.
+        Calling artifact_handler will execute all back-end functionality currently loaded, given
+        the provided ``interaction_type``.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
             print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
