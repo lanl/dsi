@@ -191,7 +191,7 @@ class SystemKernel(Environment):
         modules = self.get_cmd_output(lsmod_command).split("\n")
 
         sep = "END MODINFO"
-        modinfo_command = ["/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}') | "
+        modinfo_command = ["/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}' | sed 's/nvidia_/nvidia-current-/g' | sed 's/^nvidia$/nvidia-current/g') | "
                             f"sed -e 's/filename:/{sep}filename:/g'"]
         modinfos = self.get_cmd_output(modinfo_command).split("\n" + sep)
 
