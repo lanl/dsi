@@ -1,4 +1,5 @@
 from importlib import import_module
+from collections import OrderedDict
 from itertools import product
 import os
 
@@ -39,6 +40,8 @@ class Terminal():
         valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + self.VALID_MODULE_FUNCTIONS['driver']
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
+        self.active_metadata = OrderedDict()
+        self.transload_lock=False
 
     def list_available_modules(self, mod_type):
         """
@@ -66,6 +69,9 @@ class Terminal():
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
         """
+        if self.transload_lock==True and mod_type=='plugin':
+            print('Plugin module loading is prohibited after transload. No action taken.')
+            return
         if mod_function not in self.VALID_MODULE_FUNCTIONS[mod_type]:
             raise NotImplementedError
         if mod_name in [obj.__class__.__name__ for obj in self.active_modules[mod_function]]:
@@ -95,15 +101,23 @@ class Terminal():
         """
         return(self.active_modules)
 
-    def transload(self):
+    def transload(self, **kwargs):
         """
-        Transloading signals to the DSI Core Terminal that Plugin/Driver set up is complete.
+        Transloading signals to the DSI Core Terminal that Plugin set up is complete.
 
         A DSI Core Terminal must be transloaded before queries, metadata collection, or metadata 
         storage is possible. Transloading is the process of merging Plugin metadata from many 
         data sources to a single DSI Core Middleware data structure.
         """
-        pass
+        selected_function_modules = dict((k,self.active_modules[k]) for k in ('producer','consumer'))
+        # Note this transload supports plugin.env Environment types only now.
+        for module_type, objs in selected_function_modules.items():
+            for obj in objs:
+                obj.add_row(**kwargs)
+                for col_name, col_metadata in obj.output_collector.items():
+                    self.active_metadata[col_name] = col_metadata
+        self.transload_lock=True
+
 
     def query(self):
         """Query is the user-facing query interface to a DSI Core Terminal."""
