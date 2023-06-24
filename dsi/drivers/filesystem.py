@@ -1,5 +1,3 @@
-"""Abstract class for generic driver interfaces."""
-
 from abc import ABCMeta, abstractmethod
 import csv
 import os
@@ -24,7 +22,7 @@ class Driver(metaclass=ABCMeta):
         pass
 
 class Filesystem(Driver):
-    git_commit_sha='8a7df0b2e0fe296a7bc87dc2c3dfed9734833b79'
+    git_commit_sha='a8b15ecae6a81a2fb6e73288d8b51aee1a14ad59'
     # Declare named types for sql
     DOUBLE = "DOUBLE"
     STRING = "VARCHAR"
