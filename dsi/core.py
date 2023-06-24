@@ -95,9 +95,26 @@ class Terminal():
         """
         return(self.active_modules)
 
-# Core capability requirements:
-# 	Init plugin, parse data
-# 	Store backend
-# 	Query backend
-# 	SQLAlchemy converts query to backend compatible format
-# 	Only supports python primitive data structures, everything else goes into a driver.
+    def transload(self):
+        """
+        Transloading signals to the DSI Core Terminal that Plugin/Driver set up is complete.
+
+        A DSI Core Terminal must be transloaded before queries, metadata collection, or metadata 
+        storage is possible. Transloading is the process of merging Plugin metadata from many 
+        data sources to a single DSI Core Middleware data structure.
+        """
+        pass
+
+    def query(self):
+        """Query is the user-facing query interface to a DSI Core Terminal."""
+        pass
+
+    def store(self):
+        """
+        Store using all loaded DSI Drivers with back-end functionality.
+
+        A DSI Core Terminal may load zero or more Drivers with back-end storage functionality.
+        Calling store will execute all back-end functionality currently loaded.
+        """
+        pass
+
