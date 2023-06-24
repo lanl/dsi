@@ -22,8 +22,8 @@ class Driver(metaclass=ABCMeta):
         pass
 
 class Filesystem(Driver):
-    git_commit_sha='1512cad7433ef9cf5e9fdf5fe18ec926f0cba1e6'
-    # Declare named types for sql
+    git_commit_sha='b05404e70fab9e2f90f6fb47b234fb18bbe547e5'
+    # Declare named types
     DOUBLE = "DOUBLE"
     STRING = "VARCHAR"
     FLOAT = "FLOAT"
@@ -32,8 +32,9 @@ class Filesystem(Driver):
     #Declare store types
     GUFI_STORE = "gufi"
     SQLITE_STORE = "sqlite"
+    PARQUET_STORE = "parquet"
   
-    # Declare comparison types for sql
+    # Declare comparison types
     GT = ">"
     LT = "<"
     EQ = "="

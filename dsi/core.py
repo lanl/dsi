@@ -12,13 +12,14 @@ class Terminal():
     for more information.
     """
     DRIVER_PREFIX = ['dsi.drivers']
-    DRIVER_IMPLEMENTATIONS = ['gufi','sqlite']
+    DRIVER_IMPLEMENTATIONS = ['gufi','sqlite','parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env']
     VALID_PLUGINS = ['Hostname','SystemKernel','Bueno']
-    VALID_DRIVERS = ['Gufi','Sqlite']
+    VALID_DRIVERS = ['Gufi','Sqlite','Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
     VALID_MODULE_FUNCTIONS = {'plugin':['producer','consumer'],'driver':['front-end','back-end']}
+    VALID_ARTIFACT_INTERACTION_TYPES = ['get','set','put']
 
     def __init__(self):
         # Helper function to get parent module names.
@@ -73,6 +74,7 @@ class Terminal():
             print('Plugin module loading is prohibited after transload. No action taken.')
             return
         if mod_function not in self.VALID_MODULE_FUNCTIONS[mod_type]:
+            print('Hint: Did you declare your Module Function in the Terminal Global vars?')
             raise NotImplementedError
         if mod_name in [obj.__class__.__name__ for obj in self.active_modules[mod_function]]:
            print('{} {} already loaded as {}. Nothing to do.'.format(mod_name,mod_type,mod_function))
@@ -91,6 +93,7 @@ class Terminal():
         if load_success:
             print('{} {} {} loaded successfully.'.format(mod_name,mod_type,mod_function))
         else:
+            print('Hint: Did you declare your Plugin/Driver in the Terminal Global vars?')
             raise NotImplementedError
                 
     def list_loaded_modules(self):
@@ -110,7 +113,7 @@ class Terminal():
         data sources to a single DSI Core Middleware data structure.
         """
         selected_function_modules = dict((k,self.active_modules[k]) for k in ('producer','consumer'))
-        # Note this transload supports plugin.env Environment types only now.
+        # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 obj.add_row(**kwargs)
@@ -123,12 +126,25 @@ class Terminal():
         """Query is the user-facing query interface to a DSI Core Terminal."""
         pass
 
-    def store(self):
+    def artifact_handler(self,interaction_type,**kwargs):
         """
-        Store using all loaded DSI Drivers with back-end functionality.
+        Store or retrieve using all loaded DSI Drivers with back-end functionality.
 
         A DSI Core Terminal may load zero or more Drivers with back-end storage functionality.
         Calling store will execute all back-end functionality currently loaded.
         """
-        pass
+        if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
+            print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+            raise NotImplementedError
+        selected_function_modules = dict((k,self.active_modules[k]) for k in (['back-end']))
+        for module_type, objs in selected_function_modules.items():
+            for obj in objs:
+                if interaction_type=='put' or interaction_type=='set':
+                    obj.put_artifacts(collection=self.active_metadata, **kwargs)
+                elif interaction_type=='get':
+                    self.active_metadata=obj.get_artifacts(**kwargs)
+                else:
+                    print('Hint: Did you implement a case for your artifact interaction in the artifact_handler loop?')
+                    raise NotImplementedError
+
 
