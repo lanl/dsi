@@ -45,16 +45,16 @@ def test_envprov_plugin_adds_rows():
     assert len(plug.output_collector.keys()) > 100 # should def have more than 100 columns
 
 def test_bueno_plugin_type():
-    plug = Bueno()
     path = '/'.join([get_git_root('.'),'dsi/data','bueno.data'])
-    plug.add_row(filename=path)
+    plug = Bueno(filename=path)
+    plug.add_row()
     assert type(plug.output_collector) == collections.OrderedDict
 
 def test_bueno_plugin_adds_rows():
-    plug = Bueno()
     path = '/'.join([get_git_root('.'),'dsi/data','bueno.data'])
-    plug.add_row(path)
-    plug.add_row(path)
+    plug = Bueno(filename=path)
+    plug.add_row()
+    plug.add_row()
 
     for key, val in plug.output_collector.items():
         assert len(val) == 2

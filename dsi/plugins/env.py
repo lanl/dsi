@@ -56,10 +56,10 @@ class Bueno(Environment):
     are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
 
-    def __init__(self, path, **kwargs) -> None:
+    def __init__(self, filename, **kwargs) -> None:
         super().__init__()
         self.bueno_data = OrderedDict()
-        self.path = path
+        self.filename = filename
 
     def pack_header(self) -> None:
         """Set schema with POSIX and Bueno data."""
@@ -69,7 +69,7 @@ class Bueno(Environment):
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
-            with open(self.path,'r') as fh:
+            with open(self.filename,'r') as fh:
                 file_content=(fh.read())
             rows = file_content.split('\n')
             drop_rows = [row for row in rows if row != '']

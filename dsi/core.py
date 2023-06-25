@@ -19,7 +19,7 @@ class Terminal():
     VALID_DRIVERS = ['Gufi','Sqlite','Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
     VALID_MODULE_FUNCTIONS = {'plugin':['producer','consumer'],'driver':['front-end','back-end']}
-    VALID_ARTIFACT_INTERACTION_TYPES = ['get','set','put']
+    VALID_ARTIFACT_INTERACTION_TYPES = ['get','set','put', 'inspect']
 
     def __init__(self):
         # Helper function to get parent module names.
@@ -121,17 +121,7 @@ class Terminal():
                     self.active_metadata[col_name] = col_metadata
         self.transload_lock=True
 
-
-    def user_handler(self, **kwargs):
-        """
-        The user_handler prepares a human/machine interface.
-
-        A Driver implements the user_handler experience, defining how the user interacts with the
-        `self.active_metadata` currently loaded in the DSI Core Terminal.
-        """
-        pass
-
-    def artifact_handler(self,interaction_type,**kwargs):
+    def artifact_handler(self,interaction_type, **kwargs):
         """
         Store or retrieve using all loaded DSI Drivers with back-end functionality.
 
@@ -142,15 +132,28 @@ class Terminal():
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
             print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
             raise NotImplementedError
+        operation_success = False
+        # Perform artifact movement first, because inspect implementation may rely on 
+        # self.active_metadata or some stored artifact.
         selected_function_modules = dict((k,self.active_modules[k]) for k in (['back-end']))
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 if interaction_type=='put' or interaction_type=='set':
                     obj.put_artifacts(collection=self.active_metadata, **kwargs)
+                    operation_success = True
                 elif interaction_type=='get':
                     self.active_metadata=obj.get_artifacts(**kwargs)
-                else:
-                    print('Hint: Did you implement a case for your artifact interaction in the artifact_handler loop?')
-                    raise NotImplementedError
+                    operation_success = True
+        if interaction_type=='inspect':
+            for module_type, objs in selected_function_modules.items():
+                for obj in objs:
+                    obj.put_artifacts(collection=self.active_metadata, **kwargs)
+                    self.active_metadata=obj.inspect_artifacts(collection=self.active_metadata, **kwargs)
+                    operation_success = True
+        if operation_success:
+            return
+        else:
+            print('Hint: Did you implement a case for your artifact interaction in the artifact_handler loop?')
+            raise NotImplementedError
 
 

@@ -15,3 +15,7 @@ Drivers have front-end and back-end functions. Drivers connect users to DSI Core
 .. automodule:: dsi.drivers.gufi
    :members:
 
+.. automodule:: dsi.drivers.parquet
+   :members:
+
+

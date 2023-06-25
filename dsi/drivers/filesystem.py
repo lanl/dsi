@@ -20,9 +20,13 @@ class Driver(metaclass=ABCMeta):
     @abstractmethod
     def get_artifacts(self, query):
         pass
+  
+    @abstractmethod
+    def inspect_artifacts(self):
+        pass
 
 class Filesystem(Driver):
-    git_commit_sha='c8d495cd58ac9abf9f43f5c89f1ea84a89699bf4'
+    git_commit_sha='349706c7208d7ae6685262b77989002e434cd0b3'
     # Declare named types
     DOUBLE = "DOUBLE"
     STRING = "VARCHAR"
@@ -46,4 +50,7 @@ class Filesystem(Driver):
         pass
   
     def get_artifacts(self, query):
+        pass
+  
+    def inspect_artifacts(self):
         pass
