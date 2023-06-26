@@ -106,7 +106,7 @@ class SystemKernel(Environment):
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
-        column_names = list(self.prov_info.keys())
+        column_names = list(self.posix_info.keys()) + list(self.prov_info.keys()) 
         self.set_schema(column_names)
 
 
@@ -116,7 +116,7 @@ class SystemKernel(Environment):
             self.pack_header()
 
         pairs = self.get_prov_info()
-        self.add_to_output(list(pairs.values()))
+        self.add_to_output(list(self.posix_info.values()) + list(pairs.values()))
         
 
     def get_prov_info(self) -> dict:
