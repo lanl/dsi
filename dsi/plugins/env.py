@@ -195,9 +195,7 @@ class SystemKernel(Environment):
         sep = "END MODINFO"
         modinfo_command = ["/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}' | sed 's/nvidia_/nvidia-current-/g' | sed 's/^nvidia$/nvidia-current/g') | "
                             f"sed -e 's/filename:/{sep}filename:/g'"]
-        modinfos = self.get_cmd_output(modinfo_command).split("\n" + sep)
-
-        assert len(modules) == len(modinfos)
+        modinfos = self.get_cmd_output(modinfo_command, ignore_stderr=True).split("\n" + sep)
 
         mod_configs = {}
         for mod, info in zip(modules, modinfos):
@@ -217,14 +215,14 @@ class SystemKernel(Environment):
 
 
     @staticmethod
-    def get_cmd_output(cmd: list) -> str:
+    def get_cmd_output(cmd: list, ignore_stderr=False) -> str:
         """
         Runs a given command and returns the stdout if successful.
 
         If stderr is not empty, an exception is raised with the stderr text.
         """
         proc = subprocess.run(cmd, capture_output=True, shell=True)
-        if proc.stderr != b"":
+        if proc.stderr != b"" and not ignore_stderr:
             raise Exception(proc.stderr)
         return proc.stdout.strip().decode("utf-8")
 
