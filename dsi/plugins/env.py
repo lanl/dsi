@@ -2,6 +2,7 @@ from collections import OrderedDict
 import os
 import socket
 import subprocess
+from getpass import getuser
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -20,7 +21,7 @@ class Environment(StructuredMetadata):
         self.posix_info['uid'] = os.getuid()
         self.posix_info['effective_gid'] = os.getgid()
         egid = self.posix_info['effective_gid']
-        self.posix_info['moniker'] = os.getlogin()
+        self.posix_info['moniker'] = getuser()
         moniker = self.posix_info['moniker']
         self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
 
