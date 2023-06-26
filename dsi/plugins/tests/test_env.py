@@ -1,6 +1,6 @@
 import collections
 
-from dsi.plugins.env import Hostname, SystemKernel, Bueno
+from dsi.plugins.env import Hostname, SystemKernel, Bueno, GitInfo
 import git
 
 def get_git_root(path):
@@ -60,3 +60,27 @@ def test_bueno_plugin_adds_rows():
         assert len(val) == 2
 
     assert len(plug.output_collector.keys()) == 7 # 3 Bueno cols + 4 inherited Env cols
+
+def test_git_plugin_type():
+    plug = GitInfo()
+    plug.add_row()
+    assert type(plug.output_collector) == collections.OrderedDict
+
+def test_git_plugin_adds_rows():
+    plug = GitInfo()
+    plug.add_row()
+    plug.add_row()
+
+    for key, val in plug.output_collector.items():
+        assert len(val) == 2
+
+    assert len(plug.output_collector.keys()) == 6 # 2 Git cols + 4 inherited Env cols
+
+def test_git_plugin_infos_are_str():
+    plug = GitInfo()
+    plug.add_row()
+
+    assert type(plug.output_collector["git-remote"][0]) == str
+    assert type(plug.output_collector["git-commit"][0]) == str
+
+

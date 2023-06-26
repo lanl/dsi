@@ -15,7 +15,7 @@ class Terminal():
     DRIVER_IMPLEMENTATIONS = ['gufi','sqlite','parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env']
-    VALID_PLUGINS = ['Hostname','SystemKernel','Bueno']
+    VALID_PLUGINS = ['Hostname','SystemKernel','Bueno', 'GitInfo']
     VALID_DRIVERS = ['Gufi','Sqlite','Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
     VALID_MODULE_FUNCTIONS = {'plugin':['producer','consumer'],'driver':['front-end','back-end']}

@@ -3,6 +3,7 @@ import os
 import socket
 import subprocess
 from getpass import getuser
+from git import Repo
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -83,6 +84,39 @@ class Bueno(Environment):
             self.pack_header()
 
         row = list(self.posix_info.values()) + list(self.bueno_data.values())
+        self.add_to_output(row)
+
+class GitInfo(Environment):
+    """
+    A Plugin to capture Git information.
+
+    Adds the current git remote and git commit to metadata.
+    """
+
+    def __init__(self, git_repo_path="./") -> None:
+        """ Initializes the git repo in the given directory and access to git commands """
+        super().__init__()
+        try:
+            self.repo = Repo(git_repo_path)
+        except:
+            raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
+                             "GitInfo Plugin must be given a repo base path (default is working dir)")
+        self.git_info = {
+            "git-remote": lambda: self.repo.git.remote("-v"),
+            "git-commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
+        }
+
+    def pack_header(self) -> None:
+        """ Set schema with POSIX and Git columns """
+        column_names = list(self.posix_info.keys()) + list(self.git_info.keys())
+        self.set_schema(column_names)
+
+    def add_row(self) -> None:
+        """ Adds a row to the output with POSIX info, git remote, and git commit """
+        if not self.schema_is_set():
+            self.pack_header()
+
+        row = list(self.posix_info.values()) + [self.git_info["git-remote"](), self.git_info["git-commit"]()]
         self.add_to_output(row)
 
 class SystemKernel(Environment):
