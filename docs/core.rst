@@ -74,8 +74,8 @@ You can then close your Jupyter notebook, ``transload()`` additionally to increa
 
 Although this demonstration only used one Plugin per Plugin functionality, any number of plugins can be added to collect an arbitrary amount of queriable metadata::
 
->>> a.load_module('driver','Parquet','front-end',filename='parquet.data')
->>> # Parquet driver front-end loaded successfully.
+>>> a.load_module('plugin','SystemKernel','producer')
+>>> # SystemKernel plugin producer loaded successfully
 >>> a.list_loaded_modules()
 >>> # {'producer': [<dsi.plugins.env.Hostname object at 0x7fce3c612b50>, <dsi.plugins.env.SystemKernel object at 0x7fce68519250>], 
 >>> # 'consumer': [<dsi.plugins.env.Bueno object at 0x7fce3c622110>], 
