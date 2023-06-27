@@ -17,6 +17,8 @@ def test_wildfire_data_sql_artifact():
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
     store.close()
+    # No error implies success
+    assert True
 
     
 def test_wildfire_data_csv_artifact():
@@ -25,6 +27,8 @@ def test_wildfire_data_csv_artifact():
     store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath,"simulation", isVerbose=isVerbose)
     store.close()
+    # No error implies success
+    assert True
     
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'),'dsi/data/yosemite5.csv'])
@@ -32,12 +36,8 @@ def test_yosemite_data_csv_artifact():
     store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath,"vision", isVerbose=isVerbose)
     store.close()
-
-def test_query():    
-    #Query everything
-    #result = store.sqlquery("SELECT * FROM " + str("vision"))
-    #store.close()
-    pass
+    # No error implies success
+    assert True
 
 
 def test_artifact_query():
@@ -45,11 +45,10 @@ def test_artifact_query():
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
     anames = store.get_artifact_list(isVerbose=isVerbose)
-    for name in anames:
-        print( name[0] )
     data_type = DataType()
     data_type.name = "simulation"
     result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " + str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
     store.export_csv(result, "query.csv")
     store.close()
-    print("Done")
+    # No error implies success
+    assert True
