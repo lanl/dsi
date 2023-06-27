@@ -29,7 +29,7 @@ class Plugin(metaclass=ABCMeta):
 
 class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
-    git_commit_sha='349706c7208d7ae6685262b77989002e434cd0b3'
+    git_commit_sha='8934ce294eb16c5c2d116e07cf8f3309a6884c97'
     
     def __init__(self):
         """ 

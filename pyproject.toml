@@ -21,5 +21,6 @@ classifiers=[
     "Programming Language :: Python"
 ]
 dependencies = [
-	"gitpython"
+	"gitpython",
+  "pyarrow"
 ]
