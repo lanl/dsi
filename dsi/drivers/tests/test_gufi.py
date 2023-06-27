@@ -2,12 +2,6 @@ from dsi.drivers.gufi import Gufi, DataType
 
 isVerbose=False
 
-def test_query():    
-    #Query everything
-    #store.close()
-    pass
-
-
 def test_artifact_query():
     dbpath = "db.db"
     index = "gufi_indexes"
@@ -17,9 +11,7 @@ def test_artifact_query():
     store = Gufi(prefix, index, dbpath, table, column, isVerbose)
     sqlstr = "select * from dsi_entries"
     rows = store.get_artifacts(sqlstr)
-    print( rows )
-
     store.close()
-    print("Done")
+    assert len(rows)>0
+    
 
-test_artifact_query()
