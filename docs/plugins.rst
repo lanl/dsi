@@ -1,11 +1,9 @@
 Plugins
 ===================
+Plugins connect data-producing applications to DSI middleware. Plugins have "producer" or "consumer" functions. A Plugin consumer function deals with existing data files or input streams. A Plugin producer deals with generating new data. Plugins are modular to support user contribution. Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. In order to be compatible with DSI middleware, Plugins should produce data in Python built-in data structures or data structures sourced from the Python ``collections`` library. Plugin extensions will be accepted conditional to the extention of ``plugins/tests`` to demonstrate the new Plugin capability. We can not accept pull requests that are not tested.
+.. image:: PluginClassHierarchy.png
 
-Plugins are an abstraction to connect a data source (ex- physics simulation) to the DSI core middleware. Plugins are responsible for transforming data source outputs into a DSI compatible middleware format. Currently we require that Plugins produce Python built-in data structures, or an ``OrderedDict`` from the ``collections`` Python library. Plugin inputs may be anything, however, and we encourage the open source community to act as Plugin Authors to produce Plugin contributions. Feel free to make Pull Requests into the project source with your Plugins. Please provide Unit tests for these contributions.
-
-
-
-.. automodule:: dsi.plugins.structured_metadata_plugin
+.. automodule:: dsi.plugins.metadata
    :members:
 
 .. automodule:: dsi.plugins.env

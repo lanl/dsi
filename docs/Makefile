@@ -9,7 +9,17 @@ all: html
 
 # Build HTML
 html:
+	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
+	python ./drivers/generate_driver_class_hierarchy.py ../dsi/drivers/
+	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
+	mv DriverClassHierarchy.gv.png DriverClassHierarchy.png
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
+	rm -rf $(BUILDDIR)/html/htmlcov
+	pytest --cov --cov-report=html ../
+	mv ./htmlcov $(BUILDDIR)/html
+	rm ../coverage.svg
+	coverage-badge -o ../coverage.svg
+	git add ../coverage.svg
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
@@ -26,6 +36,7 @@ gh-pages: _build/html
 	touch .nojekyll && \
 	git init && \
 	git add . && \
+	git add --force ./htmlcov && \
 	git commit -m "DSI Documentation" && \
 	git push -f $$root master:gh-pages && \
 	rm -rf .git
@@ -33,6 +44,13 @@ gh-pages: _build/html
 # Push to external docs site
 publish:
 	git push -f origin gh-pages
+
+# Make a PDF
+latexpdf:
+	$(SPHINXBUILD) -b latex . $(BUILDDIR)/latex
+	@echo "Running LaTeX files through pdflatex..."
+	$(MAKE) -C $(BUILDDIR)/latex all-pdf
+	@echo "pdflatex finished; the PDF files are in $(BUILDDIR)/latex."
 
 # Print usage
 help:
@@ -42,4 +60,4 @@ help:
 	@echo "  publish    upload documentation to github"
 
 clean:
-	-rm -rf $(BUILDDIR)/* 
+	-rm -rf $(BUILDDIR)/* *ClassHierarchy.gv *Hierarchy.png 

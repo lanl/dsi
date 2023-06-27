@@ -20,4 +20,6 @@ authors=[
 classifiers=[
     "Programming Language :: Python"
 ]
-
+dependencies = [
+	"gitpython"
+]
