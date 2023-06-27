@@ -62,12 +62,14 @@ def test_bueno_plugin_adds_rows():
     assert len(plug.output_collector.keys()) == 7 # 3 Bueno cols + 4 inherited Env cols
 
 def test_git_plugin_type():
-    plug = GitInfo()
+    root = get_git_root('.')
+    plug = GitInfo(git_repo_path=root)
     plug.add_row()
     assert type(plug.output_collector) == collections.OrderedDict
 
 def test_git_plugin_adds_rows():
-    plug = GitInfo()
+    root = get_git_root('.')
+    plug = GitInfo(git_repo_path=root)
     plug.add_row()
     plug.add_row()
 
@@ -77,7 +79,8 @@ def test_git_plugin_adds_rows():
     assert len(plug.output_collector.keys()) == 6 # 2 Git cols + 4 inherited Env cols
 
 def test_git_plugin_infos_are_str():
-    plug = GitInfo()
+    root = get_git_root('.')
+    plug = GitInfo(git_repo_path=root)
     plug.add_row()
 
     assert type(plug.output_collector["git-remote"][0]) == str

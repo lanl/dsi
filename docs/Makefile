@@ -17,7 +17,7 @@ html:
 	rm -rf $(BUILDDIR)/html/htmlcov
 	pytest --cov --cov-report=html ../
 	mv ./htmlcov $(BUILDDIR)/html
-	rm ../coverage.svg
+	rm -f ../coverage.svg
 	coverage-badge -o ../coverage.svg
 	git add ../coverage.svg
 	@echo
