@@ -1,5 +1,9 @@
 Pylama
 ======
+First, make sure you have pylama in your pip venv::
+
+        python -m pip install pylama
+
 
 If you want to ensure your commits meet PEP8 style guidelines for every commit you make. Do the following::
 
@@ -18,6 +22,11 @@ First, blessings upon you for helping. It is likely that there are many style pr
 
 How to go faster
 ================
+
+To go faster (highly recommended), first install autopep8 in your pip venv::
+
+        python -m pip install autopep8
+
 
 You can use the ``autopep8`` automatic formatter to fix many mistakes in the code automatically. It won't catch everything, but it will get a lot of it. Using this to blindly replace strings in the code seems like a bad idea. Instead, we recommend that you do the following:
 
