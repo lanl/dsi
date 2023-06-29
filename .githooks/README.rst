@@ -6,6 +6,11 @@ If you want to ensure your commits meet PEP8 style guidelines for every commit y
         cp .githooks/pre-commit .git/hooks/
         chmod +x .git/hooks/pre-commit
 
+For a special ASCII treat to reward your righteous labors, also do::
+        
+        cp .githooks/post-commit .git/hooks/
+        chmod +x .git/hooks/post-commit
+
 How to use it
 =============
 
