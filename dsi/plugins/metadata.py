@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from abc import ABCMeta, abstractmethod
 
+
 class Plugin(metaclass=ABCMeta):
     """Plugin abstract class for DSI core product.
 
@@ -27,20 +28,21 @@ class Plugin(metaclass=ABCMeta):
         Read a Plugin file. Return a Plugin object.
         """
 
+
 class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
-    git_commit_sha='5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
-    
+    git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
+
     def __init__(self):
-        """ 
+        """
         Initializes a StructuredDataPlugin with an output collector
         and an initially unset column count.
         """
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
-    
+
     def set_schema(self, column_names: list) -> None:
-        """ 
+        """
         Initializes columns in the output_collector and column_cnt.
         Useful in a plugin's pack_header method.
         """
@@ -49,7 +51,7 @@ class StructuredMetadata(Plugin):
         self.column_cnt = len(column_names)
 
     def add_to_output(self, row: list) -> None:
-        """ 
+        """
         Adds a row of data to the output_collector and guarantees good structure.
         Useful in a plugin's add_row method.
         """
