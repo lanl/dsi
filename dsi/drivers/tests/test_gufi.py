@@ -1,6 +1,7 @@
-from dsi.drivers.gufi import Gufi, DataType
+from dsi.drivers.gufi import Gufi
 
-isVerbose=False
+isVerbose = False
+
 
 def test_artifact_query():
     dbpath = "db.db"
@@ -12,6 +13,4 @@ def test_artifact_query():
     sqlstr = "select * from dsi_entries"
     rows = store.get_artifacts(sqlstr)
     store.close()
-    assert len(rows)>0
-    
-
+    assert len(rows) > 0
