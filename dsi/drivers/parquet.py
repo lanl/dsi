@@ -5,6 +5,7 @@ import subprocess
 
 from dsi.drivers.filesystem import Filesystem
 
+
 class Parquet(Filesystem):
     """
     Support for a Parquet back-end Driver.
@@ -14,12 +15,12 @@ class Parquet(Filesystem):
 
     def __init__(self, filename, **kwargs):
         super().__init__(filename=filename)
-        self.filename=filename
+        self.filename = filename
         try:
             self.compression = kwargs['compression']
         except KeyError:
             self.compression = None
-        
+
     def get_artifacts(self):
         """Get Parquet data from filename."""
         table = pq.read_table(self.filename)
@@ -59,11 +60,11 @@ class Parquet(Filesystem):
 
         code2 = """\
         df.info()
-        """.format(self.filename)
+        """
 
         code3 = """\
         df.describe()
-        """.format(self.filename)
+        """
 
         nb['cells'] = [nbf.v4.new_markdown_cell(text),
                        nbf.v4.new_code_cell(code1),
@@ -77,4 +78,5 @@ class Parquet(Filesystem):
             nbf.write(nb, fh)
 
         print('Opening Jupyter notebook...')
-        self.get_cmd_output(cmd=['jupyter-lab ./dsi_parquet_driver_output.ipynb'])
+        self.get_cmd_output(
+            cmd=['jupyter-lab ./dsi_parquet_driver_output.ipynb'])
