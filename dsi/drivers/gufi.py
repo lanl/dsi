@@ -10,8 +10,11 @@ class DataType:
     properties = {}
     units = {}
 
+class GUFIStore(FsStore):
+    '''
+    GUFI Datastore
+    '''
 
-class Gufi(Filesystem):
     prefix = ""
     index = ""
     dbfile = ""
@@ -28,6 +31,15 @@ class Gufi(Filesystem):
     """
 
     def __init__(self, prefix, index, dbfile, table, column, verbose=False):
+        '''
+        prefix: prefix to GUFI commands
+        index: directory with GUFI indexes
+        dbfile: sqlite db file from DSI
+        table: table name from the DSI db we want to join on
+        column: column name from the DSI db to join on
+        verbose: print debugging statements or not
+        '''
+
         super().__init__(dbfile)
         # prefix is the prefix to the GUFI installation
         self.prefix = prefix
@@ -44,6 +56,11 @@ class Gufi(Filesystem):
 
     # Query GUFI and DSI db
     def get_artifacts(self, query):
+        '''
+        Retrieves GUFI's metadata joined with a dsi database
+        query: an sql query into the dsi_entries table
+        '''
+
         resout = self._run_gufi_query(query)
         if self.isVerbose:
             print(resout)
@@ -55,15 +72,18 @@ class Gufi(Filesystem):
 
     # Runs the gufi query command
     def _run_gufi_query(self, sqlstring):
-        # Create the string for the -Q option that specifies the dsi db file,
-        # the dsi db table name, and the dsi db inode column name.
-        # qstr = self.dbfile + " " + self.table + " " + self.column + " inode"
+        '''
+        Calls the qufy_query command to run the sql query
+        sqlstring: the query into the dsi_entries table
+        '''
 
-        # Run the GUFI query command
-        result = subprocess.run([self.prefix + "/gufi_query",
-                                 "-d", "|", "-Q", self.dbfile, self.table, self.column,
-                                 "inode", "-E", sqlstring, self.index], capture_output=True,
-                                text=True)
+        #Create the string for the -Q option that specifies the dsi db file, 
+        #the dsi db table name, and the dsi db inode column name.
+        qstr = self.dbfile + " " + self.table + " " + self.column + " inode"
+
+        #Run the GUFI query command
+        result = subprocess.run([self.prefix + "/gufi_query", "-d", "|", "-Q", self.dbfile, self.table, self.column, "inode", "-E", 
+                                 sqlstring, self.index], capture_output=True, text=True)
         return result.stdout
 
     def close(self):
