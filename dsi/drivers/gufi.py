@@ -10,6 +10,7 @@ class DataType:
     properties = {}
     units = {}
 
+
 class GUFIStore(FsStore):
     '''
     GUFI Datastore
@@ -77,12 +78,12 @@ class GUFIStore(FsStore):
         sqlstring: the query into the dsi_entries table
         '''
 
-        #Create the string for the -Q option that specifies the dsi db file, 
-        #the dsi db table name, and the dsi db inode column name.
+        # Create the string for the -Q option that specifies the dsi db file,
+        # the dsi db table name, and the dsi db inode column name.
         qstr = self.dbfile + " " + self.table + " " + self.column + " inode"
 
-        #Run the GUFI query command
-        result = subprocess.run([self.prefix + "/gufi_query", "-d", "|", "-Q", self.dbfile, self.table, self.column, "inode", "-E", 
+        # Run the GUFI query command
+        result = subprocess.run([self.prefix + "/gufi_query", "-d", "|", "-Q", self.dbfile, self.table, self.column, "inode", "-E",
                                  sqlstring, self.index], capture_output=True, text=True)
         return result.stdout
 
