@@ -1,8 +1,8 @@
 import subprocess
 
-from dsi.drivers.filesystem import Filesystem
 
 # Holds table name and data properties
+from dsi.drivers.filesystem import FsStore
 
 
 class DataType:
@@ -80,11 +80,12 @@ class GUFIStore(FsStore):
 
         # Create the string for the -Q option that specifies the dsi db file,
         # the dsi db table name, and the dsi db inode column name.
-        qstr = self.dbfile + " " + self.table + " " + self.column + " inode"
+        _ = self.dbfile + " " + self.table + " " + self.column + " inode"
 
         # Run the GUFI query command
-        result = subprocess.run([self.prefix + "/gufi_query", "-d", "|", "-Q", self.dbfile, self.table, self.column, "inode", "-E",
-                                 sqlstring, self.index], capture_output=True, text=True)
+        result = subprocess.run([self.prefix + "/gufi_query", "-d", "|", "-Q", self.dbfile,
+                                self.table, self.column, "inode", "-E", sqlstring, self.index],
+                                capture_output=True, text=True)
         return result.stdout
 
     def close(self):
