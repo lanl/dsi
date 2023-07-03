@@ -2,7 +2,7 @@ import subprocess
 
 
 # Holds table name and data properties
-from dsi.drivers.filesystem import FsStore
+from dsi.drivers.filesystem import Filesystem
 
 
 class DataType:
@@ -11,7 +11,7 @@ class DataType:
     units = {}
 
 
-class GUFIStore(FsStore):
+class Gufi(Filesystem):
     '''
     GUFI Datastore
     '''
