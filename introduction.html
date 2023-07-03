@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="installation.html" />
+    <link rel="prev" title="The Data Science Infrastructure Project (DSI)" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#implementation">Implementation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi-core-middleware">DSI Core Middleware</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#plugin-abstract-classes">Plugin Abstract Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#driver-abstract-classes">Driver Abstract Classes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h1>
+<p>The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and share data repositories. DSI enables flexible, data-intensive scientific workflows that meet researcher needs.</p>
+<a class="reference internal image-reference" href="_images/data_lifecycle.png"><img alt="_images/data_lifecycle.png" src="_images/data_lifecycle.png" style="width: 305.0px; height: 315.0px;" /></a>
+<p>DSI system design is driven by experiences which satisfy User Stories. DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.</p>
+<section id="implementation">
+<h2>Implementation<a class="headerlink" href="#implementation" title="Permalink to this heading"></a></h2>
+<p>The DSI system is composed of three fundamental parts:</p>
+<a class="reference internal image-reference" href="_images/three_easy_pieces.png"><img alt="_images/three_easy_pieces.png" src="_images/three_easy_pieces.png" style="width: 347.16px; height: 247.5px;" /></a>
+<section id="dsi-core-middleware">
+<h3>DSI Core Middleware<a class="headerlink" href="#dsi-core-middleware" title="Permalink to this heading"></a></h3>
+<p>DSI’s core middleware is focused on delivering user-queries on unified metadata which are distributed across many files and security domains. DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions. The DSI Core middleware is a home for DSI Plugins and an interface for DSI Drivers.</p>
+</section>
+<section id="plugin-abstract-classes">
+<h3>Plugin Abstract Classes<a class="headerlink" href="#plugin-abstract-classes" title="Permalink to this heading"></a></h3>
+<p>Plugins transform an arbitrary data source into a format that is compatible with our middleware. We call the parsed and queriable attributes “metadata” (data about the data). Metadata share the same security profile as the source data.</p>
+<p>Plugins can operate as data consumers or data producers. A simple data consumer might parse an application’s output file and place it into a middleware compatible data structure: Python built-ins and members of the popular Python <code class="docutils literal notranslate"><span class="pre">collection</span></code> module. A simple data producer might execute an application to supplement existing data and queriable metadata.</p>
+<p>Plugins are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.</p>
+<img alt="_images/PluginClassHierarchy.png" src="_images/PluginClassHierarchy.png" />
+</section>
+<section id="driver-abstract-classes">
+<h3>Driver Abstract Classes<a class="headerlink" href="#driver-abstract-classes" title="Permalink to this heading"></a></h3>
+<p>Drivers are an interface between the User and the Core, or an interface between the Core and a storage medium. Drivers can operate as Front-ends or Back-ends, and a Driver contributor can choose to implement one or both. Driver front-ends are built to deliver an experience which is compatible with a User Story. A simple supporting User Story is a need to query metadata by SQL query. Because the set of queriable metadata are spread across filesystems and security domains, a supporting Driver Back-end is required to assemble query results and present them to the DSI core middleware for transformation and return, creating an experience which is compatible with the User Story.</p>
+<a class="reference internal image-reference" href="_images/user_story.png"><img alt="_images/user_story.png" src="_images/user_story.png" style="width: 494.0px; height: 373.0px;" /></a>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="The Data Science Infrastructure Project (DSI)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Terry Turton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

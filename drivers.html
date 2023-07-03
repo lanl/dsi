@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drivers &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Plugins" href="plugins.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Drivers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.drivers.sqlite.Artifact"><code class="docutils literal notranslate"><span class="pre">Artifact</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite"><code class="docutils literal notranslate"><span class="pre">Sqlite</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.check_type"><code class="docutils literal notranslate"><span class="pre">Sqlite.check_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.export_csv"><code class="docutils literal notranslate"><span class="pre">Sqlite.export_csv()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.get_artifact_list"><code class="docutils literal notranslate"><span class="pre">Sqlite.get_artifact_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.put_artifact_type"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifact_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.put_artifacts"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.put_artifacts_csv"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts_csv()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.query_fctime"><code class="docutils literal notranslate"><span class="pre">Sqlite.query_fctime()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.query_fname"><code class="docutils literal notranslate"><span class="pre">Sqlite.query_fname()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.query_fsize"><code class="docutils literal notranslate"><span class="pre">Sqlite.query_fsize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.sqlite.Sqlite.sqlquery"><code class="docutils literal notranslate"><span class="pre">Sqlite.sqlquery()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.drivers.gufi.Gufi"><code class="docutils literal notranslate"><span class="pre">Gufi</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.gufi.Gufi.get_artifacts"><code class="docutils literal notranslate"><span class="pre">Gufi.get_artifacts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.gufi.Gufi.isVerbose"><code class="docutils literal notranslate"><span class="pre">Gufi.isVerbose</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.drivers.parquet.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.parquet.Parquet.get_artifacts"><code class="docutils literal notranslate"><span class="pre">Parquet.get_artifacts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.parquet.Parquet.get_cmd_output"><code class="docutils literal notranslate"><span class="pre">Parquet.get_cmd_output()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.parquet.Parquet.inspect_artifacts"><code class="docutils literal notranslate"><span class="pre">Parquet.inspect_artifacts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.drivers.parquet.Parquet.put_artifacts"><code class="docutils literal notranslate"><span class="pre">Parquet.put_artifacts()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Drivers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/drivers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="drivers">
+<h1>Drivers<a class="headerlink" href="#drivers" title="Permalink to this heading"></a></h1>
+<p>Drivers have front-end and back-end functions. Drivers connect users to DSI Core middleware (front-end), and Drivers allow DSI Middleware data structures to read and write to persistent external storage (back-end). Drivers are modular to support user contribution. Driver contributors are encouraged to offer custom Driver abstract classes and Driver implementations. A contributed Driver abstract class may extend another Driver to inherit the properties of the parent. In order to be compatible with DSI Core middleware, Drivers should create an interface to Python built-in data structures or data structures from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library. Driver extensions will be accepted conditional to the extention of <code class="docutils literal notranslate"><span class="pre">drivers/tests</span></code> to demonstrate new Driver capability. We can not accept pull requests that are not tested.</p>
+<img alt="_images/DriverClassHierarchy.png" src="_images/DriverClassHierarchy.png" />
+<span class="target" id="module-dsi.drivers.filesystem"></span><span class="target" id="module-dsi.drivers.sqlite"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Artifact">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.drivers.sqlite.</span></span><span class="sig-name descname"><span class="pre">Artifact</span></span><a class="headerlink" href="#dsi.drivers.sqlite.Artifact" title="Permalink to this definition"></a></dt>
+<dd><p>Primary Artifact class that holds database schema in memory.
+An Artifact is a generic construct that defines the schema for metadata that
+defines the tables inside of SQL</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.drivers.sqlite.</span></span><span class="sig-name descname"><span class="pre">Sqlite</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite" title="Permalink to this definition"></a></dt>
+<dd><p>Primary storage class, inherits sql class</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.check_type">
+<span class="sig-name descname"><span class="pre">check_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.check_type" title="Permalink to this definition"></a></dt>
+<dd><p>Tests input text and returns a predicted compatible SQL Type
+<cite>text</cite>: text string
+<cite>return</cite>: string description of a SQL data type</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.export_csv">
+<span class="sig-name descname"><span class="pre">export_csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.export_csv" title="Permalink to this definition"></a></dt>
+<dd><p>Function that outputs a csv file of a return query, given an initial query.</p>
+<p><cite>query</cite>: raw SQL query to be executed on current table</p>
+<p><cite>fname</cite>: target filename (including path) that will output the return query as a csv file</p>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.get_artifact_list">
+<span class="sig-name descname"><span class="pre">get_artifact_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.get_artifact_list" title="Permalink to this definition"></a></dt>
+<dd><p>Function that returns a list of all of the Artifact names (represented as sql tables)</p>
+<p><cite>return</cite>: list of Artifact names</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.put_artifact_type">
+<span class="sig-name descname"><span class="pre">put_artifact_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">types</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.put_artifact_type" title="Permalink to this definition"></a></dt>
+<dd><p>Primary class for defining metadata Artifact schema.</p>
+<dl class="simple">
+<dt><cite>types</cite>: DataType derived class that defines the string name, properties</dt><dd><p>(named SQL type), and units for each column in the schema.</p>
+</dd>
+</dl>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.put_artifacts">
+<span class="sig-name descname"><span class="pre">put_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifacts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.put_artifacts" title="Permalink to this definition"></a></dt>
+<dd><p>Primary class for insertion of Artifact metadata into a defined schema</p>
+<dl class="simple">
+<dt><cite>Artifacts</cite>: DataType derived class that has a regular structure of a defined schema,</dt><dd><p>filled with rows to insert.</p>
+</dd>
+</dl>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.put_artifacts_csv">
+<span class="sig-name descname"><span class="pre">put_artifacts_csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.put_artifacts_csv" title="Permalink to this definition"></a></dt>
+<dd><p>Function for insertion of Artifact metadata into a defined schema by using a CSV file,
+where the first row of the CSV contains the column names of the schema. Any rows
+thereafter contain data to be inserted. Data types are automatically assigned based on
+typecasting and default to a string type if none can be found.</p>
+<p><cite>fname</cite>: filepath to the .csv file to be read and inserted into the database</p>
+<p><cite>tname</cite>: String name of the table to be inserted</p>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.query_fctime">
+<span class="sig-name descname"><span class="pre">query_fctime</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">operator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ctime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.query_fctime" title="Permalink to this definition"></a></dt>
+<dd><p>Function that queries file creation times within the filesystem metadata store</p>
+<p><cite>operator</cite>: operator input GT, LT, EQ as a modifier for a creation time search</p>
+<p><cite>ctime</cite>: creation time in POSIX format, see the utils <cite>dateToPosix</cite> conversion function</p>
+<p><cite>return</cite>: query list of filenames matching the creation time criteria with modifiers</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.query_fname">
+<span class="sig-name descname"><span class="pre">query_fname</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.query_fname" title="Permalink to this definition"></a></dt>
+<dd><p>Function that queries filenames within the filesystem metadata store</p>
+<p><cite>name</cite>: string name of a subsection of a filename to be searched</p>
+<p><cite>return</cite>: query list of filenames matching <cite>name</cite> string</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.query_fsize">
+<span class="sig-name descname"><span class="pre">query_fsize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">operator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.query_fsize" title="Permalink to this definition"></a></dt>
+<dd><p>Function that queries ranges of file sizes within the filesystem metadata store</p>
+<p><cite>operator</cite>: operator input GT, LT, EQ as a modifier for a filesize search</p>
+<p><cite>size</cite>: size in bytes</p>
+<p><cite>return</cite>: query list of filenames matching filesize criteria with modifiers</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.sqlite.Sqlite.sqlquery">
+<span class="sig-name descname"><span class="pre">sqlquery</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.sqlite.Sqlite.sqlquery" title="Permalink to this definition"></a></dt>
+<dd><p>Function that provides a direct sql query passthrough to the database.</p>
+<p><cite>query</cite>: raw SQL query to be executed on current table</p>
+<p><cite>return</cite>: raw sql query list that contains result of the original query</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-dsi.drivers.gufi"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.drivers.gufi.Gufi">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.drivers.gufi.</span></span><span class="sig-name descname"><span class="pre">Gufi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dbfile</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.gufi.Gufi" title="Permalink to this definition"></a></dt>
+<dd><p>GUFI Datastore</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.gufi.Gufi.get_artifacts">
+<span class="sig-name descname"><span class="pre">get_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.gufi.Gufi.get_artifacts" title="Permalink to this definition"></a></dt>
+<dd><p>Retrieves GUFI’s metadata joined with a dsi database
+query: an sql query into the dsi_entries table</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.drivers.gufi.Gufi.isVerbose">
+<span class="sig-name descname"><span class="pre">isVerbose</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#dsi.drivers.gufi.Gufi.isVerbose" title="Permalink to this definition"></a></dt>
+<dd><p>prefix: prefix to GUFI commands
+index: directory with GUFI indexes
+dbfile: sqlite db file from DSI
+table: table name from the DSI db we want to join on
+column: column name from the DSI db to join on</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-dsi.drivers.parquet"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.drivers.parquet.Parquet">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.drivers.parquet.</span></span><span class="sig-name descname"><span class="pre">Parquet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.parquet.Parquet" title="Permalink to this definition"></a></dt>
+<dd><p>Support for a Parquet back-end Driver.</p>
+<p>Parquet is a convenient format when metadata are larger than SQLite supports.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.parquet.Parquet.get_artifacts">
+<span class="sig-name descname"><span class="pre">get_artifacts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.parquet.Parquet.get_artifacts" title="Permalink to this definition"></a></dt>
+<dd><p>Get Parquet data from filename.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.parquet.Parquet.get_cmd_output">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cmd_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.drivers.parquet.Parquet.get_cmd_output" title="Permalink to this definition"></a></dt>
+<dd><p>Runs a given command and returns the stdout if successful.</p>
+<p>If stderr is not empty, an exception is raised with the stderr text.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.parquet.Parquet.inspect_artifacts">
+<span class="sig-name descname"><span class="pre">inspect_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.parquet.Parquet.inspect_artifacts" title="Permalink to this definition"></a></dt>
+<dd><p>Populate a Jupyter notebook with tools required to look at Parquet data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.drivers.parquet.Parquet.put_artifacts">
+<span class="sig-name descname"><span class="pre">put_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.drivers.parquet.Parquet.put_artifacts" title="Permalink to this definition"></a></dt>
+<dd><p>Put artifacts into file at filename path.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="plugins.html" class="btn btn-neutral float-left" title="Plugins" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Terry Turton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

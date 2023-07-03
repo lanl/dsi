@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plugins &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Drivers" href="drivers.html" />
+    <link rel="prev" title="Core" href="core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Plugins</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.metadata.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.metadata.Plugin.add_to_output"><code class="docutils literal notranslate"><span class="pre">Plugin.add_to_output()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.metadata.StructuredMetadata"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.metadata.StructuredMetadata.add_to_output"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata.add_to_output()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.metadata.StructuredMetadata.schema_is_set"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata.schema_is_set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.metadata.StructuredMetadata.set_schema"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata.set_schema()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.env.Bueno"><code class="docutils literal notranslate"><span class="pre">Bueno</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.Bueno.add_row"><code class="docutils literal notranslate"><span class="pre">Bueno.add_row()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.Bueno.pack_header"><code class="docutils literal notranslate"><span class="pre">Bueno.pack_header()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.env.Environment"><code class="docutils literal notranslate"><span class="pre">Environment</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.env.GitInfo"><code class="docutils literal notranslate"><span class="pre">GitInfo</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.GitInfo.add_row"><code class="docutils literal notranslate"><span class="pre">GitInfo.add_row()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.GitInfo.pack_header"><code class="docutils literal notranslate"><span class="pre">GitInfo.pack_header()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.env.Hostname"><code class="docutils literal notranslate"><span class="pre">Hostname</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.Hostname.add_row"><code class="docutils literal notranslate"><span class="pre">Hostname.add_row()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.Hostname.pack_header"><code class="docutils literal notranslate"><span class="pre">Hostname.pack_header()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.env.SystemKernel"><code class="docutils literal notranslate"><span class="pre">SystemKernel</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.add_row"><code class="docutils literal notranslate"><span class="pre">SystemKernel.add_row()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_cmd_output"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_cmd_output()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_kernel_bt_config"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_kernel_bt_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_kernel_ct_config"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_kernel_ct_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_kernel_mod_config"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_kernel_mod_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_kernel_rt_config"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_kernel_rt_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_kernel_version"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_kernel_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.get_prov_info"><code class="docutils literal notranslate"><span class="pre">SystemKernel.get_prov_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.pack_header"><code class="docutils literal notranslate"><span class="pre">SystemKernel.pack_header()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.env.SystemKernel.update_output"><code class="docutils literal notranslate"><span class="pre">SystemKernel.update_output()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Plugins</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/plugins.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="plugins">
+<h1>Plugins<a class="headerlink" href="#plugins" title="Permalink to this heading"></a></h1>
+<p>Plugins connect data-producing applications to DSI middleware. Plugins have “producer” or “consumer” functions. A Plugin consumer function deals with existing data files or input streams. A Plugin producer deals with generating new data. Plugins are modular to support user contribution. Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. In order to be compatible with DSI middleware, Plugins should produce data in Python built-in data structures or data structures sourced from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library. Plugin extensions will be accepted conditional to the extention of <code class="docutils literal notranslate"><span class="pre">plugins/tests</span></code> to demonstrate the new Plugin capability. We can not accept pull requests that are not tested.</p>
+<img alt="_images/PluginClassHierarchy.png" src="_images/PluginClassHierarchy.png" />
+<span class="target" id="module-dsi.plugins.metadata"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.Plugin">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.metadata.</span></span><span class="sig-name descname"><span class="pre">Plugin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.Plugin" title="Permalink to this definition"></a></dt>
+<dd><p>Plugin abstract class for DSI core product.</p>
+<p>A Plugin connects a data producer to a compatible middleware
+data structure.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.Plugin.add_to_output">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.Plugin.add_to_output" title="Permalink to this definition"></a></dt>
+<dd><p>Initialize Plugin setup.</p>
+<p>Read a Plugin file. Return a Plugin object.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.metadata.</span></span><span class="sig-name descname"><span class="pre">StructuredMetadata</span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata" title="Permalink to this definition"></a></dt>
+<dd><p>plugin superclass that provides handy methods for structured data</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.add_to_output">
+<span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.add_to_output" title="Permalink to this definition"></a></dt>
+<dd><p>Adds a row of data to the output_collector and guarantees good structure.
+Useful in a plugin’s add_row method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.schema_is_set">
+<span class="sig-name descname"><span class="pre">schema_is_set</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.schema_is_set" title="Permalink to this definition"></a></dt>
+<dd><p>Helper method to see if the schema has been set</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.set_schema">
+<span class="sig-name descname"><span class="pre">set_schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">column_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.set_schema" title="Permalink to this definition"></a></dt>
+<dd><p>Initializes columns in the output_collector and column_cnt.
+Useful in a plugin’s pack_header method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-dsi.plugins.env"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.Bueno">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Bueno</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.Bueno" title="Permalink to this definition"></a></dt>
+<dd><p>A Plugin to capture performance data from Bueno (github.com/lanl/bueno)</p>
+<p>Bueno outputs performance data in keyvalue pairs in a file. Keys and values
+are delimited by <code class="docutils literal notranslate"><span class="pre">:</span></code>. Keyval pairs are delimited by <code class="docutils literal notranslate"><span class="pre">\n</span></code>.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Bueno.add_row">
+<span class="sig-name descname"><span class="pre">add_row</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Bueno.add_row" title="Permalink to this definition"></a></dt>
+<dd><p>Parses environment provenance data and adds the row.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Bueno.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Bueno.pack_header" title="Permalink to this definition"></a></dt>
+<dd><p>Set schema with POSIX and Bueno data.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.Environment">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Environment</span></span><a class="headerlink" href="#dsi.plugins.env.Environment" title="Permalink to this definition"></a></dt>
+<dd><p>Environment Plugins inspect the calling process’ context.</p>
+<p>Environments assume a POSIX-compliant filesystem and always collect UID/GID
+information.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">GitInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">git_repo_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.GitInfo" title="Permalink to this definition"></a></dt>
+<dd><p>A Plugin to capture Git information.</p>
+<p>Adds the current git remote and git commit to metadata.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo.add_row">
+<span class="sig-name descname"><span class="pre">add_row</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.GitInfo.add_row" title="Permalink to this definition"></a></dt>
+<dd><p>Adds a row to the output with POSIX info, git remote, and git commit</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.GitInfo.pack_header" title="Permalink to this definition"></a></dt>
+<dd><p>Set schema with POSIX and Git columns</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Hostname</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.Hostname" title="Permalink to this definition"></a></dt>
+<dd><p>An example Environment implementation.</p>
+<p>This plugin collects the hostname of the machine, and couples this with the POSIX
+information gathered by the Environment base class.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname.add_row">
+<span class="sig-name descname"><span class="pre">add_row</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Hostname.add_row" title="Permalink to this definition"></a></dt>
+<dd><p>Parses environment provenance data and adds the row.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Hostname.pack_header" title="Permalink to this definition"></a></dt>
+<dd><p>Set schema with keys of prov_info.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">SystemKernel</span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel" title="Permalink to this definition"></a></dt>
+<dd><p>Plugin for reading environment provenance data.</p>
+<p>An environment provenance plugin which does the following:
+1. System Kernel Version
+2. Kernel compile-time config
+3. Kernel boot config
+4. Kernel runtime config
+5. Kernel modules and module config
+6. Container information, if containerized</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.add_row">
+<span class="sig-name descname"><span class="pre">add_row</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.add_row" title="Permalink to this definition"></a></dt>
+<dd><p>Parses environment provenance data and adds the row.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_cmd_output">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cmd_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_stderr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_cmd_output" title="Permalink to this definition"></a></dt>
+<dd><p>Runs a given command and returns the stdout if successful.</p>
+<p>If stderr is not empty, an exception is raised with the stderr text.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_bt_config">
+<span class="sig-name descname"><span class="pre">get_kernel_bt_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_bt_config" title="Permalink to this definition"></a></dt>
+<dd><p>Kernel boot-time configuration is collected by looking at /proc/cmdline.</p>
+<p>The output of this command is one string of boot-time parameters. This string is
+returned in a dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_ct_config">
+<span class="sig-name descname"><span class="pre">get_kernel_ct_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_ct_config" title="Permalink to this definition"></a></dt>
+<dd><p>Kernel compile-time configuration is collected by looking at /boot/config-(kernel version)
+and removing comments and empty lines.</p>
+<p>The output of said command is newline-delimited option=value pairs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_mod_config">
+<span class="sig-name descname"><span class="pre">get_kernel_mod_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_mod_config" title="Permalink to this definition"></a></dt>
+<dd><p>Kernel module configuration is collected with the “lsmod” and “modinfo” commands.</p>
+<p>Each module and modinfo are stored as a key-value pair in the returned dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_rt_config">
+<span class="sig-name descname"><span class="pre">get_kernel_rt_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_rt_config" title="Permalink to this definition"></a></dt>
+<dd><p>Kernel run-time configuration is collected with the “sysctl -a” command.</p>
+<p>The output of this command is lines consisting of two possibilities:
+option = value (note the spaces), and sysctl: permission denied …
+The option = value pairs are added to the output dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_version">
+<span class="sig-name descname"><span class="pre">get_kernel_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_version" title="Permalink to this definition"></a></dt>
+<dd><p>Kernel version is obtained by the “uname -r” command, returns it in a dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_prov_info">
+<span class="sig-name descname"><span class="pre">get_prov_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_prov_info" title="Permalink to this definition"></a></dt>
+<dd><p>Collect and return the different categories of provenance info.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.pack_header" title="Permalink to this definition"></a></dt>
+<dd><p>Set schema with keys of prov_info.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.update_output">
+<span class="sig-name descname"><span class="pre">update_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pairs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.update_output" title="Permalink to this definition"></a></dt>
+<dd><p>Appends a given dict’s values to the output under the same key.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="core.html" class="btn btn-neutral float-left" title="Core" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="drivers.html" class="btn btn-neutral float-right" title="Drivers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Terry Turton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Plugins" href="plugins.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Core</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.core.Terminal"><code class="docutils literal notranslate"><span class="pre">Terminal</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Terminal.artifact_handler"><code class="docutils literal notranslate"><span class="pre">Terminal.artifact_handler()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Terminal.list_available_modules"><code class="docutils literal notranslate"><span class="pre">Terminal.list_available_modules()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Terminal.list_loaded_modules"><code class="docutils literal notranslate"><span class="pre">Terminal.list_loaded_modules()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Terminal.load_module"><code class="docutils literal notranslate"><span class="pre">Terminal.load_module()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Terminal.transload"><code class="docutils literal notranslate"><span class="pre">Terminal.transload()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Core</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="core">
+<h1>Core<a class="headerlink" href="#core" title="Permalink to this heading"></a></h1>
+<p>The DSI Core middleware defines the Terminal concept. An instantiated Terminal is the human/machine DSI interface. The person setting up a Core Terminal only needs to know how they want to ask questions, and what metadata they want to ask questions about. If they don’t see an option to ask questions the way they like, or they don’t see the metadata they want to ask questions about, then they should ask a Driver Contributor or a Plugin Contributor, respectively.</p>
+<p>A Core Terminal is a home for Plugins, and an interface for Drivers. A Core Terminal is instantiated with a set of default Plugins and Drivers, but they must be loaded before a user query is attempted. Here’s an example of how you might work with DSI using an interactive Python interpreter for your data science workflows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">=</span><span class="n">Terminal</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># [&#39;Bueno&#39;, &#39;Hostname&#39;, &#39;SystemKernel&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span><span class="s1">&#39;Bueno&#39;</span><span class="p">,</span><span class="s1">&#39;consumer&#39;</span><span class="p">,</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;./data/bueno.data&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Bueno plugin consumer loaded successfully.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span><span class="s1">&#39;Hostname&#39;</span><span class="p">,</span><span class="s1">&#39;producer&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Hostname plugin producer loaded successfully.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">list_loaded_modules</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># {&#39;producer&#39;: [&lt;dsi.plugins.env.Hostname object at 0x7f21232474d0&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1">#  &#39;consumer&#39;: [&lt;dsi.plugins.env.Bueno object at 0x7f2123247410&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1">#  &#39;front-end&#39;: [],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1">#   &#39;back-end&#39;: []}</span>
+</pre></div>
+</div>
+<p>At this point, you might decide that you are ready to collect data for inspection. It is possible to utilize DSI Drivers to load additional metadata to supplement your Plugin metadata, but you can also sample Plugin data and search it directly.</p>
+<p>The process of transforming a set of Plugin producers and consumers into a querable format is called transloading. A DSI Core Terminal has a <code class="docutils literal notranslate"><span class="pre">transload()</span></code> method which may be called to execute all Plugins at once:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">active_metadata</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># OrderedDict([(&#39;uid&#39;, [1000]), (&#39;effective_gid&#39;, [1000]), (&#39;moniker&#39;, [&#39;qwofford&#39;])...</span>
+</pre></div>
+</div>
+<p>Once a Core Terminal has been transloaded, no further Plugins may be added. However, the transload method can be used to samples of each plugin as many times as you like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">active_metadata</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># OrderedDict([(&#39;uid&#39;, [1000, 1000, 1000, 1000]), (&#39;effective_gid&#39;, [1000, 1000, 1000...</span>
+</pre></div>
+</div>
+<p>If you perform data science tasks using Python, it is not necessary to create a DSI Core Terminal front-end because the data is already in a Python data structure. If your data science tasks can be completed in one session, it is not required to interact with DSI Drivers. However, if you do want to save your work, you can load a DSI Driver with a back-end function:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;driver&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># [&#39;Gufi&#39;, &#39;Sqlite&#39;, &#39;Parquet&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;driver&#39;</span><span class="p">,</span><span class="s1">&#39;Parquet&#39;</span><span class="p">,</span><span class="s1">&#39;back-end&#39;</span><span class="p">,</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;parquet.data&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Parquet driver back-end loaded successfully.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">list_loaded_modules</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># {&#39;producer&#39;: [&lt;dsi.plugins.env.Hostname object at 0x7f21232474d0&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1">#  &#39;consumer&#39;: [&lt;dsi.plugins.env.Bueno object at 0x7f2123247410&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1">#  &#39;front-end&#39;: [],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1">#   &#39;back-end&#39;: [&lt;dsi.drivers.parquet.Parquet object at 0x7f212325a110&gt;]}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;put&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The contents of the active DSI Core Terminal metadata storage will be saved to a Parquet object at the path you provided at module loading time.</p>
+<p>It is possible that you prefer to perform data science tasks using a higher level abstraction than Python itself. This is the purpose of the DSI Driver front-end functionality. Unlike Plugins, Drivers can be added after the initial <code class="docutils literal notranslate"><span class="pre">transload()</span></code> operation has been performed:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;driver&#39;</span><span class="p">,</span><span class="s1">&#39;Parquet&#39;</span><span class="p">,</span><span class="s1">&#39;front-end&#39;</span><span class="p">,</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;parquet.data&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Parquet driver front-end loaded successfully.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">list_loaded_modules</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># {&#39;producer&#39;: [&lt;dsi.plugins.env.Hostname object at 0x7fce3c612b50&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># &#39;consumer&#39;: [&lt;dsi.plugins.env.Bueno object at 0x7fce3c622110&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># &#39;front-end&#39;: [&lt;dsi.drivers.parquet.Parquet object at 0x7fce3c622290&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># &#39;back-end&#39;: [&lt;dsi.drivers.parquet.Parquet object at 0x7fce3c622650&gt;]}</span>
+</pre></div>
+</div>
+<p>Any front-end may be used, but in this case the Parquet driver has a front-end implementation which builds a jupyter notebook from scratch that loads your metadata collection into a Pandas Dataframe. The Parquet front-end will then launch the Jupyter Notebook to support an interactive data science workflow:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;inspect&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Writing Jupyter notebook...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Opening Jupyter notebook...</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/jupyter_frontend.png"><img alt="_images/jupyter_frontend.png" src="_images/jupyter_frontend.png" style="width: 934.23px; height: 592.6800000000001px;" /></a>
+<p>You can then close your Jupyter notebook, <code class="docutils literal notranslate"><span class="pre">transload()</span></code> additionally to increase your sample size, and use the interface to explore more data.</p>
+<p>Although this demonstration only used one Plugin per Plugin functionality, any number of plugins can be added to collect an arbitrary amount of queriable metadata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span><span class="s1">&#39;SystemKernel&#39;</span><span class="p">,</span><span class="s1">&#39;producer&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># SystemKernel plugin producer loaded successfully</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">list_loaded_modules</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># {&#39;producer&#39;: [&lt;dsi.plugins.env.Hostname object at 0x7fce3c612b50&gt;, &lt;dsi.plugins.env.SystemKernel object at 0x7fce68519250&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># &#39;consumer&#39;: [&lt;dsi.plugins.env.Bueno object at 0x7fce3c622110&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># &#39;front-end&#39;: [&lt;dsi.drivers.parquet.Parquet object at 0x7fce3c622290&gt;],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># &#39;back-end&#39;: [&lt;dsi.drivers.parquet.Parquet object at 0x7fce3c622650&gt;]}</span>
+</pre></div>
+</div>
+<span class="target" id="module-dsi.core"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.core.Terminal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.core.</span></span><span class="sig-name descname"><span class="pre">Terminal</span></span><a class="headerlink" href="#dsi.core.Terminal" title="Permalink to this definition"></a></dt>
+<dd><p>An instantiated Terminal is the DSI human/machine interface.</p>
+<p>Terminals are a home for Plugins and an interface for Drivers. Drivers may be
+front-ends or back-ends. Plugins may be producers or consumers. See documentation
+for more information.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.artifact_handler">
+<span class="sig-name descname"><span class="pre">artifact_handler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interaction_type</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.artifact_handler" title="Permalink to this definition"></a></dt>
+<dd><p>Store or retrieve using all loaded DSI Drivers with back-end functionality.</p>
+<p>A DSI Core Terminal may load zero or more Drivers with back-end storage functionality.
+Calling artifact_handler will execute all back-end functionality currently loaded, given
+the provided <code class="docutils literal notranslate"><span class="pre">interaction_type</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list_available_modules">
+<span class="sig-name descname"><span class="pre">list_available_modules</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list_available_modules" title="Permalink to this definition"></a></dt>
+<dd><p>List available DSI modules of an arbitrary module type.</p>
+<p>This method is useful for Core Terminal setup. Plugin and Driver type DSI modules
+are supported, but this getter can be extended to support any new DSI module
+types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
+however, DSI Modules are classes, hence the naming idiosynchrocies below.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list_loaded_modules">
+<span class="sig-name descname"><span class="pre">list_loaded_modules</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list_loaded_modules" title="Permalink to this definition"></a></dt>
+<dd><p>List DSI modules which have already been loaded.</p>
+<p>These Plugins and Drivers are active or ready to execute a post-processing task.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.load_module">
+<span class="sig-name descname"><span class="pre">load_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_function</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.load_module" title="Permalink to this definition"></a></dt>
+<dd><p>Load a DSI module from the available Plugin and Drive module collection.</p>
+<p>DSI modules may be loaded which are not explicitly listed by the list_available_modules.
+This flexibility ensures that advanced users can access higher level abstractions.
+We expect most users will work with module implementations rather than templates, but
+but all high level class abstractions are accessible with this method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.transload">
+<span class="sig-name descname"><span class="pre">transload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.transload" title="Permalink to this definition"></a></dt>
+<dd><p>Transloading signals to the DSI Core Terminal that Plugin set up is complete.</p>
+<p>A DSI Core Terminal must be transloaded before queries, metadata collection, or metadata
+storage is possible. Transloading is the process of merging Plugin metadata from many
+data sources to a single DSI Core Middleware data structure.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="plugins.html" class="btn btn-neutral float-right" title="Plugins" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Terry Turton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
