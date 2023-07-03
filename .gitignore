@@ -48,6 +48,14 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Testing artifacts
+*query.csv
+dsi_parquet_driver_output.ipynb
+*.ipynb_checkpoints
+parquet.data
+
+# Force coverage svg include
+!coverage.svg
 # Misc
 .vscode
 docs/_build
