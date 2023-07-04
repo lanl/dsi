@@ -82,7 +82,7 @@ class Bueno(Environment):
             drop_rows = [row for row in rows if row != '']
             rows = drop_rows
             for row in rows:
-                colon_split = row.split(':')
+                colon_split = row.split(':', maxsplit=1)
                 if len(colon_split) != 2:
                     raise TypeError
                 self.bueno_data[colon_split[0]] = colon_split[1]
