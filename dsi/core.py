@@ -1,4 +1,5 @@
 from importlib import import_module
+from importlib.machinery import SourceFileLoader
 from collections import OrderedDict
 from itertools import product
 
@@ -103,6 +104,22 @@ class Terminal():
         else:
             print('Hint: Did you declare your Plugin/Driver in the Terminal Global vars?')
             raise NotImplementedError
+
+    def add_external_python_module(self, mod_type, mod_name, mod_path):
+        """
+        Adds a given external, meaning not from the DSI repo, Python module to the module_collection.
+
+        Afterwards, load_module can be used to load a DSI module from the added Python module.
+        Note: mod_type is needed because each Python module should only implement plugins or drivers.
+        
+        For example,
+        term = Terminal()
+        term.add_external_python_module('plugin', 'my_python_file', '/the/path/to/my_python_file.py')
+        term.load_module('plugin', 'MyPlugin', 'consumer')
+        term.list_loaded_modules() # includes MyPlugin
+        """
+        mod = SourceFileLoader(mod_name, mod_path).load_module()
+        self.module_collection[mod_type][mod_name] = mod
 
     def list_loaded_modules(self):
         """
