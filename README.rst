@@ -24,6 +24,7 @@ DSI Core Requirements
 =====================
 * python3 (3.11 tested)
 * Linux OS (RHEL- and Debian-based distributions tested)
+* Git
 * Plugins and Drivers introduce further requirements
 
 ===============
