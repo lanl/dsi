@@ -8,6 +8,7 @@ DSI
 The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and shared data repositories. DSI enables flexible, data-intensive scientific workflows that meet researcher needs.
 
 DSI is implemented in three parts:
+
 * Plugins
 * Drivers
 * Core middleware
