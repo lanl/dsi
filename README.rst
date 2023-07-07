@@ -1,56 +1,54 @@
 =============
-DSI / DSIpy
+DSI
 =============
 
 .. image:: coverage.svg
       :target: https://lanl.github.io/dsi/htmlcov/index.html
 
-DSIpy is part of LANL's Data Science Infrastructure project providing several purposes:
+The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and shared data repositories. DSI enables flexible, data-intensive scientific workflows that meet researcher needs.
 
-The DSI module provides an abstraction layer to developers to interface with SQLite tools to easily create a custom database with customizable schemas/tables.
+DSI is implemented in three parts:
 
-The Filesystem crawler captures file properties and attributes into an SQL database using the library above, and provides helper functions to easily parse the data ingested into the database.
+* Plugins
+* Drivers
+* Core middleware
 
-=============
-Demo
-=============
+Plugins curate metadata for query and data return. Plugins can have producer or consumer funcitonality. Plugins acting as consumers harvest data from files and streams. Plugins acting as producers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
-The driver for this project with examples on how to use the DSI library can be found in dsi_wildfire and fs_test.py. This driver script first file-crawls a root directory of an example dataset and captures filesystem information using the os.stat command. The os.stat python command captures filesystem properties such as file-permissions, file creation and modification dates, and file sizes.
+Drivers are interfaces for the Core middleware. Drivers can have front-end or back-end functionalities. Driver front-ends are the interface between a DSI user and the Core middleware. Driver back-ends are the interface between the Core Middleware and a data store. Drivers may be user contributed and a default set of drivers is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
-Once fs information is captured, an instance of the DSI class is created and examples are given on how to declare the location of the database on-disk, table name, and schema used. When a schema type is declared, a loop is used to ingest os.stat information into the database via the API.
+DSI Core middleware provides the user/machine interface. The Core middleware defines a Terminal object. An instantiated Core Terminal can load zero or more plugins and drivers. A Terminal object can be used in scripting workflows and program loops.
 
-The final portion of the driver gives a few examples on how to perform queries using the abstraction layer. Users can use a sqlite command passthrough for raw queries, or helper functions that relate to filesystem properties and sample operators.
+=====================
+DSI Core Requirements
+=====================
+* python3 (3.11 tested)
+* Linux OS (RHEL- and Debian-based distributions tested)
+* Git
+* Plugins and Drivers introduce further requirements
 
-=============
-Requirements
-=============
-* python3 (3.11 recommended)
+===============
+Getting Started
+===============
 
-=============
-How-to-run
-=============
+DSI does not yet have a versioned release and should be considered pre-alpha. Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. Consequently a PyPA release is planned but incomplete. It is possible to install DSI locally instead.
 
-To run, simply execute: ::
+We recommend Miniconda3 for managing virtual environments for DSI::
+
+	. ~/miniconda3/bin/activate
+	conda create -n dsi python=3.11
+	conda activate dsi
+
+After activating your environment::
 
 	git clone https://github.com/lanl/dsi.git
 	cd dsi/
-	cd examples/
-	python3 dsi_wildfire.py
-	python3 dsi_wildfire_query.py
+	python -m pip install .
+	
 
-
-=============
-How to install in an active Python virtual environment
-=============
-
-If you are attempting to use DSI with an existing tool, and you have a virtual environment configured for the existing tool, you can pip install DSI in that virtual environment using this command: ::
-
-  python -m pip install .  # In directory where pyproject.toml is located
-
-
-=============
+=====================
 Copyright and License
-=============
+=====================
 
 This program is open source under the BSD-3 License.
 
