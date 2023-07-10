@@ -115,7 +115,8 @@ class Terminal():
                 print("{} {} {} unloaded successfully.".format(
                     mod_name, mod_type, mod_function))
                 return
-        print("{} {} {} could not be found in active_modules. No action taken.")
+        print("{} {} {} could not be found in active_modules. No action taken.".format(
+            mod_name, mod_type, mod_function))
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
