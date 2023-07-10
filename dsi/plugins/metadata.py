@@ -63,6 +63,8 @@ class StructuredMetadata(Plugin):
             row_dict = {k: v for k, v in zip(
                 self.output_collector.keys(), row)}
             self.validation_model.model_validate(row_dict)
+        elif len(row) != self.column_cnt:
+            raise RuntimeError("Incorrect length of row was given")
 
         for key, row_elem in zip(self.output_collector.keys(), row):
             self.output_collector[key].append(row_elem)
