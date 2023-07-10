@@ -97,5 +97,5 @@ def test_git_plugin_infos_are_str():
     plug = GitInfo(git_repo_path=root)
     plug.add_row()
 
-    assert type(plug.output_collector["git-remote"][0]) == str
-    assert type(plug.output_collector["git-commit"][0]) == str
+    assert type(plug.output_collector["git_remote"][0]) == str
+    assert type(plug.output_collector["git_commit"][0]) == str
