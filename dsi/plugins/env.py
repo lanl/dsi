@@ -7,6 +7,9 @@ from git import Repo
 import git.exc
 
 from dsi.plugins.metadata import StructuredMetadata
+from dsi.plugins.plugin_models import (
+    EnvironmentModel, GitInfoModel, HostnameModel, create_dynamic_model
+)
 
 
 class Environment(StructuredMetadata):
@@ -43,7 +46,7 @@ class Hostname(Environment):
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
-        self.set_schema(column_names)
+        self.set_schema(column_names, validation_model=HostnameModel)
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -69,9 +72,11 @@ class Bueno(Environment):
 
     def pack_header(self) -> None:
         """Set schema with POSIX and Bueno data."""
-        column_names = list(self.posix_info.keys()) + \
-            list(self.bueno_data.keys())
-        self.set_schema(column_names)
+        bueno_names = list(self.bueno_data.keys())
+        column_names = list(self.posix_info.keys()) + bueno_names
+        model = create_dynamic_model("BuenoModel", col_names=bueno_names,
+                                     col_types=[str] * len(bueno_names), base=EnvironmentModel)
+        self.set_schema(column_names, validation_model=model)
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -109,15 +114,15 @@ class GitInfo(Environment):
                             "GitInfo Plugin must be given a repo base path " +
                             "(default is working dir)")
         self.git_info = {
-            "git-remote": lambda: self.repo.git.remote("-v"),
-            "git-commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
+            "git_remote": lambda: self.repo.git.remote("-v"),
+            "git_commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
         }
 
     def pack_header(self) -> None:
         """ Set schema with POSIX and Git columns """
         column_names = list(self.posix_info.keys()) + \
             list(self.git_info.keys())
-        self.set_schema(column_names)
+        self.set_schema(column_names, validation_model=GitInfoModel)
 
     def add_row(self) -> None:
         """ Adds a row to the output with POSIX info, git remote, and git commit """
@@ -125,7 +130,7 @@ class GitInfo(Environment):
             self.pack_header()
 
         row = list(self.posix_info.values()) + \
-            [self.git_info["git-remote"](), self.git_info["git-commit"]()]
+            [self.git_info["git_remote"](), self.git_info["git_commit"]()]
         self.add_to_output(row)
 
 
@@ -149,9 +154,11 @@ class SystemKernel(Environment):
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
-        column_names = list(self.posix_info.keys()) + \
-            list(self.prov_info.keys())
-        self.set_schema(column_names)
+        prov_info_names = list(self.prov_info.keys())
+        column_names = list(self.posix_info.keys()) + prov_info_names
+        model = create_dynamic_model("BuenoModel", col_names=prov_info_names,
+                                     col_types=[str] * len(prov_info_names), base=EnvironmentModel)
+        self.set_schema(column_names, validation_model=model)
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
