@@ -10,7 +10,6 @@ def test_terminal_module_getter():
 
 def test_unload_module():
     a = Terminal()
-    print(a.list_loaded_modules())
     a.load_module('plugin', 'GitInfo', 'producer')
     assert len(a.list_loaded_modules()['producer']) == 1
     a.unload_module('plugin', 'GitInfo', 'producer')
