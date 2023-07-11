@@ -109,6 +109,10 @@ class Terminal():
         """
         Unloads a DSI module from the active_modules collection
         """
+        if self.transload_lock and mod_type == 'plugin':
+            print(
+                'Plugin  module unloading is prohibited after transload. No action taken.')
+            return
         for i, mod in enumerate(self.active_modules[mod_function]):
             if mod.__class__.__name__ == mod_name:
                 self.active_modules[mod_function].pop(i)
