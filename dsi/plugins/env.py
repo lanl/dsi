@@ -170,7 +170,6 @@ class SystemKernel(Environment):
         prov_info.update(self.get_kernel_bt_config())
         prov_info.update(self.get_kernel_rt_config())
         prov_info.update(self.get_kernel_mod_config())
-        prov_info.update(self.get_container_config())
         return prov_info
 
     def get_kernel_version(self) -> dict:
@@ -245,15 +244,6 @@ class SystemKernel(Environment):
         for mod, info in zip(modules, modinfos):
             mod_configs["/sbin/modinfo " + mod] = info
         return mod_configs
-
-    def get_container_config(self) -> dict:
-        # Not yet implemented
-        return {}
-
-    def update_output(self, pairs: dict) -> None:
-        """Appends a given dict's values to the output under the same key."""
-        for key, val in pairs.items():
-            self.output[key].append(val)
 
     @staticmethod
     def get_cmd_output(cmd: list, ignore_stderr=False) -> str:
