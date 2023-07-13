@@ -25,6 +25,7 @@ class Parquet(Filesystem):
         """Get Parquet data from filename."""
         table = pq.read_table(self.filename)
         resout = table.to_pydict()
+        perms = {k, }
         return resout
 
     def put_artifacts(self, collection):

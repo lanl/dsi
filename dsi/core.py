@@ -47,6 +47,7 @@ class Terminal():
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
         self.active_metadata = OrderedDict()
+        self.active_metadata_perms = OrderedDict()
         self.transload_lock = False
 
     def list_available_modules(self, mod_type):
@@ -111,7 +112,7 @@ class Terminal():
 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
         Note: mod_type is needed because each Python module should only implement plugins or drivers.
-        
+
         For example,
         term = Terminal()
         term.add_external_python_module('plugin', 'my_python_file', '/the/path/to/my_python_file.py')
@@ -171,7 +172,9 @@ class Terminal():
                         collection=self.active_metadata, **kwargs)
                     operation_success = True
                 elif interaction_type == 'get':
-                    self.active_metadata = obj.get_artifacts(**kwargs)
+                    self.active_metadata.update(obj.get_artifacts(**kwargs))
+                    self.active_metadata_perms.update(
+                        obj.get_artifacts_perms(), **kwargs)
                     operation_success = True
         if interaction_type == 'inspect':
             for module_type, objs in selected_function_modules.items():

@@ -1,4 +1,8 @@
 from abc import ABCMeta, abstractmethod
+from stat import S_IRWXU, S_IRWXG, S_IRWXO
+from os import stat
+
+from dsi.drivers.permissions import PermissionsManager
 
 
 class Driver(metaclass=ABCMeta):
@@ -12,7 +16,7 @@ class Driver(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def put_artifacts(self, artifacts, kwargs) -> None:
+    def put_artifacts(self, artifacts, **kwargs) -> None:
         pass
 
     @abstractmethod
@@ -43,9 +47,9 @@ class Filesystem(Driver):
     EQ = "="
 
     def __init__(self, filename) -> None:
-        pass
+        self.perms_manager = PermissionsManager()
 
-    def put_artifacts(self, artifacts, kwargs) -> None:
+    def put_artifacts(self, artifacts, **kwargs) -> None:
         pass
 
     def get_artifacts(self, query):
@@ -53,3 +57,11 @@ class Filesystem(Driver):
 
     def inspect_artifacts(self):
         pass
+
+    def get_file_permissions(self, fpath: str) -> tuple[int, int, str]:
+        st = stat(fpath)
+        uid = st.st_uid
+        gid = st.st_gid
+        perm_mask = S_IRWXU | S_IRWXG | S_IRWXO
+        settings = oct(st.st_mode & perm_mask)
+        return (uid, gid, settings)
