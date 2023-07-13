@@ -106,6 +106,23 @@ class Terminal():
             print('Hint: Did you declare your Plugin/Driver in the Terminal Global vars?')
             raise NotImplementedError
 
+    def unload_module(self, mod_type, mod_name, mod_function):
+        """
+        Unloads a DSI module from the active_modules collection
+        """
+        if self.transload_lock and mod_type == 'plugin':
+            print(
+                'Plugin  module unloading is prohibited after transload. No action taken.')
+            return
+        for i, mod in enumerate(self.active_modules[mod_function]):
+            if mod.__class__.__name__ == mod_name:
+                self.active_modules[mod_function].pop(i)
+                print("{} {} {} unloaded successfully.".format(
+                    mod_name, mod_type, mod_function))
+                return
+        print("{} {} {} could not be found in active_modules. No action taken.".format(
+            mod_name, mod_type, mod_function))
+
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
         Adds a given external, meaning not from the DSI repo, Python module to the module_collection.
