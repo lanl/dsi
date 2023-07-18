@@ -43,6 +43,7 @@ class Hostname(Environment):
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
+        self.set_schema(column_names)
         self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_row(self) -> None:
@@ -109,7 +110,7 @@ class GitInfo(Environment):
         super().__init__(**kwargs)
         try:
             self.repo = Repo(git_repo_path)
-        except git.exc:
+        except git.exc.InvalidGitRepositoryError:
             raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
                             "GitInfo Plugin must be given a repo base path " +
                             "(default is working dir)")

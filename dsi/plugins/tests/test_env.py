@@ -1,6 +1,7 @@
 import collections
 
 from dsi.plugins.env import Hostname, SystemKernel, Bueno, GitInfo
+from dsi.permissions.permissions import PermissionsManager
 import git
 
 
@@ -11,14 +12,16 @@ def get_git_root(path):
 
 
 def test_hostname_plugin_type():
-    a = Hostname()
+    mock_pm = PermissionsManager()
+    a = Hostname(perms_manager=mock_pm)
     a.add_row()
     a.add_row()
     assert type(a.output_collector) == collections.OrderedDict
 
 
 def test_hostname_plugin_col_shape():
-    a = Hostname()
+    mock_pm = PermissionsManager()
+    a = Hostname(perms_manager=mock_pm)
     a.add_row()
     a.add_row()
     assert len(a.output_collector.keys()) == len(a.output_collector.values())
@@ -26,7 +29,8 @@ def test_hostname_plugin_col_shape():
 
 def test_hostname_plugin_row_shape():
     for row_cnt in range(1, 10):
-        a = Hostname()
+        mock_pm = PermissionsManager()
+        a = Hostname(perms_manager=mock_pm)
         for _ in range(row_cnt):
             a.add_row()
         column_values = list(a.output_collector.values())
@@ -36,12 +40,14 @@ def test_hostname_plugin_row_shape():
 
 
 def test_envprov_plugin_type():
-    plug = SystemKernel()
+    mock_pm = PermissionsManager()
+    plug = SystemKernel(perms_manager=mock_pm)
     assert type(plug.output_collector) == collections.OrderedDict
 
 
 def test_envprov_plugin_adds_rows():
-    plug = SystemKernel()
+    mock_pm = PermissionsManager()
+    plug = SystemKernel(perms_manager=mock_pm)
     plug.add_row()
     plug.add_row()
 
@@ -53,15 +59,17 @@ def test_envprov_plugin_adds_rows():
 
 
 def test_bueno_plugin_type():
+    mock_pm = PermissionsManager()
     path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
-    plug = Bueno(filename=path)
+    plug = Bueno(filename=path, perms_manager=mock_pm)
     plug.add_row()
     assert type(plug.output_collector) == collections.OrderedDict
 
 
 def test_bueno_plugin_adds_rows():
+    mock_pm = PermissionsManager()
     path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
-    plug = Bueno(filename=path)
+    plug = Bueno(filename=path, perms_manager=mock_pm)
     plug.add_row()
     plug.add_row()
 
@@ -73,15 +81,17 @@ def test_bueno_plugin_adds_rows():
 
 
 def test_git_plugin_type():
+    mock_pm = PermissionsManager()
     root = get_git_root('.')
-    plug = GitInfo(git_repo_path=root)
+    plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_row()
     assert type(plug.output_collector) == collections.OrderedDict
 
 
 def test_git_plugin_adds_rows():
+    mock_pm = PermissionsManager()
     root = get_git_root('.')
-    plug = GitInfo(git_repo_path=root)
+    plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_row()
     plug.add_row()
 
@@ -93,8 +103,9 @@ def test_git_plugin_adds_rows():
 
 
 def test_git_plugin_infos_are_str():
+    mock_pm = PermissionsManager()
     root = get_git_root('.')
-    plug = GitInfo(git_repo_path=root)
+    plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_row()
 
     assert type(plug.output_collector["git-remote"][0]) == str
