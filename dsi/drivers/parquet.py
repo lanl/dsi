@@ -14,8 +14,7 @@ class Parquet(Filesystem):
     """
 
     def __init__(self, filename, **kwargs):
-        super().__init__(filename=filename)
-        self.filename = filename
+        super().__init__(filename=filename, **kwargs)
         try:
             self.compression = kwargs['compression']
         except KeyError:
@@ -25,7 +24,8 @@ class Parquet(Filesystem):
         """Get Parquet data from filename."""
         table = pq.read_table(self.filename)
         resout = table.to_pydict()
-        perms = {k, }
+        self.perms_manager.register_columns_with_file(
+            list(resout.keys()), self.filename)
         return resout
 
     def put_artifacts(self, collection):

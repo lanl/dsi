@@ -3,6 +3,8 @@ from importlib.machinery import SourceFileLoader
 from collections import OrderedDict
 from itertools import product
 
+from dsi.permissions.permissions import PermissionsManager
+
 
 class Terminal():
     """
@@ -47,7 +49,7 @@ class Terminal():
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
         self.active_metadata = OrderedDict()
-        self.active_metadata_perms = OrderedDict()
+        self.perms_manager = PermissionsManager()
         self.transload_lock = False
 
     def list_available_modules(self, mod_type):
@@ -95,7 +97,8 @@ class Terminal():
             try:
                 this_module = import_module(python_module)
                 class_ = getattr(this_module, class_name)
-                self.active_modules[mod_function].append(class_(**kwargs))
+                instance = class_(perms_manager=self.perms_manager, **kwargs)
+                self.active_modules[mod_function].append(instance)
                 load_success = True
             except AttributeError:
                 continue
@@ -190,8 +193,6 @@ class Terminal():
                     operation_success = True
                 elif interaction_type == 'get':
                     self.active_metadata.update(obj.get_artifacts(**kwargs))
-                    self.active_metadata_perms.update(
-                        obj.get_artifacts_perms(), **kwargs)
                     operation_success = True
         if interaction_type == 'inspect':
             for module_type, objs in selected_function_modules.items():

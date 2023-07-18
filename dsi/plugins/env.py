@@ -17,8 +17,8 @@ class Environment(StructuredMetadata):
     information.
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Get POSIX info
         self.posix_info = OrderedDict()
         self.posix_info['uid'] = os.getuid()
@@ -38,12 +38,12 @@ class Hostname(Environment):
     """
 
     def __init__(self, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
-        self.set_schema(column_names)
+        self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -63,14 +63,19 @@ class Bueno(Environment):
     """
 
     def __init__(self, filename, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
         self.bueno_data = OrderedDict()
         self.filename = filename
 
     def pack_header(self) -> None:
         """Set schema with POSIX and Bueno data."""
-        column_names = list(self.posix_info.keys()) + \
-            list(self.bueno_data.keys())
+        posix_columns = list(self.posix_info.keys())
+        bueno_columns = list(self.bueno_data.keys())
+        self.perms_manager.register_columns_with_file(posix_columns, None)
+        self.perms_manager.register_columns_with_file(
+            bueno_columns, self.filename)
+
+        column_names = posix_columns + bueno_columns
         self.set_schema(column_names)
 
     def add_row(self) -> None:
@@ -99,9 +104,9 @@ class GitInfo(Environment):
     Adds the current git remote and git commit to metadata.
     """
 
-    def __init__(self, git_repo_path="./") -> None:
+    def __init__(self, git_repo_path="./", **kwargs) -> None:
         """ Initializes the git repo in the given directory and access to git commands """
-        super().__init__()
+        super().__init__(**kwargs)
         try:
             self.repo = Repo(git_repo_path)
         except git.exc:
@@ -118,6 +123,7 @@ class GitInfo(Environment):
         column_names = list(self.posix_info.keys()) + \
             list(self.git_info.keys())
         self.set_schema(column_names)
+        self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_row(self) -> None:
         """ Adds a row to the output with POSIX info, git remote, and git commit """
@@ -142,9 +148,9 @@ class SystemKernel(Environment):
     6. Container information, if containerized
     """
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """Initialize SystemKernel with inital provenance info."""
-        super().__init__()
+        super().__init__(**kwargs)
         self.prov_info = self.get_prov_info()
 
     def pack_header(self) -> None:
@@ -152,6 +158,7 @@ class SystemKernel(Environment):
         column_names = list(self.posix_info.keys()) + \
             list(self.prov_info.keys())
         self.set_schema(column_names)
+        self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""

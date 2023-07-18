@@ -1,8 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from stat import S_IRWXU, S_IRWXG, S_IRWXO
-from os import stat
-
-from dsi.drivers.permissions import PermissionsManager
+from dsi.permissions.permissions import PermissionsManager
 
 
 class Driver(metaclass=ABCMeta):
@@ -29,7 +26,7 @@ class Driver(metaclass=ABCMeta):
 
 
 class Filesystem(Driver):
-    git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
+    git_commit_sha: str = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
     # Declare named types
     DOUBLE = "DOUBLE"
     STRING = "VARCHAR"
@@ -46,8 +43,9 @@ class Filesystem(Driver):
     LT = "<"
     EQ = "="
 
-    def __init__(self, filename) -> None:
-        self.perms_manager = PermissionsManager()
+    def __init__(self, filename: str, perms_manager: PermissionsManager) -> None:
+        self.filename = filename
+        self.perms_manager = perms_manager
 
     def put_artifacts(self, artifacts, **kwargs) -> None:
         pass
@@ -57,11 +55,3 @@ class Filesystem(Driver):
 
     def inspect_artifacts(self):
         pass
-
-    def get_file_permissions(self, fpath: str) -> tuple[int, int, str]:
-        st = stat(fpath)
-        uid = st.st_uid
-        gid = st.st_gid
-        perm_mask = S_IRWXU | S_IRWXG | S_IRWXO
-        settings = oct(st.st_mode & perm_mask)
-        return (uid, gid, settings)

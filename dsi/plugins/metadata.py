@@ -31,20 +31,22 @@ class Plugin(metaclass=ABCMeta):
 
 class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
-    git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
+    git_commit_sha: str = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initializes a StructuredDataPlugin with an output collector
         and an initially unset column count.
         """
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
+        self.perms_manager = kwargs['perms_manager']
 
     def set_schema(self, column_names: list) -> None:
         """
         Initializes columns in the output_collector and column_cnt.
         Useful in a plugin's pack_header method.
+        Also registers column permissions if filename is set.
         """
         for name in column_names:
             self.output_collector[name] = []
