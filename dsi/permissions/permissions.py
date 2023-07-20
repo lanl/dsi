@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from stat import S_IRWXU, S_IRWXG, S_IRWXO
-from os import stat
+from os import stat, getuid, getgid
 
 
 @dataclass(eq=True, frozen=True)
@@ -43,7 +43,8 @@ class PermissionsManager:
             self.column_perms[key] = perm
 
     def register_columns_with_file(self, keys: list[str], fp: str) -> None:
-        uid, gid, settings = (None, None, None) if fp is None \
+        """ Gets a file's Permission and links it to the given columns """
+        uid, gid, settings = self.get_process_permissions() if fp is None \
             else self.get_file_permissions(fp)
         perm = self.get_perm(uid, gid, settings)
         self.register_columns(keys, perm)
@@ -63,6 +64,15 @@ class PermissionsManager:
         perm_mask = S_IRWXU | S_IRWXG | S_IRWXO  # user | group | other
         settings = oct(st.st_mode & perm_mask)  # select perm bits from st_mode
         return (uid, gid, settings)
+
+    def get_process_permissions(self) -> tuple[int, int, str]:
+        """
+        In the event of data not coming from a file,
+        default to (uid, egid, 660)
+        """
+        uid = getuid()
+        egid = getgid()
+        return (uid, egid, "0o660")
 
 
 class PermissionNotFoundError(Exception):

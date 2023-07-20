@@ -23,8 +23,9 @@ def test_multiple_files_different_perms():
     term.transload()
 
     for env_col in ('uid', 'effective_gid', 'moniker', 'gid_list'):
-        assert tuple(term.perms_manager.column_perms[env_col]) == \
-            (None, None, None)
+        uid, gid, settings = tuple(term.perms_manager.column_perms[env_col])
+        assert type(uid) == type(gid) == int
+        assert settings == '0o660'
 
     for bueno_col in ('foo', 'bar', 'baz'):
         uid, gid, settings = tuple(term.perms_manager.column_perms[bueno_col])
