@@ -1,6 +1,6 @@
 import collections
 
-from dsi.plugins.env import Hostname, SystemKernel, Bueno, GitInfo
+from dsi.plugins.env import Hostname, SystemKernel, GitInfo
 import git
 
 
@@ -50,26 +50,6 @@ def test_envprov_plugin_adds_rows():
 
     # should def have more than 100 columns
     assert len(plug.output_collector.keys()) > 100
-
-
-def test_bueno_plugin_type():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
-    plug = Bueno(filename=path)
-    plug.add_row()
-    assert type(plug.output_collector) == collections.OrderedDict
-
-
-def test_bueno_plugin_adds_rows():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
-    plug = Bueno(filename=path)
-    plug.add_row()
-    plug.add_row()
-
-    for key, val in plug.output_collector.items():
-        assert len(val) == 2
-
-    # 3 Bueno cols + 4 inherited Env cols
-    assert len(plug.output_collector.keys()) == 7
 
 
 def test_git_plugin_type():
