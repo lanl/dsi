@@ -1,6 +1,7 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from stat import S_IRWXU, S_IRWXG, S_IRWXO
-from os import stat, getuid, getgid
+from os import stat, getuid, getgid, chown, chmod
 
 
 @dataclass(eq=True, frozen=True)
@@ -14,6 +15,9 @@ class Permission:
         """ enables conversion to tuple, list, etc. """
         for v in (self.uid, self.gid, self.settings):
             yield v
+
+    def __str__(self):
+        return f"{self.uid}-{self.gid}-{self.settings}"
 
 
 class PermissionsManager:
@@ -49,6 +53,15 @@ class PermissionsManager:
         perm = self.get_perm(uid, gid, settings)
         self.register_columns(keys, perm)
 
+    def get_permission_columnlist_mapping(self) -> dict[Permission, list[str]]:
+        """
+        Returns a mapping from unique Permission to list of columns.
+        """
+        mapping = defaultdict(list)
+        for col, perm in self.column_perms.items():
+            mapping[perm].append(col)
+        return mapping
+
     def get_column_perms(self, key: str) -> Permission:
         """ Get the Permission of a given column """
         try:
@@ -64,6 +77,17 @@ class PermissionsManager:
         perm_mask = S_IRWXU | S_IRWXG | S_IRWXO  # user | group | other
         settings = oct(st.st_mode & perm_mask)  # select perm bits from st_mode
         return (uid, gid, settings)
+
+    def set_file_permissions(self, file_mapping: dict[str, list[str]]) -> None:
+        """
+        Given a mapping from filename to list of columns, set each file
+        to its column's permissions. (All columns of a file share perms)
+        """
+        for filename, cols in file_mapping.items():
+            f_perm = self.get_column_perms(cols[0])  # cols share same perms
+            uid, gid, settings = tuple(f_perm)
+            chown(filename, uid, gid)  # type: ignore
+            chmod(filename, int(settings, base=8))  # type: ignore
 
     def get_process_permissions(self) -> tuple[int, int, str]:
         """

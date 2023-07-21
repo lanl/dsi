@@ -30,8 +30,12 @@ class Parquet(Filesystem):
 
     def put_artifacts(self, collection):
         """Put artifacts into file at filename path."""
-        table = pa.table(collection)
-        pq.write_table(table, self.filename, compression=self.compression)
+        def write_dict(collection, fname):
+            table = pa.table(collection)
+            pq.write_table(table, fname, compression=self.compression)
+
+        self.write_files(collection, write_func=write_dict,
+                         f_basename=self.filename[:-3], f_ext='.pq')
 
     @staticmethod
     def get_cmd_output(cmd: list) -> str:
