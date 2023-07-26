@@ -124,14 +124,15 @@ class Terminal():
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
-        Adds a given external, meaning not from the DSI repo, Python module to the module_collection.
+        Adds an external, meaning not from the DSI repo, Python module to the module_collection.
 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
-        Note: mod_type is needed because each Python module should only implement plugins or drivers.
+        Note: mod_type is needed because each Python module only implements plugins or drivers.
 
         For example,
         term = Terminal()
-        term.add_external_python_module('plugin', 'my_python_file', '/the/path/to/my_python_file.py')
+        term.add_external_python_module('plugin', 'my_python_file',
+                                        '/the/path/to/my_python_file.py')
         term.load_module('plugin', 'MyPlugin', 'consumer')
         term.list_loaded_modules() # includes MyPlugin
         """
