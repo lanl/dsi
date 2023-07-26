@@ -21,7 +21,7 @@ class FileConsumer(StructuredMetadata):
         self.file_info['sha1'] = sha.hexdigest()
 
 
-class CSV(FileConsumer):
+class Csv(FileConsumer):
     """
     A Plugin to ingest CSV data
     """
@@ -37,8 +37,8 @@ class CSV(FileConsumer):
         column_names = list(self.file_info.keys()) + self.csv_col_names
         self.set_schema(column_names)
 
-    def add_row(self) -> None:
-        """ Adds each row of the CSV along with file_info to output. """
+    def add_rows(self) -> None:
+        """ Adds a list containing one or more rows of the CSV along with file_info to output. """
         if not self.schema_is_set():
             with open(self.filename, 'r') as f:
                 r = reader(f, **self.reader_options)
@@ -50,8 +50,8 @@ class CSV(FileConsumer):
             self.pack_header()
 
         for line in self.csv_data:
-            row = list(self.file_info.values()) + line
-            self.add_to_output(row)
+            rows = list(self.file_info.values()) + line
+            self.add_to_output(rows)
 
 
 class Bueno(FileConsumer):
@@ -61,32 +61,49 @@ class Bueno(FileConsumer):
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values
     are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
-
-    def __init__(self, filename, **kwargs) -> None:
-        super().__init__(filename)
+    def __init__(self, filenames, **kwargs) -> None:
+        super().__init__()
         self.bueno_data = OrderedDict()
+        if type(filenames)==str:
+            self.filenames = [filenames]
+        elif type(filenames)==list:
+            self.filenames = filenames
+        else:
+            raise TypeError
 
     def pack_header(self) -> None:
-        """Set schema with Bueno data."""
-        column_names = list(self.file_info.keys()) + \
-            list(self.bueno_data.keys())
+        """Set schema with POSIX and Bueno data."""
+        column_names = list(self.bueno_data.keys())
         self.set_schema(column_names)
 
-    def add_row(self) -> None:
-        """Parses Bueno data and adds the row."""
-        if not self.schema_is_set():
-            with open(self.filename, 'r') as fh:
-                file_content = (fh.read())
-            rows = file_content.split('\n')
-            drop_rows = [row for row in rows if row != '']
-            rows = drop_rows
-            for row in rows:
-                colon_split = row.split(':', maxsplit=1)
-                if len(colon_split) != 2:
-                    raise TypeError
-                self.bueno_data[colon_split[0]] = colon_split[1]
+    def add_rows(self) -> None:
+        """Parses Bueno data and adds a list containing 1 or more rows."""
+        for idx,filename in enumerate(self.filenames):
+            if not self.schema_is_set():
+                with open(filename, 'r') as fh:
+                    file_content = fh.read()
+                keyval_pairs = file_content.split('\n')
+                # Remove blank lines from the file
+                def _valid_line(x):
+                    return(x != '')
+                drop_blank = list(filter(_valid_line,keyval_pairs))
+                keyval_pairs = drop_blank
+                # Each row contains a keyval pair
+                for keyval_pair in keyval_pairs:
+                    colon_split = keyval_pair.split(':', maxsplit=1)
+                    # If a row does not have a : delimiter, raise error.
+                    if len(colon_split) != 2:
+                        raise TypeError
+                    # Check if column already exists
+                    try:
+                        self.bueno_data[colon_split[0]]
+                    # Initialize empty column if first time seeing it
+                    except KeyError:
+                        self.bueno_data[colon_split[0]] = [None]*len(self.filenames)
+                    # Set the appropriate row index value for this keyval_pair
+                    finally:
+                        self.bueno_data[colon_split[0]][idx]= colon_split[1]
             self.pack_header()
+        rows = list(self.bueno_data.values())
+        self.add_to_output(rows)
 
-        row = list(self.file_info.values()) + \
-            list(self.bueno_data.values())
-        self.add_to_output(row)
