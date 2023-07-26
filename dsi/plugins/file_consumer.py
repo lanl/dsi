@@ -64,9 +64,9 @@ class Bueno(FileConsumer):
     def __init__(self, filenames, **kwargs) -> None:
         super().__init__()
         self.bueno_data = OrderedDict()
-        if type(filenames)==str:
+        if type(filenames) == str:
             self.filenames = [filenames]
-        elif type(filenames)==list:
+        elif type(filenames) == list:
             self.filenames = filenames
         else:
             raise TypeError
@@ -78,15 +78,14 @@ class Bueno(FileConsumer):
 
     def add_rows(self) -> None:
         """Parses Bueno data and adds a list containing 1 or more rows."""
-        for idx,filename in enumerate(self.filenames):
+        for idx, filename in enumerate(self.filenames):
             if not self.schema_is_set():
                 with open(filename, 'r') as fh:
                     file_content = fh.read()
                 keyval_pairs = file_content.split('\n')
                 # Remove blank lines from the file
-                def _valid_line(x):
-                    return(x != '')
-                drop_blank = list(filter(_valid_line,keyval_pairs))
+                _valid_line = lambda x: x != '' # noqa
+                drop_blank = list(filter(_valid_line, keyval_pairs))
                 keyval_pairs = drop_blank
                 # Each row contains a keyval pair
                 for keyval_pair in keyval_pairs:
@@ -99,11 +98,10 @@ class Bueno(FileConsumer):
                         self.bueno_data[colon_split[0]]
                     # Initialize empty column if first time seeing it
                     except KeyError:
-                        self.bueno_data[colon_split[0]] = [None]*len(self.filenames)
+                        self.bueno_data[colon_split[0]] = [None] * len(self.filenames)
                     # Set the appropriate row index value for this keyval_pair
                     finally:
-                        self.bueno_data[colon_split[0]][idx]= colon_split[1]
+                        self.bueno_data[colon_split[0]][idx] = colon_split[1]
             self.pack_header()
         rows = list(self.bueno_data.values())
         self.add_to_output(rows)
-
