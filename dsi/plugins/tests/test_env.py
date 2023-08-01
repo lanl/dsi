@@ -2,6 +2,7 @@ import collections
 
 from dsi.plugins.env import Hostname, SystemKernel, Bueno, GitInfo
 import git
+from json import loads
 
 
 def get_git_root(path):
@@ -35,12 +36,12 @@ def test_hostname_plugin_row_shape():
             assert len(col) == row_shape == row_cnt
 
 
-def test_envprov_plugin_type():
+def test_systemkernel_plugin_type():
     plug = SystemKernel()
     assert type(plug.output_collector) == collections.OrderedDict
 
 
-def test_envprov_plugin_adds_rows():
+def test_systemkernel_plugin_adds_rows():
     plug = SystemKernel()
     plug.add_row()
     plug.add_row()
@@ -48,8 +49,19 @@ def test_envprov_plugin_adds_rows():
     for key, val in plug.output_collector.items():
         assert len(val) == 2
 
-    # should def have more than 100 columns
-    assert len(plug.output_collector.keys()) > 100
+    # 1 SystemKernel column + 4 inherited Env cols
+    assert len(plug.output_collector.keys()) == 5
+
+
+def test_systemkernel_plugin_blob_is_big():
+    plug = SystemKernel()
+    plug.add_row()
+
+    blob = plug.output_collector["kernel_info"][0]
+    info_dict = loads(blob)
+
+    # dict should have more than 1000 (~7000) keys
+    assert len(info_dict.keys()) > 1000
 
 
 def test_bueno_plugin_type():

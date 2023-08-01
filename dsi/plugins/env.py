@@ -5,6 +5,7 @@ import subprocess
 from getpass import getuser
 from git import Repo
 import git.exc
+from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
@@ -150,7 +151,7 @@ class SystemKernel(Environment):
     def __init__(self) -> None:
         """Initialize SystemKernel with inital provenance info."""
         super().__init__()
-        self.prov_info = self.get_prov_info()
+        self.column_names = ["kernel_info"]
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
@@ -160,25 +161,25 @@ class SystemKernel(Environment):
                                      col_types=[str] * len(prov_info_names), base=EnvironmentModel)
         self.set_schema(column_names, validation_model=model)
 
+
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
-        pairs = self.get_prov_info()
-        self.add_to_output(list(self.posix_info.values()) +
-                           list(pairs.values()))
+        blob = self.get_kernel_info()
+        self.add_to_output(list(self.posix_info.values()) + [blob])
 
-    def get_prov_info(self) -> dict:
+    def get_kernel_info(self) -> str:
         """Collect and return the different categories of provenance info."""
-        prov_info = {}
-        prov_info.update(self.get_kernel_version())
-        prov_info.update(self.get_kernel_ct_config())
-        prov_info.update(self.get_kernel_bt_config())
-        prov_info.update(self.get_kernel_rt_config())
-        prov_info.update(self.get_kernel_mod_config())
-        prov_info.update(self.get_container_config())
-        return prov_info
+        kernel_info = {}
+        kernel_info.update(self.get_kernel_version())
+        kernel_info.update(self.get_kernel_ct_config())
+        kernel_info.update(self.get_kernel_bt_config())
+        kernel_info.update(self.get_kernel_rt_config())
+        kernel_info.update(self.get_kernel_mod_config())
+        blob = dumps(kernel_info)
+        return blob
 
     def get_kernel_version(self) -> dict:
         """Kernel version is obtained by the "uname -r" command, returns it in a dict. """
@@ -252,15 +253,6 @@ class SystemKernel(Environment):
         for mod, info in zip(modules, modinfos):
             mod_configs["/sbin/modinfo " + mod] = info
         return mod_configs
-
-    def get_container_config(self) -> dict:
-        # Not yet implemented
-        return {}
-
-    def update_output(self, pairs: dict) -> None:
-        """Appends a given dict's values to the output under the same key."""
-        for key, val in pairs.items():
-            self.output[key].append(val)
 
     @staticmethod
     def get_cmd_output(cmd: list, ignore_stderr=False) -> str:
