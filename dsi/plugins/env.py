@@ -9,7 +9,7 @@ from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
-    EnvironmentModel, GitInfoModel, HostnameModel, create_dynamic_model
+    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
 )
 
 
@@ -105,12 +105,12 @@ class GitInfo(Environment):
     Adds the current git remote and git commit to metadata.
     """
 
-    def __init__(self, git_repo_path="./") -> None:
+    def __init__(self, git_repo_path='./') -> None:
         """ Initializes the git repo in the given directory and access to git commands """
         super().__init__()
         try:
-            self.repo = Repo(git_repo_path)
-        except git.exc:
+            self.repo = Repo(git_repo_path, search_parent_directories=True)
+        except git.exc.InvalidGitRepositoryError:
             raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
                             "GitInfo Plugin must be given a repo base path " +
                             "(default is working dir)")
@@ -151,33 +151,31 @@ class SystemKernel(Environment):
     def __init__(self) -> None:
         """Initialize SystemKernel with inital provenance info."""
         super().__init__()
+        self.prov_info = self.get_prov_info()
         self.column_names = ["kernel_info"]
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
-        prov_info_names = list(self.prov_info.keys())
-        column_names = list(self.posix_info.keys()) + prov_info_names
-        model = create_dynamic_model("BuenoModel", col_names=prov_info_names,
-                                     col_types=[str] * len(prov_info_names), base=EnvironmentModel)
-        self.set_schema(column_names, validation_model=model)
+        column_names = list(self.posix_info.keys()) + self.column_names
+        self.set_schema(column_names, validation_model=SystemKernelModel)
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
-        blob = self.get_kernel_info()
+        blob = self.get_prov_info()
         self.add_to_output(list(self.posix_info.values()) + [blob])
 
-    def get_kernel_info(self) -> str:
+    def get_prov_info(self) -> str:
         """Collect and return the different categories of provenance info."""
-        kernel_info = {}
-        kernel_info.update(self.get_kernel_version())
-        kernel_info.update(self.get_kernel_ct_config())
-        kernel_info.update(self.get_kernel_bt_config())
-        kernel_info.update(self.get_kernel_rt_config())
-        kernel_info.update(self.get_kernel_mod_config())
-        blob = dumps(kernel_info)
+        prov_info = {}
+        prov_info.update(self.get_kernel_version())
+        prov_info.update(self.get_kernel_ct_config())
+        prov_info.update(self.get_kernel_bt_config())
+        prov_info.update(self.get_kernel_rt_config())
+        prov_info.update(self.get_kernel_mod_config())
+        blob = dumps(prov_info)
         return blob
 
     def get_kernel_version(self) -> dict:

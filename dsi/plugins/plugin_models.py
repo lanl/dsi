@@ -32,3 +32,7 @@ class HostnameModel(EnvironmentModel):
 class GitInfoModel(EnvironmentModel):
     git_remote: str
     git_commit: str
+
+
+class SystemKernelModel(EnvironmentModel):
+    kernel_info: str
