@@ -5,6 +5,7 @@ import subprocess
 from getpass import getuser
 from git import Repo
 import git.exc
+from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -145,12 +146,11 @@ class SystemKernel(Environment):
     def __init__(self) -> None:
         """Initialize SystemKernel with inital provenance info."""
         super().__init__()
-        self.prov_info = self.get_prov_info()
+        self.column_names = ["kernel_info"]
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
-        column_names = list(self.posix_info.keys()) + \
-            list(self.prov_info.keys())
+        column_names = list(self.posix_info.keys()) + self.column_names
         self.set_schema(column_names)
 
     def add_row(self) -> None:
@@ -158,19 +158,19 @@ class SystemKernel(Environment):
         if not self.schema_is_set():
             self.pack_header()
 
-        pairs = self.get_prov_info()
-        self.add_to_output(list(self.posix_info.values()) +
-                           list(pairs.values()))
+        blob = self.get_kernel_info()
+        self.add_to_output(list(self.posix_info.values()) + [blob])
 
-    def get_prov_info(self) -> dict:
+    def get_kernel_info(self) -> str:
         """Collect and return the different categories of provenance info."""
-        prov_info = {}
-        prov_info.update(self.get_kernel_version())
-        prov_info.update(self.get_kernel_ct_config())
-        prov_info.update(self.get_kernel_bt_config())
-        prov_info.update(self.get_kernel_rt_config())
-        prov_info.update(self.get_kernel_mod_config())
-        return prov_info
+        kernel_info = {}
+        kernel_info.update(self.get_kernel_version())
+        kernel_info.update(self.get_kernel_ct_config())
+        kernel_info.update(self.get_kernel_bt_config())
+        kernel_info.update(self.get_kernel_rt_config())
+        kernel_info.update(self.get_kernel_mod_config())
+        blob = dumps(kernel_info)
+        return blob
 
     def get_kernel_version(self) -> dict:
         """Kernel version is obtained by the "uname -r" command, returns it in a dict. """
