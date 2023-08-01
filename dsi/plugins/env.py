@@ -167,7 +167,7 @@ class SystemKernel(Environment):
         blob = self.get_prov_info()
         self.add_to_output(list(self.posix_info.values()) + [blob])
 
-    def get_prov_info(self) -> dict:
+    def get_prov_info(self) -> str:
         """Collect and return the different categories of provenance info."""
         prov_info = {}
         prov_info.update(self.get_kernel_version())
