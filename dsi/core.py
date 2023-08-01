@@ -127,7 +127,7 @@ class Terminal():
         Adds a given external, meaning not from the DSI repo, Python module to the module_collection
 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
-        
+
         Note: mod_type is needed because each Python module should only implement plugins or drivers
 
         For example,

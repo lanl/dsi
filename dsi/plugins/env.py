@@ -161,7 +161,6 @@ class SystemKernel(Environment):
                                      col_types=[str] * len(prov_info_names), base=EnvironmentModel)
         self.set_schema(column_names, validation_model=model)
 
-
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
