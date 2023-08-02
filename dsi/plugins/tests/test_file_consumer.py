@@ -11,20 +11,20 @@ def get_git_root(path):
 
 
 def test_bueno_plugin_type():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
+    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno1.data'])
     plug = Bueno(filenames=path)
     plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 
 def test_bueno_plugin_adds_rows():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
+    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno1.data'])
     plug = Bueno(filenames=path)
     plug.add_rows()
     plug.add_rows()
 
     for key, val in plug.output_collector.items():
-        assert len(val) == 2
+        assert len(val) == 4 
 
     # 3 Bueno cols + 2 inherited FileConsumer cols
     assert len(plug.output_collector.keys()) == 5

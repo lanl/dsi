@@ -102,6 +102,6 @@ class Bueno(FileConsumer):
                     # Set the appropriate row index value for this keyval_pair
                     finally:
                         self.bueno_data[colon_split[0]][idx] = colon_split[1]
-            self.pack_header()
+        self.pack_header()
         rows = list(self.bueno_data.values())
         self.add_to_output(rows)
