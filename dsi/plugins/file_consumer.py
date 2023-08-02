@@ -12,13 +12,18 @@ class FileConsumer(StructuredMetadata):
     they are ingesting, namely absolute path and hash.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filenames):
         super().__init__()
-        self.filename = filename
-        self.file_info = OrderedDict()
-        self.file_info['abspath'] = abspath(filename)
-        sha = sha1(open(filename, 'rb').read())
-        self.file_info['sha1'] = sha.hexdigest()
+        if type(filenames) == str:
+            self.filenames = [filenames]
+        elif type(filenames) == list:
+            self.filenames = filenames
+        else:
+            raise TypeError
+        self.file_info = {}
+        for filename in self.filenames:
+            sha = sha1(open(filename, 'rb').read())
+            self.file_info[abspath(filename)] = sha.hexdigest()
 
 
 class Csv(FileConsumer):
@@ -26,27 +31,28 @@ class Csv(FileConsumer):
     A Plugin to ingest CSV data
     """
 
-    def __init__(self, filename, **kwargs):
-        super().__init__(filename)
+    def __init__(self, filenames, **kwargs):
+        super().__init__(filenames)
         self.csv_data = []
         self.csv_col_names = []
         self.reader_options = kwargs
 
     def pack_header(self) -> None:
         """ Set schema based on the CSV columns """
-        column_names = list(self.file_info.keys()) + self.csv_col_names
+        column_names = ['metadata_source', 'metadata_source_sha'] + self.csv_col_names
         self.set_schema(column_names)
 
     def add_rows(self) -> None:
         """ Adds a list containing one or more rows of the CSV along with file_info to output. """
         if not self.schema_is_set():
-            with open(self.filename, 'r') as f:
+            # TODO: Csv FileConsumer only supports reading a single file. See filename index below.
+            with open(self.filenames[0], 'r') as f:
                 r = reader(f, **self.reader_options)
                 for i, line in enumerate(r):
                     if i == 0:
                         self.csv_col_names = line
                     else:
-                        self.csv_data.append(line)
+                        self.csv_data.append([self.filenames[0]] + [self.file_info[self.filenames[0]]] + line)
             self.pack_header()
 
         for line in self.csv_data:
@@ -62,14 +68,8 @@ class Bueno(FileConsumer):
     are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
     def __init__(self, filenames, **kwargs) -> None:
-        super().__init__()
+        super().__init__(filenames)
         self.bueno_data = OrderedDict()
-        if type(filenames) == str:
-            self.filenames = [filenames]
-        elif type(filenames) == list:
-            self.filenames = filenames
-        else:
-            raise TypeError
 
     def pack_header(self) -> None:
         """Set schema with POSIX and Bueno data."""
