@@ -13,6 +13,7 @@ The Data Science Infrastructure Project (DSI)
 
    introduction
    installation
+   contributing_readers
    core
    plugins
    drivers
