@@ -18,16 +18,17 @@ def test_bueno_plugin_type():
 
 
 def test_bueno_plugin_adds_rows():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno1.data'])
-    plug = Bueno(filenames=path)
+    path1 = '/'.join([get_git_root('.'), 'dsi/data', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'dsi/data', 'bueno2.data'])
+    plug = Bueno(filenames=[path1, path2])
     plug.add_rows()
     plug.add_rows()
 
     for key, val in plug.output_collector.items():
-        assert len(val) == 4 
+        assert len(val) == 2  # two lists of length two
 
-    # 3 Bueno cols + 2 inherited FileConsumer cols
-    assert len(plug.output_collector.keys()) == 5
+    # 4 Bueno cols + 2 inherited FileConsumer cols
+    assert len(plug.output_collector.keys()) == 6
 
 
 def test_csv_plugin_type():

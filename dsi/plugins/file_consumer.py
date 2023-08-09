@@ -39,7 +39,8 @@ class Csv(FileConsumer):
 
     def pack_header(self) -> None:
         """ Set schema based on the CSV columns """
-        column_names = ['metadata_source', 'metadata_source_sha'] + self.csv_col_names
+        column_names = ['metadata_source',
+                        'metadata_source_sha'] + self.csv_col_names
         self.set_schema(column_names)
 
     def add_rows(self) -> None:
@@ -52,7 +53,8 @@ class Csv(FileConsumer):
                     if i == 0:
                         self.csv_col_names = line
                     else:
-                        self.csv_data.append([self.filenames[0]] + [self.file_info[self.filenames[0]]] + line)
+                        self.csv_data.append(
+                            [self.filenames[0]] + [self.file_info[self.filenames[0]]] + line)
             self.pack_header()
 
         for line in self.csv_data:
@@ -67,6 +69,7 @@ class Bueno(FileConsumer):
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values
     are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
+
     def __init__(self, filenames, **kwargs) -> None:
         super().__init__(filenames)
         self.bueno_data = OrderedDict()
@@ -78,13 +81,13 @@ class Bueno(FileConsumer):
 
     def add_rows(self) -> None:
         """Parses Bueno data and adds a list containing 1 or more rows."""
-        for idx, filename in enumerate(self.filenames):
-            if not self.schema_is_set():
+        if not self.schema_is_set():
+            for idx, filename in enumerate(self.filenames):
                 with open(filename, 'r') as fh:
                     file_content = fh.read()
                 keyval_pairs = file_content.split('\n')
                 # Remove blank lines from the file
-                _valid_line = lambda x: x != '' # noqa
+                def _valid_line(x): return x != ''  # noqa
                 drop_blank = list(filter(_valid_line, keyval_pairs))
                 keyval_pairs = drop_blank
                 # Each row contains a keyval pair
@@ -94,14 +97,13 @@ class Bueno(FileConsumer):
                     if len(colon_split) != 2:
                         raise TypeError
                     # Check if column already exists
-                    try:
-                        self.bueno_data[colon_split[0]]
-                    # Initialize empty column if first time seeing it
-                    except KeyError:
-                        self.bueno_data[colon_split[0]] = [None] * len(self.filenames)
+                    if colon_split[0] not in self.bueno_data:
+                        # Initialize empty column if first time seeing it
+                        self.bueno_data[colon_split[0]] = [None] \
+                            * len(self.filenames)
                     # Set the appropriate row index value for this keyval_pair
-                    finally:
-                        self.bueno_data[colon_split[0]][idx] = colon_split[1]
-        self.pack_header()
+                    self.bueno_data[colon_split[0]][idx] = colon_split[1]
+            self.pack_header()
+
         rows = list(self.bueno_data.values())
         self.add_to_output(rows)
