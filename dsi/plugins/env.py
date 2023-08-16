@@ -5,8 +5,12 @@ import subprocess
 from getpass import getuser
 from git import Repo
 import git.exc
+from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
+from dsi.plugins.plugin_models import (
+    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
+)
 
 
 class Environment(StructuredMetadata):
@@ -43,7 +47,7 @@ class Hostname(Environment):
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
-        self.set_schema(column_names)
+        self.set_schema(column_names, validation_model=HostnameModel)
 
     def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -61,25 +65,25 @@ class GitInfo(Environment):
     Adds the current git remote and git commit to metadata.
     """
 
-    def __init__(self, git_repo_path="./") -> None:
+    def __init__(self, git_repo_path='./') -> None:
         """ Initializes the git repo in the given directory and access to git commands """
         super().__init__()
         try:
-            self.repo = Repo(git_repo_path)
-        except git.exc:
+            self.repo = Repo(git_repo_path, search_parent_directories=True)
+        except git.exc.InvalidGitRepositoryError:
             raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
                             "GitInfo Plugin must be given a repo base path " +
                             "(default is working dir)")
         self.git_info = {
-            "git-remote": lambda: self.repo.git.remote("-v"),
-            "git-commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
+            "git_remote": lambda: self.repo.git.remote("-v"),
+            "git_commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
         }
 
     def pack_header(self) -> None:
         """ Set schema with POSIX and Git columns """
         column_names = list(self.posix_info.keys()) + \
             list(self.git_info.keys())
-        self.set_schema(column_names)
+        self.set_schema(column_names, validation_model=GitInfoModel)
 
     def add_rows(self) -> None:
         """ Adds a row to the output with POSIX info, git remote, and git commit """
@@ -87,7 +91,7 @@ class GitInfo(Environment):
             self.pack_header()
 
         row = list(self.posix_info.values()) + \
-            [self.git_info["git-remote"](), self.git_info["git-commit"]()]
+            [self.git_info["git_remote"](), self.git_info["git_commit"]()]
         self.add_to_output(row)
 
 
@@ -108,23 +112,22 @@ class SystemKernel(Environment):
         """Initialize SystemKernel with inital provenance info."""
         super().__init__()
         self.prov_info = self.get_prov_info()
+        self.column_names = ["kernel_info"]
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
-        column_names = list(self.posix_info.keys()) + \
-            list(self.prov_info.keys())
-        self.set_schema(column_names)
+        column_names = list(self.posix_info.keys()) + self.column_names
+        self.set_schema(column_names, validation_model=SystemKernelModel)
 
     def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
-        pairs = self.get_prov_info()
-        self.add_to_output(list(self.posix_info.values()) +
-                           list(pairs.values()))
+        blob = self.get_prov_info()
+        self.add_to_output(list(self.posix_info.values()) + [blob])
 
-    def get_prov_info(self) -> dict:
+    def get_prov_info(self) -> str:
         """Collect and return the different categories of provenance info."""
         prov_info = {}
         prov_info.update(self.get_kernel_version())
@@ -132,7 +135,8 @@ class SystemKernel(Environment):
         prov_info.update(self.get_kernel_bt_config())
         prov_info.update(self.get_kernel_rt_config())
         prov_info.update(self.get_kernel_mod_config())
-        return prov_info
+        blob = dumps(prov_info)
+        return blob
 
     def get_kernel_version(self) -> dict:
         """Kernel version is obtained by the "uname -r" command, returns it in a dict. """

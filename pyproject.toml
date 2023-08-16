@@ -24,5 +24,6 @@ dependencies = [
 	"gitpython",
   "pyarrow",
   "pandas",
-  "nbformat"
+  "nbformat",
+  "pydantic"
 ]

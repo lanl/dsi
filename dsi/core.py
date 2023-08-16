@@ -130,10 +130,13 @@ class Terminal():
         Note: mod_type is needed because each Python module only implements plugins or drivers.
 
         For example,
+
         term = Terminal()
         term.add_external_python_module('plugin', 'my_python_file',
                                         '/the/path/to/my_python_file.py')
+
         term.load_module('plugin', 'MyPlugin', 'consumer')
+
         term.list_loaded_modules() # includes MyPlugin
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
