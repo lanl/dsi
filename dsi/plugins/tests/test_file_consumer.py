@@ -27,7 +27,7 @@ def test_bueno_plugin_adds_rows():
     for key, val in plug.output_collector.items():
         assert len(val) == 4  # two lists of length 4
 
-    # 4 Bueno cols 
+    # 4 Bueno cols
     assert len(plug.output_collector.keys()) == 4
 
 
