@@ -15,8 +15,8 @@ class Terminal():
     DRIVER_PREFIX = ['dsi.drivers']
     DRIVER_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'Bueno', 'GitInfo']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_consumer']
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv']
     VALID_DRIVERS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
     VALID_MODULE_FUNCTIONS = {'plugin': [
@@ -163,6 +163,18 @@ class Terminal():
                 obj.add_rows(**kwargs)
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
+
+        # Plugins may add more rows than each other (vector vs matrix data).
+        # So, we must pad the shorter columns to match the max length column.
+        max_len = max([len(col) for col in self.active_metadata.values()])
+        for colname, coldata in self.active_metadata.items():
+            if len(coldata) != max_len:
+                self.active_metadata[colname].extend(  # add None's until reaching max_len
+                    [None] * (max_len - len(coldata)))
+
+        assert all([len(col) == max_len for col in self.active_metadata.values(
+        )]), "All columns must have the same number of rows"
+
         self.transload_lock = True
 
     def artifact_handler(self, interaction_type, **kwargs):
