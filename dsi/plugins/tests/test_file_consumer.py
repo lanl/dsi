@@ -3,9 +3,6 @@ from collections import OrderedDict
 import git
 
 from dsi.plugins.file_consumer import Bueno, Csv
-<< << << < HEAD
-== == == =
->>>>>> > a54727a30b8c156e5135dd99db7b5c108e4841c3
 
 
 def get_git_root(path):
