@@ -107,3 +107,10 @@ class Bueno(FileConsumer):
 
         rows = list(self.bueno_data.values())
         self.add_to_output(rows)
+        # Flatten multiple samples of the same file. 
+        try:
+            for col,rows in self.output_collector.items():
+                self.output_collector[col] = rows[0]+rows[1]
+        except IndexError:
+            # First pass. Nothing to do.
+            pass

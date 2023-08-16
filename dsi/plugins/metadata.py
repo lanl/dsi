@@ -63,6 +63,7 @@ class StructuredMetadata(Plugin):
         for key, row_elem in zip(self.output_collector.keys(), row):
             self.output_collector[key].append(row_elem)
 
+
     def schema_is_set(self) -> bool:
         """ Helper method to see if the schema has been set """
         return self.column_cnt is not None

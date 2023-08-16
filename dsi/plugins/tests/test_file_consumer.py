@@ -25,10 +25,10 @@ def test_bueno_plugin_adds_rows():
     plug.add_rows()
 
     for key, val in plug.output_collector.items():
-        assert len(val) == 2  # two lists of length two
+        assert len(val) == 4  # two lists of length 4
 
-    # 4 Bueno cols + 2 inherited FileConsumer cols
-    assert len(plug.output_collector.keys()) == 6
+    # 4 Bueno cols 
+    assert len(plug.output_collector.keys()) == 4
 
 
 def test_csv_plugin_type():
