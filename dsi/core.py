@@ -167,7 +167,7 @@ class Terminal():
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
 
-        # Plugins may add may add one or more rows (vector vs matrix data).
+        # Plugins may add one or more rows (vector vs matrix data).
         # You may have two or more plugins with different numbers of rows.
         # Consequently, transload operations may have unstructured shape for
         # some plugin configurations. We must force structure to create a valid
