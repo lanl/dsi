@@ -55,7 +55,7 @@ class StructuredMetadata(Plugin):
     def add_to_output(self, row: list) -> None:
         """
         Adds a row of data to the output_collector and guarantees good structure.
-        Useful in a plugin's add_row method.
+        Useful in a plugin's add_rows method.
         """
         if not self.schema_is_set():
             raise RuntimeError("pack_header must be done before add_row")

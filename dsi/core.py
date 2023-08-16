@@ -15,8 +15,8 @@ class Terminal():
     DRIVER_PREFIX = ['dsi.drivers']
     DRIVER_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'Bueno', 'GitInfo']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_consumer']
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv']
     VALID_DRIVERS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
     VALID_MODULE_FUNCTIONS = {'plugin': [
@@ -124,17 +124,17 @@ class Terminal():
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
-        Adds a given external, meaning not from the DSI repo, Python module to the module_collection
+        Adds an external, meaning not from the DSI repo, Python module to the module_collection.
 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
-
-        Note: mod_type is needed because each Python module should only implement plugins or drivers
+        Note: mod_type is needed because each Python module only implements plugins or drivers.
 
         For example,
 
         term = Terminal()
+        term.add_external_python_module('plugin', 'my_python_file',
 
-        term.add_external_python_module('plugin','my_python_file','/the/path/to/my_python_file.py')
+                                        '/the/path/to/my_python_file.py')
 
         term.load_module('plugin', 'MyPlugin', 'consumer')
 
@@ -164,9 +164,25 @@ class Terminal():
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
-                obj.add_row(**kwargs)
+                obj.add_rows(**kwargs)
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
+
+        # Plugins may add one or more rows (vector vs matrix data).
+        # You may have two or more plugins with different numbers of rows.
+        # Consequently, transload operations may have unstructured shape for
+        # some plugin configurations. We must force structure to create a valid
+        # middleware data structure.
+        # To resolve, we pad the shorter columns to match the max length column.
+        max_len = max([len(col) for col in self.active_metadata.values()])
+        for colname, coldata in self.active_metadata.items():
+            if len(coldata) != max_len:
+                self.active_metadata[colname].extend(  # add None's until reaching max_len
+                    [None] * (max_len - len(coldata)))
+
+        assert all([len(col) == max_len for col in self.active_metadata.values(
+        )]), "All columns must have the same number of rows"
+
         self.transload_lock = True
 
     def artifact_handler(self, interaction_type, **kwargs):
