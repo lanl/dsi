@@ -51,7 +51,6 @@ class Hostname(Environment):
             self.pack_header()
 
         row = list(self.posix_info.values()) + [socket.gethostname()]
-        print('row:', row)
         self.add_to_output(row)
 
 
