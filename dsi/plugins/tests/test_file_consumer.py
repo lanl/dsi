@@ -46,5 +46,19 @@ def test_csv_plugin_adds_rows():
     for key, val in plug.output_collector.items():
         assert len(val) == 4
 
-    # 11 Csv cols + 2 inherited FileConsumer cols
-    assert len(plug.output_collector.keys()) == 13
+    # 11 Csv cols + 1 inherited FileConsumer cols
+    assert len(plug.output_collector.keys()) == 12
+
+
+def test_csv_plugin_adds_rows_multiple_files():
+    path1 = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'dsi/data', 'yosemite5.csv'])
+
+    plug = Csv(filenames=[path1, path2])
+    plug.add_rows()
+
+    for key, val in plug.output_collector.items():
+        assert len(val) == 8
+
+    # 13 Csv cols + 2 inherited FileConsumer cols
+    assert len(plug.output_collector.keys()) == 15

@@ -1,7 +1,8 @@
 from collections import OrderedDict
-from csv import reader
 from os.path import abspath
 from hashlib import sha1
+from pandas import DataFrame, read_csv, concat
+from math import isnan
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -33,33 +34,35 @@ class Csv(FileConsumer):
 
     def __init__(self, filenames, **kwargs):
         super().__init__(filenames)
-        self.csv_data = []
-        self.csv_col_names = []
+        self.csv_data = {}
         self.reader_options = kwargs
 
     def pack_header(self) -> None:
         """ Set schema based on the CSV columns """
-        column_names = ['metadata_source',
-                        'metadata_source_sha'] + self.csv_col_names
+        column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
         self.set_schema(column_names)
 
     def add_rows(self) -> None:
         """ Adds a list containing one or more rows of the CSV along with file_info to output. """
         if not self.schema_is_set():
-            # TODO: Csv FileConsumer only supports reading a single file. See filename index below.
-            with open(self.filenames[0], 'r') as f:
-                r = reader(f, **self.reader_options)
-                for i, line in enumerate(r):
-                    if i == 0:
-                        self.csv_col_names = line
-                    else:
-                        self.csv_data.append(
-                            [self.filenames[0]] + [self.file_info[self.filenames[0]]] + line)
+            # use Pandas to append all CSVs together as a
+            # dataframe, then convert to dict
+            total_df = DataFrame()
+            for filename in self.filenames:
+                temp_df = read_csv(filename)
+                total_df = concat([total_df, temp_df])
+
+            self.csv_data = total_df.to_dict('list')
+            for col, coldata in self.csv_data.items():  # replace NaNs with None
+                self.csv_data[col] = [None if type(item) == float and isnan(item) else item
+                                      for item in coldata]
             self.pack_header()
 
-        for line in self.csv_data:
-            rows = list(self.file_info.values()) + line
-            self.add_to_output(rows)
+        total_length = len(self.csv_data[list(self.csv_data.keys())[0]])
+        for row_idx in range(total_length):
+            row = [self.csv_data[k][row_idx] for k in self.csv_data.keys()]
+            row_w_fileinfo = list(self.file_info.values()) + row
+            self.add_to_output(row_w_fileinfo)
 
 
 class Bueno(FileConsumer):

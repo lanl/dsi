@@ -22,5 +22,6 @@ classifiers=[
 ]
 dependencies = [
 	"gitpython",
-  "pyarrow"
+  "pyarrow",
+  "pandas"
 ]
