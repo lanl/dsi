@@ -167,8 +167,12 @@ class Terminal():
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
 
-        # Plugins may add more rows than each other (vector vs matrix data).
-        # So, we must pad the shorter columns to match the max length column.
+        # Plugins may add may add one or more rows (vector vs matrix data).
+        # You may have two or more plugins with different numbers of rows.
+        # Consequently, transload operations may have unstructured shape for
+        # some plugin configurations. We must force structure to create a valid
+        # middleware data structure.
+        # To resolve, we pad the shorter columns to match the max length column.
         max_len = max([len(col) for col in self.active_metadata.values()])
         for colname, coldata in self.active_metadata.items():
             if len(coldata) != max_len:
