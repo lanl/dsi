@@ -55,7 +55,7 @@ def test_systemkernel_plugin_adds_rows():
 
 def test_systemkernel_plugin_blob_is_big():
     plug = SystemKernel()
-    plug.add_row()
+    plug.add_rows()
 
     blob = plug.output_collector["kernel_info"][0]
     info_dict = loads(blob)
