@@ -23,5 +23,6 @@ classifiers=[
 dependencies = [
 	"gitpython",
   "pyarrow",
-  "pandas"
+  "pandas",
+  "nbformat"
 ]

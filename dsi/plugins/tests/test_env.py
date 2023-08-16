@@ -12,15 +12,15 @@ def get_git_root(path):
 
 def test_hostname_plugin_type():
     a = Hostname()
-    a.add_row()
-    a.add_row()
+    a.add_rows()
+    a.add_rows()
     assert type(a.output_collector) == collections.OrderedDict
 
 
 def test_hostname_plugin_col_shape():
     a = Hostname()
-    a.add_row()
-    a.add_row()
+    a.add_rows()
+    a.add_rows()
     assert len(a.output_collector.keys()) == len(a.output_collector.values())
 
 
@@ -28,7 +28,7 @@ def test_hostname_plugin_row_shape():
     for row_cnt in range(1, 10):
         a = Hostname()
         for _ in range(row_cnt):
-            a.add_row()
+            a.add_rows()
         column_values = list(a.output_collector.values())
         row_shape = len(column_values[0])
         for col in column_values[1:]:
@@ -42,8 +42,8 @@ def test_envprov_plugin_type():
 
 def test_envprov_plugin_adds_rows():
     plug = SystemKernel()
-    plug.add_row()
-    plug.add_row()
+    plug.add_rows()
+    plug.add_rows()
 
     for key, val in plug.output_collector.items():
         assert len(val) == 2
@@ -55,15 +55,15 @@ def test_envprov_plugin_adds_rows():
 def test_git_plugin_type():
     root = get_git_root('.')
     plug = GitInfo(git_repo_path=root)
-    plug.add_row()
+    plug.add_rows()
     assert type(plug.output_collector) == collections.OrderedDict
 
 
 def test_git_plugin_adds_rows():
     root = get_git_root('.')
     plug = GitInfo(git_repo_path=root)
-    plug.add_row()
-    plug.add_row()
+    plug.add_rows()
+    plug.add_rows()
 
     for key, val in plug.output_collector.items():
         assert len(val) == 2
@@ -75,7 +75,7 @@ def test_git_plugin_adds_rows():
 def test_git_plugin_infos_are_str():
     root = get_git_root('.')
     plug = GitInfo(git_repo_path=root)
-    plug.add_row()
+    plug.add_rows()
 
     assert type(plug.output_collector["git-remote"][0]) == str
     assert type(plug.output_collector["git-commit"][0]) == str

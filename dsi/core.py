@@ -160,7 +160,7 @@ class Terminal():
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
-                obj.add_row(**kwargs)
+                obj.add_rows(**kwargs)
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
         self.transload_lock = True
