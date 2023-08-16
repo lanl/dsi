@@ -45,7 +45,7 @@ class Hostname(Environment):
         column_names = list(self.posix_info.keys()) + ["hostname"]
         self.set_schema(column_names)
 
-    def add_row(self) -> None:
+    def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
@@ -81,7 +81,7 @@ class GitInfo(Environment):
             list(self.git_info.keys())
         self.set_schema(column_names)
 
-    def add_row(self) -> None:
+    def add_rows(self) -> None:
         """ Adds a row to the output with POSIX info, git remote, and git commit """
         if not self.schema_is_set():
             self.pack_header()
@@ -115,7 +115,7 @@ class SystemKernel(Environment):
             list(self.prov_info.keys())
         self.set_schema(column_names)
 
-    def add_row(self) -> None:
+    def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()

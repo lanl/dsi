@@ -124,14 +124,15 @@ class Terminal():
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
-        Adds a given external, meaning not from the DSI repo, Python module to the module_collection.
+        Adds an external, meaning not from the DSI repo, Python module to the module_collection.
 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
-        Note: mod_type is needed because each Python module should only implement plugins or drivers.
+        Note: mod_type is needed because each Python module only implements plugins or drivers.
 
         For example,
         term = Terminal()
-        term.add_external_python_module('plugin', 'my_python_file', '/the/path/to/my_python_file.py')
+        term.add_external_python_module('plugin', 'my_python_file',
+                                        '/the/path/to/my_python_file.py')
         term.load_module('plugin', 'MyPlugin', 'consumer')
         term.list_loaded_modules() # includes MyPlugin
         """
@@ -159,7 +160,7 @@ class Terminal():
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
-                obj.add_row(**kwargs)
+                obj.add_rows(**kwargs)
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
         self.transload_lock = True

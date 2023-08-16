@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import git
 
-from dsi.plugins.file_consumer import Bueno, CSV
+from dsi.plugins.file_consumer import Bueno, Csv
 
 
 def get_git_root(path):
@@ -11,39 +11,54 @@ def get_git_root(path):
 
 
 def test_bueno_plugin_type():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
-    plug = Bueno(filename=path)
-    plug.add_row()
+    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno1.data'])
+    plug = Bueno(filenames=path)
+    plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 
 def test_bueno_plugin_adds_rows():
-    path = '/'.join([get_git_root('.'), 'dsi/data', 'bueno.data'])
-    plug = Bueno(filename=path)
-    plug.add_row()
-    plug.add_row()
+    path1 = '/'.join([get_git_root('.'), 'dsi/data', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'dsi/data', 'bueno2.data'])
+    plug = Bueno(filenames=[path1, path2])
+    plug.add_rows()
+    plug.add_rows()
 
     for key, val in plug.output_collector.items():
-        assert len(val) == 2
+        assert len(val) == 4  # two lists of length 4
 
-    # 3 Bueno cols + 2 inherited FileConsumer cols
-    assert len(plug.output_collector.keys()) == 5
+    # 4 Bueno cols
+    assert len(plug.output_collector.keys()) == 4
 
 
 def test_csv_plugin_type():
     path = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
-    plug = CSV(filename=path)
-    plug.add_row()
+    plug = Csv(filenames=path)
+    plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 
 def test_csv_plugin_adds_rows():
     path = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
-    plug = CSV(filename=path)
-    plug.add_row()
+    plug = Csv(filenames=path)
+    plug.add_rows()
 
     for key, val in plug.output_collector.items():
         assert len(val) == 4
 
-    # 11 CSV cols + 2 inherited FileConsumer cols
-    assert len(plug.output_collector.keys()) == 13
+    # 11 Csv cols + 1 inherited FileConsumer cols
+    assert len(plug.output_collector.keys()) == 12
+
+
+def test_csv_plugin_adds_rows_multiple_files():
+    path1 = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'dsi/data', 'yosemite5.csv'])
+
+    plug = Csv(filenames=[path1, path2])
+    plug.add_rows()
+
+    for key, val in plug.output_collector.items():
+        assert len(val) == 8
+
+    # 13 Csv cols + 2 inherited FileConsumer cols
+    assert len(plug.output_collector.keys()) == 15
