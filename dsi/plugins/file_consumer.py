@@ -89,7 +89,7 @@ class Bueno(FileConsumer):
             for idx, filename in enumerate(self.filenames):
                 with open(filename, 'r') as fh:
                     file_content = json.load(fh)
-                for key,val in file_content.items():
+                for key, val in file_content.items():
                     # Check if column already exists
                     if key not in self.bueno_data:
                         # Initialize empty column if first time seeing it
