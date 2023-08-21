@@ -1,8 +1,9 @@
 from collections import OrderedDict
 from os.path import abspath
 from hashlib import sha1
-from pandas import DataFrame, read_csv, concat
+import json
 from math import isnan
+from pandas import DataFrame, read_csv, concat
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -87,25 +88,15 @@ class Bueno(FileConsumer):
         if not self.schema_is_set():
             for idx, filename in enumerate(self.filenames):
                 with open(filename, 'r') as fh:
-                    file_content = fh.read()
-                keyval_pairs = file_content.split('\n')
-                # Remove blank lines from the file
-                def _valid_line(x): return x != ''  # noqa
-                drop_blank = list(filter(_valid_line, keyval_pairs))
-                keyval_pairs = drop_blank
-                # Each row contains a keyval pair
-                for keyval_pair in keyval_pairs:
-                    colon_split = keyval_pair.split(':', maxsplit=1)
-                    # If a row does not have a : delimiter, raise error.
-                    if len(colon_split) != 2:
-                        raise TypeError
+                    file_content = json.load(fh)
+                for key, val in file_content.items():
                     # Check if column already exists
-                    if colon_split[0] not in self.bueno_data:
+                    if key not in self.bueno_data:
                         # Initialize empty column if first time seeing it
-                        self.bueno_data[colon_split[0]] = [None] \
+                        self.bueno_data[key] = [None] \
                             * len(self.filenames)
                     # Set the appropriate row index value for this keyval_pair
-                    self.bueno_data[colon_split[0]][idx] = colon_split[1]
+                    self.bueno_data[key][idx] = val
             self.pack_header()
 
         rows = list(self.bueno_data.values())
