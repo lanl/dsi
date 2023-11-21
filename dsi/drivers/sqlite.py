@@ -110,6 +110,7 @@ class Sqlite(Filesystem):
         self.con.commit()
 
     # Adds columns and rows automaticallly based on a csv file
+    #[NOTE 3] This method should be deprecated in favor of put_artifacts.
     def put_artifacts_csv(self, fname, tname, isVerbose=False):
         """
         Function for insertion of Artifact metadata into a defined schema by using a CSV file,
@@ -127,6 +128,7 @@ class Sqlite(Filesystem):
             print("Opening " + fname)
 
         print('Entering csv method')
+        #[BEGIN NOTE 1] This is a csv getter. Does not belong! QW
         with open(fname) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             header = next(csv_reader)
@@ -150,7 +152,8 @@ class Sqlite(Filesystem):
                     self.cur.execute(str_query)
                     self.con.commit()
                     line_count += 1
-
+        #[END NOTE 1] QW
+        #[BEGIN NOTE 2]  This puts each row into a potentially new table. It does not take existing metadata as input. QW
                 str_query = "INSERT INTO " + str(tname) + " VALUES ( "
                 for column in row:
                     str_query = str_query + " '" + str(column) + "'"
@@ -168,6 +171,7 @@ class Sqlite(Filesystem):
 
             if isVerbose:
                 print("Read " + str(line_count) + " rows.")
+      #[END NOTE 2]
 
     # Returns text list from query
     def get_artifact_list(self, isVerbose=False):
