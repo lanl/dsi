@@ -63,6 +63,16 @@ def test_csv_plugin_adds_rows_multiple_files():
 
     # 13 Csv cols + 2 inherited FileConsumer cols
     assert len(plug.output_collector.keys()) == 15
+    
+    
+def test_csv_plugin_adds_rows_multiple_files_strict_mode():
+    path1 = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'dsi/data', 'yosemite5.csv'])
+
+    plug = Csv(filenames=[path1, path2], strict_mode = True)
+    plug.add_rows()
+
+    assert len(plug.output_collector.keys()) == 0
 
 
 def test_csv_plugin_leaves_active_metadata_wellformed():

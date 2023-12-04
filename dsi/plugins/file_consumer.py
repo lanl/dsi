@@ -27,11 +27,18 @@ class FileConsumer(StructuredMetadata):
             sha = sha1(open(filename, 'rb').read())
             self.file_info[abspath(filename)] = sha.hexdigest()
 
+class InvalidSchemasException(Exception):
+    "Raised when the schemas of multiple files do not match."
+    pass
 
 class Csv(FileConsumer):
     """
     A Plugin to ingest CSV data
     """
+    
+    # This turns on strict_mode when reading in multiple csv files that need matching schemas.
+    # Default value is False.
+    strict_mode = False
 
     def __init__(self, filenames, **kwargs):
         super().__init__(filenames)
@@ -40,19 +47,47 @@ class Csv(FileConsumer):
 
     def pack_header(self) -> None:
         """ Set schema based on the CSV columns """
+            
         column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
         self.set_schema(column_names)
 
     def add_rows(self) -> None:
         """ Adds a list containing one or more rows of the CSV along with file_info to output. """
+        
+        # Check for strict_mode option
+        for key,value in self.reader_options.items():
+            if key == 'strict_mode':
+                self.strict_mode = value
+                
         if not self.schema_is_set():
             # use Pandas to append all CSVs together as a
             # dataframe, then convert to dict
-            total_df = DataFrame()
-            for filename in self.filenames:
-                temp_df = read_csv(filename)
-                total_df = concat([total_df, temp_df])
-
+            if self.strict_mode == True:
+                total_df = DataFrame()
+                dfs = []
+                for filename in self.filenames:
+                    if total_df.empty == True:
+                        total_df = read_csv(filename)
+                        dfs.append(total_df)
+                    else:
+                        temp_df = read_csv(filename)
+                        dfs.append(temp_df)
+                        total_df = concat([total_df, temp_df])
+                        
+                # raise exception if schemas do not match
+                try:
+                    if any([set(dfs[0].columns) != set(df.columns) for df in dfs]):
+                        raise InvalidSchemasException
+                except InvalidSchemasException:
+                    print('Error: Strict schema option is on. Schemas do not match.')
+                    return
+                            
+            elif self.strict_mode == False:
+                total_df = DataFrame()
+                for filename in self.filenames:
+                    temp_df = read_csv(filename)
+                    total_df = concat([total_df, temp_df])
+                          
             self.csv_data = total_df.to_dict('list')
             for col, coldata in self.csv_data.items():  # replace NaNs with None
                 self.csv_data[col] = [None if type(item) == float and isnan(item) else item
