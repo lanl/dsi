@@ -93,9 +93,6 @@ class Sqlite(Filesystem):
         types = DataType()
         types.properties = artifacts
         
-        print(types.properties.keys())
-        print(types.properties.values())
-        
         self.put_artifact_type(types)
         
         col_names = ', '.join(types.properties.keys())
@@ -106,11 +103,6 @@ class Sqlite(Filesystem):
         # col_list helps access the specific keys of the dictionary in the for loop
         col_list = col_names.split(', ')
 
-        #print("col_names: ",col_names)
-        #print("col_list: ", col_list)
-        
-        print(str_query)
-        
         # loop through the contents of each column and insert into table as a row
         for ind1 in range(len(types.properties[col_list[0]])):
             vals = []
@@ -118,7 +110,6 @@ class Sqlite(Filesystem):
                 vals.append(str(types.properties[col_list[ind2]][ind1]))
             # Make sure this works if types.properties[][] is already a string
             tup_vals = tuple(vals)
-            print(tup_vals)
             self.cur.execute(str_query,tup_vals)
 
         if isVerbose:
@@ -147,7 +138,7 @@ class Sqlite(Filesystem):
             print("Opening " + fname)
 
         print('Entering csv method')
-        #[BEGIN NOTE 1] This is a csv getter. Does not belong! QW
+        #[BEGIN NOTE 1] This is a csv getter. Does it belong? QW
         with open(fname) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             header = next(csv_reader)
