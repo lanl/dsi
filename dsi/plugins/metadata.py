@@ -41,9 +41,8 @@ class StructuredMetadata(Plugin):
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
         self.validation_model = None  # optional pydantic Model
-
         # Check for strict_mode option
-        if 'strict_mode' in kwargs.items():
+        if 'strict_mode' in kwargs:
             if type(kwargs['strict_mode']) == bool:
                 self.strict_mode = kwargs['strict_mode']
             else:

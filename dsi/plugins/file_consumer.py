@@ -15,7 +15,7 @@ class FileConsumer(StructuredMetadata):
     """
 
     def __init__(self, filenames, **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         if type(filenames) == str:
             self.filenames = [filenames]
         elif type(filenames) == list:
@@ -28,11 +28,6 @@ class FileConsumer(StructuredMetadata):
             self.file_info[abspath(filename)] = sha.hexdigest()
 
 
-class InvalidSchemasException(Exception):
-    "Raised when the schemas of multiple files do not match."
-    pass
-
-
 class Csv(FileConsumer):
     """
     A Plugin to ingest CSV data
@@ -43,9 +38,8 @@ class Csv(FileConsumer):
     strict_mode = False
 
     def __init__(self, filenames, **kwargs):
-        super().__init__(filenames, kwargs)
+        super().__init__(filenames, **kwargs)
         self.csv_data = {}
-        self.reader_options = kwargs
 
     def pack_header(self) -> None:
         """ Set schema based on the CSV columns """
@@ -107,7 +101,7 @@ class Bueno(FileConsumer):
     """
 
     def __init__(self, filenames, **kwargs) -> None:
-        super().__init__(filenames)
+        super().__init__(filenames, **kwargs)
         self.bueno_data = OrderedDict()
 
     def pack_header(self) -> None:
