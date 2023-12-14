@@ -33,7 +33,7 @@ class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
     git_commit_sha: str = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initializes a StructuredDataPlugin with an output collector
         and an initially unset column count.
@@ -41,16 +41,44 @@ class StructuredMetadata(Plugin):
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
         self.validation_model = None  # optional pydantic Model
+        # Check for strict_mode option
+        if 'strict_mode' in kwargs:
+            if type(kwargs['strict_mode']) == bool:
+                self.strict_mode = kwargs['strict_mode']
+            else:
+                print('strict_mode must be bool type.')
+                raise TypeError
+        else:
+            self.strict_mode = False
+        # Lock to enforce strict mode
+        self.strict_mode_lock = False
 
     def set_schema(self, column_names: list, validation_model=None) -> None:
         """
         Initializes columns in the output_collector and column_cnt.
         Useful in a plugin's pack_header method.
         """
+
+        # Strict mode | SMLock | relation
+        # --------------------------------
+        # 0 | 0 | Proceed, no lock
+        # 0 | 1 | Raise error. Nonsense.
+        # 1 | 0 | Proceed, then lock
+        # 1 | 1 | Raise error. Previously locked.
+        if self.strict_mode and self.strict_mode_lock:
+            print('Previously locked schema. Refusing to proceed.')
+            raise RuntimeError
+        if not self.strict_mode and self.strict_mode_lock:
+            print('Strict mode disabled but strict more lock active.')
+            raise NotImplementedError
+
         for name in column_names:
             self.output_collector[name] = []
         self.column_cnt = len(column_names)
         self.validation_model = validation_model
+
+        if not self.strict_mode_lock:
+            self.strict_mode_lock = True
 
     def add_to_output(self, row: list) -> None:
         """

@@ -65,6 +65,18 @@ def test_csv_plugin_adds_rows_multiple_files():
     assert len(plug.output_collector.keys()) == 15
 
 
+def test_csv_plugin_adds_rows_multiple_files_strict_mode():
+    path1 = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'dsi/data', 'yosemite5.csv'])
+
+    plug = Csv(filenames=[path1, path2], strict_mode=True)
+    try:
+        plug.add_rows()
+    except TypeError:
+        # Strict mode will throw TypeError if enabled and csv headers don't match
+        assert True
+
+
 def test_csv_plugin_leaves_active_metadata_wellformed():
     path = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
 

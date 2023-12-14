@@ -14,8 +14,8 @@ class FileConsumer(StructuredMetadata):
     they are ingesting, namely absolute path and hash.
     """
 
-    def __init__(self, filenames):
-        super().__init__()
+    def __init__(self, filenames, **kwargs):
+        super().__init__(**kwargs)
         if type(filenames) == str:
             self.filenames = [filenames]
         elif type(filenames) == list:
@@ -33,26 +33,52 @@ class Csv(FileConsumer):
     A Plugin to ingest CSV data
     """
 
+    # This turns on strict_mode when reading in multiple csv files that need matching schemas.
+    # Default value is False.
+    strict_mode = False
+
     def __init__(self, filenames, **kwargs):
-        super().__init__(filenames)
+        super().__init__(filenames, **kwargs)
         self.csv_data = {}
-        self.reader_options = kwargs
 
     def pack_header(self) -> None:
         """ Set schema based on the CSV columns """
+
         column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
         self.set_schema(column_names)
 
     def add_rows(self) -> None:
         """ Adds a list containing one or more rows of the CSV along with file_info to output. """
+
         if not self.schema_is_set():
             # use Pandas to append all CSVs together as a
             # dataframe, then convert to dict
-            total_df = DataFrame()
-            for filename in self.filenames:
-                temp_df = read_csv(filename)
-                total_df = concat([total_df, temp_df])
+            if self.strict_mode:
+                total_df = DataFrame()
+                dfs = []
+                for filename in self.filenames:
+                    # Initial case. Empty df collection.
+                    if total_df.empty:
+                        total_df = read_csv(filename)
+                        dfs.append(total_df)
+                    else:  # One or more dfs in collection
+                        temp_df = read_csv(filename)
+                        # raise exception if schemas do not match
+                        if any([set(temp_df.columns) != set(df.columns) for df in dfs]):
+                            print('Error: Strict schema mode is on. Schemas do not match.')
+                            raise TypeError
+                        dfs.append(temp_df)
+                        total_df = concat([total_df, temp_df])
 
+            # Reminder: Schema is not set in this block.
+            else:  # self.strict_mode == False
+                total_df = DataFrame()
+                for filename in self.filenames:
+                    temp_df = read_csv(filename)
+                    total_df = concat([total_df, temp_df])
+
+            # Columns are present in the middleware already (schema_is_set==True).
+            # TODO: Can this go under the else block at line #79?
             self.csv_data = total_df.to_dict('list')
             for col, coldata in self.csv_data.items():  # replace NaNs with None
                 self.csv_data[col] = [None if type(item) == float and isnan(item) else item
@@ -75,7 +101,7 @@ class Bueno(FileConsumer):
     """
 
     def __init__(self, filenames, **kwargs) -> None:
-        super().__init__(filenames)
+        super().__init__(filenames, **kwargs)
         self.bueno_data = OrderedDict()
 
     def pack_header(self) -> None:
