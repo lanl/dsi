@@ -6,13 +6,14 @@ from os import stat, getuid, getgid, chown, chmod
 
 @dataclass(eq=True, frozen=True)
 class Permission:
-    """ A simple dataclass to represent POSIX file permissions """
+    """A simple dataclass to represent POSIX file permissions"""
+
     uid: int
     gid: int
     settings: str
 
     def __iter__(self):
-        """ enables conversion to tuple, list, etc. """
+        """enables conversion to tuple, list, etc."""
         for v in (self.uid, self.gid, self.settings):
             yield v
 
@@ -27,29 +28,38 @@ class PermissionsManager:
     permission is shared and only stored in memory once.
     """
 
-    def __init__(self):
+    def __init__(self, allow_multiple_permissions=False, squash_permissions=False):
         self.perms_collection = {}
         self.column_perms = {}
+        self.allow_multiple_permissions = allow_multiple_permissions
+        self.squash_permissions = squash_permissions
 
     def get_perm(self, uid, gid, settings) -> Permission:
-        """ If a perm already exists, return it. Else create it. """
+        """If a perm already exists, return it. Else create it."""
         if (uid, gid, settings) in self.perms_collection:
             return self.perms_collection[(uid, gid, settings)]
-        perm = Permission(uid, gid, settings)
+        perm = (
+            Permission(uid, gid, settings)
+            if not self.squash_permissions
+            else Permission(*self.get_process_permissions())
+        )
         self.perms_collection[(uid, gid, settings)] = perm
         return perm
 
     def register_columns(self, keys: list[str], perm: Permission) -> None:
-        """ Links a list of column names to a given permission """
+        """Links a list of column names to a given permission"""
         if tuple(perm) not in self.perms_collection:
             raise PermissionNotFoundError(perm)
         for key in keys:
             self.column_perms[key] = perm
 
     def register_columns_with_file(self, keys: list[str], fp: str) -> None:
-        """ Gets a file's Permission and links it to the given columns """
-        uid, gid, settings = self.get_process_permissions() if fp is None \
+        """Gets a file's Permission and links it to the given columns"""
+        uid, gid, settings = (
+            self.get_process_permissions()
+            if fp is None
             else self.get_file_permissions(fp)
+        )
         perm = self.get_perm(uid, gid, settings)
         self.register_columns(keys, perm)
 
@@ -63,14 +73,14 @@ class PermissionsManager:
         return mapping
 
     def get_column_perms(self, key: str) -> Permission:
-        """ Get the Permission of a given column """
+        """Get the Permission of a given column"""
         try:
             return self.column_perms[key]
         except KeyError:
             raise ColumnNotRegisteredError(key)
 
     def get_file_permissions(self, fpath: str) -> tuple[int, int, str]:
-        """ Given a filepath, returns (uid, gid, settings) """
+        """Given a filepath, returns (uid, gid, settings)"""
         st = stat(fpath)  # includes info on filetype, perms, etc.
         uid = st.st_uid
         gid = st.st_gid
@@ -98,11 +108,16 @@ class PermissionsManager:
         egid = getgid()
         return (uid, egid, "0o660")
 
+    def has_multiple_permissions(self) -> bool:
+        return len(self.perms_collection.keys()) > 1
+
 
 class PermissionNotFoundError(Exception):
     def __init__(self, perm: Permission) -> None:
-        self.msg = f"Permission {perm} not found. Make sure to use get_perm instead of " + \
-            "manually instantiating a Permission to register."
+        self.msg = (
+            f"Permission {perm} not found. Make sure to use get_perm instead of "
+            + "manually instantiating a Permission to register."
+        )
         super().__init__(self.msg)
 
 
