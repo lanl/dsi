@@ -4,7 +4,6 @@ from collections import OrderedDict
 from itertools import product
 
 from dsi.permissions.permissions import PermissionsManager
-from dsi.drivers.filesystem import Filesystem
 
 
 class Terminal:
@@ -19,8 +18,8 @@ class Terminal:
     DRIVER_PREFIX = ["dsi.drivers"]
     DRIVER_IMPLEMENTATIONS = ["gufi", "sqlite", "parquet"]
     PLUGIN_PREFIX = ["dsi.plugins"]
-    PLUGIN_IMPLEMENTATIONS = ["env"]
-    VALID_PLUGINS = ["Hostname", "SystemKernel", "Bueno", "GitInfo"]
+    PLUGIN_IMPLEMENTATIONS = ["env", "file_consumer"]
+    VALID_PLUGINS = ["Hostname", "SystemKernel", "Bueno", "Csv", "GitInfo"]
     VALID_DRIVERS = ["Gufi", "Sqlite", "Parquet"]
     VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
     VALID_MODULE_FUNCTIONS = {
@@ -162,10 +161,13 @@ class Terminal:
         Note: mod_type is needed because each Python module should only implement plugins or drivers
 
         For example,
+
         term = Terminal()
         term.add_external_python_module('plugin', 'my_python_file',
-            '/the/path/to/my_python_file.py')
+                                        '/the/path/to/my_python_file.py')
+
         term.load_module('plugin', 'MyPlugin', 'consumer')
+
         term.list_loaded_modules() # includes MyPlugin
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
@@ -193,9 +195,29 @@ class Terminal:
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
-                obj.add_row(**kwargs)
+                obj.add_rows(**kwargs)
                 for col_name, col_metadata in obj.output_collector.items():
                     self.active_metadata[col_name] = col_metadata
+
+        # Plugins may add one or more rows (vector vs matrix data).
+        # You may have two or more plugins with different numbers of rows.
+        # Consequently, transload operations may have unstructured shape for
+        # some plugin configurations. We must force structure to create a valid
+        # middleware data structure.
+        # To resolve, we pad the shorter columns to match the max length column.
+        max_len = max([len(col) for col in self.active_metadata.values()])
+        for colname, coldata in self.active_metadata.items():
+            if len(coldata) != max_len:
+                self.active_metadata[
+                    colname
+                ].extend(  # add None's until reaching max_len
+                    [None] * (max_len - len(coldata))
+                )
+
+        assert all(
+            [len(col) == max_len for col in self.active_metadata.values()]
+        ), "All columns must have the same number of rows"
+
         self.transload_lock = True
 
     def artifact_handler(self, interaction_type, **kwargs) -> bool:
@@ -213,20 +235,18 @@ class Terminal:
                 "Hint: Did you declare your artifact interaction type in the Terminal Global vars?"
             )
             raise NotImplementedError
+
+        if interaction_type == "put" or interaction_type == "set":
+            should_continue = self.handle_permissions_interactions()
+            if not should_continue:
+                return False
+
         operation_success = False
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
         selected_function_modules = dict(
             (k, self.active_modules[k]) for k in (["back-end"])
         )
-
-        if interaction_type == "put" or interaction_type == "set":
-            should_continue = self.handle_permissions_interactions(
-                selected_function_modules
-            )
-            if not should_continue:
-                return False
-
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 if interaction_type == "put" or interaction_type == "set":
@@ -252,14 +272,19 @@ class Terminal:
             )
             raise NotImplementedError
 
-    def handle_permissions_interactions(self, backends) -> bool:
+    def handle_permissions_interactions(self) -> bool:
+        """
+        Presents the user with information on how permissions are being handled
+        and recieves consent to the operations through input.
+        Returns whether or not the user wants the operation to be carried out.
+        """
         if (
             self.perms_manager.has_multiple_permissions()
             and not self.allow_multiple_permissions
         ):
             print(
                 "Data has multiple permissions as shown here: \n"
-                + self.put_report(backends)
+                + self.put_report()
                 + "However, allow_multiple_permissions is not true.\n"
                 + "No action taken."
             )
@@ -268,7 +293,7 @@ class Terminal:
             msg = (
                 "WARNING: One file will be written, throwing out all "
                 + "permissions attached as shown below:\n"
-                + self.put_report(backends)
+                + self.put_report()
                 + "THIS SHOULD BE DONE WITH EXTREME CAUTION! Continue? (y/n): "
             )
             if input(msg).lower().strip() != "y":
@@ -278,7 +303,7 @@ class Terminal:
             msg = (
                 "WARNING: One file will be written for each POSIX permission "
                 + "present in read files as shown below:\n"
-                + self.put_report(backends)
+                + self.put_report()
                 + "Continue? (y/n)"
             )
             if input(msg).lower().strip() != "y":
@@ -286,12 +311,12 @@ class Terminal:
                 return False
         return True
 
-    def put_report(self, backends) -> str:
+    def put_report(self) -> str:
+        """
+        Generates a report of which columns are registered to which permissions
+        ex. col1: 444-444-0o660
+        """
         report = ""
-        for fs in filter(lambda d: isinstance(d, Filesystem), backends):
-            perm_raw = self.perms_manager.get_file_permissions(fs.filename)
-            perm_registered = self.perms_manager.get_perm(
-                *perm_raw
-            )  # may be different if squash_permissions
-            report += fs.filename + " (" + str(perm_registered) + ")\n"
+        for col, perm in self.perms_manager.column_perms.items():
+            report += f"{col}: {perm}\n"
         return report

@@ -12,20 +12,31 @@ def get_git_root(path):
     return git_root
 
 
-def test_multiple_perms_fails_by_default():
+def print_and_y(s):
+    print(s)
+    return "y"
+
+
+def test_multiple_perms_fails_by_default(monkeypatch):
+    monkeypatch.setattr("builtins.input", print_and_y)  # mock input
     term = Terminal()
-    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno.data"])
+    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno1.data"])
     os.chmod(bueno_path, 0o664)
-    term.load_module("plugin", "Bueno", "consumer", filename=bueno_path)
+    term.load_module("plugin", "Bueno", "consumer", filenames=bueno_path)
+    term.load_module("plugin", "Hostname", "consumer")
     term.transload()
+    pq_path = "/".join([get_git_root("."), "dsi/data", "dummy_data.pq"])
+    term.load_module("driver", "Parquet", "back-end", filename=pq_path)
     assert not term.artifact_handler(interaction_type="put")
 
 
-def test_multiple_permissions_register_correctly():
+def test_multiple_permissions_register_correctly(monkeypatch):
+    monkeypatch.setattr("builtins.input", print_and_y)  # mock input
     term = Terminal(allow_multiple_permissions=True)
-    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno.data"])
+    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno1.data"])
     os.chmod(bueno_path, 0o664)
-    term.load_module("plugin", "Bueno", "consumer", filename=bueno_path)
+    term.load_module("plugin", "Bueno", "consumer", filenames=bueno_path)
+    term.load_module("plugin", "Hostname", "consumer")
 
     term.transload()
 
@@ -41,12 +52,18 @@ def test_multiple_permissions_register_correctly():
         assert isinstance(gid, int)
         assert settings == "0o664"
 
+    pq_path = "/".join([get_git_root("."), "dsi/data", "dummy_data.pq"])
+    term.load_module("driver", "Parquet", "back-end", filename=pq_path)
+    assert term.artifact_handler(interaction_type="put")
 
-def test_squash_permissions_register_correctly():
+
+def test_squash_permissions_register_correctly(monkeypatch):
+    monkeypatch.setattr("builtins.input", print_and_y)  # mock input
     term = Terminal(squash_permissions=True)
-    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno.data"])
+    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno1.data"])
     os.chmod(bueno_path, 0o664)
-    term.load_module("plugin", "Bueno", "consumer", filename=bueno_path)
+    term.load_module("plugin", "Bueno", "consumer", filenames=bueno_path)
+    term.load_module("plugin", "Hostname", "consumer")
 
     term.transload()
 
@@ -62,20 +79,25 @@ def test_squash_permissions_register_correctly():
         assert isinstance(gid, int)
         assert settings == "0o660"
 
+    pq_path = "/".join([get_git_root("."), "dsi/data", "dummy_data.pq"])
+    term.load_module("driver", "Parquet", "back-end", filename=pq_path)
+    assert term.artifact_handler(interaction_type="put")
+
 
 def test_permissions_output_correctly(monkeypatch):
-    monkeypatch.setattr("builtins.input", lambda _: "y")  # mock input
+    monkeypatch.setattr("builtins.input", print_and_y)  # mock input
     term = Terminal(allow_multiple_permissions=True)
-    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno.data"])
+    bueno_path = "/".join([get_git_root("."), "dsi/data", "bueno1.data"])
     os.chmod(bueno_path, 0o664)
 
-    term.load_module("plugin", "Bueno", "consumer", filename=bueno_path)
+    term.load_module("plugin", "Bueno", "consumer", filenames=bueno_path)
+    term.load_module("plugin", "Hostname", "consumer")
     term.transload()
 
     pq_path = "/".join([get_git_root("."), "dsi/data", "dummy_data.pq"])
     term.load_module("driver", "Parquet", "back-end", filename=pq_path)
 
-    term.artifact_handler(interaction_type="put")
+    assert term.artifact_handler(interaction_type="put")
 
     pm = PermissionsManager()
     written_paths = glob("/".join([get_git_root("."), "dsi/data"]) + "/dummy_data*.pq")

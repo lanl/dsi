@@ -57,7 +57,7 @@ class PermissionsManager:
         """Gets a file's Permission and links it to the given columns"""
         uid, gid, settings = (
             self.get_process_permissions()
-            if fp is None
+            if fp is None or self.squash_permissions
             else self.get_file_permissions(fp)
         )
         perm = self.get_perm(uid, gid, settings)
@@ -109,6 +109,9 @@ class PermissionsManager:
         return (uid, egid, "0o660")
 
     def has_multiple_permissions(self) -> bool:
+        """
+        Returns whether or not the collection has multiple permissions.
+        """
         return len(self.perms_collection.keys()) > 1
 
 
