@@ -162,8 +162,7 @@ class Terminal:
         For example,
 
         term = Terminal()
-        term.add_external_python_module('plugin', 'my_python_file',
-                                        '/the/path/to/my_python_file.py')
+        term.add_external_python_module('plugin', 'my_python_file', '/the/path/to/my_python_file.py')
 
         term.load_module('plugin', 'MyPlugin', 'consumer')
 
