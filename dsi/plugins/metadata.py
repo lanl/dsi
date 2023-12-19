@@ -41,6 +41,21 @@ class StructuredMetadata(Plugin):
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
         self.perms_manager = kwargs['perms_manager']
+<<<<<<< HEAD
+=======
+        self.validation_model = None  # optional pydantic Model
+        # Check for strict_mode option
+        if 'strict_mode' in kwargs:
+            if type(kwargs['strict_mode']) == bool:
+                self.strict_mode = kwargs['strict_mode']
+            else:
+                print('strict_mode must be bool type.')
+                raise TypeError
+        else:
+            self.strict_mode = False
+        # Lock to enforce strict mode
+        self.strict_mode_lock = False
+>>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
 
     def set_schema(self, column_names: list, validation_model=None) -> None:
         """
@@ -48,15 +63,32 @@ class StructuredMetadata(Plugin):
         Useful in a plugin's pack_header method.
         Also registers column permissions if filename is set.
         """
+
+        # Strict mode | SMLock | relation
+        # --------------------------------
+        # 0 | 0 | Proceed, no lock
+        # 0 | 1 | Raise error. Nonsense.
+        # 1 | 0 | Proceed, then lock
+        # 1 | 1 | Raise error. Previously locked.
+        if self.strict_mode and self.strict_mode_lock:
+            print('Previously locked schema. Refusing to proceed.')
+            raise RuntimeError
+        if not self.strict_mode and self.strict_mode_lock:
+            print('Strict mode disabled but strict more lock active.')
+            raise NotImplementedError
+
         for name in column_names:
             self.output_collector[name] = []
         self.column_cnt = len(column_names)
         self.validation_model = validation_model
 
+        if not self.strict_mode_lock:
+            self.strict_mode_lock = True
+
     def add_to_output(self, row: list) -> None:
         """
         Adds a row of data to the output_collector and guarantees good structure.
-        Useful in a plugin's add_row method.
+        Useful in a plugin's add_rows method.
         """
         if not self.schema_is_set():
             raise RuntimeError("pack_header must be done before add_row")
