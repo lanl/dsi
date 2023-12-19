@@ -4,7 +4,7 @@ DSI is capable of consuming information from files, environments, and in-situ pr
 
 By default, DSI will stop users from saving any metadata if the length of the union of the set of column permissions is greater than one. This prevents users from saving files that might have complex security implications. If a user enables the ``allow_multiple_permissions`` parameter of the ``PermissionsManager``, then the number of files that will be saved is equal to the length of the union of the set of column permissions in the middleware data structures being written (an example of this behavior follows). There will be one file for each set of columns read by the same permissions authority.
 
-By default, DSI will always respect the POSIX permissions authority by which information was read. If the user wishes to override this behavior and write all of their metadata to the same file with a unified UID and GID, they can enable the ``squash_permissions`` perameter of the ``PermissionsManager``. The user should be very certain that the information they are writing is protected appropriately in this case.
+By default, DSI will always respect the POSIX permissions authority by which information was read. If the user wishes to override this behavior and write all of their metadata to the same file with a unified UID and GID, they can enable the ``squash_permissions`` parameter of the ``PermissionsManager``. The user should be very certain that the information they are writing is protected appropriately in this case.
 
 An example helps illustrate these scenarios:
 
