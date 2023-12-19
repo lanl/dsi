@@ -1,4 +1,5 @@
 import git
+from collections import OrderedDict
 
 from dsi.drivers.sqlite import Sqlite, DataType
 
@@ -18,7 +19,6 @@ def test_wildfire_data_sql_artifact():
     # No error implies success
     assert True
 
-
 def test_wildfire_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
@@ -28,6 +28,14 @@ def test_wildfire_data_csv_artifact():
     # No error implies success
     assert True
 
+def test_wildfiredata_artifact_put():
+   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
+   dbpath = 'test_wildfiredata_artifact.sqlite_data'
+   store = Sqlite(dbpath)
+   store.put_artifacts(valid_middleware_datastructure)
+   store.close()
+   # No error implies success
+   assert True
 
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/yosemite5.csv'])

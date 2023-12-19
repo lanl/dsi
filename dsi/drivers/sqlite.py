@@ -5,14 +5,13 @@ from dsi.drivers.filesystem import Filesystem
 
 # Holds table name and data properties
 
-
 class DataType:
-    name = "DEFAULT"
+    name = "TABLENAME" # Note: using the word DEFAULT outputs a syntax error
     properties = {}
     units = {}
 
-# Holds the main data
 
+# Holds the main data
 
 class Artifact:
     """
@@ -22,8 +21,8 @@ class Artifact:
     """
     properties = {}
 
-# Main storage class, interfaces with SQL
 
+# Main storage class, interfaces with SQL
 
 class Sqlite(Filesystem):
     """
@@ -55,7 +54,10 @@ class Sqlite(Filesystem):
             except ValueError:
                 return " VARCHAR"
 
-    # Adds columns to table and their types
+    # Creates and adds columns to table and their types.
+    # Note 1: 'add column types' to be implemented.
+    # Note 2: TABLENAME is the default name for all tables created which might cause issues when creating multiple Sqlite files.
+    
     def put_artifact_type(self, types, isVerbose=False):
         """
         Primary class for defining metadata Artifact schema.
@@ -65,21 +67,17 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        str_query = "CREATE TABLE IF NOT EXISTS " + str(types.name) + " ( "
-        for key, value in types.properties.items():
-            str_query = str_query + str(key) + " " + str(value)
-            str_query = str_query + ","
-
-        str_query = str_query.rstrip(',')
-        str_query = str_query + " )"
+        
+        col_names = ', '.join(types.properties.keys())
+        
+        str_query = "CREATE TABLE IF NOT EXISTS {} ({});".format(str(types.name), col_names)
 
         if isVerbose:
             print(str_query)
 
+        print(str_query)
         self.cur.execute(str_query)
         self.con.commit()
-
-        self.types = types
 
     # Adds rows to the columns defined previously
     def put_artifacts(self, artifacts, isVerbose=False):
@@ -91,25 +89,38 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        str_query = "INSERT INTO " + str(self.types.name) + " VALUES ( "
-        for key, value in artifacts.properties.items():
-            if key == 'file':  # Todo, use this to detect str type
-                str_query = str_query + " '" + str(value) + "' "
-            else:
-                str_query = str_query + " " + str(value)
+        
+        types = DataType()
+        types.properties = artifacts
+        
+        self.put_artifact_type(types)
+        
+        col_names = ', '.join(types.properties.keys())
+        placeholders = ', '.join('?' * len(types.properties))
+        
+        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+        
+        # col_list helps access the specific keys of the dictionary in the for loop
+        col_list = col_names.split(', ')
 
-            str_query = str_query + ","
-
-        str_query = str_query.rstrip(',')
-        str_query = str_query + " )"
+        # loop through the contents of each column and insert into table as a row
+        for ind1 in range(len(types.properties[col_list[0]])):
+            vals = []
+            for ind2 in range(len(types.properties.keys())):
+                vals.append(str(types.properties[col_list[ind2]][ind1]))
+            # Make sure this works if types.properties[][] is already a string
+            tup_vals = tuple(vals)
+            self.cur.execute(str_query,tup_vals)
 
         if isVerbose:
             print(str_query)
 
-        self.cur.execute(str_query)
         self.con.commit()
+        
+        self.types = types
 
     # Adds columns and rows automaticallly based on a csv file
+    #[NOTE 3] This method should be deprecated in favor of put_artifacts.
     def put_artifacts_csv(self, fname, tname, isVerbose=False):
         """
         Function for insertion of Artifact metadata into a defined schema by using a CSV file,
@@ -127,6 +138,7 @@ class Sqlite(Filesystem):
             print("Opening " + fname)
 
         print('Entering csv method')
+        #[BEGIN NOTE 1] This is a csv getter. Does it belong? QW
         with open(fname) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             header = next(csv_reader)
@@ -150,7 +162,8 @@ class Sqlite(Filesystem):
                     self.cur.execute(str_query)
                     self.con.commit()
                     line_count += 1
-
+        #[END NOTE 1] QW
+        #[BEGIN NOTE 2]  This puts each row into a potentially new table. It does not take existing metadata as input. QW
                 str_query = "INSERT INTO " + str(tname) + " VALUES ( "
                 for column in row:
                     str_query = str_query + " '" + str(column) + "'"
@@ -168,6 +181,7 @@ class Sqlite(Filesystem):
 
             if isVerbose:
                 print("Read " + str(line_count) + " rows.")
+      #[END NOTE 2]
 
     # Returns text list from query
     def get_artifact_list(self, isVerbose=False):
