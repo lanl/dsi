@@ -14,7 +14,6 @@ class Terminal:
     front-ends or back-ends. Plugins may be producers or consumers. See documentation
     for more information.
     """
-
     DRIVER_PREFIX = ["dsi.drivers"]
     DRIVER_IMPLEMENTATIONS = ["gufi", "sqlite", "parquet"]
     PLUGIN_PREFIX = ["dsi.plugins"]
