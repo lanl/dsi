@@ -5,8 +5,12 @@ import subprocess
 from getpass import getuser
 from git import Repo
 import git.exc
+from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
+from dsi.plugins.plugin_models import (
+    EnvironmentModel, GitInfoModel, HostnameModel, create_dynamic_model
+)
 
 
 class Environment(StructuredMetadata):
@@ -70,6 +74,7 @@ class Bueno(Environment):
 
     def pack_header(self) -> None:
         """Set schema with POSIX and Bueno data."""
+<<<<<<< HEAD
         posix_columns = list(self.posix_info.keys())
         bueno_columns = list(self.bueno_data.keys())
         self.perms_manager.register_columns_with_file(posix_columns, None)
@@ -78,6 +83,13 @@ class Bueno(Environment):
 
         column_names = posix_columns + bueno_columns
         self.set_schema(column_names)
+=======
+        bueno_names = list(self.bueno_data.keys())
+        column_names = list(self.posix_info.keys()) + bueno_names
+        model = create_dynamic_model("BuenoModel", col_names=bueno_names,
+                                     col_types=[str] * len(bueno_names), base=EnvironmentModel)
+        self.set_schema(column_names, validation_model=model)
+>>>>>>> main
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -115,16 +127,20 @@ class GitInfo(Environment):
                             "GitInfo Plugin must be given a repo base path " +
                             "(default is working dir)")
         self.git_info = {
-            "git-remote": lambda: self.repo.git.remote("-v"),
-            "git-commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
+            "git_remote": lambda: self.repo.git.remote("-v"),
+            "git_commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
         }
 
     def pack_header(self) -> None:
         """ Set schema with POSIX and Git columns """
         column_names = list(self.posix_info.keys()) + \
             list(self.git_info.keys())
+<<<<<<< HEAD
         self.set_schema(column_names)
         self.perms_manager.register_columns_with_file(column_names, None)
+=======
+        self.set_schema(column_names, validation_model=GitInfoModel)
+>>>>>>> main
 
     def add_row(self) -> None:
         """ Adds a row to the output with POSIX info, git remote, and git commit """
@@ -132,7 +148,7 @@ class GitInfo(Environment):
             self.pack_header()
 
         row = list(self.posix_info.values()) + \
-            [self.git_info["git-remote"](), self.git_info["git-commit"]()]
+            [self.git_info["git_remote"](), self.git_info["git_commit"]()]
         self.add_to_output(row)
 
 
@@ -151,6 +167,7 @@ class SystemKernel(Environment):
 
     def __init__(self, **kwargs) -> None:
         """Initialize SystemKernel with inital provenance info."""
+<<<<<<< HEAD
         super().__init__(**kwargs)
         self.prov_info = self.get_prov_info()
 
@@ -160,25 +177,37 @@ class SystemKernel(Environment):
             list(self.prov_info.keys())
         self.set_schema(column_names)
         self.perms_manager.register_columns_with_file(column_names, None)
+=======
+        super().__init__()
+        self.column_names = ["kernel_info"]
+
+    def pack_header(self) -> None:
+        """Set schema with keys of prov_info."""
+        prov_info_names = list(self.prov_info.keys())
+        column_names = list(self.posix_info.keys()) + prov_info_names
+        model = create_dynamic_model("BuenoModel", col_names=prov_info_names,
+                                     col_types=[str] * len(prov_info_names), base=EnvironmentModel)
+        self.set_schema(column_names, validation_model=model)
+>>>>>>> main
 
     def add_row(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
-        pairs = self.get_prov_info()
-        self.add_to_output(list(self.posix_info.values()) +
-                           list(pairs.values()))
+        blob = self.get_kernel_info()
+        self.add_to_output(list(self.posix_info.values()) + [blob])
 
-    def get_prov_info(self) -> dict:
+    def get_kernel_info(self) -> str:
         """Collect and return the different categories of provenance info."""
-        prov_info = {}
-        prov_info.update(self.get_kernel_version())
-        prov_info.update(self.get_kernel_ct_config())
-        prov_info.update(self.get_kernel_bt_config())
-        prov_info.update(self.get_kernel_rt_config())
-        prov_info.update(self.get_kernel_mod_config())
-        return prov_info
+        kernel_info = {}
+        kernel_info.update(self.get_kernel_version())
+        kernel_info.update(self.get_kernel_ct_config())
+        kernel_info.update(self.get_kernel_bt_config())
+        kernel_info.update(self.get_kernel_rt_config())
+        kernel_info.update(self.get_kernel_mod_config())
+        blob = dumps(kernel_info)
+        return blob
 
     def get_kernel_version(self) -> dict:
         """Kernel version is obtained by the "uname -r" command, returns it in a dict. """

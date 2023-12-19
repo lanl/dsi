@@ -3,6 +3,7 @@ import collections
 from dsi.plugins.env import Hostname, SystemKernel, Bueno, GitInfo
 from dsi.permissions.permissions import PermissionsManager
 import git
+from json import loads
 
 
 def get_git_root(path):
@@ -54,8 +55,19 @@ def test_envprov_plugin_adds_rows():
     for key, val in plug.output_collector.items():
         assert len(val) == 2
 
-    # should def have more than 100 columns
-    assert len(plug.output_collector.keys()) > 100
+    # 1 SystemKernel column + 4 inherited Env cols
+    assert len(plug.output_collector.keys()) == 5
+
+
+def test_systemkernel_plugin_blob_is_big():
+    plug = SystemKernel()
+    plug.add_row()
+
+    blob = plug.output_collector["kernel_info"][0]
+    info_dict = loads(blob)
+
+    # dict should have more than 1000 (~7000) keys
+    assert len(info_dict.keys()) > 1000
 
 
 def test_bueno_plugin_type():
@@ -108,5 +120,5 @@ def test_git_plugin_infos_are_str():
     plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_row()
 
-    assert type(plug.output_collector["git-remote"][0]) == str
-    assert type(plug.output_collector["git-commit"][0]) == str
+    assert type(plug.output_collector["git_remote"][0]) == str
+    assert type(plug.output_collector["git_commit"][0]) == str
