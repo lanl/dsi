@@ -39,7 +39,7 @@ If a user enables the ``allow_multiple_permissions`` parameter, two files will b
 >>> $ get_perms(file2)
 >>> Perm F
 
-If a user enables ``allow_multiple_permissions`` and ``squash_permissions``, then a single file will be written with the users UID and effective GID and 660 access:
+If a user enables ``allow_multiple_permissions`` and ``squash_permissions``, then a single file will be written with the user's UID and effective GID and 660 access:
 
 >>> $ cat file
 >>> | Col A  | Col B  | Col C  |
