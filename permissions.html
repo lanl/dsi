@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Permissions &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Drivers" href="drivers.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Permissions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.permissions.permissions.ColumnNotRegisteredError"><code class="docutils literal notranslate"><span class="pre">ColumnNotRegisteredError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.permissions.permissions.Permission"><code class="docutils literal notranslate"><span class="pre">Permission</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.permissions.permissions.PermissionNotFoundError"><code class="docutils literal notranslate"><span class="pre">PermissionNotFoundError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager"><code class="docutils literal notranslate"><span class="pre">PermissionsManager</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.get_column_perms"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.get_column_perms()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.get_file_permissions"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.get_file_permissions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.get_perm"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.get_perm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.get_permission_columnlist_mapping"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.get_permission_columnlist_mapping()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.get_process_permissions"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.get_process_permissions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.has_multiple_permissions"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.has_multiple_permissions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.register_columns"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.register_columns()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.register_columns_with_file"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.register_columns_with_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.permissions.permissions.PermissionsManager.set_file_permissions"><code class="docutils literal notranslate"><span class="pre">PermissionsManager.set_file_permissions()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Permissions</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/permissions.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="permissions">
+<h1>Permissions<a class="headerlink" href="#permissions" title="Permalink to this heading"></a></h1>
+<p>DSI is capable of consuming information from files, environments, and in-situ processes which may or may not have the same permissions authority. To track this information for the purposes of returning user queries into DSI storage, we utilize a permissions handler. The permissions handler bundles the authority by which information is read and adds this to each column data structure. Most relational database systems require that types are enforced by column, and DSI extends this idea to require that permissions are enforced by column. By tracking the permissions associated with each column, DSI can save files using the same POSIX permissions authority that initially granted access to the information, therefore preserving POSIX permssions as files are saved.</p>
+<p>By default, DSI will stop users from saving any metadata if the length of the union of the set of column permissions is greater than one. This prevents users from saving files that might have complex security implications. If a user enables the <code class="docutils literal notranslate"><span class="pre">allow_multiple_permissions</span></code> parameter of the <code class="docutils literal notranslate"><span class="pre">PermissionsManager</span></code>, then the number of files that will be saved is equal to the length of the union of the set of column permissions in the middleware data structures being written (an example of this behavior follows). There will be one file for each set of columns read by the same permissions authority.</p>
+<p>By default, DSI will always respect the POSIX permissions authority by which information was read. If the user wishes to override this behavior and write all of their metadata to the same file with a unified UID and GID, they can enable the <code class="docutils literal notranslate"><span class="pre">squash_permissions</span></code> parameter of the <code class="docutils literal notranslate"><span class="pre">PermissionsManager</span></code>. The user should be very certain that the information they are writing is protected appropriately in this case.</p>
+<p>An example helps illustrate these scenarios:</p>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p>Col A</p></td>
+<td><p>Col B</p></td>
+<td><p>Col C</p></td>
+</tr>
+<tr class="row-even"><td><p><em>Perm D</em></p></td>
+<td><p><em>Perm D</em></p></td>
+<td><p><em>Perm F</em></p></td>
+</tr>
+<tr class="row-odd"><td><p>Row A1</p></td>
+<td><p>Row B1</p></td>
+<td><p>Row C1</p></td>
+</tr>
+<tr class="row-even"><td><p>Row A2</p></td>
+<td><p>Row B2</p></td>
+<td><p>Row C2</p></td>
+</tr>
+</tbody>
+</table>
+<p>By default, DSI will refuse to write this data structure to disk because <code class="docutils literal notranslate"><span class="pre">len(union({D,D,F}))</span> <span class="pre">&gt;</span> <span class="pre">1</span></code></p>
+<p>If a user enables the <code class="docutils literal notranslate"><span class="pre">allow_multiple_permissions</span></code> parameter, two files will be saved:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span>&gt;&gt;&gt; $ cat file1
+&gt;&gt;&gt; | Col A  | Col B  |
+&gt;&gt;&gt; ===================
+&gt;&gt;&gt; | Perm D | Perm D |
+&gt;&gt;&gt; | Row A1 | Row B1 |
+&gt;&gt;&gt; | Row A2 | Row B2 |
+&gt;&gt;&gt; $ get_perms(file1)
+&gt;&gt;&gt; Perm D
+&gt;&gt;&gt; $ cat file2
+&gt;&gt;&gt; | Col C  |
+&gt;&gt;&gt; ==========
+&gt;&gt;&gt; | Perm F |
+&gt;&gt;&gt; | Row C1 |
+&gt;&gt;&gt; | Row C2 |
+&gt;&gt;&gt; $ get_perms(file2)
+&gt;&gt;&gt; Perm F
+</pre></div>
+</div>
+<p>If a user enables <code class="docutils literal notranslate"><span class="pre">allow_multiple_permissions</span></code> and <code class="docutils literal notranslate"><span class="pre">squash_permissions</span></code>, then a single file will be written with the user’s UID and effective GID and 660 access:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span>&gt;&gt;&gt; $ cat file
+&gt;&gt;&gt; | Col A  | Col B  | Col C  |
+&gt;&gt;&gt; ============================
+&gt;&gt;&gt; | Perm D | Perm D | Perm F |
+&gt;&gt;&gt; | Row A1 | Row B1 | Row C1 |
+&gt;&gt;&gt; | Row A2 | Row B2 | Row C2 |
+&gt;&gt;&gt; $ get_perms(file)
+&gt;&gt;&gt; My UID and Effective GID, with 660 access controls.
+</pre></div>
+</div>
+<span class="target" id="module-dsi.permissions.permissions"></span><dl class="py exception">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.ColumnNotRegisteredError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.permissions.permissions.</span></span><span class="sig-name descname"><span class="pre">ColumnNotRegisteredError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.permissions.permissions.ColumnNotRegisteredError" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.Permission">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.permissions.permissions.</span></span><span class="sig-name descname"><span class="pre">Permission</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">uid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.permissions.permissions.Permission" title="Permalink to this definition"></a></dt>
+<dd><p>A simple dataclass to represent POSIX file permissions</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionNotFoundError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.permissions.permissions.</span></span><span class="sig-name descname"><span class="pre">PermissionNotFoundError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dsi.permissions.permissions.Permission" title="dsi.permissions.permissions.Permission"><span class="pre">Permission</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.permissions.permissions.PermissionNotFoundError" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.permissions.permissions.</span></span><span class="sig-name descname"><span class="pre">PermissionsManager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">allow_multiple_permissions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">squash_permissions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager" title="Permalink to this definition"></a></dt>
+<dd><p>A class to handle and register the mapping from columns
+to their permissions. Uses flyweights so that each unique
+permission is shared and only stored in memory once.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.get_column_perms">
+<span class="sig-name descname"><span class="pre">get_column_perms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#dsi.permissions.permissions.Permission" title="dsi.permissions.permissions.Permission"><span class="pre">Permission</span></a></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.get_column_perms" title="Permalink to this definition"></a></dt>
+<dd><p>Get the Permission of a given column</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.get_file_permissions">
+<span class="sig-name descname"><span class="pre">get_file_permissions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fpath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.get_file_permissions" title="Permalink to this definition"></a></dt>
+<dd><p>Given a filepath, returns (uid, gid, settings)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.get_perm">
+<span class="sig-name descname"><span class="pre">get_perm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">uid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#dsi.permissions.permissions.Permission" title="dsi.permissions.permissions.Permission"><span class="pre">Permission</span></a></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.get_perm" title="Permalink to this definition"></a></dt>
+<dd><p>If a perm already exists, return it. Else create it.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.get_permission_columnlist_mapping">
+<span class="sig-name descname"><span class="pre">get_permission_columnlist_mapping</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsi.permissions.permissions.Permission" title="dsi.permissions.permissions.Permission"><span class="pre">dsi.permissions.permissions.Permission</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.get_permission_columnlist_mapping" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a mapping from unique Permission to list of columns.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.get_process_permissions">
+<span class="sig-name descname"><span class="pre">get_process_permissions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.get_process_permissions" title="Permalink to this definition"></a></dt>
+<dd><p>In the event of data not coming from a file,
+default to (uid, egid, 660)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.has_multiple_permissions">
+<span class="sig-name descname"><span class="pre">has_multiple_permissions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.has_multiple_permissions" title="Permalink to this definition"></a></dt>
+<dd><p>Returns whether or not the collection has multiple permissions.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.register_columns">
+<span class="sig-name descname"><span class="pre">register_columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dsi.permissions.permissions.Permission" title="dsi.permissions.permissions.Permission"><span class="pre">Permission</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.register_columns" title="Permalink to this definition"></a></dt>
+<dd><p>Links a list of column names to a given permission</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.register_columns_with_file">
+<span class="sig-name descname"><span class="pre">register_columns_with_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.register_columns_with_file" title="Permalink to this definition"></a></dt>
+<dd><p>Gets a file’s Permission and links it to the given columns</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.permissions.permissions.PermissionsManager.set_file_permissions">
+<span class="sig-name descname"><span class="pre">set_file_permissions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_mapping</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.permissions.permissions.PermissionsManager.set_file_permissions" title="Permalink to this definition"></a></dt>
+<dd><p>Given a mapping from filename to list of columns, set each file
+to its column’s permissions. (All columns of a file share perms)</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="drivers.html" class="btn btn-neutral float-left" title="Drivers" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Triad National Security, LLC.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
