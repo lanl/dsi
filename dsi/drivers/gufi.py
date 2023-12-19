@@ -31,7 +31,7 @@ class Gufi(Filesystem):
     column: column name from the DSI db to join on
     """
 
-    def __init__(self, prefix, index, dbfile, table, column, verbose=False):
+    def __init__(self, prefix, index, dbfile, table, column, verbose=False, **kwargs):
         '''
         prefix: prefix to GUFI commands
         index: directory with GUFI indexes
@@ -41,7 +41,7 @@ class Gufi(Filesystem):
         verbose: print debugging statements or not
         '''
 
-        super().__init__(dbfile)
+        super().__init__(dbfile, **kwargs)
         # prefix is the prefix to the GUFI installation
         self.prefix = prefix
         # index is the directory where the GUFI indexes are stored
@@ -65,6 +65,7 @@ class Gufi(Filesystem):
         resout = self._run_gufi_query(query)
         if self.isVerbose:
             print(resout)
+        # TODO: Needs to register permissions for columns
 
         return resout
 

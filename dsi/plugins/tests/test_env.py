@@ -1,6 +1,7 @@
 import collections
 
 from dsi.plugins.env import Hostname, SystemKernel, GitInfo
+from dsi.permissions.permissions import PermissionsManager
 import git
 from json import loads
 
@@ -8,18 +9,20 @@ from json import loads
 def get_git_root(path):
     git_repo = git.Repo(path, search_parent_directories=True)
     git_root = git_repo.git.rev_parse("--show-toplevel")
-    return (git_root)
+    return git_root
 
 
 def test_hostname_plugin_type():
-    a = Hostname()
+    mock_pm = PermissionsManager()
+    a = Hostname(perms_manager=mock_pm)
     a.add_rows()
     a.add_rows()
     assert type(a.output_collector) == collections.OrderedDict
 
 
 def test_hostname_plugin_col_shape():
-    a = Hostname()
+    mock_pm = PermissionsManager()
+    a = Hostname(perms_manager=mock_pm)
     a.add_rows()
     a.add_rows()
     assert len(a.output_collector.keys()) == len(a.output_collector.values())
@@ -27,7 +30,8 @@ def test_hostname_plugin_col_shape():
 
 def test_hostname_plugin_row_shape():
     for row_cnt in range(1, 10):
-        a = Hostname()
+        mock_pm = PermissionsManager()
+        a = Hostname(perms_manager=mock_pm)
         for _ in range(row_cnt):
             a.add_rows()
         column_values = list(a.output_collector.values())
@@ -36,13 +40,15 @@ def test_hostname_plugin_row_shape():
             assert len(col) == row_shape == row_cnt
 
 
-def test_systemkernel_plugin_type():
-    plug = SystemKernel()
+def test_envprov_plugin_type():
+    mock_pm = PermissionsManager()
+    plug = SystemKernel(perms_manager=mock_pm)
     assert type(plug.output_collector) == collections.OrderedDict
 
 
-def test_systemkernel_plugin_adds_rows():
-    plug = SystemKernel()
+def test_envprov_plugin_adds_rows():
+    mock_pm = PermissionsManager()
+    plug = SystemKernel(perms_manager=mock_pm)
     plug.add_rows()
     plug.add_rows()
 
@@ -54,26 +60,32 @@ def test_systemkernel_plugin_adds_rows():
 
 
 def test_systemkernel_plugin_blob_is_big():
-    plug = SystemKernel()
+    mock_pm = PermissionsManager()
+    plug = SystemKernel(perms_manager=mock_pm)
     plug.add_rows()
 
     blob = plug.output_collector["kernel_info"][0]
     info_dict = loads(blob)
+
+    # 1 systemkernel col + 4 inherited Env cols
+    assert len(plug.output_collector.keys()) == 5
 
     # dict should have more than 1000 (~7000) keys
     assert len(info_dict.keys()) > 1000
 
 
 def test_git_plugin_type():
-    root = get_git_root('.')
-    plug = GitInfo(git_repo_path=root)
+    mock_pm = PermissionsManager()
+    root = get_git_root(".")
+    plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_rows()
     assert type(plug.output_collector) == collections.OrderedDict
 
 
 def test_git_plugin_adds_rows():
-    root = get_git_root('.')
-    plug = GitInfo(git_repo_path=root)
+    mock_pm = PermissionsManager()
+    root = get_git_root(".")
+    plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_rows()
     plug.add_rows()
 
@@ -85,8 +97,9 @@ def test_git_plugin_adds_rows():
 
 
 def test_git_plugin_infos_are_str():
-    root = get_git_root('.')
-    plug = GitInfo(git_repo_path=root)
+    mock_pm = PermissionsManager()
+    root = get_git_root(".")
+    plug = GitInfo(git_repo_path=root, perms_manager=mock_pm)
     plug.add_rows()
 
     assert type(plug.output_collector["git_remote"][0]) == str

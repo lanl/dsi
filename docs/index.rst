@@ -16,7 +16,7 @@ The Data Science Infrastructure Project (DSI)
    core
    plugins
    drivers
-
+   permissions
 
 Indices and tables
 ==================

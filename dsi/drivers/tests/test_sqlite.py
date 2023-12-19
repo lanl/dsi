@@ -2,6 +2,7 @@ import git
 from collections import OrderedDict
 
 from dsi.drivers.sqlite import Sqlite, DataType
+from dsi.permissions.permissions import PermissionsManager
 
 isVerbose = True
 
@@ -14,7 +15,8 @@ def get_git_root(path):
 
 def test_wildfire_data_sql_artifact():
     dbpath = "wildfire.db"
-    store = Sqlite(dbpath)
+    mock_pm = PermissionsManager()
+    store = Sqlite(dbpath, perms_manager=mock_pm)
     store.close()
     # No error implies success
     assert True
@@ -22,7 +24,8 @@ def test_wildfire_data_sql_artifact():
 def test_wildfire_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
-    store = Sqlite(dbpath)
+    mock_pm = PermissionsManager()
+    store = Sqlite(dbpath, perms_manager=mock_pm)
     store.put_artifacts_csv(csvpath, "simulation", isVerbose=isVerbose)
     store.close()
     # No error implies success
@@ -40,7 +43,8 @@ def test_wildfiredata_artifact_put():
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/yosemite5.csv'])
     dbpath = "yosemite.db"
-    store = Sqlite(dbpath)
+    mock_pm = PermissionsManager()
+    store = Sqlite(dbpath, perms_manager=mock_pm)
     store.put_artifacts_csv(csvpath, "vision", isVerbose=isVerbose)
     store.close()
     # No error implies success
@@ -49,7 +53,8 @@ def test_yosemite_data_csv_artifact():
 
 def test_artifact_query():
     dbpath = "wildfire.db"
-    store = Sqlite(dbpath)
+    mock_pm = PermissionsManager()
+    store = Sqlite(dbpath, perms_manager=mock_pm)
     _ = store.get_artifact_list(isVerbose=isVerbose)
     data_type = DataType()
     data_type.name = "simulation"

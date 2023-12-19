@@ -24,7 +24,7 @@ class FileConsumer(StructuredMetadata):
             raise TypeError
         self.file_info = {}
         for filename in self.filenames:
-            sha = sha1(open(filename, 'rb').read())
+            sha = sha1(open(filename, "rb").read())
             self.file_info[abspath(filename)] = sha.hexdigest()
 
 
@@ -42,13 +42,13 @@ class Csv(FileConsumer):
         self.csv_data = {}
 
     def pack_header(self) -> None:
-        """ Set schema based on the CSV columns """
+        """Set schema based on the CSV columns"""
 
         column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
         self.set_schema(column_names)
 
     def add_rows(self) -> None:
-        """ Adds a list containing one or more rows of the CSV along with file_info to output. """
+        """Adds a list containing one or more rows of the CSV along with file_info to output."""
 
         if not self.schema_is_set():
             # use Pandas to append all CSVs together as a
@@ -65,8 +65,14 @@ class Csv(FileConsumer):
                         temp_df = read_csv(filename)
                         # raise exception if schemas do not match
                         if any([set(temp_df.columns) != set(df.columns) for df in dfs]):
-                            print('Error: Strict schema mode is on. Schemas do not match.')
+                            print(
+                                "Error: Strict schema mode is on. Schemas do not match."
+                            )
                             raise TypeError
+
+                        self.perms_manager.register_columns_with_file(
+                            temp_df.columns, filename
+                        )
                         dfs.append(temp_df)
                         total_df = concat([total_df, temp_df])
 
@@ -75,14 +81,19 @@ class Csv(FileConsumer):
                 total_df = DataFrame()
                 for filename in self.filenames:
                     temp_df = read_csv(filename)
+                    self.perms_manager.register_columns_with_file(
+                        temp_df.columns, filename
+                    )
                     total_df = concat([total_df, temp_df])
 
             # Columns are present in the middleware already (schema_is_set==True).
             # TODO: Can this go under the else block at line #79?
-            self.csv_data = total_df.to_dict('list')
+            self.csv_data = total_df.to_dict("list")
             for col, coldata in self.csv_data.items():  # replace NaNs with None
-                self.csv_data[col] = [None if type(item) == float and isnan(item) else item
-                                      for item in coldata]
+                self.csv_data[col] = [
+                    None if type(item) == float and isnan(item) else item
+                    for item in coldata
+                ]
             self.pack_header()
 
         total_length = len(self.csv_data[list(self.csv_data.keys())[0]])
@@ -113,16 +124,18 @@ class Bueno(FileConsumer):
         """Parses Bueno data and adds a list containing 1 or more rows."""
         if not self.schema_is_set():
             for idx, filename in enumerate(self.filenames):
-                with open(filename, 'r') as fh:
+                with open(filename, "r") as fh:
                     file_content = json.load(fh)
                 for key, val in file_content.items():
                     # Check if column already exists
                     if key not in self.bueno_data:
                         # Initialize empty column if first time seeing it
-                        self.bueno_data[key] = [None] \
-                            * len(self.filenames)
+                        self.bueno_data[key] = [None] * len(self.filenames)
                     # Set the appropriate row index value for this keyval_pair
                     self.bueno_data[key][idx] = val
+            self.perms_manager.register_columns_with_file(
+                list(self.bueno_data.keys()), self.filenames[0]
+            )  # TODO: Each row comes from a different file, not sure what to do
             self.pack_header()
 
         rows = list(self.bueno_data.values())

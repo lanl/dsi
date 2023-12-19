@@ -40,6 +40,7 @@ class StructuredMetadata(Plugin):
         """
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
+        self.perms_manager = kwargs['perms_manager']
         self.validation_model = None  # optional pydantic Model
         # Check for strict_mode option
         if 'strict_mode' in kwargs:
@@ -57,6 +58,7 @@ class StructuredMetadata(Plugin):
         """
         Initializes columns in the output_collector and column_cnt.
         Useful in a plugin's pack_header method.
+        Also registers column permissions if filename is set.
         """
 
         # Strict mode | SMLock | relation

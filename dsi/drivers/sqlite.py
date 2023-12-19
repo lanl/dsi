@@ -33,7 +33,8 @@ class Sqlite(Filesystem):
     con = None
     cur = None
 
-    def __init__(self, filename):
+    def __init__(self, filename, **kwargs):
+        super().__init__(filename, **kwargs)
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
@@ -205,7 +206,8 @@ class Sqlite(Filesystem):
 
     # Returns reference from query
     def get_artifacts(self, query):
-        self.get_artifacts_list()
+        # TODO: Needs to register permissions by column
+        return self.get_artifacts_list()
 
     # Closes connection to server
     def close(self):

@@ -8,9 +8,7 @@ import git.exc
 from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
-from dsi.plugins.plugin_models import (
-    GitInfoModel, HostnameModel, SystemKernelModel
-)
+from dsi.plugins.plugin_models import GitInfoModel, HostnameModel, SystemKernelModel
 
 
 class Environment(StructuredMetadata):
@@ -21,16 +19,16 @@ class Environment(StructuredMetadata):
     information.
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Get POSIX info
         self.posix_info = OrderedDict()
-        self.posix_info['uid'] = os.getuid()
-        self.posix_info['effective_gid'] = os.getgid()
-        egid = self.posix_info['effective_gid']
-        self.posix_info['moniker'] = getuser()
-        moniker = self.posix_info['moniker']
-        self.posix_info['gid_list'] = os.getgrouplist(moniker, egid)
+        self.posix_info["uid"] = os.getuid()
+        self.posix_info["effective_gid"] = os.getgid()
+        egid = self.posix_info["effective_gid"]
+        self.posix_info["moniker"] = getuser()
+        moniker = self.posix_info["moniker"]
+        self.posix_info["gid_list"] = os.getgrouplist(moniker, egid)
 
 
 class Hostname(Environment):
@@ -42,12 +40,13 @@ class Hostname(Environment):
     """
 
     def __init__(self, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
-        self.set_schema(column_names, validation_model=HostnameModel)
+        self.set_schema(column_names)
+        self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -65,35 +64,38 @@ class GitInfo(Environment):
     Adds the current git remote and git commit to metadata.
     """
 
-    def __init__(self, git_repo_path='./') -> None:
-        """ Initializes the git repo in the given directory and access to git commands """
-        super().__init__()
+    def __init__(self, git_repo_path="./", **kwargs) -> None:
+        """Initializes the git repo in the given directory and access to git commands"""
+        super().__init__(**kwargs)
         try:
             self.repo = Repo(git_repo_path, search_parent_directories=True)
         except git.exc.InvalidGitRepositoryError:
-            raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
-                            "GitInfo Plugin must be given a repo base path " +
-                            "(default is working dir)")
+            raise Exception(
+                f"Git could not find .git/ in {git_repo_path}, "
+                + "GitInfo Plugin must be given a repo base path "
+                + "(default is working dir)"
+            )
         self.git_info = {
             "git_remote": lambda: self.repo.git.remote("-v"),
-            "git_commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
+            "git_commit": lambda: self.repo.git.rev_parse("--short", "HEAD"),
         }
 
     def pack_header(self) -> None:
-        """ Set schema with POSIX and Git columns """
-        column_names = list(self.posix_info.keys()) + \
-            list(self.git_info.keys())
+        """Set schema with POSIX and Git columns"""
+        column_names = list(self.posix_info.keys()) + list(self.git_info.keys())
         self.set_schema(column_names, validation_model=GitInfoModel)
+        self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_rows(self) -> None:
-        """ Adds a row to the output with POSIX info, git remote, and git commit """
+        """Adds a row to the output with POSIX info, git remote, and git commit"""
         if not self.schema_is_set():
             self.pack_header()
 
-        row = list(self.posix_info.values()) + \
-            [self.git_info["git_remote"](), self.git_info["git_commit"]()]
+        row = list(self.posix_info.values()) + [
+            self.git_info["git_remote"](),
+            self.git_info["git_commit"](),
+        ]
         self.add_to_output(row)
-
 
 class SystemKernel(Environment):
     """
@@ -108,9 +110,9 @@ class SystemKernel(Environment):
     6. Container information, if containerized
     """
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """Initialize SystemKernel with inital provenance info."""
-        super().__init__()
+        super().__init__(**kwargs)
         self.prov_info = self.get_prov_info()
         self.column_names = ["kernel_info"]
 
@@ -118,6 +120,7 @@ class SystemKernel(Environment):
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + self.column_names
         self.set_schema(column_names, validation_model=SystemKernelModel)
+        self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
@@ -139,7 +142,7 @@ class SystemKernel(Environment):
         return blob
 
     def get_kernel_version(self) -> dict:
-        """Kernel version is obtained by the "uname -r" command, returns it in a dict. """
+        """Kernel version is obtained by the "uname -r" command, returns it in a dict."""
         return {"kernel version": self.get_cmd_output(["uname -r"])}
 
     def get_kernel_ct_config(self) -> dict:
@@ -183,8 +186,7 @@ class SystemKernel(Environment):
         rt_config = {}
         for line in lines:
             if "=" in line:  # if the line is not permission denied
-                option, value = line.split(
-                    " = ", maxsplit=1)  # note the spaces
+                option, value = line.split(" = ", maxsplit=1)  # note the spaces
                 rt_config[option] = value
             # If line is permission denied, ignore it.
         return rt_config
@@ -199,12 +201,15 @@ class SystemKernel(Environment):
         modules = self.get_cmd_output(lsmod_command).split("\n")
 
         sep = "END MODINFO"
-        modinfo_command = ["/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}' | \
+        modinfo_command = [
+            "/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}' | \
                            sed 's/nvidia_/nvidia-current-/g' | \
                            sed 's/^nvidia$/nvidia-current/g') | "
-                           f"sed -e 's/filename:/{sep}filename:/g'"]
-        modinfos = self.get_cmd_output(
-            modinfo_command, ignore_stderr=True).split("\n" + sep)
+            f"sed -e 's/filename:/{sep}filename:/g'"
+        ]
+        modinfos = self.get_cmd_output(modinfo_command, ignore_stderr=True).split(
+            "\n" + sep
+        )
 
         mod_configs = {}
         for mod, info in zip(modules, modinfos):
