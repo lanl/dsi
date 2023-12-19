@@ -45,11 +45,7 @@ class Hostname(Environment):
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
         column_names = list(self.posix_info.keys()) + ["hostname"]
-<<<<<<< HEAD
         self.set_schema(column_names)
-=======
-        self.set_schema(column_names, validation_model=HostnameModel)
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
         self.perms_manager.register_columns_with_file(column_names, None)
 
     def add_rows(self) -> None:
@@ -61,60 +57,6 @@ class Hostname(Environment):
         self.add_to_output(row)
 
 
-<<<<<<< HEAD
-class Bueno(Environment):
-    """
-    A Plugin to capture performance data from Bueno (github.com/lanl/bueno)
-
-    Bueno outputs performance data in keyvalue pairs in a file. Keys and values
-    are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
-    """
-
-    def __init__(self, filename, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.bueno_data = OrderedDict()
-        self.filename = filename
-
-    def pack_header(self) -> None:
-        """Set schema with POSIX and Bueno data."""
-<<<<<<< HEAD
-        posix_columns = list(self.posix_info.keys())
-        bueno_columns = list(self.bueno_data.keys())
-        self.perms_manager.register_columns_with_file(posix_columns, None)
-        self.perms_manager.register_columns_with_file(
-            bueno_columns, self.filename)
-
-        column_names = posix_columns + bueno_columns
-        self.set_schema(column_names)
-=======
-        bueno_names = list(self.bueno_data.keys())
-        column_names = list(self.posix_info.keys()) + bueno_names
-        model = create_dynamic_model("BuenoModel", col_names=bueno_names,
-                                     col_types=[str] * len(bueno_names), base=EnvironmentModel)
-        self.set_schema(column_names, validation_model=model)
->>>>>>> main
-
-    def add_row(self) -> None:
-        """Parses environment provenance data and adds the row."""
-        if not self.schema_is_set():
-            with open(self.filename, 'r') as fh:
-                file_content = (fh.read())
-            rows = file_content.split('\n')
-            drop_rows = [row for row in rows if row != '']
-            rows = drop_rows
-            for row in rows:
-                colon_split = row.split(':', maxsplit=1)
-                if len(colon_split) != 2:
-                    raise TypeError
-                self.bueno_data[colon_split[0]] = colon_split[1]
-            self.pack_header()
-
-        row = list(self.posix_info.values()) + list(self.bueno_data.values())
-        self.add_to_output(row)
-
-
-=======
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
 class GitInfo(Environment):
     """
     A Plugin to capture Git information.
@@ -139,22 +81,10 @@ class GitInfo(Environment):
         }
 
     def pack_header(self) -> None:
-<<<<<<< HEAD
-        """ Set schema with POSIX and Git columns """
-        column_names = list(self.posix_info.keys()) + \
-            list(self.git_info.keys())
-<<<<<<< HEAD
-        self.set_schema(column_names)
-        self.perms_manager.register_columns_with_file(column_names, None)
-=======
-        self.set_schema(column_names, validation_model=GitInfoModel)
->>>>>>> main
-=======
         """Set schema with POSIX and Git columns"""
         column_names = list(self.posix_info.keys()) + list(self.git_info.keys())
         self.set_schema(column_names, validation_model=GitInfoModel)
         self.perms_manager.register_columns_with_file(column_names, None)
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
 
     def add_rows(self) -> None:
         """Adds a row to the output with POSIX info, git remote, and git commit"""
@@ -166,7 +96,6 @@ class GitInfo(Environment):
             self.git_info["git_commit"](),
         ]
         self.add_to_output(row)
-
 
 class SystemKernel(Environment):
     """
@@ -183,39 +112,15 @@ class SystemKernel(Environment):
 
     def __init__(self, **kwargs) -> None:
         """Initialize SystemKernel with inital provenance info."""
-<<<<<<< HEAD
-<<<<<<< HEAD
         super().__init__(**kwargs)
         self.prov_info = self.get_prov_info()
-
-    def pack_header(self) -> None:
-        """Set schema with keys of prov_info."""
-        column_names = list(self.posix_info.keys()) + \
-            list(self.prov_info.keys())
-        self.set_schema(column_names)
-        self.perms_manager.register_columns_with_file(column_names, None)
-=======
-        super().__init__()
-=======
-        super().__init__(**kwargs)
-        self.prov_info = self.get_prov_info()
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
         self.column_names = ["kernel_info"]
 
     def pack_header(self) -> None:
         """Set schema with keys of prov_info."""
-<<<<<<< HEAD
-        prov_info_names = list(self.prov_info.keys())
-        column_names = list(self.posix_info.keys()) + prov_info_names
-        model = create_dynamic_model("BuenoModel", col_names=prov_info_names,
-                                     col_types=[str] * len(prov_info_names), base=EnvironmentModel)
-        self.set_schema(column_names, validation_model=model)
->>>>>>> main
-=======
         column_names = list(self.posix_info.keys()) + self.column_names
         self.set_schema(column_names, validation_model=SystemKernelModel)
         self.perms_manager.register_columns_with_file(column_names, None)
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
 
     def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""

@@ -41,8 +41,6 @@ class StructuredMetadata(Plugin):
         self.output_collector = OrderedDict()
         self.column_cnt = None  # schema not set until pack_header
         self.perms_manager = kwargs['perms_manager']
-<<<<<<< HEAD
-=======
         self.validation_model = None  # optional pydantic Model
         # Check for strict_mode option
         if 'strict_mode' in kwargs:
@@ -55,7 +53,6 @@ class StructuredMetadata(Plugin):
             self.strict_mode = False
         # Lock to enforce strict mode
         self.strict_mode_lock = False
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
 
     def set_schema(self, column_names: list, validation_model=None) -> None:
         """

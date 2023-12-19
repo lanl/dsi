@@ -49,13 +49,8 @@ def test_envprov_plugin_type():
 def test_envprov_plugin_adds_rows():
     mock_pm = PermissionsManager()
     plug = SystemKernel(perms_manager=mock_pm)
-<<<<<<< HEAD
-    plug.add_row()
-    plug.add_row()
-=======
     plug.add_rows()
     plug.add_rows()
->>>>>>> 3055a541fac93aa877cb42e13273b3c3ec047877
 
     for key, val in plug.output_collector.items():
         assert len(val) == 2
@@ -72,8 +67,8 @@ def test_systemkernel_plugin_blob_is_big():
     blob = plug.output_collector["kernel_info"][0]
     info_dict = loads(blob)
 
-    # 3 Bueno cols + 4 inherited Env cols
-    assert len(plug.output_collector.keys()) == 7
+    # 1 systemkernel col + 4 inherited Env cols
+    assert len(plug.output_collector.keys()) == 5
 
     # dict should have more than 1000 (~7000) keys
     assert len(info_dict.keys()) > 1000
