@@ -90,6 +90,7 @@ class Parquet(Filesystem):
             print('Opening Jupyter notebook...')
             self.get_cmd_output(cmd=['jupyter-lab ./dsi_parquet_driver_output.ipynb'])
         else:
+#            self.get_cmd_output(cmd=['jupyter nbconvert --to html {}'.format(fname)])
             # Init HTML exporter
             html_exporter = nbc.HTMLExporter()
             html_content,_ = html_exporter.from_notebook_node(nb_content)
