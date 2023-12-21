@@ -24,4 +24,6 @@ def test_inspect_artifact():
     a = Parquet(filename='/'.join([get_git_root('.'), 'dsi/data/wildfiredata.pq']))
     b = a.get_artifacts()
     a.inspect_artifacts(b)
+    # No error on inspect_artifact return implies success
+    assert True
 
