@@ -80,7 +80,7 @@ class Sqlite(Filesystem):
         self.con.commit()
 
     # Adds rows to the columns defined previously
-    def put_artifacts(self, artifacts, isVerbose=False):
+    def put_artifacts(self, collection, isVerbose=False):
         """
         Primary class for insertion of Artifact metadata into a defined schema
 
@@ -89,9 +89,14 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        
+        # Core compatibility name assignment
+        artifacts = collection
+
         types = DataType()
-        types.properties = artifacts
+        types.properties = {}
+        for key in artifacts:
+            types.properties[key.replace('-','_minus_')] = artifacts[key]
+        
         
         self.put_artifact_type(types)
         
