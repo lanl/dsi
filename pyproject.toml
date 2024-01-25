@@ -20,10 +20,6 @@ authors=[
 classifiers=[
     "Programming Language :: Python"
 ]
-dependencies = [
-	"gitpython",
-  "pyarrow",
-  "pandas",
-  "nbformat",
-  "pydantic"
-]
+dynamic = ["dependencies"]
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]} 

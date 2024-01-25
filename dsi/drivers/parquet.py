@@ -1,5 +1,6 @@
 import pyarrow as pa
 from pyarrow import parquet as pq
+import nbconvert as nbc
 import nbformat as nbf
 import subprocess
 
@@ -44,7 +45,7 @@ class Parquet(Filesystem):
             raise Exception(proc.stderr)
         return proc.stdout.strip().decode("utf-8")
 
-    def inspect_artifacts(self, collection):
+    def inspect_artifacts(self, collection, interactive=False):
         """Populate a Jupyter notebook with tools required to look at Parquet data."""
         nb = nbf.v4.new_notebook()
         text = """\
@@ -77,6 +78,23 @@ class Parquet(Filesystem):
         with open(fname, 'w') as fh:
             nbf.write(nb, fh)
 
-        print('Opening Jupyter notebook...')
-        self.get_cmd_output(
-            cmd=['jupyter-lab ./dsi_parquet_driver_output.ipynb'])
+        # open the jupyter notebook for static page generation
+        with open(fname, 'r', encoding='utf-8') as fh:
+            nb_content = nbf.read(fh, as_version=4)
+        # Init executor for notebook
+        run_nb = nbc.preprocessors.ExecutePreprocessor(timeout=-1) # No timeout
+        # Execute the notebook
+        run_nb.preprocess(nb_content, {'metadata':{'path':'.'}})
+
+        if interactive:
+            print('Opening Jupyter notebook...')
+            self.get_cmd_output(cmd=['jupyter-lab ./dsi_parquet_driver_output.ipynb'])
+        else:
+#            self.get_cmd_output(cmd=['jupyter nbconvert --to html {}'.format(fname)])
+            # Init HTML exporter
+            html_exporter = nbc.HTMLExporter()
+            html_content,_ = html_exporter.from_notebook_node(nb_content)
+            # Save HTML file
+            html_filename = 'dsi_parquet_driver_output.html'
+            with open(html_filename, 'w', encoding='utf-8') as fh:
+                fh.write(html_content)
