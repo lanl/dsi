@@ -10,9 +10,9 @@ all: html
 # Build HTML
 html:
 	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
-	python ./drivers/generate_driver_class_hierarchy.py ../dsi/drivers/
+	python ./backends/generate_backend_class_hierarchy.py ../dsi/backends/
 	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
-	mv DriverClassHierarchy.gv.png DriverClassHierarchy.png
+	mv BackendClassHierarchy.gv.png BackendClassHierarchy.png
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
 	rm -rf $(BUILDDIR)/html/htmlcov
 	pytest --cov --cov-report=html ../

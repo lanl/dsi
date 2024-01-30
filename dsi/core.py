@@ -8,19 +8,19 @@ class Terminal():
     """
     An instantiated Terminal is the DSI human/machine interface.
 
-    Terminals are a home for Plugins and an interface for Drivers. Drivers may be
+    Terminals are a home for Plugins and an interface for Backends. Backends may be
     front-ends or back-ends. Plugins may be producers or consumers. See documentation
     for more information.
     """
-    DRIVER_PREFIX = ['dsi.drivers']
-    DRIVER_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
+    BACKEND_PREFIX = ['dsi.backends']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_consumer']
     VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv']
-    VALID_DRIVERS = ['Gufi', 'Sqlite', 'Parquet']
-    VALID_MODULES = VALID_PLUGINS + VALID_DRIVERS
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
+    VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': [
-        'producer', 'consumer'], 'driver': ['front-end', 'back-end']}
+        'producer', 'consumer'], 'backend': ['front-end', 'back-end']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect']
 
     def __init__(self):
@@ -29,11 +29,11 @@ class Terminal():
             return (['.'.join(i) for i in product(prefix, implementations)])
 
         self.module_collection = {}
-        driver_modules = static_munge(
-            self.DRIVER_PREFIX, self.DRIVER_IMPLEMENTATIONS)
-        self.module_collection['driver'] = {}
-        for module in driver_modules:
-            self.module_collection['driver'][module] = import_module(module)
+        backend_modules = static_munge(
+            self.BACKEND_PREFIX, self.BACKEND_IMPLEMENTATIONS)
+        self.module_collection['backend'] = {}
+        for module in backend_modules:
+            self.module_collection['backend'][module] = import_module(module)
 
         plugin_modules = static_munge(
             self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
@@ -43,7 +43,7 @@ class Terminal():
 
         self.active_modules = {}
         valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + \
-            self.VALID_MODULE_FUNCTIONS['driver']
+            self.VALID_MODULE_FUNCTIONS['backend']
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
         self.active_metadata = OrderedDict()
@@ -53,7 +53,7 @@ class Terminal():
         """
         List available DSI modules of an arbitrary module type.
 
-        This method is useful for Core Terminal setup. Plugin and Driver type DSI modules
+        This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
         are supported, but this getter can be extended to support any new DSI module
         types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
         however, DSI Modules are classes, hence the naming idiosynchrocies below.
@@ -69,7 +69,7 @@ class Terminal():
 
     def load_module(self, mod_type, mod_name, mod_function, **kwargs):
         """
-        Load a DSI module from the available Plugin and Drive module collection.
+        Load a DSI module from the available Plugin and Backend module collection.
 
         DSI modules may be loaded which are not explicitly listed by the list_available_modules.
         This flexibility ensures that advanced users can access higher level abstractions.
@@ -102,7 +102,7 @@ class Terminal():
             print('{} {} {} loaded successfully.'.format(
                 mod_name, mod_type, mod_function))
         else:
-            print('Hint: Did you declare your Plugin/Driver in the Terminal Global vars?')
+            print('Hint: Did you declare your Plugin/Backend in the Terminal Global vars?')
             raise NotImplementedError
 
     def unload_module(self, mod_type, mod_name, mod_function):
@@ -127,7 +127,7 @@ class Terminal():
         Adds an external, meaning not from the DSI repo, Python module to the module_collection.
 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
-        Note: mod_type is needed because each Python module only implements plugins or drivers.
+        Note: mod_type is needed because each Python module only implements plugins or backends.
 
         For example,
 
@@ -147,7 +147,7 @@ class Terminal():
         """
         List DSI modules which have already been loaded.
 
-        These Plugins and Drivers are active or ready to execute a post-processing task.
+        These Plugins and Backends are active or ready to execute a post-processing task.
         """
         return (self.active_modules)
 
@@ -187,9 +187,9 @@ class Terminal():
 
     def artifact_handler(self, interaction_type, **kwargs):
         """
-        Store or retrieve using all loaded DSI Drivers with back-end functionality.
+        Store or retrieve using all loaded DSI Backends with storage functionality.
 
-        A DSI Core Terminal may load zero or more Drivers with back-end storage functionality.
+        A DSI Core Terminal may load zero or more Backends with storage functionality.
         Calling artifact_handler will execute all back-end functionality currently loaded, given
         the provided ``interaction_type``.
         """

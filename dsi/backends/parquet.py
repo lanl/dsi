@@ -4,7 +4,7 @@ import nbconvert as nbc
 import nbformat as nbf
 import subprocess
 
-from dsi.drivers.filesystem import Filesystem
+from dsi.backends.filesystem import Filesystem
 
 
 class Parquet(Filesystem):

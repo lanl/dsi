@@ -53,7 +53,7 @@ cover/
 
 # Testing artifacts
 *query.csv
-dsi_parquet_driver_output.ipynb
+dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
 

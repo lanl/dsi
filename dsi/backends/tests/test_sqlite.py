@@ -1,7 +1,7 @@
 import git
 from collections import OrderedDict
 
-from dsi.drivers.sqlite import Sqlite, DataType
+from dsi.backends.sqlite import Sqlite, DataType
 
 isVerbose = True
 

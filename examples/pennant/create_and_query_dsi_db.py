@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#!/usr/bin/env python3
 
 """
 This script reads in the csv file created from parse_slurm_output.py.
@@ -8,7 +7,7 @@ Then it creates a DSI db from the csv file and performs a query.
 
 import argparse
 import sys
-from dsi.drivers.sqlite import Sqlite, DataType
+from dsi.backends.sqlite import Sqlite, DataType
 
 isVerbose = True
 

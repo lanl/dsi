@@ -9,8 +9,8 @@ import sys
 # Temporary until DSI becomes a module
 # Path to root dsi folder
 sys.path.insert(1, '../')
-from dsi.drivers.sqlite import Sqlite, DataType
-from dsi.drivers.filesystem import Filesystem as fs
+from dsi.backends.sqlite import Sqlite, DataType
+from dsi.backends.filesystem import Filesystem as fs
 
 # Analysis
 import matplotlib.pyplot as plt

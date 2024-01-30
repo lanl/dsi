@@ -4,8 +4,8 @@ from dsi.core import Terminal
 def test_terminal_module_getter():
     a = Terminal()
     plugins = a.list_available_modules('plugin')
-    drivers = a.list_available_modules('driver')
-    assert len(plugins) > 0 and len(drivers) > 0
+    backends = a.list_available_modules('backend')
+    assert len(plugins) > 0 and len(backends) > 0
 
 
 def test_unload_module():

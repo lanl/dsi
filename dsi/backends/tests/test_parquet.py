@@ -1,7 +1,7 @@
 import git
 from collections import OrderedDict
 
-from dsi.drivers.parquet import Parquet
+from dsi.backends.parquet import Parquet
 
 isVerbose = True
 
