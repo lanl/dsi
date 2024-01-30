@@ -23,10 +23,9 @@ import numpy as np
 datapath = "./"
 
 ruser = "jesus"
-rserver = "192.168.0.100"
+rserver = "192.168.88.248"
 
 # Define path of the database
-#dbpath = "shell_implosion_1d.db"
 dbpath = "wildfire.db"
 store = Sqlite(dbpath)
 
