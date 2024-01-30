@@ -33,7 +33,7 @@ def test_artifact_query(test_name):
     data_type = DataType()
     data_type.name = "rundata"
     query = "SELECT * FROM " + str(data_type.name) + \
-      " where hydro_cycle_run_time > 1.0"
+      " where hydro_cycle_run_time > 0.006"
     print("Running Query", query)
     result = store.sqlquery(query)
     store.export_csv(result, "pennant_query.csv")
