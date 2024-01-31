@@ -4,6 +4,9 @@ Plugins connect data-producing applications to DSI middleware. Plugins have "wri
 
 .. image:: PluginClassHierarchy.png
 
+.. automodule:: dsi.plugins.plugin
+   :members:
+
 .. automodule:: dsi.plugins.metadata
    :members:
 
