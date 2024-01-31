@@ -1,4 +1,4 @@
-from dsi.plugins.metadata import Plugin
+from dsi.plugins.plugin import Plugin
 
 import os
 import sys
