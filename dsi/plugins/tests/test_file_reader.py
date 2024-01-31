@@ -2,7 +2,7 @@ from dsi.core import Terminal
 from collections import OrderedDict
 import git
 
-from dsi.plugins.file_consumer import Bueno, Csv
+from dsi.plugins.file_reader import Bueno, Csv
 
 
 def get_git_root(path):
@@ -47,7 +47,7 @@ def test_csv_plugin_adds_rows():
     for key, val in plug.output_collector.items():
         assert len(val) == 4
 
-    # 11 Csv cols + 1 inherited FileConsumer cols
+    # 11 Csv cols + 1 inherited FileReader cols
     assert len(plug.output_collector.keys()) == 12
 
 
@@ -61,7 +61,7 @@ def test_csv_plugin_adds_rows_multiple_files():
     for key, val in plug.output_collector.items():
         assert len(val) == 8
 
-    # 13 Csv cols + 2 inherited FileConsumer cols
+    # 13 Csv cols + 2 inherited FileReader cols
     assert len(plug.output_collector.keys()) == 15
 
 
@@ -81,8 +81,8 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
     path = '/'.join([get_git_root('.'), 'dsi/data', 'wildfiredata.csv'])
 
     term = Terminal()
-    term.load_module('plugin', 'Csv', 'consumer', filenames=[path])
-    term.load_module('plugin', 'Hostname', 'producer')
+    term.load_module('plugin', 'Csv', 'reader', filenames=[path])
+    term.load_module('plugin', 'Hostname', 'writer')
     term.transload()
 
     columns = list(term.active_metadata.values())

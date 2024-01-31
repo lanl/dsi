@@ -25,7 +25,7 @@ Plugin Abstract Classes
 -----------------------
 Plugins transform an arbitrary data source into a format that is compatible with our middleware. We call the parsed and queriable attributes "metadata" (data about the data). Metadata share the same security profile as the source data.
 
-Plugins can operate as data consumers or data producers. A simple data consumer might parse an application's output file and place it into a middleware compatible data structure: Python built-ins and members of the popular Python ``collection`` module. A simple data producer might execute an application to supplement existing data and queriable metadata.
+Plugins can operate as data readers or data writers. A simple data reader might parse an application's output file and place it into a middleware compatible data structure: Python built-ins and members of the popular Python ``collection`` module. A simple data writer might execute an application to supplement existing data and queriable metadata.
 
 Plugins are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.
 

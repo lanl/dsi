@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 class Plugin(metaclass=ABCMeta):
     """Plugin abstract class for DSI core product.
 
-    A Plugin connects a data producer to a compatible middleware
+    A Plugin connects a data writer or reader to a compatible middleware
     data structure.
     """
 

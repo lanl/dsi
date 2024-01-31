@@ -13,7 +13,7 @@ DSI is implemented in three parts:
 * Backends
 * Core middleware
 
-Plugins curate metadata for query and data return. Plugins can have producer or consumer funcitonality. Plugins acting as consumers harvest data from files and streams. Plugins acting as producers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Plugins curate metadata for query and data return. Plugins can have write or read funcitonality. Plugins acting as readers harvest data from files and streams. Plugins acting as writers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
 Backends are interfaces for the Core middleware. Backends consist mostly of back-end/storage functionalities and are the interface between the Core Middleware and a data store. Backends may also have some front-end functionality interfacing between a DSI user and the Core middleware. Backends may be user contributed and a default set of backends are available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 

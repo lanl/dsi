@@ -9,18 +9,18 @@ class Terminal():
     An instantiated Terminal is the DSI human/machine interface.
 
     Terminals are a home for Plugins and an interface for Backends. Backends may be
-    front-ends or back-ends. Plugins may be producers or consumers. See documentation
+    front-ends or back-ends. Plugins may be Writers or readers. See documentation
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env', 'file_consumer']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader']
     VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv']
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': [
-        'producer', 'consumer'], 'backend': ['front-end', 'back-end']}
+        'writer', 'reader'], 'backend': ['front-end', 'back-end']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect']
 
     def __init__(self):
@@ -136,7 +136,7 @@ class Terminal():
 
                                         '/the/path/to/my_python_file.py')
 
-        term.load_module('plugin', 'MyPlugin', 'consumer')
+        term.load_module('plugin', 'MyPlugin', 'reader')
 
         term.list_loaded_modules() # includes MyPlugin
         """
@@ -160,7 +160,7 @@ class Terminal():
         data sources to a single DSI Core Middleware data structure.
         """
         selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in ('producer', 'consumer'))
+            (k, self.active_modules[k]) for k in ('writer', 'reader'))
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:

@@ -8,13 +8,13 @@ A Core Terminal is a home for Plugins, and an interface for Drivers. A Core Term
 >>> a=Terminal()
 >>> a.list_available_modules('plugin')
 >>> # ['Bueno', 'Hostname', 'SystemKernel']
->>> a.load_module('plugin','Bueno','consumer',filename='./data/bueno.data')
->>> # Bueno plugin consumer loaded successfully.
->>> a.load_module('plugin','Hostname','producer')
->>> # Hostname plugin producer loaded successfully.
+>>> a.load_module('plugin','Bueno','reader',filename='./data/bueno.data')
+>>> # Bueno plugin reader loaded successfully.
+>>> a.load_module('plugin','Hostname','writer')
+>>> # Hostname plugin writer loaded successfully.
 >>> a.list_loaded_modules()
->>> # {'producer': [<dsi.plugins.env.Hostname object at 0x7f21232474d0>], 
->>> #  'consumer': [<dsi.plugins.env.Bueno object at 0x7f2123247410>], 
+>>> # {'writer': [<dsi.plugins.env.Hostname object at 0x7f21232474d0>], 
+>>> #  'reader': [<dsi.plugins.env.Bueno object at 0x7f2123247410>], 
 >>> #  'front-end': [], 
 >>> #   'back-end': []}
 
@@ -22,7 +22,7 @@ A Core Terminal is a home for Plugins, and an interface for Drivers. A Core Term
 At this point, you might decide that you are ready to collect data for inspection. It is possible to utilize DSI Drivers to load additional metadata to supplement your Plugin metadata, but you can also sample Plugin data and search it directly. 
 
 
-The process of transforming a set of Plugin producers and consumers into a querable format is called transloading. A DSI Core Terminal has a ``transload()`` method which may be called to execute all Plugins at once::
+The process of transforming a set of Plugin writers and readers into a querable format is called transloading. A DSI Core Terminal has a ``transload()`` method which may be called to execute all Plugins at once::
 
 >>> a.transload()
 >>> a.active_metadata
@@ -43,8 +43,8 @@ If you perform data science tasks using Python, it is not necessary to create a 
 >>> a.load_module('driver','Parquet','back-end',filename='parquet.data')
 >>> # Parquet driver back-end loaded successfully.
 >>> a.list_loaded_modules()
->>> # {'producer': [<dsi.plugins.env.Hostname object at 0x7f21232474d0>], 
->>> #  'consumer': [<dsi.plugins.env.Bueno object at 0x7f2123247410>], 
+>>> # {'writer': [<dsi.plugins.env.Hostname object at 0x7f21232474d0>], 
+>>> #  'reader': [<dsi.plugins.env.Bueno object at 0x7f2123247410>], 
 >>> #  'front-end': [], 
 >>> #   'back-end': [<dsi.drivers.parquet.Parquet object at 0x7f212325a110>]}
 >>> a.artifact_handler(interaction_type='put')
@@ -56,8 +56,8 @@ It is possible that you prefer to perform data science tasks using a higher leve
 >>> a.load_module('driver','Parquet','front-end',filename='parquet.data')
 >>> # Parquet driver front-end loaded successfully.
 >>> a.list_loaded_modules()
->>> # {'producer': [<dsi.plugins.env.Hostname object at 0x7fce3c612b50>], 
->>> # 'consumer': [<dsi.plugins.env.Bueno object at 0x7fce3c622110>], 
+>>> # {'writer': [<dsi.plugins.env.Hostname object at 0x7fce3c612b50>], 
+>>> # 'reader': [<dsi.plugins.env.Bueno object at 0x7fce3c622110>], 
 >>> # 'front-end': [<dsi.drivers.parquet.Parquet object at 0x7fce3c622290>], 
 >>> # 'back-end': [<dsi.drivers.parquet.Parquet object at 0x7fce3c622650>]}
 
@@ -74,11 +74,11 @@ You can then close your Jupyter notebook, ``transload()`` additionally to increa
 
 Although this demonstration only used one Plugin per Plugin functionality, any number of plugins can be added to collect an arbitrary amount of queriable metadata::
 
->>> a.load_module('plugin','SystemKernel','producer')
->>> # SystemKernel plugin producer loaded successfully
+>>> a.load_module('plugin','SystemKernel','writer')
+>>> # SystemKernel plugin writer loaded successfully
 >>> a.list_loaded_modules()
->>> # {'producer': [<dsi.plugins.env.Hostname object at 0x7fce3c612b50>, <dsi.plugins.env.SystemKernel object at 0x7fce68519250>], 
->>> # 'consumer': [<dsi.plugins.env.Bueno object at 0x7fce3c622110>], 
+>>> # {'writer': [<dsi.plugins.env.Hostname object at 0x7fce3c612b50>, <dsi.plugins.env.SystemKernel object at 0x7fce68519250>], 
+>>> # 'reader': [<dsi.plugins.env.Bueno object at 0x7fce3c622110>], 
 >>> # 'front-end': [<dsi.drivers.parquet.Parquet object at 0x7fce3c622290>], 
 >>> # 'back-end': [<dsi.drivers.parquet.Parquet object at 0x7fce3c622650>]}
 
