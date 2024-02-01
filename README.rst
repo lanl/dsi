@@ -9,15 +9,15 @@ The goal of the Data Science Infrastructure Project (DSI) is to provide a flexib
 
 DSI is implemented in three parts:
 
-* Plugins
-* Drivers
+* Plugins (Readers and Writers)
+* Backends
 * Core middleware
 
-Plugins curate metadata for query and data return. Plugins can have producer or consumer funcitonality. Plugins acting as consumers harvest data from files and streams. Plugins acting as producers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Plugins curate metadata for query and data return. Plugins can have read or write funcitonality acting as Readers and Writers for DSI. Plugins acting as readers harvest data from files and streams. Plugins acting as writers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
-Drivers are interfaces for the Core middleware. Drivers can have front-end or back-end functionalities. Driver front-ends are the interface between a DSI user and the Core middleware. Driver back-ends are the interface between the Core Middleware and a data store. Drivers may be user contributed and a default set of drivers is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Backends are interfaces for the Core middleware. Backends consist mostly of back-end/storage functionalities and are the interface between the Core Middleware and a data store. Backends may also have some front-end functionality interfacing between a DSI user and the Core middleware. Backends may be user contributed and a default set of backends are available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
-DSI Core middleware provides the user/machine interface. The Core middleware defines a Terminal object. An instantiated Core Terminal can load zero or more plugins and drivers. A Terminal object can be used in scripting workflows and program loops.
+DSI Core middleware provides the user/machine interface. The Core middleware defines a Terminal object. An instantiated Core Terminal can load zero or more plugins and backends. A Terminal object can be used in scripting workflows and program loops.
 
 =====================
 DSI Core Requirements
@@ -25,7 +25,7 @@ DSI Core Requirements
 * python3 (3.11 tested)
 * Linux OS (RHEL- and Debian-based distributions tested)
 * Git
-* Plugins and Drivers introduce further requirements
+* Plugins and Backends introduce further requirements
 
 ===============
 Getting Started

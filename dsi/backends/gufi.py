@@ -2,7 +2,7 @@ import subprocess
 
 
 # Holds table name and data properties
-from dsi.drivers.filesystem import Filesystem
+from dsi.backends.filesystem import Filesystem
 
 
 class DataType:

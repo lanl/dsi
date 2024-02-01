@@ -8,9 +8,9 @@ from pandas import DataFrame, read_csv, concat
 from dsi.plugins.metadata import StructuredMetadata
 
 
-class FileConsumer(StructuredMetadata):
+class FileReader(StructuredMetadata):
     """
-    FileConsumer Plugins keep information about the file that
+    FileReader Plugins keep information about the file that
     they are ingesting, namely absolute path and hash.
     """
 
@@ -28,7 +28,7 @@ class FileConsumer(StructuredMetadata):
             self.file_info[abspath(filename)] = sha.hexdigest()
 
 
-class Csv(FileConsumer):
+class Csv(FileReader):
     """
     A Plugin to ingest CSV data
     """
@@ -92,7 +92,7 @@ class Csv(FileConsumer):
             self.add_to_output(row_w_fileinfo)
 
 
-class Bueno(FileConsumer):
+class Bueno(FileReader):
     """
     A Plugin to capture performance data from Bueno (github.com/lanl/bueno)
 

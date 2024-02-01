@@ -1,7 +1,7 @@
 import csv
 import sqlite3
 
-from dsi.drivers.filesystem import Filesystem
+from dsi.backends.filesystem import Filesystem
 
 # Holds table name and data properties
 

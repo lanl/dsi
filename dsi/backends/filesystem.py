@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
 
-class Driver(metaclass=ABCMeta):
+class Backend(metaclass=ABCMeta):
     @abstractmethod
     def __init__(self, filename) -> None:
         pass
@@ -24,7 +24,7 @@ class Driver(metaclass=ABCMeta):
         pass
 
 
-class Filesystem(Driver):
+class Filesystem(Backend):
     git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
     # Declare named types
     DOUBLE = "DOUBLE"

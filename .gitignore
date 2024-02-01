@@ -23,6 +23,9 @@ wheels/
 share/python-wheels/
 MANIFEST
 
+# Local environment
+pcenv/
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -50,7 +53,7 @@ cover/
 
 # Testing artifacts
 *query.csv
-dsi_parquet_driver_output.ipynb
+dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
 

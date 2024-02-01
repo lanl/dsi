@@ -25,9 +25,9 @@ sha = get_cmd_output(cmd=['git rev-parse HEAD'])
 # Get the root of the git project
 git_root = get_cmd_output(cmd=['git rev-parse --show-toplevel'])
 
-# String replace git_sha_commit placeholder for Plugin and Driver implementations
+# String replace git_sha_commit placeholder for Plugin and Backend implementations
 metadata = '/'.join([git_root, 'dsi/plugins/metadata.py'])
-filesystem = '/'.join([git_root, 'dsi/drivers/filesystem.py'])
+filesystem = '/'.join([git_root, 'dsi/backends/filesystem.py'])
 
 
 class SetupWrapper(install):

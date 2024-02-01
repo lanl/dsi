@@ -1,4 +1,4 @@
-from dsi.drivers.gufi import Gufi
+from dsi.backends.gufi import Gufi
 
 isVerbose = False
 

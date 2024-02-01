@@ -1,4 +1,4 @@
-from dsi.drivers.filesystem import Driver
+from dsi.backends.filesystem import Backend
 
 import os
 import sys
@@ -48,5 +48,5 @@ class ClassTreeNode:
 
 
 if __name__ == "__main__":
-    ct = ClassTreeNode(Driver)  # generate class hierarchy for Driver
-    ct.export_png(name="DriverClassHierarchy")
+    ct = ClassTreeNode(Backend)  # generate class hierarchy for Backend
+    ct.export_png(name="BackendClassHierarchy")
