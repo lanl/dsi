@@ -45,7 +45,6 @@ After activating your environment::
 	cd dsi/
 	python -m pip install .
 	
-
 =====================
 Copyright and License
 =====================
