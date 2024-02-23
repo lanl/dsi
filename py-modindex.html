@@ -10,9 +10,10 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="_static/jquery.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
         <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
@@ -48,8 +49,7 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
-<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="permissions.html">Permissions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 </ul>
 
         </div>
@@ -95,32 +95,27 @@
      <tr class="cg-1">
        <td></td>
        <td>&#160;&#160;&#160;
+       <a href="backends.html#module-dsi.backends.filesystem"><code class="xref">dsi.backends.filesystem</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="cg-1">
+       <td></td>
+       <td>&#160;&#160;&#160;
+       <a href="backends.html#module-dsi.backends.gufi"><code class="xref">dsi.backends.gufi</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="cg-1">
+       <td></td>
+       <td>&#160;&#160;&#160;
+       <a href="backends.html#module-dsi.backends.parquet"><code class="xref">dsi.backends.parquet</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="cg-1">
+       <td></td>
+       <td>&#160;&#160;&#160;
+       <a href="backends.html#module-dsi.backends.sqlite"><code class="xref">dsi.backends.sqlite</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="cg-1">
+       <td></td>
+       <td>&#160;&#160;&#160;
        <a href="core.html#module-dsi.core"><code class="xref">dsi.core</code></a></td><td>
-       <em></em></td></tr>
-     <tr class="cg-1">
-       <td></td>
-       <td>&#160;&#160;&#160;
-       <a href="drivers.html#module-dsi.drivers.filesystem"><code class="xref">dsi.drivers.filesystem</code></a></td><td>
-       <em></em></td></tr>
-     <tr class="cg-1">
-       <td></td>
-       <td>&#160;&#160;&#160;
-       <a href="drivers.html#module-dsi.drivers.gufi"><code class="xref">dsi.drivers.gufi</code></a></td><td>
-       <em></em></td></tr>
-     <tr class="cg-1">
-       <td></td>
-       <td>&#160;&#160;&#160;
-       <a href="drivers.html#module-dsi.drivers.parquet"><code class="xref">dsi.drivers.parquet</code></a></td><td>
-       <em></em></td></tr>
-     <tr class="cg-1">
-       <td></td>
-       <td>&#160;&#160;&#160;
-       <a href="drivers.html#module-dsi.drivers.sqlite"><code class="xref">dsi.drivers.sqlite</code></a></td><td>
-       <em></em></td></tr>
-     <tr class="cg-1">
-       <td></td>
-       <td>&#160;&#160;&#160;
-       <a href="permissions.html#module-dsi.permissions.permissions"><code class="xref">dsi.permissions.permissions</code></a></td><td>
        <em></em></td></tr>
      <tr class="cg-1">
        <td></td>
@@ -132,6 +127,11 @@
        <td>&#160;&#160;&#160;
        <a href="plugins.html#module-dsi.plugins.metadata"><code class="xref">dsi.plugins.metadata</code></a></td><td>
        <em></em></td></tr>
+     <tr class="cg-1">
+       <td></td>
+       <td>&#160;&#160;&#160;
+       <a href="plugins.html#module-dsi.plugins.plugin"><code class="xref">dsi.plugins.plugin</code></a></td><td>
+       <em></em></td></tr>
    </table>
 
 
@@ -142,7 +142,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Triad National Security, LLC.</p>
+    <p>&#169; Copyright 2023, Terry Turton.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

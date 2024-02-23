@@ -15,8 +15,8 @@ The Data Science Infrastructure Project (DSI)
    installation
    core
    plugins
-   drivers
-   permissions
+   backends
+
 
 Indices and tables
 ==================

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Data Science Infrastructure Project (DSI) &mdash; DSI 0.0.0 documentation</title>
@@ -11,9 +11,10 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="_static/jquery.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
         <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
@@ -47,8 +48,7 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
-<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="permissions.html">Permissions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 </ul>
 
         </div>
@@ -93,7 +93,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.metadata.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.plugin.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.metadata.StructuredMetadata"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.env.Environment"><code class="docutils literal notranslate"><span class="pre">Environment</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.env.GitInfo"><code class="docutils literal notranslate"><span class="pre">GitInfo</span></code></a></li>
@@ -101,18 +101,11 @@
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.env.SystemKernel"><code class="docutils literal notranslate"><span class="pre">SystemKernel</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="drivers.html#dsi.drivers.sqlite.Artifact"><code class="docutils literal notranslate"><span class="pre">Artifact</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="drivers.html#dsi.drivers.sqlite.Sqlite"><code class="docutils literal notranslate"><span class="pre">Sqlite</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="drivers.html#dsi.drivers.gufi.Gufi"><code class="docutils literal notranslate"><span class="pre">Gufi</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="drivers.html#dsi.drivers.parquet.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="permissions.html">Permissions</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="permissions.html#dsi.permissions.permissions.ColumnNotRegisteredError"><code class="docutils literal notranslate"><span class="pre">ColumnNotRegisteredError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="permissions.html#dsi.permissions.permissions.Permission"><code class="docutils literal notranslate"><span class="pre">Permission</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="permissions.html#dsi.permissions.permissions.PermissionNotFoundError"><code class="docutils literal notranslate"><span class="pre">PermissionNotFoundError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="permissions.html#dsi.permissions.permissions.PermissionsManager"><code class="docutils literal notranslate"><span class="pre">PermissionsManager</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.sqlite.Artifact"><code class="docutils literal notranslate"><span class="pre">Artifact</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.sqlite.Sqlite"><code class="docutils literal notranslate"><span class="pre">Sqlite</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.gufi.Gufi"><code class="docutils literal notranslate"><span class="pre">Gufi</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.parquet.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -137,7 +130,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Triad National Security, LLC.</p>
+    <p>&#169; Copyright 2023, Terry Turton.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

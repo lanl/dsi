@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Plugins &mdash; DSI 0.0.0 documentation</title>
@@ -11,15 +11,16 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="_static/jquery.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
         <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Drivers" href="drivers.html" />
+    <link rel="next" title="Backends" href="backends.html" />
     <link rel="prev" title="Core" href="core.html" /> 
 </head>
 
@@ -48,8 +49,8 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Plugins</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.metadata.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.metadata.Plugin.add_to_output"><code class="docutils literal notranslate"><span class="pre">Plugin.add_to_output()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.plugin.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.plugin.Plugin.add_to_output"><code class="docutils literal notranslate"><span class="pre">Plugin.add_to_output()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.metadata.StructuredMetadata"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code></a><ul>
@@ -83,8 +84,7 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="drivers.html">Drivers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="permissions.html">Permissions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 </ul>
 
         </div>
@@ -113,24 +113,24 @@
              
   <section id="plugins">
 <h1>Plugins<a class="headerlink" href="#plugins" title="Permalink to this heading"></a></h1>
-<p>Plugins connect data-producing applications to DSI middleware. Plugins have “producer” or “consumer” functions. A Plugin consumer function deals with existing data files or input streams. A Plugin producer deals with generating new data. Plugins are modular to support user contribution. Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. In order to be compatible with DSI middleware, Plugins should produce data in Python built-in data structures or data structures sourced from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library. Plugin extensions will be accepted conditional to the extention of <code class="docutils literal notranslate"><span class="pre">plugins/tests</span></code> to demonstrate the new Plugin capability. We can not accept pull requests that are not tested.</p>
+<p>Plugins connect data-producing applications to DSI middleware. Plugins have “writers” or “readers” functions. A Plugin reader function deals with existing data files or input streams. A Plugin writer deals with generating new data. Plugins are modular to support user contribution. Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. In order to be compatible with DSI middleware, Plugins should produce data in Python built-in data structures or data structures sourced from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library. Plugin extensions will be accepted conditional to the extention of <code class="docutils literal notranslate"><span class="pre">plugins/tests</span></code> to demonstrate the new Plugin capability. We can not accept pull requests that are not tested.</p>
 <img alt="_images/PluginClassHierarchy.png" src="_images/PluginClassHierarchy.png" />
-<span class="target" id="module-dsi.plugins.metadata"></span><dl class="py class">
-<dt class="sig sig-object py" id="dsi.plugins.metadata.Plugin">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.metadata.</span></span><span class="sig-name descname"><span class="pre">Plugin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.Plugin" title="Permalink to this definition"></a></dt>
+<span class="target" id="module-dsi.plugins.plugin"></span><dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.plugin.Plugin">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin.</span></span><span class="sig-name descname"><span class="pre">Plugin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin.Plugin" title="Permalink to this definition"></a></dt>
 <dd><p>Plugin abstract class for DSI core product.</p>
-<p>A Plugin connects a data producer to a compatible middleware
+<p>A Plugin connects a data reader or writer to a compatible middleware
 data structure.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="dsi.plugins.metadata.Plugin.add_to_output">
-<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.Plugin.add_to_output" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="dsi.plugins.plugin.Plugin.add_to_output">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin.Plugin.add_to_output" title="Permalink to this definition"></a></dt>
 <dd><p>Initialize Plugin setup.</p>
 <p>Read a Plugin file. Return a Plugin object.</p>
 </dd></dl>
 
 </dd></dl>
 
-<dl class="py class">
+<span class="target" id="module-dsi.plugins.metadata"></span><dl class="py class">
 <dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.metadata.</span></span><span class="sig-name descname"><span class="pre">StructuredMetadata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata" title="Permalink to this definition"></a></dt>
 <dd><p>plugin superclass that provides handy methods for structured data</p>
@@ -151,15 +151,14 @@ Useful in a plugin’s add_rows method.</p>
 <dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.set_schema">
 <span class="sig-name descname"><span class="pre">set_schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">column_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validation_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.set_schema" title="Permalink to this definition"></a></dt>
 <dd><p>Initializes columns in the output_collector and column_cnt.
-Useful in a plugin’s pack_header method.
-Also registers column permissions if filename is set.</p>
+Useful in a plugin’s pack_header method.</p>
 </dd></dl>
 
 </dd></dl>
 
 <span class="target" id="module-dsi.plugins.env"></span><dl class="py class">
 <dt class="sig sig-object py" id="dsi.plugins.env.Environment">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Environment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.Environment" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Environment</span></span><a class="headerlink" href="#dsi.plugins.env.Environment" title="Permalink to this definition"></a></dt>
 <dd><p>Environment Plugins inspect the calling process’ context.</p>
 <p>Environments assume a POSIX-compliant filesystem and always collect UID/GID
 information.</p>
@@ -167,7 +166,7 @@ information.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dsi.plugins.env.GitInfo">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">GitInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">git_repo_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.GitInfo" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">GitInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">git_repo_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.GitInfo" title="Permalink to this definition"></a></dt>
 <dd><p>A Plugin to capture Git information.</p>
 <p>Adds the current git remote and git commit to metadata.</p>
 <dl class="py method">
@@ -206,7 +205,7 @@ information gathered by the Environment base class.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">SystemKernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.SystemKernel" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">SystemKernel</span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel" title="Permalink to this definition"></a></dt>
 <dd><p>Plugin for reading environment provenance data.</p>
 <p>An environment provenance plugin which does the following:
 1. System Kernel Version
@@ -287,13 +286,13 @@ The option = value pairs are added to the output dict.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="core.html" class="btn btn-neutral float-left" title="Core" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="drivers.html" class="btn btn-neutral float-right" title="Drivers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="backends.html" class="btn btn-neutral float-right" title="Backends" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Triad National Security, LLC.</p>
+    <p>&#169; Copyright 2023, Terry Turton.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
