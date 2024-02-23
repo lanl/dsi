@@ -13,13 +13,13 @@ html:
 	python ./backends/generate_backend_class_hierarchy.py ../dsi/backends/
 	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
 	mv BackendClassHierarchy.gv.png BackendClassHierarchy.png
+	rm -rf $(BUILDDIR)/html
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
-	rm -rf $(BUILDDIR)/html/htmlcov
-	pytest --cov --cov-report=html ../
-	mv ./htmlcov $(BUILDDIR)/html
+#	pytest --cov --cov-report=html ../
+#	mv ./htmlcov $(BUILDDIR)/html
 	rm -f ../coverage.svg
-	coverage-badge -o ../coverage.svg
-	git add ../coverage.svg
+#	coverage-badge -o ../coverage.svg
+#	git add ../coverage.svg
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
