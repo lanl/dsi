@@ -32,7 +32,7 @@ Plugins are defined by a base abstract class, and support child abstract classes
 .. image:: PluginClassHierarchy.png
 
 Backend Abstract Classes
------------------------
+------------------------
 Backends are an interface between the User and the Core, or an interface between the Core and a storage medium. Backends can operate as Front-ends or Back-ends, and a Backend contributor can choose to implement one or both. Backend front-ends are built to deliver an experience which is compatible with a User Story. A simple supporting User Story is a need to query metadata by SQL query. Because the set of queriable metadata are spread across filesystems and security domains, a supporting Backend Back-end is required to assemble query results and present them to the DSI core middleware for transformation and return, creating an experience which is compatible with the User Story.
 
 .. image:: user_story.png
