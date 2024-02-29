@@ -52,7 +52,7 @@ coverage.xml
 cover/
 
 # Testing artifacts
-*query.csv
+query.csv
 dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
@@ -63,3 +63,4 @@ parquet.data
 .vscode
 docs/_build
 dsi.egg-info/
+.DS_Store
