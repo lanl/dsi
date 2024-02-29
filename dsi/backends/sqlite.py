@@ -239,7 +239,7 @@ class Sqlite(Filesystem):
         return resout
 
     # Given an output of a sql query, reformat and write a csv of the subset data
-    def export_csv(self, query, fname, isVerbose=False):
+    def export_csv_query(self, query, fname, isVerbose=False):
         """
         Function that outputs a csv file of a return query, given an initial query.
 
@@ -251,8 +251,11 @@ class Sqlite(Filesystem):
         """
         if isVerbose:
             print(query)
+        
+         # Parse the table out of the query
+        tname = query.split("FROM ",1)[1]
+        tname = tname[:-1]
 
-        tname = "vision"
         self.cur = self.con.cursor()
         cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
         cnames = [entry[1] for entry in cdata]
@@ -269,6 +272,35 @@ class Sqlite(Filesystem):
 
         return 1
 
+    def export_csv(self, query, tname, fname, isVerbose=False):
+        """
+        Function that outputs a csv file of a return query, given an initial query.
+
+        `query`: raw SQL query to be executed on current table
+
+        `fname`: target filename (including path) that will output the return query as a csv file
+
+        `return`: none
+        """
+        if isVerbose:
+            print(query)
+
+        self.cur = self.con.cursor()
+        cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+        cnames = [entry[1] for entry in cdata]
+        if isVerbose:
+            print(cnames)
+
+        with open(fname, "w+") as ocsv:
+            csvWriter = csv.writer(ocsv, delimiter=',')
+            csvWriter.writerow(cnames)
+
+            for row in query:
+                print(row)
+                csvWriter.writerow(row)
+
+        return 1
+    
     # Query file name
     def query_fname(self, name, isVerbose=False):
         """
