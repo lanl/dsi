@@ -47,7 +47,7 @@ class Csv(FileWriter):
         self.set_schema(column_names)
 
     # Given an output of a sql query, reformat and write a csv of the subset data
-    def export_csv(self,query,fname):
+    def export_csv_query(self,query,fname):
         """
         Function that outputs a csv file of a return query, given an initial query.
 
@@ -75,6 +75,34 @@ class Csv(FileWriter):
             csvWriter.writerow(cnames)
 
             for row in query:
+                print(row)
+                csvWriter.writerow(row)
+        
+        return 1
+    
+    # Given an output of a list, reformat and write a csv of the subset data
+    def export_csv(self,qlist,tname,fname):
+        """
+        Function that outputs a csv file of a return query, given an initial query.
+
+        `qlist`: a python list to be executed on current table
+
+        `tname`: a sql table name that originated qlist
+
+        `fname`: target filename (including path) that will output the return query as a csv file
+
+        `return`: none
+        """
+
+        self.cur = self.con.cursor()
+        cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+        cnames = [entry[1] for entry in cdata]
+
+        with open(fname,"w+") as ocsv:
+            csvWriter = csv.writer(ocsv,delimiter=',')
+            csvWriter.writerow(cnames)
+
+            for row in qlist:
                 print(row)
                 csvWriter.writerow(row)
         
