@@ -257,6 +257,9 @@ class Sqlite(Filesystem):
         tname = tname[:-1]
 
         self.cur = self.con.cursor()
+        #carry out query
+        qdata = self.con.execute(query)
+        #gather column names
         cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
         cnames = [entry[1] for entry in cdata]
         if isVerbose:
@@ -266,7 +269,7 @@ class Sqlite(Filesystem):
             csvWriter = csv.writer(ocsv, delimiter=',')
             csvWriter.writerow(cnames)
 
-            for row in query:
+            for row in qdata:
                 print(row)
                 csvWriter.writerow(row)
 
