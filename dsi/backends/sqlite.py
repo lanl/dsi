@@ -257,16 +257,27 @@ class Sqlite(Filesystem):
         # Check to see if query is delimited
         if ";" in query:
             tname = tname[:-1]
+
+        # Isolate table name from other commands
+        if "WHERE" in tname:
+            tname = tname.split("WHERE ",1)[0][:-1]
         
         if isVerbose:
             print("Table: " + tname)
 
         self.cur = self.con.cursor()
-        #carry out query
+        # Carry out query
         qdata = self.con.execute(query)
-        #gather column names
-        cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-        cnames = [entry[1] for entry in cdata]
+        
+        # Gather column names
+        if "*" in query:
+            cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+            cnames = [entry[1] for entry in cdata]
+        else:
+            cnames = query.split("SELECT ",1)[1]
+            cnames = cnames.split("FROM ",1)[0][:-1]
+            cnames = cnames.split(',')
+
         if isVerbose:
             print(cnames)
 
@@ -280,18 +291,20 @@ class Sqlite(Filesystem):
 
         return 1
 
-    def export_csv(self, query, tname, fname, isVerbose=False):
+    def export_csv(self, rquery, tname, fname, isVerbose=False):
         """
-        Function that outputs a csv file of a return query, given an initial query.
+        Function that outputs a csv file of a return query, not the query itself
 
-        `query`: raw SQL query to be executed on current table
+        `rquery`: return of an already called query output
+
+        `tname`: name of the table for (all) columns to export
 
         `fname`: target filename (including path) that will output the return query as a csv file
 
         `return`: none
         """
         if isVerbose:
-            print(query)
+            print(rquery)
 
         self.cur = self.con.cursor()
         cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
@@ -303,7 +316,7 @@ class Sqlite(Filesystem):
             csvWriter = csv.writer(ocsv, delimiter=',')
             csvWriter.writerow(cnames)
 
-            for row in query:
+            for row in rquery:
                 print(row)
                 csvWriter.writerow(row)
 
