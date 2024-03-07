@@ -252,9 +252,14 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(query)
         
-         # Parse the table out of the query
+        # Parse the table out of the query
         tname = query.split("FROM ",1)[1]
-        tname = tname[:-1]
+        # Check to see if query is delimited
+        if ";" in query:
+            tname = tname[:-1]
+        
+        if isVerbose:
+            print("Table: " + tname)
 
         self.cur = self.con.cursor()
         #carry out query
