@@ -63,3 +63,4 @@ parquet.data
 .vscode
 docs/_build
 dsi.egg-info/
+.DS_Store
