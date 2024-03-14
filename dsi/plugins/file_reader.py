@@ -134,3 +134,45 @@ class Bueno(FileReader):
         except IndexError:
             # First pass. Nothing to do.
             pass
+
+class JSON(FileReader):
+    """
+    A Plugin to capture JSON data
+
+    The JSON data's keys are used as columns and values are rows
+   
+    """
+
+    def __init__(self, filenames, **kwargs) -> None:
+        super().__init__(filenames, **kwargs)
+        self.key_data = []
+        self.base_dict = OrderedDict()
+        
+    def pack_header(self) -> None:
+        """Set schema with POSIX and JSON data."""
+        self.set_schema(self.key_data)
+
+    def add_rows(self) -> None:
+        """Parses JSON data and adds a list containing 1 or more rows."""
+
+        objs = []
+        for idx, filename in enumerate(self.filenames):
+            with open(filename, 'r') as fh:
+                    file_content = json.load(fh)
+                    objs.append(file_content)
+                    for key, val in file_content.items():
+                        # Check if column already exists
+                        if key not in self.key_data:
+                            self.key_data.append(key)
+        if not self.schema_is_set():
+            self.pack_header()
+            for key in self.key_data:
+                self.base_dict[key] = None
+
+        for o in objs:
+            new_row = self.base_dict.copy()
+            for key, val in o.items():
+                new_row[key] = val
+            print(new_row.values())
+            self.add_to_output(list(new_row.values()))
+

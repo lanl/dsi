@@ -2,7 +2,7 @@ from dsi.core import Terminal
 from collections import OrderedDict
 import git
 
-from dsi.plugins.file_reader import Bueno, Csv
+from dsi.plugins.file_reader import JSON, Bueno, Csv
 
 
 def get_git_root(path):
@@ -31,6 +31,16 @@ def test_bueno_plugin_adds_rows():
     # 4 Bueno cols
     assert len(plug.output_collector.keys()) == 4
 
+def test_json_plugin_adds_rows():
+    path1 = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
+    plug = JSON(filenames=[path1, path2])
+    plug.add_rows()
+    for key, val in plug.output_collector.items():
+        assert len(val) == 2  # two lists of length 4
+
+    # 4 Bueno cols
+    assert len(plug.output_collector.keys()) == 4
 
 def test_csv_plugin_type():
     path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
