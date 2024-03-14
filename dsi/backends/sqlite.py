@@ -232,6 +232,7 @@ class Sqlite(Filesystem):
         self.cur = self.con.cursor()
         self.res = self.cur.execute(query)
         resout = self.res.fetchall()
+        self.con.commit()
 
         if isVerbose:
             print(resout)
