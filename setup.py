@@ -19,6 +19,8 @@ def insert_git_commit(replacement_target, sha):
                         r"git_commit_sha='{}'".format(sha), line)
             print(op, end='')
 
+# Get version from main folder
+exec(open("dsi/_version.py").read())
 
 # Get the current git hash
 sha = get_cmd_output(cmd=['git rev-parse HEAD'])
@@ -29,7 +31,6 @@ git_root = get_cmd_output(cmd=['git rev-parse --show-toplevel'])
 metadata = '/'.join([git_root, 'dsi/plugins/metadata.py'])
 filesystem = '/'.join([git_root, 'dsi/backends/filesystem.py'])
 
-
 class SetupWrapper(install):
     def run(self):
         insert_git_commit(metadata, sha)
@@ -39,4 +40,6 @@ class SetupWrapper(install):
         install.run(self)
 
 
-setup(cmdclass={'install': SetupWrapper})
+setup(
+    cmdclass={'install': SetupWrapper},
+    version=__version__)

@@ -36,11 +36,17 @@ We recommend Miniconda3 for managing virtual environments for DSI::
 	conda create -n dsi python=3.11
 	conda activate dsi
 
+Python virtual environments can also be used for DSI::
+
+	python3 -m venv dsienv
+	source dsienv/bin/activate
+	pip install --upgrade pip
+
 After activating your environment::
 
 	git clone https://github.com/lanl/dsi.git
 	cd dsi/
-	python -m pip install .
+	python3 -m pip install .
 	
 =====================
 Copyright and License
