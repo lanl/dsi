@@ -2,13 +2,22 @@
 Introduction
 ============
 
-The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and share data repositories. DSI enables flexible, data-intensive scientific workflows that meet researcher needs.
+The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI  capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:
 
-.. image:: data_lifecycle.png
-   :scale: 50%
+- Data management is subject to strict, POSIX-enforced, file security.
+- DSI capabilities support a wide range of common metadata queries.
+- DSI interfaces with multiple database technologies and archival storage options.
+- Query-driven data movement is supported and is transparent to the user.
+- The DSI API can be used to develop user-specific workflows.
 
-DSI system design is driven by experiences which satisfy User Stories. DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community. 
+..  figure:: data_lifecycle.png
+    :alt: Figure depicting the data life cycle
+    :class: with-shadow
+    :scale: 50%
 
+    A depiction of data life cycle can be seen here. The Data Science Infrastructure API supports the user to manage the life cycle aspects of their data.
+
+DSI system design has been driven by specific use cases, both AI/ML and more generic usage.  These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities.  DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.  The DSI API is Python-based.
 
 Implementation
 ==============
