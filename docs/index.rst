@@ -13,9 +13,9 @@ The Data Science Infrastructure Project (DSI)
 
    introduction
    installation
-   core
    plugins
    backends
+   core
 
 
 Indices and tables

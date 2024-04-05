@@ -29,6 +29,8 @@ html:
 # github for some reason runs jekyll automatically on gh-pages
 # files, but we don't want that.  'touch .nojekyll' takes care
 # of it.
+#	git add --force ./htmlcov && \
+
 gh-pages: _build/html
 	root="$$(git rev-parse --show-toplevel)" && \
 	cd _build/html && \
@@ -36,7 +38,6 @@ gh-pages: _build/html
 	touch .nojekyll && \
 	git init && \
 	git add . && \
-	git add --force ./htmlcov && \
 	git commit -m "DSI Documentation" && \
 	git push -f $$root master:gh-pages && \
 	rm -rf .git
@@ -60,4 +61,4 @@ help:
 	@echo "  publish    upload documentation to github"
 
 clean:
-	-rm -rf $(BUILDDIR)/* *ClassHierarchy.gv *Hierarchy.png 
+	-rm -rf $(BUILDDIR)/* *ClassHierarchy.gv *Hierarchy.png

@@ -1,10 +1,16 @@
 Backends
-========================
+========
 
-Backends have front-end and back-end functions. Backends connect users to DSI Core middleware (front-end), and Backends allow DSI Middleware data structures to read and write to persistent external storage (back-end). Backends are modular to support user contribution. Backend contributors are encouraged to offer custom Backend abstract classes and Backend implementations. A contributed Backend abstract class may extend another Backend to inherit the properties of the parent. In order to be compatible with DSI Core middleware, Backends should create an interface to Python built-in data structures or data structures from the Python ``collections`` library. Backend extensions will be accepted conditional to the extention of ``backends/tests`` to demonstrate new Backend capability. We can not accept pull requests that are not tested.
+Backends connect users to DSI Core middleware and backends allow DSI middleware data structures to read and write to persistent external storage. Backends are modular to support user contribution.  Backend contributors are encouraged to offer custom backend abstract classes and backend implementations.  A contributed backend abstract class may extend another backend to inherit the properties of the parent. In order to be compatible with DSI core middleware, backends should create an interface to Python built-in data structures or data structures from the Python ``collections`` library. Backend extensions will be accepted conditional to the extention of ``backends/tests`` to demonstrate new Backend capability. We can not accept pull requests that are not tested.
 
+Note that any contributed backends or extensions must include unit tests in  ``backends/tests`` to demonstrate the new Backend capability.
 
-.. image:: BackendClassHierarchy.png
+.. figure:: BackendClassHierarchy.png
+   :alt: Figure depicting the current backend class hierarchy.
+   :class: with-shadow
+   :scale: 100%
+
+   Figure depicts the current DSI backend class hierarchy.
 
 .. automodule:: dsi.backends.filesystem
    :members:
@@ -17,5 +23,3 @@ Backends have front-end and back-end functions. Backends connect users to DSI Co
 
 .. automodule:: dsi.backends.parquet
    :members:
-
-
