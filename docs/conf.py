@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'DSI'
-copyright = '2023, Terry Turton'
-author = 'Terry Turton'
+copyright = '2023, Triad National Security, LLC. All rights reserved.'
+author = 'The DSI Project team'
 release = '0.0.0'
 
 # -- General configuration ---------------------------------------------------
