@@ -60,4 +60,4 @@ We suggest creating a python environment:
    source mydsi/bin/activate
 
 4. Proceed with Step 2 in the "How to build documentation" section.
-5. When you've completed work, deativate the conda environment with ``deactivate`` .
+5. When you've completed work, deativate the environment with ``deactivate`` .
