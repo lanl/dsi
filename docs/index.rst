@@ -3,7 +3,6 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-=============================================
 The Data Science Infrastructure Project (DSI)
 =============================================
 
@@ -16,7 +15,8 @@ The Data Science Infrastructure Project (DSI)
    plugins
    backends
    core
-
+   tiers
+   examples
 
 Indices and tables
 ==================

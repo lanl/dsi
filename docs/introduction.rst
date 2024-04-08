@@ -1,6 +1,5 @@
-============
-Introduction
-============
+
+
 
 The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI  capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:
 
@@ -72,3 +71,5 @@ DSI Core
 --------
 
 DSI basic functionality is contained within the middleware known as the *core*.  The DSI core is focused on delivering user-queries on unified metadata which can be distributed across many files and security domains. DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions. The DSI core is a home for DSI Plugins and an interface for DSI Backends.
+
+Core Documentation

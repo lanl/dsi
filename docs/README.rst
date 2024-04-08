@@ -1,9 +1,11 @@
-===========================
-How to build documentation
-===========================
+.. _label_builddocs:
 
-1. Create or activate a DSI virtual environment †
-2. Go down into the project space root and pip install dsi along with other libraries needed for the documentation:
+How to build documentation
+==========================
+
+#. Create or activate a DSI virtual environment (`How to create and activate a virtual environment`_).
+
+#. Go down into the project space root and use pip to install dsi along with other libraries needed for the documentation:
 
 .. code-block:: unixconfig
 
@@ -41,13 +43,15 @@ to build the documents.  When complete, push the changes to the repo.
 
    make publish
 
-====================================================
-† How to create and activate a virtual environment
-====================================================
+.. _label_virtual:
+
+How to create and activate a virtual environment
+================================================
+
 We suggest creating a python environment:
 
 1. Navigate to the project workspace.
-2. If this is the first time creating a DSI virtual environment, choose a name, e.g. *mydsi*:
+2. If this is the first time creating a DSI virtual environment, choose a name, e.g. **mydsi**:
 
 .. code-block:: unixconfig
 
@@ -59,5 +63,5 @@ We suggest creating a python environment:
 
    source mydsi/bin/activate
 
-4. Proceed with Step 2 in the "How to build documentation" section.
+4. Proceed with the pip installation in the `How to build documentation`_ section.
 5. When you've completed work, deativate the environment with ``deactivate`` .
