@@ -5,7 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name="dsi"
 license={text = "BSD-3-Clause"}
-version="0.0.0"
 description="A Data Science Infrastructure Metadatabase"
 authors=[
 	{name = 'James Ahrens', email = 'ahrens@lanl.gov'},
@@ -20,6 +19,9 @@ authors=[
 classifiers=[
     "Programming Language :: Python"
 ]
-dynamic = ["dependencies"]
+dynamic = ["dependencies","version"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]} 
+
+[tool.setuptools]
+py-modules = ["dsi"]

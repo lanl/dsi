@@ -19,24 +19,29 @@ def insert_git_commit(replacement_target, sha):
                         r"git_commit_sha='{}'".format(sha), line)
             print(op, end='')
 
+# Get version from main folder
+exec(open("dsi/_version.py").read())
 
 # Get the current git hash
-sha = get_cmd_output(cmd=['git rev-parse HEAD'])
+sha = get_cmd_output(cmd='git rev-parse HEAD')
 # Get the root of the git project
-git_root = get_cmd_output(cmd=['git rev-parse --show-toplevel'])
+git_root = get_cmd_output(cmd='git rev-parse --show-toplevel')
 
 # String replace git_sha_commit placeholder for Plugin and Backend implementations
 metadata = '/'.join([git_root, 'dsi/plugins/metadata.py'])
 filesystem = '/'.join([git_root, 'dsi/backends/filesystem.py'])
-
 
 class SetupWrapper(install):
     def run(self):
         insert_git_commit(metadata, sha)
         insert_git_commit(filesystem, sha)
         print(get_cmd_output(
-            cmd=['git add {} {}'.format(metadata, filesystem)]))
+            cmd='git add {} {}'.format(metadata, filesystem)))
         install.run(self)
 
 
-setup(cmdclass={'install': SetupWrapper})
+setup(
+    packages=['dsi','dsi.plugins','dsi.backends','dsi.tests'],
+    cmdclass={'install': SetupWrapper},
+    version=__version__
+)
