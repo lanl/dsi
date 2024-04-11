@@ -22,6 +22,6 @@ classifiers=[
 dynamic = ["dependencies","version"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]} 
-[tool.setuptools]
-py-modules = []
 
+[tool.setuptools]
+py-modules = ["dsi"]
