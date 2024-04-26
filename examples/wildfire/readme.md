@@ -12,7 +12,7 @@ This will generate a wildfire.cdb folder with downloaded images from the server 
 
 To visualize the results, run:
 
-    python3 -m pip install cinema
+    python3 -m pip install pycinema
 
 and 
 

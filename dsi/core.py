@@ -2,6 +2,10 @@ from importlib import import_module
 from importlib.machinery import SourceFileLoader
 from collections import OrderedDict
 from itertools import product
+import os
+
+from dsi.backends.filesystem import Filesystem
+from dsi.backends.sqlite import Sqlite, DataType, Artifact
 
 
 class Terminal():
@@ -226,3 +230,139 @@ class Terminal():
                 'Hint: Did you implement a case for your artifact interaction in the \
                  artifact_handler loop?')
             raise NotImplementedError
+
+class Sync():
+    """
+    A class defined to assist in data management activities for DSI
+
+    Sync is where data movement functions such as copy (to remote location) and 
+    sync (local filesystem with remote) exist.
+    """
+
+    def __init__(self, project_name="test"):
+        # Helper function to get parent module names.
+        #self.remote_location = {}
+        #self.local_location = {}
+        self.project_name = project_name
+
+    def copy(self, local_loc, remote_loc):
+        # Helper function to stage location and get filesystem information, and copy
+        # data over using preferred API
+
+        print("loc: "+local_loc+ " rem: "+remote_loc)
+        # Data Craw and gather metadata of local location
+        file_list = self.dircrawl(local_loc)
+
+        # populate st_list to hold all filesystem attributes
+        st_list = []
+        rfile_list = []
+
+        # Do a quick validation of group permissions
+        for file in file_list:
+            file = os.path.relpath(file,local_loc) #rel path
+            #utils.isgroupreadable(file) # quick test
+            filepath = os.path.join(local_loc, file)
+            st = os.stat(filepath)
+            # append future location to st
+            rfilepath = os.path.join(remote_loc,self.project_name, file)
+            rfile_list.append(rfilepath)
+            st_list.append(st)
+
+        # Test remote location validity, try to check access
+        # Future: iterate through remote/server list here, for now:::
+        remote_list = [ os.path.join(remote_loc,self.project_name) ]
+        for remote in remote_list:
+            try: # Try for file permissions
+                if os.path.exists(remote): # Check if exists
+                    print(f"The directory '{remote}' already exists locally.")
+                else:
+                    os.makedirs(remote) # Create it
+                    print(f"The directory '{remote}' has been created locally.")
+            except Exception as err:
+                print(f"Unexpected {err=}, {type(err)=}")
+                raise
+
+        # Try to open or create a local database to store fs info before copy
+        # Open and validate local DSI data store
+        try:
+            #f = os.path.join((local_loc, str(self.project_name+".sqlite_db") ))
+            f = local_loc+"/"+self.project_name+".sqlite_db"
+            print("db: ", f)
+            store = Sqlite( f )
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            raise
+
+        # Create new filesystem table with origin and remote locations
+        data_type = DataType()
+        #Begin the driver test
+        data_type.name = "filesystem"
+        data_type.properties["file_origin"] = Sqlite.STRING
+        data_type.properties["st_mode"] = Sqlite.DOUBLE
+        data_type.properties["st_ino"] = Sqlite.DOUBLE
+        data_type.properties["st_dev"] = Sqlite.DOUBLE
+        data_type.properties["st_nlink"] = Sqlite.DOUBLE
+        data_type.properties["st_uid"] = Sqlite.DOUBLE
+        data_type.properties["st_gid"] = Sqlite.DOUBLE
+        data_type.properties["st_size"] = Sqlite.DOUBLE
+        data_type.properties["st_atime"] = Sqlite.DOUBLE
+        data_type.properties["st_mtime"] = Sqlite.DOUBLE
+        data_type.properties["st_ctime"] = Sqlite.DOUBLE
+        data_type.properties["file_remote"] = Sqlite.STRING
+        #print(data_type.properties)
+        store.put_artifact_type(data_type, True)
+
+        artifact = Artifact()
+        for file,st,file_remote in zip(file_list,st_list,rfile_list):
+            artifact.properties["file_origin"] = str(file)
+            artifact.properties["st_mode"] = st.st_mode
+            artifact.properties["st_ino"] = st.st_ino
+            artifact.properties["st_dev"] = st.st_dev
+            artifact.properties["st_nlink"] = st.st_nlink
+            artifact.properties["st_uid"] = st.st_uid
+            artifact.properties["st_gid"] = st.st_gid
+            artifact.properties["st_size"] = st.st_size
+            artifact.properties["st_atime"] = st.st_atime
+            artifact.properties["st_mtime"] = st.st_mtime
+            artifact.properties["st_ctime"] = st.st_ctime
+            artifact.properties["file_remote"] = str(file_remote)
+            #print(artifact.properties)
+            store.put_artifacts_only(artifact, True)
+
+        # Data movement
+        # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
+        for file,file_remote in zip(file_list,rfile_list):
+            print( " cp " + file + " " + file_remote)
+
+        # Database movement
+        print( " cp " + os.path.join(local_loc, str(self.project_name+".sqlite_db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".sqlite_db" ) )
+
+
+
+    def dircrawl(self,filepath):
+        """
+        Crawls the root 'filepath' directory and returns files
+
+        `filepath`: source filepath to be crawled
+
+        `return`: returns crawled file-list
+        """
+        file_list = []
+        for root, dirs, files in os.walk(filepath):
+            #if os.path.basename(filepath) != 'tmp': # Lets skip some files
+            #    continue
+
+            for f in files: # Appent root-level files
+                file_list.append(os.path.join(root, f))
+            for d in dirs: # Recursively dive into directories
+                sub_list = self.dircrawl(os.path.join(root, d))
+                for sf in sub_list:
+                    file_list.append(sf)
+    
+        return file_list
+    
+    def get(project_name = "Project"):
+        # Helper function that searches remote location based on project name, and retrieves
+        # DSI database
+        True
+        
