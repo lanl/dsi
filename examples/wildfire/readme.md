@@ -16,6 +16,8 @@ To visualize the results using Jupyter Lab and Plotly, run:
 
     python3 -m pip install plotly
 
+    python3 -m pip install jupyterlab
+
 Open Jupyter Lab with 
     
     jupyter lab --browser Firefox 
