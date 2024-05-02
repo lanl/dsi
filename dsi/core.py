@@ -239,6 +239,8 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and 
     sync (local filesystem with remote) exist.
     """
+    remote_location = []
+    local_location = []
 
     def __init__(self, project_name="test"):
         # Helper function to get parent module names.
@@ -246,12 +248,21 @@ class Sync():
         #self.local_location = {}
         self.project_name = project_name
 
-    def copy(self, local_loc, remote_loc, isVerbose=False):
-        # Helper function to stage location and get filesystem information, and copy
-        # data over using preferred API
+    def populate(self, local_loc, remote_loc, isVerbose=False):
+        """
+        Helper function to gather filesystem information, local and remote locations
+        to create a filesystem entry in a new or existing database
+        """
+        True
 
-        print("loc: "+local_loc+ " rem: "+remote_loc)
-        # Data Craw and gather metadata of local location
+    def copy(self, local_loc, remote_loc, isVerbose=False):
+        """
+        Helper function to stage location and get filesystem information, and copy
+        data over using a preferred API
+        """
+        if isVerbose:
+            print("loc: "+local_loc+ " rem: "+remote_loc)
+        # Data Crawl and gather metadata of local location
         file_list = self.dircrawl(local_loc)
 
         # populate st_list to hold all filesystem attributes
@@ -286,8 +297,8 @@ class Sync():
         # Try to open or create a local database to store fs info before copy
         # Open and validate local DSI data store
         try:
-            #f = os.path.join((local_loc, str(self.project_name+".sqlite") ))
-            f = local_loc+"/"+self.project_name+".sqlite"
+            #f = os.path.join((local_loc, str(self.project_name+".db") ))
+            f = local_loc+"/"+self.project_name+".db"
             print("db: ", f)
             store = Sqlite( f )
         except Exception as err:
@@ -310,7 +321,7 @@ class Sync():
         data_type.properties["st_ctime"] = Sqlite.DOUBLE
         data_type.properties["file_remote"] = Sqlite.STRING
         #print(data_type.properties)
-        store.put_artifact_type(data_type, True)
+        store.put_artifact_type(data_type, isVerbose)
 
         artifact = Artifact()
         artifact.name = "filesystem"
@@ -328,7 +339,9 @@ class Sync():
             artifact.properties["st_ctime"] = st.st_ctime
             artifact.properties["file_remote"] = str(file_remote)
             #print(artifact.properties)
-            store.put_artifacts_lgcy(artifact, True)
+            store.put_artifacts_lgcy(artifact, isVerbose)
+
+        store.close()
 
         # Data movement
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
@@ -340,9 +353,10 @@ class Sync():
 
         # Database movement
         if isVerbose:
-            print( " cp " + os.path.join(local_loc, str(self.project_name+".sqlite") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".sqlite" ) )
-        shutil.copyfile(os.path.join(local_loc, str(self.project_name+".sqlite") ), os.path.join(remote_loc, self.project_name, self.project_name+".sqlite" ) )
+            print( " cp " + os.path.join(local_loc, str(self.project_name+".db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+        shutil.copyfile(os.path.join(local_loc, str(self.project_name+".db") ), os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
 
+        print( " Data Copy Complete! ")
 
 
     def dircrawl(self,filepath):
@@ -368,7 +382,9 @@ class Sync():
         return file_list
     
     def get(project_name = "Project"):
-        # Helper function that searches remote location based on project name, and retrieves
-        # DSI database
+        '''
+        Helper function that searches remote location based on project name, and retrieves
+        DSI database
+        '''
         True
         
