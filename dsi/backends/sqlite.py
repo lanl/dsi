@@ -3,6 +3,13 @@ import sqlite3
 
 from dsi.backends.filesystem import Filesystem
 
+# Declare supported named types for sql
+
+DOUBLE = "DOUBLE"
+STRING = "VARCHAR"
+FLOAT = "FLOAT"
+INT = "INT"
+
 # Holds table name and data properties
 
 class DataType:
@@ -19,6 +26,7 @@ class Artifact:
         An Artifact is a generic construct that defines the schema for metadata that
         defines the tables inside of SQL
     """
+    name = "TABLENAME"
     properties = {}
 
 
@@ -79,6 +87,8 @@ class Sqlite(Filesystem):
         self.cur.execute(str_query)
         self.con.commit()
 
+        self.types = types
+
     # Adds rows to the columns defined previously
     def put_artifacts(self, collection, isVerbose=False):
         """
@@ -94,10 +104,10 @@ class Sqlite(Filesystem):
 
         types = DataType()
         types.properties = {}
+
         for key in artifacts:
             types.properties[key.replace('-','_minus_')] = artifacts[key]
-        
-        
+           
         self.put_artifact_type(types)
         
         col_names = ', '.join(types.properties.keys())
@@ -123,6 +133,70 @@ class Sqlite(Filesystem):
         self.con.commit()
         
         self.types = types
+
+    def put_artifacts_only(self, artifacts, isVerbose=False):
+        """
+        Function for insertion of Artifact metadata into a defined schema as a Tuple
+
+        `Artifacts`: DataType derived class that has a regular structure of a defined schema,
+                     filled with rows to insert.
+
+        `return`: none
+        """
+        self.types = artifacts
+
+        #self.types already defined previous
+        col_names = ', '.join(self.types.properties.keys())
+        placeholders = ', '.join('?' * len(self.types.properties))
+
+        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(self.types.name), col_names, placeholders)
+        
+        if isVerbose:
+            print(str_query)
+
+        # col_list helps access the specific keys of the dictionary in the for loop
+        col_list = col_names.split(', ')
+
+        # loop through the contents of each column and insert into table as a row
+        for ind1 in range(len(self.types.properties[col_list[0]])):
+            vals = []
+            for ind2 in range(len(self.types.properties.keys())):
+                if len(self.types.properties[col_list[ind2]]) <= ind1:
+                    vals.append(str(''))
+                    continue
+                vals.append(str(self.types.properties[col_list[ind2]][ind1]))
+            # Make sure this works if types.properties[][] is already a string
+            tup_vals = tuple(vals)
+            self.cur.execute(str_query,tup_vals)
+
+        self.con.commit()
+
+     # Adds rows to the columns defined previously
+    def put_artifacts_lgcy(self,artifacts, isVerbose=False):
+        """
+        Legacy function for insertion of artifact metadata into a defined schema
+
+        `artifacts`: data_type derived class that has a regular structure of a defined schema, filled with rows to insert.
+
+        `return`: none
+        """
+        str_query = "INSERT INTO " + str(self.types.name) + " VALUES ( "
+        for key, value in artifacts.properties.items():
+            if 'file' in key: # Todo, use this to detect str type
+                str_query = str_query + " '" + str(value) +"' "
+            else:
+                str_query = str_query + " " + str(value)
+
+            str_query = str_query +  ","
+
+        str_query = str_query.rstrip(',')
+        str_query = str_query + " )"
+
+        if isVerbose:
+            print(str_query)
+        
+        self.cur.execute(str_query)
+        self.con.commit()
 
     # Adds columns and rows automaticallly based on a csv file
     #[NOTE 3] This method should be deprecated in favor of put_artifacts.
