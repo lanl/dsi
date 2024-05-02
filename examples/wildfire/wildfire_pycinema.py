@@ -22,7 +22,7 @@ CinemaDatabaseReader_0 = pycinema.filters.CinemaDatabaseReader()
 ImageReader_0 = pycinema.filters.ImageReader()
 
 # properties
-CinemaDatabaseReader_0.inputs.path.set("../dsi/examples/wildfire/wildfire.cdb", False)
+CinemaDatabaseReader_0.inputs.path.set("./examples/wildfire/wildfire.cdb", False)
 CinemaDatabaseReader_0.inputs.file_column.set("FILE", False)
 TableView_0.inputs.table.set(CinemaDatabaseReader_0.outputs.table, False)
 ImageView_0.inputs.images.set(ImageReader_0.outputs.images, False)
