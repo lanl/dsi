@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import urllib.request 
 from dsi.backends.sqlite import Sqlite, DataType
+import shutil
 
 isVerbose = True
 
@@ -97,12 +98,17 @@ if __name__ == "__main__":
     downloadImages(dstFolder, path_to_csv_input, imgDstFolder)
 
     # generate the SQLite database
+    dbExist = os.path.exists(path_to_sqlite_db)
+    if dbExist:
+        os.remove(path_to_sqlite_db)
     generateWildfireDB(dstFolder, path_to_csv_input, path_to_sqlite_db, dbName)
-
     # moves the images to the Cinema Database folder
     isExist = os.path.exists(path_to_cinema_db)
     if not isExist:
         os.makedirs(path_to_cinema_db)
+    imgDirExist = os.path.exists(path_to_cinema_images)
+    if imgDirExist:
+        shutil.rmtree(path_to_cinema_images)
     os.rename(imgDstFolder, path_to_cinema_images)
 
     # update the paths in the database to the local paths
