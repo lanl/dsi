@@ -3,6 +3,7 @@ from importlib.machinery import SourceFileLoader
 from collections import OrderedDict
 from itertools import product
 import os
+import shutil
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -245,7 +246,7 @@ class Sync():
         #self.local_location = {}
         self.project_name = project_name
 
-    def copy(self, local_loc, remote_loc):
+    def copy(self, local_loc, remote_loc, isVerbose=False):
         # Helper function to stage location and get filesystem information, and copy
         # data over using preferred API
 
@@ -285,8 +286,8 @@ class Sync():
         # Try to open or create a local database to store fs info before copy
         # Open and validate local DSI data store
         try:
-            #f = os.path.join((local_loc, str(self.project_name+".sqlite_db") ))
-            f = local_loc+"/"+self.project_name+".sqlite_db"
+            #f = os.path.join((local_loc, str(self.project_name+".sqlite") ))
+            f = local_loc+"/"+self.project_name+".sqlite"
             print("db: ", f)
             store = Sqlite( f )
         except Exception as err:
@@ -295,7 +296,6 @@ class Sync():
 
         # Create new filesystem table with origin and remote locations
         data_type = DataType()
-        #Begin the driver test
         data_type.name = "filesystem"
         data_type.properties["file_origin"] = Sqlite.STRING
         data_type.properties["st_mode"] = Sqlite.DOUBLE
@@ -313,6 +313,7 @@ class Sync():
         store.put_artifact_type(data_type, True)
 
         artifact = Artifact()
+        artifact.name = "filesystem"
         for file,st,file_remote in zip(file_list,st_list,rfile_list):
             artifact.properties["file_origin"] = str(file)
             artifact.properties["st_mode"] = st.st_mode
@@ -327,15 +328,20 @@ class Sync():
             artifact.properties["st_ctime"] = st.st_ctime
             artifact.properties["file_remote"] = str(file_remote)
             #print(artifact.properties)
-            store.put_artifacts_only(artifact, True)
+            store.put_artifacts_lgcy(artifact, True)
 
         # Data movement
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         for file,file_remote in zip(file_list,rfile_list):
-            print( " cp " + file + " " + file_remote)
+            if isVerbose:
+                print( " cp " + file + " " + file_remote)
+            shutil.copyfile(file , file_remote)
+            
 
         # Database movement
-        print( " cp " + os.path.join(local_loc, str(self.project_name+".sqlite_db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".sqlite_db" ) )
+        if isVerbose:
+            print( " cp " + os.path.join(local_loc, str(self.project_name+".sqlite") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".sqlite" ) )
+        shutil.copyfile(os.path.join(local_loc, str(self.project_name+".sqlite") ), os.path.join(remote_loc, self.project_name, self.project_name+".sqlite" ) )
 
 
 
