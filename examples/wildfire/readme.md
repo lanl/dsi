@@ -24,7 +24,7 @@ and navigate to wildfire_plotly.ipynb. Run the cells to visualize the results of
 
 To visualize the results using pycinema (https://github.com/cinemascience/pycinema), run:
 
-    python3 -m pip install cinema
+    python3 -m pip install pycinema
 
 and 
 
