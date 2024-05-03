@@ -89,12 +89,29 @@ class Sqlite(Filesystem):
 
         self.types = types
 
-    # Adds rows to the columns defined previously
-    def put_artifacts(self, collection, tableName="TABLENAME", isVerbose=False):
+    def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
         """
-        Primary class for insertion of Artifact metadata into a defined schema
+        Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
 
-        `Artifacts`: DataType derived class that has a regular structure of a defined schema,
+        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
+                     filled with rows to insert.
+
+        `tableName`: A passthrough to define a table and set the name of a table
+
+        `return`: none
+        """ 
+
+        # Define table name in local class space
+        self.types = DataType()
+        self.types.name = tableName
+        self.put_artifacts(collection, isVerbose)
+
+    # Adds rows to the columns defined previously
+    def put_artifacts(self, collection, isVerbose=False):
+        """
+        Primary class for insertion of collection of Artifacts metadata into a defined schema
+
+        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
                      filled with rows to insert.
 
         `return`: none
@@ -103,8 +120,11 @@ class Sqlite(Filesystem):
         artifacts = collection
 
         types = DataType()
-        types.name = tableName
         types.properties = {}
+
+        # Check if this has been defined from helper function
+        if self.types != None:
+            types.name = self.types.name
 
         for key in artifacts:
             types.properties[key.replace('-','_minus_')] = artifacts[key]
