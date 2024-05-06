@@ -4,6 +4,7 @@ from collections import OrderedDict
 from itertools import product
 import os
 import shutil
+from pathlib import Path
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -346,6 +347,13 @@ class Sync():
         # Data movement
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         for file,file_remote in zip(file_list,rfile_list):
+            abspath = os.path.dirname(os.path.abspath(file_remote))
+            if not os.path.exists(abspath):
+                if isVerbose:
+                    print( " mkdir " + abspath)
+                path = Path(abspath)
+                path.mkdir(parents=True)
+
             if isVerbose:
                 print( " cp " + file + " " + file_remote)
             shutil.copyfile(file , file_remote)
