@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=7026087e"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="DSI Development Plans" href="tiers.html" />
+    <link rel="prev" title="Backends" href="backends.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Core</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#core-sync">Core:Sync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dsi.core">Core Modules and Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Sync"><code class="docutils literal notranslate"><span class="pre">Sync</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Sync.copy"><code class="docutils literal notranslate"><span class="pre">Sync.copy()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Sync.dircrawl"><code class="docutils literal notranslate"><span class="pre">Sync.dircrawl()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Sync.get"><code class="docutils literal notranslate"><span class="pre">Sync.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Sync.populate"><code class="docutils literal notranslate"><span class="pre">Sync.populate()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.core.Terminal"><code class="docutils literal notranslate"><span class="pre">Terminal</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.add_external_python_module"><code class="docutils literal notranslate"><span class="pre">Terminal.add_external_python_module()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.artifact_handler"><code class="docutils literal notranslate"><span class="pre">Terminal.artifact_handler()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.list_available_modules"><code class="docutils literal notranslate"><span class="pre">Terminal.list_available_modules()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.list_loaded_modules"><code class="docutils literal notranslate"><span class="pre">Terminal.list_loaded_modules()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.load_module"><code class="docutils literal notranslate"><span class="pre">Terminal.load_module()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.transload"><code class="docutils literal notranslate"><span class="pre">Terminal.transload()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal.unload_module"><code class="docutils literal notranslate"><span class="pre">Terminal.unload_module()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Core</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="core">
+<h1>Core<a class="headerlink" href="#core" title="Link to this heading"></a></h1>
+<p>The DSI Core middleware defines the Terminal concept. An instantiated Terminal is the human/machine DSI interface. The person setting up a Core Terminal only needs to know how they want to ask questions, and what metadata they want to ask questions about. If they don’t see an option to ask questions the way they like, or they don’t see the metadata they want to ask questions about, then they should ask a Backend Contributor or a Plugin Contributor, respectively.</p>
+<p>A Core Terminal is a home for Plugins (Readers/Writers), and an interface for Backends. A Core Terminal is instantiated with a set of default Plugins and Backends, but they must be loaded before a user query is attempted. <code class="docutils literal notranslate"><span class="pre">core.py</span></code> contains examples of how you might work with DSI using an interactive Python interpreter for your data science workflows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#Loading using plugins and backends</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">a</span><span class="o">=</span><span class="n">Terminal</span><span class="p">()</span>
+
+<span class="n">a</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">)</span>
+<span class="c1"># [&#39;GitInfo&#39;, &#39;Hostname&#39;, &#39;SystemKernel&#39;, &#39;Bueno&#39;, &#39;Csv&#39;]</span>
+
+<span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span><span class="s1">&#39;Bueno&#39;</span><span class="p">,</span><span class="s1">&#39;reader&#39;</span><span class="p">,</span><span class="n">filenames</span><span class="o">=</span><span class="s1">&#39;./data/bueno1.data&#39;&#39;)</span>
+<span class="c1"># Bueno plugin reader loaded successfully.</span>
+
+<span class="n">a</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span><span class="s1">&#39;Hostname&#39;</span><span class="p">,</span><span class="s1">&#39;writer&#39;</span><span class="p">)</span>
+<span class="c1"># Hostname plugin writer loaded successfully.</span>
+
+<span class="n">a</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">)</span>
+<span class="c1">#[&#39;Gufi&#39;, &#39;Sqlite&#39;, &#39;Parquet&#39;]</span>
+
+<span class="c1">#a.load_module(&#39;backend&#39;,&#39;Sqlite&#39;,&#39;back-end&#39;,filenames=&#39;./data/bueno.sqlite_db&#39;)</span>
+<span class="c1">#a.load_module(&#39;backend&#39;,&#39;Parquet&#39;,&#39;back-end&#39;,filename=&#39;./data/bueno.pq&#39;)</span>
+              
+<span class="n">a</span><span class="o">.</span><span class="n">list_loaded_modules</span><span class="p">()</span>
+<span class="c1"># {&#39;writer&#39;: [&lt;dsi.plugins.env.Hostname object at 0x7f21232474d0&gt;],</span>
+<span class="c1">#  &#39;reader&#39;: [&lt;dsi.plugins.env.Bueno object at 0x7f2123247410&gt;],</span>
+<span class="c1">#  &#39;front-end&#39;: [],</span>
+<span class="c1">#   &#39;back-end&#39;: []}</span>
+</pre></div>
+</div>
+<p>At this point, you might decide that you are ready to collect data for inspection. It is possible to utilize DSI Backends to load additional metadata to supplement your Plugin metadata, but you can also sample Plugin data and search it directly.</p>
+<p>The process of transforming a set of Plugin writers and readers into a queryable format is called transloading. A DSI Core Terminal has a <code class="docutils literal notranslate"><span class="pre">transload()</span></code> method which may be called to execute all Plugins at once:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">active_metadata</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># OrderedDict([(&#39;uid&#39;, [1000]), (&#39;effective_gid&#39;, [1000]), (&#39;moniker&#39;, [&#39;qwofford&#39;])...</span>
+</pre></div>
+</div>
+<p>Once a Core Terminal has been transloaded, no further Plugins may be added.</p>
+<section id="core-sync">
+<h2>Core:Sync<a class="headerlink" href="#core-sync" title="Link to this heading"></a></h2>
+<p>The DSI Core middleware also defines data management functionality in <code class="docutils literal notranslate"><span class="pre">Sync</span></code>. The purpose of <code class="docutils literal notranslate"><span class="pre">Sync</span></code> is to provide file metadata documentation and data movement capabilities when moving data to/from local and remote locations. The purpose of data documentation is to capture and archive metadata (i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates) and track their movement to the remote location for future access. The primary functions, <code class="docutils literal notranslate"><span class="pre">Copy</span></code>, <code class="docutils literal notranslate"><span class="pre">Move</span></code>, and <code class="docutils literal notranslate"><span class="pre">Get</span></code> serve as mechanisms to copy data, move data, or retrieve data from remote locations by creating a DSI database in the process, or retrieving an existing DSI database that contains the location(s) of the target data.</p>
+</section>
+<section id="module-dsi.core">
+<span id="core-modules-and-functions"></span><h2>Core Modules and Functions<a class="headerlink" href="#module-dsi.core" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.core.Sync">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.core.</span></span><span class="sig-name descname"><span class="pre">Sync</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'test'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync" title="Link to this definition"></a></dt>
+<dd><p>A class defined to assist in data management activities for DSI</p>
+<p>Sync is where data movement functions such as copy (to remote location) and 
+sync (local filesystem with remote) exist.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.copy" title="Link to this definition"></a></dt>
+<dd><p>Helper function to stage location and get filesystem information, and copy
+data over using a preferred API</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.dircrawl">
+<span class="sig-name descname"><span class="pre">dircrawl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.dircrawl" title="Link to this definition"></a></dt>
+<dd><p>Crawls the root ‘filepath’ directory and returns files</p>
+<p><cite>filepath</cite>: source filepath to be crawled</p>
+<p><cite>return</cite>: returns crawled file-list</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.get" title="Link to this definition"></a></dt>
+<dd><p>Helper function that searches remote location based on project name, and retrieves
+DSI database</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.populate">
+<span class="sig-name descname"><span class="pre">populate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.populate" title="Link to this definition"></a></dt>
+<dd><p>Helper function to gather filesystem information, local and remote locations
+to create a filesystem entry in a new or existing database</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.core.Terminal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.core.</span></span><span class="sig-name descname"><span class="pre">Terminal</span></span><a class="headerlink" href="#dsi.core.Terminal" title="Link to this definition"></a></dt>
+<dd><p>An instantiated Terminal is the DSI human/machine interface.</p>
+<p>Terminals are a home for Plugins and an interface for Backends. Backends may be
+front-ends or back-ends. Plugins may be Writers or readers. See documentation
+for more information.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.add_external_python_module">
+<span class="sig-name descname"><span class="pre">add_external_python_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.add_external_python_module" title="Link to this definition"></a></dt>
+<dd><p>Adds an external, meaning not from the DSI repo, Python module to the module_collection.</p>
+<p>Afterwards, load_module can be used to load a DSI module from the added Python module.
+Note: mod_type is needed because each Python module only implements plugins or backends.</p>
+<p>For example,</p>
+<p>term = Terminal()
+term.add_external_python_module(‘plugin’, ‘my_python_file’,</p>
+<blockquote>
+<div><p>‘/the/path/to/my_python_file.py’)</p>
+</div></blockquote>
+<p>term.load_module(‘plugin’, ‘MyPlugin’, ‘reader’)</p>
+<p>term.list_loaded_modules() # includes MyPlugin</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.artifact_handler">
+<span class="sig-name descname"><span class="pre">artifact_handler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interaction_type</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.artifact_handler" title="Link to this definition"></a></dt>
+<dd><p>Store or retrieve using all loaded DSI Backends with storage functionality.</p>
+<p>A DSI Core Terminal may load zero or more Backends with storage functionality.
+Calling artifact_handler will execute all back-end functionality currently loaded, given
+the provided <code class="docutils literal notranslate"><span class="pre">interaction_type</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list_available_modules">
+<span class="sig-name descname"><span class="pre">list_available_modules</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list_available_modules" title="Link to this definition"></a></dt>
+<dd><p>List available DSI modules of an arbitrary module type.</p>
+<p>This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
+are supported, but this getter can be extended to support any new DSI module
+types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
+however, DSI Modules are classes, hence the naming idiosynchrocies below.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list_loaded_modules">
+<span class="sig-name descname"><span class="pre">list_loaded_modules</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list_loaded_modules" title="Link to this definition"></a></dt>
+<dd><p>List DSI modules which have already been loaded.</p>
+<p>These Plugins and Backends are active or ready to execute a post-processing task.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.load_module">
+<span class="sig-name descname"><span class="pre">load_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_function</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.load_module" title="Link to this definition"></a></dt>
+<dd><p>Load a DSI module from the available Plugin and Backend module collection.</p>
+<p>DSI modules may be loaded which are not explicitly listed by the list_available_modules.
+This flexibility ensures that advanced users can access higher level abstractions.
+We expect most users will work with module implementations rather than templates, but
+but all high level class abstractions are accessible with this method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.transload">
+<span class="sig-name descname"><span class="pre">transload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.transload" title="Link to this definition"></a></dt>
+<dd><p>Transloading signals to the DSI Core Terminal that Plugin set up is complete.</p>
+<p>A DSI Core Terminal must be transloaded before queries, metadata collection, or metadata
+storage is possible. Transloading is the process of merging Plugin metadata from many
+data sources to a single DSI Core Middleware data structure.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.unload_module">
+<span class="sig-name descname"><span class="pre">unload_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_function</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.unload_module" title="Link to this definition"></a></dt>
+<dd><p>Unloads a DSI module from the active_modules collection</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="backends.html" class="btn btn-neutral float-left" title="Backends" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tiers.html" class="btn btn-neutral float-right" title="DSI Development Plans" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Triad National Security, LLC. All rights reserved..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
