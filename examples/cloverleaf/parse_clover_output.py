@@ -8,14 +8,23 @@ import argparse
 import sys
 import re
 import glob
+import git
+
+def getCurrentCommitHash(gitdir):
+    repo = git.Repo(gitdir)
+    print(repo.head.object.committer)
+    print(repo.head.object.committed_datetime.strftime("%Y-%m-%d"))
+    return repo
 
 def main():
     """ A testname argument is required """
     parser = argparse.ArgumentParser()
     parser.add_argument('--testname', help='the test name')
+    parser.add_argument('--gitdir', help='the git directory')
     args = parser.parse_args()
     # testname = "temp_test"
     testname = args.testname
+    git_repo = getCurrentCommitHash(args.gitdir)
     if testname is None:
         parser.print_help()
         sys.exit(0)
@@ -26,6 +35,11 @@ def main():
         with open(slurmoutput, 'r') as slurmout:
             data = {}
             data['testname'] = testname
+            if git_repo:
+                data['git_hash'] = git_repo.head.object.hexsha
+                data['git_committer'] = git_repo.head.object.committer
+                data['git_committed_date'] = git_repo.head.object.committed_datetime.strftime("%Y-%m-%d")
+
             for line in slurmout:
                 if "Clover Version" in line:
                     match = re.match(r'Clover Version\s+(\d+.\d+)', line)
