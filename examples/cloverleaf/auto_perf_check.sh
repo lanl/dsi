@@ -23,7 +23,7 @@ run_and_check_commit() {
     
     echo "============================= Running CloverLeaf ============================= "
     mpirun -np $MPI_THREADS clover_leaf
-    cp clover.out $base_directory"/clover_$1.out"
+    cp clover.out $base_directory"/clover_output/clover_$1.out"
     echo "======================= CloverLeaf Executed for has $1 ======================= "
     
     echo "=========================== Running output parser ============================ "
