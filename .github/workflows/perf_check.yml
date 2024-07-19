@@ -72,12 +72,13 @@ jobs:
       - name: Run cloverleaf
         run: |
             mpirun -np 2 clover_leaf
+            mv clover.out clover_output_${{ matrix.hashes }}
     
       - name: Produce Artifact
         uses: actions/upload-artifact@v4
         with:
             name: clover_output_${{ matrix.hashes }}
-            path: clover.out
+            path: clover_output_${{ matrix.hashes }}
 
   consume-artifacts:
     runs-on: macos-latest
@@ -90,7 +91,7 @@ jobs:
 
     - name: Check artifact files
       run: |
-        ls .
+        tail -n 10 clover_output_*
 #   # This workflow contains a single job called "build"
 #   build:
 #     # The type of runner that the job will run on
