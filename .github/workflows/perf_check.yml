@@ -72,7 +72,7 @@ jobs:
       - name: Run cloverleaf
         run: |
             mpirun -np 2 clover_leaf
-            mv clover.out clover_output_${{ matrix.hashes }}
+            mv clover.out clover_output_${{ matrix.hashes }}.out
     
       - name: Produce Artifact
         uses: actions/upload-artifact@v4
