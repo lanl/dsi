@@ -59,6 +59,9 @@ jobs:
 
       - uses: fortran-lang/setup-fortran@v1.6.1
 
+      - name: Install OpenMPI
+        run: sudo apt install -y openmpi-bin libopenmpi-dev
+
     # check all the requirements and their versions
       - name: Check installed dependencies
         run: |
