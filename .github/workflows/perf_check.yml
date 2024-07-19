@@ -58,12 +58,20 @@ jobs:
     #       path: color
 
       - uses: fortran-lang/setup-fortran@v1.6.1
+      - uses: amarrerod/build_cmake_mpi@v1.0.0
 
     # check all the requirements and their versions
       - name: Check installed dependencies
         run: |
             gcc --version
             gfortran --version
+            mpirun --version
+            make COMPILER=GNU
+    
+      - name: Run cloverleaf
+        run: |
+            mpirun -np 4 clover_leaf
+            
 
 #   # This workflow contains a single job called "build"
 #   build:
