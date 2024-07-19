@@ -43,8 +43,9 @@ jobs:
 
       
       
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
+            channels: defaults,conda-forge,spyder-ide
             activate-environment: cdsi
             environment-file: examples/cloverleaf/environment.yml
             auto-activate-base: false
