@@ -76,7 +76,7 @@ jobs:
       - name: Produce Artifact
         uses: actions/upload-artifact@v4
         with:
-            name: clover_output
+            name: clover_output_${{ matrix.hashes }}
             path: clover.out
 
   consume-artifacts:
