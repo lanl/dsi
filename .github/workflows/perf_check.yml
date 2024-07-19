@@ -68,11 +68,15 @@ jobs:
             gcc --version
             gfortran --version
             mpirun --version
+            lscpu | grep -E '^Thread|^Core|^Socket|^CPU\('
+
+      - name: Compile cloverleaf
+        run: |
             make COMPILER=GNU
     
       - name: Run cloverleaf
         run: |
-            mpirun -np 4 clover_leaf
+            mpirun -np 2 clover_leaf
             
 
 #   # This workflow contains a single job called "build"
