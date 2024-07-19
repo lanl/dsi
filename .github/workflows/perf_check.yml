@@ -34,7 +34,7 @@ jobs:
       - name: Define Hashes
         id: hashes
         run: |
-          echo 'hashes=["158e23d08f73d36f71e144851451955b3ae02dff", "2efdde26ab1eef67dfce5a29163e8d513b6dffc4"]' >> "$GITHUB_OUTPUT"
+          echo 'hashes=["158e23d08f73d36f71e144851451955b3ae02dff"]' >> "$GITHUB_OUTPUT"
   
   produce-performance-artifacts:
     runs-on: ubuntu-latest
@@ -58,7 +58,6 @@ jobs:
     #       path: color
 
       - uses: fortran-lang/setup-fortran@v1.6.1
-      - uses: amarrerod/build_cmake_mpi@v1.0.0
 
     # check all the requirements and their versions
       - name: Check installed dependencies
