@@ -32,21 +32,30 @@ jobs:
         #   repository: UK-MAC/CloverLeaf_ref
         #   ref: 0ddf495cf21cc59f84e274617522a1383e2c328c
     
-      - uses: actions/setup-python@v5
-        with:
-            python-version: '3.10'
+    #   - uses: actions/setup-python@v5
+    #     with:
+    #         python-version: '3.10'
 
-      - name: Add conda to system path
-        run: |
-            # $CONDA is an environment variable pointing to the root of the miniconda directory
-            echo $CONDA/bin >> $GITHUB_PATH
+    #   - name: Add conda to system path
+    #     run: |
+    #         # $CONDA is an environment variable pointing to the root of the miniconda directory
+    #         echo $CONDA/bin >> $GITHUB_PATH
 
-      - name: Install dependencies
-        run: |
-            cd examples/cloverleaf
-            conda env create --file environment.yml --name cdsi
-            conda activate cdsi
+    #   - name: Install dependencies
+    #     run: |
+    #         cd examples/cloverleaf
+    #         conda env create --file environment.yml --name cdsi
+    #         conda activate cdsi
       
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+            activate-environment: cdsi
+            environment-file: examples/cloverleaf/environment.yml
+            auto-activate-base: false
+      - run: |
+          conda info
+          conda list
+
       # check all the requirements and their versions
       - name: Check installed dependencies
         run: |
