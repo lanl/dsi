@@ -77,8 +77,8 @@ jobs:
       - name: Produce Artifact
         uses: actions/upload-artifact@v4
         with:
-            name: clover_output_${{ matrix.hashes }}
-            path: clover_output_${{ matrix.hashes }}
+            name: clover_artifact_${{ matrix.hashes }}
+            path: clover_output_${{ matrix.hashes }}.out
 
   consume-artifacts:
     runs-on: macos-latest
@@ -88,9 +88,15 @@ jobs:
     steps:
     - name: Download all workflow run artifacts
       uses: actions/download-artifact@v4
+      with:
+        path: clover_artifact
+        pattern: clover_artifact_*
+        merge-multiple: true
 
     - name: Check artifact files
       run: |
+        ls -R clover_artifact
+        cd clover_artifact
         tail -n 10 clover_output_*
 #   # This workflow contains a single job called "build"
 #   build:
