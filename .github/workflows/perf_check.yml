@@ -12,6 +12,15 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    # inputs:
+    #   hashes:
+    #     required: true
+    #     type: choice
+    #     description: Make a choice
+    #     options:
+    #     - foo
+    #     - bar
+    #     - baz
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -27,20 +36,17 @@ jobs:
         run: |
           echo 'hashes=["158e23d08f73d36f71e144851451955b3ae02dff", "2efdde26ab1eef67dfce5a29163e8d513b6dffc4", "89cc919b28f687a25d30b44ddf547201da930c14"]' >> "$GITHUB_OUTPUT"
   
-  produce-artifacts:
-    runs-on: ubuntu-latest
+  produce-performance-artifacts:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     needs: define-matrix
     strategy:
       matrix:
         hashes: ${{ fromJSON(needs.define-matrix.outputs.hashes) }}
 
-    steps:
-      - name: Define Hashes
-        env:
-          hashes: ${{ matrix.hashes }}
-        run: |
-          echo "$hashes" > hashes
-      
+    steps:      
       - uses: actions/checkout@v4
         with:
           repository: UK-MAC/CloverLeaf_ref
@@ -51,12 +57,29 @@ jobs:
     #       name: ${{ matrix.hashes }}
     #       path: color
 
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+            channels: defaults,conda-forge,spyder-ide
+            activate-environment: cdsi
+            environment-file: examples/cloverleaf/environment.yml
+            auto-activate-base: false
+
       - name: Run a multi-line script
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
-          ls .
-          git rev-parse HEAD
+            echo Add other actions to build,
+            echo test, and deploy your project.
+            ls .
+            git rev-parse HEAD
+
+    # check all the requirements and their versions
+      - name: Check installed dependencies
+        run: |
+            python3 --version
+            gcc --version
+            conda --version
+            gfortran --version
+            conda info
+            conda list
 
 #   # This workflow contains a single job called "build"
 #   build:
@@ -86,12 +109,12 @@ jobs:
 
       
       
-#       - uses: conda-incubator/setup-miniconda@v3
-#         with:
-#             channels: defaults,conda-forge,spyder-ide
-#             activate-environment: cdsi
-#             environment-file: examples/cloverleaf/environment.yml
-#             auto-activate-base: false
+    #   - uses: conda-incubator/setup-miniconda@v3
+    #     with:
+    #         channels: defaults,conda-forge,spyder-ide
+    #         activate-environment: cdsi
+    #         environment-file: examples/cloverleaf/environment.yml
+    #         auto-activate-base: false
       
 #     #   - uses: s-weigand/setup-conda@v1.2.2
       
@@ -101,15 +124,15 @@ jobs:
 #     #         conda env create --file environment.yml --name cdsi
 #     #         conda activate cdsi
 
-#       # check all the requirements and their versions
-#       - name: Check installed dependencies
-#         run: |
-#           python3 --version
-#           gcc --version
-#           conda --version
-#           gfortran --version
-#           conda info
-#           conda list
+    #   # check all the requirements and their versions
+    #   - name: Check installed dependencies
+    #     run: |
+    #       python3 --version
+    #       gcc --version
+    #       conda --version
+    #       gfortran --version
+    #       conda info
+    #       conda list
 
 #       # Runs a set of commands using the runners shell
 #       - name: Run a multi-line script
