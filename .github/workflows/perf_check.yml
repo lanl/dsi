@@ -34,7 +34,7 @@ jobs:
       - name: Define Hashes
         id: hashes
         run: |
-          echo 'hashes=["158e23d08f73d36f71e144851451955b3ae02dff"]' >> "$GITHUB_OUTPUT"
+          echo 'hashes=["158e23d08f73d36f71e144851451955b3ae02dff", "89cc919b28f687a25d30b44ddf547201da930c14"]' >> "$GITHUB_OUTPUT"
   
   produce-performance-artifacts:
     runs-on: ubuntu-latest
@@ -51,11 +51,6 @@ jobs:
         with:
           repository: UK-MAC/CloverLeaf_ref
           ref: ${{ matrix.hashes }}
-    #   - name: Produce Artifact
-    #     uses: actions/upload-artifact@v4
-    #     with:
-    #       name: ${{ matrix.hashes }}
-    #       path: color
 
       - uses: fortran-lang/setup-fortran@v1.6.1
 
@@ -77,8 +72,25 @@ jobs:
       - name: Run cloverleaf
         run: |
             mpirun -np 2 clover_leaf
-            
+    
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+            name: clover_output
+            path: clover.out
 
+  consume-artifacts:
+    runs-on: macos-latest
+    needs:
+    - produce-performance-artifacts
+
+    steps:
+    - name: Download all workflow run artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Check artifact files
+      run: |
+        ls .
 #   # This workflow contains a single job called "build"
 #   build:
 #     # The type of runner that the job will run on
