@@ -32,12 +32,25 @@ run_and_check_commit() {
     echo "============================ Output CSV updated ============================== "
 }
 
+track_variables() {
+    echo "current commit hash $1"
+
+    cd $clover_leaf_base_directory
+    git checkout $1
+    
+    echo "=========================== Running code sensing ============================ "
+    cd $base_directory
+    python3 code_sensing.py --testname random_test --gitdir $clover_leaf_base_directory
+    echo "============================ Output CSV updated ============================== "
+}
+
 cd $clover_leaf_base_directory
 prev_hash=( $(git log master -n "$CHECK_PREV_COMMITS" --format=format:%h) )
 
 for c_hash in "${prev_hash[@]}"
 do
-   run_and_check_commit $c_hash
+#    run_and_check_commit $c_hash
+    track_variables $c_hash
 done
 
 cd $clover_leaf_base_directory
