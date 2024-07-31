@@ -37,6 +37,15 @@ def test_wildfiredata_artifact_put():
    # No error implies success
    assert True
 
+def test_wildfiredata_artifact_put_t():
+   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
+   dbpath = 'test_wildfiredata_artifact.sqlite_data'
+   store = Sqlite(dbpath)
+   store.put_artifacts_t(valid_middleware_datastructure, tableName="Wildfire")
+   store.close()
+   # No error implies success
+   assert True
+
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/yosemite5.csv'])
     dbpath = "yosemite.db"
@@ -55,7 +64,7 @@ def test_artifact_query():
     data_type.name = "simulation"
     result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
                             str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
-    store.export_csv(result, "query.csv")
+    store.export_csv(result, "TABLENAME", "query.csv")
     store.close()
     # No error implies success
     assert True
