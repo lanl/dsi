@@ -1,5 +1,7 @@
 import csv
 import sqlite3
+import json
+import re
 
 from dsi.backends.filesystem import Filesystem
 
@@ -9,6 +11,7 @@ DOUBLE = "DOUBLE"
 STRING = "VARCHAR"
 FLOAT = "FLOAT"
 INT = "INT"
+JSON = "TEXT"
 
 # Holds table name and data properties
 
@@ -83,7 +86,6 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(str_query)
 
-        print(str_query)
         self.cur.execute(str_query)
         self.con.commit()
 
@@ -216,6 +218,53 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(str_query)
         
+        self.cur.execute(str_query)
+        self.con.commit()
+
+    def put_artifacts_json(self, fname, tname, isVerbose=False):
+        """
+        Function for insertion of Artifact metadata into a defined schema by using a JSON file
+        `fname`: filepath to the .json file to be read and inserted into the database
+
+        `tname`: String name of the table to be inserted
+
+        `return`: none
+        """
+
+        json_str = None
+        try:
+            j = open(fname)
+            data = json.load(j)
+            json_str = json.dumps(data)
+            json_str = "'" + json_str + "'"
+            j.close()
+        except IOError as i:
+            print(i)
+            return
+        except ValueError as v:
+            print(v)
+            return
+
+        types = DataType()
+        types.properties = {}
+        types.name = tname
+        
+        # Check if this has been defined from helper function
+        if self.types != None:
+            types.name = self.types.name
+
+        col_name = re.sub(r'.json', '', fname)
+        col_name = re.sub(r'.*/', '', col_name)
+        col_name = "'" + col_name + "'"
+        types.properties[col_name] = JSON
+           
+        self.put_artifact_type(types)
+        col_names = ', '.join(types.properties.keys())
+        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, json_str)
+        if isVerbose:
+            print(str_query)
+
+        self.types = types
         self.cur.execute(str_query)
         self.con.commit()
 

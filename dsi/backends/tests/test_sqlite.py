@@ -46,6 +46,16 @@ def test_wildfiredata_artifact_put_t():
    # No error implies success
    assert True
 
+#Data from: https://microsoftedge.github.io/Demos/json-dummy-data/64KB.json
+def test_jsondata_artifact_put():
+   jsonpath = '/'.join([get_git_root('.'), 'dsi/data/64KB.json'])
+   dbpath = "jsondata.db"
+   store = Sqlite(dbpath)
+   store.put_artifacts_json(jsonpath, tname="JSONData")
+   store.close()
+   # No error implies success
+   assert True
+
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/yosemite5.csv'])
     dbpath = "yosemite.db"
@@ -68,3 +78,6 @@ def test_artifact_query():
     store.close()
     # No error implies success
     assert True
+
+
+test_jsondata_artifact_put()
