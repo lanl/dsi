@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-from dash import Dash, html, dcc, Input, Output, callback, State
+from dash import Dash, html, dcc, Input, Output, callback, State, callback_context
 import dash_bootstrap_components as dbc
 
 import plotly.graph_objects as go
@@ -16,13 +16,48 @@ import re
 from github import Github
 import requests
 import datetime
+import diskcache
+import os
+import git
+import subprocess
 
 
 sorted_df = None
 fetched_branches = list()
 repo_name = ""
-local_cached_data = dict()
-local_cached_data['git_nodes'] = dict()
+local_cached_data = None
+
+class PerfRunner():
+    def __init__(self, cwd='/tmp/fly_dsi'):
+        self.current_working_directory = cwd
+        self.current_git_directory = cwd + '/src'
+
+    def initGitRepo(self, gup='UK-MAC/CloverLeaf_ref'):
+        self.git_user_repo = gup
+        self.git_http_url = 'https://github.com/' + self.git_user_repo + '.git'
+        self.git_ssh_url = 'git@github.com:' + self.git_user_repo + '.git'
+        
+        self.git_repo = None
+        if os.path.exists(self.current_git_directory) == False:
+            os.mkdir(self.current_git_directory)
+        try:
+            self.git_repo = git.Repo(self.current_git_directory)
+        except git.InvalidGitRepositoryError:
+            self.git_repo = git.Repo.clone_from(self.git_ssh_url, self.current_git_directory)
+
+
+def initAndLoadCachedData(workignDir='/tmp/fly_dsi'):
+    global local_cached_data
+    if not os.path.exists(workignDir):
+        print("Cache path not exist. Creating directory.")
+        os.makedirs(workignDir)
+    print("Loading cached data ...")
+    cpath = os.path.join(workignDir, 'dsi_perf.diskCacheIndex')
+    local_cached_data = diskcache.Index(cpath)
+    if 'git_nodes' not in local_cached_data:
+        local_cached_data['git_nodes'] = dict()
+        
+
 
 def getGitRepo(user_repo):
     return None
@@ -31,57 +66,61 @@ def getGitGraph(user_repo, selected_branches):
     # considering perf_data is already sorted by commit time
     global fetched_branches
     global local_cached_data
+    cached_data = local_cached_data['git_nodes']
 
     all_nodes_list = list()
     repo = None
     for current_selected_branches in selected_branches:
-        if current_selected_branches in local_cached_data['git_nodes']:
-            all_nodes_list.extend(local_cached_data['git_nodes'][current_selected_branches])
+        if current_selected_branches in cached_data:
+            all_nodes_list.extend(cached_data[current_selected_branches])
         else:
 
             print("Trying to get git graphs")
-            # git_graph_max_depth = 8
+            git_graph_max_depth = 8
 
-            # visited_commit_hash = []
-            # commit_queue = []
-            # nodes_list = []
-            # repo = getGitRepo(user_repo)
-            # # checked_branches_list = ["master", "feature/CMake", "feature/caliper", "fix_gcc", "parse_fix", "development"]
-            # for each_branch in fetched_branches:
-            #     if each_branch.name == current_selected_branches:
-            #         commit_queue.append({"commit":each_branch.commit,"branch":each_branch.name, "depth":0})
-            #         # print(each_branch.commit.commit.committer.date.strftime("%b-%d,%Y(%H:%M)"))
+            visited_commit_hash = []
+            commit_queue = []
+            nodes_list = []
+            repo = getGitRepo(user_repo)
+            # checked_branches_list = ["master", "feature/CMake", "feature/caliper", "fix_gcc", "parse_fix", "development"]
+            for each_branch in fetched_branches:
+                if each_branch.name == current_selected_branches:
+                    commit_queue.append({"commit":each_branch.commit,"branch":each_branch.name, "depth":0})
+                    # print(each_branch.commit.commit.committer.date.strftime("%b-%d,%Y(%H:%M)"))
 
-            # while len(commit_queue) > 0:
-            #     top_here = commit_queue.pop()
-            #     c_commit = top_here["commit"]
-            #     if c_commit.commit.sha in visited_commit_hash:
-            #         continue
-            #     if top_here["depth"] > git_graph_max_depth:
-            #         continue
-            #     c_branch = top_here["branch"]
-            #     visited_commit_hash.append(c_commit.commit.sha)
+            while len(commit_queue) > 0:
+                top_here = commit_queue.pop()
+                c_commit = top_here["commit"]
+                if c_commit.commit.sha in visited_commit_hash:
+                    continue
+                if top_here["depth"] > git_graph_max_depth:
+                    continue
+                c_branch = top_here["branch"]
+                visited_commit_hash.append(c_commit.commit.sha)
                 
-            #     for each_parent in c_commit.commit.parents:
-            #         nodes_list.append({"sha":c_commit.commit.sha, 
-            #                     "date":c_commit.commit.committer.date,
-            #                     "depth":top_here["depth"],
-            #                     "branch":top_here["branch"],
-            #                     "message":c_commit.commit.message
-            #         })
-            #         child_commit = repo.get_commit(sha=each_parent.sha)
-            #         nodes_list.append({"sha":child_commit.commit.sha, 
-            #                         "date":child_commit.commit.committer.date,
-            #                         "depth":top_here["depth"]+1,
-            #                         "branch":top_here["branch"],
-            #                         "message":None
-            #         })
-            #         if child_commit.commit.sha not in visited_commit_hash:
-            #             commit_queue.append({"commit":child_commit,"branch":top_here["branch"], "depth":top_here["depth"]+1})
-            nodes_list = [{'sha': '07d783c332e3ac0fb63a743736d2707838b429c9', 'date': datetime.datetime(2022, 12, 24, 14, 26, 8, tzinfo=datetime.timezone.utc), 'depth': 0, 'branch': 'feature/CMake', 'message': 'merge master changes + cmake update'}, {'sha': '0e66b53c9c876a7f8298ef31666c9b52dbbbfd75', 'date': datetime.datetime(2022, 12, 24, 14, 14, 59, tzinfo=datetime.timezone.utc), 'depth': 1, 'branch': 'feature/CMake', 'message': None}, {'sha': '0e66b53c9c876a7f8298ef31666c9b52dbbbfd75', 'date': datetime.datetime(2022, 12, 24, 14, 14, 59, tzinfo=datetime.timezone.utc), 'depth': 1, 'branch': 'feature/CMake', 'message': 'file correction'}, {'sha': 'de4876d5a45af5c85100af17188c2fc7d3c831bf', 'date': datetime.datetime(2022, 12, 24, 14, 2, 54, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': None}, {'sha': '0e66b53c9c876a7f8298ef31666c9b52dbbbfd75', 'date': datetime.datetime(2022, 12, 24, 14, 14, 59, tzinfo=datetime.timezone.utc), 'depth': 1, 'branch': 'feature/CMake', 'message': 'file correction'}, {'sha': '0fdb917bf10d20363dd8b88d762851908643925b', 'date': datetime.datetime(2021, 8, 9, 12, 23, 14, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': None}, {'sha': '0fdb917bf10d20363dd8b88d762851908643925b', 'date': datetime.datetime(2021, 8, 9, 12, 23, 14, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': 'OMP flag update'}, {'sha': '1398cd9cfa7570db9c8eb7a17a2f3e698c90aeb4', 'date': datetime.datetime(2021, 8, 3, 8, 49, 14, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': None}, {'sha': '1398cd9cfa7570db9c8eb7a17a2f3e698c90aeb4', 'date': datetime.datetime(2021, 8, 3, 8, 49, 14, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': 'Merge pull request #7 from amd-toolchain-support/aocc_support'}, {'sha': '2efdde26ab1eef67dfce5a29163e8d513b6dffc4', 'date': datetime.datetime(2020, 8, 20, 14, 20, 55, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': None}, {'sha': '1398cd9cfa7570db9c8eb7a17a2f3e698c90aeb4', 'date': datetime.datetime(2021, 8, 3, 8, 49, 14, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': 'Merge pull request #7 from amd-toolchain-support/aocc_support'}, {'sha': '158e23d08f73d36f71e144851451955b3ae02dff', 'date': datetime.datetime(2021, 8, 2, 18, 40, 45, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': None}, {'sha': '158e23d08f73d36f71e144851451955b3ae02dff', 'date': datetime.datetime(2021, 8, 2, 18, 40, 45, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': 'adding AOCC compiler support for CloverLeaf_ref'}, {'sha': '2efdde26ab1eef67dfce5a29163e8d513b6dffc4', 'date': datetime.datetime(2020, 8, 20, 14, 20, 55, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': None}, {'sha': '2efdde26ab1eef67dfce5a29163e8d513b6dffc4', 'date': datetime.datetime(2020, 8, 20, 14, 20, 55, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': 'Fix typos in C kernels.'}, {'sha': '89cc919b28f687a25d30b44ddf547201da930c14', 'date': datetime.datetime(2020, 7, 14, 9, 16, 46, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': None}, {'sha': '89cc919b28f687a25d30b44ddf547201da930c14', 'date': datetime.datetime(2020, 7, 14, 9, 16, 46, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Add ivdep in place of previous simd.'}, {'sha': '07fcf4d773ba7626e6ea36c7002f7b2cd7c76b2a', 'date': datetime.datetime(2020, 7, 14, 8, 44, 25, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None}, {'sha': '07fcf4d773ba7626e6ea36c7002f7b2cd7c76b2a', 'date': datetime.datetime(2020, 7, 14, 8, 44, 25, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': 'Unaligned.'}, {'sha': 'e37e1d7aab99070a65094e784721b4d05fb86444', 'date': datetime.datetime(2020, 7, 14, 8, 13, 22, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': None}, {'sha': 'e37e1d7aab99070a65094e784721b4d05fb86444', 'date': datetime.datetime(2020, 7, 14, 8, 13, 22, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': 'Remove simd directives, causing loops to not vectorise under LLVM/clang.'}, {'sha': '439c8d846ede012c89f7be451763a32dbaa5eb2c', 'date': datetime.datetime(2020, 7, 13, 20, 16, 34, tzinfo=datetime.timezone.utc), 'depth': 9, 'branch': 'feature/CMake', 'message': None}, {'sha': 'de4876d5a45af5c85100af17188c2fc7d3c831bf', 'date': datetime.datetime(2022, 12, 24, 14, 2, 54, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': 'cleanup before merge'}, {'sha': '37c34c42421f605e73f3698bbbbfe7181e82615e', 'date': datetime.datetime(2020, 5, 6, 14, 48, 4, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': None}, {'sha': '37c34c42421f605e73f3698bbbbfe7181e82615e', 'date': datetime.datetime(2020, 5, 6, 14, 48, 4, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': 'Cleanup build'}, {'sha': '9e4093c80cbdb8ac33497569ad0d217c1e8d386c', 'date': datetime.datetime(2020, 5, 6, 14, 44, 38, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': None}, {'sha': '9e4093c80cbdb8ac33497569ad0d217c1e8d386c', 'date': datetime.datetime(2020, 5, 6, 14, 44, 38, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': 'Initial CMake changes'}, {'sha': '6cf9b1a810531cf691be3b080c7ecfd73019c9b3', 'date': datetime.datetime(2020, 5, 6, 14, 29, 46, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': None}, {'sha': '6cf9b1a810531cf691be3b080c7ecfd73019c9b3', 'date': datetime.datetime(2020, 5, 6, 14, 29, 46, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': "Merge remote-tracking branch 'origin/parse_fix' into feature/CMake"}, {'sha': 'c97a402a197d1b7df1b230cf39a59ef505570c50', 'date': datetime.datetime(2016, 5, 23, 10, 28, 22, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': None}, {'sha': '6cf9b1a810531cf691be3b080c7ecfd73019c9b3', 'date': datetime.datetime(2020, 5, 6, 14, 29, 46, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': "Merge remote-tracking branch 'origin/parse_fix' into feature/CMake"}, {'sha': '8d0cfdebc707e9372384a68635bf607772bc4ba5', 'date': datetime.datetime(2019, 3, 11, 13, 7, 50, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': None}, {'sha': '8d0cfdebc707e9372384a68635bf607772bc4ba5', 'date': datetime.datetime(2019, 3, 11, 13, 7, 50, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Fix error in argument parsing'}, {'sha': '0ddf495cf21cc59f84e274617522a1383e2c328c', 'date': datetime.datetime(2015, 10, 28, 8, 39, 46, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None}, {'sha': '0ddf495cf21cc59f84e274617522a1383e2c328c', 'date': datetime.datetime(2015, 10, 28, 8, 39, 46, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': 'Update to version 1.3 For Mantevo SC2015'}, {'sha': '4f23dd3beb6376f0b6d4922336943760664d5b9a', 'date': datetime.datetime(2015, 8, 5, 22, 32, 14, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': None}, {'sha': '4f23dd3beb6376f0b6d4922336943760664d5b9a', 'date': datetime.datetime(2015, 8, 5, 22, 32, 14, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': 'Added pack/unpack message methods to qextname list for IBM compilers'}, {'sha': '3822dab44664b151a857da568e4b0974ac807195', 'date': datetime.datetime(2015, 8, 5, 13, 45, 53, tzinfo=datetime.timezone.utc), 'depth': 9, 'branch': 'feature/CMake', 'message': None}, {'sha': 'c97a402a197d1b7df1b230cf39a59ef505570c50', 'date': datetime.datetime(2016, 5, 23, 10, 28, 22, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Merge pull request #3 from AndrewMallinson/master_v1.3_UHnosync\n\nMaster v1.3 u hnosync'}, {'sha': '0ddf495cf21cc59f84e274617522a1383e2c328c', 'date': datetime.datetime(2015, 10, 28, 8, 39, 46, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None}, {'sha': 'c97a402a197d1b7df1b230cf39a59ef505570c50', 'date': datetime.datetime(2016, 5, 23, 10, 28, 22, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Merge pull request #3 from AndrewMallinson/master_v1.3_UHnosync\n\nMaster v1.3 u hnosync'}, {'sha': '57875df8f3dcf4ffd79df41d621e6577dc6c2d16', 'date': datetime.datetime(2016, 5, 5, 14, 48, 27, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None}, {'sha': '57875df8f3dcf4ffd79df41d621e6577dc6c2d16', 'date': datetime.datetime(2016, 5, 5, 14, 48, 27, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': 'updated CHANGE LOG to capture the optimisation to update halo.f90'}, {'sha': 'a144711c6e803e71b9e8df7b515deb62ccfab2a5', 'date': datetime.datetime(2016, 2, 19, 14, 50, 2, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': None}, {'sha': 'a144711c6e803e71b9e8df7b515deb62ccfab2a5', 'date': datetime.datetime(2016, 2, 19, 14, 50, 2, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': 'modified update halo kernel.f90 to reduce sync to one barrier\n\nstill need to test'}, {'sha': 'f274ea05a6c8adde7fafcd6ba614dd845a2852df', 'date': datetime.datetime(2016, 2, 11, 17, 42, 46, tzinfo=datetime.timezone.utc), 'depth': 9, 'branch': 'feature/CMake', 'message': None}]
-            local_cached_data['git_nodes'][current_selected_branches] = nodes_list
+                for each_parent in c_commit.commit.parents:
+                    nodes_list.append({"sha":c_commit.commit.sha, 
+                                "date":c_commit.commit.committer.date,
+                                "depth":top_here["depth"],
+                                "branch":top_here["branch"],
+                                "message":c_commit.commit.message,
+                                "cname":c_commit.commit.committer.name
+                    })
+                    child_commit = repo.get_commit(sha=each_parent.sha)
+                    nodes_list.append({"sha":child_commit.commit.sha, 
+                                    "date":child_commit.commit.committer.date,
+                                    "depth":top_here["depth"]+1,
+                                    "branch":top_here["branch"],
+                                    "message":None,
+                                    "cname":None
+                    })
+                    if child_commit.commit.sha not in visited_commit_hash:
+                        commit_queue.append({"commit":child_commit,"branch":top_here["branch"], "depth":top_here["depth"]+1})
+            # nodes_list = [{'sha': '07d783c332e3ac0fb63a743736d2707838b429c9', 'date': datetime.datetime(2022, 12, 24, 14, 26, 8, tzinfo=datetime.timezone.utc), 'depth': 0, 'branch': 'feature/CMake', 'message': 'merge master changes + cmake update', 'cname': 'caxwl'}, {'sha': '0e66b53c9c876a7f8298ef31666c9b52dbbbfd75', 'date': datetime.datetime(2022, 12, 24, 14, 14, 59, tzinfo=datetime.timezone.utc), 'depth': 1, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '0e66b53c9c876a7f8298ef31666c9b52dbbbfd75', 'date': datetime.datetime(2022, 12, 24, 14, 14, 59, tzinfo=datetime.timezone.utc), 'depth': 1, 'branch': 'feature/CMake', 'message': 'file correction', 'cname': 'caxwl'}, {'sha': 'de4876d5a45af5c85100af17188c2fc7d3c831bf', 'date': datetime.datetime(2022, 12, 24, 14, 2, 54, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '0e66b53c9c876a7f8298ef31666c9b52dbbbfd75', 'date': datetime.datetime(2022, 12, 24, 14, 14, 59, tzinfo=datetime.timezone.utc), 'depth': 1, 'branch': 'feature/CMake', 'message': 'file correction', 'cname': 'caxwl'}, {'sha': '0fdb917bf10d20363dd8b88d762851908643925b', 'date': datetime.datetime(2021, 8, 9, 12, 23, 14, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '0fdb917bf10d20363dd8b88d762851908643925b', 'date': datetime.datetime(2021, 8, 9, 12, 23, 14, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': 'OMP flag update', 'cname': 'caxwl'}, {'sha': '1398cd9cfa7570db9c8eb7a17a2f3e698c90aeb4', 'date': datetime.datetime(2021, 8, 3, 8, 49, 14, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '1398cd9cfa7570db9c8eb7a17a2f3e698c90aeb4', 'date': datetime.datetime(2021, 8, 3, 8, 49, 14, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': 'Merge pull request #7 from amd-toolchain-support/aocc_support', 'cname': 'GitHub'}, {'sha': '2efdde26ab1eef67dfce5a29163e8d513b6dffc4', 'date': datetime.datetime(2020, 8, 20, 14, 20, 55, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '1398cd9cfa7570db9c8eb7a17a2f3e698c90aeb4', 'date': datetime.datetime(2021, 8, 3, 8, 49, 14, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': 'Merge pull request #7 from amd-toolchain-support/aocc_support', 'cname': 'GitHub'}, {'sha': '158e23d08f73d36f71e144851451955b3ae02dff', 'date': datetime.datetime(2021, 8, 2, 18, 40, 45, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '158e23d08f73d36f71e144851451955b3ae02dff', 'date': datetime.datetime(2021, 8, 2, 18, 40, 45, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': 'adding AOCC compiler support for CloverLeaf_ref', 'cname': 'mohan002'}, {'sha': '2efdde26ab1eef67dfce5a29163e8d513b6dffc4', 'date': datetime.datetime(2020, 8, 20, 14, 20, 55, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '2efdde26ab1eef67dfce5a29163e8d513b6dffc4', 'date': datetime.datetime(2020, 8, 20, 14, 20, 55, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': 'Fix typos in C kernels.', 'cname': 'jdshanks'}, {'sha': '89cc919b28f687a25d30b44ddf547201da930c14', 'date': datetime.datetime(2020, 7, 14, 9, 16, 46, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '89cc919b28f687a25d30b44ddf547201da930c14', 'date': datetime.datetime(2020, 7, 14, 9, 16, 46, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Add ivdep in place of previous simd.', 'cname': 'jdshanks'}, {'sha': '07fcf4d773ba7626e6ea36c7002f7b2cd7c76b2a', 'date': datetime.datetime(2020, 7, 14, 8, 44, 25, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '07fcf4d773ba7626e6ea36c7002f7b2cd7c76b2a', 'date': datetime.datetime(2020, 7, 14, 8, 44, 25, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': 'Unaligned.', 'cname': 'jdshanks'}, {'sha': 'e37e1d7aab99070a65094e784721b4d05fb86444', 'date': datetime.datetime(2020, 7, 14, 8, 13, 22, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': 'e37e1d7aab99070a65094e784721b4d05fb86444', 'date': datetime.datetime(2020, 7, 14, 8, 13, 22, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': 'Remove simd directives, causing loops to not vectorise under LLVM/clang.', 'cname': 'jdshanks'}, {'sha': '439c8d846ede012c89f7be451763a32dbaa5eb2c', 'date': datetime.datetime(2020, 7, 13, 20, 16, 34, tzinfo=datetime.timezone.utc), 'depth': 9, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': 'de4876d5a45af5c85100af17188c2fc7d3c831bf', 'date': datetime.datetime(2022, 12, 24, 14, 2, 54, tzinfo=datetime.timezone.utc), 'depth': 2, 'branch': 'feature/CMake', 'message': 'cleanup before merge', 'cname': 'caxwl'}, {'sha': '37c34c42421f605e73f3698bbbbfe7181e82615e', 'date': datetime.datetime(2020, 5, 6, 14, 48, 4, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '37c34c42421f605e73f3698bbbbfe7181e82615e', 'date': datetime.datetime(2020, 5, 6, 14, 48, 4, tzinfo=datetime.timezone.utc), 'depth': 3, 'branch': 'feature/CMake', 'message': 'Cleanup build', 'cname': 'Wei'}, {'sha': '9e4093c80cbdb8ac33497569ad0d217c1e8d386c', 'date': datetime.datetime(2020, 5, 6, 14, 44, 38, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '9e4093c80cbdb8ac33497569ad0d217c1e8d386c', 'date': datetime.datetime(2020, 5, 6, 14, 44, 38, tzinfo=datetime.timezone.utc), 'depth': 4, 'branch': 'feature/CMake', 'message': 'Initial CMake changes', 'cname': 'Wei'}, {'sha': '6cf9b1a810531cf691be3b080c7ecfd73019c9b3', 'date': datetime.datetime(2020, 5, 6, 14, 29, 46, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '6cf9b1a810531cf691be3b080c7ecfd73019c9b3', 'date': datetime.datetime(2020, 5, 6, 14, 29, 46, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': "Merge remote-tracking branch 'origin/parse_fix' into feature/CMake", 'cname': 'Wei'}, {'sha': 'c97a402a197d1b7df1b230cf39a59ef505570c50', 'date': datetime.datetime(2016, 5, 23, 10, 28, 22, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '6cf9b1a810531cf691be3b080c7ecfd73019c9b3', 'date': datetime.datetime(2020, 5, 6, 14, 29, 46, tzinfo=datetime.timezone.utc), 'depth': 5, 'branch': 'feature/CMake', 'message': "Merge remote-tracking branch 'origin/parse_fix' into feature/CMake", 'cname': 'Wei'}, {'sha': '8d0cfdebc707e9372384a68635bf607772bc4ba5', 'date': datetime.datetime(2019, 3, 11, 13, 7, 50, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '8d0cfdebc707e9372384a68635bf607772bc4ba5', 'date': datetime.datetime(2019, 3, 11, 13, 7, 50, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Fix error in argument parsing', 'cname': 'Tom Deakin'}, {'sha': '0ddf495cf21cc59f84e274617522a1383e2c328c', 'date': datetime.datetime(2015, 10, 28, 8, 39, 46, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '0ddf495cf21cc59f84e274617522a1383e2c328c', 'date': datetime.datetime(2015, 10, 28, 8, 39, 46, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': 'Update to version 1.3 For Mantevo SC2015', 'cname': 'Oliver Perks'}, {'sha': '4f23dd3beb6376f0b6d4922336943760664d5b9a', 'date': datetime.datetime(2015, 8, 5, 22, 32, 14, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '4f23dd3beb6376f0b6d4922336943760664d5b9a', 'date': datetime.datetime(2015, 8, 5, 22, 32, 14, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': 'Added pack/unpack message methods to qextname list for IBM compilers', 'cname': 'David Beckingsale'}, {'sha': '3822dab44664b151a857da568e4b0974ac807195', 'date': datetime.datetime(2015, 8, 5, 13, 45, 53, tzinfo=datetime.timezone.utc), 'depth': 9, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': 'c97a402a197d1b7df1b230cf39a59ef505570c50', 'date': datetime.datetime(2016, 5, 23, 10, 28, 22, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Merge pull request #3 from AndrewMallinson/master_v1.3_UHnosync\n\nMaster v1.3 u hnosync', 'cname': 'OliverPerks'}, {'sha': '0ddf495cf21cc59f84e274617522a1383e2c328c', 'date': datetime.datetime(2015, 10, 28, 8, 39, 46, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': 'c97a402a197d1b7df1b230cf39a59ef505570c50', 'date': datetime.datetime(2016, 5, 23, 10, 28, 22, tzinfo=datetime.timezone.utc), 'depth': 6, 'branch': 'feature/CMake', 'message': 'Merge pull request #3 from AndrewMallinson/master_v1.3_UHnosync\n\nMaster v1.3 u hnosync', 'cname': 'OliverPerks'}, {'sha': '57875df8f3dcf4ffd79df41d621e6577dc6c2d16', 'date': datetime.datetime(2016, 5, 5, 14, 48, 27, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': '57875df8f3dcf4ffd79df41d621e6577dc6c2d16', 'date': datetime.datetime(2016, 5, 5, 14, 48, 27, tzinfo=datetime.timezone.utc), 'depth': 7, 'branch': 'feature/CMake', 'message': 'updated CHANGE LOG to capture the optimisation to update halo.f90', 'cname': 'Andrew Mallinson'}, {'sha': 'a144711c6e803e71b9e8df7b515deb62ccfab2a5', 'date': datetime.datetime(2016, 2, 19, 14, 50, 2, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': None, 'cname': None}, {'sha': 'a144711c6e803e71b9e8df7b515deb62ccfab2a5', 'date': datetime.datetime(2016, 2, 19, 14, 50, 2, tzinfo=datetime.timezone.utc), 'depth': 8, 'branch': 'feature/CMake', 'message': 'modified update halo kernel.f90 to reduce sync to one barrier\n\nstill need to test', 'cname': 'Andrew Mallinson'}, {'sha': 'f274ea05a6c8adde7fafcd6ba614dd845a2852df', 'date': datetime.datetime(2016, 2, 11, 17, 42, 46, tzinfo=datetime.timezone.utc), 'depth': 9, 'branch': 'feature/CMake', 'message': None, 'cname': None}]
+            cached_data[current_selected_branches] = nodes_list
             all_nodes_list.extend(nodes_list)
             # print(nodes_list)
+    local_cached_data['git_nodes'] = cached_data
     print('fetched data from ', selected_branches)
     return all_nodes_list
 
@@ -236,7 +275,9 @@ def generateGitChart(git_nodes):
             Xe += [commit_dates[ind-1], commit_dates[ind], None]
             Ye += [le, re, None]
             edges.append(((git_nodes_df['date'][ind-1],XY_ind),(git_nodes_df['date'][ind],XY_ind)))
-            cd += [[git_nodes_df['message'][ind-1], git_nodes_df['sha'][ind-1]], [git_nodes_df['message'][ind], git_nodes_df['sha'][ind]], None]
+            cd += [[git_nodes_df['message'][ind-1], git_nodes_df['sha'][ind-1], git_nodes_df['cname'][ind-1]], 
+                   [git_nodes_df['message'][ind], git_nodes_df['sha'][ind], git_nodes_df['cname'][ind]], 
+                   None]
             XY_ind = XY_ind + 1
 
     gitFig.add_trace(go.Scatter(x=Xe,
@@ -250,7 +291,7 @@ def generateGitChart(git_nodes):
                                     ),
                                 name='',
                                 hovertemplate =
-                                '%{customdata[0]}<extra></extra>',
+                                'Message: %{customdata[0]}<br>Name: %{customdata[2]}<extra></extra>',
                                 showlegend = False,
                                 customdata=cd),
                     row = 2,
@@ -409,6 +450,8 @@ def main(git_nodes):
 )
 def update_branch_output_text(n_clicks, value):
     repo_name = value
+    global perf_runner
+    perf_runner.initGitRepo(repo_name)
     return 'Fetching branches for {}'.format(
         value
     )
@@ -468,9 +511,6 @@ def update_git_selection(selection):
         
     dss = pd.DataFrame(selection['points'])
 
-
-    # unique_git_nodes_dates_df = dss.drop_duplicates(subset=['brand']).reset_index(drop=True)
-
     msg_list = [x[0] for x in dss['customdata']]
     hash_list = [x[1][:7] for x in dss['customdata']]
 
@@ -493,8 +533,49 @@ def update_git_selection(selection):
     Input('run-perf-commit', 'n_clicks'),
     prevent_initial_call=True
 )
-def run_perf_with_commits(selectedData, value):
-    print(selectedData)
+def run_perf_with_commits(selectedData, n_clicks):
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+
+    if 'run-perf-commit' in changed_id:
+        if selectedData is None:
+            print("no data")
+        dss = pd.DataFrame(selectedData['points'])
+
+        msg_list = [x[0] for x in dss['customdata']]
+        hash_list = [x[1][:7] for x in dss['customdata']]
+
+        c_df = pd.DataFrame({
+            'date(time)':dss['x'].to_list(),
+            'hash':hash_list,
+            'message': msg_list
+        })
+        table_df = c_df.dropna().drop_duplicates(subset=['hash']).sort_values(by=['date(time)'], ascending=True)
+        global perf_runner
+        for ind in table_df.index:
+            candidate_commit_hash = table_df['hash'][ind]
+            perf_runner.git_repo.git.checkout(candidate_commit_hash)
+
+            my_env = os.environ.copy()
+            my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
+            # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
+            try:
+                command = ['source runner_script.sh']
+                result = subprocess.run(command, env=my_env, shell=True)
+
+            except subprocess.CalledProcessError as cpe:
+                result = cpe.output
+            finally:
+                print("final done")
+                print(result)
+
+
+
+
+            # p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            # for line in p.stdout.readlines():
+            #     print(line)
+        
+        print(n_clicks)
 
 
 if __name__ == "__main__":
@@ -506,7 +587,10 @@ if __name__ == "__main__":
     #     parser.print_help()
     #     sys.exit(0)
     # git_repo = git.Repo(args.gitdir)
-
+    global perf_runner
+    perf_runner = PerfRunner()
+    
+    initAndLoadCachedData(perf_runner.current_working_directory)
     df = pd.read_csv("clover_random_test.csv")
     sorted_df = df.sort_values(by=['git_committed_date'], ascending=True)
     git_nodes = getGitGraph(sorted_df["git_repo_name"][0],[])
