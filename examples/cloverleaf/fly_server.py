@@ -21,6 +21,7 @@ import os
 import git
 import subprocess
 
+import parse_clover_output
 
 sorted_df = None
 fetched_branches = list()
@@ -151,35 +152,8 @@ def range_update(l, r, X, F):
     add(r + 1, -X, F)
 # =================================
 
-
-def generatePerfChart(vlineDate='0'):
-    perFig = go.Figure()
-    # int_cols = {"PdV":'mean', "Cell Advection":'mean', "MPI Halo Exchange":'mean', "Self Halo Exchange":'mean', "Momentum Advection":'mean', "Total":'mean'}
-    # sorted_df = df.sort_values(by=['git_committed_date'], ascending=True).groupby('git_committed_date').agg(int_cols)
-    # commit_dates = pd.to_datetime(sorted_df.index.to_list()).strftime("%b %d, %Y")
-    # for col_name in sorted_df.columns:
-    #     fig.add_trace(go.Scatter(x=commit_dates, y=sorted_df[col_name],
-    #                         mode='lines', # 'lines' or 'markers'
-    #                         name=col_name))
-    sorted_df['git_committed_date']
-    commit_dates = pd.to_datetime(sorted_df['git_committed_date']).dt.strftime("%b-%d,%Y(%H:%M)")
-    for col_name in ["PdV", "Cell Advection", "MPI Halo Exchange", "Self Halo Exchange", "Momentum Advection", "Total"]:
-        perFig.add_trace(go.Scatter(x=commit_dates, y=sorted_df[col_name],
-                            mode='lines',
-                            name=col_name))
-
-    perFig.update_traces(mode='lines+markers')
-    perFig.update_xaxes(showgrid=False)
-    perFig.update_layout(margin=dict(l=20, r=20, t=0, b=0),
-                        legend=dict(
-                            x=100,
-                            y=-20
-    ))
-    # if vlineDate is not None:
-    perFig.add_vline(x=vlineDate, line_dash = 'dash')
-    return perFig
-
 def generateGitChart(git_nodes):
+    global sorted_df
     if len(git_nodes) == 0:
         fig1 = go.Figure().add_annotation(
             x=2, y=2,
@@ -204,7 +178,7 @@ def generateGitChart(git_nodes):
     git_nodes_df = pd.DataFrame(git_nodes)#.sort_values(by=['date'], ascending=True)
     commit_dates = pd.to_datetime(git_nodes_df['date']).dt.strftime("%b-%d,%Y(%H:%M)")
     sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
-    sorted_commit_dates = pd.to_datetime(sorted_git_nodes_df['date']).dt.strftime("%b-%d,%Y(%H:%M)")
+    sorted_commit_dates = pd.to_datetime(sorted_git_nodes_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
 
 
     Xe = []
@@ -299,39 +273,27 @@ def generateGitChart(git_nodes):
                     secondary_y = False
             )
 
-    commit_dates_second = pd.to_datetime(sorted_df['git_committed_date']).dt.strftime("%b-%d,%Y(%H:%M)")
-    for col_name in ["PdV", "Cell Advection", "MPI Halo Exchange", "Self Halo Exchange", "Momentum Advection", "Total"]:
-        gitFig.add_trace(go.Scatter(x=commit_dates_second, y=sorted_df[col_name],
-                            mode='lines',
-                            name=col_name),
-                        row = 1,
-                        col = 1,
-                        secondary_y = False
-                        )
+    if sorted_df is not None and len(sorted_df) > 0:
+        commit_dates_second = pd.to_datetime(sorted_df['git_committed_date']).dt.strftime("%b-%d,%Y(%H:%M)")
+        for col_name in ["PdV", "Cell Advection", "MPI Halo Exchange", "Self Halo Exchange", "Momentum Advection", "Total"]:
+            gitFig.add_trace(go.Scatter(x=commit_dates_second, y=sorted_df[col_name],
+                                mode='lines',
+                                name=col_name),
+                            row = 1,
+                            col = 1,
+                            secondary_y = False
+                            )
 
     gitFig.update_traces(mode='lines+markers')
     gitFig.update_xaxes(showgrid=False, categoryorder='array', categoryarray=sorted_commit_dates)
     gitFig.update_yaxes(visible=False, showticklabels=False, row=2, col=1)
-    gitFig.update_layout(margin=dict(l=20, r=20, t=0, b=0),
+    gitFig.update_layout(margin=dict(l=20, r=20, t=0, b=20),
                          annotations=make_annotations(),
                          legend_traceorder="normal",
                          dragmode="select",
                          hovermode="x unified")
     gitFig.update_traces(xaxis='x2')
     return gitFig
-
-@callback(
-    Output("graph", "figure"), 
-    Input("hovermode", "value"))
-def update_hovermode(mode):
-    df = px.data.gapminder().query("continent=='Oceania'") # replace with your own data source
-    fig = px.line(
-        df, x="year", y="lifeExp", color="country", 
-        title="Hover over points to see the change")
-    fig.update_traces(
-        mode="markers+lines", hovertemplate=None)
-    fig.update_layout(hovermode=mode)
-    return fig
 
 # @callback(
 #     Output('perf_graph', 'figure'),
@@ -341,7 +303,7 @@ def update_hovermode(mode):
 #     current_time = hoverData['points'][0]['x']
 #     return generatePerfChart(current_time)
 
-def main(git_nodes):
+def main():
     app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
     app.layout = dbc.Container([
         html.Div([
@@ -411,14 +373,14 @@ def main(git_nodes):
                     dcc.Graph(
                         figure=generateGitChart(git_nodes),
                         id='git-graph'
-                    ), style={'width': 790,'margin-top': 0}),
+                    ), style={'width': 790,'margin-top': 0, 'margin-bottom':20}),
                 html.Div([
-                    html.H3('Selected Commits:'),
+                    html.Button('Run performance with selected commits', id='run-perf-commit', n_clicks=0, disabled=True),
+                    html.H4('Selected Commits:'),
                     html.Div(
                         dcc.Graph(
                             id='selected-commits-table'
-                        ), style={'width': 790,'margin-top': 0,'margin-left': 0}),
-                    html.Button('Run performance with selected commits', id='run-perf-commit', n_clicks=0, disabled=True),
+                        ), style={'width': 790,'margin-top': 0,'margin-left': 0})
                 ], style={'width': 790,'margin-top': 0,'margin-left': 0})
             ],
             style={
@@ -529,6 +491,7 @@ def update_git_selection(selection):
 
 
 @callback(
+    # Output('git-graph', 'figure'),
     Input('git-graph', 'selectedData'),
     Input('run-perf-commit', 'n_clicks'),
     prevent_initial_call=True
@@ -549,10 +512,13 @@ def run_perf_with_commits(selectedData, n_clicks):
             'hash':hash_list,
             'message': msg_list
         })
+        testname = "perf_runner_test_run"
         table_df = c_df.dropna().drop_duplicates(subset=['hash']).sort_values(by=['date(time)'], ascending=True)
         global perf_runner
         for ind in table_df.index:
             candidate_commit_hash = table_df['hash'][ind]
+            if parse_clover_output.test_artifact_query(testname, perf_runner.current_working_directory, candidate_commit_hash):
+                continue
             perf_runner.git_repo.git.checkout(candidate_commit_hash)
 
             my_env = os.environ.copy()
@@ -561,12 +527,14 @@ def run_perf_with_commits(selectedData, n_clicks):
             try:
                 command = ['source runner_script.sh']
                 result = subprocess.run(command, env=my_env, shell=True)
-
             except subprocess.CalledProcessError as cpe:
                 result = cpe.output
             finally:
                 print("final done")
                 print(result)
+                
+                data = parse_clover_output.parse_clover_output_file(testname, perf_runner.current_git_directory)
+                parse_clover_output.add_output_to_dsi(data, testname, perf_runner.current_working_directory)
 
 
 
@@ -576,7 +544,6 @@ def run_perf_with_commits(selectedData, n_clicks):
             #     print(line)
         
         print(n_clicks)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -594,4 +561,4 @@ if __name__ == "__main__":
     df = pd.read_csv("clover_random_test.csv")
     sorted_df = df.sort_values(by=['git_committed_date'], ascending=True)
     git_nodes = getGitGraph(sorted_df["git_repo_name"][0],[])
-    main(git_nodes)
+    main()

@@ -71,8 +71,8 @@ def add_non_existing_columns(data, test_name):
     store.close()
     
 
-def add_output_to_dsi(data, test_name):
-    dbpath = 'clover_' + test_name + '.db'
+def add_output_to_dsi(data, test_name, db_base_dir):
+    dbpath = db_base_dir + '/clover_' + test_name + '.db'
     dsi_dict = Dict(data)
     dsi_dict.add_rows()
     # print(dsi_dict.collections)
@@ -88,33 +88,39 @@ def add_output_to_dsi(data, test_name):
 """
 Performs a sample query on the DSI db
 """
-def test_artifact_query(test_name):
-    dbpath = "clover_" + test_name + ".db"
+def test_artifact_query(test_name, db_base_dir, git_hash):
+    dbpath = db_base_dir +  "/clover_" + test_name + ".db"
     store = Sqlite(dbpath)
     _ = store.get_artifact_list(isVerbose=False)
     data_type = DataType()
     data_type.name = "TABLENAME"
-    query = "SELECT * FROM " + str(data_type.name)# + " WHERE Viscosity > 0.1"
+    query = "SELECT * FROM " + str(data_type.name) + " WHERE git_hash LIKE '" + git_hash + "%'"
     print("Running Query", query)
     result = store.sqlquery(query)
-    # store.export_csv_query(query, "clover_query.csv")
-    print(result)
     store.close()
+    if len(result) > 0:
+        print("found")
+        return True
+    else:
+        print("not found")
+    return False
+    # store.export_csv_query(query, "clover_query.csv")
 
 def process_keys_for_sqlite(key):
     return key.replace(" ", "_").lower()
 
 
-def parse_clover_output_file(testname, git_repo):
+def parse_clover_output_file(testname, git_dir):
+    git_repo = get_git_repo(git_dir)
     data = {}
     data['testname'] = [testname]
-    clover_output = "clover_output/"
+    clover_output = git_dir + "/"
     if git_repo:
         data['git_hash'] = [git_repo.head.object.hexsha]
         data['git_committer'] = [git_repo.head.object.committer.email]
-        data['git_committed_date'] = [git_repo.head.object.committed_datetime.strftime("%Y-%m-%d")]
+        data['git_committed_date'] = [git_repo.head.object.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")]
         data['git_repo_name'] = [get_repo_and_name_from_url(git_repo.remotes.origin.url)]
-        clover_output = clover_output + "clover_" + git_repo.head.object.hexsha[:7]  +".out"
+        clover_output = clover_output + "clover.out"
         # print(clover_output)
     else:
         raise Exception("Git repo not found")
@@ -158,12 +164,11 @@ def main():
     args = parser.parse_args()
     # testname = "temp_test"
     testname = args.testname
-    git_repo = get_git_repo(args.gitdir)
     if testname is None:
         parser.print_help()
         sys.exit(0)
 
-    data = parse_clover_output_file(testname, git_repo)
+    data = parse_clover_output_file(testname, args.gitdir)
     # add_output_to_csv_file(data, testname)
     add_output_to_dsi(data, testname)
 
