@@ -9,6 +9,7 @@ import sys
 import re
 import glob
 import git
+import pandas as pd
 from dsi.plugins.collection_reader import Dict
 from dsi.backends.sqlite import Sqlite, DataType
 import json
@@ -48,8 +49,8 @@ def add_output_to_csv_file(data, testname):
 
         clover_out.write(row + "\n")
 
-def add_non_existing_columns(data, test_name):
-    dbpath = "clover_" + test_name + ".db"
+def add_non_existing_columns(data, test_name, db_base_dir):
+    dbpath = db_base_dir + "/clover_" + test_name + ".db"
     store = Sqlite(dbpath)
     data_type = DataType()
     data_type.name = "TABLENAME"
@@ -77,7 +78,7 @@ def add_output_to_dsi(data, test_name, db_base_dir):
     dsi_dict.add_rows()
     # print(dsi_dict.collections)
 
-    add_non_existing_columns(data, test_name)
+    add_non_existing_columns(data, test_name, db_base_dir)
 
     store = Sqlite(dbpath)
     # store.types.name = test_name
@@ -94,17 +95,43 @@ def test_artifact_query(test_name, db_base_dir, git_hash):
     _ = store.get_artifact_list(isVerbose=False)
     data_type = DataType()
     data_type.name = "TABLENAME"
-    query = "SELECT * FROM " + str(data_type.name) + " WHERE git_hash LIKE '" + git_hash + "%'"
+    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
+    result = store.sqlquery(query)
+    if len(result) == 0:
+        return False
+    query = "SELECT count(*) as cn FROM " + str(data_type.name) + " WHERE git_hash LIKE '" + git_hash + "%'"
     print("Running Query", query)
     result = store.sqlquery(query)
     store.close()
-    if len(result) > 0:
+    if len(result) > 0 and result[0][0] > 0:
         print("found")
         return True
     else:
         print("not found")
     return False
     # store.export_csv_query(query, "clover_query.csv")
+
+
+"""
+Performs a sample query on the DSI db
+"""
+def get_all_db_data(test_name, db_base_dir):
+    dbpath = db_base_dir +  "/clover_" + test_name + ".db"
+    store = Sqlite(dbpath)
+    _ = store.get_artifact_list(isVerbose=False)
+    data_type = DataType()
+    data_type.name = "TABLENAME"
+    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
+    result = store.sqlquery(query)
+    if len(result) == 0:
+        return None
+    query = "SELECT * FROM " + str(data_type.name)
+    print("Running Query", query)
+    result = pd.read_sql(query, store.con)
+    # result = store.sqlquery(query)
+    store.close()
+    return result
+
 
 def process_keys_for_sqlite(key):
     return key.replace(" ", "_").lower()

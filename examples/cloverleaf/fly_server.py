@@ -2,7 +2,8 @@
 
 import argparse
 import sys
-from dash import Dash, html, dcc, Input, Output, callback, State, callback_context
+from dash import Dash, html, dcc, Input, Output, callback, State, callback_context, no_update
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 import plotly.graph_objects as go
@@ -23,7 +24,6 @@ import subprocess
 
 import parse_clover_output
 
-sorted_df = None
 fetched_branches = list()
 repo_name = ""
 local_cached_data = None
@@ -152,9 +152,8 @@ def range_update(l, r, X, F):
     add(r + 1, -X, F)
 # =================================
 
-def generateGitChart(git_nodes):
-    global sorted_df
-    if len(git_nodes) == 0:
+def generateGitChart(sorted_df, git_nodes):
+    if git_nodes is None or len(git_nodes) == 0:
         fig1 = go.Figure().add_annotation(
             x=2, y=2,
             text="No Data to Display",
@@ -175,11 +174,14 @@ def generateGitChart(git_nodes):
     branch_depth = dict()
     hash_depth = dict()
 
-    git_nodes_df = pd.DataFrame(git_nodes)#.sort_values(by=['date'], ascending=True)
-    commit_dates = pd.to_datetime(git_nodes_df['date']).dt.strftime("%b-%d,%Y(%H:%M)")
-    sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
-    sorted_commit_dates = pd.to_datetime(sorted_git_nodes_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
+    git_nodes_df = pd.DataFrame(git_nodes)
 
+    merged_df = git_nodes_df
+    if sorted_df is not None:
+        merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
+    combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
+    combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
+    sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
 
     Xe = []
     Ye = []
@@ -215,6 +217,9 @@ def generateGitChart(git_nodes):
             # print(git_nodes_df['date'][ind], re.index[0])
             range_update(re.index[0]+1, le.index[0]-1, 1, F)
 
+    def find_commit_dates(hash):
+        return combined_all_df[combined_all_df["sha"] == hash]["formatted_date"].iloc[0]
+        
     def make_annotations(font_size=15, font_color='rgb(0,0,0)'):
         annotations = []
         for ind in git_nodes_df.index:
@@ -222,7 +227,7 @@ def generateGitChart(git_nodes):
                 annotations.append(
                     dict(
                         text=git_nodes_df['branch'][ind],
-                        x=commit_dates[ind],
+                        x=find_commit_dates(git_nodes_df['sha'][ind]),
                         y=getNodeY(git_nodes_df.loc[ind]),
                         xref='x2', yref='y2',
                         font=dict(color=font_color, size=font_size),# textangle=-90,
@@ -234,7 +239,7 @@ def generateGitChart(git_nodes):
     cd = []
     edges = list()
     XY_ind = 0
-    
+    Xe2 = []
     for ind in git_nodes_df.index:
         if ind % 2 == 1:
             # le = getNodeWidth(git_nodes_df['sha'][ind-1], git_nodes_df['depth'][ind-1])
@@ -243,17 +248,14 @@ def generateGitChart(git_nodes):
             le = getNodeY(git_nodes_df.loc[ind-1])
             re = getNodeY(git_nodes_df.loc[ind])
 
-            # if git_nodes_df['depth'] == 0:
-            #     branch_head_Y[git_nodes_df['branch']] = le
-
-            Xe += [commit_dates[ind-1], commit_dates[ind], None]
+            Xe += [find_commit_dates(git_nodes_df['sha'][ind-1]), find_commit_dates(git_nodes_df['sha'][ind]), None]
             Ye += [le, re, None]
             edges.append(((git_nodes_df['date'][ind-1],XY_ind),(git_nodes_df['date'][ind],XY_ind)))
             cd += [[git_nodes_df['message'][ind-1], git_nodes_df['sha'][ind-1], git_nodes_df['cname'][ind-1]], 
                    [git_nodes_df['message'][ind], git_nodes_df['sha'][ind], git_nodes_df['cname'][ind]], 
                    None]
             XY_ind = XY_ind + 1
-
+            
     gitFig.add_trace(go.Scatter(x=Xe,
                                 y=Ye,
                                 line_shape='hv',
@@ -274,9 +276,8 @@ def generateGitChart(git_nodes):
             )
 
     if sorted_df is not None and len(sorted_df) > 0:
-        commit_dates_second = pd.to_datetime(sorted_df['git_committed_date']).dt.strftime("%b-%d,%Y(%H:%M)")
-        for col_name in ["PdV", "Cell Advection", "MPI Halo Exchange", "Self Halo Exchange", "Momentum Advection", "Total"]:
-            gitFig.add_trace(go.Scatter(x=commit_dates_second, y=sorted_df[col_name],
+        for col_name in ["pdv", "cell_advection", "mpi_halo_exchange", "self_halo_exchange", "momentum_advection", "total"]:
+            gitFig.add_trace(go.Scatter(x=combined_all_df["formatted_date"], y=combined_all_df[col_name],
                                 mode='lines',
                                 name=col_name),
                             row = 1,
@@ -285,8 +286,9 @@ def generateGitChart(git_nodes):
                             )
 
     gitFig.update_traces(mode='lines+markers')
-    gitFig.update_xaxes(showgrid=False, categoryorder='array', categoryarray=sorted_commit_dates)
+    gitFig.update_xaxes(showgrid=False, categoryorder='array', categoryarray=combined_all_df["formatted_date"])
     gitFig.update_yaxes(visible=False, showticklabels=False, row=2, col=1)
+    gitFig.update_yaxes(type="linear", row=1, col=1)
     gitFig.update_layout(margin=dict(l=20, r=20, t=0, b=20),
                          annotations=make_annotations(),
                          legend_traceorder="normal",
@@ -303,7 +305,7 @@ def generateGitChart(git_nodes):
 #     current_time = hoverData['points'][0]['x']
 #     return generatePerfChart(current_time)
 
-def main():
+def main(perf_data, git_nodes):
     app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
     app.layout = dbc.Container([
         html.Div([
@@ -369,12 +371,17 @@ def main():
                 #         figure=generatePerfChart(),
                 #         id='perf_graph'
                 #     ), style={'width': 790}),
-                html.Div(
-                    dcc.Graph(
-                        figure=generateGitChart(git_nodes),
-                        id='git-graph'
-                    ), style={'width': 790,'margin-top': 0, 'margin-bottom':20}),
+                # html.Div(
+                    # dcc.Graph(
+                    #     figure=generateGitChart(perf_data, git_nodes),
+                    #     id='git-graph'
+                    # ), style={'width': 790,'margin-top': 0, 'margin-bottom':20}),
                 html.Div([
+                    dcc.Loading(
+                        [dcc.Graph(figure=generateGitChart(perf_data, git_nodes), id='git-graph')],
+                        overlay_style={"visibility":"visible", "opacity": .5, "backgroundColor": "white"},
+                        custom_spinner=html.H2(["Loading Performance data", dbc.Spinner(color="primary")]),
+                    ),
                     html.Button('Run performance with selected commits', id='run-perf-commit', n_clicks=0, disabled=True),
                     html.H4('Selected Commits:'),
                     html.Div(
@@ -436,13 +443,80 @@ def update_branch_output_lists(n_clicks, value):
 @callback(
     Output('git-graph', 'figure'),
     Input('input-on-submit', 'value'),
-    Input('branch_multi_option', 'value')
+    Input('branch_multi_option', 'value'),
+    Input('git-graph', 'selectedData'),
+    Input('run-perf-commit', 'n_clicks'),
+    prevent_initial_call=True
 )
-def update_branch_selection_output(repo_name, value):
-    selected_branches = value
-    git_nodes = getGitGraph(repo_name, selected_branches)
-    print(selected_branches)
-    return generateGitChart(git_nodes)
+def update_branch_selection_output(repo_name, value, selectedData, n_clicks):
+    
+
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    global perf_runner
+    testname = "perf_runner_test_run"
+    if 'branch_multi_option' in changed_id:
+        selected_branches = value
+        git_nodes = getGitGraph(repo_name, selected_branches)
+
+        results = parse_clover_output.get_all_db_data(testname, perf_runner.current_working_directory)
+        sorted_df = None
+        if results is not None and len(results) > 0:
+            sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
+        return generateGitChart(sorted_df, git_nodes)
+
+    elif 'run-perf-commit' in changed_id:
+        if selectedData is None:
+            return no_update
+        dss = pd.DataFrame(selectedData['points'])
+
+        msg_list = [x[0] for x in dss['customdata']]
+        hash_list = [x[1] for x in dss['customdata']]
+
+        c_df = pd.DataFrame({
+            'date(time)':dss['x'].to_list(),
+            'hash':hash_list,
+            'message': msg_list
+        })
+        
+        table_df = c_df.dropna().drop_duplicates(subset=['hash']).sort_values(by=['date(time)'], ascending=True)
+        
+        for ind in table_df.index:
+            candidate_commit_hash = table_df['hash'][ind]
+            if parse_clover_output.test_artifact_query(testname, perf_runner.current_working_directory, candidate_commit_hash):
+                continue
+            # perf_runner.git_repo.git.checkout(force=True,hash=candidate_commit_hash)
+
+            my_env = os.environ.copy()
+            my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
+            my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
+            # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
+            try:
+                command = ['source runner_script.sh']
+                result = subprocess.run(command, env=my_env, shell=True)
+            except subprocess.CalledProcessError as cpe:
+                result = cpe.output
+            finally:
+                print("final done")
+                print(result)
+                
+                data = parse_clover_output.parse_clover_output_file(testname, perf_runner.current_git_directory)
+                parse_clover_output.add_output_to_dsi(data, testname, perf_runner.current_working_directory)
+
+
+
+
+            # p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            # for line in p.stdout.readlines():
+            #     print(line)
+        print('got chart updates')
+        results = parse_clover_output.get_all_db_data(testname, perf_runner.current_working_directory)
+        if results is not None and len(results) > 0:
+            sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
+            selected_branches = value
+            git_nodes = getGitGraph(repo_name, selected_branches)
+            return generateGitChart(sorted_df, git_nodes)
+        return no_update
+    return no_update
 
 
 @callback(
@@ -489,62 +563,6 @@ def update_git_selection(selection):
     fig.update_layout(autosize=False, margin = {"l":20, "t":0},)
     return [fig, False]
 
-
-@callback(
-    # Output('git-graph', 'figure'),
-    Input('git-graph', 'selectedData'),
-    Input('run-perf-commit', 'n_clicks'),
-    prevent_initial_call=True
-)
-def run_perf_with_commits(selectedData, n_clicks):
-    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-
-    if 'run-perf-commit' in changed_id:
-        if selectedData is None:
-            print("no data")
-        dss = pd.DataFrame(selectedData['points'])
-
-        msg_list = [x[0] for x in dss['customdata']]
-        hash_list = [x[1][:7] for x in dss['customdata']]
-
-        c_df = pd.DataFrame({
-            'date(time)':dss['x'].to_list(),
-            'hash':hash_list,
-            'message': msg_list
-        })
-        testname = "perf_runner_test_run"
-        table_df = c_df.dropna().drop_duplicates(subset=['hash']).sort_values(by=['date(time)'], ascending=True)
-        global perf_runner
-        for ind in table_df.index:
-            candidate_commit_hash = table_df['hash'][ind]
-            if parse_clover_output.test_artifact_query(testname, perf_runner.current_working_directory, candidate_commit_hash):
-                continue
-            perf_runner.git_repo.git.checkout(candidate_commit_hash)
-
-            my_env = os.environ.copy()
-            my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
-            # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
-            try:
-                command = ['source runner_script.sh']
-                result = subprocess.run(command, env=my_env, shell=True)
-            except subprocess.CalledProcessError as cpe:
-                result = cpe.output
-            finally:
-                print("final done")
-                print(result)
-                
-                data = parse_clover_output.parse_clover_output_file(testname, perf_runner.current_git_directory)
-                parse_clover_output.add_output_to_dsi(data, testname, perf_runner.current_working_directory)
-
-
-
-
-            # p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            # for line in p.stdout.readlines():
-            #     print(line)
-        
-        print(n_clicks)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument('--testname', help='the test name')
@@ -558,7 +576,7 @@ if __name__ == "__main__":
     perf_runner = PerfRunner()
     
     initAndLoadCachedData(perf_runner.current_working_directory)
-    df = pd.read_csv("clover_random_test.csv")
-    sorted_df = df.sort_values(by=['git_committed_date'], ascending=True)
-    git_nodes = getGitGraph(sorted_df["git_repo_name"][0],[])
-    main()
+    # df = pd.read_csv("clover_random_test.csv")
+    # sorted_df = df.sort_values(by=['git_committed_date'], ascending=True)
+    # git_nodes = getGitGraph(sorted_df["git_repo_name"][0],[])
+    main(None, None)
