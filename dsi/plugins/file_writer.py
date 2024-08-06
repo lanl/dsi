@@ -3,6 +3,8 @@ from os.path import abspath
 from hashlib import sha1
 import json, csv
 from math import isnan
+import sqlite3
+import subprocess
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -26,6 +28,95 @@ class FileWriter(StructuredMetadata):
             sha = sha1(open(filename, 'rb').read())
             self.file_info[abspath(filename)] = sha.hexdigest()
 
+class Dot(FileWriter):
+
+    def __init__(self, filenames, **kwargs):
+        super().__init__(filenames, **kwargs)
+
+    def export_db_dot(self, dbname, fname):
+        """
+        Function that outputs a dot file for the given database.
+
+        `dbname`: database to create an ER diagram for
+
+        `fname`: name (including path) of the png file that contains the generated ER diagram
+
+        `return`: none
+        """
+        db = sqlite3.connect(dbname)
+        if fname[-4:] != ".dot":
+            fname += ".dot"
+        dot_file = open(fname, "w")
+
+        numColsERD = 1
+
+        dot_file.write("digraph sqliteschema { ")
+        dot_file.write("node [shape=plaintext]; ")
+        dot_file.write("rankdir=LR ")
+        dot_file.write("splines=true ")
+        dot_file.write("overlap=false ")
+
+        list_db_tbls = "SELECT tbl_name, NULL AS label, NULL AS color, NULL AS clusterid FROM sqlite_master WHERE type='table'"
+        try:    
+            tbl_list_stmt = db.execute(list_db_tbls)
+        except sqlite3.Error as er:
+            dot_file.write(er.sqlite_errorname)
+            dot_file.write("Can't prepare table list statement")
+            db.close()
+            dot_file.close()
+
+        for row in tbl_list_stmt:
+            tbl_name = row[0]
+
+            tbl_info_sql = f"PRAGMA table_info({tbl_name})"
+            try:
+                tbl_info_stmt = db.execute(tbl_info_sql)
+            except sqlite3.Error as er:
+                dot_file.write(er.sqlite_errorname)
+                dot_file.write(f"Can't prepare table info statement on table {tbl_name}") 
+                db.close()
+                dot_file.close()
+
+            dot_file.write(f"{tbl_name} [label=<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{numColsERD}\"><B>{tbl_name}</B></TD></TR>")
+
+            curr_row = 0
+            inner_brace = 0
+            for info_row in tbl_info_stmt:
+                if curr_row % numColsERD == 0:
+                    inner_brace = 1
+                    dot_file.write("<TR>")
+
+                dot_file.write(f"<TD PORT=\"{info_row[1]}\">{info_row[1]}</TD>")
+                curr_row += 1
+                if curr_row % numColsERD == 0:
+                    inner_brace = 0
+                    dot_file.write("</TR>")
+
+            if inner_brace:
+                dot_file.write("</TR>")
+            dot_file.write("</TABLE>>]; ")
+
+        tbl_list_stmt = db.execute(list_db_tbls)
+        for row in tbl_list_stmt:
+            tbl_name = row[0]
+
+            fkey_info_sql = f"PRAGMA foreign_key_list({tbl_name})"
+            try:
+                fkey_info_stmt = db.execute(fkey_info_sql)
+            except sqlite3.Error as er:
+                dot_file.write(er.sqlite_errorname)
+                dot_file.write(f"Can't prepare foreign key statement on table {tbl_name}")
+                db.close()
+                dot_file.close()
+
+            for fkey_row in fkey_info_stmt:
+                dot_file.write(f"{tbl_name}:{fkey_row[3]} -> {fkey_row[2]}:{fkey_row[4]}; ")
+
+        dot_file.write("}")
+        db.close()
+        dot_file.close()
+
+        subprocess.run(["dot", "-Tpng", "-o", fname + ".png", fname + ".dot"])
 
 class Csv(FileWriter):
     """
