@@ -45,7 +45,8 @@ def recursive_customized_match(re_list, search_file_list, cur_dir):
                         for each_re in re_list:
                             line_match = re.compile(r".*(" + each_re + r").*").match(line)
                             if line_match is not None:
-                                c_line = line_match.group(1)
+                                # c_line = line_match.group(1)
+                                c_line = line.rstrip()
                                 occurance[c_line] = occurance.get(c_line, dict())
                                 # occurance[line]["first"] = line_match.group(1)
                                 # occurance[line]["second"] = line_match.group(2)
@@ -71,14 +72,14 @@ def main():
     git_hash = git.Repo(git_repo).head.object.hexsha
     re_list = ["pragma", "define"]
     search_file_list = [r"\.c", r"\.cc"]
-    occ = recursive_c_directive_match(re_list, search_file_list, git_repo)
+    # occ = recursive_c_directive_match(re_list, search_file_list, git_repo)
 
-    with open(git_hash + '.pickle', 'wb') as handle:
-        pickle.dump(occ, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(git_hash + '.pickle', 'wb') as handle:
+    #     pickle.dump(occ, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    re_list = [r"OMP PARALLEL", r"vol=0\.0", r"\w+=\d+\.\d+"]
+    # re_list = [r"OMP PARALLEL", r"vol=0\.0", r"\w+=\d+\.\d+"]
     search_file_list = [r"\.c", r"\.cc", r"\.f90"]
-    # recursive_customized_match(re_list, search_file_list, git_repo)
+    recursive_customized_match(re_list, search_file_list, git_repo)
 
     # with open(git_hash + '.pickle', 'rb') as handle:
     #     b = pickle.load(handle)

@@ -9,9 +9,10 @@ source ~/.bash_profile
 conda activate cdsi
 cd $SOURCE_BASE_DIRECTORY
 git checkout -f $CANDIDATE_COMMIT_HASH
-make clean
-make COMPILER=GNU
-echo "================================ Compile Done ================================ "
+
+make clean;
+make COMPILER=GNU;
+echo "================================ Compile Done ================================ "l
     
-echo "============================= Running CloverLeaf ============================= "
-mpirun -np 2 clover_leaf
+echo "============================= Running CloverLeaf ============================= "j
+mpirun -np 2 clover_leaf;

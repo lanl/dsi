@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-from dash import Dash, html, dcc, Input, Output, callback, State, callback_context, no_update
+from dash import Dash, html, dcc, Input, Output, dash_table, callback, State, callback_context, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
@@ -23,6 +23,7 @@ import git
 import subprocess
 
 import parse_clover_output
+import code_sensing
 
 fetched_branches = list()
 repo_name = ""
@@ -30,6 +31,7 @@ local_cached_data = None
 
 class PerfRunner():
     def __init__(self, cwd='/tmp/fly_dsi'):
+        self.testname = "perf_runner_test_run"
         self.current_working_directory = cwd
         self.current_git_directory = cwd + '/src'
 
@@ -61,7 +63,9 @@ def initAndLoadCachedData(workignDir='/tmp/fly_dsi'):
 
 
 def getGitRepo(user_repo):
-    return None
+    GITHUB_ACCESS_TOKEN = ""
+    g = Github(GITHUB_ACCESS_TOKEN)
+    return g.get_repo(user_repo)
 
 def getGitGraph(user_repo, selected_branches):
     # considering perf_data is already sorted by commit time
@@ -156,7 +160,7 @@ def generateGitChart(sorted_df, git_nodes):
     if git_nodes is None or len(git_nodes) == 0:
         fig1 = go.Figure().add_annotation(
             x=2, y=2,
-            text="No Data to Display",
+            text="Select Branches",
             font=dict(family="sans serif",size=25,color="crimson"),
             showarrow=False,
             yshift=10)
@@ -165,10 +169,10 @@ def generateGitChart(sorted_df, git_nodes):
             yaxis = { "visible": False })
         return fig1
     # gitFig = go.Figure()
-    gitFig = make_subplots(rows=2, cols=1,
+    gitFig = make_subplots(rows=3, cols=1,
                     vertical_spacing = 0.05,
                     shared_xaxes=True,
-                    row_heights=[0.6, 0.4],
+                    row_heights=[0.5, 0.2, 0.3],
                     subplot_titles=("hello",""))
 
     branch_depth = dict()
@@ -229,7 +233,7 @@ def generateGitChart(sorted_df, git_nodes):
                         text=git_nodes_df['branch'][ind],
                         x=find_commit_dates(git_nodes_df['sha'][ind]),
                         y=getNodeY(git_nodes_df.loc[ind]),
-                        xref='x2', yref='y2',
+                        xref='x2', yref='y3',
                         font=dict(color=font_color, size=font_size),# textangle=-90,
                         showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2,
                         align="right", valign="top", xanchor="auto", yanchor="bottom"
@@ -270,7 +274,7 @@ def generateGitChart(sorted_df, git_nodes):
                                 'Message: %{customdata[0]}<br>Name: %{customdata[2]}<extra></extra>',
                                 showlegend = False,
                                 customdata=cd),
-                    row = 2,
+                    row = 3,
                     col = 1,
                     secondary_y = False
             )
@@ -285,10 +289,47 @@ def generateGitChart(sorted_df, git_nodes):
                             secondary_y = False
                             )
 
+
+    # global local_cached_data
+    # if 'code_sensing' in local_cached_data:
+    #     cached_data = local_cached_data['code_sensing']
+    #     all_var_list = list()
+    #     for each_hash in cached_data:
+    #         for each_var in cached_data[each_hash]:
+    #             f_list = dict()
+    #             f_list['var_name'] = each_var
+    #             f_list['hash'] = each_hash
+    #             f_list['file_name'] = each_file
+    #             # f_list['occ'] = len(cached_data[each_hash][each_var][each_file])
+    #             all_var_list.append(f_list)
+
+    #             len(cached_data[each_hash][each_var])
+    #             # for each_file in cached_data[each_hash][each_var]:
+    #             #     f_list = dict()
+    #             #     f_list['var_name'] = each_var
+    #             #     f_list['hash'] = each_hash
+    #             #     f_list['file_name'] = each_file
+    #             #     f_list['occ'] = len(cached_data[each_hash][each_var][each_file])
+    #             #     all_var_list.append(f_list)
+    #     print(all_var_list)
+    #     all_var_df = pd.DataFrame(all_var_list)
+
+    #     code_senese_df = pd.merge(all_var_df, git_nodes_df, left_on="hash", right_on="sha", how="outer")
+    #     code_senese_df["formatted_date"] = pd.to_datetime(code_senese_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
+
+    #     gitFig.add_trace(go.Scatter(code_senese_df, x="formatted_date", y='file_name',
+    #                                 mode='markers',
+    #                                 name='var_name'),
+    #                         row = 2,
+    #                         col = 1,
+    #                         secondary_y = False
+    #                         )
+
+    
     gitFig.update_traces(mode='lines+markers')
     gitFig.update_xaxes(showgrid=False, categoryorder='array', categoryarray=combined_all_df["formatted_date"])
-    gitFig.update_yaxes(visible=False, showticklabels=False, row=2, col=1)
-    gitFig.update_yaxes(type="linear", row=1, col=1)
+    gitFig.update_yaxes(visible=True, showticklabels=False, title="Commits", row=2, col=1)
+    gitFig.update_yaxes(type="linear", title="Time (s)", row=1, col=1)
     gitFig.update_layout(margin=dict(l=20, r=20, t=0, b=20),
                          annotations=make_annotations(),
                          legend_traceorder="normal",
@@ -306,7 +347,7 @@ def generateGitChart(sorted_df, git_nodes):
 #     return generatePerfChart(current_time)
 
 def main(perf_data, git_nodes):
-    app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
+    app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_callback_exceptions=True)
     app.layout = dbc.Container([
         html.Div([
             html.Div([
@@ -318,24 +359,42 @@ def main(perf_data, git_nodes):
                 html.
                 P("Analyze performance accross commit"
                 )
-            ],
-                    style={"vertical-alignment": "top", "height": 260}),
+            ], style={"vertical-alignment": "top"}),
+            html.Div([
+                dcc.Loading(
+                    [dcc.Graph(figure=generateGitChart(perf_data, git_nodes), id='git-graph')],
+                    overlay_style={"visibility":"visible", "opacity": .5, "backgroundColor": "white"},
+                    custom_spinner=html.H2(["Loading Performance data", dbc.Spinner(color="primary")]),
+                ),
+                html.Div(
+                    html.Button('Run performance with selected commits', id='run-perf-commit', n_clicks=0, disabled=True
+                    ), style={'margin-top': 20,'margin-bottom': 20}),
+                html.H4('Selected Commits:'),
+                html.Div(
+                    dcc.Graph(
+                        id='selected-commits-table'
+                    ), style={'width': 790,'margin-top': 0,'margin-left': 0})
+            ], style={'width': 790,'margin-top': 0,'margin-left': 0})
+            # html.Div(
+            #     html.Img(src='assets/image.svg',
+            #             style={'margin-left': 15, 'margin-right': 15, 'margin-top': 30, 'width': 310})
+            # )
+        ], style={
+            'width': '20%',
+            'margin-left': 10,
+            'margin-top': 35,
+            'margin-right': 10,
+            'margin-bottom': 35
+        }),
+        html.Div([
             html.Div([
                 html.H6("Provide user and reository name in the form <user/repo>"),
                 html.Div([
-                    html.Div(dcc.Input(id='input-on-submit', value='UK-MAC/CloverLeaf_ref', type='text')),
+                    dcc.Input(id='input-on-submit', value='UK-MAC/CloverLeaf_ref', type='text', style={'width':200}),
                     html.Button('Get Branches', id='submit-val', n_clicks=0),
                     html.Div(id='container-button-basic',
-                            children='Enter a value and press submit')
-
-
-
-                    # "Input: ",
-                    # dcc.Input(id='input-repo', value='UK-MAC/CloverLeaf_ref', type='text'),
-                    # html.Button(id='input-repo-submit', type='submit', children='ok')
+                            children='Enter a value and press Get Branches')
                 ]),
-                # html.Br(),
-                # html.Div(id='my-output'),
             ]),
             html.Div([
                 html.Div([
@@ -350,69 +409,200 @@ def main(perf_data, git_nodes):
                         optionHeight=40,
                         multi=True
                     ),
-                    html.Div(id='branch-selection_text',
-                            children='Selected branches')
+                    html.Div(id='branch-selection_text', children='Selected branches')
                 ])
-            ], style={'margin-left': 15, 'margin-right': 15, 'margin-top': 30}),
-            # html.Div(
-            #     html.Img(src='assets/image.svg',
-            #             style={'margin-left': 15, 'margin-right': 15, 'margin-top': 30, 'width': 310})
-            # )
-        ], style={
-            'width': 340,
-            'margin-left': 35,
-            'margin-top': 35,
-            'margin-bottom': 35
+            ], style={'margin-left': 0, 'margin-right': 0, 'margin-top': 10}),
+        ],
+        style={
+            'width': '40%',
+            'margin-top': 20,
+            'margin-right': 10,
+            'margin-bottom': 0,
+            "vertical-alignment": "top"
         }),
-        html.Div(
-            [
-                # html.Div(
-                #     dcc.Graph(
-                #         figure=generatePerfChart(),
-                #         id='perf_graph'
-                #     ), style={'width': 790}),
-                # html.Div(
-                    # dcc.Graph(
-                    #     figure=generateGitChart(perf_data, git_nodes),
-                    #     id='git-graph'
-                    # ), style={'width': 790,'margin-top': 0, 'margin-bottom':20}),
-                html.Div([
-                    dcc.Loading(
-                        [dcc.Graph(figure=generateGitChart(perf_data, git_nodes), id='git-graph')],
-                        overlay_style={"visibility":"visible", "opacity": .5, "backgroundColor": "white"},
-                        custom_spinner=html.H2(["Loading Performance data", dbc.Spinner(color="primary")]),
-                    ),
-                    html.Button('Run performance with selected commits', id='run-perf-commit', n_clicks=0, disabled=True),
-                    html.H4('Selected Commits:'),
-                    html.Div(
-                        dcc.Graph(
-                            id='selected-commits-table'
-                        ), style={'width': 790,'margin-top': 0,'margin-left': 0})
-                ], style={'width': 790,'margin-top': 0,'margin-left': 0})
-            ],
-            style={
-                'width': 990,
-                'margin-top': 20,
-                'margin-right': 35,
-                'margin-bottom': 0,
-                "vertical-alignment": "top"
-            })
+        html.Div([
+            html.Div([
+                html.H4("Search any variable, (regex or plaintext):"),
+                dcc.Input(id='custom-var-search', value='pragma, define', type='text', style={'margin-bottom': 10}),
+                html.Div(id='search-var-info', children='Choose files types to filter'),
+                dcc.Dropdown(
+                    [".c", ".cc", ".py", ".f90", ".ipynb"],
+                    [".c", ".cc",],
+                    id="filter-file-multi-options",
+                    clearable=True,
+                    optionHeight=40,
+                    multi=True
+                ),
+                html.Div(id='file-filter-selection-text', children='Filtered Files', style={'margin-bottom': 10}),
+                html.Button('Search', id='submit-var-search', n_clicks=0, disabled=True),
+                html.Div(id='var-results-table', style={'margin-top': 10}),
+                html.Div(id='code-view', style={'margin-top': 10,
+                                                'height': '1000px', 'maxHeight': '1000px',
+                                                'overflow': 'auto',
+                                                }),
+            ], style={'margin-left': 0, 'margin-top': 30}),
+        ], style={
+            'width': '40%',
+            'margin-left': 0,
+        }),
     ],
-                            fluid=True,
-                            style={'display': 'flex'},
-                            className='dashboard-container')
-    
-    
-
-
-
-
+    fluid=True,
+    style={'display': 'flex'},
+    className='dashboard-container')
 
     app.run_server(debug=True)
+
+@callback(
+    Output('var-results-table', 'children'),
+    Input('submit-var-search', 'n_clicks'),
+    State('custom-var-search', 'value'),
+    Input('filter-file-multi-options', 'value'),
+    prevent_initial_call=True
+)
+def update_var_result_table(n_clicks, search_var, filtered_files):
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    if 'submit-var-search' in changed_id:
+
+
+        global perf_runner
+        global local_cached_data
+        if 'code_sensing' not in local_cached_data:
+            local_cached_data['code_sensing'] = dict()
+        cached_data = local_cached_data['code_sensing']
+
+        candidate_commit_hash = perf_runner.git_repo.head.object.hexsha
+
+
+        cached_data[candidate_commit_hash] = cached_data.get(candidate_commit_hash, dict())
+
+        all_var_list = list()
+        for each_var in search_var.split(","):
+            ev = each_var.rstrip()
+            if ev not in cached_data[candidate_commit_hash]:
+                var_dict = code_sensing.recursive_customized_match([ev], filtered_files, perf_runner.current_git_directory)
+                cached_data[candidate_commit_hash][ev] = cached_data[candidate_commit_hash].get(ev, dict())
+                cached_data[candidate_commit_hash][ev].update(var_dict)
+
+            each_hash = candidate_commit_hash
+            # for each_hash in cached_data:
+            if ev in cached_data[each_hash]:
+                for each_var in cached_data[each_hash][ev]:
+                    for each_file in cached_data[each_hash][ev][each_var]:
+                        for f_type in filtered_files:
+                            if re.search(f_type + '$', each_file):
+                                f_list = dict()
+                                f_list['var_name'] = each_var
+                                f_list['hash'] = each_hash
+                                f_list['ev'] = ev
+                                f_list['file_name'] = each_file
+                                f_list['occ'] = len(cached_data[each_hash][ev][each_var][each_file])
+                                all_var_list.append(f_list)
+                break
+
+        local_cached_data['code_sensing'] = cached_data
+
+
+        var_result_table = dash_table.DataTable(
+            id='var-search-table',
+            columns=[
+                {'name': 'variable', 'id': 'var_name', 'type': 'text'},
+                {'name': 'file name', 'id': 'file_name', 'type': 'text'},
+                # {'name': 'occurance', 'id': 'occ', 'type': 'numeric'}
+            ],
+            data=all_var_list,
+            filter_action='native',
+            editable=False,
+            sort_action="native",
+            row_selectable="single",
+            row_deletable=True,
+            style_table={
+                'height': '250px', 'minHeight': '200px', 'maxHeight': '250px',
+                'overflow': 'auto',
+                'font-size': '12px',
+            },
+            style_data={
+                # 'width': '100px', 'minWidth': '100px', 
+                'maxWidth': '100px',
+                'whiteSpace': 'normal',
+                'overflow': 'auto',
+                # 'textOverflow': 'ellipsis',
+            }
+        )
+        return var_result_table
+    return no_update
+
+
+@callback(
+    Output('code-view', "children"),
+    Input('var-search-table', "derived_virtual_data"),
+    Input('var-search-table', "derived_virtual_selected_rows"))
+def action_on_selected_vars(rows, derived_virtual_selected_rows):
+    # print(rows)
+    # print(derived_virtual_selected_rows)
+    if derived_virtual_selected_rows is None or len(derived_virtual_selected_rows) == 0 or len(rows) < derived_virtual_selected_rows[0]:
+        return no_update
+    mk_data = rows[derived_virtual_selected_rows[0]]
+    global perf_runner
+    global local_cached_data
+    cached_data = local_cached_data['code_sensing']
+    
+    
+
+
+    file_url = perf_runner.current_git_directory + '/' + mk_data['file_name']
+    line_padding = 5
+    f_lines = cached_data[mk_data['hash']][mk_data['ev']][mk_data['var_name']][mk_data['file_name']]
+
+    # mk_string = "\n\n" + "[" + mk_data['file_name'] + "](https://github.com/" + perf_runner.git_user_repo + "/blob/" + mk_data['hash'] + "/" + mk_data['file_name'] + "#L16)\n\n``` cpp\n\n"
+    mk_string = ""
+    is_first = True
+    with open(file_url) as fp:
+        line_index = 1
+        for line in fp:
+            for lp in range(line_padding):
+                if line_index-lp in f_lines:
+                    if lp == 0:
+                        if is_first:
+                            is_first = False
+                        else:
+                            mk_string += "```"
+                        mk_string += "\n\n[" + mk_data['file_name'] + " Line:" + str(line_index) + "](https://github.com/" + perf_runner.git_user_repo + "/blob/" + mk_data['hash'] + "/" + mk_data['file_name'] + "#L" + str(line_index) + ")\n\n``` python\n\n"
+                    mk_string += line + '\n'
+            line_index = line_index + 1
+    if is_first is False:
+        mk_string += "```"
+    
+    mk_component = dcc.Markdown(mk_string, id='actual-source-block')
+    return mk_component
+
+
+@callback(
+    Output('search-var-info', 'children'),
+    Input('submit-var-search', 'n_clicks'),
+    State('custom-var-search', 'value'),
+    Input('filter-file-multi-options', 'value'),
+    prevent_initial_call=True
+)
+def update_search_var_output_text(n_clicks, search_var, filtered_files):
+    global perf_runner
+    results = parse_clover_output.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
+    if results is not None and len(results) > 0:
+        pass
+    
+    # global local_cached_data
+    # if 'code_sensing' not in local_cached_data:
+    #     local_cached_data['code_sensing'] = dict()
+    # cached_data = local_cached_data['code_sensing']
+
+    # code_sensing.recursive_customized_match(search_var.split(","), filtered_files, perf_runner.current_git_directory)
+    return 'Searched vars: {}'.format(
+        search_var
+    )
 
 
 @callback(
     Output('container-button-basic', 'children'),
+    Output('submit-var-search','disabled'),
     Input('submit-val', 'n_clicks'),
     State('input-on-submit', 'value'),
     prevent_initial_call=True
@@ -421,9 +611,9 @@ def update_branch_output_text(n_clicks, value):
     repo_name = value
     global perf_runner
     perf_runner.initGitRepo(repo_name)
-    return 'Fetching branches for {}'.format(
+    return ['Fetched branches for {}'.format(
         value
-    )
+    ), False]
 
 @callback(
     Output('branch_multi_option', 'options'),
@@ -446,19 +636,20 @@ def update_branch_output_lists(n_clicks, value):
     Input('branch_multi_option', 'value'),
     Input('git-graph', 'selectedData'),
     Input('run-perf-commit', 'n_clicks'),
+    State('custom-var-search', 'value'),
+    Input('filter-file-multi-options', 'value'),
     prevent_initial_call=True
 )
-def update_branch_selection_output(repo_name, value, selectedData, n_clicks):
+def update_branch_selection_output(repo_name, value, selectedData, n_clicks, search_var, filtered_files):
     
 
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     global perf_runner
-    testname = "perf_runner_test_run"
     if 'branch_multi_option' in changed_id:
         selected_branches = value
         git_nodes = getGitGraph(repo_name, selected_branches)
 
-        results = parse_clover_output.get_all_db_data(testname, perf_runner.current_working_directory)
+        results = parse_clover_output.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
         sorted_df = None
         if results is not None and len(results) > 0:
             sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
@@ -479,37 +670,52 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks):
         })
         
         table_df = c_df.dropna().drop_duplicates(subset=['hash']).sort_values(by=['date(time)'], ascending=True)
-        
+        global local_cached_data
+        if 'code_sensing' not in local_cached_data:
+            local_cached_data['code_sensing'] = dict()
+        cached_data = local_cached_data['code_sensing']
+
         for ind in table_df.index:
             candidate_commit_hash = table_df['hash'][ind]
-            if parse_clover_output.test_artifact_query(testname, perf_runner.current_working_directory, candidate_commit_hash):
-                continue
+            
+            if parse_clover_output.test_artifact_query(perf_runner.testname, perf_runner.current_working_directory, candidate_commit_hash):
+                try:
+                    result = subprocess.run('cd ' + perf_runner.current_git_directory + ' && git checkout -f ' + candidate_commit_hash, shell=True)
+                except subprocess.CalledProcessError as cpe:
+                    result = cpe.output
+                finally:
+                    print("checkout done")
+                    print(result)
             # perf_runner.git_repo.git.checkout(force=True,hash=candidate_commit_hash)
+            else:
+                my_env = os.environ.copy()
+                my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
+                my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
+                # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
+                try:
+                    command = ['source runner_script.sh']
+                    result = subprocess.run(command, env=my_env, shell=True)
+                except subprocess.CalledProcessError as cpe:
+                    result = cpe.output
+                finally:
+                    print("final done")
+                    print(result)
+                    
+                    data = parse_clover_output.parse_clover_output_file(perf_runner.testname, perf_runner.current_git_directory)
+                    parse_clover_output.add_output_to_dsi(data, perf_runner.testname, perf_runner.current_working_directory)
 
-            my_env = os.environ.copy()
-            my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
-            my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
-            # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
-            try:
-                command = ['source runner_script.sh']
-                result = subprocess.run(command, env=my_env, shell=True)
-            except subprocess.CalledProcessError as cpe:
-                result = cpe.output
-            finally:
-                print("final done")
-                print(result)
-                
-                data = parse_clover_output.parse_clover_output_file(testname, perf_runner.current_git_directory)
-                parse_clover_output.add_output_to_dsi(data, testname, perf_runner.current_working_directory)
+            cached_data[candidate_commit_hash] = cached_data.get(candidate_commit_hash, dict())
+            for each_var in search_var.split(","):
+                ev = each_var.rstrip()
+                if ev not in cached_data[candidate_commit_hash]:
+                    var_dict = code_sensing.recursive_customized_match([ev], filtered_files, perf_runner.current_git_directory)
+                    cached_data[candidate_commit_hash][ev] = cached_data[candidate_commit_hash].get(ev, dict())
+                    cached_data[candidate_commit_hash][ev].update(var_dict)
 
 
-
-
-            # p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            # for line in p.stdout.readlines():
-            #     print(line)
         print('got chart updates')
-        results = parse_clover_output.get_all_db_data(testname, perf_runner.current_working_directory)
+        local_cached_data['code_sensing'] = cached_data
+        results = parse_clover_output.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
         if results is not None and len(results) > 0:
             sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
             selected_branches = value
