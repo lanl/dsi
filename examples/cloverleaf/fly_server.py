@@ -381,7 +381,6 @@ def main(perf_data, git_nodes):
                                     ],
                                     filter_action='native',
                                     editable=False,
-                                    sort_action="native",
                                     row_selectable="multi",
                                     row_deletable=True,
                                     style_cell={'textAlign': 'left'},
@@ -468,7 +467,7 @@ def main(perf_data, git_nodes):
                                     filter_action='native',
                                     editable=False,
                                     sort_action="native",
-                                    row_selectable="single",
+                                    row_selectable="multi",
                                     row_deletable=True,
                                     style_cell={'textAlign': 'left'},
                                     style_table={
@@ -572,48 +571,47 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     blank_markdown = dcc.Markdown("", id='actual-source-block')
     
-    if derived_virtual_selected_rows is None or len(derived_virtual_selected_rows) == 0 or len(rows) < derived_virtual_selected_rows[0]:
-        return blank_markdown
-    mk_data = rows[derived_virtual_selected_rows[0]]
+    mk_data = None
     global perf_runner
     global local_cached_data
     cached_data = local_cached_data['code_sensing']
     
     
-
-
-    file_url = perf_runner.current_git_directory + '/' + mk_data['file_name']
-    line_padding = 5
-    selected_hash = ""
-    if derived_selected_commits_list is None or len(derived_selected_commits_list) == 0: # no commit selected
-        selected_hash = mk_data['hash']
-        f_lines = cached_data[mk_data['hash']][mk_data['ev']][mk_data['var_name']][mk_data['file_name']]
-    elif len(derived_selected_commits_list) == 1:
-        selected_hash = selected_commits_row[derived_selected_commits_list[0]]["long_hash"]
-        if selected_hash in cached_data and mk_data['ev'] in cached_data[selected_hash] and mk_data['var_name'] in cached_data[selected_hash][mk_data['ev']] and mk_data['file_name'] in cached_data[selected_hash][mk_data['ev']][mk_data['var_name']]:
-            f_lines = cached_data[selected_hash][mk_data['ev']][mk_data['var_name']][mk_data['file_name']]
-        else:
-            return dcc.Markdown("##### Selected file does not exist in the selected commit.", id='actual-source-block')
-
-    # mk_string = "\n\n" + "[" + mk_data['file_name'] + "](https://github.com/" + perf_runner.git_user_repo + "/blob/" + mk_data['hash'] + "/" + mk_data['file_name'] + "#L16)\n\n``` cpp\n\n"
     if len(derived_selected_commits_list) < 2:
-        mk_string = "\n\n Commit: " + selected_hash[:7] + "\n\n"
-        is_first = True
-        with open(file_url) as fp:
-            line_index = 1
-            for line in fp:
-                for lp in range(line_padding):
-                    if line_index-lp in f_lines:
-                        if lp == 0:
-                            if is_first:
-                                is_first = False
-                            else:
-                                mk_string += "```"
-                            mk_string += "\n\n[" + mk_data['file_name'] + " Line:" + str(line_index) + "](https://github.com/" + perf_runner.git_user_repo + "/blob/" + selected_hash + "/" + mk_data['file_name'] + "#L" + str(line_index) + ")\n\n``` python\n\n"
-                        mk_string += line + '\n'
-                line_index = line_index + 1
-        if is_first is False:
-            mk_string += "```"
+        line_padding = 5
+        selected_hash = ""
+        if derived_virtual_selected_rows is None or len(derived_virtual_selected_rows) == 0 or len(rows) < derived_virtual_selected_rows[0]:
+            return blank_markdown
+    
+        mk_string = "\n\n Commit: " + rows[derived_virtual_selected_rows[0]]['hash'][:7] + "\n\n"
+        for i in range(len(derived_virtual_selected_rows)):
+            mk_data = rows[derived_virtual_selected_rows[i]]
+            selected_hash = mk_data['hash']
+            # selected_hash = selected_commits_row[derived_selected_commits_list[0]]["long_hash"]
+            if selected_hash in cached_data and mk_data['ev'] in cached_data[selected_hash] and mk_data['var_name'] in cached_data[selected_hash][mk_data['ev']] and mk_data['file_name'] in cached_data[selected_hash][mk_data['ev']][mk_data['var_name']]:
+                f_lines = cached_data[selected_hash][mk_data['ev']][mk_data['var_name']][mk_data['file_name']]
+            else:
+                return dcc.Markdown("##### Selected variable in file does not exist in the selected commit.", id='actual-source-block')
+        
+            file_url = perf_runner.current_git_directory + '/' + mk_data['file_name']
+            
+            is_first = True
+            with open(file_url) as fp:
+                line_index = 1
+                for line in fp:
+                    for lp in range(line_padding):
+                        if line_index-lp in f_lines:
+                            if lp == 0:
+                                if is_first:
+                                    is_first = False
+                                else:
+                                    mk_string += "```"
+                                mk_string += "\n\n[" + mk_data['file_name'] + " Line:" + str(line_index) + "](https://github.com/" + perf_runner.git_user_repo + "/blob/" + selected_hash + "/" + mk_data['file_name'] + "#L" + str(line_index) + ")\n\n``` "
+                                mk_string +=  os.path.splitext(mk_data['file_name'])[1] + "\n\n"
+                            mk_string += line + '\n'
+                    line_index = line_index + 1
+            if is_first is False:
+                mk_string += "```"
         
         mk_component = dcc.Markdown(mk_string, id='actual-source-block')
 
@@ -621,6 +619,11 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
     elif len(derived_selected_commits_list) > 2:
         return dcc.Markdown("##### Please select upto two commits", id='actual-source-block')
     
+    if derived_virtual_selected_rows is not None and len(derived_virtual_selected_rows) > 0 and len(rows) >= derived_virtual_selected_rows[0]:
+        mk_data = list()
+        for i in range(len(derived_virtual_selected_rows)):
+            mk_data.append(rows[derived_virtual_selected_rows[i]]['file_name'])
+
     git_repo = getGitRepo(perf_runner.git_user_repo)
     first_commit_hash = selected_commits_row[derived_selected_commits_list[0]]["long_hash"]
     second_commit_hash = selected_commits_row[derived_selected_commits_list[1]]["long_hash"]
@@ -631,12 +634,14 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
         mk_string += "\n\n Base: " + second_commit_hash[:7] + "\n\n Head: " + first_commit_hash[:7] + "\n"
     else:
         mk_string += "\n\n Base: " + first_commit_hash[:7] + "\n\n Head: " + second_commit_hash[:7] + "\n"
+    
     for each_files in comp_result.files:
-        if each_files.filename in mk_data['file_name'] or mk_data['file_name'] in each_files.filename and each_files.patch is not None:
-            mk_string += "\n\n[" + mk_data['file_name'] + "](https://github.com/" + perf_runner.git_user_repo + "/compare/" + first_commit_hash + ".." + second_commit_hash + ")\n\n"
-            mk_string += "```diff\n\n"
-            mk_string += each_files.patch
-            mk_string += "\n```\n"
+        if each_files.patch is not None:
+            if mk_data is None or each_files.filename in mk_data:
+                mk_string += "\n\n[" + each_files.filename + "](https://github.com/" + perf_runner.git_user_repo + "/compare/" + first_commit_hash + ".." + second_commit_hash + ")\n\n"
+                mk_string += "```diff\n\n"
+                mk_string += each_files.patch
+                mk_string += "\n```\n"
 
     mk_component = dcc.Markdown(mk_string, id='actual-source-block')
 
