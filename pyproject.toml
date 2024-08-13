@@ -3,14 +3,15 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name="dsi"
+name="pydsinf"
 license={text = "BSD-3-Clause"}
 description="A Data Science Infrastructure Metadatabase"
+readme = "README.rst"
 authors=[
+	{name = 'Jesus Pulido', email = 'pulido@lanl.gov'},
 	{name = 'James Ahrens', email = 'ahrens@lanl.gov'},
 	{name = 'Divya Banesh', email = 'dbanesh@lanl.gov'},
 	{name = 'Hugh Greenberg', email = 'hng@lanl.gov'},
-	{name = 'Jesus Pulido', email = 'pulido@lanl.gov'},
 	{name = 'Ben Sims', email = 'bsims@lanl.gov'},
 	{name = 'Christine Sweeney', email = 'cahrens@lanl.gov'},
 	{name = 'Terry Turton', email = 'tlturton@lanl.gov'},
