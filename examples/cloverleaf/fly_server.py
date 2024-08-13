@@ -159,7 +159,7 @@ def range_update(l, r, X, F):
     add(r + 1, -X, F)
 # =================================
 
-def generateGitChart(sorted_df, git_nodes, mk_data=None):
+def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
     if git_nodes is None or len(git_nodes) == 0:
         fig1 = go.Figure().add_annotation(
             x=2, y=2,
@@ -283,7 +283,7 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None):
             )
 
     if sorted_df is not None and len(sorted_df) > 0:
-        for col_name in ["pdv", "cell_advection", "mpi_halo_exchange", "self_halo_exchange", "momentum_advection", "total"]:
+        for col_name in perf_filter:# ["pdv", "cell_advection", "mpi_halo_exchange", "self_halo_exchange", "momentum_advection", "total"]:
             gitFig.add_trace(go.Scatter(x=combined_all_df["formatted_date"], y=combined_all_df[col_name],
                                 mode='lines',
                                 name=col_name),
@@ -354,16 +354,59 @@ def main(perf_data, git_nodes):
     app.layout = dbc.Container([
         html.Div([
             html.Div([
-                html.H1([
+                html.H3([
                     html.Span("Welcome"),
                     html.Br(),
                     html.Span("PerfAnalyzer")
                 ]),
-                html.
-                P("Analyze performance accross commit"
-                )
+                # html.P("Analyze performance accross commit")
             ], style={"vertical-alignment": "top"}),
+            
+
+
             html.Div([
+                html.Div([
+                    html.H6("Provide user and reository name"),
+                    html.Div([
+                        dcc.Input(id='input-on-submit', value='UK-MAC/CloverLeaf_ref', type='text', style={'width':200}),
+                        html.Button('Get Branches', id='submit-val', n_clicks=0),
+                        html.Div(id='container-button-basic',
+                                children='Enter <user/repo> and press Get Branches')
+                    ]),
+                ], style={'width': '39%', 'display': 'inline-block'}),
+                html.Div([
+                    html.Div([
+                        html.H6('Branches'),
+                        dcc.Dropdown(
+                            id="branch-multi-option",
+                            options=[
+                                {'label':i, 'value':i} for i in fetched_branches
+                            ],
+                            placeholder="Select Branches",
+                            clearable=True,
+                            optionHeight=40,
+                            multi=True
+                        ),
+                        # html.Div(id='branch-selection_text', children='Selected branches')
+                    ])
+                ], style={'width': '59%', 'display': 'inline-block', 'margin-left': 0, 'margin-right': 0, 'vertical-align': 'top'}),
+            ],
+            style={
+                'margin-top': 0,
+                'margin-bottom': 10,
+                "vertical-alignment": "top"
+            }),
+
+            html.Div([
+                dcc.Dropdown(
+                    id="perf-metric-option",
+                    options=[],
+                    placeholder="Select performance metric to filter",
+                    clearable=True,
+                    optionHeight=40,
+                    multi=True,
+                    style={'margin-bottom': 10, 'width': '100%'}
+                ),
                 dcc.Loading(
                     [dcc.Graph(figure=generateGitChart(perf_data, git_nodes), id='git-graph')],
                     overlay_style={"visibility":"visible", "opacity": .5, "backgroundColor": "white"},
@@ -403,45 +446,11 @@ def main(perf_data, git_nodes):
             #             style={'margin-left': 15, 'margin-right': 15, 'margin-top': 30, 'width': 310})
             # )
         ], style={
-            'width': '20%',
+            'width': '60%',
             'height': '1000px',
             'margin-left': 10,
-            'margin-top': 35,
+            'margin-top': 5,
             'margin-right': 10
-        }),
-        html.Div([
-            html.Div([
-                html.H6("Provide user and reository name in the form <user/repo>"),
-                html.Div([
-                    dcc.Input(id='input-on-submit', value='UK-MAC/CloverLeaf_ref', type='text', style={'width':200}),
-                    html.Button('Get Branches', id='submit-val', n_clicks=0),
-                    html.Div(id='container-button-basic',
-                            children='Enter a value and press Get Branches')
-                ]),
-            ]),
-            html.Div([
-                html.Div([
-                    html.H4('Branches'),
-                    html.Div(id='branch-div'),
-                    dcc.Dropdown(
-                        id="branch_multi_option",
-                        options=[
-                            {'label':i, 'value':i} for i in fetched_branches
-                        ],
-                        clearable=True,
-                        optionHeight=40,
-                        multi=True
-                    ),
-                    # html.Div(id='branch-selection_text', children='Selected branches')
-                ])
-            ], style={'margin-left': 0, 'margin-right': 0, 'margin-top': 10}),
-        ],
-        style={
-            'width': '40%',
-            'margin-top': 20,
-            'margin-right': 10,
-            'margin-bottom': 0,
-            "vertical-alignment": "top"
         }),
         html.Div([
             html.Div([
@@ -488,7 +497,7 @@ def main(perf_data, git_nodes):
                                                 'height': '1000px', 'maxHeight': '1000px',
                                                 'overflow': 'auto',
                                                 }),
-            ], style={'margin-left': 0, 'margin-top': 30}),
+            ], style={'margin-left': 0, 'margin-top': 5}),
         ], style={
             'width': '40%',
             'margin-left': 0,
@@ -679,7 +688,7 @@ def update_branch_output_text(n_clicks, value):
     ), False]
 
 @callback(
-    Output('branch_multi_option', 'options'),
+    Output('branch-multi-option', 'options'),
     Input('submit-val', 'n_clicks'),
     State('input-on-submit', 'value'),
     prevent_initial_call=True
@@ -692,23 +701,41 @@ def update_branch_output_lists(n_clicks, value):
     fetched_branches = repo.get_branches()
     return [br.name for br in fetched_branches]
 
+def get_browsable_perf_metric(df):
+    column_list = list()
+    for column in df:
+        if column == 'testname' or column.startswith("git_") or 'min' in column or 'max' in column or 'x_cells' in column or 'y_cells' in column:
+            continue
+        column_list.append(column)
+    return column_list
+
+def find_interesting_perf_metric(df):
+    for column in df:
+        if column == 'testname' or column.startswith("git_") or 'min' in column or 'max' in column or 'x_cells' in column or 'y_cells' in column:
+            continue
+        df[column] = pd.to_numeric(df[column].fillna(value=np.nan), errors='coerce')
+    another = df.select_dtypes(include='number').std() > 0.5
+    return list(another[another].index)
 
 @callback(
     Output('git-graph', 'figure'),
+    Output('perf-metric-option', 'options'),
+    Output('perf-metric-option', 'value'),
     Input('input-on-submit', 'value'),
-    Input('branch_multi_option', 'value'),
+    Input('branch-multi-option', 'value'),
     Input('git-graph', 'selectedData'),
     Input('run-perf-commit', 'n_clicks'),
     State('custom-var-search', 'value'),
     Input('filter-file-multi-options', 'value'),
     State('var-search-table', "derived_virtual_data"),
     State('var-search-table', "derived_virtual_selected_rows"),
+    Input('perf-metric-option', 'value'),
     prevent_initial_call=True
 )
-def update_branch_selection_output(repo_name, value, selectedData, n_clicks, search_var, filtered_files, rows, derived_virtual_selected_rows):
+def update_branch_selection_output(repo_name, value, selectedData, n_clicks, search_var, filtered_files, rows, derived_virtual_selected_rows, perf_list):
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     global perf_runner
-    if 'branch_multi_option' in changed_id:
+    if 'branch-multi-option' in changed_id or 'perf-metric-option' in changed_id:
         selected_branches = value
         git_nodes = getGitGraph(repo_name, selected_branches)
 
@@ -716,18 +743,21 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
         sorted_df = None
         if results is not None and len(results) > 0:
             sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
-        return generateGitChart(sorted_df, git_nodes)
+        pfl = perf_list
+        if perf_list is None or len(perf_list) == 0:
+            pfl = find_interesting_perf_metric(sorted_df)
+        return [generateGitChart(sorted_df, git_nodes,perf_filter=pfl), get_browsable_perf_metric(sorted_df), pfl]
 
     elif 'run-perf-commit' in changed_id:
         if selectedData is None:
-            return no_update
+            [no_update, no_update]
         dss = pd.DataFrame(selectedData['points'])
         
         msg_list = [x[0] for x in dss['customdata']]
         hash_list = [x[1] for x in dss['customdata']]
 
         if 'customdata' not in dss:
-            return no_update
+            [no_update, no_update]
         
         c_df = pd.DataFrame({
             'date(time)':dss['x'].to_list(),
@@ -787,9 +817,12 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
             mk_data = None
             if derived_virtual_selected_rows is not None and len(derived_virtual_selected_rows) > 0 and len(rows) >= derived_virtual_selected_rows[0]:
                 mk_data = rows[derived_virtual_selected_rows[0]]
-            return generateGitChart(sorted_df, git_nodes, mk_data)
-        return no_update
-    return no_update
+            pfl = perf_list
+            if perf_list is None or len(perf_list) == 0:
+                pfl = find_interesting_perf_metric(sorted_df)
+            return [generateGitChart(sorted_df, git_nodes, mk_data, pfl), get_browsable_perf_metric(sorted_df), pfl]
+        return [no_update, no_update, no_update]
+    return [no_update, no_update, no_update]
 
 
 @callback(
