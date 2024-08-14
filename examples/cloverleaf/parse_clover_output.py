@@ -183,6 +183,44 @@ def parse_clover_output_file(testname, git_dir):
     # print(data)
     return data
 
+
+def parse_tau_output_file(testname, git_dir):
+    git_repo = get_git_repo(git_dir)
+    data = {}
+    data['testname'] = [testname]
+    clover_output = git_dir + "/"
+    if git_repo:
+        data['git_hash'] = [git_repo.head.object.hexsha]
+        data['git_committer'] = [git_repo.head.object.committer.email]
+        data['git_committed_date'] = [git_repo.head.object.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")]
+        data['git_repo_name'] = [get_repo_and_name_from_url(git_repo.remotes.origin.url)]
+        clover_output = clover_output + "tau_results"
+        # print(clover_output)
+    else:
+        raise Exception("Git repo not found")
+    
+    do_parse = False
+    with open(clover_output, 'r') as slurmout:
+        for line in slurmout:
+            if 'total' in line:
+                do_parse = True
+            elif 'mean' in line:
+                do_parse = False
+            if do_parse is True:
+                if "MPI_" in line:
+                    match = re.match(r'\s+(\d+\.\d+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)\s+(MPI_\w+)\(\)\s+', line)
+                    # data[match.group(7) + '_time'] = [match.group(1)]
+                    data[match.group(7) + '_emsec'] = [match.group(2)]
+                    data[match.group(7) + '_imsec'] = [match.group(3)]
+                    # data[match.group(7) + '_calls'] = [match.group(4)]
+                    # data[match.group(7) + '_subs'] = [match.group(5)]
+                    # data[match.group(7) + '_iusec_p_call'] = [match.group(6)]
+    # print(data)
+    return data
+
+
+
+
 def main():
     """ A testname argument is required """
     parser = argparse.ArgumentParser()
@@ -195,7 +233,8 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    data = parse_clover_output_file(testname, args.gitdir)
+    # data = parse_clover_output_file(testname, args.gitdir)
+    data = parse_tau_output_file(testname, args.gitdir)
     # add_output_to_csv_file(data, testname)
     add_output_to_dsi(data, testname)
 

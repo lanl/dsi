@@ -583,7 +583,13 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
     mk_data = None
     global perf_runner
     global local_cached_data
+
+    if 'code_sensing' not in local_cached_data:
+        return no_update
+
     cached_data = local_cached_data['code_sensing']
+    if cached_data is None:
+        return no_update
     
     
     if len(derived_selected_commits_list) < 2:
@@ -702,6 +708,8 @@ def update_branch_output_lists(n_clicks, value):
     return [br.name for br in fetched_branches]
 
 def get_browsable_perf_metric(df):
+    if df is None:
+        return list()
     column_list = list()
     for column in df:
         if column == 'testname' or column.startswith("git_") or 'min' in column or 'max' in column or 'x_cells' in column or 'y_cells' in column:
@@ -710,6 +718,8 @@ def get_browsable_perf_metric(df):
     return column_list
 
 def find_interesting_perf_metric(df):
+    if df is None:
+        return list()
     for column in df:
         if column == 'testname' or column.startswith("git_") or 'min' in column or 'max' in column or 'x_cells' in column or 'y_cells' in column:
             continue
@@ -786,6 +796,7 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
                 my_env = os.environ.copy()
                 my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
                 my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
+                my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
                 # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
                 try:
                     command = ['source runner_script.sh']
@@ -796,6 +807,8 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
                     print("final done")
                     
                     data = parse_clover_output.parse_clover_output_file(perf_runner.testname, perf_runner.current_git_directory)
+                    tau_data = parse_clover_output.parse_tau_output_file(perf_runner.testname, perf_runner.current_git_directory)
+                    data.update(tau_data)
                     parse_clover_output.add_output_to_dsi(data, perf_runner.testname, perf_runner.current_working_directory)
 
             cached_data[candidate_commit_hash] = cached_data.get(candidate_commit_hash, dict())
