@@ -15,6 +15,8 @@ export PROFILEDIR=$SOURCE_BASE_DIRECTORY
 cd $SOURCE_BASE_DIRECTORY
 git checkout -f $CANDIDATE_COMMIT_HASH
 
+cp ../clover.in .
+
 make clean;
 make COMPILER=GNU;
 echo "================================ Compile Done ================================ "l

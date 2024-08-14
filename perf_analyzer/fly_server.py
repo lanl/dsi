@@ -724,7 +724,7 @@ def find_interesting_perf_metric(df):
         if column == 'testname' or column.startswith("git_") or 'min' in column or 'max' in column or 'x_cells' in column or 'y_cells' in column:
             continue
         df[column] = pd.to_numeric(df[column].fillna(value=np.nan), errors='coerce')
-    another = df.select_dtypes(include='number').std() > 0.5
+    another = df.select_dtypes(include='number').std() > 0.015
     return list(another[another].index)
 
 @callback(

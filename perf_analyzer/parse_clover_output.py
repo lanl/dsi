@@ -210,8 +210,8 @@ def parse_tau_output_file(testname, git_dir):
                 if "MPI_" in line:
                     match = re.match(r'\s+(\d+\.\d+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)\s+(MPI_\w+)\(\)\s+', line)
                     # data[match.group(7) + '_time'] = [match.group(1)]
-                    data[match.group(7) + '_emsec'] = [match.group(2)]
-                    data[match.group(7) + '_imsec'] = [match.group(3)]
+                    data[match.group(7) + '_esec'] = [float(match.group(2))/1000]
+                    data[match.group(7) + '_isec'] = [float(match.group(3))/1000]
                     # data[match.group(7) + '_calls'] = [match.group(4)]
                     # data[match.group(7) + '_subs'] = [match.group(5)]
                     # data[match.group(7) + '_iusec_p_call'] = [match.group(6)]
