@@ -167,7 +167,7 @@ class GAN:
        
         return dataframe
 
-    def extract_images_from_path(self, imgColumnId, dbName, pathPrefix='./')
+    def extract_images_from_path(self, imgColumnId, dbName, pathPrefix='./'):
         '''
         Given an integer that corresponds to the column with image path
         Return np array of images following that path to image location
