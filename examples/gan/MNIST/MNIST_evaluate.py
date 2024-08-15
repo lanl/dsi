@@ -90,7 +90,7 @@ def MNIST_evaluate(pathToGenerator, pathToDB, columnsofInterest, numImages, nois
         
                 
 if __name__ == '__main__':
-      path_to_generator = 'mnist_pretrained_models/gen_49.keras'
+      path_to_generator = 'mnist_pretrained_models/gen_59.keras'
       path_to_db = 'mnist.db'
       columns_of_interest = range(785)
       num_of_images = 25

@@ -20,7 +20,7 @@ def FMNIST_predict(pathToGenerator, numImages, noiseDim, prediction_path):
 
 
 if __name__ == '__main__':
-    path_to_generator = 'fmnist_pretrained_models/gen_49.keras'
+    path_to_generator = 'fmnist_pretrained_models/gen_42.keras'
     num_of_images = 16
     noise_dim = 100
     prediction_path = 'prediction.png'
