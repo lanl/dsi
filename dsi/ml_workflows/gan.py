@@ -167,11 +167,11 @@ class GAN:
        
         return dataframe
 
-    def extract_images_from_url(self, imgColumnId, dbName, pathPrefix='./'):
+    def extract_images_from_path(self, imgColumnId, dbName, pathPrefix='./')
         '''
-        Given an integer that corresponds to the column with image url
-        Return np array of images following that url to image location
-        Optional path prefix allows to add relative path to those in url
+        Given an integer that corresponds to the column with image path
+        Return np array of images following that path to image location
+        Optional path prefix allows to add relative path to those in path
         '''
         if not isinstance(imgColumnId, int):
             print("Error: Column Id is not of type integer")
@@ -194,14 +194,14 @@ class GAN:
         #     names += name + ","
         # names = names[:-1]
 
-        # get the url data from the needed column
+        # get the path data from the needed column
         query = "SELECT " + name  + " FROM " + str(dataType.name) + ";"
         result = self.database.sqlquery(query)
 
         # extract the image data from the path
         images = []
-        for url in result:
-            path = pathPrefix + url[0]
+        for pth in result:
+            path = pathPrefix + pth[0]
             img = Image.open(path).convert('L') #future work: color img
             images.append(img)
 
