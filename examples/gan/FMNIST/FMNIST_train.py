@@ -1,3 +1,4 @@
+import os
 from dsi.ml_workflows.gan import GAN
 
 def FMNIST_train(pathToGenerator, pathToDiscriminator, pathToDB, columnsofInterest, epochs, batchSize, noise, trainedModelsFolder):
@@ -18,6 +19,8 @@ def FMNIST_train(pathToGenerator, pathToDiscriminator, pathToDB, columnsofIntere
         images = gWorkflow.format_images(images)
 
         # run the training process
+        if not os.path.exists(trainedModelsFolder):
+            os.makedirs(trainedModelsFolder)        
         gWorkflow.train(images, epochs, batchSize, noise)
         gWorkflow.save_models_to_file(trainedModelsFolder)
         gWorkflow.close_database()

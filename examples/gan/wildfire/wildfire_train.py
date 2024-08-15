@@ -1,3 +1,4 @@
+import os
 from dsi.ml_workflows.gan import GAN
 
 def wildfire_train(pathToGenerator, pathToDiscriminator, pathToDB, dataColumnsofInterest, imagesColumnOfInterest, epochs, batchSize, noise, trainedModelsFolder, pathPrefix):
@@ -20,6 +21,8 @@ def wildfire_train(pathToGenerator, pathToDiscriminator, pathToDB, dataColumnsof
                 images = gWorkflow.format_images(images)
 
                 # run the training process
+                if not os.path.exists(trainedModelsFolder):
+                    os.makedirs(trainedModelsFolder)                
                 gWorkflow.train(images, epochs, batchSize, noise)
                 gWorkflow.save_models_to_file(trainedModelsFolder)
                 gWorkflow.close_database()
