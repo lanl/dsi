@@ -28,12 +28,12 @@ class FileWriter(StructuredMetadata):
             sha = sha1(open(filename, 'rb').read())
             self.file_info[abspath(filename)] = sha.hexdigest()
 
-class Dot(FileWriter):
+class ER_Diagram(FileWriter):
 
     def __init__(self, filenames, **kwargs):
         super().__init__(filenames, **kwargs)
 
-    def export_db_dot(self, dbname, fname):
+    def export_erd(self, dbname, fname):
         """
         Function that outputs a dot file for the given database.
 
@@ -44,9 +44,21 @@ class Dot(FileWriter):
         `return`: none
         """
         db = sqlite3.connect(dbname)
-        if fname[-4:] != ".dot":
-            fname += ".dot"
-        dot_file = open(fname, "w")
+        
+        # if fname[-4:] == ".dot":
+        #     fname = fname[:-4]
+
+        file_type = ".png"
+        if fname[-4:] == ".png" or fname[-4:] == ".pdf" or fname[-4:] == ".jpg":
+            file_type = fname[-4:]
+            fname = fname[:-4]
+        elif fname[-5:] == ".jpeg":
+            file_type = fname[-5:]
+            fname = fname[:-5]
+
+        # if fname[-4:] == ".dot":
+        #     fname = fname[:-4]
+        dot_file = open(fname + ".dot", "w")
 
         numColsERD = 1
 
@@ -116,7 +128,7 @@ class Dot(FileWriter):
         db.close()
         dot_file.close()
 
-        subprocess.run(["dot", "-Tpng", "-o", fname + ".png", fname + ".dot"])
+        subprocess.run(["dot", "-T", file_type[1:], "-o", fname + file_type, fname + ".dot"])
 
 class Csv(FileWriter):
     """
