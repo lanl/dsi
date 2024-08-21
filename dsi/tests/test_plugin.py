@@ -20,4 +20,4 @@ def test_export_db_erd():
     er_image = cv2.imread("test1.png") 
 
     assert er_image is not None #check if image generated at all
-    assert np.mean(er_image) != 255 #check if image is all white pixels (no diagram generated)
+    assert np.mean(er_image) != 255 #check if image is all white pixels (empty diagram)
