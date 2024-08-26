@@ -1,5 +1,9 @@
 import csv
 import sqlite3
+import yaml
+import re
+import subprocess
+import os
 
 from dsi.backends.filesystem import Filesystem
 
@@ -494,3 +498,38 @@ class Sqlite(Filesystem):
             print(resout)
 
         return resout
+
+class YamlReader(Sqlite):
+
+    def __init__(self, filename):
+        super().__init__(filename)
+
+    def yamlToSqlite(self, filename, db_name):
+
+        with open(filename, 'r') as yaml_file, open(db_name+".sql", "w") as sql_file:
+            editedString = yaml_file.read()
+            editedString = re.sub('specification', r'columns:\n    specification', editedString) #indent specification and put all under a columns dictionary
+            editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString) #make ! into a string
+            yml_data = yaml.safe_load_all(editedString)
+
+            for table in yml_data:
+                cols = table['columns'].keys()
+                vals = table['columns'].values()
+                tableName = table["segment"]
+
+                if not os.path.isfile(db_name+".db"):
+                    data_types = {float: "REAL", str: "TEXT", int: "INTEGER"}
+
+                    createStmt = f"CREATE TABLE {tableName} ( "
+                    for key,val in table['columns'].items():
+                        createStmt += f"{key} {data_types[type(val)]}, "
+                    createStmt = createStmt[:-2]
+                    createStmt+= ");\n\n"
+
+                    sql_file.write(createStmt)
+
+                sql = f"INSERT INTO {tableName} {tuple(cols)} VALUES {tuple(vals)};\n\n"
+                sql_file.write(sql)
+        
+        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+        os.remove(db_name+".sql")
