@@ -5,6 +5,7 @@ import json, csv
 from math import isnan
 import sqlite3
 import subprocess
+import os
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -129,6 +130,7 @@ class ER_Diagram(FileWriter):
         dot_file.close()
 
         subprocess.run(["dot", "-T", file_type[1:], "-o", fname + file_type, fname + ".dot"])
+        os.remove(fname + ".dot")
 
 class Csv(FileWriter):
     """
