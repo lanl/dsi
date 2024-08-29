@@ -1,7 +1,8 @@
 import git
 from collections import OrderedDict
-
-from dsi.backends.sqlite import Sqlite, DataType
+from dsi.backends.sqlite import Sqlite, DataType, YamlReader
+import os
+import subprocess
 
 isVerbose = True
 
@@ -59,3 +60,14 @@ def test_artifact_query():
     store.close()
     # No error implies success
     assert True
+
+def test_yaml_reader():
+    reader = YamlReader()
+    reader.yaml_to_db("../../../examples/data/schema.yml", "vedant-test")
+    subprocess.run(["diff", "../../../examples/data/compare-yml.sql", "vedant-test.sql"], stdout=open("output.txt", "w"))
+    file_size = os.path.getsize("output.txt")
+    os.remove("output.txt")
+    os.remove("vedant-test.sql")
+    os.remove("vedant-test.db")
+
+    assert file_size == 0 #difference between sql files should be 0 characters

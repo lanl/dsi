@@ -499,17 +499,37 @@ class Sqlite(Filesystem):
 
         return resout
 
-class YamlReader(Sqlite):
+class YamlReader():
 
-    def __init__(self, filename):
-        super().__init__(filename)
+    def __init__(self):
+        pass
 
     def yamlToSqlite(self, filename, db_name):
+        """
+        Function that should be called externally to create the sqlite database file and delete temporary sql file used to ingest data
+
+        `filename`: name of YAML file that is ingested
+
+        `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
+        """
+        self.yaml_to_db(filename, db_name)
+        os.remove(db_name+".sql")
+
+    def yaml_to_db(self, filename, db_name):
+        """
+        DO NOT CALL EXTERNALLY EXCEPT FOR TESTING
+
+        Function creates/adds to a sqlite db file from a given YAML file with specified database name
+
+        `filename`: name of YAML file that is ingested
+
+        `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
+        """
 
         with open(filename, 'r') as yaml_file, open(db_name+".sql", "w") as sql_file:
             editedString = yaml_file.read()
-            editedString = re.sub('specification', r'columns:\n    specification', editedString) #indent specification and put all under a columns dictionary
-            editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString) #make ! into a string
+            editedString = re.sub('specification', r'columns:\n  specification', editedString)
+            editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
             yml_data = yaml.safe_load_all(editedString)
 
             for table in yml_data:
@@ -517,19 +537,52 @@ class YamlReader(Sqlite):
                 vals = table['columns'].values()
                 tableName = table["segment"]
 
+                data_types = {float: "REAL", str: "TEXT", int: "INTEGER"}
                 if not os.path.isfile(db_name+".db"):
-                    data_types = {float: "REAL", str: "TEXT", int: "INTEGER"}
-
                     createStmt = f"CREATE TABLE {tableName} ( "
-                    for key,val in table['columns'].items():
-                        createStmt += f"{key} {data_types[type(val)]}, "
-                    createStmt = createStmt[:-2]
-                    createStmt+= ");\n\n"
+                    createUnitStmt = f"CREATE TABLE {tableName}_units ( "  
+                    insertUnitStmt = f"INSERT INTO {tableName}_units {tuple(cols)} VALUES( "
 
-                    sql_file.write(createStmt)
+                    for key, val in table['columns'].items():
+                        createUnitStmt+= f"{key} TEXT, "
+                        if data_types[type(val)] == "TEXT" and self.check_type(val[:val.find(" ")]) in ["INTEGER", "REAL"]:
+                            createStmt += f"{key} {self.check_type(val[:val.find(" ")])}, "
+                            insertUnitStmt+= f"'{val[val.find(" ")+1:]}', "
+                        else:
+                            createStmt += f"{key} {data_types[type(val)]}, "
+                            insertUnitStmt+= "NULL, "
 
-                sql = f"INSERT INTO {tableName} {tuple(cols)} VALUES {tuple(vals)};\n\n"
-                sql_file.write(sql)
-        
+                    sql_file.write(createStmt[:-2] + ");\n\n")
+                    sql_file.write(createUnitStmt[:-2] + ");\n\n")
+                    sql_file.write(insertUnitStmt[:-2] + ");\n\n")
+
+                insertStmt = f"INSERT INTO {tableName} {tuple(cols)} VALUES( "
+                for val in vals:
+                    if data_types[type(val)] == "TEXT" and self.check_type(val[:val.find(" ")]) in ["INTEGER", "REAL"]:
+                        insertStmt+= f"{val[:val.find(" ")]}, "
+                    elif data_types[type(val)] == "TEXT":
+                        insertStmt+= f"'{val}', "
+                    else:
+                        insertStmt+= f"{val}, "
+
+                sql_file.write(insertStmt[:-2] + ");\n\n")
+    
         subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
-        os.remove(db_name+".sql")
+
+    def check_type(self, text):
+        """
+        Tests input text and returns a predicted compatible SQL Type
+
+        `text`: text string
+
+        `return`: string description of a SQL data type
+        """
+        try:
+            value = int(text)
+            return "INTEGER"
+        except ValueError:
+            try:
+                value = float(text)
+                return "REAL"
+            except ValueError:
+                return "TEXT"

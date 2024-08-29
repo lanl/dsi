@@ -1,0 +1,29 @@
+---
+segment: math
+specification: !jack
+  a: 1
+  b: "there is CM"
+  c: "45.98 cm"
+  d: 2
+  e: 34.8
+  f: 89e4
+---
+segment: address
+specification: !sam
+  fileLoc: '/home/sam/lib/data'
+  g: "good memories"
+  h: "556place street"
+  i: 2
+  j: 3 
+  k: 4
+  l: 10000e-4
+  m: 99
+---
+segment: physics
+specification: !amy
+  n: "9.8 m / s / s"
+  o: "gravity"
+  p: "23 s"
+  q: "home 23"
+  r: '1 million grams'
+  s: -12e-4
