@@ -28,6 +28,3 @@ jobs:
       run: |
         pip install pytest
         pytest dsi/tests/test_plugin.py
-
-
-

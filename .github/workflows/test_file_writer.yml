@@ -27,6 +27,3 @@ jobs:
       run: |
         pip install pytest
         pytest dsi/plugins/tests/test_file_writer.py
-
-
-

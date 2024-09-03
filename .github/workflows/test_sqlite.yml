@@ -28,6 +28,3 @@ jobs:
       run: |
         pip install pytest
         pytest dsi/backends/tests/test_sqlite.py
-
-
-
