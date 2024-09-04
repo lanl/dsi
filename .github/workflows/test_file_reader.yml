@@ -3,7 +3,11 @@ name: file_reader test
 on:
   push:
     branches:
-    - gh-pages
+    - main
+  pull_request:
+    branches:
+    - main
+  
 
 
 jobs:

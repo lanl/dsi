@@ -3,7 +3,10 @@ name: test_plugin.py test
 on:
   push:
     branches:
-    - gh-pages
+    - main
+  pull_request:
+    branches:
+    - main
 
 
 jobs:
