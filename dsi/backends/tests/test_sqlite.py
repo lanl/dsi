@@ -63,11 +63,11 @@ def test_artifact_query():
 
 def test_yaml_reader():
     reader = YamlReader()
-    reader.yaml_to_db("../../../examples/data/schema.yml", "vedant-test")
-    subprocess.run(["diff", "../../../examples/data/compare-yml.sql", "vedant-test.sql"], stdout=open("output.txt", "w"))
+    reader.yaml_to_db("../../../examples/data/schema.yml", "yaml-test")
+    subprocess.run(["diff", "../../../examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("output.txt", "w"))
     file_size = os.path.getsize("output.txt")
     os.remove("output.txt")
-    os.remove("vedant-test.sql")
-    os.remove("vedant-test.db")
+    os.remove("yaml-test.sql")
+    os.remove("yaml-test.db")
 
     assert file_size == 0 #difference between sql files should be 0 characters
