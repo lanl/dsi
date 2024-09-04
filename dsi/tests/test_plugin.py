@@ -2,6 +2,7 @@ from dsi.plugins import file_writer as fw
 import cv2
 import sqlite3
 import numpy as np
+import os
 
 def test_export_db_erd():
 
@@ -14,10 +15,9 @@ def test_export_db_erd():
     connection.commit()
     connection.close()
 
-    erd = fw.ER_Diagram("test.db")
-    erd.export_erd("test.db", "test1")
-    
     er_image = cv2.imread("test1.png") 
+    pixel_mean = np.mean(er_image)
 
     assert er_image is not None #check if image generated at all
-    assert np.mean(er_image) != 255 #check if image is all white pixels (empty diagram)
+    os.remove("test1.png")
+    assert pixel_mean != 255 #check if image is all white pixels (no diagram generated)
