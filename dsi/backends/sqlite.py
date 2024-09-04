@@ -533,15 +533,13 @@ class YamlReader():
             yml_data = yaml.safe_load_all(editedString)
 
             for table in yml_data:
-                cols = table['columns'].keys()
-                vals = table['columns'].values()
                 tableName = table["segment"]
 
                 data_types = {float: "REAL", str: "TEXT", int: "INTEGER"}
                 if not os.path.isfile(db_name+".db"):
                     createStmt = f"CREATE TABLE {tableName} ( "
                     createUnitStmt = f"CREATE TABLE {tableName}_units ( "  
-                    insertUnitStmt = f"INSERT INTO {tableName}_units {tuple(cols)} VALUES( "
+                    insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
 
                     for key, val in table['columns'].items():
                         createUnitStmt+= f"{key} TEXT, "
@@ -556,8 +554,8 @@ class YamlReader():
                     sql_file.write(createUnitStmt[:-2] + ");\n\n")
                     sql_file.write(insertUnitStmt[:-2] + ");\n\n")
 
-                insertStmt = f"INSERT INTO {tableName} {tuple(cols)} VALUES( "
-                for val in vals:
+                insertStmt = f"INSERT INTO {tableName} VALUES( "
+                for val in table['columns'].values():
                     if data_types[type(val)] == "TEXT" and self.check_type(val[:val.find(" ")]) in ["INTEGER", "REAL"]:
                         insertStmt+= f"{val[:val.find(" ")]}, "
                     elif data_types[type(val)] == "TEXT":
