@@ -40,14 +40,11 @@ class ER_Diagram(FileWriter):
 
         `dbname`: database to create an ER diagram for
 
-        `fname`: name (including path) of the png file that contains the generated ER diagram
+        `fname`: name (including path) of the image file that contains the generated ER diagram - default png if not specified
 
         `return`: none
         """
         db = sqlite3.connect(dbname)
-        
-        # if fname[-4:] == ".dot":
-        #     fname = fname[:-4]
 
         file_type = ".png"
         if fname[-4:] == ".png" or fname[-4:] == ".pdf" or fname[-4:] == ".jpg":
@@ -57,8 +54,6 @@ class ER_Diagram(FileWriter):
             file_type = fname[-5:]
             fname = fname[:-5]
 
-        # if fname[-4:] == ".dot":
-        #     fname = fname[:-4]
         dot_file = open(fname + ".dot", "w")
 
         numColsERD = 1

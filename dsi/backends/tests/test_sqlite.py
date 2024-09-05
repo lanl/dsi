@@ -1,6 +1,6 @@
 import git
 from collections import OrderedDict
-from dsi.backends.sqlite import Sqlite, DataType, YamlReader
+from dsi.backends.sqlite import Sqlite, DataType
 import os
 import subprocess
 
@@ -38,6 +38,25 @@ def test_wildfiredata_artifact_put():
    # No error implies success
    assert True
 
+def test_wildfiredata_artifact_put_t():
+   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
+   dbpath = 'test_wildfiredata_artifact.sqlite_data'
+   store = Sqlite(dbpath)
+   store.put_artifacts_t(valid_middleware_datastructure, tableName="Wildfire")
+   store.close()
+   # No error implies success
+   assert True
+
+#Data from: https://microsoftedge.github.io/Demos/json-dummy-data/64KB.json
+def test_jsondata_artifact_put():
+   jsonpath = '/'.join([get_git_root('.'), 'dsi/data/64KB.json'])
+   dbpath = "jsondata.db"
+   store = Sqlite(dbpath)
+   store.put_artifacts_json(jsonpath, tname="JSONData")
+   store.close()
+   # No error implies success
+   assert True
+
 def test_yosemite_data_csv_artifact():
     csvpath = '/'.join([get_git_root('.'), 'dsi/data/yosemite5.csv'])
     dbpath = "yosemite.db"
@@ -56,18 +75,21 @@ def test_artifact_query():
     data_type.name = "simulation"
     result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
                             str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
-    store.export_csv(result, "query.csv")
+    store.export_csv(result, "TABLENAME", "query.csv")
     store.close()
     # No error implies success
     assert True
 
 def test_yaml_reader():
-    reader = YamlReader()
-    reader.yaml_to_db("../../../examples/data/schema.yml", "vedant-test")
-    subprocess.run(["diff", "../../../examples/data/compare-yml.sql", "vedant-test.sql"], stdout=open("output.txt", "w"))
-    file_size = os.path.getsize("output.txt")
-    os.remove("output.txt")
-    os.remove("vedant-test.sql")
-    os.remove("vedant-test.db")
+    reader = Sqlite("yaml-test.db")
+    reader.yamlToSqlite("../../../examples/data/schema.yml", "yaml-test", deleteSql=False)
+    subprocess.run(["diff", "../../../examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("compare_sql.txt", "w"))
+    file_size = os.path.getsize("compare_sql.txt")
+    assert file_size == 0 #difference between sql files should be 0 characters
 
+def test_toml_reader():
+    reader = Sqlite("toml-test.db")
+    reader.tomlToSqlite("../../../examples/data/schema.toml", "toml-test", deleteSql=False)
+    subprocess.run(["diff", "../../../examples/data/compare-schema.sql", "toml-test.sql"], stdout=open("compare_sql.txt", "w"))
+    file_size = os.path.getsize("compare_sql.txt")
     assert file_size == 0 #difference between sql files should be 0 characters

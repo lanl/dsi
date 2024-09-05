@@ -1,9 +1,11 @@
 import csv
 import sqlite3
-import yaml
+import json
 import re
+import yaml
 import subprocess
 import os
+import toml
 
 from dsi.backends.filesystem import Filesystem
 
@@ -13,6 +15,7 @@ DOUBLE = "DOUBLE"
 STRING = "VARCHAR"
 FLOAT = "FLOAT"
 INT = "INT"
+JSON = "TEXT"
 
 # Holds table name and data properties
 
@@ -87,7 +90,6 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(str_query)
 
-        print(str_query)
         self.cur.execute(str_query)
         self.con.commit()
 
@@ -220,6 +222,53 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(str_query)
         
+        self.cur.execute(str_query)
+        self.con.commit()
+
+    def put_artifacts_json(self, fname, tname, isVerbose=False):
+        """
+        Function for insertion of Artifact metadata into a defined schema by using a JSON file
+        `fname`: filepath to the .json file to be read and inserted into the database
+
+        `tname`: String name of the table to be inserted
+
+        `return`: none
+        """
+
+        json_str = None
+        try:
+            j = open(fname)
+            data = json.load(j)
+            json_str = json.dumps(data)
+            json_str = "'" + json_str + "'"
+            j.close()
+        except IOError as i:
+            print(i)
+            return
+        except ValueError as v:
+            print(v)
+            return
+
+        types = DataType()
+        types.properties = {}
+        types.name = tname
+        
+        # Check if this has been defined from helper function
+        if self.types != None:
+            types.name = self.types.name
+
+        col_name = re.sub(r'.json', '', fname)
+        col_name = re.sub(r'.*/', '', col_name)
+        col_name = "'" + col_name + "'"
+        types.properties[col_name] = JSON
+           
+        self.put_artifact_type(types)
+        col_names = ', '.join(types.properties.keys())
+        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, json_str)
+        if isVerbose:
+            print(str_query)
+
+        self.types = types
         self.cur.execute(str_query)
         self.con.commit()
 
@@ -499,31 +548,16 @@ class Sqlite(Filesystem):
 
         return resout
 
-class YamlReader():
 
-    def __init__(self):
-        pass
-
-    def yamlToSqlite(self, filename, db_name):
+    def yamlToSqlite(self, filename, db_name, deleteSql=True):
         """
-        Function that should be called externally to create the sqlite database file and delete temporary sql file used to ingest data
+        Function that ingests a YAML file into a sqlite database based on the given database name
 
         `filename`: name of YAML file that is ingested
 
         `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
-        """
-        self.yaml_to_db(filename, db_name)
-        os.remove(db_name+".sql")
 
-    def yaml_to_db(self, filename, db_name):
-        """
-        DO NOT CALL EXTERNALLY EXCEPT FOR TESTING
-
-        Function creates/adds to a sqlite db file from a given YAML file with specified database name
-
-        `filename`: name of YAML file that is ingested
-
-        `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
+        `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
         """
 
         with open(filename, 'r') as yaml_file, open(db_name+".sql", "w") as sql_file:
@@ -533,20 +567,18 @@ class YamlReader():
             yml_data = yaml.safe_load_all(editedString)
 
             for table in yml_data:
-                cols = table['columns'].keys()
-                vals = table['columns'].values()
                 tableName = table["segment"]
 
-                data_types = {float: "REAL", str: "TEXT", int: "INTEGER"}
-                if not os.path.isfile(db_name+".db"):
+                data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
+                if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
                     createStmt = f"CREATE TABLE {tableName} ( "
                     createUnitStmt = f"CREATE TABLE {tableName}_units ( "  
-                    insertUnitStmt = f"INSERT INTO {tableName}_units {tuple(cols)} VALUES( "
+                    insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
 
                     for key, val in table['columns'].items():
-                        createUnitStmt+= f"{key} TEXT, "
-                        if data_types[type(val)] == "TEXT" and self.check_type(val[:val.find(" ")]) in ["INTEGER", "REAL"]:
-                            createStmt += f"{key} {self.check_type(val[:val.find(" ")])}, "
+                        createUnitStmt+= f"{key} VARCHAR, "
+                        if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
+                            createStmt += f"{key}{self.check_type(val[:val.find(" ")])}, "
                             insertUnitStmt+= f"'{val[val.find(" ")+1:]}', "
                         else:
                             createStmt += f"{key} {data_types[type(val)]}, "
@@ -556,11 +588,11 @@ class YamlReader():
                     sql_file.write(createUnitStmt[:-2] + ");\n\n")
                     sql_file.write(insertUnitStmt[:-2] + ");\n\n")
 
-                insertStmt = f"INSERT INTO {tableName} {tuple(cols)} VALUES( "
-                for val in vals:
-                    if data_types[type(val)] == "TEXT" and self.check_type(val[:val.find(" ")]) in ["INTEGER", "REAL"]:
+                insertStmt = f"INSERT INTO {tableName} VALUES( "
+                for val in table['columns'].values():
+                    if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
                         insertStmt+= f"{val[:val.find(" ")]}, "
-                    elif data_types[type(val)] == "TEXT":
+                    elif data_types[type(val)] == "VARCHAR":
                         insertStmt+= f"'{val}', "
                     else:
                         insertStmt+= f"{val}, "
@@ -569,20 +601,56 @@ class YamlReader():
     
         subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-    def check_type(self, text):
-        """
-        Tests input text and returns a predicted compatible SQL Type
+        if deleteSql == True:
+            os.remove(db_name+".sql")
 
-        `text`: text string
-
-        `return`: string description of a SQL data type
+    def tomlToSqlite(self, filename, db_name, deleteSql=True):
         """
-        try:
-            value = int(text)
-            return "INTEGER"
-        except ValueError:
-            try:
-                value = float(text)
-                return "REAL"
-            except ValueError:
-                return "TEXT"
+        Function that ingests a TOML file into a sqlite database based on the given database name
+
+        `filename`: name of TOML file that is ingested
+
+        `db_name`: name of database that TOML file should be added to. Database will be created if it does not exist in local directory.
+
+        `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
+        """
+        with open(filename, 'r') as toml_file, open(db_name+".sql", "w") as sql_file:
+            data = toml.load(toml_file)
+
+            for tableName, tableData in data.items():
+                data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
+
+                if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
+                    createStmt = f"CREATE TABLE {tableName} ( "
+                    createUnitStmt = f"CREATE TABLE {tableName}_units ( "
+                    insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
+
+                    for key, val in tableData.items():
+                        createUnitStmt+= f"{key} VARCHAR, "
+                        if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
+                            createStmt += f"{key}{self.check_type(val[0])}, "
+                            insertUnitStmt+= f"'{val[1]}', "
+                        else:
+                            createStmt += f"{key} {data_types[type(val)]}, "
+                            insertUnitStmt+= "NULL, "
+                    
+                    sql_file.write(createStmt[:-2] + ");\n\n")
+                    sql_file.write(createUnitStmt[:-2] + ");\n\n")
+                    sql_file.write(insertUnitStmt[:-2] + ");\n\n")
+                
+                insertStmt = f"INSERT INTO {tableName} VALUES( "
+                for val in tableData.values():
+                    if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
+                        insertStmt+= f"{val[0]}, "
+                    elif type(val) == str:
+                        insertStmt+= f"'{val}', "
+                    else:
+                        insertStmt+= f"{val}, "
+
+                sql_file.write(insertStmt[:-2] + ");\n\n")
+
+        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+
+        if deleteSql == True:
+            os.remove(db_name+".sql")
+
