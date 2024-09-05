@@ -2,6 +2,9 @@ import git
 from collections import OrderedDict
 
 from dsi.backends.sqlite import Sqlite, DataType
+import os
+import subprocess
+
 
 isVerbose = True
 
