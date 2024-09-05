@@ -16,8 +16,8 @@ def test_export_db_erd():
     connection.close()
 
     er_image = cv2.imread("test1.png") 
-    pixel_mean = np.mean(er_image)
-
     assert er_image is not None #check if image generated at all
+    
+    pixel_mean = np.mean(er_image)
     os.remove("test1.png")
     assert pixel_mean != 255 #check if image is all white pixels (no diagram generated)

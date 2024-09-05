@@ -36,7 +36,7 @@ class ER_Diagram(FileWriter):
 
     def export_erd(self, dbname, fname):
         """
-        Function that outputs a dot file for the given database.
+        Function that outputs a ER diagram for the given database.
 
         `dbname`: database to create an ER diagram for
 
