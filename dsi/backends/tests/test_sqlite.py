@@ -23,7 +23,7 @@ def test_wildfire_data_sql_artifact():
     assert True
 
 def test_wildfire_data_csv_artifact():
-    csvpath = '/'.join([get_git_root('.'), '/home/runner/work/dsi/examples/data/wildfiredata.csv'])
+    csvpath = '/'.join([get_git_root('.'), 'home/runner/work/dsi/examples/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath, "simulation", isVerbose=isVerbose)
@@ -60,7 +60,7 @@ def test_jsondata_artifact_put():
    assert True
 
 def test_yosemite_data_csv_artifact():
-    csvpath = '/'.join([get_git_root('.'), '/home/runner/work/dsi/examples/data/yosemite5.csv'])
+    csvpath = '/'.join([get_git_root('.'), 'home/runner/work/dsi/examples/data/yosemite5.csv'])
     dbpath = "yosemite.db"
     store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath, "vision", isVerbose=isVerbose)
@@ -87,7 +87,7 @@ test_jsondata_artifact_put()
 
 def test_yaml_reader():
     reader = Sqlite("yaml-test.db")
-    reader.yamlToSqlite("/home/runner/work/dsi/examples/data/schema.yml", "yaml-test", deleteSql=False)
+    reader.yamlToSqlite("home/runner/work/dsi/examples/data/schema.yml", "yaml-test", deleteSql=False)
     subprocess.run(["diff", "/home/runner/work/dsi/examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("compare_sql.txt", "w"))
     file_size = os.path.getsize("compare_sql.txt")
     os.remove("compare_sql.txt")
@@ -98,7 +98,7 @@ def test_yaml_reader():
 
 def test_toml_reader():
     reader = Sqlite("toml-test.db")
-    reader.tomlToSqlite("/home/runner/work/dsi/examples/data/schema.toml", "toml-test", deleteSql=False)
+    reader.tomlToSqlite("home/runner/work/dsi/examples/data/schema.toml", "toml-test", deleteSql=False)
     subprocess.run(["diff", "/home/runner/work/dsi/examples/data/compare-schema.sql", "toml-test.sql"], stdout=open("compare_sql.txt", "w"))
     file_size = os.path.getsize("compare_sql.txt")
     os.remove("compare_sql.txt")
