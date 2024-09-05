@@ -23,7 +23,7 @@ def test_wildfire_data_sql_artifact():
     assert True
 
 def test_wildfire_data_csv_artifact():
-    csvpath = '/'.join([get_git_root('.'), '/../../examples/data/wildfiredata.csv'])
+    csvpath = '/'.join([get_git_root('.'), 'examples/data/wildfiredata.csv'])
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
     store.put_artifacts_csv(csvpath, "simulation", isVerbose=isVerbose)
