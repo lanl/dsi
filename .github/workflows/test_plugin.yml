@@ -30,6 +30,7 @@ jobs:
         pip install pyyaml
         pip install toml
         pip install .
+        pip install graphviz
     - name: Test reader
       run: |
         pip install pytest
