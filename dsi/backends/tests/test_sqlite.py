@@ -2,6 +2,9 @@ import git
 from collections import OrderedDict
 
 from dsi.backends.sqlite import Sqlite, DataType
+import os
+import subprocess
+
 
 isVerbose = True
 
@@ -81,3 +84,25 @@ def test_artifact_query():
 
 
 test_jsondata_artifact_put()
+
+def test_yaml_reader():
+    reader = Sqlite("yaml-test.db")
+    reader.yamlToSqlite("../../../examples/data/schema.yml", "yaml-test", deleteSql=False)
+    subprocess.run(["diff", "../../../examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("compare_sql.txt", "w"))
+    file_size = os.path.getsize("compare_sql.txt")
+    os.remove("compare_sql.txt")
+    os.remove("yaml-test.sql")
+    os.remove("yaml-test.db")
+
+    assert file_size == 0 #difference between sql files should be 0 characters
+
+def test_toml_reader():
+    reader = Sqlite("toml-test.db")
+    reader.tomlToSqlite("../../../examples/data/schema.toml", "toml-test", deleteSql=False)
+    subprocess.run(["diff", "../../../examples/data/compare-schema.sql", "toml-test.sql"], stdout=open("compare_sql.txt", "w"))
+    file_size = os.path.getsize("compare_sql.txt")
+    os.remove("compare_sql.txt")
+    os.remove("toml-test.sql")
+    os.remove("toml-test.db")
+
+    assert file_size == 0 #difference between sql files should be 0 characters
