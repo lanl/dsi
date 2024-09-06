@@ -15,5 +15,3 @@ def test_export_db_erd():
     assert output.shape == reference.shape
     assert cv2.countNonZero(cv2.cvtColor(cv2.absdiff(output, reference), cv2.COLOR_BGR2GRAY)) == 0
     os.remove("erd_test_output.png")
-
-test_export_db_erd()
