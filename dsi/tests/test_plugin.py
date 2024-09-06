@@ -1,5 +1,6 @@
 from dsi.plugins import file_writer as fw
 import cv2
+import numpy as np
 import subprocess
 import os
 
