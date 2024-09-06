@@ -1,23 +1,17 @@
 from dsi.plugins import file_writer as fw
 import cv2
-import sqlite3
 import numpy as np
+import subprocess
 import os
 
 def test_export_db_erd():
-
-    connection = sqlite3.connect("test.db")
-    cursor = connection.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS example (id INTEGER, name TEXT, age INTEGER)")
-    cursor.execute("INSERT INTO example VALUES (1, 'alice', 20)")
-    cursor.execute("INSERT INTO example VALUES (2, 'bob', 30)")
-    cursor.execute("INSERT INTO example VALUES (3, 'eve', 40)")
-    connection.commit()
-    connection.close()
-
-    er_image = cv2.imread("test1.png") 
-    pixel_mean = np.mean(er_image)
-
+    subprocess.run(["sqlite3", "erd_test.db"], stdin= open("examples/data/erd_test.sql", "r"))
+    fw.ER_Diagram("erd_test.db").export_erd("erd_test.db", "erd_test_output")
+    os.remove("erd_test.db")
+    
+    er_image = cv2.imread("erd_test_output.png")
     assert er_image is not None #check if image generated at all
-    os.remove("test1.png")
+    
+    pixel_mean = np.mean(er_image)
+    os.remove("erd_test_output.png")
     assert pixel_mean != 255 #check if image is all white pixels (no diagram generated)

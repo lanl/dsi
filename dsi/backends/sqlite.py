@@ -576,8 +576,8 @@ class Sqlite(Filesystem):
                     for key, val in table['columns'].items():
                         createUnitStmt+= f"{key} VARCHAR, "
                         if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
-                            createStmt += f"{key}{self.check_type(val[:val.find(" ")])}, "
-                            insertUnitStmt+= f"'{val[val.find(" ")+1:]}', "
+                            createStmt += f"{key}{self.check_type(val[:val.find(' ')])}, "
+                            insertUnitStmt+= f"'{val[val.find(' ')+1:]}', "
                         else:
                             createStmt += f"{key} {data_types[type(val)]}, "
                             insertUnitStmt+= "NULL, "
@@ -589,7 +589,7 @@ class Sqlite(Filesystem):
                 insertStmt = f"INSERT INTO {tableName} VALUES( "
                 for val in table['columns'].values():
                     if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
-                        insertStmt+= f"{val[:val.find(" ")]}, "
+                        insertStmt+= f"{val[:val.find(' ')]}, "
                     elif data_types[type(val)] == "VARCHAR":
                         insertStmt+= f"'{val}', "
                     else:
