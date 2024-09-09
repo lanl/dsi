@@ -548,23 +548,41 @@ class Sqlite(Filesystem):
 
         return resout
 
-    def yamlToSqlite(self, filename, db_name, deleteSql=True):
+    def yamlDataToList(self, filenames):
+        """
+        Function that reads a YAML file or files into a list
+        """
+        
+        yamlData = []
+        for filename in filenames:
+            with open(filename, 'r') as yaml_file:
+                editedString = yaml_file.read()
+                editedString = re.sub('specification', r'columns:\n  specification', editedString)
+                editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
+                yml_data = yaml.safe_load_all(editedString)
+                
+                for table in yml_data:
+                    yamlData.append(table)
+
+        return yamlData
+            
+    def yamlToSqlite(self, filenames, db_name, deleteSql=True):
         """
         Function that ingests a YAML file into a sqlite database based on the given database name
 
-        `filename`: name of YAML file that is ingested
+        `filenames`: name of YAML file or a list of YAML files to be ingested
 
         `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
 
         `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
         """
-        with open(filename, 'r') as yaml_file, open(db_name+".sql", "w") as sql_file:
-            editedString = yaml_file.read()
-            editedString = re.sub('specification', r'columns:\n  specification', editedString)
-            editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
-            yml_data = yaml.safe_load_all(editedString)
 
-            for table in yml_data:
+        if isinstance(filenames, str):
+            filenames = [filenames]
+
+        with open(db_name+".sql", "w") as sql_file:
+            yml_list = self.yamlDataToList(filenames)
+            for table in yml_list:
                 tableName = table["segment"]
 
                 data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
@@ -597,25 +615,40 @@ class Sqlite(Filesystem):
 
                 sql_file.write(insertStmt[:-2] + ");\n\n")
     
-        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+            subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-        if deleteSql == True:
-            os.remove(db_name+".sql")
+            if deleteSql == True:
+                os.remove(db_name+".sql")
 
-    def tomlToSqlite(self, filename, db_name, deleteSql=True):
+    def tomlDataToList(self, filenames):
+        """
+        Function that reads a TOML file or files into a list
+        """
+        
+        toml_data = []
+        for filename in filenames:
+            with open(filename, 'r') as toml_file:
+                data = toml.load(toml_file)
+                for tableName, tableData in data.items():
+                    toml_data.append([tableName, tableData])
+
+        return toml_data
+    
+    def tomlToSqlite(self, filenames, db_name, deleteSql=True):
         """
         Function that ingests a TOML file into a sqlite database based on the given database name
 
-        `filename`: name of TOML file that is ingested
+        `filenames`: name of TOML file or a list of TOML files to be ingested
 
         `db_name`: name of database that TOML file should be added to. Database will be created if it does not exist in local directory.
 
         `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
         """
-        with open(filename, 'r') as toml_file, open(db_name+".sql", "w") as sql_file:
-            data = toml.load(toml_file)
+        with open(db_name+".sql", "w") as sql_file:
+            data = self.tomlDataToList(filenames)
 
-            for tableName, tableData in data.items():
+            for item in data:
+                tableName, tableData = item
                 data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
 
                 if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:

@@ -87,7 +87,7 @@ test_jsondata_artifact_put()
 
 def test_yaml_reader():
     reader = Sqlite("yaml-test.db")
-    reader.yamlToSqlite("examples/data/schema.yml", "yaml-test", deleteSql=False)
+    reader.yamlToSqlite(["examples/data/schema.yml", "examples/data/schema2.yml"], "yaml-test", deleteSql=False)
     subprocess.run(["diff", "examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("compare_sql.txt", "w"))
     file_size = os.path.getsize("compare_sql.txt")
     os.remove("compare_sql.txt")
@@ -98,7 +98,7 @@ def test_yaml_reader():
 
 def test_toml_reader():
     reader = Sqlite("toml-test.db")
-    reader.tomlToSqlite("examples/data/schema.toml", "toml-test", deleteSql=False)
+    reader.tomlToSqlite(["examples/data/schema.toml", "examples/data/schema2.toml"], "toml-test", deleteSql=False)
     subprocess.run(["diff", "examples/data/compare-schema.sql", "toml-test.sql"], stdout=open("compare_sql.txt", "w"))
     file_size = os.path.getsize("compare_sql.txt")
     os.remove("compare_sql.txt")
