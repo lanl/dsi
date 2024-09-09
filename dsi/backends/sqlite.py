@@ -644,6 +644,9 @@ class Sqlite(Filesystem):
 
         `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
         """
+        if isinstance(filenames, str):
+            filenames = [filenames]
+
         with open(db_name+".sql", "w") as sql_file:
             data = self.tomlDataToList(filenames)
 
