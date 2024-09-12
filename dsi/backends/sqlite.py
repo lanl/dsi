@@ -587,8 +587,8 @@ class Sqlite(Filesystem):
 
                 data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
                 if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
-                    createStmt = f"CREATE TABLE {tableName} ( "
-                    createUnitStmt = f"CREATE TABLE {tableName}_units ( "  
+                    createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
+                    createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "  
                     insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
 
                     for key, val in table['columns'].items():
