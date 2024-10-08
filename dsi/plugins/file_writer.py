@@ -6,6 +6,8 @@ from math import isnan
 import sqlite3
 import subprocess
 import os
+from matplotlib import pyplot as plt
+
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -207,3 +209,39 @@ class Csv(FileWriter):
                 csvWriter.writerow(row)
         
         return 1
+
+class Plot_Database(FileWriter):
+    def __init__(self, filenames, **kwargs):
+        super().__init__(filenames, **kwargs)
+
+    def plot_table(self, db_name, table_name):
+        db = sqlite3.connect(db_name)
+
+        col_info = db.execute(f"PRAGMA table_info({table_name})")
+        colNames = []
+        for col in col_info:
+            if col[2] in ('INT', 'FLOAT'):
+                colNames.append(col[1])
+
+        sqlColNames = str(colNames)[1:-1].replace("'", "")
+        data = db.execute(f"SELECT row_number() over (order by ''), {sqlColNames} FROM {table_name}")
+        data_list = [[] for x in range(len(colNames)+1)]
+        for row in data:
+            for i in range(len(row)):
+                data_list[i].append(row[i])
+
+        unit_info = db.execute(f"SELECT {sqlColNames} FROM {table_name}_units").fetchone()
+        for i in range(len(unit_info)):
+            if unit_info[i] != None:
+                colNames[i] += f" ({unit_info[i]})"
+                
+        for i in range(1, len(data_list)):
+            plt.plot(data_list[0], data_list[i], label = colNames[i-1])
+        plt.xticks(data_list[0])
+        plt.xlabel("Sim Number")
+        plt.ylabel("Values")
+        plt.title(f"{table_name} Values")
+        plt.legend()
+        plt.savefig(f"{table_name} Values", bbox_inches='tight')
+
+        db.close()
