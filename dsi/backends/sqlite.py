@@ -577,6 +577,7 @@ class Sqlite(Filesystem):
         `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
         """
 
+        sql_statements = []
         if isinstance(filenames, str):
             filenames = [filenames]
 
@@ -600,9 +601,15 @@ class Sqlite(Filesystem):
                             createStmt += f"{key} {data_types[type(val)]}, "
                             insertUnitStmt+= "NULL, "
 
-                    sql_file.write(createStmt[:-2] + ");\n\n")
-                    sql_file.write(createUnitStmt[:-2] + ");\n\n")
-                    sql_file.write(insertUnitStmt[:-2] + ");\n\n")
+                    if createStmt not in sql_statements:
+                        sql_statements.append(createStmt)
+                        sql_file.write(createStmt[:-2] + ");\n\n")
+                    if createUnitStmt not in sql_statements:
+                        sql_statements.append(createUnitStmt)
+                        sql_file.write(createUnitStmt[:-2] + ");\n\n")
+                    if insertUnitStmt not in sql_statements:
+                        sql_statements.append(insertUnitStmt)
+                        sql_file.write(insertUnitStmt[:-2] + ");\n\n")
 
                 insertStmt = f"INSERT INTO {tableName} VALUES( "
                 for val in table['columns'].values():
@@ -613,12 +620,14 @@ class Sqlite(Filesystem):
                     else:
                         insertStmt+= f"{val}, "
 
-                sql_file.write(insertStmt[:-2] + ");\n\n")
+                if insertStmt not in sql_statements:
+                    sql_statements.append(insertStmt)
+                    sql_file.write(insertStmt[:-2] + ");\n\n")
     
-            subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-            if deleteSql == True:
-                os.remove(db_name+".sql")
+        if deleteSql == True:
+            os.remove(db_name+".sql")
 
     def tomlDataToList(self, filenames):
         """
