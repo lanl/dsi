@@ -66,3 +66,9 @@ parquet.data
 docs/_build
 dsi.egg-info/
 .DS_Store
+
+# packages
+pip.conf
+pydsinf.egg-info
+
+examples/halos/tests/data
