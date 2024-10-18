@@ -8,16 +8,13 @@ import subprocess
 import os
 from matplotlib import pyplot as plt
 
-
 from dsi.plugins.metadata import StructuredMetadata
-
 
 class FileWriter(StructuredMetadata):
     """
     FileWriter Plugins keep information about the file that
     they are ingesting, namely absolute path and hash.
     """
-
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
         if type(filenames) == str:
@@ -26,10 +23,11 @@ class FileWriter(StructuredMetadata):
             self.filenames = filenames
         else:
             raise TypeError
-        self.file_info = {}
+        
+        '''self.file_info = {}
         for filename in self.filenames:
             sha = sha1(open(filename, 'rb').read())
-            self.file_info[abspath(filename)] = sha.hexdigest()
+            self.file_info[abspath(filename)] = sha.hexdigest()'''
 
 class ER_Diagram(FileWriter):
 
@@ -46,6 +44,7 @@ class ER_Diagram(FileWriter):
 
         `return`: none
         """
+        
         db = sqlite3.connect(dbname)
 
         file_type = ".png"
@@ -210,38 +209,38 @@ class Csv(FileWriter):
         
         return 1
 
-class Plot_Database(FileWriter):
-    def __init__(self, filenames, **kwargs):
-        super().__init__(filenames, **kwargs)
+class Table_Plot(FileWriter):
+    '''
+    Plugin that plots all numeric column data for a specified table
+    '''
+    def __init__(self, table_name, filename, **kwargs):
+        '''
+        `table_name`: name of table to be plotted
+        `filename`: name of output file that plot be stored in
+        '''
+        super().__init__(filename, **kwargs)
+        self.output_name = filename
+        self.table_name = table_name
 
-    def plot_table(self, db_name, table_name):
-        db = sqlite3.connect(db_name)
+    def get_rows(self, collection) -> None:
+        numeric_cols = []
+        col_len = None
+        for colName, colData in collection[self.table_name].items():
+            if col_len == None:
+                col_len = len(colData)
+            if isinstance(colData[0], str) == False:
+                if colName+"_units" in collection[self.table_name].keys() and collection[self.table_name][colName+"_units"][0] != "NULL":
+                    numeric_cols.append((colName + f" ({collection[self.table_name][colName+"_units"][0]})", colData))
+                else:
+                    numeric_cols.append((colName, colData))
 
-        col_info = db.execute(f"PRAGMA table_info({table_name})")
-        colNames = []
-        for col in col_info:
-            if col[2] in ('INT', 'FLOAT'):
-                colNames.append(col[1])
+        sim_list = list(range(1, col_len + 1))
 
-        sqlColNames = str(colNames)[1:-1].replace("'", "")
-        data = db.execute(f"SELECT row_number() over (order by ''), {sqlColNames} FROM {table_name}")
-        data_list = [[] for x in range(len(colNames)+1)]
-        for row in data:
-            for i in range(len(row)):
-                data_list[i].append(row[i])
-
-        unit_info = db.execute(f"SELECT {sqlColNames} FROM {table_name}_units").fetchone()
-        for i in range(len(unit_info)):
-            if unit_info[i] != None:
-                colNames[i] += f" ({unit_info[i]})"
-                
-        for i in range(1, len(data_list)):
-            plt.plot(data_list[0], data_list[i], label = colNames[i-1])
-        plt.xticks(data_list[0])
+        for colName, colData in numeric_cols:
+            plt.plot(sim_list, colData, label = colName)
+        plt.xticks(sim_list)
         plt.xlabel("Sim Number")
         plt.ylabel("Values")
-        plt.title(f"{table_name} Values")
+        plt.title(f"{self.table_name} Values")
         plt.legend()
-        plt.savefig(f"{table_name} Values", bbox_inches='tight')
-
-        db.close()
+        plt.savefig(f"{self.table_name} Values", bbox_inches='tight')
