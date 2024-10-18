@@ -20,7 +20,7 @@ JSON = "TEXT"
 # Holds table name and data properties
 
 class DataType:
-    name = "TABLENAME" # Note: using the word DEFAULT outputs a syntax error
+    name = "" # Note: using the word DEFAULT outputs a syntax error
     properties = {}
     units = {}
 
@@ -33,7 +33,7 @@ class Artifact:
         An Artifact is a generic construct that defines the schema for metadata that
         defines the tables inside of SQL
     """
-    name = "TABLENAME"
+    name = ""
     properties = {}
 
 
@@ -124,42 +124,45 @@ class Sqlite(Filesystem):
         """
         # Core compatibility name assignment
         artifacts = collection
+        
+        for tableName, tableData in artifacts.items():
 
-        types = DataType()
-        types.properties = {}
+            types = DataType()
+            types.properties = {}
 
-        # Check if this has been defined from helper function
-        if self.types != None:
-            types.name = self.types.name
+            # Check if this has been defined from helper function
+            '''if self.types != None:
+                types.name = self.types.name'''
+            types.name = tableName
 
-        for key in artifacts:
-            types.properties[key.replace('-','_minus_')] = artifacts[key]
+            for key in tableData:
+                types.properties[key.replace('-','_minus_')] = tableData[key]
            
-        self.put_artifact_type(types)
+            self.put_artifact_type(types)
         
-        col_names = ', '.join(types.properties.keys())
-        placeholders = ', '.join('?' * len(types.properties))
+            col_names = ', '.join(types.properties.keys())
+            placeholders = ', '.join('?' * len(types.properties))
         
-        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+            str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
         
-        # col_list helps access the specific keys of the dictionary in the for loop
-        col_list = col_names.split(', ')
+            # col_list helps access the specific keys of the dictionary in the for loop
+            col_list = col_names.split(', ')
 
-        # loop through the contents of each column and insert into table as a row
-        for ind1 in range(len(types.properties[col_list[0]])):
-            vals = []
-            for ind2 in range(len(types.properties.keys())):
-                vals.append(str(types.properties[col_list[ind2]][ind1]))
-            # Make sure this works if types.properties[][] is already a string
-            tup_vals = tuple(vals)
-            self.cur.execute(str_query,tup_vals)
+            # loop through the contents of each column and insert into table as a row
+            for ind1 in range(len(types.properties[col_list[0]])):
+                vals = []
+                for ind2 in range(len(types.properties.keys())):
+                    vals.append(str(types.properties[col_list[ind2]][ind1]))
+                # Make sure this works if types.properties[][] is already a string
+                tup_vals = tuple(vals)
+                self.cur.execute(str_query,tup_vals)
 
-        if isVerbose:
-            print(str_query)
+            if isVerbose:
+                print(str_query)
 
-        self.con.commit()
-        
-        self.types = types
+            self.con.commit()
+            
+            self.types = types #This will only copy the last collection from artifacts (collections input)
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
@@ -337,13 +340,13 @@ class Sqlite(Filesystem):
       #[END NOTE 2]
 
     # Returns text list from query
-    def get_artifact_list(self, isVerbose=False):
+    def get_artifact_list(self, query, isVerbose=False):
         """
         Function that returns a list of all of the Artifact names (represented as sql tables)
 
         `return`: list of Artifact names
         """
-        str_query = "SELECT name FROM sqlite_master WHERE type='table';"
+        str_query = query
         if isVerbose:
             print(str_query)
 
@@ -357,8 +360,8 @@ class Sqlite(Filesystem):
         return resout
 
     # Returns reference from query
-    def get_artifacts(self, query):
-        self.get_artifacts_list()
+    def get_artifacts(self, query, isVerbose=False):
+        self.get_artifact_list(query, isVerbose)
 
     # Closes connection to server
     def close(self):
