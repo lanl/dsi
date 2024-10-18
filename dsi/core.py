@@ -21,8 +21,8 @@ class Terminal():
     BACKEND_PREFIX = ['dsi.backends']
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML', 'TOML', "Table_Plot"]
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': [
@@ -166,13 +166,16 @@ class Terminal():
         data sources to a single DSI Core Middleware data structure.
         """
         selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in ('writer', 'reader'))
+            (k, self.active_modules[k]) for k in ('reader', 'writer'))
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
-                obj.add_rows(**kwargs)
-                for col_name, col_metadata in obj.output_collector.items():
-                    self.active_metadata[col_name] = col_metadata
+                if module_type == "reader":
+                    obj.add_rows(**kwargs)
+                    for table_name, table_metadata in obj.output_collector.items():
+                        self.active_metadata[table_name] = table_metadata
+                elif module_type == "writer":
+                    obj.get_rows(self.active_metadata, **kwargs)
 
         # Plugins may add one or more rows (vector vs matrix data).
         # You may have two or more plugins with different numbers of rows.
@@ -180,6 +183,8 @@ class Terminal():
         # some plugin configurations. We must force structure to create a valid
         # middleware data structure.
         # To resolve, we pad the shorter columns to match the max length column.
+        #COMMENTED OUT TILL LATER
+        '''
         max_len = max([len(col) for col in self.active_metadata.values()])
         for colname, coldata in self.active_metadata.items():
             if len(coldata) != max_len:
@@ -188,6 +193,7 @@ class Terminal():
 
         assert all([len(col) == max_len for col in self.active_metadata.values(
         )]), "All columns must have the same number of rows"
+        '''
 
         self.transload_lock = True
 
