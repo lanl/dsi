@@ -128,7 +128,7 @@ class ER_Diagram(FileWriter):
         subprocess.run(["dot", "-T", file_type[1:], "-o", fname + file_type, fname + ".dot"])
         os.remove(fname + ".dot")
 
-class Csv(FileWriter):
+class Csv_Writer(FileWriter):
     """
     A Plugin to output queries as CSV data
     """
@@ -230,7 +230,7 @@ class Table_Plot(FileWriter):
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
                 if colName+"_units" in collection[self.table_name].keys() and collection[self.table_name][colName+"_units"][0] != "NULL":
-                    numeric_cols.append((colName + f" ({collection[self.table_name][colName+"_units"][0]})", colData))
+                    numeric_cols.append((colName + f" ({collection[self.table_name][colName+'_units'][0]})", colData))
                 else:
                     numeric_cols.append((colName, colData))
 

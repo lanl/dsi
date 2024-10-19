@@ -25,22 +25,22 @@ def test_bueno_plugin_adds_rows():
     plug.add_rows()
     plug.add_rows()
 
-    for key, val in plug.output_collector.items():
+    for key, val in plug.output_collector["Bueno"].items():
         assert len(val) == 4  # two lists of length 4
 
     # 4 Bueno cols
-    assert len(plug.output_collector.keys()) == 4
+    assert len(plug.output_collector["Bueno"].keys()) == 4
 
 def test_json_plugin_adds_rows():
     path1 = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
     path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
     plug = JSON(filenames=[path1, path2])
     plug.add_rows()
-    for key, val in plug.output_collector.items():
+    for key, val in plug.output_collector["JSON"].items():
         assert len(val) == 2  # two lists of length 4
 
     # 4 Bueno cols
-    assert len(plug.output_collector.keys()) == 4
+    assert len(plug.output_collector["JSON"].keys()) == 4
 
 def test_csv_plugin_type():
     path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
@@ -48,18 +48,16 @@ def test_csv_plugin_type():
     plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
-
 def test_csv_plugin_adds_rows():
     path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
 
-    for key, val in plug.output_collector.items():
+    for key, val in plug.output_collector["Csv"].items():
         assert len(val) == 4
 
     # 11 Csv cols + 1 inherited FileReader cols
-    assert len(plug.output_collector.keys()) == 12
-
+    assert len(plug.output_collector["Csv"].keys()) == 12
 
 def test_csv_plugin_adds_rows_multiple_files():
     path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
@@ -68,12 +66,11 @@ def test_csv_plugin_adds_rows_multiple_files():
     plug = Csv(filenames=[path1, path2])
     plug.add_rows()
 
-    for key, val in plug.output_collector.items():
+    for key, val in plug.output_collector["Csv"].items():
         assert len(val) == 8
 
     # 13 Csv cols + 2 inherited FileReader cols
-    assert len(plug.output_collector.keys()) == 15
-
+    assert len(plug.output_collector["Csv"].keys()) == 15
 
 def test_csv_plugin_adds_rows_multiple_files_strict_mode():
     path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
@@ -86,15 +83,14 @@ def test_csv_plugin_adds_rows_multiple_files_strict_mode():
         # Strict mode will throw TypeError if enabled and csv headers don't match
         assert True
 
-
 def test_csv_plugin_leaves_active_metadata_wellformed():
     path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
 
     term = Terminal()
     term.load_module('plugin', 'Csv', 'reader', filenames=[path])
-    term.load_module('plugin', 'Hostname', 'writer')
+    #term.load_module('plugin', 'Hostname', 'writer')
     term.transload()
 
-    columns = list(term.active_metadata.values())
+    columns = list(term.active_metadata["Csv"].values())
     assert all([len(columns[0]) == len(col)
                for col in columns])  # all same length

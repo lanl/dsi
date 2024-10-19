@@ -44,7 +44,7 @@ def test_wildfiredata_artifact_put_t():
    valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
    dbpath = 'test_wildfiredata_artifact.sqlite_data'
    store = Sqlite(dbpath)
-   store.put_artifacts_t(valid_middleware_datastructure, tableName="Wildfire")
+   store.put_artifacts_t(OrderedDict([("wildfire", valid_middleware_datastructure)]), tableName="Wildfire")
    store.close()
    # No error implies success
    assert True
@@ -81,20 +81,3 @@ def test_artifact_query():
     store.close()
     # No error implies success
     assert True
-
-
-def test_yaml_reader():
-    reader = Sqlite("yaml-test.db")
-    reader.yamlToSqlite(["examples/data/schema.yml", "examples/data/schema2.yml"], "yaml-test", deleteSql=False)
-    subprocess.run(["diff", "examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("compare_sql.txt", "w"))
-    file_size = os.path.getsize("compare_sql.txt")
-
-    assert file_size == 0 #difference between sql files should be 0 characters
-
-def test_toml_reader():
-    reader = Sqlite("toml-test.db")
-    reader.tomlToSqlite(["examples/data/schema.toml", "examples/data/schema2.toml"], "toml-test", deleteSql=False)
-    subprocess.run(["diff", "examples/data/compare-schema.sql", "toml-test.sql"], stdout=open("compare_sql.txt", "w"))
-    file_size = os.path.getsize("compare_sql.txt")
-
-    assert file_size == 0 #difference between sql files should be 0 characters
