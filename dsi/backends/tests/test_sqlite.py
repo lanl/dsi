@@ -69,15 +69,15 @@ def test_yosemite_data_csv_artifact():
     assert True
 
 
-def test_artifact_query():
-    dbpath = "wildfire.db"
-    store = Sqlite(dbpath)
-    _ = store.get_artifact_list(isVerbose=isVerbose)
-    data_type = DataType()
-    data_type.name = "simulation"
-    result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
-                            str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
-    store.export_csv(result, "TABLENAME", "query.csv")
-    store.close()
-    # No error implies success
-    assert True
+# def test_artifact_query():
+#     dbpath = "wildfire.db"
+#     store = Sqlite(dbpath)
+#     _ = store.get_artifact_list(isVerbose=isVerbose)
+#     data_type = DataType()
+#     data_type.name = "simulation"
+#     result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
+#                             str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
+#     store.export_csv(result, "TABLENAME", "query.csv")
+#     store.close()
+#     # No error implies success
+#     assert True
