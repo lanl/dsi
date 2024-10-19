@@ -5,6 +5,8 @@ from itertools import product
 import os
 import shutil
 from pathlib import Path
+import logging
+from datetime import datetime
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -55,6 +57,8 @@ class Terminal():
         self.active_metadata = OrderedDict()
         self.transload_lock = False
 
+        self.logger = logging.getLogger(self.__class__.__name__)
+
     def list_available_modules(self, mod_type):
         """
         List available DSI modules of an arbitrary module type.
@@ -82,16 +86,25 @@ class Terminal():
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
         """
+        self.logger.info(f"-------------------------------------")
+        self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
+        start = datetime.now()
         if self.transload_lock and mod_type == 'plugin':
             print('Plugin module loading is prohibited after transload. No action taken.')
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
             return
         if mod_function not in self.VALID_MODULE_FUNCTIONS[mod_type]:
             print(
                 'Hint: Did you declare your Module Function in the Terminal Global vars?')
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
             raise NotImplementedError
         if mod_name in [obj.__class__.__name__ for obj in self.active_modules[mod_function]]:
             print('{} {} already loaded as {}. Nothing to do.'.format(
                 mod_name, mod_type, mod_function))
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
             return
         # DSI Modules are Python classes.
         class_name = mod_name
@@ -109,7 +122,11 @@ class Terminal():
                 mod_name, mod_type, mod_function))
         else:
             print('Hint: Did you declare your Plugin/Backend in the Terminal Global vars?')
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
             raise NotImplementedError
+        end = datetime.now()
+        self.logger.info(f"Runtime: {end-start}")
 
     def unload_module(self, mod_type, mod_name, mod_function):
         """
@@ -170,12 +187,20 @@ class Terminal():
         # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
+                self.logger.info(f"-------------------------------------")
+                self.logger.info(obj.__class__.__name__ + f" {module_type}")
                 if module_type == "reader":
+                    start = datetime.now()
                     obj.add_rows(**kwargs)
                     for table_name, table_metadata in obj.output_collector.items():
                         self.active_metadata[table_name] = table_metadata
+                    end = datetime.now()
+                    self.logger.info(f"Runtime: {end-start}")
                 elif module_type == "writer":
+                    start = datetime.now()
                     obj.get_rows(self.active_metadata, **kwargs)
+                    end = datetime.now()
+                    self.logger.info(f"Runtime: {end-start}")
 
         # Plugins may add one or more rows (vector vs matrix data).
         # You may have two or more plugins with different numbers of rows.
@@ -197,7 +222,7 @@ class Terminal():
 
         self.transload_lock = True
 
-    def artifact_handler(self, interaction_type, **kwargs):
+    def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Store or retrieve using all loaded DSI Backends with storage functionality.
 
@@ -216,13 +241,22 @@ class Terminal():
             (k, self.active_modules[k]) for k in (['back-end']))
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
+                self.logger.info(f"-------------------------------------")
+                self.logger.info(obj.__class__.__name__ + f" {module_type} - {interaction_type} the data")
                 if interaction_type == 'put' or interaction_type == 'set':
+                    start = datetime.now()
                     obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
                     operation_success = True
-                elif interaction_type == 'get':
-                    self.active_metadata = obj.get_artifacts(**kwargs)
+                    end = datetime.now()
+                    self.logger.info(f"Runtime: {end-start}")
+                elif interaction_type == 'get' and query != None:
+                    self.logger.info(f"Query to get data: {query}")
+                    start = datetime.now()
+                    self.active_metadata = obj.get_artifacts(query, **kwargs)
                     operation_success = True
+                    end = datetime.now()
+                    self.logger.info(f"Runtime: {end-start}")
         if interaction_type == 'inspect':
             for module_type, objs in selected_function_modules.items():
                 for obj in objs:
