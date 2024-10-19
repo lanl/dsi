@@ -250,10 +250,10 @@ class Terminal():
                     operation_success = True
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
-                elif interaction_type == 'get' and query != None:
+                elif interaction_type == 'get':
                     self.logger.info(f"Query to get data: {query}")
                     start = datetime.now()
-                    self.active_metadata = obj.get_artifacts(query, **kwargs)
+                    self.active_metadata = obj.get_artifacts(**kwargs)
                     operation_success = True
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
