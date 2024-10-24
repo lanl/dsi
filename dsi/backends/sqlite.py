@@ -152,7 +152,7 @@ class Sqlite(Filesystem):
                     key += " PRIMARY KEY"
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
                     foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
-                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {artifacts[dsi_name]["primary_key"][foreignIndex][0]} ({artifacts[dsi_name]["primary_key"][foreignIndex][1]})"
+                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {artifacts[dsi_name]['primary_key'][foreignIndex][0]} ({artifacts[dsi_name]['primary_key'][foreignIndex][1]})"
                 
                 types.properties[key.replace('-','_minus_')] = tableData[key]
             
