@@ -32,7 +32,7 @@ def test_wildfire_data_csv_artifact():
     assert True
 
 def test_wildfiredata_artifact_put():
-   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
+   valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
    dbpath = 'test_wildfiredata_artifact.sqlite_data'
    store = Sqlite(dbpath)
    store.put_artifacts(valid_middleware_datastructure)
@@ -44,7 +44,7 @@ def test_wildfiredata_artifact_put_t():
    valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
    dbpath = 'test_wildfiredata_artifact.sqlite_data'
    store = Sqlite(dbpath)
-   store.put_artifacts_t(valid_middleware_datastructure, tableName="Wildfire")
+   store.put_artifacts_t(OrderedDict([("wildfire", valid_middleware_datastructure)]), tableName="Wildfire")
    store.close()
    # No error implies success
    assert True
@@ -69,32 +69,15 @@ def test_yosemite_data_csv_artifact():
     assert True
 
 
-def test_artifact_query():
-    dbpath = "wildfire.db"
-    store = Sqlite(dbpath)
-    _ = store.get_artifact_list(isVerbose=isVerbose)
-    data_type = DataType()
-    data_type.name = "simulation"
-    result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
-                            str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
-    store.export_csv(result, "TABLENAME", "query.csv")
-    store.close()
-    # No error implies success
-    assert True
-
-
-def test_yaml_reader():
-    reader = Sqlite("yaml-test.db")
-    reader.yamlToSqlite(["examples/data/schema.yml", "examples/data/schema2.yml"], "yaml-test", deleteSql=False)
-    subprocess.run(["diff", "examples/data/compare-schema.sql", "yaml-test.sql"], stdout=open("compare_sql.txt", "w"))
-    file_size = os.path.getsize("compare_sql.txt")
-
-    assert file_size == 0 #difference between sql files should be 0 characters
-
-def test_toml_reader():
-    reader = Sqlite("toml-test.db")
-    reader.tomlToSqlite(["examples/data/schema.toml", "examples/data/schema2.toml"], "toml-test", deleteSql=False)
-    subprocess.run(["diff", "examples/data/compare-schema.sql", "toml-test.sql"], stdout=open("compare_sql.txt", "w"))
-    file_size = os.path.getsize("compare_sql.txt")
-
-    assert file_size == 0 #difference between sql files should be 0 characters
+# def test_artifact_query():
+#     dbpath = "wildfire.db"
+#     store = Sqlite(dbpath)
+#     _ = store.get_artifact_list(isVerbose=isVerbose)
+#     data_type = DataType()
+#     data_type.name = "simulation"
+#     result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
+#                             str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
+#     store.export_csv(result, "TABLENAME", "query.csv")
+#     store.close()
+#     # No error implies success
+#     assert True

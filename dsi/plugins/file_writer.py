@@ -6,16 +6,15 @@ from math import isnan
 import sqlite3
 import subprocess
 import os
+from matplotlib import pyplot as plt
 
 from dsi.plugins.metadata import StructuredMetadata
-
 
 class FileWriter(StructuredMetadata):
     """
     FileWriter Plugins keep information about the file that
     they are ingesting, namely absolute path and hash.
     """
-
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
         if type(filenames) == str:
@@ -24,10 +23,11 @@ class FileWriter(StructuredMetadata):
             self.filenames = filenames
         else:
             raise TypeError
-        self.file_info = {}
+        
+        '''self.file_info = {}
         for filename in self.filenames:
             sha = sha1(open(filename, 'rb').read())
-            self.file_info[abspath(filename)] = sha.hexdigest()
+            self.file_info[abspath(filename)] = sha.hexdigest()'''
 
 class ER_Diagram(FileWriter):
 
@@ -44,6 +44,7 @@ class ER_Diagram(FileWriter):
 
         `return`: none
         """
+        
         db = sqlite3.connect(dbname)
 
         file_type = ".png"
@@ -127,7 +128,7 @@ class ER_Diagram(FileWriter):
         subprocess.run(["dot", "-T", file_type[1:], "-o", fname + file_type, fname + ".dot"])
         os.remove(fname + ".dot")
 
-class Csv(FileWriter):
+class Csv_Writer(FileWriter):
     """
     A Plugin to output queries as CSV data
     """
@@ -207,3 +208,39 @@ class Csv(FileWriter):
                 csvWriter.writerow(row)
         
         return 1
+
+class Table_Plot(FileWriter):
+    '''
+    Plugin that plots all numeric column data for a specified table
+    '''
+    def __init__(self, table_name, filename, **kwargs):
+        '''
+        `table_name`: name of table to be plotted
+        `filename`: name of output file that plot be stored in
+        '''
+        super().__init__(filename, **kwargs)
+        self.output_name = filename
+        self.table_name = table_name
+
+    def get_rows(self, collection) -> None:
+        numeric_cols = []
+        col_len = None
+        for colName, colData in collection[self.table_name].items():
+            if col_len == None:
+                col_len = len(colData)
+            if isinstance(colData[0], str) == False:
+                if self.table_name + "_units" in collection.keys() and collection[self.table_name + "_units"][colName][0] != "NULL":
+                    numeric_cols.append((colName + f" ({collection[self.table_name + '_units'][colName][0]})", colData))
+                else:
+                    numeric_cols.append((colName, colData))
+
+        sim_list = list(range(1, col_len + 1))
+
+        for colName, colData in numeric_cols:
+            plt.plot(sim_list, colData, label = colName)
+        plt.xticks(sim_list)
+        plt.xlabel("Sim Number")
+        plt.ylabel("Values")
+        plt.title(f"{self.table_name} Values")
+        plt.legend()
+        plt.savefig(f"{self.table_name} Values", bbox_inches='tight')

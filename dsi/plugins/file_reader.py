@@ -4,6 +4,10 @@ from hashlib import sha1
 import json
 from math import isnan
 from pandas import DataFrame, read_csv, concat
+import re
+import yaml
+import toml
+import ast
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -129,8 +133,8 @@ class Bueno(FileReader):
         self.add_to_output(rows)
         # Flatten multiple samples of the same file.
         try:
-            for col, rows in self.output_collector.items():
-                self.output_collector[col] = rows[0] + rows[1]
+            for col, rows in self.output_collector["Bueno"].items():
+                self.output_collector["Bueno"][col] = rows[0] + rows[1]
         except IndexError:
             # First pass. Nothing to do.
             pass
@@ -142,7 +146,6 @@ class JSON(FileReader):
     The JSON data's keys are used as columns and values are rows
    
     """
-
     def __init__(self, filenames, **kwargs) -> None:
         super().__init__(filenames, **kwargs)
         self.key_data = []
@@ -176,3 +179,164 @@ class JSON(FileReader):
             print(new_row.values())
             self.add_to_output(list(new_row.values()))
 
+class YAML(FileReader):
+    '''
+    Plugin to read in an individual or a set of YAML files
+
+    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    '''
+    def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
+        '''
+        `filenames`: one yaml file or a list of yaml files to be ingested
+        `target_table_prefix`: prefix to be added to every table created to differentiate between other yaml sources
+        `yamlSpace`: indent used in ingested yaml files - default 2 spaces but can change to the indentation used in input
+        '''
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.yaml_files = [filenames]
+        else:
+            self.yaml_files = filenames
+        self.yamlSpace = yamlSpace
+        self.yaml_data = OrderedDict()
+        self.target_table_prefix = target_table_prefix
+
+    def pack_header(self) -> None:
+        """Set schema with YAML data."""
+        table_info = []
+        for table_name in list(self.yaml_data.keys()):
+            table_info.append((self.target_table_prefix + "__" + table_name, list(self.yaml_data[table_name].keys())))
+        self.set_schema(table_info)
+
+    def check_type(self, text):
+        """
+        Tests input text and returns a predicted compatible SQL Type
+        `text`: text string
+        `return`: string returned as int, float or still a string
+        """
+        try:
+            _ = int(text)
+            return int(text)
+        except ValueError:
+            try:
+                _ = float(text)
+                return float(text)
+            except ValueError:
+                return text
+            
+    def add_rows(self) -> None:
+        """
+        Parses YAML data and creates an ordered dict which stores an ordered dict for each table.
+        """
+        for filename in self.yaml_files:
+            with open(filename, 'r') as yaml_file:
+                editedString = yaml_file.read()
+                editedString = re.sub('specification', f'columns:\n{self.yamlSpace}specification', editedString)
+                editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
+                yaml_load_data = list(yaml.safe_load_all(editedString))
+                
+                if not self.schema_is_set():
+                    for table in yaml_load_data:
+                        self.yaml_data[table["segment"]] = OrderedDict((key, []) for key in table["columns"].keys())
+                        self.yaml_data[table["segment"]+"_units"] = OrderedDict((key, []) for key in table["columns"].keys())
+                    self.yaml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+                    self.pack_header()
+
+                for table in yaml_load_data:
+                    row = []
+                    unit_row = []
+                    for col_name, data in table["columns"].items():
+                        unit_data = "NULL"
+                        if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
+                            unit_data = data[data.find(' ')+1:]
+                            data = self.check_type(data[:data.find(" ")])
+                        self.yaml_data[table["segment"]][col_name].append(data)
+                        if len(self.yaml_data[table["segment"] + "_units"][col_name]) < 1:
+                            unit_row.append(unit_data)
+                            self.yaml_data[table["segment"] + "_units"][col_name].append(unit_data)
+                        row.append(data)
+                    self.add_to_output(row, self.target_table_prefix + "__" + table["segment"])
+                    if len(next(iter(self.output_collector[self.target_table_prefix + "__" + table["segment"] + "_units"].values()))) < 1:
+                        self.add_to_output(unit_row, self.target_table_prefix + "__" + table["segment"] + "_units")
+
+class TOML(FileReader):
+    '''
+    Plugin to read in an individual or a set of TOML files
+
+    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    '''
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        '''
+        `filenames`: one toml file or a list of toml files to be ingested
+        `target_table_prefix`: prefix to be added to every table created to differentiate between other toml sources
+        '''
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.toml_files = [filenames]
+        else:
+            self.toml_files = filenames
+        self.toml_data = OrderedDict()
+        self.target_table_prefix = target_table_prefix
+
+    def pack_header(self) -> None:
+        """Set schema with TOML data."""
+        table_info = []
+        for table_name in list(self.toml_data.keys()):
+            table_info.append((self.target_table_prefix + "__" + table_name, list(self.toml_data[table_name].keys())))
+        self.set_schema(table_info)
+
+    def check_type(self, text):
+        """
+        Tests input text and returns a predicted compatible SQL Type
+        `text`: text string
+        `return`: string returned as int, float or still a string
+        """
+        try:
+            _ = int(text)
+            return int(text)
+        except ValueError:
+            try:
+                _ = float(text)
+                return float(text)
+            except ValueError:
+                return text
+
+    def add_rows(self) -> None:
+        """
+        Parses TOML data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
+        """
+        for filename in self.toml_files:
+            with open(filename, 'r+') as temp_file:
+                editedString = temp_file.read()
+                if '"{' not in editedString:
+                    editedString = re.sub('{', '"{', editedString)
+                    editedString = re.sub('}', '}"', editedString)
+                    temp_file.seek(0)
+                    temp_file.write(editedString)
+
+            with open(filename, 'r') as toml_file:
+                toml_load_data = toml.load(toml_file)
+
+                if not self.schema_is_set():
+                    for tableName, tableData in toml_load_data.items():
+                        self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
+                        self.toml_data[tableName + "_units"] = OrderedDict((key, []) for key in tableData.keys())
+                    self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+                    self.pack_header()
+
+                for tableName, tableData in toml_load_data.items():
+                    row = []
+                    unit_row = []
+                    for col_name, data in tableData.items():
+                        unit_data = "NULL"
+                        if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
+                            data = ast.literal_eval(data)
+                            unit_data = data["units"]
+                            data = data["value"]
+                        self.toml_data[tableName][col_name].append(data)
+                        if len(self.toml_data[tableName + "_units"][col_name]) < 1:
+                            unit_row.append(unit_data)
+                            self.toml_data[tableName + "_units"][col_name].append(unit_data)
+                        row.append(data)
+                    self.add_to_output(row, self.target_table_prefix + "__" + tableName)
+                    if len(next(iter(self.output_collector[self.target_table_prefix + "__" + tableName + "_units"].values()))) < 1:
+                        self.add_to_output(unit_row, self.target_table_prefix + "__" + tableName + "_units")
