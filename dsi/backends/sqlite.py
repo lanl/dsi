@@ -73,7 +73,7 @@ class Sqlite(Filesystem):
     # Note 1: 'add column types' to be implemented.
     # Note 2: TABLENAME is the default name for all tables created which might cause issues when creating multiple Sqlite files.
     
-    def put_artifact_type(self, types, isVerbose=False):
+    def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
         """
         Primary class for defining metadata Artifact schema.
 
@@ -82,10 +82,17 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        
-        col_names = ', '.join(types.properties.keys())
-        
-        str_query = "CREATE TABLE IF NOT EXISTS {} ({});".format(str(types.name), col_names)
+        key_names = types.properties.keys()
+        if "_units" in types.name:
+            key_names = [item + " UNIQUE" for item in types.properties.keys()]
+
+        col_names = ', '.join(key_names)
+
+        str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
+
+        if foreign_query != None:
+            str_query += foreign_query
+        str_query += ");"
 
         if isVerbose:
             print(str_query)
@@ -126,6 +133,8 @@ class Sqlite(Filesystem):
         artifacts = collection
         
         for tableName, tableData in artifacts.items():
+            if "dsi_relations" in tableName:
+                continue
 
             types = DataType()
             types.properties = {}
@@ -135,16 +144,31 @@ class Sqlite(Filesystem):
                 types.name = self.types.name'''
             types.name = tableName
 
+            foreign_query = ""
             for key in tableData:
+                comboTuple = (tableName, key)
+                dsi_name = tableName[:tableName.find("__")] + "__dsi_relations"
+                if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
+                    key += " PRIMARY KEY"
+                if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
+                    foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
+                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {artifacts[dsi_name]["primary_key"][foreignIndex][0]} ({artifacts[dsi_name]["primary_key"][foreignIndex][1]})"
+                
                 types.properties[key.replace('-','_minus_')] = tableData[key]
-           
-            self.put_artifact_type(types)
+            
+            if foreign_query != "":
+                self.put_artifact_type(types, foreign_query)
+            else:
+                self.put_artifact_type(types)
         
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
-        
-            str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-        
+
+            if "_units" in tableName:
+                str_query = "INSERT OR IGNORE INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+            else:
+                str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+
             # col_list helps access the specific keys of the dictionary in the for loop
             col_list = col_names.split(', ')
 

@@ -229,8 +229,8 @@ class Table_Plot(FileWriter):
             if col_len == None:
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
-                if colName+"_units" in collection[self.table_name].keys() and collection[self.table_name][colName+"_units"][0] != "NULL":
-                    numeric_cols.append((colName + f" ({collection[self.table_name][colName+'_units'][0]})", colData))
+                if self.table_name + "_units" in collection.keys() and collection[self.table_name + "_units"][colName][0] != "NULL":
+                    numeric_cols.append((colName + f" ({collection[self.table_name + '_units'][colName][0]})", colData))
                 else:
                     numeric_cols.append((colName, colData))
 

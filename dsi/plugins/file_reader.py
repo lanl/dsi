@@ -7,6 +7,7 @@ from pandas import DataFrame, read_csv, concat
 import re
 import yaml
 import toml
+import ast
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -203,7 +204,7 @@ class YAML(FileReader):
         """Set schema with YAML data."""
         table_info = []
         for table_name in list(self.yaml_data.keys()):
-            table_info.append((self.target_table_prefix + "_" + table_name, list(self.yaml_data[table_name].keys())))
+            table_info.append((self.target_table_prefix + "__" + table_name, list(self.yaml_data[table_name].keys())))
         self.set_schema(table_info)
 
     def check_type(self, text):
@@ -235,22 +236,27 @@ class YAML(FileReader):
                 
                 if not self.schema_is_set():
                     for table in yaml_load_data:
-                        unit_list = [col + "_units" for col in table["columns"].keys()]
-                        total_col_list = list(sum(zip(table["columns"].keys(), unit_list), ()))
-                        self.yaml_data[table["segment"]] = OrderedDict((key, []) for key in total_col_list)
+                        self.yaml_data[table["segment"]] = OrderedDict((key, []) for key in table["columns"].keys())
+                        self.yaml_data[table["segment"]+"_units"] = OrderedDict((key, []) for key in table["columns"].keys())
+                    self.yaml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
                     self.pack_header()
 
                 for table in yaml_load_data:
                     row = []
+                    unit_row = []
                     for col_name, data in table["columns"].items():
                         unit_data = "NULL"
                         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
                             unit_data = data[data.find(' ')+1:]
                             data = self.check_type(data[:data.find(" ")])
                         self.yaml_data[table["segment"]][col_name].append(data)
-                        self.yaml_data[table["segment"]][col_name + "_units"].append(unit_data)
-                        row.extend([data, unit_data])
-                    self.add_to_output(row, self.target_table_prefix + "_" + table["segment"])
+                        if len(self.yaml_data[table["segment"] + "_units"][col_name]) < 1:
+                            unit_row.append(unit_data)
+                            self.yaml_data[table["segment"] + "_units"][col_name].append(unit_data)
+                        row.append(data)
+                    self.add_to_output(row, self.target_table_prefix + "__" + table["segment"])
+                    if len(next(iter(self.output_collector[self.target_table_prefix + "__" + table["segment"] + "_units"].values()))) < 1:
+                        self.add_to_output(unit_row, self.target_table_prefix + "__" + table["segment"] + "_units")
 
 class TOML(FileReader):
     '''
@@ -275,7 +281,7 @@ class TOML(FileReader):
         """Set schema with TOML data."""
         table_info = []
         for table_name in list(self.toml_data.keys()):
-            table_info.append((self.target_table_prefix + "_" + table_name, list(self.toml_data[table_name].keys())))
+            table_info.append((self.target_table_prefix + "__" + table_name, list(self.toml_data[table_name].keys())))
         self.set_schema(table_info)
 
     def check_type(self, text):
@@ -299,24 +305,38 @@ class TOML(FileReader):
         Parses TOML data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
         """
         for filename in self.toml_files:
+            with open(filename, 'r+') as temp_file:
+                editedString = temp_file.read()
+                if '"{' not in editedString:
+                    editedString = re.sub('{', '"{', editedString)
+                    editedString = re.sub('}', '}"', editedString)
+                    temp_file.seek(0)
+                    temp_file.write(editedString)
+
             with open(filename, 'r') as toml_file:
                 toml_load_data = toml.load(toml_file)
 
                 if not self.schema_is_set():
                     for tableName, tableData in toml_load_data.items():
-                        unit_list = [col + "_units" for col in tableData.keys()]
-                        total_col_list = list(sum(zip(tableData.keys(), unit_list), ()))
-                        self.toml_data[tableName] = OrderedDict((key, []) for key in total_col_list)
+                        self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
+                        self.toml_data[tableName + "_units"] = OrderedDict((key, []) for key in tableData.keys())
+                    self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
                     self.pack_header()
 
                 for tableName, tableData in toml_load_data.items():
                     row = []
+                    unit_row = []
                     for col_name, data in tableData.items():
                         unit_data = "NULL"
-                        if isinstance(data, list):
-                            unit_data = data[1]
-                            data = self.check_type(data[0])
+                        if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
+                            data = ast.literal_eval(data)
+                            unit_data = data["units"]
+                            data = data["value"]
                         self.toml_data[tableName][col_name].append(data)
-                        self.toml_data[tableName][col_name + "_units"].append(unit_data)
-                        row.extend([data, unit_data])
-                    self.add_to_output(row, self.target_table_prefix + "_" + tableName)
+                        if len(self.toml_data[tableName + "_units"][col_name]) < 1:
+                            unit_row.append(unit_data)
+                            self.toml_data[tableName + "_units"][col_name].append(unit_data)
+                        row.append(data)
+                    self.add_to_output(row, self.target_table_prefix + "__" + tableName)
+                    if len(next(iter(self.output_collector[self.target_table_prefix + "__" + tableName + "_units"].values()))) < 1:
+                        self.add_to_output(unit_row, self.target_table_prefix + "__" + tableName + "_units")
