@@ -27,9 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         python -m pip install opencv-python
-        pip install matplotlib
-        pip install pyyaml
-        pip install toml
         pip install .
         pip install graphviz
         sudo apt-get install graphviz
