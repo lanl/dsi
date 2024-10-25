@@ -260,11 +260,16 @@ class Terminal():
         if interaction_type == 'inspect':
             for module_type, objs in selected_function_modules.items():
                 for obj in objs:
+                    self.logger.info(f"-------------------------------------")
+                    self.logger.info(obj.__class__.__name__ + f" {module_type} - {interaction_type} the data")
+                    start = datetime.now()
                     obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
                     self.active_metadata = obj.inspect_artifacts(
                         collection=self.active_metadata, **kwargs)
                     operation_success = True
+                    end = datetime.now()
+                    self.logger.info(f"Runtime: {end-start}")
         if operation_success:
             return
         else:
