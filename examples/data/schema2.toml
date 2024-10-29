@@ -1,28 +1,28 @@
-[math2]
+[math]
 specification = "!jack"
-a = 1
+a = 2
 b = "there is CM"
 c = ["45.98", "cm"]
-d = 2
-e = 34.8
-f = 89.0e-4
+d = 3
+e = 35.8
+f = 869.0e-4
 
-[address2]
+[address]
 specification = "!sam"
 fileLoc = '/home/sam/lib/data'
 g = "good memories"
 h = "556place street"
-i = 2
-j = 3 
-k = 4
-l = 10000.0e-4
-m = 99
+i = 3
+j = 4 
+k = 5
+l = 110000.0e-4
+m = 999
 
-[physics2]
+[physics]
 specification = "!amy"
-n = ["9.8", "m / s / s"]
+n = ["19.8", "m / s / s"]
 o = "gravity"
-p = ["23", "s"]
+p = ["24", "s"]
 q = "home 23"
-r = ['1', 'million grams']
-s = -12.0e-4
+r = ['2', 'million grams']
+s = -122.0e-4

@@ -20,7 +20,7 @@ JSON = "TEXT"
 # Holds table name and data properties
 
 class DataType:
-    name = "TABLENAME" # Note: using the word DEFAULT outputs a syntax error
+    name = "" # Note: using the word DEFAULT outputs a syntax error
     properties = {}
     units = {}
 
@@ -33,7 +33,7 @@ class Artifact:
         An Artifact is a generic construct that defines the schema for metadata that
         defines the tables inside of SQL
     """
-    name = "TABLENAME"
+    name = ""
     properties = {}
 
 
@@ -73,7 +73,7 @@ class Sqlite(Filesystem):
     # Note 1: 'add column types' to be implemented.
     # Note 2: TABLENAME is the default name for all tables created which might cause issues when creating multiple Sqlite files.
     
-    def put_artifact_type(self, types, isVerbose=False):
+    def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
         """
         Primary class for defining metadata Artifact schema.
 
@@ -82,10 +82,17 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        
-        col_names = ', '.join(types.properties.keys())
-        
-        str_query = "CREATE TABLE IF NOT EXISTS {} ({});".format(str(types.name), col_names)
+        key_names = types.properties.keys()
+        if "_units" in types.name:
+            key_names = [item + " UNIQUE" for item in types.properties.keys()]
+
+        col_names = ', '.join(key_names)
+
+        str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
+
+        if foreign_query != None:
+            str_query += foreign_query
+        str_query += ");"
 
         if isVerbose:
             print(str_query)
@@ -124,42 +131,62 @@ class Sqlite(Filesystem):
         """
         # Core compatibility name assignment
         artifacts = collection
-
-        types = DataType()
-        types.properties = {}
-
-        # Check if this has been defined from helper function
-        if self.types != None:
-            types.name = self.types.name
-
-        for key in artifacts:
-            types.properties[key.replace('-','_minus_')] = artifacts[key]
-           
-        self.put_artifact_type(types)
         
-        col_names = ', '.join(types.properties.keys())
-        placeholders = ', '.join('?' * len(types.properties))
-        
-        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-        
-        # col_list helps access the specific keys of the dictionary in the for loop
-        col_list = col_names.split(', ')
+        for tableName, tableData in artifacts.items():
+            if "dsi_relations" in tableName:
+                continue
 
-        # loop through the contents of each column and insert into table as a row
-        for ind1 in range(len(types.properties[col_list[0]])):
-            vals = []
-            for ind2 in range(len(types.properties.keys())):
-                vals.append(str(types.properties[col_list[ind2]][ind1]))
-            # Make sure this works if types.properties[][] is already a string
-            tup_vals = tuple(vals)
-            self.cur.execute(str_query,tup_vals)
+            types = DataType()
+            types.properties = {}
 
-        if isVerbose:
-            print(str_query)
+            # Check if this has been defined from helper function
+            '''if self.types != None:
+                types.name = self.types.name'''
+            types.name = tableName
 
-        self.con.commit()
+            foreign_query = ""
+            for key in tableData:
+                comboTuple = (tableName, key)
+                dsi_name = tableName[:tableName.find("__")] + "__dsi_relations"
+                if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
+                    key += " PRIMARY KEY"
+                if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
+                    foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
+                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {artifacts[dsi_name]['primary_key'][foreignIndex][0]} ({artifacts[dsi_name]['primary_key'][foreignIndex][1]})"
+                
+                types.properties[key.replace('-','_minus_')] = tableData[key]
+            
+            if foreign_query != "":
+                self.put_artifact_type(types, foreign_query)
+            else:
+                self.put_artifact_type(types)
         
-        self.types = types
+            col_names = ', '.join(types.properties.keys())
+            placeholders = ', '.join('?' * len(types.properties))
+
+            if "_units" in tableName:
+                str_query = "INSERT OR IGNORE INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+            else:
+                str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+
+            # col_list helps access the specific keys of the dictionary in the for loop
+            col_list = col_names.split(', ')
+
+            # loop through the contents of each column and insert into table as a row
+            for ind1 in range(len(types.properties[col_list[0]])):
+                vals = []
+                for ind2 in range(len(types.properties.keys())):
+                    vals.append(str(types.properties[col_list[ind2]][ind1]))
+                # Make sure this works if types.properties[][] is already a string
+                tup_vals = tuple(vals)
+                self.cur.execute(str_query,tup_vals)
+
+            if isVerbose:
+                print(str_query)
+
+            self.con.commit()
+            
+            self.types = types #This will only copy the last collection from artifacts (collections input)
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
@@ -337,13 +364,13 @@ class Sqlite(Filesystem):
       #[END NOTE 2]
 
     # Returns text list from query
-    def get_artifact_list(self, isVerbose=False):
+    def get_artifact_list(self, query, isVerbose=False):
         """
         Function that returns a list of all of the Artifact names (represented as sql tables)
 
         `return`: list of Artifact names
         """
-        str_query = "SELECT name FROM sqlite_master WHERE type='table';"
+        str_query = query
         if isVerbose:
             print(str_query)
 
@@ -357,8 +384,8 @@ class Sqlite(Filesystem):
         return resout
 
     # Returns reference from query
-    def get_artifacts(self, query):
-        self.get_artifacts_list()
+    def get_artifacts(self, query, isVerbose=False):
+        self.get_artifact_list(query, isVerbose)
 
     # Closes connection to server
     def close(self):
@@ -577,6 +604,7 @@ class Sqlite(Filesystem):
         `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
         """
 
+        sql_statements = []
         if isinstance(filenames, str):
             filenames = [filenames]
 
@@ -600,9 +628,15 @@ class Sqlite(Filesystem):
                             createStmt += f"{key} {data_types[type(val)]}, "
                             insertUnitStmt+= "NULL, "
 
-                    sql_file.write(createStmt[:-2] + ");\n\n")
-                    sql_file.write(createUnitStmt[:-2] + ");\n\n")
-                    sql_file.write(insertUnitStmt[:-2] + ");\n\n")
+                    if createStmt not in sql_statements:
+                        sql_statements.append(createStmt)
+                        sql_file.write(createStmt[:-2] + ");\n\n")
+                    if createUnitStmt not in sql_statements:
+                        sql_statements.append(createUnitStmt)
+                        sql_file.write(createUnitStmt[:-2] + ");\n\n")
+                    if insertUnitStmt not in sql_statements:
+                        sql_statements.append(insertUnitStmt)
+                        sql_file.write(insertUnitStmt[:-2] + ");\n\n")
 
                 insertStmt = f"INSERT INTO {tableName} VALUES( "
                 for val in table['columns'].values():
@@ -613,12 +647,14 @@ class Sqlite(Filesystem):
                     else:
                         insertStmt+= f"{val}, "
 
-                sql_file.write(insertStmt[:-2] + ");\n\n")
+                if insertStmt not in sql_statements:
+                    sql_statements.append(insertStmt)
+                    sql_file.write(insertStmt[:-2] + ");\n\n")
     
-            subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-            if deleteSql == True:
-                os.remove(db_name+".sql")
+        if deleteSql == True:
+            os.remove(db_name+".sql")
 
     def tomlDataToList(self, filenames):
         """
