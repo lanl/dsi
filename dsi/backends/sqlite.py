@@ -385,7 +385,7 @@ class Sqlite(Filesystem):
 
     # Returns reference from query
     def get_artifacts(self, query, isVerbose=False):
-        self.get_artifact_list(query, isVerbose)
+        return self.get_artifact_list(query, isVerbose)
 
     # Closes connection to server
     def close(self):

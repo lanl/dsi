@@ -31,7 +31,7 @@ class Terminal():
         'writer', 'reader'], 'backend': ['front-end', 'back-end']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect']
 
-    def __init__(self):
+    def __init__(self, debug_flag = False):
         # Helper function to get parent module names.
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -58,6 +58,14 @@ class Terminal():
         self.transload_lock = False
 
         self.logger = logging.getLogger(self.__class__.__name__)
+
+        if debug_flag:
+            logging.basicConfig(
+                filename='logger.txt',         # Name of the log file
+                filemode='a',               # Append mode ('w' for overwrite)
+                format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
+                level=logging.INFO          # Minimum log level to capture
+            )
 
     def list_available_modules(self, mod_type):
         """
@@ -253,7 +261,10 @@ class Terminal():
                 elif interaction_type == 'get':
                     self.logger.info(f"Query to get data: {query}")
                     start = datetime.now()
-                    self.active_metadata = obj.get_artifacts(**kwargs)
+                    if query != None:
+                        self.active_metadata = obj.get_artifacts(query, **kwargs)
+                    else:
+                        raise ValueError("Need to specify a query of the database to return data")
                     operation_success = True
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
@@ -271,6 +282,8 @@ class Terminal():
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
         if operation_success:
+            if self.active_metadata:
+                return self.active_metadata
             return
         else:
             print(
