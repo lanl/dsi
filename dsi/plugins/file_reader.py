@@ -6,8 +6,10 @@ from math import isnan
 from pandas import DataFrame, read_csv, concat
 import re
 import yaml
-import toml
-import ast
+try: import tomllib
+except ModuleNotFoundError: import pip._vendor.tomli as tomllib
+
+# import ast
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -284,59 +286,48 @@ class TOML(FileReader):
             table_info.append((self.target_table_prefix + "__" + table_name, list(self.toml_data[table_name].keys())))
         self.set_schema(table_info)
 
-    def check_type(self, text):
-        """
-        Tests input text and returns a predicted compatible SQL Type
-        `text`: text string
-        `return`: string returned as int, float or still a string
-        """
-        try:
-            _ = int(text)
-            return int(text)
-        except ValueError:
-            try:
-                _ = float(text)
-                return float(text)
-            except ValueError:
-                return text
-
     def add_rows(self) -> None:
         """
         Parses TOML data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
         """
         for filename in self.toml_files:
-            with open(filename, 'r+') as temp_file:
-                editedString = temp_file.read()
-                if '"{' not in editedString:
-                    editedString = re.sub('{', '"{', editedString)
-                    editedString = re.sub('}', '}"', editedString)
-                    temp_file.seek(0)
-                    temp_file.write(editedString)
+            # with open(filename, 'r+') as temp_file:
+            #     editedString = temp_file.read()
+            #     if '"{' not in editedString:
+            #         editedString = re.sub('{', '"{', editedString)
+            #         editedString = re.sub('}', '}"', editedString)
+            #         temp_file.seek(0)
+            #         temp_file.write(editedString)
+            
+            toml_load_data = None
+            with open(filename, 'rb') as toml_file:
+                toml_load_data = tomllib.load(toml_file)
 
-            with open(filename, 'r') as toml_file:
-                toml_load_data = toml.load(toml_file)
-
-                if not self.schema_is_set():
-                    for tableName, tableData in toml_load_data.items():
-                        self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
-                        self.toml_data[tableName + "_units"] = OrderedDict((key, []) for key in tableData.keys())
-                    self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-                    self.pack_header()
-
+            if not self.schema_is_set():
                 for tableName, tableData in toml_load_data.items():
-                    row = []
-                    unit_row = []
-                    for col_name, data in tableData.items():
-                        unit_data = "NULL"
-                        if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
-                            data = ast.literal_eval(data)
-                            unit_data = data["units"]
-                            data = data["value"]
-                        self.toml_data[tableName][col_name].append(data)
-                        if len(self.toml_data[tableName + "_units"][col_name]) < 1:
-                            unit_row.append(unit_data)
-                            self.toml_data[tableName + "_units"][col_name].append(unit_data)
-                        row.append(data)
-                    self.add_to_output(row, self.target_table_prefix + "__" + tableName)
-                    if len(next(iter(self.output_collector[self.target_table_prefix + "__" + tableName + "_units"].values()))) < 1:
-                        self.add_to_output(unit_row, self.target_table_prefix + "__" + tableName + "_units")
+                    self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
+                    self.toml_data[tableName + "_units"] = OrderedDict((key, []) for key in tableData.keys())
+                self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+                self.pack_header()
+
+            for tableName, tableData in toml_load_data.items():
+                row = []
+                unit_row = []
+                for col_name, data in tableData.items():
+                    unit_data = "NULL"
+                    if isinstance(data, dict):
+                        unit_data = data["units"]
+                        data = data["value"]
+                    # IF statement for manual data parsing for python 3.10 and below
+                    # if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
+                    #     data = ast.literal_eval(data)
+                    #     unit_data = data["units"]
+                    #     data = data["value"]
+                    self.toml_data[tableName][col_name].append(data)
+                    if len(self.toml_data[tableName + "_units"][col_name]) < 1:
+                        unit_row.append(unit_data)
+                        self.toml_data[tableName + "_units"][col_name].append(unit_data)
+                    row.append(data)
+                self.add_to_output(row, self.target_table_prefix + "__" + tableName)
+                if len(next(iter(self.output_collector[self.target_table_prefix + "__" + tableName + "_units"].values()))) < 1:
+                    self.add_to_output(unit_row, self.target_table_prefix + "__" + tableName + "_units")
