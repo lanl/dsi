@@ -6,6 +6,8 @@ from math import isnan
 from pandas import DataFrame, read_csv, concat
 import re
 import yaml
+import tomllib
+# import ast
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -297,12 +299,7 @@ class TOML(FileReader):
             
             toml_load_data = None
             with open(filename, 'rb') as toml_file:
-                try:
-                    import tomllib
-                    toml_load_data = tomllib.load(toml_file)
-                except ImportError:
-                    import tomlkit
-                    toml_load_data = tomlkit.load(toml_file)
+                toml_load_data = tomllib.load(toml_file)
 
             if not self.schema_is_set():
                 for tableName, tableData in toml_load_data.items():
@@ -319,6 +316,11 @@ class TOML(FileReader):
                     if isinstance(data, dict):
                         unit_data = data["units"]
                         data = data["value"]
+                    # IF statement for manual data parsing for python 3.10 and below
+                    # if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
+                    #     data = ast.literal_eval(data)
+                    #     unit_data = data["units"]
+                    #     data = data["value"]
                     self.toml_data[tableName][col_name].append(data)
                     if len(self.toml_data[tableName + "_units"][col_name]) < 1:
                         unit_row.append(unit_data)
