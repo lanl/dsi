@@ -5,7 +5,6 @@ import re
 import yaml
 import subprocess
 import os
-import toml
 
 from dsi.backends.filesystem import Filesystem
 
