@@ -575,161 +575,161 @@ class Sqlite(Filesystem):
 
         return resout
 
-    def yamlDataToList(self, filenames):
-        """
-        Function that reads a YAML file or files into a list
-        """
+    # def yamlDataToList(self, filenames):
+    #     """
+    #     Function that reads a YAML file or files into a list
+    #     """
         
-        yamlData = []
-        for filename in filenames:
-            with open(filename, 'r') as yaml_file:
-                editedString = yaml_file.read()
-                editedString = re.sub('specification', r'columns:\n  specification', editedString)
-                editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
-                yml_data = yaml.safe_load_all(editedString)
+    #     yamlData = []
+    #     for filename in filenames:
+    #         with open(filename, 'r') as yaml_file:
+    #             editedString = yaml_file.read()
+    #             editedString = re.sub('specification', r'columns:\n  specification', editedString)
+    #             editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
+    #             yml_data = yaml.safe_load_all(editedString)
                 
-                for table in yml_data:
-                    yamlData.append(table)
+    #             for table in yml_data:
+    #                 yamlData.append(table)
 
-        return yamlData
+    #     return yamlData
             
-    def yamlToSqlite(self, filenames, db_name, deleteSql=True):
-        """
-        Function that ingests a YAML file into a sqlite database based on the given database name
+    # def yamlToSqlite(self, filenames, db_name, deleteSql=True):
+    #     """
+    #     Function that ingests a YAML file into a sqlite database based on the given database name
 
-        `filenames`: name of YAML file or a list of YAML files to be ingested
+    #     `filenames`: name of YAML file or a list of YAML files to be ingested
 
-        `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
+    #     `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
 
-        `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
-        """
+    #     `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
+    #     """
 
-        sql_statements = []
-        if isinstance(filenames, str):
-            filenames = [filenames]
+    #     sql_statements = []
+    #     if isinstance(filenames, str):
+    #         filenames = [filenames]
 
-        with open(db_name+".sql", "w") as sql_file:
-            yml_list = self.yamlDataToList(filenames)
-            for table in yml_list:
-                tableName = table["segment"]
+    #     with open(db_name+".sql", "w") as sql_file:
+    #         yml_list = self.yamlDataToList(filenames)
+    #         for table in yml_list:
+    #             tableName = table["segment"]
 
-                data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
-                if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
-                    createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
-                    createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "  
-                    insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
+    #             data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
+    #             if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
+    #                 createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
+    #                 createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "  
+    #                 insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
 
-                    for key, val in table['columns'].items():
-                        createUnitStmt+= f"{key} VARCHAR, "
-                        if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
-                            createStmt += f"{key}{self.check_type(val[:val.find(' ')])}, "
-                            insertUnitStmt+= f"'{val[val.find(' ')+1:]}', "
-                        else:
-                            createStmt += f"{key} {data_types[type(val)]}, "
-                            insertUnitStmt+= "NULL, "
+    #                 for key, val in table['columns'].items():
+    #                     createUnitStmt+= f"{key} VARCHAR, "
+    #                     if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
+    #                         createStmt += f"{key}{self.check_type(val[:val.find(' ')])}, "
+    #                         insertUnitStmt+= f"'{val[val.find(' ')+1:]}', "
+    #                     else:
+    #                         createStmt += f"{key} {data_types[type(val)]}, "
+    #                         insertUnitStmt+= "NULL, "
 
-                    if createStmt not in sql_statements:
-                        sql_statements.append(createStmt)
-                        sql_file.write(createStmt[:-2] + ");\n\n")
-                    if createUnitStmt not in sql_statements:
-                        sql_statements.append(createUnitStmt)
-                        sql_file.write(createUnitStmt[:-2] + ");\n\n")
-                    if insertUnitStmt not in sql_statements:
-                        sql_statements.append(insertUnitStmt)
-                        sql_file.write(insertUnitStmt[:-2] + ");\n\n")
+    #                 if createStmt not in sql_statements:
+    #                     sql_statements.append(createStmt)
+    #                     sql_file.write(createStmt[:-2] + ");\n\n")
+    #                 if createUnitStmt not in sql_statements:
+    #                     sql_statements.append(createUnitStmt)
+    #                     sql_file.write(createUnitStmt[:-2] + ");\n\n")
+    #                 if insertUnitStmt not in sql_statements:
+    #                     sql_statements.append(insertUnitStmt)
+    #                     sql_file.write(insertUnitStmt[:-2] + ");\n\n")
 
-                insertStmt = f"INSERT INTO {tableName} VALUES( "
-                for val in table['columns'].values():
-                    if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
-                        insertStmt+= f"{val[:val.find(' ')]}, "
-                    elif data_types[type(val)] == "VARCHAR":
-                        insertStmt+= f"'{val}', "
-                    else:
-                        insertStmt+= f"{val}, "
+    #             insertStmt = f"INSERT INTO {tableName} VALUES( "
+    #             for val in table['columns'].values():
+    #                 if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
+    #                     insertStmt+= f"{val[:val.find(' ')]}, "
+    #                 elif data_types[type(val)] == "VARCHAR":
+    #                     insertStmt+= f"'{val}', "
+    #                 else:
+    #                     insertStmt+= f"{val}, "
 
-                if insertStmt not in sql_statements:
-                    sql_statements.append(insertStmt)
-                    sql_file.write(insertStmt[:-2] + ");\n\n")
+    #             if insertStmt not in sql_statements:
+    #                 sql_statements.append(insertStmt)
+    #                 sql_file.write(insertStmt[:-2] + ");\n\n")
     
-        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+    #     subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-        if deleteSql == True:
-            os.remove(db_name+".sql")
+    #     if deleteSql == True:
+    #         os.remove(db_name+".sql")
 
-    def tomlDataToList(self, filenames):
-        """
-        Function that reads a TOML file or files into a list
-        """
+    # def tomlDataToList(self, filenames):
+    #     """
+    #     Function that reads a TOML file or files into a list
+    #     """
         
-        toml_data = []
-        for filename in filenames:
-            with open(filename, 'r') as toml_file:
-                data = toml.load(toml_file)
-                for tableName, tableData in data.items():
-                    toml_data.append([tableName, tableData])
+    #     toml_data = []
+    #     for filename in filenames:
+    #         with open(filename, 'r') as toml_file:
+    #             data = toml.load(toml_file)
+    #             for tableName, tableData in data.items():
+    #                 toml_data.append([tableName, tableData])
 
-        return toml_data
+    #     return toml_data
     
-    def tomlToSqlite(self, filenames, db_name, deleteSql=True):
-        """
-        Function that ingests a TOML file into a sqlite database based on the given database name
+    # def tomlToSqlite(self, filenames, db_name, deleteSql=True):
+    #     """
+    #     Function that ingests a TOML file into a sqlite database based on the given database name
 
-        `filenames`: name of TOML file or a list of TOML files to be ingested
+    #     `filenames`: name of TOML file or a list of TOML files to be ingested
 
-        `db_name`: name of database that TOML file should be added to. Database will be created if it does not exist in local directory.
+    #     `db_name`: name of database that TOML file should be added to. Database will be created if it does not exist in local directory.
 
-        `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
-        """
+    #     `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
+    #     """
 
-        sql_statements = []
-        if isinstance(filenames, str):
-            filenames = [filenames]
+    #     sql_statements = []
+    #     if isinstance(filenames, str):
+    #         filenames = [filenames]
 
-        with open(db_name+".sql", "w") as sql_file:
-            data = self.tomlDataToList(filenames)
+    #     with open(db_name+".sql", "w") as sql_file:
+    #         data = self.tomlDataToList(filenames)
 
-            for item in data:
-                tableName, tableData = item
-                data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
+    #         for item in data:
+    #             tableName, tableData = item
+    #             data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
 
-                if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
-                    createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
-                    createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "
-                    insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
+    #             if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
+    #                 createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
+    #                 createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "
+    #                 insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
 
-                    for key, val in tableData.items():
-                        createUnitStmt+= f"{key} VARCHAR, "
-                        if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
-                            createStmt += f"{key}{self.check_type(val[0])}, "
-                            insertUnitStmt+= f"'{val[1]}', "
-                        else:
-                            createStmt += f"{key} {data_types[type(val)]}, "
-                            insertUnitStmt+= "NULL, "
+    #                 for key, val in tableData.items():
+    #                     createUnitStmt+= f"{key} VARCHAR, "
+    #                     if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
+    #                         createStmt += f"{key}{self.check_type(val[0])}, "
+    #                         insertUnitStmt+= f"'{val[1]}', "
+    #                     else:
+    #                         createStmt += f"{key} {data_types[type(val)]}, "
+    #                         insertUnitStmt+= "NULL, "
 
-                    if createStmt not in sql_statements:
-                        sql_statements.append(createStmt)
-                        sql_file.write(createStmt[:-2] + ");\n\n")
-                    if createUnitStmt not in sql_statements:
-                        sql_statements.append(createUnitStmt)
-                        sql_file.write(createUnitStmt[:-2] + ");\n\n")
-                    if insertUnitStmt not in sql_statements:
-                        sql_statements.append(insertUnitStmt)
-                        sql_file.write(insertUnitStmt[:-2] + ");\n\n")
+    #                 if createStmt not in sql_statements:
+    #                     sql_statements.append(createStmt)
+    #                     sql_file.write(createStmt[:-2] + ");\n\n")
+    #                 if createUnitStmt not in sql_statements:
+    #                     sql_statements.append(createUnitStmt)
+    #                     sql_file.write(createUnitStmt[:-2] + ");\n\n")
+    #                 if insertUnitStmt not in sql_statements:
+    #                     sql_statements.append(insertUnitStmt)
+    #                     sql_file.write(insertUnitStmt[:-2] + ");\n\n")
                 
-                insertStmt = f"INSERT INTO {tableName} VALUES( "
-                for val in tableData.values():
-                    if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
-                        insertStmt+= f"{val[0]}, "
-                    elif type(val) == str:
-                        insertStmt+= f"'{val}', "
-                    else:
-                        insertStmt+= f"{val}, "
+    #             insertStmt = f"INSERT INTO {tableName} VALUES( "
+    #             for val in tableData.values():
+    #                 if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
+    #                     insertStmt+= f"{val[0]}, "
+    #                 elif type(val) == str:
+    #                     insertStmt+= f"'{val}', "
+    #                 else:
+    #                     insertStmt+= f"{val}, "
 
-                if insertStmt not in sql_statements:
-                    sql_statements.append(insertStmt)
-                    sql_file.write(insertStmt[:-2] + ");\n\n")
+    #             if insertStmt not in sql_statements:
+    #                 sql_statements.append(insertStmt)
+    #                 sql_file.write(insertStmt[:-2] + ");\n\n")
 
-        subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
+    #     subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-        if deleteSql == True:
-            os.remove(db_name+".sql")
+    #     if deleteSql == True:
+    #         os.remove(db_name+".sql")
