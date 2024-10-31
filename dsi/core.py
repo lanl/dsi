@@ -17,7 +17,7 @@ class Terminal():
     An instantiated Terminal is the DSI human/machine interface.
 
     Terminals are a home for Plugins and an interface for Backends. Backends may be
-    front-ends or back-ends. Plugins may be Writers or readers. See documentation
+    back-reads or back-writes. Plugins may be Writers or readers. See documentation
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
@@ -28,7 +28,7 @@ class Terminal():
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': [
-        'writer', 'reader'], 'backend': ['front-end', 'back-end']}
+        'writer', 'reader'], 'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect']
 
     def __init__(self, debug_flag = False):
@@ -235,7 +235,7 @@ class Terminal():
         Store or retrieve using all loaded DSI Backends with storage functionality.
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
-        Calling artifact_handler will execute all back-end functionality currently loaded, given
+        Calling artifact_handler will execute all back-write functionality currently loaded, given
         the provided ``interaction_type``.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
@@ -246,7 +246,7 @@ class Terminal():
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
         selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in (['back-end']))
+            (k, self.active_modules[k]) for k in (['back-write']))
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
@@ -268,11 +268,7 @@ class Terminal():
                     operation_success = True
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
-        if interaction_type == 'inspect':
-            for module_type, objs in selected_function_modules.items():
-                for obj in objs:
-                    self.logger.info(f"-------------------------------------")
-                    self.logger.info(obj.__class__.__name__ + f" {module_type} - {interaction_type} the data")
+                elif interaction_type == 'inspect':
                     start = datetime.now()
                     obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)

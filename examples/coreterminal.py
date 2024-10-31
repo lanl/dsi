@@ -23,9 +23,9 @@ a.load_module('plugin', 'YAML', 'reader', filenames=["data/student_test1.yml", "
 # print(a.active_metadata)
 a.load_module('plugin', 'TOML', 'reader', filenames=["data/results.toml"], target_table_prefix = "results")
 # print(a.active_metadata)
-a.load_module('backend','Sqlite','back-end', filename='data/data.db')   
-#a.load_module('backend','Sqlite','back-end', filename='data/data2.db')   
-# a.load_module('backend','Parquet','back-end',filename='./data/bueno.pq')
+a.load_module('backend','Sqlite','back-write', filename='data/data.db')   
+#a.load_module('backend','Sqlite','back-write', filename='data/data2.db')   
+# a.load_module('backend','Parquet','back-write',filename='./data/bueno.pq')
 
 #a.load_module('plugin', "Table_Plot", "writer", table_name = "schema_physics", filename = "schema_physics")
 
@@ -35,12 +35,12 @@ a.artifact_handler(interaction_type='put')
 # {'writer': [<dsi.plugins.env.Hostname object at 0x7f21232474d0>],
 #  'reader': [<dsi.plugins.env.Bueno object at 0x7f2123247410>],
 #  'front-end': [],
-#   'back-end': []}
+#   'back-write': []}
 
 
 # Example use
 # a.load_module('plugin','Bueno','reader',filenames='data/bueno1.data')
-# a.load_module('backend','Sqlite','back-end',filename='data/bueno.db')
+# a.load_module('backend','Sqlite','back-write',filename='data/bueno.db')
 # a.transload()
 # a.artifact_handler(interaction_type='put')
 data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM sqlite_master WHERE type='table';")#, isVerbose = True)
