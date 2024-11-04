@@ -24,12 +24,12 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML', 'TOML', "Table_Plot"]
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML', 'TOML', "Table_Plot", "Schema"]
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'SqliteReader']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
-    VALID_MODULE_FUNCTIONS = {'plugin': [
-        'writer', 'reader'], 'backend': ['back-read', 'back-write']}
-    VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect']
+    VALID_MODULE_FUNCTIONS = {'plugin': ['writer', 'reader'], 
+                              'backend': ['back-read', 'back-write']}
+    VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read']
 
     def __init__(self, debug_flag = False):
         # Helper function to get parent module names.
@@ -146,6 +146,8 @@ class Terminal():
             return
         for i, mod in enumerate(self.active_modules[mod_function]):
             if mod.__class__.__name__ == mod_name:
+                if mod_type == 'backend':
+                    mod.close()
                 self.active_modules[mod_function].pop(i)
                 print("{} {} {} unloaded successfully.".format(
                     mod_name, mod_type, mod_function))
@@ -201,7 +203,14 @@ class Terminal():
                     start = datetime.now()
                     obj.add_rows(**kwargs)
                     for table_name, table_metadata in obj.output_collector.items():
-                        self.active_metadata[table_name] = table_metadata
+                        if table_name not in self.active_metadata.keys():
+                            self.active_metadata[table_name] = table_metadata
+                        else:
+                            for colName, colData in table_metadata.items():
+                                if colName in self.active_metadata[table_name].keys():
+                                    self.active_metadata[table_name][colName] += colData
+                                else:
+                                    raise ValueError(f"Mismatched column input for table {table_name}")
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
                 elif module_type == "writer":
@@ -209,7 +218,6 @@ class Terminal():
                     obj.get_rows(self.active_metadata, **kwargs)
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
-
         # Plugins may add one or more rows (vector vs matrix data).
         # You may have two or more plugins with different numbers of rows.
         # Consequently, transload operations may have unstructured shape for
@@ -246,39 +254,36 @@ class Terminal():
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
         selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in (['back-write']))
+            (k, self.active_modules[k]) for k in ('back-read', 'back-write'))
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
-                self.logger.info(obj.__class__.__name__ + f" {module_type} - {interaction_type} the data")
+                self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
+                start = datetime.now()
                 if interaction_type == 'put' or interaction_type == 'set':
-                    start = datetime.now()
                     obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
                     operation_success = True
-                    end = datetime.now()
-                    self.logger.info(f"Runtime: {end-start}")
                 elif interaction_type == 'get':
                     self.logger.info(f"Query to get data: {query}")
-                    start = datetime.now()
                     if query != None:
                         self.active_metadata = obj.get_artifacts(query, **kwargs)
                     else:
                         raise ValueError("Need to specify a query of the database to return data")
                     operation_success = True
-                    end = datetime.now()
-                    self.logger.info(f"Runtime: {end-start}")
                 elif interaction_type == 'inspect':
-                    start = datetime.now()
                     obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
                     self.active_metadata = obj.inspect_artifacts(
                         collection=self.active_metadata, **kwargs)
                     operation_success = True
-                    end = datetime.now()
-                    self.logger.info(f"Runtime: {end-start}")
+                elif interaction_type == "read":
+                    self.active_metadata = obj.read_to_artifact()
+                    operation_success = True
+                end = datetime.now()
+                self.logger.info(f"Runtime: {end-start}")
         if operation_success:
-            if self.active_metadata:
+            if interaction_type == 'get' and self.active_metadata:
                 return self.active_metadata
             return
         else:
