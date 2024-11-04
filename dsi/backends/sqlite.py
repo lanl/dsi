@@ -2,10 +2,13 @@ import csv
 import sqlite3
 import json
 import re
-import yaml
-import subprocess
-import os
+# import yaml
+# import subprocess
+# import os
+import nbconvert as nbc
+import nbformat as nbf
 
+from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
 
 # Declare supported named types for sql
@@ -21,7 +24,7 @@ JSON = "TEXT"
 class DataType:
     name = "" # Note: using the word DEFAULT outputs a syntax error
     properties = {}
-    units = {}
+    unit_keys = [] #should be same length as number of keys in properties
 
 
 # Holds the main data
@@ -35,9 +38,54 @@ class Artifact:
     name = ""
     properties = {}
 
+class SqliteReader(Filesystem):
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.con = sqlite3.connect(filename)
+        self.cur = self.con.cursor()
+
+    def read_to_artifact(self):
+        artifact = OrderedDict()
+
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+
+        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
+        pkList = []
+
+        for item in tableList:
+            tableName = item[0]
+            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
+            colDict = OrderedDict()
+            for colInfo in tableInfo:
+                colDict[colInfo[1]] = []
+                if colInfo[5] == 1:
+                    pkList.append((tableName, colInfo[1]))
+
+            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
+            for row in data:
+                for colName, val in zip(colDict.keys(), row):
+                    colDict[colName].append(val)
+            artifact[tableName] = colDict
+
+            fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
+            for row in fkData:
+                artifact["dsi_relations"]["primary_key"].append((row[2], row[4]))
+                artifact["dsi_relations"]["foreign_key"].append((tableName, row[3]))
+                if (row[2], row[4]) in pkList:
+                    pkList.remove((row[2], row[4]))
+
+        for pk_tuple in pkList:
+            if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
+                artifact["dsi_relations"]["primary_key"].append(pk_tuple)
+                artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+        return artifact
+
+    # Closes connection to server
+    def close(self):
+        self.con.close()
 
 # Main storage class, interfaces with SQL
-
 class Sqlite(Filesystem):
     """
         Primary storage class, inherits sql class
@@ -68,10 +116,6 @@ class Sqlite(Filesystem):
             except ValueError:
                 return " VARCHAR"
 
-    # Creates and adds columns to table and their types.
-    # Note 1: 'add column types' to be implemented.
-    # Note 2: TABLENAME is the default name for all tables created which might cause issues when creating multiple Sqlite files.
-    
     def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
         """
         Primary class for defining metadata Artifact schema.
@@ -81,12 +125,12 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        key_names = types.properties.keys()
+        # key_names = types.properties.keys()
+        key_names = types.unit_keys
         if "_units" in types.name:
-            key_names = [item + " UNIQUE" for item in types.properties.keys()]
+            key_names = [item + " UNIQUE" for item in types.unit_keys]
 
         col_names = ', '.join(key_names)
-
         str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
 
         if foreign_query != None:
@@ -95,7 +139,6 @@ class Sqlite(Filesystem):
 
         if isVerbose:
             print(str_query)
-
         self.cur.execute(str_query)
         self.con.commit()
 
@@ -130,13 +173,16 @@ class Sqlite(Filesystem):
         """
         # Core compatibility name assignment
         artifacts = collection
+
+
         
         for tableName, tableData in artifacts.items():
-            if "dsi_relations" in tableName:
+            if tableName == "dsi_relations":
                 continue
 
             types = DataType()
             types.properties = {}
+            types.unit_keys = []
 
             # Check if this has been defined from helper function
             '''if self.types != None:
@@ -146,14 +192,17 @@ class Sqlite(Filesystem):
             foreign_query = ""
             for key in tableData:
                 comboTuple = (tableName, key)
-                dsi_name = tableName[:tableName.find("__")] + "__dsi_relations"
-                if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    key += " PRIMARY KEY"
+                dsi_name = "dsi_relations"
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
                     foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
                     foreign_query += f", FOREIGN KEY ({key}) REFERENCES {artifacts[dsi_name]['primary_key'][foreignIndex][0]} ({artifacts[dsi_name]['primary_key'][foreignIndex][1]})"
                 
                 types.properties[key.replace('-','_minus_')] = tableData[key]
+
+                if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
+                    types.unit_keys.append(key + f"{self.check_type(str(tableData[key][0]))} PRIMARY KEY")
+                else:
+                    types.unit_keys.append(key + self.check_type(str(tableData[key][0])))
             
             if foreign_query != "":
                 self.put_artifact_type(types, foreign_query)
@@ -176,16 +225,14 @@ class Sqlite(Filesystem):
                 vals = []
                 for ind2 in range(len(types.properties.keys())):
                     vals.append(str(types.properties[col_list[ind2]][ind1]))
-                # Make sure this works if types.properties[][] is already a string
                 tup_vals = tuple(vals)
                 self.cur.execute(str_query,tup_vals)
 
             if isVerbose:
                 print(str_query)
 
-            self.con.commit()
-            
-            self.types = types #This will only copy the last collection from artifacts (collections input)
+            self.con.commit()            
+            self.types = types #This will only copy the last table from artifacts (collections input)
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
@@ -384,7 +431,16 @@ class Sqlite(Filesystem):
 
     # Returns reference from query
     def get_artifacts(self, query, isVerbose=False):
-        return self.get_artifact_list(query, isVerbose)
+        data = self.get_artifact_list(query)
+        return data
+
+    def inspect_artifacts(self, collection, interactive=False):
+        nb = nbf.v4.new_notebook()
+        text = """\
+        # This notebook was auto-generated by a DSI Backend for SQLite.
+        # Execute the Jupyter notebook cells below and interact with "collection"
+        # to explore your data.
+        """
 
     # Closes connection to server
     def close(self):
@@ -497,82 +553,86 @@ class Sqlite(Filesystem):
 
         return 1
     
+    '''UNUSED QUERY FUNCTIONS'''
+    
     # Query file name
-    def query_fname(self, name, isVerbose=False):
-        """
-        Function that queries filenames within the filesystem metadata store
+    # def query_fname(self, name, isVerbose=False):
+    #     """
+    #     Function that queries filenames within the filesystem metadata store
 
-        `name`: string name of a subsection of a filename to be searched
+    #     `name`: string name of a subsection of a filename to be searched
 
-        `return`: query list of filenames matching `name` string
-        """
-        table = "filesystem"
-        str_query = "SELECT * FROM " + \
-            str(table) + " WHERE file LIKE '%" + str(name) + "%'"
-        if isVerbose:
-            print(str_query)
+    #     `return`: query list of filenames matching `name` string
+    #     """
+    #     table = "filesystem"
+    #     str_query = "SELECT * FROM " + \
+    #         str(table) + " WHERE file LIKE '%" + str(name) + "%'"
+    #     if isVerbose:
+    #         print(str_query)
 
-        self.cur = self.con.cursor()
-        self.res = self.cur.execute(str_query)
-        resout = self.res.fetchall()
+    #     self.cur = self.con.cursor()
+    #     self.res = self.cur.execute(str_query)
+    #     resout = self.res.fetchall()
 
-        if isVerbose:
-            print(resout)
+    #     if isVerbose:
+    #         print(resout)
 
-        return resout
+    #     return resout
 
-    # Query file size
+    # # Query file size
 
-    def query_fsize(self, operator, size, isVerbose=False):
-        """
-        Function that queries ranges of file sizes within the filesystem metadata store
+    # def query_fsize(self, operator, size, isVerbose=False):
+    #     """
+    #     Function that queries ranges of file sizes within the filesystem metadata store
 
-        `operator`: operator input GT, LT, EQ as a modifier for a filesize search
+    #     `operator`: operator input GT, LT, EQ as a modifier for a filesize search
 
-        `size`: size in bytes
+    #     `size`: size in bytes
 
-        `return`: query list of filenames matching filesize criteria with modifiers
-        """
-        str_query = "SELECT * FROM " + \
-            str(self.types.name) + " WHERE st_size " + \
-            str(operator) + " " + str(size)
-        if isVerbose:
-            print(str_query)
+    #     `return`: query list of filenames matching filesize criteria with modifiers
+    #     """
+    #     str_query = "SELECT * FROM " + \
+    #         str(self.types.name) + " WHERE st_size " + \
+    #         str(operator) + " " + str(size)
+    #     if isVerbose:
+    #         print(str_query)
 
-        self.cur = self.con.cursor()
-        self.res = self.cur.execute(str_query)
-        resout = self.res.fetchall()
+    #     self.cur = self.con.cursor()
+    #     self.res = self.cur.execute(str_query)
+    #     resout = self.res.fetchall()
 
-        if isVerbose:
-            print(resout)
+    #     if isVerbose:
+    #         print(resout)
 
-        return resout
+    #     return resout
 
-    # Query file creation time
-    def query_fctime(self, operator, ctime, isVerbose=False):
-        """
-        Function that queries file creation times within the filesystem metadata store
+    # # Query file creation time
+    # def query_fctime(self, operator, ctime, isVerbose=False):
+    #     """
+    #     Function that queries file creation times within the filesystem metadata store
 
-        `operator`: operator input GT, LT, EQ as a modifier for a creation time search
+    #     `operator`: operator input GT, LT, EQ as a modifier for a creation time search
 
-        `ctime`: creation time in POSIX format, see the utils `dateToPosix` conversion function
+    #     `ctime`: creation time in POSIX format, see the utils `dateToPosix` conversion function
 
-        `return`: query list of filenames matching the creation time criteria with modifiers
-        """
-        str_query = "SELECT * FROM " + \
-            str(self.types.name) + " WHERE st_ctime " + \
-            str(operator) + " " + str(ctime)
-        if isVerbose:
-            print(str_query)
+    #     `return`: query list of filenames matching the creation time criteria with modifiers
+    #     """
+    #     str_query = "SELECT * FROM " + \
+    #         str(self.types.name) + " WHERE st_ctime " + \
+    #         str(operator) + " " + str(ctime)
+    #     if isVerbose:
+    #         print(str_query)
 
-        self.cur = self.con.cursor()
-        self.res = self.cur.execute(str_query)
-        resout = self.res.fetchall()
+    #     self.cur = self.con.cursor()
+    #     self.res = self.cur.execute(str_query)
+    #     resout = self.res.fetchall()
 
-        if isVerbose:
-            print(resout)
+    #     if isVerbose:
+    #         print(resout)
 
-        return resout
+    #     return resout
+
+    '''YAML AND TOML READERS'''
 
     # def yamlDataToList(self, filenames):
     #     """
@@ -730,5 +790,5 @@ class Sqlite(Filesystem):
 
     #     subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
 
-    #     if deleteSql == True:
-    #         os.remove(db_name+".sql")
+        # if deleteSql == True:
+        #     os.remove(db_name+".sql")
