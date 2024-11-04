@@ -50,7 +50,7 @@ a.artifact_handler(interaction_type='put')
 
 
 #Example use 2
-# a.load_module('backend','SqliteReader','back-read', filename='data/code-trans-dm0801.db')   
+# a.load_module('backend','SqliteReader','back-read', filename='data/data.db')   
 # a.artifact_handler(interaction_type="read")
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
 # a.transload()
