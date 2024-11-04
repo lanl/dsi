@@ -6,7 +6,8 @@ from math import isnan
 from pandas import DataFrame, read_csv, concat
 import re
 import yaml
-import tomllib
+try: import tomllib
+except ModuleNotFoundError: import pip._vendor.tomli as tomllib
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
