@@ -104,7 +104,7 @@ class ER_Diagram(FileWriter):
                 continue
             if f_table != "NULL":
                 foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                dot_file.write(f"{f_table}:{f_col} -> {collection["dsi_relations"]['primary_key'][foreignIndex][0]}: {collection["dsi_relations"]['primary_key'][foreignIndex][1]}; ")
+                dot_file.write(f"{f_table}:{f_col} -> {collection['dsi_relations']['primary_key'][foreignIndex][0]}: {collection['dsi_relations']['primary_key'][foreignIndex][1]}; ")
 
         dot_file.write("}")
         dot_file.close()
