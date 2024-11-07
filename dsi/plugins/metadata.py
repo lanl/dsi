@@ -85,7 +85,10 @@ class StructuredMetadata(Plugin):
             raise RuntimeError(f"For {tableName}, incorrect number of values was given")
         
         for key, row_elem in zip(self.output_collector[tableName].keys(), row):
-            self.output_collector[tableName][key].append(row_elem)
+            if "dsi_units" != tableName:
+                self.output_collector[tableName][key].append(row_elem)
+            else:
+                self.output_collector[tableName][key] = row_elem
 
     def schema_is_set(self) -> bool:
         """ Helper method to see if the schema has been set """

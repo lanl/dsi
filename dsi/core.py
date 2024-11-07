@@ -207,10 +207,17 @@ class Terminal():
                             self.active_metadata[table_name] = table_metadata
                         else:
                             for colName, colData in table_metadata.items():
-                                if colName in self.active_metadata[table_name].keys():
+                                if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     self.active_metadata[table_name][colName] += colData
+                                elif table_name == "dsi_units": #allow overwrite of unit data
+                                    self.active_metadata[table_name][colName] = colData
                                 else:
                                     raise ValueError(f"Mismatched column input for table {table_name}")
+                                # NO OVERWRITE OF UNIT DATA
+                                # elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
+                                #     self.active_metadata[table_name][colName] = colData
+                                # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
+                                #     raise ValueError(f"Mismatched column input for table {table_name}")
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
                 elif module_type == "writer":
@@ -253,9 +260,8 @@ class Terminal():
         operation_success = False
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
-        selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in ('back-read', 'back-write'))
-        for module_type, objs in selected_function_modules.items():
+        selected_write_backends = dict((k, self.active_modules[k]) for k in (['back-write']))
+        for module_type, objs in selected_write_backends.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
                 self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
@@ -277,11 +283,21 @@ class Terminal():
                     self.active_metadata = obj.inspect_artifacts(
                         collection=self.active_metadata, **kwargs)
                     operation_success = True
-                elif interaction_type == "read":
+                end = datetime.now()
+                self.logger.info(f"Runtime: {end-start}")
+
+        selected_read_backends = dict((k, self.active_modules[k]) for k in (['back-read']))        
+        for module_type, objs in selected_read_backends.items():
+            for obj in objs:
+                self.logger.info(f"-------------------------------------")
+                self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
+                start = datetime.now()
+                if interaction_type == "read":
                     self.active_metadata = obj.read_to_artifact()
                     operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
+
         if operation_success:
             if interaction_type == 'get' and self.active_metadata:
                 return self.active_metadata

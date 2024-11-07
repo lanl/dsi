@@ -16,15 +16,14 @@ a=Terminal(debug_flag=False)
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
 # a.transload()
 
-a.load_module('backend','Sqlite','back-write', filename='data/data.db')   
-# a.load_module('backend','Parquet','back-write',filename='./data/bueno.pq')
+# a.load_module('backend','Sqlite','back-write', filename='data/data.db')
+# a.load_module('backend','Parquet','back-write',filename='data/bueno.pq')
 
-a.artifact_handler(interaction_type='put')
-# data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM sqlite_master WHERE type='table';")#, isVerbose = True)
+# a.artifact_handler(interaction_type='put')
+# data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM run_table;")#, isVerbose = True)
 # print(data)
 
 # a.unload_module('backend', 'Sqlite', 'back-write')
-
 
 # LIST MODULES
 # a.list_available_modules('plugin')
@@ -50,7 +49,8 @@ a.artifact_handler(interaction_type='put')
 
 
 #Example use 2
-# a.load_module('backend','SqliteReader','back-read', filename='data/data.db')   
-# a.artifact_handler(interaction_type="read")
-# a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
-# a.transload()
+a.load_module('backend','SqliteReader','back-read', filename='data/data.db')   
+a.artifact_handler(interaction_type="read")
+a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
+a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")
+a.transload()
