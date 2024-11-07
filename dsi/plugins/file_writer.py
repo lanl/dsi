@@ -77,7 +77,9 @@ class ER_Diagram(FileWriter):
         dot_file.write("overlap=false ")
 
         for tableName, tableData in collection.items():
-            if tableName == "dsi_relations" or (self.target_table_prefix is not None and self.target_table_prefix not in tableName):
+            if tableName == "dsi_relations" or tableName == "sqlite_sequence":
+                continue
+            elif self.target_table_prefix is not None and self.target_table_prefix not in tableName:
                 continue
 
             dot_file.write(f"{tableName} [label=<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>")
@@ -304,11 +306,15 @@ class Table_Plot(FileWriter):
         numeric_cols = []
         col_len = None
         for colName, colData in collection[self.table_name].items():
+            if colName == "run_id":
+                continue
             if col_len == None:
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
-                if self.table_name + "_units" in collection.keys() and collection[self.table_name + "_units"][colName][0] != "NULL":
-                    numeric_cols.append((colName + f" ({collection[self.table_name + '_units'][colName][0]})", colData))
+                if self.table_name in collection["dsi_units"].keys():
+                    unit_tuple = next((t[1] for t in collection["dsi_units"][self.table_name] if t[0] == colName), "NULL")
+                if unit_tuple != "NULL":
+                    numeric_cols.append((colName + f" ({unit_tuple})", colData))
                 else:
                     numeric_cols.append((colName, colData))
 
