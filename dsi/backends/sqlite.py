@@ -228,6 +228,16 @@ class Sqlite(Filesystem):
             else:
                 return str(e)
 
+        for tableName, tableData in artifacts["dsi_units"].items():
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
+            self.cur.execute(create_query)
+            self.con.commit()
+            if len({t[1] for t in tableData}) > 1:
+                for col_unit_pair in tableData:
+                    str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
+                    self.cur.execute(str_query)
+                    self.con.commit()   
+
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
         Function for insertion of Artifact metadata into a defined schema as a Tuple
