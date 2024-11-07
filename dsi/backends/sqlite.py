@@ -7,6 +7,7 @@ import re
 # import os
 import nbconvert as nbc
 import nbformat as nbf
+from datetime import datetime
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -40,21 +41,23 @@ class Artifact:
 
 class SqliteReader(Filesystem):
 
-    def __init__(self, filename):
+    def __init__(self, filename, append = False):
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
 
     def read_to_artifact(self):
         artifact = OrderedDict()
+        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
 
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-
-        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
         pkList = []
-
         for item in tableList:
             tableName = item[0]
+            if tableName == "dsi_units":
+                artifact["dsi_units"] = self.read_units_helper()
+                continue
+
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
             colDict = OrderedDict()
             for colInfo in tableInfo:
@@ -81,6 +84,17 @@ class SqliteReader(Filesystem):
                 artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
         return artifact
 
+    def read_units_helper(self):
+        unitsDict = OrderedDict()
+        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
+        for row in unitsTable:
+            tableName = row[0]
+            if tableName not in unitsDict.keys():
+                unitsDict[tableName] = []
+            unitsDict[tableName].append(eval(row[1]))
+        return unitsDict
+
+
     # Closes connection to server
     def close(self):
         self.con.close()
@@ -95,10 +109,11 @@ class Sqlite(Filesystem):
     con = None
     cur = None
 
-    def __init__(self, filename):
+    def __init__(self, filename, run_table = True):
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
+        self.run_flag = run_table
 
     def check_type(self, text):
         """
@@ -125,17 +140,19 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        # key_names = types.properties.keys()
-        key_names = types.unit_keys
-        if "_units" in types.name:
-            key_names = [item + " UNIQUE" for item in types.unit_keys]
-
-        col_names = ', '.join(key_names)
-        str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
+        col_names = ', '.join(types.unit_keys)
+        if self.run_flag:
+            str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), col_names)
+        else:
+            str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
 
         if foreign_query != None:
             str_query += foreign_query
-        str_query += ");"
+        
+        if self.run_flag:
+            str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id));"
+        else:
+            str_query += ");"
 
         if isVerbose:
             print(str_query)
@@ -174,10 +191,18 @@ class Sqlite(Filesystem):
         # Core compatibility name assignment
         artifacts = collection
 
+        if self.run_flag:
+            runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
+            self.cur.execute(runTable_create)
+            self.con.commit()
 
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
+            self.cur.execute(runTable_insert)
+            self.con.commit()
         
         for tableName, tableData in artifacts.items():
-            if tableName == "dsi_relations":
+            if tableName == "dsi_relations" or tableName == "dsi_units":
                 continue
 
             types = DataType()
@@ -212,14 +237,14 @@ class Sqlite(Filesystem):
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
 
-            if "_units" in tableName:
-                str_query = "INSERT OR IGNORE INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+            str_query = "INSERT INTO "
+            if self.run_flag:
+                run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
+                str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
             else:
-                str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+                str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
 
-            # col_list helps access the specific keys of the dictionary in the for loop
             col_list = col_names.split(', ')
-
             # loop through the contents of each column and insert into table as a row
             for ind1 in range(len(types.properties[col_list[0]])):
                 vals = []
@@ -232,7 +257,17 @@ class Sqlite(Filesystem):
                 print(str_query)
 
             self.con.commit()            
-            self.types = types #This will only copy the last table from artifacts (collections input)
+            self.types = types #This will only copy the last table from artifacts (collections input)            
+
+        for tableName, tableData in artifacts["dsi_units"].items():
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
+            self.cur.execute(create_query)
+            self.con.commit()
+            if len({t[1] for t in tableData}) > 1:
+                for col_unit_pair in tableData:
+                    str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
+                    self.cur.execute(str_query)
+                    self.con.commit()   
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
