@@ -94,3 +94,36 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
     columns = list(term.active_metadata["Csv"].values())
     assert all([len(columns[0]) == len(col)
                for col in columns])  # all same length
+    
+def test_yaml_reader():
+    a=Terminal()
+    a.load_module('plugin', 'YAML', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
+    a.transload()
+
+    assert len(a.active_metadata.keys()) == 3
+    for tableData in a.active_metadata.values():
+        assert isinstance(tableData, OrderedDict)
+        numRows = 2
+        assert all(len(lst) == numRows for lst in tableData.values())
+
+def test_toml_reader():
+    a=Terminal()
+    a.load_module('plugin', 'TOML', 'reader', filenames="examples/data/results.toml", target_table_prefix = "results")
+    a.transload()
+
+    assert len(a.active_metadata.keys()) == 1
+    for tableData in a.active_metadata.values():
+        assert isinstance(tableData, OrderedDict)
+        numRows = 1
+        assert all(len(lst) == numRows for lst in tableData.values())
+
+def test_schema_reader():
+    a=Terminal()
+    a.load_module('plugin', 'Schema', 'reader', filename="examples/data/example_schema.json" , target_table_prefix = "student")
+    a.transload()
+
+    assert len(a.active_metadata.keys()) == 1
+    assert "dsi_relations" in a.active_metadata.keys()
+    for tableData in a.active_metadata.values():
+        assert isinstance(tableData, OrderedDict)
+        assert len(tableData["primary_key"]) == len(tableData["foreign_key"])
