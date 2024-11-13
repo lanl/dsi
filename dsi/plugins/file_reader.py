@@ -199,28 +199,52 @@ class Schema(FileReader):
             table_info.append((table_name, list(self.schema_data[table_name].keys())))
         self.set_schema(table_info)
 
-    def add_rows(self) -> None:
-        if not self.schema_is_set():
-            self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-            self.pack_header()
-
+    def add_rows(self) -> None:    
+        self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
         with open(self.schema_file, 'r') as fh:
             schema_content = json.load(fh)
 
             for tableName, tableData in schema_content.items():
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
-                if tableData["primary_key"] != "NULL":
-                    self.schema_data["dsi_relations"]["primary_key"].append((tableName, tableData["primary_key"]))
-                    self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
-                    self.add_to_output([(tableName, tableData["primary_key"]), ("NULL", "NULL")], "dsi_relations")
-
+                
+                pkList = []
                 for colName, colData in tableData["foreign_key"].items():
                     if self.target_table_prefix is not None:
                         colData[0] = self.target_table_prefix + "__" + colData[0]
                     self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
                     self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
-                    self.add_to_output([(colData[0], colData[1]), (tableName, colName)], "dsi_relations")
+
+                if tableData["primary_key"] != "NULL":
+                    pkList.append((tableName, tableData["primary_key"]))
+            
+            for pk in pkList:
+                if pk not in self.schema_data["dsi_relations"]["primary_key"]:
+                    self.schema_data["dsi_relations"]["primary_key"].append(pk)
+                    self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+            self.set_schema_2(self.schema_data)
+
+        # if not self.schema_is_set():
+        #     self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+        #     self.pack_header()
+
+        # with open(self.schema_file, 'r') as fh:
+        #     schema_content = json.load(fh)
+
+        #     for tableName, tableData in schema_content.items():
+        #         if self.target_table_prefix is not None:
+        #             tableName = self.target_table_prefix + "__" + tableName
+        #         if tableData["primary_key"] != "NULL":
+        #             self.schema_data["dsi_relations"]["primary_key"].append((tableName, tableData["primary_key"]))
+        #             self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+        #             self.add_to_output([(tableName, tableData["primary_key"]), ("NULL", "NULL")], "dsi_relations")
+
+        #         for colName, colData in tableData["foreign_key"].items():
+        #             if self.target_table_prefix is not None:
+        #                 colData[0] = self.target_table_prefix + "__" + colData[0]
+        #             self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
+        #             self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
+        #             self.add_to_output([(colData[0], colData[1]), (tableName, colName)], "dsi_relations")
 
 class YAML(FileReader):
     '''
@@ -276,39 +300,63 @@ class YAML(FileReader):
                 editedString = re.sub('specification', f'columns:\n{self.yamlSpace}specification', editedString)
                 editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
                 yaml_load_data = list(yaml.safe_load_all(editedString))
-                
-                if not self.schema_is_set():
-                    self.yaml_data["dsi_units"] = OrderedDict()
-                    for table in yaml_load_data:
-                        tableName = table["segment"]
-                        if self.target_table_prefix is not None:
-                            tableName = self.target_table_prefix + "__" + table["segment"]
-                        self.yaml_data[tableName] = OrderedDict((key, []) for key in table["columns"].keys())
-                        self.yaml_data["dsi_units"][tableName] = []
-                    # self.yaml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-                    self.pack_header()
 
-                unit_row = []
+                if "dsi_units" not in self.yaml_data.keys():
+                    self.yaml_data["dsi_units"] = OrderedDict()
                 for table in yaml_load_data:
-                    row = []
-                    table_unit_row = []
                     tableName = table["segment"]
                     if self.target_table_prefix is not None:
                         tableName = self.target_table_prefix + "__" + table["segment"]
+                    if tableName not in self.yaml_data.keys():
+                        self.yaml_data[tableName] = OrderedDict()
+                    unitsList = []
                     for col_name, data in table["columns"].items():
                         unit_data = "NULL"
                         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
                             unit_data = data[data.find(' ')+1:]
                             data = self.check_type(data[:data.find(" ")])
+                        if col_name not in self.yaml_data[tableName].keys():
+                            self.yaml_data[tableName][col_name] = []
                         self.yaml_data[tableName][col_name].append(data)
-                        if (col_name, unit_data) not in self.yaml_data["dsi_units"][tableName]:
-                            table_unit_row.append((col_name, unit_data))
-                            self.yaml_data["dsi_units"][tableName].append((col_name, unit_data))
-                        row.append(data)
-                    self.add_to_output(row, tableName)
-                    unit_row.append(table_unit_row)
-                if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
-                    self.add_to_output(unit_row, "dsi_units")
+                        if unit_data != "NULL" and (col_name, unit_data) not in unitsList:
+                            unitsList.append((col_name, unit_data))
+                    if len(unitsList) > 0 and tableName not in self.yaml_data["dsi_units"].keys():
+                        self.yaml_data["dsi_units"][tableName] = unitsList
+
+                self.set_schema_2(self.yaml_data)
+
+                # if not self.schema_is_set():
+                #     self.yaml_data["dsi_units"] = OrderedDict()
+                #     for table in yaml_load_data:
+                #         tableName = table["segment"]
+                #         if self.target_table_prefix is not None:
+                #             tableName = self.target_table_prefix + "__" + table["segment"]
+                #         self.yaml_data[tableName] = OrderedDict((key, []) for key in table["columns"].keys())
+                #         self.yaml_data["dsi_units"][tableName] = []
+                #     # self.yaml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+                #     self.pack_header()
+
+                # unit_row = []
+                # for table in yaml_load_data:
+                #     row = []
+                #     table_unit_row = []
+                #     tableName = table["segment"]
+                #     if self.target_table_prefix is not None:
+                #         tableName = self.target_table_prefix + "__" + table["segment"]
+                #     for col_name, data in table["columns"].items():
+                #         unit_data = "NULL"
+                #         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
+                #             unit_data = data[data.find(' ')+1:]
+                #             data = self.check_type(data[:data.find(" ")])
+                #         self.yaml_data[tableName][col_name].append(data)
+                #         if (col_name, unit_data) not in self.yaml_data["dsi_units"][tableName]:
+                #             table_unit_row.append((col_name, unit_data))
+                #             self.yaml_data["dsi_units"][tableName].append((col_name, unit_data))
+                #         row.append(data)
+                #     self.add_to_output(row, tableName)
+                #     unit_row.append(table_unit_row)
+                # if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
+                #     self.add_to_output(unit_row, "dsi_units")
 
 class TOML(FileReader):
     '''
@@ -329,12 +377,12 @@ class TOML(FileReader):
         self.toml_data = OrderedDict()
         self.target_table_prefix = target_table_prefix
 
-    def pack_header(self) -> None:
-        """Set schema with TOML data."""
-        table_info = []
-        for table_name in list(self.toml_data.keys()):
-            table_info.append((table_name, list(self.toml_data[table_name].keys())))
-        self.set_schema(table_info)
+    # def pack_header(self) -> None:
+    #     """Set schema with TOML data."""
+    #     table_info = []
+    #     for table_name in list(self.toml_data.keys()):
+    #         table_info.append((table_name, list(self.toml_data[table_name].keys())))
+    #     self.set_schema(table_info)
 
     def add_rows(self) -> None:
         """
@@ -353,21 +401,14 @@ class TOML(FileReader):
             with open(filename, 'rb') as toml_file:
                 toml_load_data = tomllib.load(toml_file)
 
-            if not self.schema_is_set():
-                for tableName, tableData in toml_load_data.items():
-                    if self.target_table_prefix is not None:
-                        tableName = self.target_table_prefix + "__" + tableName
-                    self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
-                    self.toml_data["dsi_units"] = OrderedDict([(tableName,[])])
-                # self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-                self.pack_header()
-
-            unit_row = []
+            if "dsi_units" not in self.toml_data.keys():
+                    self.toml_data["dsi_units"] = OrderedDict()
             for tableName, tableData in toml_load_data.items():
-                row = []
-                table_unit_row = []
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
+                if tableName not in self.toml_data.keys():
+                    self.toml_data[tableName] = OrderedDict()
+                unitsList = []
                 for col_name, data in tableData.items():
                     unit_data = "NULL"
                     if isinstance(data, dict):
@@ -378,12 +419,47 @@ class TOML(FileReader):
                     #     data = ast.literal_eval(data)
                     #     unit_data = data["units"]
                     #     data = data["value"]
+                    if col_name not in self.toml_data[tableName].keys():
+                        self.toml_data[tableName][col_name] = []
                     self.toml_data[tableName][col_name].append(data)
-                    if (col_name, unit_data) not in self.toml_data["dsi_units"][tableName]:
-                        table_unit_row.append((col_name, unit_data))
-                        self.toml_data["dsi_units"][tableName].append((col_name, unit_data))
-                    row.append(data)
-                self.add_to_output(row, tableName)
-                unit_row.append(table_unit_row)
-            if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
-                    self.add_to_output(unit_row, "dsi_units")
+                    if unit_data != "NULL" and (col_name, unit_data) not in unitsList:
+                        unitsList.append((col_name, unit_data))
+                if len(unitsList) > 0 and tableName not in self.toml_data["dsi_units"].keys():
+                    self.toml_data["dsi_units"][tableName] = unitsList
+
+            self.set_schema_2(self.toml_data)
+
+            # if not self.schema_is_set():
+            #     for tableName, tableData in toml_load_data.items():
+            #         if self.target_table_prefix is not None:
+            #             tableName = self.target_table_prefix + "__" + tableName
+            #         self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
+            #         self.toml_data["dsi_units"] = OrderedDict([(tableName,[])])
+            #     # self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+            #     self.pack_header()
+
+            # unit_row = []
+            # for tableName, tableData in toml_load_data.items():
+            #     row = []
+            #     table_unit_row = []
+            #     if self.target_table_prefix is not None:
+            #         tableName = self.target_table_prefix + "__" + tableName
+            #     for col_name, data in tableData.items():
+            #         unit_data = "NULL"
+            #         if isinstance(data, dict):
+            #             unit_data = data["units"]
+            #             data = data["value"]
+            #         # IF statement for manual data parsing for python 3.10 and below
+            #         # if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
+            #         #     data = ast.literal_eval(data)
+            #         #     unit_data = data["units"]
+            #         #     data = data["value"]
+            #         self.toml_data[tableName][col_name].append(data)
+            #         if (col_name, unit_data) not in self.toml_data["dsi_units"][tableName]:
+            #             table_unit_row.append((col_name, unit_data))
+            #             self.toml_data["dsi_units"][tableName].append((col_name, unit_data))
+            #         row.append(data)
+            #     self.add_to_output(row, tableName)
+            #     unit_row.append(table_unit_row)
+            # if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
+            #         self.add_to_output(unit_row, "dsi_units")
