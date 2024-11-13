@@ -2,12 +2,11 @@ import csv
 import sqlite3
 import json
 import re
-# import yaml
-# import subprocess
-# import os
+import subprocess
 import nbconvert as nbc
 import nbformat as nbf
 from datetime import datetime
+import textwrap
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -157,7 +156,6 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(str_query)
         self.cur.execute(str_query)
-        self.con.commit()
 
         self.types = types
 
@@ -190,7 +188,8 @@ class Sqlite(Filesystem):
         """
         # Core compatibility name assignment
         artifacts = collection
-
+        insertError = False
+        errorString = None
         if self.run_flag:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
@@ -198,8 +197,12 @@ class Sqlite(Filesystem):
 
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
-            self.cur.execute(runTable_insert)
-            self.con.commit()
+            try:
+                self.cur.execute(runTable_insert)
+            except sqlite3.Error as e:
+                if errorString is None:
+                    errorString = e
+                insertError = True
         
         for tableName, tableData in artifacts.items():
             if tableName == "dsi_relations" or tableName == "dsi_units":
@@ -208,10 +211,6 @@ class Sqlite(Filesystem):
             types = DataType()
             types.properties = {}
             types.unit_keys = []
-
-            # Check if this has been defined from helper function
-            '''if self.types != None:
-                types.name = self.types.name'''
             types.name = tableName
 
             foreign_query = ""
@@ -243,31 +242,42 @@ class Sqlite(Filesystem):
                 str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
             else:
                 str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-
-            col_list = col_names.split(', ')
-            # loop through the contents of each column and insert into table as a row
-            for ind1 in range(len(types.properties[col_list[0]])):
-                vals = []
-                for ind2 in range(len(types.properties.keys())):
-                    vals.append(str(types.properties[col_list[ind2]][ind1]))
-                tup_vals = tuple(vals)
-                self.cur.execute(str_query,tup_vals)
+            
+            rows = zip(*types.properties.values())
+            try:
+                self.cur.executemany(str_query,rows)
+            except sqlite3.Error as e:
+                if errorString is None:
+                    errorString = e
+                insertError = True
 
             if isVerbose:
                 print(str_query)
+            self.types = types #This will only copy the last table from artifacts (collections input)    
 
-            self.con.commit()            
-            self.types = types #This will only copy the last table from artifacts (collections input)            
-
-        for tableName, tableData in artifacts["dsi_units"].items():
+        if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
             self.cur.execute(create_query)
+            for tableName, tableData in artifacts["dsi_units"].items():
+                if len(tableData) > 0:
+                    for col_unit_pair in tableData:
+                        str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
+                        try:
+                            self.cur.execute(str_query)
+                        except sqlite3.Error as e:
+                            if errorString is None:
+                                errorString = e
+                            insertError = True
+
+        try:
+            assert insertError == False
             self.con.commit()
-            if len({t[1] for t in tableData}) > 1:
-                for col_unit_pair in tableData:
-                    str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
-                    self.cur.execute(str_query)
-                    self.con.commit()   
+        except Exception as e:
+            self.con.rollback()
+            if type(e) is AssertionError:
+                return f"No data was inserted into {self.filename} due to the error: {errorString}"
+            else:
+                return f"No data was inserted into {self.filename} due to the error: {e}"
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
@@ -470,12 +480,82 @@ class Sqlite(Filesystem):
         return data
 
     def inspect_artifacts(self, collection, interactive=False):
+        dsi_relations = dict(collection["dsi_relations"])
+        dsi_units = dict(collection["dsi_units"])
+
         nb = nbf.v4.new_notebook()
+
         text = """\
-        # This notebook was auto-generated by a DSI Backend for SQLite.
-        # Execute the Jupyter notebook cells below and interact with "collection"
-        # to explore your data.
+        This notebook was auto-generated by a DSI Backend for SQLite.
+        Due to the possibility of several tables stored in the DSI abstraction (OrderedDict), the data is stored as several dataframes in a list
+        Execute the Jupyter notebook cells below and interact with table_list to explore your data.
         """
+        code1 = """\
+        import pandas as pd
+        import sqlite3
+        """
+        code2 = f"""\
+        db_path = '{self.filename}'
+        conn = sqlite3.connect(db_path)
+        tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
+        dsi_units = {dsi_units}
+        dsi_relations = {dsi_relations}
+        """
+        code3 = """\
+        table_list = []
+        for table_name in tables['name']:
+            if table_name not in ['dsi_relations', 'dsi_units', 'sqlite_sequence']:
+                query = 'SELECT * FROM ' + table_name
+                df = pd.read_sql_query(query, conn)
+                df.attrs['name'] = table_name
+                if table_name in dsi_units:
+                    df.attrs['units'] = dsi_units[table_name]
+                table_list.append(df)
+        
+        df = pd.DataFrame(dsi_relations)
+        df.attrs['name'] = 'dsi_relations'
+        table_list.append(df)
+        """
+        code4 = """\
+        for table_df in table_list:
+            print(table_df.attrs)
+            print(table_df)
+            # table_df.info()
+            # table_df.describe()
+        """
+
+        nb['cells'] = [nbf.v4.new_markdown_cell(text),
+                       nbf.v4.new_code_cell(textwrap.dedent(code1)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code2)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code3)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code4))]
+        
+        fname = 'dsi_sqlite_backend_output.ipynb'
+        print('Writing Jupyter notebook...')
+        with open(fname, 'w') as fh:
+            nbf.write(nb, fh)
+
+        # open the jupyter notebook for static page generation
+        with open(fname, 'r', encoding='utf-8') as fh:
+            nb_content = nbf.read(fh, as_version=4)
+        run_nb = nbc.preprocessors.ExecutePreprocessor(timeout=-1) # No timeout
+        run_nb.preprocess(nb_content, {'metadata':{'path':'.'}})
+
+        if interactive:
+            print('Opening Jupyter notebook...')
+            
+            proc = subprocess.run(['jupyter-lab ./dsi_sqlite_backend_output.ipynb'], capture_output=True, shell=True)
+            if proc.stderr != b"":
+                raise Exception(proc.stderr)
+            return proc.stdout.strip().decode("utf-8")
+        else:
+            # Init HTML exporter
+            html_exporter = nbc.HTMLExporter()
+            html_content,_ = html_exporter.from_notebook_node(nb_content)
+            # Save HTML file
+            html_filename = 'dsi_sqlite_backend_output.html'
+            with open(html_filename, 'w', encoding='utf-8') as fh:
+                fh.write(html_content)
 
     # Closes connection to server
     def close(self):
