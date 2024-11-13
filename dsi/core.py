@@ -31,7 +31,7 @@ class Terminal():
                               'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read']
 
-    def __init__(self, debug_flag = False):
+    def __init__(self, debug_flag = False, backup_db_flag = False):
         # Helper function to get parent module names.
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -56,6 +56,8 @@ class Terminal():
             self.active_modules[valid_function] = []
         self.active_metadata = OrderedDict()
         self.transload_lock = False
+
+        self.backup_db_flag = backup_db_flag
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -194,7 +196,6 @@ class Terminal():
         """
         selected_function_modules = dict(
             (k, self.active_modules[k]) for k in ('reader', 'writer'))
-        # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
@@ -209,15 +210,10 @@ class Terminal():
                             for colName, colData in table_metadata.items():
                                 if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     self.active_metadata[table_name][colName] += colData
-                                elif table_name == "dsi_units": #allow overwrite of unit data
+                                elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
                                     self.active_metadata[table_name][colName] = colData
-                                else:
+                                elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     raise ValueError(f"Mismatched column input for table {table_name}")
-                                # NO OVERWRITE OF UNIT DATA
-                                # elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
-                                #     self.active_metadata[table_name][colName] = colData
-                                # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
-                                #     raise ValueError(f"Mismatched column input for table {table_name}")
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
                 elif module_type == "writer":
@@ -225,23 +221,6 @@ class Terminal():
                     obj.get_rows(self.active_metadata, **kwargs)
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
-        # Plugins may add one or more rows (vector vs matrix data).
-        # You may have two or more plugins with different numbers of rows.
-        # Consequently, transload operations may have unstructured shape for
-        # some plugin configurations. We must force structure to create a valid
-        # middleware data structure.
-        # To resolve, we pad the shorter columns to match the max length column.
-        #COMMENTED OUT TILL LATER
-        '''
-        max_len = max([len(col) for col in self.active_metadata.values()])
-        for colname, coldata in self.active_metadata.items():
-            if len(coldata) != max_len:
-                self.active_metadata[colname].extend(  # add None's until reaching max_len
-                    [None] * (max_len - len(coldata)))
-
-        assert all([len(col) == max_len for col in self.active_metadata.values(
-        )]), "All columns must have the same number of rows"
-        '''
 
         self.transload_lock = True
 
@@ -260,43 +239,45 @@ class Terminal():
         operation_success = False
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
-        selected_write_backends = dict((k, self.active_modules[k]) for k in (['back-write']))
-        for module_type, objs in selected_write_backends.items():
-            for obj in objs:
-                self.logger.info(f"-------------------------------------")
-                self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
-                start = datetime.now()
-                if interaction_type == 'put' or interaction_type == 'set':
-                    obj.put_artifacts(
+        for obj in self.active_modules['back-write']:
+            self.logger.info(f"-------------------------------------")
+            self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
+            start = datetime.now()
+            if interaction_type == 'put' or interaction_type == 'set':
+                if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
+                    backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
+                    shutil.copyfile(obj.filename, backup_file)
+                db_size = os.path.getsize(obj.filename)
+                errorMessage = obj.put_artifacts(
+                    collection=self.active_metadata, **kwargs)
+                if db_size == os.path.getsize(obj.filename):
+                    print(errorMessage)
+                operation_success = True
+            elif interaction_type == 'get':
+                self.logger.info(f"Query to get data: {query}")
+                if query != None:
+                    self.active_metadata = obj.get_artifacts(query, **kwargs)
+                else:
+                    raise ValueError("Need to specify a query of the database to return data")
+                operation_success = True
+            elif interaction_type == 'inspect':
+                obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
-                    operation_success = True
-                elif interaction_type == 'get':
-                    self.logger.info(f"Query to get data: {query}")
-                    if query != None:
-                        self.active_metadata = obj.get_artifacts(query, **kwargs)
-                    else:
-                        raise ValueError("Need to specify a query of the database to return data")
-                    operation_success = True
-                elif interaction_type == 'inspect':
-                    obj.put_artifacts(
+                obj.inspect_artifacts(
                         collection=self.active_metadata, **kwargs)
-                    self.active_metadata = obj.inspect_artifacts(
-                        collection=self.active_metadata, **kwargs)
-                    operation_success = True
-                end = datetime.now()
-                self.logger.info(f"Runtime: {end-start}")
+                operation_success = True
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
 
-        selected_read_backends = dict((k, self.active_modules[k]) for k in (['back-read']))        
-        for module_type, objs in selected_read_backends.items():
-            for obj in objs:
-                self.logger.info(f"-------------------------------------")
-                self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
-                start = datetime.now()
-                if interaction_type == "read":
-                    self.active_metadata = obj.read_to_artifact()
-                    operation_success = True
-                end = datetime.now()
-                self.logger.info(f"Runtime: {end-start}")
+        for obj in self.active_modules['back-read']:
+            self.logger.info(f"-------------------------------------")
+            self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
+            start = datetime.now()
+            if interaction_type == "read":
+                self.active_metadata = obj.read_to_artifact()
+                operation_success = True
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
 
         if operation_success:
             if interaction_type == 'get' and self.active_metadata:
