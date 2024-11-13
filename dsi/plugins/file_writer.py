@@ -84,9 +84,12 @@ class ER_Diagram(FileWriter):
 
             dot_file.write(f"{tableName} [label=<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>")
 
+            col_list = tableData.keys()
+            if tableName == "dsi_units":
+                col_list = ["table_name", "column_and_unit"]
             curr_row = 0
             inner_brace = 0
-            for col_name in tableData.keys():
+            for col_name in col_list:
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 1
                     dot_file.write("<TR>")
@@ -311,6 +314,7 @@ class Table_Plot(FileWriter):
             if col_len == None:
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
+                unit_tuple = "NULL"
                 if self.table_name in collection["dsi_units"].keys():
                     unit_tuple = next((t[1] for t in collection["dsi_units"][self.table_name] if t[0] == colName), "NULL")
                 if unit_tuple != "NULL":
