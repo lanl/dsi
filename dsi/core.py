@@ -214,11 +214,6 @@ class Terminal():
                                     self.active_metadata[table_name][colName] = colData
                                 elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     raise ValueError(f"Mismatched column input for table {table_name}")
-                                # NO OVERWRITE OF UNIT DATA
-                                # elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
-                                #     self.active_metadata[table_name][colName] = colData
-                                # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
-                                #     raise ValueError(f"Mismatched column input for table {table_name}")
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
                 elif module_type == "writer":
