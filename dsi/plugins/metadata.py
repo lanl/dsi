@@ -63,6 +63,11 @@ class StructuredMetadata(Plugin):
         if not self.strict_mode_lock:
             self.strict_mode_lock = True
 
+    def set_schema_2(self, collection, validation_model=None) -> None:
+        self.output_collector = collection
+        self.table_cnt = len(collection.keys())
+        self.validation_model = validation_model
+
     def add_to_output(self, row: list, tableName = None) -> None:
         """
         Adds a row of data to the output_collector and guarantees good structure.
