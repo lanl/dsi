@@ -196,9 +196,8 @@ class Sqlite(Filesystem):
                     self.con.rollback()
 
             if isVerbose:
-                print(str_query)
-            self.types = types 
-            #This will only copy the last table from artifacts (collections input)    
+                print(str_query)        
+            self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
@@ -207,16 +206,12 @@ class Sqlite(Filesystem):
                 if len(tableData) > 0:
                     for col_unit_pair in tableData:
                         str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
-                        if insertError == False:
-                            try:
-                                self.cur.execute(str_query)
-                            except sqlite3.Error as e:
-                                if errorString is None:
-                                    errorString = e
-                                insertError = True
-                                self.con.rollback()
-                        else:
-                            self.con.rollback()
+                        try:
+                            self.cur.execute(str_query)
+                        except sqlite3.Error as e:
+                            if errorString is None:
+                                errorString = e
+                            insertError = True
 
         try:
             assert insertError == False
@@ -224,19 +219,9 @@ class Sqlite(Filesystem):
         except Exception as e:
             self.con.rollback()
             if type(e) is AssertionError:
-                return str(errorString)
+                return f"No data was inserted into {self.filename} due to the error: {errorString}"
             else:
-                return str(e)
-
-        for tableName, tableData in artifacts["dsi_units"].items():
-            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
-            self.cur.execute(create_query)
-            self.con.commit()
-            if len({t[1] for t in tableData}) > 1:
-                for col_unit_pair in tableData:
-                    str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
-                    self.cur.execute(str_query)
-                    self.con.commit()   
+                return f"No data was inserted into {self.filename} due to the error: {e}"
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
