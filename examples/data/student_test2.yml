@@ -1,6 +1,6 @@
 ---
 segment: math
-specification: !jack
+specification: !jack1
   a: 2
   b: "there is CM"
   c: "45.98 cm"
@@ -9,7 +9,7 @@ specification: !jack
   f: 99.0e-4
 ---
 segment: address
-specification: !sam
+specification: !sam1
   fileLoc: '/home/sam/lib/data'
   g: "good memories"
   h: "556place street"
@@ -20,7 +20,7 @@ specification: !sam
   m: 999
 ---
 segment: physics
-specification: !amy
+specification: !amy1
   n: "91.8 m / s / s"
   o: "gravity"
   p: "233 s"

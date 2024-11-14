@@ -68,6 +68,8 @@ class StructuredMetadata(Plugin):
         Adds a row of data to the output_collector and guarantees good structure.
         Useful in a plugin's add_rows method.
         """
+        #POTENTIALLY REFACTOR AND AVOID FOR LOOP OF INGESTING DATA ROW BY ROW - MAYBE INGEST WHOLE DATA
+        
         # Finds file_reader class that called add_to_output and assigns that as table_name for this data
         if tableName == None:
             caller_frame = inspect.stack()[1]
@@ -76,11 +78,11 @@ class StructuredMetadata(Plugin):
         if not self.schema_is_set():
             raise RuntimeError("pack_header must be done before add_row")
         if self.validation_model is not None:
-            row_dict = {k: v for k, v in zip(
-                self.output_collector.keys(), row)}
+            row_dict = {k: v for k, v in zip(self.output_collector[tableName].keys(), row)}
             self.validation_model.model_validate(row_dict)
+
         elif len(row) != len(self.output_collector[tableName].keys()):
-            raise RuntimeError(f"For {tableName}, incorrect row length was given")
+            raise RuntimeError(f"For {tableName}, incorrect number of values was given")
         
         for key, row_elem in zip(self.output_collector[tableName].keys(), row):
             self.output_collector[tableName][key].append(row_elem)
