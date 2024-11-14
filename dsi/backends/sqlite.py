@@ -197,12 +197,14 @@ class Sqlite(Filesystem):
 
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
-            try:
-                self.cur.execute(runTable_insert)
-            except sqlite3.Error as e:
-                if errorString is None:
-                    errorString = e
-                insertError = True
+            if insertError == False:
+                try:
+                    self.cur.execute(runTable_insert)
+                except sqlite3.Error as e:
+                    if errorString is None:
+                        errorString = e
+                    insertError = True
+                    self.con.rollback()
         
         for tableName, tableData in artifacts.items():
             if tableName == "dsi_relations" or tableName == "dsi_units":
@@ -244,12 +246,14 @@ class Sqlite(Filesystem):
                 str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
             
             rows = zip(*types.properties.values())
-            try:
-                self.cur.executemany(str_query,rows)
-            except sqlite3.Error as e:
-                if errorString is None:
-                    errorString = e
-                insertError = True
+            if insertError == False:
+                try:
+                    self.cur.executemany(str_query,rows)
+                except sqlite3.Error as e:
+                    if errorString is None:
+                        errorString = e
+                    insertError = True
+                    self.con.rollback()
 
             if isVerbose:
                 print(str_query)
@@ -262,12 +266,14 @@ class Sqlite(Filesystem):
                 if len(tableData) > 0:
                     for col_unit_pair in tableData:
                         str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
-                        try:
-                            self.cur.execute(str_query)
-                        except sqlite3.Error as e:
-                            if errorString is None:
-                                errorString = e
-                            insertError = True
+                        if insertError == False:
+                            try:
+                                self.cur.execute(str_query)
+                            except sqlite3.Error as e:
+                                if errorString is None:
+                                    errorString = e
+                                insertError = True
+                                self.con.rollback()
 
         try:
             assert insertError == False
@@ -275,9 +281,9 @@ class Sqlite(Filesystem):
         except Exception as e:
             self.con.rollback()
             if type(e) is AssertionError:
-                return f"No data was inserted into {self.filename} due to the error: {errorString}"
+                return str(errorString)
             else:
-                return f"No data was inserted into {self.filename} due to the error: {e}"
+                return str(e)
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
