@@ -233,12 +233,10 @@ class Terminal():
         the provided ``interaction_type``.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
-            print(
-                'Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+            print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
             raise NotImplementedError
         operation_success = False
-        # Perform artifact movement first, because inspect implementation may rely on
-        # self.active_metadata or some stored artifact.
+        # Perform artifact movement first, because inspect implementation may rely on self.active_metadata
         for obj in self.active_modules['back-write']:
             self.logger.info(f"-------------------------------------")
             self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
@@ -247,22 +245,23 @@ class Terminal():
                 if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
                     backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
                     shutil.copyfile(obj.filename, backup_file)
-                db_size = os.path.getsize(obj.filename)
                 errorMessage = obj.put_artifacts(
                     collection=self.active_metadata, **kwargs)
-                if db_size == os.path.getsize(obj.filename):
-                    print(errorMessage)
+                if errorMessage is not None:
+                    print(f"No data was inserted into {obj.filename} due to the error: {errorMessage}")
                 operation_success = True
             elif interaction_type == 'get':
                 self.logger.info(f"Query to get data: {query}")
                 if query != None:
                     self.active_metadata = obj.get_artifacts(query, **kwargs)
                 else:
-                    raise ValueError("Need to specify a query of the database to return data")
+                    raise ValueError("Need to specify a query for the database to return data")
                 operation_success = True
             elif interaction_type == 'inspect':
-                obj.put_artifacts(
+                errorMessage = obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
+                if errorMessage is not None:
+                    print("Error in ingesting data to db in inspect artifact. Generating Jupyter notebook with previous instance of db")
                 obj.inspect_artifacts(
                         collection=self.active_metadata, **kwargs)
                 operation_success = True
