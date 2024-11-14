@@ -2,10 +2,10 @@
 # from os.path import abspath
 # from hashlib import sha1
 import json, csv
-from math import isnan
+# from math import isnan
 # import sqlite3
-import subprocess
-import os
+# import subprocess
+# import os
 from matplotlib import pyplot as plt
 from graphviz import Digraph
 

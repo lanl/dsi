@@ -463,3 +463,34 @@ class TOML(FileReader):
             #     unit_row.append(table_unit_row)
             # if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
             #         self.add_to_output(unit_row, "dsi_units")
+
+class TextFile(FileReader):
+    '''
+    Plugin to read in an individual or a set of text files
+
+    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    '''
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        '''
+        `filenames`: one text file or a list of text files to be ingested
+        `target_table_prefix`: prefix to be added to every table created to differentiate between other text file sources
+        '''
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.text_files = [filenames]
+        else:
+            self.text_files = filenames
+        self.text_file_data = OrderedDict()
+        self.target_table_prefix = target_table_prefix
+
+    def add_rows(self) -> None:
+        """
+        Parses text file data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
+        """
+        for filename in self.text_files:
+            df = read_csv(filename)
+            if self.target_table_prefix is not None:
+                self.text_file_data[f"{self.target_table_prefix}__text_file"] = OrderedDict(df.to_dict(orient='list'))
+            else:
+                self.text_file_data["text_file"] = OrderedDict(df.to_dict(orient='list'))
+            self.set_schema_2(self.text_file_data)
