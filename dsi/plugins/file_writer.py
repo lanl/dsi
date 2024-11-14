@@ -1,12 +1,13 @@
-from collections import OrderedDict
-from os.path import abspath
-from hashlib import sha1
+# from collections import OrderedDict
+# from os.path import abspath
+# from hashlib import sha1
 import json, csv
 from math import isnan
-import sqlite3
+# import sqlite3
 import subprocess
 import os
 from matplotlib import pyplot as plt
+from graphviz import Digraph
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -53,37 +54,32 @@ class ER_Diagram(FileWriter):
         #     return
 
         # else:
-        file_type = ".png"
-        if self.output_filename[-4:] == ".png" or self.output_filename[-4:] == ".pdf" or self.output_filename[-4:] == ".jpg":
-            file_type = self.output_filename[-4:]
+        file_type = "png"
+        if self.output_filename[-3:] in ["png", "pdf", "jpg"]:
+            file_type = self.output_filename[-3:]
             self.output_filename = self.output_filename[:-4]
-        elif self.output_filename[-5:] == ".jpeg":
-            file_type = self.output_filename[-5:]
+        elif self.output_filename[-4:] == ".jpeg":
+            file_type = self.output_filename[-4:]
             self.output_filename = self.output_filename[:-5]
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             raise ValueError("Your input for target_table_prefix does not exist in the database. Please enter a valid prefix for table names.")
-
-        dot_file = open(self.output_filename + ".dot", "w")
+        
+        dot = Digraph('workflow_schema', format = file_type)
+        if self.target_table_prefix is not None:
+            dot.attr(label = f'ER Diagram for {self.target_table_prefix} tables', labelloc='t')
+        dot.attr('node', shape='plaintext')
+        dot.attr(dpi='300', rankdir='LR', splines='true', overlap='false')
 
         num_tbl_cols = 1
-        dot_file.write("digraph workflow_schema { ")
-        if self.target_table_prefix is not None:
-            dot_file.write(f'label="ER Diagram for {self.target_table_prefix} tables"; ')
-            dot_file.write('labelloc="t"; ')
-        dot_file.write("node [shape=plaintext]; ")
-        dot_file.write("rankdir=LR ")
-        dot_file.write("splines=true ")
-        dot_file.write("overlap=false ")
-
         for tableName, tableData in collection.items():
             if tableName == "dsi_relations" or tableName == "sqlite_sequence":
                 continue
             elif self.target_table_prefix is not None and self.target_table_prefix not in tableName:
                 continue
 
-            dot_file.write(f"{tableName} [label=<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>")
-
+            html_table = f"<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>"
+            
             col_list = tableData.keys()
             if tableName == "dsi_units":
                 col_list = ["table_name", "column_and_unit"]
@@ -92,30 +88,27 @@ class ER_Diagram(FileWriter):
             for col_name in col_list:
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 1
-                    dot_file.write("<TR>")
-
-                dot_file.write(f"<TD PORT=\"{col_name}\">{col_name}</TD>")
+                    html_table += "<TR>"
+                html_table += f"<TD PORT=\"{col_name}\">{col_name}</TD>"
                 curr_row += 1
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 0
-                    dot_file.write("</TR>")
-
+                    html_table += "</TR>"
+            
             if inner_brace:
-                dot_file.write("</TR>")
-            dot_file.write("</TABLE>>]; ")
+                html_table += "</TR>"
+            html_table += "</TABLE>>"
+            dot.node(tableName, label = html_table)
 
         for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
             if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
                 continue
             if f_table != "NULL":
                 foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                dot_file.write(f"{f_table}:{f_col} -> {collection['dsi_relations']['primary_key'][foreignIndex][0]}: {collection['dsi_relations']['primary_key'][foreignIndex][1]}; ")
+                dot.edge(f"{f_table}:{f_col}", f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}")
 
-        dot_file.write("}")
-        dot_file.close()
+        dot.render(self.output_filename, cleanup=True)
 
-        subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
-        os.remove(self.output_filename + ".dot")
     
     # def export_erd(self, dbname, fname):
     #     """
