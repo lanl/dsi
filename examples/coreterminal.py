@@ -52,6 +52,6 @@ a.artifact_handler(interaction_type="inspect")
 #Example use 2
 # a.load_module('backend','Sqlite','back-read', filename='data/data.db')   
 # a.artifact_handler(interaction_type="read")
-# a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
+# a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.png')#, target_table_prefix = "physics")
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")
 # a.transload()
