@@ -674,6 +674,56 @@ class Sqlite(Filesystem):
 
         return 1
     
+    # Sqlite reader class
+    def read_to_artifact(self):
+        artifact = OrderedDict()
+        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
+
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        pkList = []
+        for item in tableList:
+            tableName = item[0]
+            if tableName == "dsi_units":
+                artifact["dsi_units"] = self.read_units_helper()
+                continue
+
+            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
+            colDict = OrderedDict()
+            for colInfo in tableInfo:
+                colDict[colInfo[1]] = []
+                if colInfo[5] == 1:
+                    pkList.append((tableName, colInfo[1]))
+
+            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
+            for row in data:
+                for colName, val in zip(colDict.keys(), row):
+                    colDict[colName].append(val)
+            artifact[tableName] = colDict
+
+            fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
+            for row in fkData:
+                artifact["dsi_relations"]["primary_key"].append((row[2], row[4]))
+                artifact["dsi_relations"]["foreign_key"].append((tableName, row[3]))
+                if (row[2], row[4]) in pkList:
+                    pkList.remove((row[2], row[4]))
+
+        for pk_tuple in pkList:
+            if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
+                artifact["dsi_relations"]["primary_key"].append(pk_tuple)
+                artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+        return artifact
+
+    def read_units_helper(self):
+        unitsDict = OrderedDict()
+        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
+        for row in unitsTable:
+            tableName = row[0]
+            if tableName not in unitsDict.keys():
+                unitsDict[tableName] = []
+            unitsDict[tableName].append(eval(row[1]))
+        return unitsDict
+   
+
     '''UNUSED QUERY FUNCTIONS'''
     
     # Query file name

@@ -25,7 +25,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML', 'TOML', "Table_Plot", "Schema"]
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'SqliteReader']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['writer', 'reader'], 
                               'backend': ['back-read', 'back-write']}
@@ -255,7 +255,9 @@ class Terminal():
                 if query != None:
                     self.active_metadata = obj.get_artifacts(query, **kwargs)
                 else:
-                    raise ValueError("Need to specify a query for the database to return data")
+                    #raise ValueError("Need to specify a query of the database to return data")
+                    # This is a valid use-case, may give a warning for now
+                    self.active_metadata = obj.get_artifacts(**kwargs)
                 operation_success = True
             elif interaction_type == 'inspect':
                 errorMessage = obj.put_artifacts(
