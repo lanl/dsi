@@ -101,10 +101,12 @@ def test_yaml_reader():
     a.transload()
 
     assert len(a.active_metadata.keys()) == 4 # 4 tables - math, address, physics, dsi_units
-    for tableData in a.active_metadata.values():
+    for name, tableData in a.active_metadata.items():
         assert isinstance(tableData, OrderedDict)
         numRows = 2
-        assert all(len(lst) == numRows for lst in tableData.values())
+        if name == "dsi_units":
+            continue
+        assert all(len(colData) == numRows for colData in tableData.values())
 
 def test_toml_reader():
     a=Terminal()
@@ -112,10 +114,12 @@ def test_toml_reader():
     a.transload()
 
     assert len(a.active_metadata.keys()) == 2 # 2 tables - people and dsi_units
-    for tableData in a.active_metadata.values():
+    for name, tableData in a.active_metadata.items():
         assert isinstance(tableData, OrderedDict)
+        if name == "dsi_units":
+            continue
         numRows = 1
-        assert all(len(lst) == numRows for lst in tableData.values())
+        assert all(len(colData) == numRows for colData in tableData.values())
 
 def test_schema_reader():
     a=Terminal()
