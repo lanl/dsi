@@ -56,8 +56,8 @@ def test_csv_plugin_adds_rows():
     for key, val in plug.output_collector["Csv"].items():
         assert len(val) == 4
 
-    # 11 Csv cols + 1 inherited FileReader cols
-    assert len(plug.output_collector["Csv"].keys()) == 12
+    # 11 Csv cols
+    assert len(plug.output_collector["Csv"].keys()) == 11
 
 def test_csv_plugin_adds_rows_multiple_files():
     path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
@@ -69,8 +69,8 @@ def test_csv_plugin_adds_rows_multiple_files():
     for key, val in plug.output_collector["Csv"].items():
         assert len(val) == 8
 
-    # 13 Csv cols + 2 inherited FileReader cols
-    assert len(plug.output_collector["Csv"].keys()) == 15
+    # 13 Csv cols
+    assert len(plug.output_collector["Csv"].keys()) == 13
 
 def test_csv_plugin_adds_rows_multiple_files_strict_mode():
     path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
