@@ -1,13 +1,5 @@
-# from collections import OrderedDict
-# from os.path import abspath
-# from hashlib import sha1
-import json, csv
-# from math import isnan
-# import sqlite3
-# import subprocess
-# import os
+import csv
 from matplotlib import pyplot as plt
-from graphviz import Digraph
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -54,22 +46,36 @@ class ER_Diagram(FileWriter):
         #     return
 
         # else:
-        file_type = "png"
-        if self.output_filename[-3:] in ["png", "pdf", "jpg"]:
-            file_type = self.output_filename[-3:]
-            self.output_filename = self.output_filename[:-4]
-        elif self.output_filename[-4:] == ".jpeg":
+        file_type = ".png"
+        if self.output_filename[-4:] == ".png" or self.output_filename[-4:] == ".pdf" or self.output_filename[-4:] == ".jpg":
             file_type = self.output_filename[-4:]
+            self.output_filename = self.output_filename[:-4]
+        elif self.output_filename[-5:] == ".jpeg":
+            file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             raise ValueError("Your input for target_table_prefix does not exist in the database. Please enter a valid prefix for table names.")
         
-        dot = Digraph('workflow_schema', format = file_type)
-        if self.target_table_prefix is not None:
-            dot.attr(label = f'ER Diagram for {self.target_table_prefix} tables', labelloc='t')
-        dot.attr('node', shape='plaintext')
-        dot.attr(dpi='300', rankdir='LR', splines='true', overlap='false')
+        manual_dot = False
+        try: from graphviz import Digraph
+        except ModuleNotFoundError: 
+            manual_dot = True
+            import subprocess
+            import os
+
+        if manual_dot:
+            dot_file = open(self.output_filename + ".dot", "w")
+            dot_file.write("digraph workflow_schema { ")
+            if self.target_table_prefix is not None:
+                dot_file.write(f'label="ER Diagram for {self.target_table_prefix} tables"; labelloc="t"; ')
+            dot_file.write("node [shape=plaintext]; dpi=300 rankdir=LR splines=true overlap=false ")
+        else:
+            dot = Digraph('workflow_schema', format = file_type[1:])
+            if self.target_table_prefix is not None:
+                dot.attr(label = f'ER Diagram for {self.target_table_prefix} tables', labelloc='t')
+            dot.attr('node', shape='plaintext')
+            dot.attr(dpi='300', rankdir='LR', splines='true', overlap='false')
 
         num_tbl_cols = 1
         for tableName, tableData in collection.items():
@@ -77,8 +83,11 @@ class ER_Diagram(FileWriter):
                 continue
             elif self.target_table_prefix is not None and self.target_table_prefix not in tableName:
                 continue
-
-            html_table = f"<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>"
+            
+            html_table = ""
+            if manual_dot:
+                html_table = f"{tableName} [label="
+            html_table += f"<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>"
             
             col_list = tableData.keys()
             if tableName == "dsi_units":
@@ -98,18 +107,30 @@ class ER_Diagram(FileWriter):
             if inner_brace:
                 html_table += "</TR>"
             html_table += "</TABLE>>"
-            dot.node(tableName, label = html_table)
+
+            if manual_dot: dot_file.write(html_table+"]; ")
+            else: dot.node(tableName, label = html_table)
 
         for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
             if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
                 continue
             if f_table != "NULL":
                 foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                dot.edge(f"{f_table}:{f_col}", f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}")
+                fk_string = f"{f_table}:{f_col}"
+                pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
+                
+                if manual_dot: dot_file.write(f"{fk_string} -> {pk_string}; ")
+                else: dot.edge(fk_string, pk_string)
 
-        dot.render(self.output_filename, cleanup=True)
+        if manual_dot:
+            dot_file.write("}")
+            dot_file.close()
+            subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
+            os.remove(self.output_filename + ".dot")
+        else:
+            dot.render(self.output_filename, cleanup=True)
 
-    
+    #REALLLLLY OLD CODE
     # def export_erd(self, dbname, fname):
     #     """
     #     Function that outputs a ER diagram for the given database.
@@ -308,7 +329,7 @@ class Table_Plot(FileWriter):
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
                 unit_tuple = "NULL"
-                if self.table_name in collection["dsi_units"].keys():
+                if "dsi_units" in collection.keys() and self.table_name in collection["dsi_units"].keys():
                     unit_tuple = next((t[1] for t in collection["dsi_units"][self.table_name] if t[0] == colName), "NULL")
                 if unit_tuple != "NULL":
                     numeric_cols.append((colName + f" ({unit_tuple})", colData))
