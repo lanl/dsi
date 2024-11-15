@@ -78,7 +78,7 @@ class Csv(FileReader):
         else:
             self.csv_data["CSV"] = table_data
         
-        self.set_schema2(self.csv_data)
+        self.set_schema_2(self.csv_data)
 
         # if not self.schema_is_set():
         #     # use Pandas to append all CSVs together as a
