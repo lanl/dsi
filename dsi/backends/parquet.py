@@ -1,7 +1,5 @@
 import pyarrow as pa
 from pyarrow import parquet as pq
-import nbconvert as nbc
-import nbformat as nbf
 import subprocess
 
 from dsi.backends.filesystem import Filesystem
@@ -46,6 +44,9 @@ class Parquet(Filesystem):
         return proc.stdout.strip().decode("utf-8")
 
     def inspect_artifacts(self, collection, interactive=False):
+        import nbconvert as nbc
+        import nbformat as nbf
+
         """Populate a Jupyter notebook with tools required to look at Parquet data."""
         nb = nbf.v4.new_notebook()
         text = """\

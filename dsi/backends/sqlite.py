@@ -3,8 +3,6 @@ import sqlite3
 import json
 import re
 import subprocess
-import nbconvert as nbc
-import nbformat as nbf
 from datetime import datetime
 import textwrap
 
@@ -227,9 +225,9 @@ class Sqlite(Filesystem):
         except Exception as e:
             self.con.rollback()
             if type(e) is AssertionError:
-                return f"No data was inserted into {self.filename} due to the error: {errorString}"
+                return errorString
             else:
-                return f"No data was inserted into {self.filename} due to the error: {e}"
+                return e
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
@@ -432,6 +430,9 @@ class Sqlite(Filesystem):
         return data
 
     def inspect_artifacts(self, collection, interactive=False):
+        import nbconvert as nbc
+        import nbformat as nbf
+
         dsi_relations = dict(collection["dsi_relations"])
         dsi_units = dict(collection["dsi_units"])
 
@@ -446,7 +447,8 @@ class Sqlite(Filesystem):
         import sqlite3
         """
         code2 = f"""\
-        conn = {self.con}
+        dbPath = '{self.filename}'
+        conn = sqlite3.connect(dbPath)
         tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
         dsi_units = {dsi_units}
         dsi_relations = {dsi_relations}
