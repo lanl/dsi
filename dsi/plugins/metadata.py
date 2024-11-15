@@ -64,7 +64,13 @@ class StructuredMetadata(Plugin):
             self.strict_mode_lock = True
 
     def set_schema_2(self, collection, validation_model=None) -> None:
-        self.output_collector = collection
+        # Finds file_reader class that called set_schema and assigns that as table_name for this data
+        if not isinstance(collection[next(iter(collection))], OrderedDict):
+            caller_frame = inspect.stack()[1]
+            tableName = caller_frame.frame.f_locals.get('self', None).__class__.__name__
+            self.output_collector[tableName] = collection
+        else:
+            self.output_collector = collection
         self.table_cnt = len(collection.keys())
         self.validation_model = validation_model
 

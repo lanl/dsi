@@ -76,7 +76,7 @@ class Csv(FileReader):
         if self.db_name is not None:
             self.csv_data[self.db_name] = table_data
         else:
-            self.csv_data["CSV"] = table_data
+            self.csv_data = table_data
         
         self.set_schema_2(self.csv_data)
 

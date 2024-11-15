@@ -97,7 +97,7 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
     
 def test_yaml_reader():
     a=Terminal()
-    a.load_module('plugin', 'YAML', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
     a.transload()
 
     assert len(a.active_metadata.keys()) == 4 # 4 tables - math, address, physics, dsi_units
@@ -110,7 +110,7 @@ def test_yaml_reader():
 
 def test_toml_reader():
     a=Terminal()
-    a.load_module('plugin', 'TOML', 'reader', filenames="examples/data/results.toml", target_table_prefix = "results")
+    a.load_module('plugin', 'TOML1', 'reader', filenames="examples/data/results.toml", target_table_prefix = "results")
     a.transload()
 
     assert len(a.active_metadata.keys()) == 2 # 2 tables - people and dsi_units

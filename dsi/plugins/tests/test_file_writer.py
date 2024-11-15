@@ -22,8 +22,8 @@ def test_csv_plugin_type():
 def test_export_db_erd():
     a=Terminal(debug_flag=False)
     a.load_module('plugin', 'Schema', 'reader', filename="examples/data/example_schema.json" , target_table_prefix = "student")
-    a.load_module('plugin', 'YAML', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
-    a.load_module('plugin', 'TOML', 'reader', filenames=["examples/data/results.toml"], target_table_prefix = "results")
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', 'TOML1', 'reader', filenames=["examples/data/results.toml"], target_table_prefix = "results")
     a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'erd_test_output.png')
     a.transload()
     
