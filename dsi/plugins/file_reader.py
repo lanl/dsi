@@ -215,7 +215,7 @@ class Schema(FileReader):
                     self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
                     self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
 
-                if tableData["primary_key"] != "NULL":
+                if "primary_key" in tableData.keys():
                     pkList.append((tableName, tableData["primary_key"]))
             
             for pk in pkList:
