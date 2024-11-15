@@ -24,7 +24,7 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML', 'TOML', "Table_Plot", "Schema"]
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema"]
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['writer', 'reader'], 
@@ -244,7 +244,7 @@ class Terminal():
                 self.logger.info(f"-------------------------------------")
                 self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
                 start = datetime.now()
-                if interaction_type == 'put' or interaction_type == 'set':
+                if (interaction_type == 'put' or interaction_type == 'set') and module_type == 'back-write':
                     if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
                         backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
                         shutil.copyfile(obj.filename, backup_file)
@@ -271,7 +271,7 @@ class Terminal():
                     obj.inspect_artifacts(
                             collection=self.active_metadata, **kwargs)
                     operation_success = True
-                elif interaction_type == "read":
+                elif interaction_type == "read" and module_type == 'back-read':
                     self.active_metadata = obj.read_to_artifact()
                     operation_success = True
                 end = datetime.now()
@@ -281,9 +281,8 @@ class Terminal():
                 return self.active_metadata
             return
         else:
-            print(
-                'Hint: Did you implement a case for your artifact interaction in the \
-                 artifact_handler loop?')
+            print('Is your artifact interaction spelled correct and is it implemented in your backend?')
+            print('Remember that backend writers cannot read a db and backend readers cannot write to a db')
             raise NotImplementedError
 
 class Sync():
