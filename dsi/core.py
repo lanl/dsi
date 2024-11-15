@@ -214,6 +214,11 @@ class Terminal():
                                     self.active_metadata[table_name][colName] = colData
                                 elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     raise ValueError(f"Mismatched column input for table {table_name}")
+                                # NO OVERWRITE OF UNIT DATA
+                                # elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
+                                #     self.active_metadata[table_name][colName] = colData
+                                # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
+                                #     raise ValueError(f"Mismatched column input for table {table_name}")
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
                 elif module_type == "writer":
@@ -236,50 +241,46 @@ class Terminal():
             print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
             raise NotImplementedError
         operation_success = False
-        # Perform artifact movement first, because inspect implementation may rely on self.active_metadata
-        for obj in self.active_modules['back-write']:
-            self.logger.info(f"-------------------------------------")
-            self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
-            start = datetime.now()
-            if interaction_type == 'put' or interaction_type == 'set':
-                if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
-                    backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
-                    shutil.copyfile(obj.filename, backup_file)
-                errorMessage = obj.put_artifacts(
-                    collection=self.active_metadata, **kwargs)
-                if errorMessage is not None:
-                    print(f"No data was inserted into {obj.filename} due to the error: {errorMessage}")
-                operation_success = True
-            elif interaction_type == 'get':
-                self.logger.info(f"Query to get data: {query}")
-                if query != None:
-                    self.active_metadata = obj.get_artifacts(query, **kwargs)
-                else:
-                    #raise ValueError("Need to specify a query of the database to return data")
-                    # This is a valid use-case, may give a warning for now
-                    self.active_metadata = obj.get_artifacts(**kwargs)
-                operation_success = True
-            elif interaction_type == 'inspect':
-                errorMessage = obj.put_artifacts(
+        # Perform artifact movement first, because inspect implementation may rely on
+        # self.active_metadata or some stored artifact.
+        selected_active_backends = dict((k, self.active_modules[k]) for k in (['back-write', 'back-read']))
+        for module_type, objs in selected_active_backends.items():
+            for obj in objs:
+                self.logger.info(f"-------------------------------------")
+                self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
+                start = datetime.now()
+                if interaction_type == 'put' or interaction_type == 'set':
+                    if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
+                        backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
+                        shutil.copyfile(obj.filename, backup_file)
+                    errorMessage = obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
-                if errorMessage is not None:
-                    print("Error in ingesting data to db in inspect artifact. Generating Jupyter notebook with previous instance of db")
-                obj.inspect_artifacts(
-                        collection=self.active_metadata, **kwargs)
-                operation_success = True
-            end = datetime.now()
-            self.logger.info(f"Runtime: {end-start}")
-
-        for obj in self.active_modules['back-read']:
-            self.logger.info(f"-------------------------------------")
-            self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
-            start = datetime.now()
-            if interaction_type == "read":
-                self.active_metadata = obj.read_to_artifact()
-                operation_success = True
-            end = datetime.now()
-            self.logger.info(f"Runtime: {end-start}")
-
+                    if errorMessage is not None:
+                        print(f"No data was inserted into {obj.filename} due to the error: {errorMessage}")
+                    operation_success = True
+                elif interaction_type == 'get':
+                    self.logger.info(f"Query to get data: {query}")
+                    if query != None:
+                        self.active_metadata = obj.get_artifacts(query, **kwargs)
+                    else:
+                        #raise ValueError("Need to specify a query of the database to return data")
+                        # This is a valid use-case, may give a warning for now
+                        self.active_metadata = obj.get_artifacts(**kwargs)
+                    operation_success = True
+                elif interaction_type == 'inspect':
+                    if module_type == 'back-write':
+                        errorMessage = obj.put_artifacts(
+                            collection=self.active_metadata, **kwargs)
+                        if errorMessage is not None:
+                            print("Error in ingesting data to db in inspect artifact. Generating Jupyter notebook with previous instance of db")
+                    obj.inspect_artifacts(
+                            collection=self.active_metadata, **kwargs)
+                    operation_success = True
+                elif interaction_type == "read":
+                    self.active_metadata = obj.read_to_artifact()
+                    operation_success = True
+                end = datetime.now()
+                self.logger.info(f"Runtime: {end-start}")
         if operation_success:
             if interaction_type == 'get' and self.active_metadata:
                 return self.active_metadata

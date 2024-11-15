@@ -215,6 +215,8 @@ class Sqlite(Filesystem):
                                     errorString = e
                                 insertError = True
                                 self.con.rollback()
+                        else:
+                            self.con.rollback()
 
         try:
             assert insertError == False
@@ -442,8 +444,7 @@ class Sqlite(Filesystem):
         import sqlite3
         """
         code2 = f"""\
-        db_path = '{self.filename}'
-        conn = sqlite3.connect(db_path)
+        conn = {self.con}
         tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
         dsi_units = {dsi_units}
         dsi_relations = {dsi_relations}
