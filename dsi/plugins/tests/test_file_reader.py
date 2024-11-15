@@ -100,7 +100,7 @@ def test_yaml_reader():
     a.load_module('plugin', 'YAML', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
     a.transload()
 
-    assert len(a.active_metadata.keys()) == 3
+    assert len(a.active_metadata.keys()) == 4 # 4 tables - math, address, physics, dsi_units
     for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         numRows = 2
@@ -111,7 +111,7 @@ def test_toml_reader():
     a.load_module('plugin', 'TOML', 'reader', filenames="examples/data/results.toml", target_table_prefix = "results")
     a.transload()
 
-    assert len(a.active_metadata.keys()) == 1
+    assert len(a.active_metadata.keys()) == 2 # 2 tables - people and dsi_units
     for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         numRows = 1
