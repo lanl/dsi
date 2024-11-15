@@ -42,9 +42,14 @@ class Csv(FileReader):
     # Default value is False.
     strict_mode = False
 
-    def __init__(self, filenames, **kwargs):
+    def __init__(self, filenames, db_name = None, **kwargs):
         super().__init__(filenames, **kwargs)
-        self.csv_data = {}
+        self.csv_data = OrderedDict()
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
+        self.db_name = db_name
 
     # def pack_header(self) -> None:
     #     """ Set schema based on the CSV columns """
