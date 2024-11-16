@@ -4,12 +4,14 @@ import urllib.request
 from dsi.backends.sqlite import Sqlite, DataType
 import shutil
 
+from dsi.core import Terminal
+
 isVerbose = True
 
 """
 Read and download the images from the SDSC server
 """
-def downloadImages(dstFolder, path_to_csv, imageFolder):
+def downloadImages(path_to_csv, imageFolder):
     df = pd.read_csv (path_to_csv)
 
     for index, row in df.iterrows():
@@ -83,7 +85,7 @@ def extractDBColumns(path_to_db, columns_to_keep, dbName, path_to_csv_output):
 
 if __name__ == "__main__":
     # predefined paths
-    dstFolder = "examples/wildfire/"
+    dstFolder = ""
     imageFolderName = "images/"
     imgDstFolder = dstFolder + imageFolderName
     path_to_csv_input = dstFolder + "wildfiredataSmall.csv"
@@ -94,28 +96,55 @@ if __name__ == "__main__":
     dbName = "wfdata"
     columns_to_keep = [0,1,2,9,10]
 
-    # for each row, read the url in column 'FILE' and download the images
-    downloadImages(dstFolder, path_to_csv_input, imgDstFolder)
+    #external work from DSI
+    downloadImages(path_to_csv_input, imgDstFolder)
 
-    # generate the SQLite database
-    dbExist = os.path.exists(path_to_sqlite_db)
-    if dbExist:
-        os.remove(path_to_sqlite_db)
-    generateWildfireDB(dstFolder, path_to_csv_input, path_to_sqlite_db, dbName)
-    # moves the images to the Cinema Database folder
-    isExist = os.path.exists(path_to_cinema_db)
-    if not isExist:
+    # moves the images to the Cinema Database folder - external to DSI
+    if not os.path.exists(path_to_cinema_db):
         os.makedirs(path_to_cinema_db)
-    imgDirExist = os.path.exists(path_to_cinema_images)
-    if imgDirExist:
+    if os.path.exists(path_to_cinema_images):
         shutil.rmtree(path_to_cinema_images)
     os.rename(imgDstFolder, path_to_cinema_images)
 
-    # update the paths in the database to the local paths
-    updateDBImagePaths(path_to_sqlite_db, dbName, imageFolderName)
+    core = Terminal()
+    core.load_module('plugin', "Csv", "reader", filenames = path_to_csv_input, table_name = dbName)
+    core.transload()
 
-    # extract columns of interest
-    extractDBColumns(path_to_sqlite_db, columns_to_keep, dbName, path_to_cinema_csv)
+    # unique use case to update DSI abstraction directly
+    updatedFilePaths = []
+    wildfire_table = core.get_current_abstraction(table_name = dbName)
+    for url_image in wildfire_table['FILE']:
+        image_name = url_image.rsplit('/', 1)[1]
+        filePath = imageFolderName + image_name
+        updatedFilePaths.append(filePath)
+    wildfire_table['FILE'] = updatedFilePaths
+    core.update_abstraction(dbName, wildfire_table)
+
+    # DIRECTLY CHANGING ACTIVE METADATA -- not good
+    # updatedFilePaths = []
+    # for url_image in core.active_metadata[dbName]['FILE']:
+    #     image_name = url_image.rsplit('/', 1)[1]
+    #     filePath = imageFolderName + image_name
+    #     updatedFilePaths.append(filePath)
+    # core.active_metadata[dbName]['FILE'] = updatedFilePaths
+
+    core.load_module('plugin', "Csv_Writer", "writer", filename = path_to_cinema_csv, table_name = dbName, cols_to_export = columns_to_keep)
+    core.transload()
+
+    if os.path.exists(path_to_sqlite_db):
+        os.remove(path_to_sqlite_db)
+
+    core.load_module('backend','Sqlite','back-write', filename=path_to_sqlite_db, run_table = False)
+    core.artifact_handler(interaction_type='put')
+
+
+    # OLD WILDFIRE PASSTHROUGH FUNCTIONS
+    # generateWildfireDB(dstFolder, path_to_csv_input, path_to_sqlite_db, dbName)
+    # # update the paths in the database to the local paths
+    # updateDBImagePaths(path_to_sqlite_db, dbName, imageFolderName)
+
+    # # extract columns of interest
+    # extractDBColumns(path_to_sqlite_db, columns_to_keep, dbName, path_to_cinema_csv)
     
 
 
