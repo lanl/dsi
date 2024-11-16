@@ -42,14 +42,14 @@ class Csv(FileReader):
     # Default value is False.
     strict_mode = False
 
-    def __init__(self, filenames, db_name = None, **kwargs):
+    def __init__(self, filenames, table_name = None, **kwargs):
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
         if isinstance(filenames, str):
             self.filenames = [filenames]
         else:
             self.filenames = filenames
-        self.db_name = db_name
+        self.table_name = table_name
 
     # def pack_header(self) -> None:
     #     """ Set schema based on the CSV columns """
@@ -73,8 +73,8 @@ class Csv(FileReader):
         for col, coldata in table_data.items():  # replace NaNs with None
             table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
         
-        if self.db_name is not None:
-            self.csv_data[self.db_name] = table_data
+        if self.table_name is not None:
+            self.csv_data[self.table_name] = table_data
         else:
             self.csv_data = table_data
         
