@@ -64,7 +64,7 @@ class Terminal():
         if debug_flag:
             logging.basicConfig(
                 filename='logger.txt',         # Name of the log file
-                filemode='a',               # Append mode ('w' for overwrite)
+                filemode='w',               # Append mode ('w' for overwrite)
                 format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
                 level=logging.INFO          # Minimum log level to capture
             )
