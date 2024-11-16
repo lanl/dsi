@@ -24,10 +24,10 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema"]
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer"]
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
-    VALID_MODULE_FUNCTIONS = {'plugin': ['writer', 'reader'], 
+    VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read']
 
@@ -147,15 +147,23 @@ class Terminal():
                 'Plugin  module unloading is prohibited after transload. No action taken.')
             return
         for i, mod in enumerate(self.active_modules[mod_function]):
+            self.logger.info(f"-------------------------------------")
+            self.logger.info(f"Unloading {mod_name} {mod_function} {mod_type}")
+            start = datetime.now()
             if mod.__class__.__name__ == mod_name:
                 if mod_type == 'backend':
                     mod.close()
                 self.active_modules[mod_function].pop(i)
                 print("{} {} {} unloaded successfully.".format(
                     mod_name, mod_type, mod_function))
+                end = datetime.now()
+                self.logger.info(f"Runtime: {end-start}")
                 return
         print("{} {} {} could not be found in active_modules. No action taken.".format(
             mod_name, mod_type, mod_function))
+        self.logger.info(f"Could not find {mod_name} {mod_function} {mod_type} to unload")
+        end = datetime.now()
+        self.logger.info(f"Runtime: {end-start}")
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
@@ -199,7 +207,7 @@ class Terminal():
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
-                self.logger.info(obj.__class__.__name__ + f" {module_type}")
+                self.logger.info(f"Transloading {obj.__class__.__name__} {module_type}")
                 if module_type == "reader":
                     start = datetime.now()
                     obj.add_rows(**kwargs)
@@ -284,6 +292,32 @@ class Terminal():
             print('Is your artifact interaction spelled correct and is it implemented in your backend?')
             print('Remember that backend writers cannot read a db and backend readers cannot write to a db')
             raise NotImplementedError
+    
+    def get_current_abstraction(self, table_name = None):
+        if table_name is not None and table_name not in self.active_metadata.keys():
+            raise ValueError(f"{table_name} not in current abstraction")
+        if table_name is None:
+            return self.active_metadata
+        else:
+            return self.active_metadata[table_name]
+        
+    def update_abstraction(self, table_name, table_data):
+        if table_name not in self.active_metadata.keys():
+            raise ValueError(f"{table_name} not in current abstraction")
+        if not isinstance(table_data, OrderedDict):
+            raise ValueError("table_data needs to be in the form of an Ordered Dictionary")
+        self.active_metadata[table_name] = table_data
+        
+        #allow more plugins to be loaded and can call transload again
+        self.transload_lock = False
+
+        #need to unload all loaded plugins to prevent duplicate reading when transload called again
+        mods = self.active_modules
+        for obj in mods['reader']:
+            self.unload_module('plugin', obj.__class__.__name__, "reader")
+        for obj in mods['writer']:
+            self.unload_module('plugin', obj.__class__.__name__, "writer")
+            
 
 class Sync():
     """
