@@ -247,6 +247,7 @@ class Terminal():
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
         selected_active_backends = dict((k, self.active_modules[k]) for k in (['back-write', 'back-read']))
+        get_artifact_data = None
         for module_type, objs in selected_active_backends.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
@@ -264,11 +265,11 @@ class Terminal():
                 elif interaction_type == 'get':
                     self.logger.info(f"Query to get data: {query}")
                     if query != None:
-                        self.active_metadata = obj.get_artifacts(query, **kwargs)
+                        get_artifact_data = obj.get_artifacts(query, **kwargs)
                     else:
                         #raise ValueError("Need to specify a query of the database to return data")
                         # This is a valid use-case, may give a warning for now
-                        self.active_metadata = obj.get_artifacts(**kwargs)
+                        get_artifact_data = obj.get_artifacts(**kwargs)
                     operation_success = True
                 elif interaction_type == 'inspect':
                     if module_type == 'back-write':
@@ -286,7 +287,7 @@ class Terminal():
                 self.logger.info(f"Runtime: {end-start}")
         if operation_success:
             if interaction_type == 'get' and self.active_metadata:
-                return self.active_metadata
+                return get_artifact_data
             return
         else:
             print('Is your artifact interaction spelled correct and is it implemented in your backend?')
