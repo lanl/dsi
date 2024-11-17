@@ -18,14 +18,10 @@ INT = "INT"
 JSON = "TEXT"
 
 # Holds table name and data properties
-
 class DataType:
     name = "" # Note: using the word DEFAULT outputs a syntax error
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
-
-
-# Holds the main data
 
 class Artifact:
     """
@@ -94,7 +90,6 @@ class Sqlite(Filesystem):
         if isVerbose:
             print(str_query)
         self.cur.execute(str_query)
-
         self.types = types
 
     def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
@@ -342,67 +337,67 @@ class Sqlite(Filesystem):
 
     # Adds columns and rows automaticallly based on a csv file
     #[NOTE 3] This method should be deprecated in favor of put_artifacts.
-    def put_artifacts_csv(self, fname, tname, isVerbose=False):
-        """
-        Function for insertion of Artifact metadata into a defined schema by using a CSV file,
-        where the first row of the CSV contains the column names of the schema. Any rows
-        thereafter contain data to be inserted. Data types are automatically assigned based on
-        typecasting and default to a string type if none can be found.
+    # def put_artifacts_csv(self, fname, tname, isVerbose=False):
+    #     """
+    #     Function for insertion of Artifact metadata into a defined schema by using a CSV file,
+    #     where the first row of the CSV contains the column names of the schema. Any rows
+    #     thereafter contain data to be inserted. Data types are automatically assigned based on
+    #     typecasting and default to a string type if none can be found.
 
-        `fname`: filepath to the .csv file to be read and inserted into the database
+    #     `fname`: filepath to the .csv file to be read and inserted into the database
 
-        `tname`: String name of the table to be inserted
+    #     `tname`: String name of the table to be inserted
 
-        `return`: none
-        """
-        if isVerbose:
-            print("Opening " + fname)
+    #     `return`: none
+    #     """
+    #     if isVerbose:
+    #         print("Opening " + fname)
 
-        print('Entering csv method')
-        #[BEGIN NOTE 1] This is a csv getter. Does it belong? QW
-        with open(fname) as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-            header = next(csv_reader)
+    #     print('Entering csv method')
+    #     #[BEGIN NOTE 1] This is a csv getter. Does it belong? QW
+    #     with open(fname) as csv_file:
+    #         csv_reader = csv.reader(csv_file, delimiter=',')
+    #         header = next(csv_reader)
 
-            line_count = 0
-            for row in csv_reader:
-                if line_count == 0:
-                    str_query = "CREATE TABLE IF NOT EXISTS " + \
-                        str(tname) + " ( "
-                    for columnd, columnh in zip(row, header):
-                        DataType = self.check_type(columnd)
-                        str_query = str_query + \
-                            str(columnh) + str(DataType) + ","
+    #         line_count = 0
+    #         for row in csv_reader:
+    #             if line_count == 0:
+    #                 str_query = "CREATE TABLE IF NOT EXISTS " + \
+    #                     str(tname) + " ( "
+    #                 for columnd, columnh in zip(row, header):
+    #                     DataType = self.check_type(columnd)
+    #                     str_query = str_query + \
+    #                         str(columnh) + str(DataType) + ","
 
-                    str_query = str_query.rstrip(',')
-                    str_query = str_query + " )"
+    #                 str_query = str_query.rstrip(',')
+    #                 str_query = str_query + " )"
 
-                    if isVerbose:
-                        print(str_query)
+    #                 if isVerbose:
+    #                     print(str_query)
 
-                    self.cur.execute(str_query)
-                    self.con.commit()
-                    line_count += 1
-        #[END NOTE 1] QW
-        #[BEGIN NOTE 2]  This puts each row into a potentially new table. It does not take existing metadata as input. QW
-                str_query = "INSERT INTO " + str(tname) + " VALUES ( "
-                for column in row:
-                    str_query = str_query + " '" + str(column) + "'"
-                    str_query = str_query + ","
+    #                 self.cur.execute(str_query)
+    #                 self.con.commit()
+    #                 line_count += 1
+    #     #[END NOTE 1] QW
+    #     #[BEGIN NOTE 2]  This puts each row into a potentially new table. It does not take existing metadata as input. QW
+    #             str_query = "INSERT INTO " + str(tname) + " VALUES ( "
+    #             for column in row:
+    #                 str_query = str_query + " '" + str(column) + "'"
+    #                 str_query = str_query + ","
 
-                str_query = str_query.rstrip(',')
-                str_query = str_query + " )"
+    #             str_query = str_query.rstrip(',')
+    #             str_query = str_query + " )"
 
-                if isVerbose:
-                    print(str_query)
+    #             if isVerbose:
+    #                 print(str_query)
 
-                self.cur.execute(str_query)
-                self.con.commit()
-                line_count += 1
+    #             self.cur.execute(str_query)
+    #             self.con.commit()
+    #             line_count += 1
 
-            if isVerbose:
-                print("Read " + str(line_count) + " rows.")
-      #[END NOTE 2]
+    #         if isVerbose:
+    #             print("Read " + str(line_count) + " rows.")
+    #   #[END NOTE 2]
 
     # Returns text list from query
     def get_artifact_list(self, query, isVerbose=False):
@@ -515,79 +510,79 @@ class Sqlite(Filesystem):
 
     # ------- Query related functions -----
     # Raw sql query
-    def sqlquery(self, query, isVerbose=False):
-        """
-        Function that provides a direct sql query passthrough to the database.
+    # def sqlquery(self, query, isVerbose=False):
+    #     """
+    #     Function that provides a direct sql query passthrough to the database.
 
-        `query`: raw SQL query to be executed on current table
+    #     `query`: raw SQL query to be executed on current table
 
-        `return`: raw sql query list that contains result of the original query
-        """
-        if isVerbose:
-            print(query)
+    #     `return`: raw sql query list that contains result of the original query
+    #     """
+    #     if isVerbose:
+    #         print(query)
 
-        self.cur = self.con.cursor()
-        self.res = self.cur.execute(query)
-        resout = self.res.fetchall()
-        self.con.commit()
+    #     self.cur = self.con.cursor()
+    #     self.res = self.cur.execute(query)
+    #     resout = self.res.fetchall()
+    #     self.con.commit()
 
-        if isVerbose:
-            print(resout)
+    #     if isVerbose:
+    #         print(resout)
 
-        return resout
+    #     return resout
 
     # Given an output of a sql query, reformat and write a csv of the subset data
-    def export_csv_query(self, query, fname, isVerbose=False):
-        """
-        Function that outputs a csv file of a return query, given an initial query.
+    # def export_csv_query(self, query, fname, isVerbose=False):
+    #     """
+    #     Function that outputs a csv file of a return query, given an initial query.
 
-        `query`: raw SQL query to be executed on current table
+    #     `query`: raw SQL query to be executed on current table
 
-        `fname`: target filename (including path) that will output the return query as a csv file
+    #     `fname`: target filename (including path) that will output the return query as a csv file
 
-        `return`: none
-        """
-        if isVerbose:
-            print(query)
+    #     `return`: none
+    #     """
+    #     if isVerbose:
+    #         print(query)
         
-        # Parse the table out of the query
-        tname = query.split("FROM ",1)[1]
-        # Check to see if query is delimited
-        if ";" in query:
-            tname = tname[:-1]
+    #     # Parse the table out of the query
+    #     tname = query.split("FROM ",1)[1]
+    #     # Check to see if query is delimited
+    #     if ";" in query:
+    #         tname = tname[:-1]
 
-        # Isolate table name from other commands
-        if "WHERE" in tname:
-            tname = tname.split("WHERE ",1)[0][:-1]
+    #     # Isolate table name from other commands
+    #     if "WHERE" in tname:
+    #         tname = tname.split("WHERE ",1)[0][:-1]
         
-        if isVerbose:
-            print("Table: " + tname)
+    #     if isVerbose:
+    #         print("Table: " + tname)
 
-        self.cur = self.con.cursor()
-        # Carry out query
-        qdata = self.con.execute(query)
+    #     self.cur = self.con.cursor()
+    #     # Carry out query
+    #     qdata = self.con.execute(query)
         
-        # Gather column names
-        if "*" in query:
-            cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-            cnames = [entry[1] for entry in cdata]
-        else:
-            cnames = query.split("SELECT ",1)[1]
-            cnames = cnames.split("FROM ",1)[0][:-1]
-            cnames = cnames.split(',')
+    #     # Gather column names
+    #     if "*" in query:
+    #         cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+    #         cnames = [entry[1] for entry in cdata]
+    #     else:
+    #         cnames = query.split("SELECT ",1)[1]
+    #         cnames = cnames.split("FROM ",1)[0][:-1]
+    #         cnames = cnames.split(',')
 
-        if isVerbose:
-            print(cnames)
+    #     if isVerbose:
+    #         print(cnames)
 
-        with open(fname, "w+") as ocsv:
-            csvWriter = csv.writer(ocsv, delimiter=',')
-            csvWriter.writerow(cnames)
+    #     with open(fname, "w+") as ocsv:
+    #         csvWriter = csv.writer(ocsv, delimiter=',')
+    #         csvWriter.writerow(cnames)
 
-            for row in qdata:
-                print(row)
-                csvWriter.writerow(row)
+    #         for row in qdata:
+    #             print(row)
+    #             csvWriter.writerow(row)
 
-        return 1
+    #     return 1
 
     def export_csv(self, rquery, tname, fname, isVerbose=False):
         """
