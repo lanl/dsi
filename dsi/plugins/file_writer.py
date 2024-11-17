@@ -1,4 +1,3 @@
-import csv
 import pandas as pd
 from matplotlib import pyplot as plt
 
@@ -335,7 +334,7 @@ class Table_Plot(FileWriter):
     '''
     Plugin that plots all numeric column data for a specified table
     '''
-    def __init__(self, table_name, filename, **kwargs):
+    def __init__(self, table_name, filename, display_cols = None, **kwargs):
         '''
         `table_name`: name of table to be plotted
         `filename`: name of output file that plot be stored in
@@ -343,12 +342,18 @@ class Table_Plot(FileWriter):
         super().__init__(filename, **kwargs)
         self.output_name = filename
         self.table_name = table_name
+        self.display_cols = display_cols
 
     def get_rows(self, collection) -> None:
+        if self.table_name not in collection.keys():
+            raise ValueError(f"{self.table_name} not in the dataset")
+        if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
+            raise ValueError(f"Inputted list of columns to plot for {self.table_name} is incorrect")
+        
         numeric_cols = []
         col_len = None
         for colName, colData in collection[self.table_name].items():
-            if colName == "run_id":
+            if colName == "run_id" or (self.display_cols is not None and colName not in self.display_cols):
                 continue
             if col_len == None:
                 col_len = len(colData)
