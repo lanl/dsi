@@ -1,11 +1,4 @@
-from collections import OrderedDict
-from os.path import abspath
-from hashlib import sha1
-import json, csv
-from math import isnan
-import sqlite3
-import subprocess
-import os
+import csv
 from matplotlib import pyplot as plt
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -63,55 +56,81 @@ class ER_Diagram(FileWriter):
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             raise ValueError("Your input for target_table_prefix does not exist in the database. Please enter a valid prefix for table names.")
+        
+        manual_dot = False
+        try: from graphviz import Digraph
+        except ModuleNotFoundError: 
+            manual_dot = True
+            import subprocess
+            import os
 
-        dot_file = open(self.output_filename + ".dot", "w")
+        if manual_dot:
+            dot_file = open(self.output_filename + ".dot", "w")
+            dot_file.write("digraph workflow_schema { ")
+            if self.target_table_prefix is not None:
+                dot_file.write(f'label="ER Diagram for {self.target_table_prefix} tables"; labelloc="t"; ')
+            dot_file.write("node [shape=plaintext]; dpi=300 rankdir=LR splines=true overlap=false ")
+        else:
+            dot = Digraph('workflow_schema', format = file_type[1:])
+            if self.target_table_prefix is not None:
+                dot.attr(label = f'ER Diagram for {self.target_table_prefix} tables', labelloc='t')
+            dot.attr('node', shape='plaintext')
+            dot.attr(dpi='300', rankdir='LR', splines='true', overlap='false')
 
         num_tbl_cols = 1
-        dot_file.write("digraph workflow_schema { ")
-        if self.target_table_prefix is not None:
-            dot_file.write(f'label="ER Diagram for {self.target_table_prefix} tables"; ')
-            dot_file.write('labelloc="t"; ')
-        dot_file.write("node [shape=plaintext]; ")
-        dot_file.write("rankdir=LR ")
-        dot_file.write("splines=true ")
-        dot_file.write("overlap=false ")
-
         for tableName, tableData in collection.items():
-            if tableName == "dsi_relations" or (self.target_table_prefix is not None and self.target_table_prefix not in tableName):
+            if tableName == "dsi_relations" or tableName == "sqlite_sequence":
                 continue
-
-            dot_file.write(f"{tableName} [label=<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>")
-
+            elif self.target_table_prefix is not None and self.target_table_prefix not in tableName:
+                continue
+            
+            html_table = ""
+            if manual_dot:
+                html_table = f"{tableName} [label="
+            html_table += f"<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>"
+            
+            col_list = tableData.keys()
+            if tableName == "dsi_units":
+                col_list = ["table_name", "column_and_unit"]
             curr_row = 0
             inner_brace = 0
-            for col_name in tableData.keys():
+            for col_name in col_list:
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 1
-                    dot_file.write("<TR>")
-
-                dot_file.write(f"<TD PORT=\"{col_name}\">{col_name}</TD>")
+                    html_table += "<TR>"
+                html_table += f"<TD PORT=\"{col_name}\">{col_name}</TD>"
                 curr_row += 1
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 0
-                    dot_file.write("</TR>")
-
+                    html_table += "</TR>"
+            
             if inner_brace:
-                dot_file.write("</TR>")
-            dot_file.write("</TABLE>>]; ")
+                html_table += "</TR>"
+            html_table += "</TABLE>>"
+
+            if manual_dot: dot_file.write(html_table+"]; ")
+            else: dot.node(tableName, label = html_table)
 
         for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
             if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
                 continue
             if f_table != "NULL":
                 foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                dot_file.write(f"{f_table}:{f_col} -> {collection['dsi_relations']['primary_key'][foreignIndex][0]}: {collection['dsi_relations']['primary_key'][foreignIndex][1]}; ")
+                fk_string = f"{f_table}:{f_col}"
+                pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
+                
+                if manual_dot: dot_file.write(f"{fk_string} -> {pk_string}; ")
+                else: dot.edge(fk_string, pk_string)
 
-        dot_file.write("}")
-        dot_file.close()
+        if manual_dot:
+            dot_file.write("}")
+            dot_file.close()
+            subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
+            os.remove(self.output_filename + ".dot")
+        else:
+            dot.render(self.output_filename, cleanup=True)
 
-        subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
-        os.remove(self.output_filename + ".dot")
-    
+    #REALLLLLY OLD CODE
     # def export_erd(self, dbname, fname):
     #     """
     #     Function that outputs a ER diagram for the given database.
@@ -304,11 +323,16 @@ class Table_Plot(FileWriter):
         numeric_cols = []
         col_len = None
         for colName, colData in collection[self.table_name].items():
+            if colName == "run_id":
+                continue
             if col_len == None:
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
-                if self.table_name + "_units" in collection.keys() and collection[self.table_name + "_units"][colName][0] != "NULL":
-                    numeric_cols.append((colName + f" ({collection[self.table_name + '_units'][colName][0]})", colData))
+                unit_tuple = "NULL"
+                if "dsi_units" in collection.keys() and self.table_name in collection["dsi_units"].keys():
+                    unit_tuple = next((t[1] for t in collection["dsi_units"][self.table_name] if t[0] == colName), "NULL")
+                if unit_tuple != "NULL":
+                    numeric_cols.append((colName + f" ({unit_tuple})", colData))
                 else:
                     numeric_cols.append((colName, colData))
 

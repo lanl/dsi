@@ -42,59 +42,84 @@ class Csv(FileReader):
     # Default value is False.
     strict_mode = False
 
-    def __init__(self, filenames, **kwargs):
+    def __init__(self, filenames, db_name = None, **kwargs):
         super().__init__(filenames, **kwargs)
-        self.csv_data = {}
+        self.csv_data = OrderedDict()
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
+        self.db_name = db_name
 
-    def pack_header(self) -> None:
-        """ Set schema based on the CSV columns """
+    # def pack_header(self) -> None:
+    #     """ Set schema based on the CSV columns """
 
-        column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
-        self.set_schema(column_names)
+    #     column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
+    #     self.set_schema(column_names)
 
     def add_rows(self) -> None:
         """ Adds a list containing one or more rows of the CSV along with file_info to output. """
 
-        if not self.schema_is_set():
-            # use Pandas to append all CSVs together as a
-            # dataframe, then convert to dict
-            if self.strict_mode:
-                total_df = DataFrame()
-                dfs = []
-                for filename in self.filenames:
-                    # Initial case. Empty df collection.
-                    if total_df.empty:
-                        total_df = read_csv(filename)
-                        dfs.append(total_df)
-                    else:  # One or more dfs in collection
-                        temp_df = read_csv(filename)
-                        # raise exception if schemas do not match
-                        if any([set(temp_df.columns) != set(df.columns) for df in dfs]):
-                            print('Error: Strict schema mode is on. Schemas do not match.')
-                            raise TypeError
-                        dfs.append(temp_df)
-                        total_df = concat([total_df, temp_df])
+        total_df = DataFrame()
+        for filename in self.filenames:
+            temp_df = read_csv(filename)
+            try:
+                total_df = concat([total_df, temp_df])
+            except:
+                raise ValueError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
 
-            # Reminder: Schema is not set in this block.
-            else:  # self.strict_mode == False
-                total_df = DataFrame()
-                for filename in self.filenames:
-                    temp_df = read_csv(filename)
-                    total_df = concat([total_df, temp_df])
+        #convert total_df to ordered dict
+        table_data = OrderedDict(total_df.to_dict(orient='list'))
+        for col, coldata in table_data.items():  # replace NaNs with None
+            table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+        
+        if self.db_name is not None:
+            self.csv_data[self.db_name] = table_data
+        else:
+            self.csv_data = table_data
+        
+        self.set_schema_2(self.csv_data)
 
-            # Columns are present in the middleware already (schema_is_set==True).
-            # TODO: Can this go under the else block at line #79?
-            self.csv_data = total_df.to_dict('list')
-            for col, coldata in self.csv_data.items():  # replace NaNs with None
-                self.csv_data[col] = [None if type(item) == float and isnan(item) else item
-                                      for item in coldata]
-            self.pack_header()
+        # if not self.schema_is_set():
+        #     # use Pandas to append all CSVs together as a
+        #     # dataframe, then convert to dict
+        #     if self.strict_mode:
+        #         total_df = DataFrame()
+        #         dfs = []
+        #         for filename in self.filenames:
+        #             # Initial case. Empty df collection.
+        #             if total_df.empty:
+        #                 total_df = read_csv(filename)
+        #                 dfs.append(total_df)
+        #             else:  # One or more dfs in collection
+        #                 temp_df = read_csv(filename)
+        #                 # raise exception if schemas do not match
+        #                 if any([set(temp_df.columns) != set(df.columns) for df in dfs]):
+        #                     print('Error: Strict schema mode is on. Schemas do not match.')
+        #                     raise TypeError
+        #                 dfs.append(temp_df)
+        #                 total_df = concat([total_df, temp_df])
 
-        total_length = len(self.csv_data[list(self.csv_data.keys())[0]])
-        for row_idx in range(total_length):
-            row = [self.csv_data[k][row_idx] for k in self.csv_data.keys()]
-            row_w_fileinfo = list(self.file_info.values()) + row
-            self.add_to_output(row_w_fileinfo)
+        #     # Reminder: Schema is not set in this block.
+        #     else:  # self.strict_mode == False
+        #         total_df = DataFrame()
+        #         for filename in self.filenames:
+        #             temp_df = read_csv(filename)
+        #             total_df = concat([total_df, temp_df])
+
+        #     # Columns are present in the middleware already (schema_is_set==True).
+        #     # TODO: Can this go under the else block at line #79?
+        #     self.csv_data = total_df.to_dict('list')
+        #     for col, coldata in self.csv_data.items():  # replace NaNs with None
+        #         self.csv_data[col] = [None if type(item) == float and isnan(item) else item
+        #                               for item in coldata]
+        #     self.pack_header()
+
+        # total_length = len(self.csv_data[list(self.csv_data.keys())[0]])
+        # for row_idx in range(total_length):
+        #     row = [self.csv_data[k][row_idx] for k in self.csv_data.keys()]
+        #     row_w_fileinfo = list(self.file_info.values()) + row
+        #     self.add_to_output(row_w_fileinfo)
 
 
 class Bueno(FileReader):
@@ -199,33 +224,56 @@ class Schema(FileReader):
             table_info.append((table_name, list(self.schema_data[table_name].keys())))
         self.set_schema(table_info)
 
-    def add_rows(self) -> None:
-        if not self.schema_is_set():
-            self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-            self.pack_header()
-
+    def add_rows(self) -> None:    
+        self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
         with open(self.schema_file, 'r') as fh:
             schema_content = json.load(fh)
 
             for tableName, tableData in schema_content.items():
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
-                if tableData["primary_key"] != "NULL":
-                    self.schema_data["dsi_relations"]["primary_key"].append((tableName, tableData["primary_key"]))
-                    self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
-                    self.add_to_output([(tableName, tableData["primary_key"]), ("NULL", "NULL")], "dsi_relations")
-
+                
+                pkList = []
                 for colName, colData in tableData["foreign_key"].items():
                     if self.target_table_prefix is not None:
                         colData[0] = self.target_table_prefix + "__" + colData[0]
                     self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
                     self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
-                    self.add_to_output([(colData[0], colData[1]), (tableName, colName)], "dsi_relations")
 
-class YAML(FileReader):
+                if "primary_key" in tableData.keys():
+                    pkList.append((tableName, tableData["primary_key"]))
+            
+            for pk in pkList:
+                if pk not in self.schema_data["dsi_relations"]["primary_key"]:
+                    self.schema_data["dsi_relations"]["primary_key"].append(pk)
+                    self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+            self.set_schema_2(self.schema_data)
+
+        # if not self.schema_is_set():
+        #     self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+        #     self.pack_header()
+
+        # with open(self.schema_file, 'r') as fh:
+        #     schema_content = json.load(fh)
+
+        #     for tableName, tableData in schema_content.items():
+        #         if self.target_table_prefix is not None:
+        #             tableName = self.target_table_prefix + "__" + tableName
+        #         if tableData["primary_key"] != "NULL":
+        #             self.schema_data["dsi_relations"]["primary_key"].append((tableName, tableData["primary_key"]))
+        #             self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+        #             self.add_to_output([(tableName, tableData["primary_key"]), ("NULL", "NULL")], "dsi_relations")
+
+        #         for colName, colData in tableData["foreign_key"].items():
+        #             if self.target_table_prefix is not None:
+        #                 colData[0] = self.target_table_prefix + "__" + colData[0]
+        #             self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
+        #             self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
+        #             self.add_to_output([(colData[0], colData[1]), (tableName, colName)], "dsi_relations")
+
+class YAML1(FileReader):
     '''
     Plugin to read in an individual or a set of YAML files
-
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     '''
     def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
@@ -243,12 +291,12 @@ class YAML(FileReader):
         self.yaml_data = OrderedDict()
         self.target_table_prefix = target_table_prefix
 
-    def pack_header(self) -> None:
-        """Set schema with YAML data."""
-        table_info = []
-        for table_name in list(self.yaml_data.keys()):
-            table_info.append((table_name, list(self.yaml_data[table_name].keys())))
-        self.set_schema(table_info)
+    # def pack_header(self) -> None:
+    #     """Set schema with YAML data."""
+    #     table_info = []
+    #     for table_name in list(self.yaml_data.keys()):
+    #         table_info.append((table_name, list(self.yaml_data[table_name].keys())))
+    #     self.set_schema(table_info)
 
     def check_type(self, text):
         """
@@ -276,41 +324,67 @@ class YAML(FileReader):
                 editedString = re.sub('specification', f'columns:\n{self.yamlSpace}specification', editedString)
                 editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
                 yaml_load_data = list(yaml.safe_load_all(editedString))
-                
-                if not self.schema_is_set():
-                    for table in yaml_load_data:
-                        tableName = table["segment"]
-                        if self.target_table_prefix is not None:
-                            tableName = self.target_table_prefix + "__" + table["segment"]
-                        self.yaml_data[tableName] = OrderedDict((key, []) for key in table["columns"].keys())
-                        self.yaml_data[tableName + "_units"] = OrderedDict((key, []) for key in table["columns"].keys())
-                    self.yaml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-                    self.pack_header()
 
+                if "dsi_units" not in self.yaml_data.keys():
+                    self.yaml_data["dsi_units"] = OrderedDict()
                 for table in yaml_load_data:
-                    row = []
-                    unit_row = []
                     tableName = table["segment"]
                     if self.target_table_prefix is not None:
                         tableName = self.target_table_prefix + "__" + table["segment"]
+                    if tableName not in self.yaml_data.keys():
+                        self.yaml_data[tableName] = OrderedDict()
+                    unitsList = []
                     for col_name, data in table["columns"].items():
                         unit_data = "NULL"
                         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
                             unit_data = data[data.find(' ')+1:]
                             data = self.check_type(data[:data.find(" ")])
+                        if col_name not in self.yaml_data[tableName].keys():
+                            self.yaml_data[tableName][col_name] = []
                         self.yaml_data[tableName][col_name].append(data)
-                        if len(self.yaml_data[tableName + "_units"][col_name]) < 1:
-                            unit_row.append(unit_data)
-                            self.yaml_data[tableName + "_units"][col_name].append(unit_data)
-                        row.append(data)
-                    self.add_to_output(row, tableName)
-                    if len(next(iter(self.output_collector[tableName + "_units"].values()))) < 1:
-                        self.add_to_output(unit_row, tableName + "_units")
+                        if unit_data != "NULL" and (col_name, unit_data) not in unitsList:
+                            unitsList.append((col_name, unit_data))
+                    if len(unitsList) > 0 and tableName not in self.yaml_data["dsi_units"].keys():
+                        self.yaml_data["dsi_units"][tableName] = unitsList
 
-class TOML(FileReader):
+        self.set_schema_2(self.yaml_data)
+
+                # if not self.schema_is_set():
+                #     self.yaml_data["dsi_units"] = OrderedDict()
+                #     for table in yaml_load_data:
+                #         tableName = table["segment"]
+                #         if self.target_table_prefix is not None:
+                #             tableName = self.target_table_prefix + "__" + table["segment"]
+                #         self.yaml_data[tableName] = OrderedDict((key, []) for key in table["columns"].keys())
+                #         self.yaml_data["dsi_units"][tableName] = []
+                #     # self.yaml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+                #     self.pack_header()
+
+                # unit_row = []
+                # for table in yaml_load_data:
+                #     row = []
+                #     table_unit_row = []
+                #     tableName = table["segment"]
+                #     if self.target_table_prefix is not None:
+                #         tableName = self.target_table_prefix + "__" + table["segment"]
+                #     for col_name, data in table["columns"].items():
+                #         unit_data = "NULL"
+                #         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
+                #             unit_data = data[data.find(' ')+1:]
+                #             data = self.check_type(data[:data.find(" ")])
+                #         self.yaml_data[tableName][col_name].append(data)
+                #         if (col_name, unit_data) not in self.yaml_data["dsi_units"][tableName]:
+                #             table_unit_row.append((col_name, unit_data))
+                #             self.yaml_data["dsi_units"][tableName].append((col_name, unit_data))
+                #         row.append(data)
+                #     self.add_to_output(row, tableName)
+                #     unit_row.append(table_unit_row)
+                # if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
+                #     self.add_to_output(unit_row, "dsi_units")
+
+class TOML1(FileReader):
     '''
     Plugin to read in an individual or a set of TOML files
-
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     '''
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
@@ -326,12 +400,12 @@ class TOML(FileReader):
         self.toml_data = OrderedDict()
         self.target_table_prefix = target_table_prefix
 
-    def pack_header(self) -> None:
-        """Set schema with TOML data."""
-        table_info = []
-        for table_name in list(self.toml_data.keys()):
-            table_info.append((table_name, list(self.toml_data[table_name].keys())))
-        self.set_schema(table_info)
+    # def pack_header(self) -> None:
+    #     """Set schema with TOML data."""
+    #     table_info = []
+    #     for table_name in list(self.toml_data.keys()):
+    #         table_info.append((table_name, list(self.toml_data[table_name].keys())))
+    #     self.set_schema(table_info)
 
     def add_rows(self) -> None:
         """
@@ -350,20 +424,14 @@ class TOML(FileReader):
             with open(filename, 'rb') as toml_file:
                 toml_load_data = tomllib.load(toml_file)
 
-            if not self.schema_is_set():
-                for tableName, tableData in toml_load_data.items():
-                    if self.target_table_prefix is not None:
-                        tableName = self.target_table_prefix + "__" + tableName
-                    self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
-                    self.toml_data[tableName + "_units"] = OrderedDict((key, []) for key in tableData.keys())
-                self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
-                self.pack_header()
-
+            if "dsi_units" not in self.toml_data.keys():
+                    self.toml_data["dsi_units"] = OrderedDict()
             for tableName, tableData in toml_load_data.items():
-                row = []
-                unit_row = []
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
+                if tableName not in self.toml_data.keys():
+                    self.toml_data[tableName] = OrderedDict()
+                unitsList = []
                 for col_name, data in tableData.items():
                     unit_data = "NULL"
                     if isinstance(data, dict):
@@ -374,11 +442,77 @@ class TOML(FileReader):
                     #     data = ast.literal_eval(data)
                     #     unit_data = data["units"]
                     #     data = data["value"]
+                    if col_name not in self.toml_data[tableName].keys():
+                        self.toml_data[tableName][col_name] = []
                     self.toml_data[tableName][col_name].append(data)
-                    if len(self.toml_data[tableName + "_units"][col_name]) < 1:
-                        unit_row.append(unit_data)
-                        self.toml_data[tableName + "_units"][col_name].append(unit_data)
-                    row.append(data)
-                self.add_to_output(row, tableName)
-                if len(next(iter(self.output_collector[tableName + "_units"].values()))) < 1:
-                    self.add_to_output(unit_row, tableName + "_units")
+                    if unit_data != "NULL" and (col_name, unit_data) not in unitsList:
+                        unitsList.append((col_name, unit_data))
+                if len(unitsList) > 0 and tableName not in self.toml_data["dsi_units"].keys():
+                    self.toml_data["dsi_units"][tableName] = unitsList
+
+        self.set_schema_2(self.toml_data)
+
+            # if not self.schema_is_set():
+            #     for tableName, tableData in toml_load_data.items():
+            #         if self.target_table_prefix is not None:
+            #             tableName = self.target_table_prefix + "__" + tableName
+            #         self.toml_data[tableName] = OrderedDict((key, []) for key in tableData.keys())
+            #         self.toml_data["dsi_units"] = OrderedDict([(tableName,[])])
+            #     # self.toml_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+            #     self.pack_header()
+
+            # unit_row = []
+            # for tableName, tableData in toml_load_data.items():
+            #     row = []
+            #     table_unit_row = []
+            #     if self.target_table_prefix is not None:
+            #         tableName = self.target_table_prefix + "__" + tableName
+            #     for col_name, data in tableData.items():
+            #         unit_data = "NULL"
+            #         if isinstance(data, dict):
+            #             unit_data = data["units"]
+            #             data = data["value"]
+            #         # IF statement for manual data parsing for python 3.10 and below
+            #         # if isinstance(data, str) and data[0] == "{" and data[-1] == "}":
+            #         #     data = ast.literal_eval(data)
+            #         #     unit_data = data["units"]
+            #         #     data = data["value"]
+            #         self.toml_data[tableName][col_name].append(data)
+            #         if (col_name, unit_data) not in self.toml_data["dsi_units"][tableName]:
+            #             table_unit_row.append((col_name, unit_data))
+            #             self.toml_data["dsi_units"][tableName].append((col_name, unit_data))
+            #         row.append(data)
+            #     self.add_to_output(row, tableName)
+            #     unit_row.append(table_unit_row)
+            # if len(next(iter(self.output_collector["dsi_units"].values()))) < 1:
+            #         self.add_to_output(unit_row, "dsi_units")
+
+class TextFile(FileReader):
+    '''
+    Plugin to read in an individual or a set of text files
+    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    '''
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        '''
+        `filenames`: one text file or a list of text files to be ingested
+        `target_table_prefix`: prefix to be added to every table created to differentiate between other text file sources
+        '''
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.text_files = [filenames]
+        else:
+            self.text_files = filenames
+        self.text_file_data = OrderedDict()
+        self.target_table_prefix = target_table_prefix
+
+    def add_rows(self) -> None:
+        """
+        Parses text file data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
+        """
+        for filename in self.text_files:
+            df = read_csv(filename)
+            if self.target_table_prefix is not None:
+                self.text_file_data[f"{self.target_table_prefix}__text_file"] = OrderedDict(df.to_dict(orient='list'))
+            else:
+                self.text_file_data["text_file"] = OrderedDict(df.to_dict(orient='list'))
+            self.set_schema_2(self.text_file_data)

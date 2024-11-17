@@ -24,14 +24,14 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML', 'TOML', "Table_Plot", "Schema"]
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema"]
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['writer', 'reader'], 
                               'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read']
 
-    def __init__(self, debug_flag = False):
+    def __init__(self, debug_flag = False, backup_db_flag = False):
         # Helper function to get parent module names.
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -57,12 +57,14 @@ class Terminal():
         self.active_metadata = OrderedDict()
         self.transload_lock = False
 
+        self.backup_db_flag = backup_db_flag
+
         self.logger = logging.getLogger(self.__class__.__name__)
 
         if debug_flag:
             logging.basicConfig(
                 filename='logger.txt',         # Name of the log file
-                filemode='a',               # Append mode ('w' for overwrite)
+                filemode='w',               # Overwrite mode ('a' for append)
                 format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
                 level=logging.INFO          # Minimum log level to capture
             )
@@ -194,7 +196,6 @@ class Terminal():
         """
         selected_function_modules = dict(
             (k, self.active_modules[k]) for k in ('reader', 'writer'))
-        # Note this transload supports plugin.env Environment types now.
         for module_type, objs in selected_function_modules.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
@@ -207,9 +208,11 @@ class Terminal():
                             self.active_metadata[table_name] = table_metadata
                         else:
                             for colName, colData in table_metadata.items():
-                                if colName in self.active_metadata[table_name].keys():
+                                if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     self.active_metadata[table_name][colName] += colData
-                                else:
+                                elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
+                                    self.active_metadata[table_name][colName] = colData
+                                elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     raise ValueError(f"Mismatched column input for table {table_name}")
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
@@ -218,23 +221,6 @@ class Terminal():
                     obj.get_rows(self.active_metadata, **kwargs)
                     end = datetime.now()
                     self.logger.info(f"Runtime: {end-start}")
-        # Plugins may add one or more rows (vector vs matrix data).
-        # You may have two or more plugins with different numbers of rows.
-        # Consequently, transload operations may have unstructured shape for
-        # some plugin configurations. We must force structure to create a valid
-        # middleware data structure.
-        # To resolve, we pad the shorter columns to match the max length column.
-        #COMMENTED OUT TILL LATER
-        '''
-        max_len = max([len(col) for col in self.active_metadata.values()])
-        for colname, coldata in self.active_metadata.items():
-            if len(coldata) != max_len:
-                self.active_metadata[colname].extend(  # add None's until reaching max_len
-                    [None] * (max_len - len(coldata)))
-
-        assert all([len(col) == max_len for col in self.active_metadata.values(
-        )]), "All columns must have the same number of rows"
-        '''
 
         self.transload_lock = True
 
@@ -247,22 +233,25 @@ class Terminal():
         the provided ``interaction_type``.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
-            print(
-                'Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+            print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
             raise NotImplementedError
         operation_success = False
         # Perform artifact movement first, because inspect implementation may rely on
         # self.active_metadata or some stored artifact.
-        selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in ('back-read', 'back-write'))
-        for module_type, objs in selected_function_modules.items():
+        selected_active_backends = dict((k, self.active_modules[k]) for k in (['back-write', 'back-read']))
+        for module_type, objs in selected_active_backends.items():
             for obj in objs:
                 self.logger.info(f"-------------------------------------")
                 self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
                 start = datetime.now()
-                if interaction_type == 'put' or interaction_type == 'set':
-                    obj.put_artifacts(
+                if (interaction_type == 'put' or interaction_type == 'set') and module_type == 'back-write':
+                    if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
+                        backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
+                        shutil.copyfile(obj.filename, backup_file)
+                    errorMessage = obj.put_artifacts(
                         collection=self.active_metadata, **kwargs)
+                    if errorMessage is not None:
+                        print(f"No data was inserted into {obj.filename} due to the error: {errorMessage}")
                     operation_success = True
                 elif interaction_type == 'get':
                     self.logger.info(f"Query to get data: {query}")
@@ -274,12 +263,15 @@ class Terminal():
                         self.active_metadata = obj.get_artifacts(**kwargs)
                     operation_success = True
                 elif interaction_type == 'inspect':
-                    obj.put_artifacts(
-                        collection=self.active_metadata, **kwargs)
-                    self.active_metadata = obj.inspect_artifacts(
-                        collection=self.active_metadata, **kwargs)
+                    if module_type == 'back-write':
+                        errorMessage = obj.put_artifacts(
+                            collection=self.active_metadata, **kwargs)
+                        if errorMessage is not None:
+                            print("Error in ingesting data to db in inspect artifact. Generating Jupyter notebook with previous instance of db")
+                    obj.inspect_artifacts(
+                            collection=self.active_metadata, **kwargs)
                     operation_success = True
-                elif interaction_type == "read":
+                elif interaction_type == "read" and module_type == 'back-read':
                     self.active_metadata = obj.read_to_artifact()
                     operation_success = True
                 end = datetime.now()
@@ -289,9 +281,8 @@ class Terminal():
                 return self.active_metadata
             return
         else:
-            print(
-                'Hint: Did you implement a case for your artifact interaction in the \
-                 artifact_handler loop?')
+            print('Is your artifact interaction spelled correct and is it implemented in your backend?')
+            print('Remember that backend writers cannot read a db and backend readers cannot write to a db')
             raise NotImplementedError
 
 class Sync():

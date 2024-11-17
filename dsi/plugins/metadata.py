@@ -63,6 +63,17 @@ class StructuredMetadata(Plugin):
         if not self.strict_mode_lock:
             self.strict_mode_lock = True
 
+    def set_schema_2(self, collection, validation_model=None) -> None:
+        # Finds file_reader class that called set_schema and assigns that as table_name for this data
+        if not isinstance(collection[next(iter(collection))], OrderedDict):
+            caller_frame = inspect.stack()[1]
+            tableName = caller_frame.frame.f_locals.get('self', None).__class__.__name__
+            self.output_collector[tableName] = collection
+        else:
+            self.output_collector = collection
+        self.table_cnt = len(collection.keys())
+        self.validation_model = validation_model
+
     def add_to_output(self, row: list, tableName = None) -> None:
         """
         Adds a row of data to the output_collector and guarantees good structure.
@@ -85,7 +96,10 @@ class StructuredMetadata(Plugin):
             raise RuntimeError(f"For {tableName}, incorrect number of values was given")
         
         for key, row_elem in zip(self.output_collector[tableName].keys(), row):
-            self.output_collector[tableName][key].append(row_elem)
+            if "dsi_units" != tableName:
+                self.output_collector[tableName][key].append(row_elem)
+            else:
+                self.output_collector[tableName][key] = row_elem
 
     def schema_is_set(self) -> bool:
         """ Helper method to see if the schema has been set """

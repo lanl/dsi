@@ -2,9 +2,9 @@ import csv
 import sqlite3
 import json
 import re
-# import yaml
-# import subprocess
-# import os
+import subprocess
+from datetime import datetime
+import textwrap
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -46,10 +46,11 @@ class Sqlite(Filesystem):
     con = None
     cur = None
 
-    def __init__(self, filename):
+    def __init__(self, filename, run_table = True):
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
+        self.run_flag = run_table
 
     def check_type(self, text):
         """
@@ -76,22 +77,23 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
-        # key_names = types.properties.keys()
-        key_names = types.unit_keys
-        if "_units" in types.name:
-            key_names = [item + " UNIQUE" for item in types.unit_keys]
-
-        col_names = ', '.join(key_names)
-        str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
+        col_names = ', '.join(types.unit_keys)
+        if self.run_flag:
+            str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), col_names)
+        else:
+            str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
 
         if foreign_query != None:
             str_query += foreign_query
-        str_query += ");"
+        
+        if self.run_flag:
+            str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id));"
+        else:
+            str_query += ");"
 
         if isVerbose:
             print(str_query)
         self.cur.execute(str_query)
-        self.con.commit()
 
         self.types = types
 
@@ -119,25 +121,38 @@ class Sqlite(Filesystem):
 
         `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
                      filled with rows to insert.
-
         `return`: none
         """
         # Core compatibility name assignment
         artifacts = collection
+        
+        insertError = False
+        errorString = None
+        if self.run_flag:
+            runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
+            self.cur.execute(runTable_create)
+            self.con.commit()
 
-
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
+            if insertError == False:
+                try:
+                    self.cur.execute(runTable_insert)
+                except sqlite3.Error as e:
+                    if errorString is None:
+                        errorString = e
+                    insertError = True
+                    self.con.rollback()
+            else:
+                self.con.rollback()
         
         for tableName, tableData in artifacts.items():
-            if tableName == "dsi_relations":
+            if tableName == "dsi_relations" or tableName == "dsi_units":
                 continue
 
             types = DataType()
             types.properties = {}
             types.unit_keys = []
-
-            # Check if this has been defined from helper function
-            '''if self.types != None:
-                types.name = self.types.name'''
             types.name = tableName
 
             foreign_query = ""
@@ -163,27 +178,56 @@ class Sqlite(Filesystem):
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
 
-            if "_units" in tableName:
-                str_query = "INSERT OR IGNORE INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+            str_query = "INSERT INTO "
+            if self.run_flag:
+                run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
+                str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
             else:
-                str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-
-            # col_list helps access the specific keys of the dictionary in the for loop
-            col_list = col_names.split(', ')
-
-            # loop through the contents of each column and insert into table as a row
-            for ind1 in range(len(types.properties[col_list[0]])):
-                vals = []
-                for ind2 in range(len(types.properties.keys())):
-                    vals.append(str(types.properties[col_list[ind2]][ind1]))
-                tup_vals = tuple(vals)
-                self.cur.execute(str_query,tup_vals)
+                str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+            
+            rows = zip(*types.properties.values())
+            if insertError == False:
+                try:
+                    self.cur.executemany(str_query,rows)
+                except sqlite3.Error as e:
+                    if errorString is None:
+                        errorString = e
+                    insertError = True
+                    self.con.rollback()
+            else:
+                self.con.rollback()
 
             if isVerbose:
-                print(str_query)
+                print(str_query)        
+            self.types = types #This will only copy the last table from artifacts (collections input)            
 
-            self.con.commit()            
-            self.types = types #This will only copy the last table from artifacts (collections input)
+        if "dsi_units" in artifacts.keys():
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
+            self.cur.execute(create_query)
+            for tableName, tableData in artifacts["dsi_units"].items():
+                if len(tableData) > 0:
+                    for col_unit_pair in tableData:
+                        str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
+                        if insertError == False:
+                            try:
+                                self.cur.execute(str_query)
+                            except sqlite3.Error as e:
+                                if errorString is None:
+                                    errorString = e
+                                insertError = True
+                                self.con.rollback()
+                        else:
+                            self.con.rollback()
+
+        try:
+            assert insertError == False
+            self.con.commit()
+        except Exception as e:
+            self.con.rollback()
+            if type(e) is AssertionError:
+                return errorString
+            else:
+                return e
 
     def put_artifacts_only(self, artifacts, isVerbose=False):
         """
@@ -386,12 +430,84 @@ class Sqlite(Filesystem):
         return data
 
     def inspect_artifacts(self, collection, interactive=False):
-        #nb = nbf.v4.new_notebook()
+        import nbconvert as nbc
+        import nbformat as nbf
+
+        dsi_relations = dict(collection["dsi_relations"])
+        dsi_units = dict(collection["dsi_units"])
+
+        nb = nbf.v4.new_notebook()
         text = """\
-        # This notebook was auto-generated by a DSI Backend for SQLite.
-        # Execute the Jupyter notebook cells below and interact with "collection"
-        # to explore your data.
+        This notebook was auto-generated by a DSI Backend for SQLite.
+        Due to the possibility of several tables stored in the DSI abstraction (OrderedDict), the data is stored as several dataframes in a list
+        Execute the Jupyter notebook cells below and interact with table_list to explore your data.
         """
+        code1 = """\
+        import pandas as pd
+        import sqlite3
+        """
+        code2 = f"""\
+        dbPath = '{self.filename}'
+        conn = sqlite3.connect(dbPath)
+        tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
+        dsi_units = {dsi_units}
+        dsi_relations = {dsi_relations}
+        """
+        code3 = """\
+        table_list = []
+        for table_name in tables['name']:
+            if table_name not in ['dsi_relations', 'dsi_units', 'sqlite_sequence']:
+                query = 'SELECT * FROM ' + table_name
+                df = pd.read_sql_query(query, conn)
+                df.attrs['name'] = table_name
+                if table_name in dsi_units:
+                    df.attrs['units'] = dsi_units[table_name]
+                table_list.append(df)
+        
+        df = pd.DataFrame(dsi_relations)
+        df.attrs['name'] = 'dsi_relations'
+        table_list.append(df)
+        """
+        code4 = """\
+        for table_df in table_list:
+            print(table_df.attrs)
+            print(table_df)
+            # table_df.info()
+            # table_df.describe()
+        """
+
+        nb['cells'] = [nbf.v4.new_markdown_cell(text),
+                       nbf.v4.new_code_cell(textwrap.dedent(code1)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code2)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code3)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code4))]
+        
+        fname = 'dsi_sqlite_backend_output.ipynb'
+        print('Writing Jupyter notebook...')
+        with open(fname, 'w') as fh:
+            nbf.write(nb, fh)
+
+        # open the jupyter notebook for static page generation
+        with open(fname, 'r', encoding='utf-8') as fh:
+            nb_content = nbf.read(fh, as_version=4)
+        run_nb = nbc.preprocessors.ExecutePreprocessor(timeout=-1) # No timeout
+        run_nb.preprocess(nb_content, {'metadata':{'path':'.'}})
+
+        if interactive:
+            print('Opening Jupyter notebook...')
+            
+            proc = subprocess.run(['jupyter-lab ./dsi_sqlite_backend_output.ipynb'], capture_output=True, shell=True)
+            if proc.stderr != b"":
+                raise Exception(proc.stderr)
+            return proc.stdout.strip().decode("utf-8")
+        else:
+            # Init HTML exporter
+            html_exporter = nbc.HTMLExporter()
+            html_content,_ = html_exporter.from_notebook_node(nb_content)
+            # Save HTML file
+            html_filename = 'dsi_sqlite_backend_output.html'
+            with open(html_filename, 'w', encoding='utf-8') as fh:
+                fh.write(html_content)
 
     # Closes connection to server
     def close(self):
@@ -507,14 +623,16 @@ class Sqlite(Filesystem):
     # Sqlite reader class
     def read_to_artifact(self):
         artifact = OrderedDict()
+        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
 
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-
-        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
         pkList = []
-
         for item in tableList:
             tableName = item[0]
+            if tableName == "dsi_units":
+                artifact["dsi_units"] = self.read_units_helper()
+                continue
+
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
             colDict = OrderedDict()
             for colInfo in tableInfo:
@@ -540,7 +658,17 @@ class Sqlite(Filesystem):
                 artifact["dsi_relations"]["primary_key"].append(pk_tuple)
                 artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
         return artifact
-    
+      
+    def read_units_helper(self):
+        unitsDict = OrderedDict()
+        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
+        for row in unitsTable:
+            tableName = row[0]
+            if tableName not in unitsDict.keys():
+                unitsDict[tableName] = []
+            unitsDict[tableName].append(eval(row[1]))
+        return unitsDict
+
     '''UNUSED QUERY FUNCTIONS'''
     
     # Query file name
@@ -619,164 +747,3 @@ class Sqlite(Filesystem):
     #         print(resout)
 
     #     return resout
-
-    '''YAML AND TOML READERS'''
-
-    # def yamlDataToList(self, filenames):
-    #     """
-    #     Function that reads a YAML file or files into a list
-    #     """
-        
-    #     yamlData = []
-    #     for filename in filenames:
-    #         with open(filename, 'r') as yaml_file:
-    #             editedString = yaml_file.read()
-    #             editedString = re.sub('specification', r'columns:\n  specification', editedString)
-    #             editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
-    #             yml_data = yaml.safe_load_all(editedString)
-                
-    #             for table in yml_data:
-    #                 yamlData.append(table)
-
-    #     return yamlData
-            
-    # def yamlToSqlite(self, filenames, db_name, deleteSql=True):
-    #     """
-    #     Function that ingests a YAML file into a sqlite database based on the given database name
-
-    #     `filenames`: name of YAML file or a list of YAML files to be ingested
-
-    #     `db_name`: name of database that YAML file should be added to. Database will be created if it does not exist in local directory.
-
-    #     `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
-    #     """
-
-    #     sql_statements = []
-    #     if isinstance(filenames, str):
-    #         filenames = [filenames]
-
-    #     with open(db_name+".sql", "w") as sql_file:
-    #         yml_list = self.yamlDataToList(filenames)
-    #         for table in yml_list:
-    #             tableName = table["segment"]
-
-    #             data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
-    #             if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
-    #                 createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
-    #                 createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "  
-    #                 insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
-
-    #                 for key, val in table['columns'].items():
-    #                     createUnitStmt+= f"{key} VARCHAR, "
-    #                     if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
-    #                         createStmt += f"{key}{self.check_type(val[:val.find(' ')])}, "
-    #                         insertUnitStmt+= f"'{val[val.find(' ')+1:]}', "
-    #                     else:
-    #                         createStmt += f"{key} {data_types[type(val)]}, "
-    #                         insertUnitStmt+= "NULL, "
-
-    #                 if createStmt not in sql_statements:
-    #                     sql_statements.append(createStmt)
-    #                     sql_file.write(createStmt[:-2] + ");\n\n")
-    #                 if createUnitStmt not in sql_statements:
-    #                     sql_statements.append(createUnitStmt)
-    #                     sql_file.write(createUnitStmt[:-2] + ");\n\n")
-    #                 if insertUnitStmt not in sql_statements:
-    #                     sql_statements.append(insertUnitStmt)
-    #                     sql_file.write(insertUnitStmt[:-2] + ");\n\n")
-
-    #             insertStmt = f"INSERT INTO {tableName} VALUES( "
-    #             for val in table['columns'].values():
-    #                 if data_types[type(val)] == "VARCHAR" and self.check_type(val[:val.find(" ")]) in [" INT", " FLOAT"]:
-    #                     insertStmt+= f"{val[:val.find(' ')]}, "
-    #                 elif data_types[type(val)] == "VARCHAR":
-    #                     insertStmt+= f"'{val}', "
-    #                 else:
-    #                     insertStmt+= f"{val}, "
-
-    #             if insertStmt not in sql_statements:
-    #                 sql_statements.append(insertStmt)
-    #                 sql_file.write(insertStmt[:-2] + ");\n\n")
-    
-    #     subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
-
-    #     if deleteSql == True:
-    #         os.remove(db_name+".sql")
-
-    # def tomlDataToList(self, filenames):
-    #     """
-    #     Function that reads a TOML file or files into a list
-    #     """
-        
-    #     toml_data = []
-    #     for filename in filenames:
-    #         with open(filename, 'r') as toml_file:
-    #             data = toml.load(toml_file)
-    #             for tableName, tableData in data.items():
-    #                 toml_data.append([tableName, tableData])
-
-    #     return toml_data
-    
-    # def tomlToSqlite(self, filenames, db_name, deleteSql=True):
-    #     """
-    #     Function that ingests a TOML file into a sqlite database based on the given database name
-
-    #     `filenames`: name of TOML file or a list of TOML files to be ingested
-
-    #     `db_name`: name of database that TOML file should be added to. Database will be created if it does not exist in local directory.
-
-    #     `deleteSql`: flag to delete temp SQL file that creates the database. Default is True, but change to False for testing or comparing outputs
-    #     """
-
-    #     sql_statements = []
-    #     if isinstance(filenames, str):
-    #         filenames = [filenames]
-
-    #     with open(db_name+".sql", "w") as sql_file:
-    #         data = self.tomlDataToList(filenames)
-
-    #         for item in data:
-    #             tableName, tableData = item
-    #             data_types = {float: "FLOAT", str: "VARCHAR", int: "INT"}
-
-    #             if not os.path.isfile(db_name+".db") or os.path.getsize(db_name+".db") == 0:
-    #                 createStmt = f"CREATE TABLE IF NOT EXISTS {tableName} ( "
-    #                 createUnitStmt = f"CREATE TABLE IF NOT EXISTS {tableName}_units ( "
-    #                 insertUnitStmt = f"INSERT INTO {tableName}_units VALUES( "
-
-    #                 for key, val in tableData.items():
-    #                     createUnitStmt+= f"{key} VARCHAR, "
-    #                     if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
-    #                         createStmt += f"{key}{self.check_type(val[0])}, "
-    #                         insertUnitStmt+= f"'{val[1]}', "
-    #                     else:
-    #                         createStmt += f"{key} {data_types[type(val)]}, "
-    #                         insertUnitStmt+= "NULL, "
-
-    #                 if createStmt not in sql_statements:
-    #                     sql_statements.append(createStmt)
-    #                     sql_file.write(createStmt[:-2] + ");\n\n")
-    #                 if createUnitStmt not in sql_statements:
-    #                     sql_statements.append(createUnitStmt)
-    #                     sql_file.write(createUnitStmt[:-2] + ");\n\n")
-    #                 if insertUnitStmt not in sql_statements:
-    #                     sql_statements.append(insertUnitStmt)
-    #                     sql_file.write(insertUnitStmt[:-2] + ");\n\n")
-                
-    #             insertStmt = f"INSERT INTO {tableName} VALUES( "
-    #             for val in tableData.values():
-    #                 if type(val) == list and type(val[0]) == str and self.check_type(val[0]) in [" INT", " FLOAT"]:
-    #                     insertStmt+= f"{val[0]}, "
-    #                 elif type(val) == str:
-    #                     insertStmt+= f"'{val}', "
-    #                 else:
-    #                     insertStmt+= f"{val}, "
-
-    #             if insertStmt not in sql_statements:
-    #                 sql_statements.append(insertStmt)
-    #                 sql_file.write(insertStmt[:-2] + ");\n\n")
-
-    #     subprocess.run(["sqlite3", db_name+".db"], stdin= open(db_name+".sql", "r"))
-
-        # if deleteSql == True:
-        #     os.remove(db_name+".sql")
