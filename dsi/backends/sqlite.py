@@ -1,6 +1,6 @@
-import csv
+# import csv
 import sqlite3
-import json
+# import json
 import re
 import subprocess
 from datetime import datetime
@@ -70,22 +70,17 @@ class Sqlite(Filesystem):
 
         `types`: DataType derived class that defines the string name, properties
                  (named SQL type), and units for each column in the schema.
-
         `return`: none
         """
         col_names = ', '.join(types.unit_keys)
+        str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
         if self.run_flag:
-            str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), col_names)
-        else:
-            str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
-
+            str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), col_names)            
         if foreign_query != None:
             str_query += foreign_query
-        
         if self.run_flag:
-            str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id));"
-        else:
-            str_query += ");"
+            str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
+        str_query += ");"
 
         if isVerbose:
             print(str_query)
@@ -121,8 +116,6 @@ class Sqlite(Filesystem):
         # Core compatibility name assignment
         artifacts = collection
         
-        insertError = False
-        errorString = None
         if self.run_flag:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
@@ -130,17 +123,8 @@ class Sqlite(Filesystem):
 
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
-            if insertError == False:
-                try:
-                    self.cur.execute(runTable_insert)
-                except sqlite3.Error as e:
-                    if errorString is None:
-                        errorString = e
-                    insertError = True
-                    self.con.rollback()
-            else:
-                self.con.rollback()
-        
+            self.cur.execute(runTable_insert)
+
         for tableName, tableData in artifacts.items():
             if tableName == "dsi_relations" or tableName == "dsi_units":
                 continue
@@ -156,20 +140,22 @@ class Sqlite(Filesystem):
                 dsi_name = "dsi_relations"
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
                     foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
-                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {artifacts[dsi_name]['primary_key'][foreignIndex][0]} ({artifacts[dsi_name]['primary_key'][foreignIndex][1]})"
+                    primaryTuple = artifacts[dsi_name]['primary_key'][foreignIndex]
+                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
                 
                 types.properties[key.replace('-','_minus_')] = tableData[key]
-
+                
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
                     types.unit_keys.append(key + f"{self.check_type(str(tableData[key][0]))} PRIMARY KEY")
                 else:
                     types.unit_keys.append(key + self.check_type(str(tableData[key][0])))
             
-            if foreign_query != "":
-                self.put_artifact_type(types, foreign_query)
-            else:
-                self.put_artifact_type(types)
-        
+            self.put_artifact_type(types, foreign_query)
+            # if foreign_query != "":
+            #     self.put_artifact_type(types, foreign_query)
+            # else:
+            #     self.put_artifact_type(types)
+            
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
 
@@ -180,20 +166,17 @@ class Sqlite(Filesystem):
             else:
                 str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
             
-            rows = zip(*types.properties.values())
-            if insertError == False:
-                try:
-                    self.cur.executemany(str_query,rows)
-                except sqlite3.Error as e:
-                    if errorString is None:
-                        errorString = e
-                    insertError = True
-                    self.con.rollback()
-            else:
-                self.con.rollback()
-
             if isVerbose:
-                print(str_query)        
+                print(str_query)
+            
+            rows = zip(*types.properties.values())
+            try:
+                self.cur.executemany(str_query,rows)
+            except sqlite3.Error as e:
+                # print(tableName)
+                # print(list(zip(*types.properties.values())))
+                self.con.rollback()
+                return e
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
@@ -203,63 +186,275 @@ class Sqlite(Filesystem):
                 if len(tableData) > 0:
                     for col_unit_pair in tableData:
                         str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
-                        if insertError == False:
-                            try:
-                                self.cur.execute(str_query)
-                            except sqlite3.Error as e:
-                                if errorString is None:
-                                    errorString = e
-                                insertError = True
-                                self.con.rollback()
-                        else:
+                        try:
+                            self.cur.execute(str_query)
+                        except sqlite3.Error as e:
                             self.con.rollback()
-
+                            return e
+                        
         try:
-            assert insertError == False
             self.con.commit()
         except Exception as e:
             self.con.rollback()
-            if type(e) is AssertionError:
-                return errorString
-            else:
-                return e
+            return e
 
-    def put_artifacts_only(self, artifacts, isVerbose=False):
-        """
-        Function for insertion of Artifact metadata into a defined schema as a Tuple
-
-        `Artifacts`: DataType derived class that has a regular structure of a defined schema,
-                     filled with rows to insert.
-
-        `return`: none
-        """
-        self.types = artifacts
-
-        #self.types already defined previous
-        col_names = ', '.join(self.types.properties.keys())
-        placeholders = ', '.join('?' * len(self.types.properties))
-
-        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(self.types.name), col_names, placeholders)
+    # Returns text list from query
+    def get_artifacts(self, query, isVerbose=False, dict_return = False):
+        if query[:6].lower() == "select":
+            try:
+                data = self.cur.execute(query).fetchall()
+                if isVerbose:
+                    print(data)
+            except:
+                raise ValueError("Incorrect SELECT query on the data. Please try again")
+        else:
+            raise ValueError("Can only run SELECT queries on the data")
         
-        if isVerbose:
-            print(str_query)
+        if dict_return:
+            query_cols = [description[0] for description in self.cur.description]
 
-        # col_list helps access the specific keys of the dictionary in the for loop
-        col_list = col_names.split(', ')
+            tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+            # table_names = [table[0] or table[1] for table in tables]
+            if len(tables) > 1:
+                raise ValueError("Can only return ordered dictionary if query with one table")
+            # col_info = self.cur.execute(f"PRAGMA table_info({table_names[0]});").fetchall()
+            # complete_cols = [column[1] for column in col_info]
+            # if not set(query_cols).issubset(set(complete_cols)):
+            #     raise ValueError("Select query cannot create non-table columns when trying to return an ordered dictionary")
+            
+            queryDict = OrderedDict()
+            for row in data:
+                for colName, val in zip(query_cols, row):
+                    if colName not in queryDict.keys():
+                        queryDict[colName] = []
+                    queryDict[colName].append(val)
+            return queryDict
+        else:
+            return data
+    # reorganized old funcs, early return for put_artifacts insertion error and get_artifacts can return an orderedDict now
+    def inspect_artifacts(self, collection, interactive=False):
+        import nbconvert as nbc
+        import nbformat as nbf
+        dsi_relations, dsi_units = None, None
+        if "dsi_relations" in collection.keys():
+            dsi_relations = dict(collection["dsi_relations"])
+        if "dsi_units" in collection.keys():
+            dsi_units = dict(collection["dsi_units"])
 
-        # loop through the contents of each column and insert into table as a row
-        for ind1 in range(len(self.types.properties[col_list[0]])):
-            vals = []
-            for ind2 in range(len(self.types.properties.keys())):
-                if len(self.types.properties[col_list[ind2]]) <= ind1:
-                    vals.append(str(''))
-                    continue
-                vals.append(str(self.types.properties[col_list[ind2]][ind1]))
-            # Make sure this works if types.properties[][] is already a string
-            tup_vals = tuple(vals)
-            self.cur.execute(str_query,tup_vals)
+        nb = nbf.v4.new_notebook()
+        text = """\
+        This notebook was auto-generated by a DSI Backend for SQLite.
+        Depending on the data, there might be several tables stored in the DSI abstraction (OrderedDict).
+        Therefore, the data will be stored as a list of dataframes where each table corresponds to a dataframe.
+        Execute the Jupyter notebook cells below and interact with table_list to explore your data.
+        """
+        code1 = """\
+        import pandas as pd
+        import sqlite3
+        """
+        code2 = f"""\
+        dbPath = '{self.filename}'
+        conn = sqlite3.connect(dbPath)
+        tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
+        dsi_units = {dsi_units}
+        dsi_relations = {dsi_relations}
+        """
+        code3 = """\
+        table_list = []
+        for table_name in tables['name']:
+            if table_name not in ['dsi_relations', 'dsi_units', 'sqlite_sequence']:
+                query = 'SELECT * FROM ' + table_name
+                df = pd.read_sql_query(query, conn)
+                df.attrs['name'] = table_name
+                if dsi_units is not None and table_name in dsi_units:
+                    df.attrs['units'] = dsi_units[table_name]
+                table_list.append(df)
+        
+        if dsi_relations is not None:
+            df = pd.DataFrame(dsi_relations)
+            df.attrs['name'] = 'dsi_relations'
+            table_list.append(df)
+        """
+        code4 = """\
+        for table_df in table_list:
+            print(table_df.attrs)
+            print(table_df)
+            # table_df.info()
+            # table_df.describe()
+        """
 
-        self.con.commit()
+        nb['cells'] = [nbf.v4.new_markdown_cell(text),
+                       nbf.v4.new_code_cell(textwrap.dedent(code1)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code2)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code3)),
+                       nbf.v4.new_code_cell(textwrap.dedent(code4))]
+        
+        fname = 'dsi_sqlite_backend_output.ipynb'
+        print('Writing Jupyter notebook...')
+        with open(fname, 'w') as fh:
+            nbf.write(nb, fh)
+
+        # open the jupyter notebook for static page generation
+        with open(fname, 'r', encoding='utf-8') as fh:
+            nb_content = nbf.read(fh, as_version=4)
+        run_nb = nbc.preprocessors.ExecutePreprocessor(timeout=-1) # No timeout
+        run_nb.preprocess(nb_content, {'metadata':{'path':'.'}})
+
+        if interactive:
+            print('Opening Jupyter notebook...')
+            
+            proc = subprocess.run(['jupyter-lab ./dsi_sqlite_backend_output.ipynb'], capture_output=True, shell=True)
+            if proc.stderr != b"":
+                raise Exception(proc.stderr)
+            return proc.stdout.strip().decode("utf-8")
+        else:
+            # Init HTML exporter
+            html_exporter = nbc.HTMLExporter()
+            html_content,_ = html_exporter.from_notebook_node(nb_content)
+            # Save HTML file
+            html_filename = 'dsi_sqlite_backend_output.html'
+            with open(html_filename, 'w', encoding='utf-8') as fh:
+                fh.write(html_content)
+
+
+    # SQLITE READER CLASS
+    def read_to_artifact(self, query = None):
+        # if query is not None and query[:6].lower() == "select":
+        #     try:
+        #         queryData = self.cur.execute(query).fetchall()
+        #     except:
+        #         raise ValueError("Incorrect SELECT query on the data. Please try again")
+        #     query_cols = [description[0] for description in self.cur.description]
+        #     queryDict = OrderedDict()
+        #     for col in query_cols:
+        #         queryDict[col] = []
+        #     tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+        #     table_names = [table[0] or table[1] for table in tables]
+        #     if len(table_names) > 1:
+        #         raise ValueError("Can only run select query with one table here")
+        # elif query is not None and query[:6].lower() != "select":
+        #     raise ValueError("Can only run SELECT queries on the data")
+        
+        artifact = OrderedDict()
+        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
+
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        pkList = []
+        for item in tableList:
+            tableName = item[0]
+            if tableName == "dsi_units":
+                artifact["dsi_units"] = self.read_units_helper()
+                continue
+
+            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
+            colDict = OrderedDict()
+            for colInfo in tableInfo:
+                colDict[colInfo[1]] = []
+                if colInfo[5] == 1:
+                    pkList.append((tableName, colInfo[1]))
+
+            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
+            # if query is not None:
+            #     data = queryData
+            #     colDict = queryDict
+            for row in data:
+                for colName, val in zip(colDict.keys(), row):
+                    colDict[colName].append(val)
+            artifact[tableName] = colDict
+
+            fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
+            for row in fkData:
+                artifact["dsi_relations"]["primary_key"].append((row[2], row[4]))
+                artifact["dsi_relations"]["foreign_key"].append((tableName, row[3]))
+                if (row[2], row[4]) in pkList:
+                    pkList.remove((row[2], row[4]))
+
+        for pk_tuple in pkList:
+            if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
+                artifact["dsi_relations"]["primary_key"].append(pk_tuple)
+                artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
+
+        if len(artifact["dsi_relations"]["primary_key"]) == 0:
+            del artifact["dsi_relations"]
+
+        return artifact
+      
+    def read_units_helper(self):
+        unitsDict = OrderedDict()
+        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
+        for row in unitsTable:
+            tableName = row[0]
+            if tableName not in unitsDict.keys():
+                unitsDict[tableName] = []
+            unitsDict[tableName].append(eval(row[1]))
+        return unitsDict
+
+    # Closes connection to server
+    def close(self):
+        self.con.close()
+    
+    # OLD GET ARTIFACTS FUNCTION
+    # OLD GET ARTIFACTS FUNCTION
+    # OLD GET ARTIFACTS FUNCTION
+    # def get_artifact_list(self, query, isVerbose=False):
+    #     """
+    #     Function that returns a list of all of the Artifact names (represented as sql tables)
+
+    #     `return`: list of Artifact names
+    #     """
+    #     str_query = query
+    #     if isVerbose:
+    #         print(str_query)
+
+    #     resout = self.cur.execute(str_query).fetchall()
+
+    #     if isVerbose:
+    #         print(resout)
+
+    #     return resout
+
+    """
+    OLD PASS THROUGH PUT ARTIFACT FUNCTIONS
+    OLD PASS THROUGH PUT ARTIFACT FUNCTIONS
+    OLD PASS THROUGH PUT ARTIFACT FUNCTIONS
+    """
+    # def put_artifacts_only(self, artifacts, isVerbose=False):
+    #     """
+    #     Function for insertion of Artifact metadata into a defined schema as a Tuple
+
+    #     `Artifacts`: DataType derived class that has a regular structure of a defined schema,
+    #                  filled with rows to insert.
+
+    #     `return`: none
+    #     """
+    #     self.types = artifacts
+
+    #     #self.types already defined previous
+    #     col_names = ', '.join(self.types.properties.keys())
+    #     placeholders = ', '.join('?' * len(self.types.properties))
+
+    #     str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(self.types.name), col_names, placeholders)
+        
+    #     if isVerbose:
+    #         print(str_query)
+
+    #     # col_list helps access the specific keys of the dictionary in the for loop
+    #     col_list = col_names.split(', ')
+
+    #     # loop through the contents of each column and insert into table as a row
+    #     for ind1 in range(len(self.types.properties[col_list[0]])):
+    #         vals = []
+    #         for ind2 in range(len(self.types.properties.keys())):
+    #             if len(self.types.properties[col_list[ind2]]) <= ind1:
+    #                 vals.append(str(''))
+    #                 continue
+    #             vals.append(str(self.types.properties[col_list[ind2]][ind1]))
+    #         # Make sure this works if types.properties[][] is already a string
+    #         tup_vals = tuple(vals)
+    #         self.cur.execute(str_query,tup_vals)
+
+    #     self.con.commit()
 
      # Adds rows to the columns defined previously
     def put_artifacts_lgcy(self,artifacts, isVerbose=False):
@@ -288,52 +483,52 @@ class Sqlite(Filesystem):
         self.cur.execute(str_query)
         self.con.commit()
 
-    def put_artifacts_json(self, fname, tname, isVerbose=False):
-        """
-        Function for insertion of Artifact metadata into a defined schema by using a JSON file
-        `fname`: filepath to the .json file to be read and inserted into the database
+    # def put_artifacts_json(self, fname, tname, isVerbose=False):
+    #     """
+    #     Function for insertion of Artifact metadata into a defined schema by using a JSON file
+    #     `fname`: filepath to the .json file to be read and inserted into the database
 
-        `tname`: String name of the table to be inserted
+    #     `tname`: String name of the table to be inserted
 
-        `return`: none
-        """
+    #     `return`: none
+    #     """
 
-        json_str = None
-        try:
-            j = open(fname)
-            data = json.load(j)
-            json_str = json.dumps(data)
-            json_str = "'" + json_str + "'"
-            j.close()
-        except IOError as i:
-            print(i)
-            return
-        except ValueError as v:
-            print(v)
-            return
+    #     json_str = None
+    #     try:
+    #         j = open(fname)
+    #         data = json.load(j)
+    #         json_str = json.dumps(data)
+    #         json_str = "'" + json_str + "'"
+    #         j.close()
+    #     except IOError as i:
+    #         print(i)
+    #         return
+    #     except ValueError as v:
+    #         print(v)
+    #         return
 
-        types = DataType()
-        types.properties = {}
-        types.name = tname
+    #     types = DataType()
+    #     types.properties = {}
+    #     types.name = tname
         
-        # Check if this has been defined from helper function
-        if self.types != None:
-            types.name = self.types.name
+    #     # Check if this has been defined from helper function
+    #     if self.types != None:
+    #         types.name = self.types.name
 
-        col_name = re.sub(r'.json', '', fname)
-        col_name = re.sub(r'.*/', '', col_name)
-        col_name = "'" + col_name + "'"
-        types.properties[col_name] = JSON
+    #     col_name = re.sub(r'.json', '', fname)
+    #     col_name = re.sub(r'.*/', '', col_name)
+    #     col_name = "'" + col_name + "'"
+    #     types.properties[col_name] = JSON
            
-        self.put_artifact_type(types)
-        col_names = ', '.join(types.properties.keys())
-        str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, json_str)
-        if isVerbose:
-            print(str_query)
+    #     self.put_artifact_type(types)
+    #     col_names = ', '.join(types.properties.keys())
+    #     str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, json_str)
+    #     if isVerbose:
+    #         print(str_query)
 
-        self.types = types
-        self.cur.execute(str_query)
-        self.con.commit()
+    #     self.types = types
+    #     self.cur.execute(str_query)
+    #     self.con.commit()
 
     # Adds columns and rows automaticallly based on a csv file
     #[NOTE 3] This method should be deprecated in favor of put_artifacts.
@@ -398,115 +593,6 @@ class Sqlite(Filesystem):
     #         if isVerbose:
     #             print("Read " + str(line_count) + " rows.")
     #   #[END NOTE 2]
-
-    # Returns text list from query
-    def get_artifact_list(self, query, isVerbose=False):
-        """
-        Function that returns a list of all of the Artifact names (represented as sql tables)
-
-        `return`: list of Artifact names
-        """
-        str_query = query
-        if isVerbose:
-            print(str_query)
-
-        self.cur = self.con.cursor()
-        self.res = self.cur.execute(str_query)
-        resout = self.res.fetchall()
-
-        if isVerbose:
-            print(resout)
-
-        return resout
-
-    # Returns reference from query
-    def get_artifacts(self, query, isVerbose=False):
-        data = self.get_artifact_list(query)
-        return data
-
-    def inspect_artifacts(self, collection, interactive=False):
-        import nbconvert as nbc
-        import nbformat as nbf
-
-        dsi_relations = dict(collection["dsi_relations"])
-        dsi_units = dict(collection["dsi_units"])
-
-        nb = nbf.v4.new_notebook()
-        text = """\
-        This notebook was auto-generated by a DSI Backend for SQLite.
-        Due to the possibility of several tables stored in the DSI abstraction (OrderedDict), the data is stored as several dataframes in a list
-        Execute the Jupyter notebook cells below and interact with table_list to explore your data.
-        """
-        code1 = """\
-        import pandas as pd
-        import sqlite3
-        """
-        code2 = f"""\
-        dbPath = '{self.filename}'
-        conn = sqlite3.connect(dbPath)
-        tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
-        dsi_units = {dsi_units}
-        dsi_relations = {dsi_relations}
-        """
-        code3 = """\
-        table_list = []
-        for table_name in tables['name']:
-            if table_name not in ['dsi_relations', 'dsi_units', 'sqlite_sequence']:
-                query = 'SELECT * FROM ' + table_name
-                df = pd.read_sql_query(query, conn)
-                df.attrs['name'] = table_name
-                if table_name in dsi_units:
-                    df.attrs['units'] = dsi_units[table_name]
-                table_list.append(df)
-        
-        df = pd.DataFrame(dsi_relations)
-        df.attrs['name'] = 'dsi_relations'
-        table_list.append(df)
-        """
-        code4 = """\
-        for table_df in table_list:
-            print(table_df.attrs)
-            print(table_df)
-            # table_df.info()
-            # table_df.describe()
-        """
-
-        nb['cells'] = [nbf.v4.new_markdown_cell(text),
-                       nbf.v4.new_code_cell(textwrap.dedent(code1)),
-                       nbf.v4.new_code_cell(textwrap.dedent(code2)),
-                       nbf.v4.new_code_cell(textwrap.dedent(code3)),
-                       nbf.v4.new_code_cell(textwrap.dedent(code4))]
-        
-        fname = 'dsi_sqlite_backend_output.ipynb'
-        print('Writing Jupyter notebook...')
-        with open(fname, 'w') as fh:
-            nbf.write(nb, fh)
-
-        # open the jupyter notebook for static page generation
-        with open(fname, 'r', encoding='utf-8') as fh:
-            nb_content = nbf.read(fh, as_version=4)
-        run_nb = nbc.preprocessors.ExecutePreprocessor(timeout=-1) # No timeout
-        run_nb.preprocess(nb_content, {'metadata':{'path':'.'}})
-
-        if interactive:
-            print('Opening Jupyter notebook...')
-            
-            proc = subprocess.run(['jupyter-lab ./dsi_sqlite_backend_output.ipynb'], capture_output=True, shell=True)
-            if proc.stderr != b"":
-                raise Exception(proc.stderr)
-            return proc.stdout.strip().decode("utf-8")
-        else:
-            # Init HTML exporter
-            html_exporter = nbc.HTMLExporter()
-            html_content,_ = html_exporter.from_notebook_node(nb_content)
-            # Save HTML file
-            html_filename = 'dsi_sqlite_backend_output.html'
-            with open(html_filename, 'w', encoding='utf-8') as fh:
-                fh.write(html_content)
-
-    # Closes connection to server
-    def close(self):
-        self.con.close()
 
     # ------- Query related functions -----
     # Raw sql query
@@ -584,85 +670,36 @@ class Sqlite(Filesystem):
 
     #     return 1
 
-    def export_csv(self, rquery, tname, fname, isVerbose=False):
-        """
-        Function that outputs a csv file of a return query, not the query itself
+    # def export_csv(self, rquery, tname, fname, isVerbose=False):
+    #     """
+    #     Function that outputs a csv file of a return query, not the query itself
 
-        `rquery`: return of an already called query output
+    #     `rquery`: return of an already called query output
 
-        `tname`: name of the table for (all) columns to export
+    #     `tname`: name of the table for (all) columns to export
 
-        `fname`: target filename (including path) that will output the return query as a csv file
+    #     `fname`: target filename (including path) that will output the return query as a csv file
 
-        `return`: none
-        """
-        if isVerbose:
-            print(rquery)
+    #     `return`: none
+    #     """
+    #     if isVerbose:
+    #         print(rquery)
 
-        self.cur = self.con.cursor()
-        cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-        cnames = [entry[1] for entry in cdata]
-        if isVerbose:
-            print(cnames)
+    #     self.cur = self.con.cursor()
+    #     cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+    #     cnames = [entry[1] for entry in cdata]
+    #     if isVerbose:
+    #         print(cnames)
 
-        with open(fname, "w+") as ocsv:
-            csvWriter = csv.writer(ocsv, delimiter=',')
-            csvWriter.writerow(cnames)
+    #     with open(fname, "w+") as ocsv:
+    #         csvWriter = csv.writer(ocsv, delimiter=',')
+    #         csvWriter.writerow(cnames)
 
-            for row in rquery:
-                print(row)
-                csvWriter.writerow(row)
+    #         for row in rquery:
+    #             print(row)
+    #             csvWriter.writerow(row)
 
-        return 1
-    
-    # Sqlite reader class
-    def read_to_artifact(self):
-        artifact = OrderedDict()
-        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
-
-        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        pkList = []
-        for item in tableList:
-            tableName = item[0]
-            if tableName == "dsi_units":
-                artifact["dsi_units"] = self.read_units_helper()
-                continue
-
-            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
-            colDict = OrderedDict()
-            for colInfo in tableInfo:
-                colDict[colInfo[1]] = []
-                if colInfo[5] == 1:
-                    pkList.append((tableName, colInfo[1]))
-
-            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
-            for row in data:
-                for colName, val in zip(colDict.keys(), row):
-                    colDict[colName].append(val)
-            artifact[tableName] = colDict
-
-            fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
-            for row in fkData:
-                artifact["dsi_relations"]["primary_key"].append((row[2], row[4]))
-                artifact["dsi_relations"]["foreign_key"].append((tableName, row[3]))
-                if (row[2], row[4]) in pkList:
-                    pkList.remove((row[2], row[4]))
-
-        for pk_tuple in pkList:
-            if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
-                artifact["dsi_relations"]["primary_key"].append(pk_tuple)
-                artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
-        return artifact
-      
-    def read_units_helper(self):
-        unitsDict = OrderedDict()
-        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
-        for row in unitsTable:
-            tableName = row[0]
-            if tableName not in unitsDict.keys():
-                unitsDict[tableName] = []
-            unitsDict[tableName].append(eval(row[1]))
-        return unitsDict
+    #     return 1
 
     '''UNUSED QUERY FUNCTIONS'''
     
