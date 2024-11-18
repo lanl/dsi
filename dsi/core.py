@@ -212,6 +212,13 @@ class Terminal():
                     start = datetime.now()
                     obj.add_rows(**kwargs)
                     for table_name, table_metadata in obj.output_collector.items():
+                        if "hostname" in table_name.lower():
+                            for colName, colData in table_metadata.items():
+                                if isinstance(colData[0], list):
+                                    str_list = []
+                                    for val in colData:
+                                        str_list.append(f'{val}')
+                                    table_metadata[colName] = str_list
                         if table_name not in self.active_metadata.keys():
                             self.active_metadata[table_name] = table_metadata
                         else:

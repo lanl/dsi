@@ -132,38 +132,59 @@ class Bueno(FileReader):
 
     def __init__(self, filenames, **kwargs) -> None:
         super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
         self.bueno_data = OrderedDict()
 
-    def pack_header(self) -> None:
-        """Set schema with POSIX and Bueno data."""
-        column_names = list(self.bueno_data.keys())
-        self.set_schema(column_names)
+    # def pack_header(self) -> None:
+    #     """Set schema with POSIX and Bueno data."""
+    #     column_names = list(self.bueno_data.keys())
+    #     self.set_schema(column_names)
 
     def add_rows(self) -> None:
         """Parses Bueno data and adds a list containing 1 or more rows."""
-        if not self.schema_is_set():
-            for idx, filename in enumerate(self.filenames):
-                with open(filename, 'r') as fh:
-                    file_content = json.load(fh)
-                for key, val in file_content.items():
-                    # Check if column already exists
-                    if key not in self.bueno_data:
-                        # Initialize empty column if first time seeing it
-                        self.bueno_data[key] = [None] \
-                            * len(self.filenames)
-                    # Set the appropriate row index value for this keyval_pair
-                    self.bueno_data[key][idx] = val
-            self.pack_header()
+        for filename in self.filenames:
+            with open(filename, 'r') as fh:
+                file_content = json.load(fh)
+            for key, val in file_content.items():
+                if key not in self.bueno_data:
+                    self.bueno_data[key] = []
+                self.bueno_data[key].append(val)
 
-        rows = list(self.bueno_data.values())
-        self.add_to_output(rows)
-        # Flatten multiple samples of the same file.
-        try:
-            for col, rows in self.output_collector["Bueno"].items():
-                self.output_collector["Bueno"][col] = rows[0] + rows[1]
-        except IndexError:
-            # First pass. Nothing to do.
-            pass
+        max_length = max(len(lst) for lst in self.bueno_data.values())
+
+        # Fill the shorter lists with None (or another value)
+        for key, value in self.bueno_data.items():
+            if len(value) < max_length:
+                # Pad the list with None (or any other value)
+                self.bueno_data[key] = value + [None] * (max_length - len(value))
+        
+        self.set_schema_2(self.bueno_data)
+
+        # for idx, filename in enumerate(self.filenames):
+        #     with open(filename, 'r') as fh:
+        #         file_content = json.load(fh)
+        #     for key, val in file_content.items():
+        #         # Check if column already exists
+        #         if key not in self.bueno_data:
+        #             # Initialize empty column if first time seeing it
+        #             self.bueno_data[key] = [None] \
+        #                 * len(self.filenames)
+        #         # Set the appropriate row index value for this keyval_pair
+        #         self.bueno_data[key][idx] = val
+        # self.pack_header()
+
+        # rows = list(self.bueno_data.values())
+        # self.add_to_output(rows)
+        # # Flatten multiple samples of the same file.
+        # try:
+        #     for col, rows in self.output_collector["Bueno"].items():
+        #         self.output_collector["Bueno"][col] = rows[0] + rows[1]
+        # except IndexError:
+        #     # First pass. Nothing to do.
+        #     pass
 
 class JSON(FileReader):
     """
