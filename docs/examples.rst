@@ -66,7 +66,7 @@ Finally, the database is queried:
    def test_artifact_query(test_name):
       dbpath = "pennant_" + test_name + ".db"
       store = Sqlite(dbpath)
-      _ = store.get_artifact_list(isVerbose=isVerbose)
+      _ = store.get_artifacts(isVerbose=isVerbose)
       data_type = DataType()
       data_type.name = "rundata"
       query = "SELECT * FROM " + str(data_type.name) + \
