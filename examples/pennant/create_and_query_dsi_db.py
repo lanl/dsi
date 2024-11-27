@@ -9,7 +9,6 @@ import argparse
 import sys
 from dsi.backends.sqlite import Sqlite, DataType
 import os
-
 from dsi.core import Terminal
 
 isVerbose = True
@@ -58,30 +57,20 @@ if __name__ == "__main__":
     output_csv = "pennant_read_query.csv"
 
     #read in csv
-    core = Terminal()
+    core = Terminal(run_table_flag=False)
     core.load_module('plugin', "Csv", "reader", filenames = csvpath, table_name = table_name)
-    core.transload()
 
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    #load to sqlite db
-    core.load_module('backend','Sqlite','back-write', filename=dbpath, run_table = False)
+
+    #load data into sqlite db
+    core.load_module('backend','Sqlite','back-write', filename=dbpath)
     core.artifact_handler(interaction_type='put')
 
-    #OLD -- read in csv and load to sqlite db
-    # import_pennant_data(test_name)
-
-    # update dsi abstraction using query to sqlite db
+    # update dsi abstraction using a query to the sqlite db
     query_data = core.artifact_handler(interaction_type='get', query = f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", dict_return = True)
     core.update_abstraction(table_name, query_data)
-
-    # ALTERNATE WAY TO UPDATE DB
-    # core.load_module('backend','Sqlite','back-read', filename=dbpath, run_table = False)
-    # core.artifact_handler(interaction_type='read', query=f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;")
 
     #export to csv
     core.load_module('plugin', "Csv_Writer", "writer", filename = output_csv, table_name = table_name)
     core.transload()
-
-    #OLD -- get part of db and export that to a csv
-    # test_artifact_query(test_name)
