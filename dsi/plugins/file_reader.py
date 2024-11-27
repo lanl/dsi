@@ -64,7 +64,7 @@ class Csv(FileReader):
         for filename in self.filenames:
             temp_df = read_csv(filename)
             try:
-                total_df = concat([total_df, temp_df])
+                total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
             except:
                 raise ValueError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
 
@@ -145,21 +145,37 @@ class Bueno(FileReader):
 
     def add_rows(self) -> None:
         """Parses Bueno data and adds a list containing 1 or more rows."""
+        file_counter = 0
+        total_df = DataFrame()
         for filename in self.filenames:
             with open(filename, 'r') as fh:
                 file_content = json.load(fh)
-            for key, val in file_content.items():
-                if key not in self.bueno_data:
-                    self.bueno_data[key] = []
-                self.bueno_data[key].append(val)
+            temp_df = DataFrame([file_content])
+            total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
 
-        max_length = max(len(lst) for lst in self.bueno_data.values())
+        #convert total_df to ordered dict
+        self.bueno_data = OrderedDict(total_df.to_dict(orient='list'))
+        for col, coldata in self.bueno_data.items():  # replace NaNs with None
+            self.bueno_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
 
-        # Fill the shorter lists with None (or another value)
-        for key, value in self.bueno_data.items():
-            if len(value) < max_length:
-                # Pad the list with None (or any other value)
-                self.bueno_data[key] = value + [None] * (max_length - len(value))
+        #     for key, val in file_content.items():
+        #         if key not in self.bueno_data:
+        #             new_list = []
+        #             if self.bueno_data and file_counter > 0:
+        #                 curr_len = len(self.bueno_data[next(iter(self.bueno_data))])
+        #                 if curr_len > 0:
+        #                     new_list = [None] * (curr_len -1)
+        #             self.bueno_data[key] = new_list
+        #         self.bueno_data[key].append(val)
+        #     file_counter += 1
+
+        # max_length = max(len(lst) for lst in self.bueno_data.values())
+
+        # # Fill the shorter lists with None (or another value)
+        # for key, value in self.bueno_data.items():
+        #     if len(value) < max_length:
+        #         # Pad the list with None (or any other value)
+        #         self.bueno_data[key] = value + [None] * (max_length - len(value))
         
         self.set_schema_2(self.bueno_data)
 
@@ -267,7 +283,7 @@ class Schema(FileReader):
             for pk in pkList:
                 if pk not in self.schema_data["dsi_relations"]["primary_key"]:
                     self.schema_data["dsi_relations"]["primary_key"].append(pk)
-                    self.schema_data["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
+                    self.schema_data["dsi_relations"]["foreign_key"].append((None, None))
             self.set_schema_2(self.schema_data)
 
         # if not self.schema_is_set():
@@ -339,6 +355,7 @@ class YAML1(FileReader):
         """
         Parses YAML data and creates an ordered dict which stores an ordered dict for each table.
         """
+        file_counter = 0        
         for filename in self.yaml_files:
             with open(filename, 'r') as yaml_file:
                 editedString = yaml_file.read()
@@ -356,18 +373,29 @@ class YAML1(FileReader):
                         self.yaml_data[tableName] = OrderedDict()
                     unitsList = []
                     for col_name, data in table["columns"].items():
-                        unit_data = "NULL"
+                        unit_data = None
                         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
-                            unit_data = data[data.find(' ')+1:]
+                            unit_data = data[data.find(" ")+1:]
                             data = self.check_type(data[:data.find(" ")])
                         if col_name not in self.yaml_data[tableName].keys():
-                            self.yaml_data[tableName][col_name] = []
+                            self.yaml_data[tableName][col_name] = [None] * (file_counter)
                         self.yaml_data[tableName][col_name].append(data)
-                        if unit_data != "NULL" and (col_name, unit_data) not in unitsList:
+                        if unit_data is not None and (col_name, unit_data) not in unitsList:
                             unitsList.append((col_name, unit_data))
-                    if len(unitsList) > 0 and tableName not in self.yaml_data["dsi_units"].keys():
-                        self.yaml_data["dsi_units"][tableName] = unitsList
+                    if len(unitsList) > 0:
+                        if tableName not in self.yaml_data["dsi_units"].keys():
+                            self.yaml_data["dsi_units"][tableName] = unitsList
+                        else:
+                            self.yaml_data["dsi_units"][tableName] += list(set(unitsList) - set(self.yaml_data["dsi_units"][tableName]))
 
+                    max_length = max(len(lst) for lst in self.yaml_data[tableName].values())
+                    for key, value in self.yaml_data[tableName].items():
+                        if len(value) < max_length:
+                            self.yaml_data[tableName][key] = value + [None] * (max_length - len(value))
+            file_counter += 1
+        
+        if len(self.yaml_data["dsi_units"]) == 0:
+            del self.yaml_data["dsi_units"]
         self.set_schema_2(self.yaml_data)
 
                 # if not self.schema_is_set():
@@ -432,6 +460,7 @@ class TOML1(FileReader):
         """
         Parses TOML data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
         """
+        file_counter = 0
         for filename in self.toml_files:
             # with open(filename, 'r+') as temp_file:
             #     editedString = temp_file.read()
@@ -454,7 +483,7 @@ class TOML1(FileReader):
                     self.toml_data[tableName] = OrderedDict()
                 unitsList = []
                 for col_name, data in tableData.items():
-                    unit_data = "NULL"
+                    unit_data = None
                     if isinstance(data, dict):
                         unit_data = data["units"]
                         data = data["value"]
@@ -464,13 +493,24 @@ class TOML1(FileReader):
                     #     unit_data = data["units"]
                     #     data = data["value"]
                     if col_name not in self.toml_data[tableName].keys():
-                        self.toml_data[tableName][col_name] = []
+                        self.toml_data[tableName][col_name] = [None] * (file_counter)
                     self.toml_data[tableName][col_name].append(data)
-                    if unit_data != "NULL" and (col_name, unit_data) not in unitsList:
+                    if unit_data is not None and (col_name, unit_data) not in unitsList:
                         unitsList.append((col_name, unit_data))
-                if len(unitsList) > 0 and tableName not in self.toml_data["dsi_units"].keys():
-                    self.toml_data["dsi_units"][tableName] = unitsList
+                if len(unitsList) > 0:
+                        if tableName not in self.toml_data["dsi_units"].keys():
+                            self.toml_data["dsi_units"][tableName] = unitsList
+                        else:
+                            self.toml_data["dsi_units"][tableName] += list(set(unitsList) - set(self.toml_data["dsi_units"][tableName]))
 
+                max_length = max(len(lst) for lst in self.toml_data[tableName].values())
+                for key, value in self.toml_data[tableName].items():
+                    if len(value) < max_length:
+                        self.toml_data[tableName][key] = value + [None] * (max_length - len(value))
+            file_counter += 1
+
+        if len(self.toml_data["dsi_units"]) == 0:
+            del self.toml_data["dsi_units"]
         self.set_schema_2(self.toml_data)
 
             # if not self.schema_is_set():
