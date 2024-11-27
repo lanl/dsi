@@ -42,7 +42,7 @@ class Sqlite(Filesystem):
     con = None
     cur = None
 
-    def __init__(self, filename, run_table = True):
+    def __init__(self, filename, run_table):
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
@@ -72,39 +72,31 @@ class Sqlite(Filesystem):
                  (named SQL type), and units for each column in the schema.
         `return`: none
         """
-        col_names = ', '.join(types.unit_keys)
-        str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), col_names)
-        if self.run_flag:
-            str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), col_names)            
-        if foreign_query != None:
-            str_query += foreign_query
-        if self.run_flag:
-            str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
-        str_query += ");"
+        if self.cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{types.name}';").fetchone():
+            col_names = types.properties.keys()
+            col_info = self.cur.execute(f"PRAGMA table_info({types.name});").fetchall()
+            query_cols = [column[1] for column in col_info]
+            diff_cols = list(set(col_names) - set(query_cols))
+            if len(diff_cols) > 0:
+                for col in diff_cols:
+                    temp_name = col + self.check_type(str(types.properties[col][0]))
+                    self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
+        else:
+            sql_cols = ', '.join(types.unit_keys)
+            str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
+            if self.run_flag:
+                str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), sql_cols)            
+            if foreign_query != None:
+                str_query += foreign_query
+            if self.run_flag:
+                str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
+            str_query += ");"
 
-        if isVerbose:
-            print(str_query)
-        self.cur.execute(str_query)
-        self.types = types
+            if isVerbose:
+                print(str_query)
+            self.cur.execute(str_query)
+            self.types = types
 
-    def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
-        """
-        Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
-
-        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
-                     filled with rows to insert.
-
-        `tableName`: A passthrough to define a table and set the name of a table
-
-        `return`: none
-        """ 
-
-        # Define table name in local class space
-        self.types = DataType()
-        self.types.name = tableName
-        self.put_artifacts(collection, isVerbose)
-
-    # Adds rows to the columns defined previously
     def put_artifacts(self, collection, isVerbose=False):
         """
         Primary class for insertion of collection of Artifacts metadata into a defined schema
@@ -151,10 +143,6 @@ class Sqlite(Filesystem):
                     types.unit_keys.append(key + self.check_type(str(tableData[key][0])))
             
             self.put_artifact_type(types, foreign_query)
-            # if foreign_query != "":
-            #     self.put_artifact_type(types, foreign_query)
-            # else:
-            #     self.put_artifact_type(types)
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -165,7 +153,6 @@ class Sqlite(Filesystem):
                 str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
             else:
                 str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-            
             if isVerbose:
                 print(str_query)
             
@@ -173,10 +160,9 @@ class Sqlite(Filesystem):
             try:
                 self.cur.executemany(str_query,rows)
             except sqlite3.Error as e:
-                # print(tableName)
-                # print(list(zip(*types.properties.values())))
                 self.con.rollback()
                 return e
+                
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
@@ -206,9 +192,9 @@ class Sqlite(Filesystem):
                 if isVerbose:
                     print(data)
             except:
-                raise ValueError("Incorrect SELECT query on the data. Please try again")
+                raise ValueError("Error in get_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            raise ValueError("Can only run SELECT queries on the data")
+            raise ValueError("Error in get_artifacts handler: Can only run SELECT queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
@@ -216,7 +202,7 @@ class Sqlite(Filesystem):
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
             # table_names = [table[0] or table[1] for table in tables]
             if len(tables) > 1:
-                raise ValueError("Can only return ordered dictionary if query with one table")
+                raise ValueError("Error in get_artifacts handler: Can only return ordered dictionary if query with one table")
             # col_info = self.cur.execute(f"PRAGMA table_info({table_names[0]});").fetchall()
             # complete_cols = [column[1] for column in col_info]
             # if not set(query_cols).issubset(set(complete_cols)):
@@ -231,7 +217,7 @@ class Sqlite(Filesystem):
             return queryDict
         else:
             return data
-    # reorganized old funcs, early return for put_artifacts insertion error and get_artifacts can return an orderedDict now
+
     def inspect_artifacts(self, collection, interactive=False):
         import nbconvert as nbc
         import nbformat as nbf
@@ -256,25 +242,41 @@ class Sqlite(Filesystem):
         dbPath = '{self.filename}'
         conn = sqlite3.connect(dbPath)
         tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
-        dsi_units = {dsi_units}
-        dsi_relations = {dsi_relations}
         """
+        if dsi_units is not None:
+            code2 += f"""dsi_units = {dsi_units}
+        """
+        if dsi_relations is not None:
+            code2 += f"""dsi_relations = {dsi_relations}
+        """
+            
         code3 = """\
         table_list = []
         for table_name in tables['name']:
-            if table_name not in ['dsi_relations', 'dsi_units', 'sqlite_sequence']:
+            if table_name not in ["""
+        if dsi_units is not None:
+            code3 += "'dsi_units', "
+        if dsi_relations is not None:
+            code3 += "'dsi_relations', "
+        code3+="""'sqlite_sequence']:
                 query = 'SELECT * FROM ' + table_name
                 df = pd.read_sql_query(query, conn)
                 df.attrs['name'] = table_name
-                if dsi_units is not None and table_name in dsi_units:
+                """
+        if dsi_units is not None:
+            code3+= """if table_name in dsi_units:
                     df.attrs['units'] = dsi_units[table_name]
-                table_list.append(df)
+                """
+        code3+= """table_list.append(df)
+        """
         
         if dsi_relations is not None:
-            df = pd.DataFrame(dsi_relations)
-            df.attrs['name'] = 'dsi_relations'
-            table_list.append(df)
+            code3+= """
+        df = pd.DataFrame(dsi_relations)
+        df.attrs['name'] = 'dsi_relations'
+        table_list.append(df)
         """
+        
         code4 = """\
         for table_df in table_list:
             print(table_df.attrs)
@@ -316,25 +318,8 @@ class Sqlite(Filesystem):
             with open(html_filename, 'w', encoding='utf-8') as fh:
                 fh.write(html_content)
 
-
-    # SQLITE READER CLASS
-    def read_to_artifact(self, query = None):
-        # if query is not None and query[:6].lower() == "select":
-        #     try:
-        #         queryData = self.cur.execute(query).fetchall()
-        #     except:
-        #         raise ValueError("Incorrect SELECT query on the data. Please try again")
-        #     query_cols = [description[0] for description in self.cur.description]
-        #     queryDict = OrderedDict()
-        #     for col in query_cols:
-        #         queryDict[col] = []
-        #     tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
-        #     table_names = [table[0] or table[1] for table in tables]
-        #     if len(table_names) > 1:
-        #         raise ValueError("Can only run select query with one table here")
-        # elif query is not None and query[:6].lower() != "select":
-        #     raise ValueError("Can only run SELECT queries on the data")
-        
+    # SQLITE READER FUNCTION
+    def read_to_artifact(self):
         artifact = OrderedDict()
         artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
 
@@ -354,12 +339,12 @@ class Sqlite(Filesystem):
                     pkList.append((tableName, colInfo[1]))
 
             data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
-            # if query is not None:
-            #     data = queryData
-            #     colDict = queryDict
             for row in data:
                 for colName, val in zip(colDict.keys(), row):
-                    colDict[colName].append(val)
+                    if val == "NULL":
+                        colDict[colName].append(None)
+                    else:
+                        colDict[colName].append(val)
             artifact[tableName] = colDict
 
             fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
@@ -372,8 +357,7 @@ class Sqlite(Filesystem):
         for pk_tuple in pkList:
             if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
                 artifact["dsi_relations"]["primary_key"].append(pk_tuple)
-                artifact["dsi_relations"]["foreign_key"].append(("NULL", "NULL"))
-        artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
+                artifact["dsi_relations"]["foreign_key"].append((None, None))
 
         if len(artifact["dsi_relations"]["primary_key"]) == 0:
             del artifact["dsi_relations"]
@@ -393,6 +377,23 @@ class Sqlite(Filesystem):
     # Closes connection to server
     def close(self):
         self.con.close()
+
+    def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
+        """
+        Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
+
+        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
+                     filled with rows to insert.
+
+        `tableName`: A passthrough to define a table and set the name of a table
+
+        `return`: none
+        """ 
+
+        # Define table name in local class space
+        self.types = DataType()
+        self.types.name = tableName
+        self.put_artifacts(collection, isVerbose)
     
     # OLD GET ARTIFACTS FUNCTION
     # OLD GET ARTIFACTS FUNCTION
