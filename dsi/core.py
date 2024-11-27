@@ -31,7 +31,7 @@ class Terminal():
                               'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read']
 
-    def __init__(self, debug_flag = False, backup_db_flag = False):
+    def __init__(self, debug_flag = False, backup_db_flag = False, run_table_flag = True):
         # Helper function to get parent module names.
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -55,8 +55,9 @@ class Terminal():
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
         self.active_metadata = OrderedDict()
-        self.transload_lock = False
+        # self.transload_lock = False
 
+        self.runTable = run_table_flag
         self.backup_db_flag = backup_db_flag
 
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -99,53 +100,75 @@ class Terminal():
         self.logger.info(f"-------------------------------------")
         self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
         start = datetime.now()
-        if self.transload_lock and mod_type == 'plugin':
-            print('Plugin module loading is prohibited after transload. No action taken.')
-            end = datetime.now()
-            self.logger.info(f"Runtime: {end-start}")
-            return
+        # if self.transload_lock and mod_type == 'plugin':
+        #     print('Plugin module loading is prohibited after transload. No action taken.')
+        #     end = datetime.now()
+        #     self.logger.info(f"Runtime: {end-start}")
+        #     return
         if mod_function not in self.VALID_MODULE_FUNCTIONS[mod_type]:
             print(
                 'Hint: Did you declare your Module Function in the Terminal Global vars?')
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
             raise NotImplementedError
-        if mod_name in [obj.__class__.__name__ for obj in self.active_modules[mod_function]]:
-            print('{} {} already loaded as {}. Nothing to do.'.format(
-                mod_name, mod_type, mod_function))
-            end = datetime.now()
-            self.logger.info(f"Runtime: {end-start}")
-            return
+        # if mod_name in [obj.__class__.__name__ for obj in self.active_modules[mod_function]]:
+        #     print('{} {} already loaded as {}. Nothing to do.'.format(
+        #         mod_name, mod_type, mod_function))
+        #     end = datetime.now()
+        #     self.logger.info(f"Runtime: {end-start}")
+        #     return
+
         # DSI Modules are Python classes.
-        class_name = mod_name
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
             try:
                 this_module = import_module(python_module)
-                class_ = getattr(this_module, class_name)
-                self.active_modules[mod_function].append(class_(**kwargs))
+                class_ = getattr(this_module, mod_name)
+                if mod_function == "reader":
+                    obj = class_(**kwargs)
+                    obj.add_rows()
+                    for table_name, table_metadata in obj.output_collector.items():
+                        if "hostname" in table_name.lower():
+                            for colName, colData in table_metadata.items():
+                                if isinstance(colData[0], list):
+                                    str_list = []
+                                    for val in colData:
+                                        str_list.append(f'{val}')
+                                    table_metadata[colName] = str_list
+                        if table_name not in self.active_metadata.keys():
+                            self.active_metadata[table_name] = table_metadata
+                        else:
+                            for colName, colData in table_metadata.items():
+                                if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
+                                    self.active_metadata[table_name][colName] += colData
+                                elif colName not in self.active_metadata[table_name].keys():# and table_name == "dsi_units":
+                                    self.active_metadata[table_name][colName] = colData
+                                # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
+                                #     raise ValueError(f"Mismatched column input for table {table_name}")
+                elif mod_type == "backend":
+                    self.active_modules[mod_function].append(class_(run_table = self.runTable, **kwargs))
+                else:
+                    self.active_modules[mod_function].append(class_(**kwargs))
                 load_success = True
+                print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
+                end = datetime.now()
+                self.logger.info(f"Runtime: {end-start}")
             except AttributeError:
                 continue
-        if load_success:
-            print('{} {} {} loaded successfully.'.format(
-                mod_name, mod_type, mod_function))
-        else:
+        if not load_success:
             print('Hint: Did you declare your Plugin/Backend in the Terminal Global vars?')
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
             raise NotImplementedError
-        end = datetime.now()
-        self.logger.info(f"Runtime: {end-start}")
 
     def unload_module(self, mod_type, mod_name, mod_function):
         """
         Unloads a DSI module from the active_modules collection
         """
-        if self.transload_lock and mod_type == 'plugin':
-            print(
-                'Plugin  module unloading is prohibited after transload. No action taken.')
-            return
+        # if self.transload_lock and mod_type == 'plugin':
+        #     print(
+        #         'Plugin module unloading is prohibited after transload. No action taken.')
+        #     return
         for i, mod in enumerate(self.active_modules[mod_function]):
             self.logger.info(f"-------------------------------------")
             self.logger.info(f"Unloading {mod_name} {mod_function} {mod_type}")
@@ -154,13 +177,11 @@ class Terminal():
                 if mod_type == 'backend':
                     mod.close()
                 self.active_modules[mod_function].pop(i)
-                print("{} {} {} unloaded successfully.".format(
-                    mod_name, mod_type, mod_function))
+                print(f"{mod_name} {mod_type} {mod_function} unloaded successfully.")
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
                 return
-        print("{} {} {} could not be found in active_modules. No action taken.".format(
-            mod_name, mod_type, mod_function))
+        print(f"{mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
         self.logger.info(f"Could not find {mod_name} {mod_function} {mod_type} to unload")
         end = datetime.now()
         self.logger.info(f"Runtime: {end-start}")
@@ -189,7 +210,6 @@ class Terminal():
     def list_loaded_modules(self):
         """
         List DSI modules which have already been loaded.
-
         These Plugins and Backends are active or ready to execute a post-processing task.
         """
         return (self.active_modules)
@@ -202,42 +222,19 @@ class Terminal():
         storage is possible. Transloading is the process of merging Plugin metadata from many
         data sources to a single DSI Core Middleware data structure.
         """
-        selected_function_modules = dict(
-            (k, self.active_modules[k]) for k in ('reader', 'writer'))
-        for module_type, objs in selected_function_modules.items():
-            for obj in objs:
-                self.logger.info(f"-------------------------------------")
-                self.logger.info(f"Transloading {obj.__class__.__name__} {module_type}")
-                if module_type == "reader":
-                    start = datetime.now()
-                    obj.add_rows(**kwargs)
-                    for table_name, table_metadata in obj.output_collector.items():
-                        if "hostname" in table_name.lower():
-                            for colName, colData in table_metadata.items():
-                                if isinstance(colData[0], list):
-                                    str_list = []
-                                    for val in colData:
-                                        str_list.append(f'{val}')
-                                    table_metadata[colName] = str_list
-                        if table_name not in self.active_metadata.keys():
-                            self.active_metadata[table_name] = table_metadata
-                        else:
-                            for colName, colData in table_metadata.items():
-                                if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
-                                    self.active_metadata[table_name][colName] += colData
-                                elif colName not in self.active_metadata[table_name].keys() and table_name == "dsi_units":
-                                    self.active_metadata[table_name][colName] = colData
-                                elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
-                                    raise ValueError(f"Mismatched column input for table {table_name}")
-                    end = datetime.now()
-                    self.logger.info(f"Runtime: {end-start}")
-                elif module_type == "writer":
-                    start = datetime.now()
-                    obj.get_rows(self.active_metadata, **kwargs)
-                    end = datetime.now()
-                    self.logger.info(f"Runtime: {end-start}")
-
-        self.transload_lock = True
+        used_writers = []
+        for obj in self.active_modules['writer']:
+            self.logger.info(f"-------------------------------------")
+            self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
+            start = datetime.now()
+            obj.get_rows(self.active_metadata, **kwargs)
+            used_writers.append(obj)
+            end = datetime.now()
+            self.logger.info(f"Runtime: {end-start}")
+        if self.active_modules["writer"] == used_writers:
+            self.active_modules["writer"] = []
+        else:
+            raise ValueError("Not all plugin writers were successfully transloaded")
 
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
@@ -260,15 +257,18 @@ class Terminal():
                 self.logger.info(f"-------------------------------------")
                 self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
                 start = datetime.now()
-                if (interaction_type == 'put' or interaction_type == 'set') and module_type == 'back-write':
+
+                if interaction_type in ['put', 'set'] and module_type == 'back-write':
                     if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
                         backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
                         shutil.copyfile(obj.filename, backup_file)
-                    errorMessage = obj.put_artifacts(
-                        collection=self.active_metadata, **kwargs)
+                    errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
                     if errorMessage is not None:
-                        print(f"No data was inserted into {obj.filename} due to the error: {errorMessage}")
+                        print(f"Error in put artifact handler: No data was inserted into {obj.filename} due to the error {errorMessage}")
                     operation_success = True
+                elif interaction_type in ['put', 'set'] and module_type == 'back-read':
+                    raise ValueError("Can only call put artifact handler with a back-WRITE backend")
+                
                 elif interaction_type == 'get':
                     self.logger.info(f"Query to get data: {query}")
                     if query != None:
@@ -278,22 +278,28 @@ class Terminal():
                         # This is a valid use-case, may give a warning for now
                         get_artifact_data = obj.get_artifacts(**kwargs)
                     operation_success = True
+
                 elif interaction_type == 'inspect':
-                    if module_type == 'back-write':
-                        errorMessage = obj.put_artifacts(
-                            collection=self.active_metadata, **kwargs)
-                        if errorMessage is not None:
-                            print("Error in ingesting data to db in inspect artifact. Generating Jupyter notebook with previous instance of db")
-                    obj.inspect_artifacts(
-                            collection=self.active_metadata, **kwargs)
+                    # if module_type == 'back-write':
+                    #     errorMessage = obj.put_artifacts(
+                    #         collection=self.active_metadata, **kwargs)
+                    #     if errorMessage is not None:
+                    #         print("Error in ingesting data to db in inspect artifact handler. Generating Jupyter notebook with previous instance of db")
+                    if not self.active_metadata:
+                        raise ValueError("Error in inspect artifact handler: Need to ingest data to DSI abstraction before generating Jupyter notebook")
+                    obj.inspect_artifacts(collection=self.active_metadata, **kwargs)
                     operation_success = True
+
                 elif interaction_type == "read" and module_type == 'back-read':
                     self.active_metadata = obj.read_to_artifact()
                     operation_success = True
+                elif interaction_type == "read" and module_type == 'back-write':
+                    raise ValueError("Can only call read to artifact handler with a back-READ backend")
+                
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
         if operation_success:
-            if interaction_type == 'get' and self.active_metadata:
+            if interaction_type == 'get' and get_artifact_data:
                 return get_artifact_data
             return
         else:
@@ -317,14 +323,14 @@ class Terminal():
         self.active_metadata[table_name] = table_data
         
         #allow more plugins to be loaded and can call transload again
-        self.transload_lock = False
+        # self.transload_lock = False
 
         #need to unload all loaded plugins to prevent duplicate reading when transload called again
-        mods = self.active_modules
-        for obj in mods['reader']:
-            self.unload_module('plugin', obj.__class__.__name__, "reader")
-        for obj in mods['writer']:
-            self.unload_module('plugin', obj.__class__.__name__, "writer")
+        # mods = self.active_modules
+        # for obj in mods['reader']:
+        #     self.unload_module('plugin', obj.__class__.__name__, "reader")
+        # for obj in mods['writer']:
+        #     self.unload_module('plugin', obj.__class__.__name__, "writer")
             
 
 class Sync():
