@@ -238,75 +238,45 @@ class Sqlite(Filesystem):
         import pandas as pd
         import sqlite3
         """
-        # code2 = f"""\
-        # dbPath = '{self.filename}'
-        # conn = sqlite3.connect(dbPath)
-        # tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
-        # """
-        # if dsi_units is not None:
-        #     code2 += f"""dsi_units = {dsi_units}
-        # """
-        # if dsi_relations is not None:
-        #     code2 += f"""dsi_relations = {dsi_relations}
-        # """
-            
-        # code3 = """\
-        # table_list = []
-        # for table_name in tables['name']:
-        #     if table_name not in ["""
-        # if dsi_units is not None:
-        #     code3 += "'dsi_units', "
-        # if dsi_relations is not None:
-        #     code3 += "'dsi_relations', "
-        # code3+="""'sqlite_sequence']:
-        #         query = 'SELECT * FROM ' + table_name
-        #         df = pd.read_sql_query(query, conn)
-        #         df.attrs['name'] = table_name
-        #         """
-        # if dsi_units is not None:
-        #     code3+= """if table_name in dsi_units:
-        #             df.attrs['units'] = dsi_units[table_name]
-        #         """
-        # code3+= """table_list.append(df)
-        # """
-        
-        # if dsi_relations is not None:
-        #     code3+= """
-        # df = pd.DataFrame(dsi_relations)
-        # df.attrs['name'] = 'dsi_relations'
-        # table_list.append(df)
-        # """
-        
-        # code4 = """\
-        # for table_df in table_list:
-        #     print(table_df.attrs)
-        #     print(table_df)
-        #     # table_df.info()
-        #     # table_df.describe()
-        # """
-
         code2 = f"""\
         dbPath = '{self.filename}'
         conn = sqlite3.connect(dbPath)
         tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
-        dsi_units = {dsi_units}
-        dsi_relations = {dsi_relations}
         """
+        if dsi_units is not None:
+            code2 += f"""dsi_units = {dsi_units}
+        """
+        if dsi_relations is not None:
+            code2 += f"""dsi_relations = {dsi_relations}
+        """
+            
         code3 = """\
         table_list = []
         for table_name in tables['name']:
-            if table_name not in ['dsi_relations', 'dsi_units', 'sqlite_sequence']:
+            if table_name not in ["""
+        if dsi_units is not None:
+            code3 += "'dsi_units', "
+        if dsi_relations is not None:
+            code3 += "'dsi_relations', "
+        code3+="""'sqlite_sequence']:
                 query = 'SELECT * FROM ' + table_name
                 df = pd.read_sql_query(query, conn)
                 df.attrs['name'] = table_name
-                if table_name in dsi_units:
+                """
+        if dsi_units is not None:
+            code3+= """if table_name in dsi_units:
                     df.attrs['units'] = dsi_units[table_name]
-                table_list.append(df)
+                """
+        code3+= """table_list.append(df)
+        """
         
+        if dsi_relations is not None:
+            code3+= """
         df = pd.DataFrame(dsi_relations)
         df.attrs['name'] = 'dsi_relations'
         table_list.append(df)
         """
+        
         code4 = """\
         for table_df in table_list:
             print(table_df.attrs)
