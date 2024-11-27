@@ -42,7 +42,7 @@ class Sqlite(Filesystem):
     con = None
     cur = None
 
-    def __init__(self, filename, run_table):
+    def __init__(self, filename, run_table = True):
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
