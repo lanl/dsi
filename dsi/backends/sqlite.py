@@ -166,12 +166,12 @@ class Sqlite(Filesystem):
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
-            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_and_unit TEXT UNIQUE)"
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column TEXT UNIQUE, unit TEXT)"
             self.cur.execute(create_query)
             for tableName, tableData in artifacts["dsi_units"].items():
                 if len(tableData) > 0:
                     for col_unit_pair in tableData:
-                        str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair}")'
+                        str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair[0]}", "{col_unit_pair[1]}")'
                         try:
                             self.cur.execute(str_query)
                         except sqlite3.Error as e:
@@ -330,6 +330,8 @@ class Sqlite(Filesystem):
             if tableName == "dsi_units":
                 artifact["dsi_units"] = self.read_units_helper()
                 continue
+            if tableName == "sqlite_sequence":
+                continue
 
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
             colDict = OrderedDict()
@@ -371,7 +373,7 @@ class Sqlite(Filesystem):
             tableName = row[0]
             if tableName not in unitsDict.keys():
                 unitsDict[tableName] = []
-            unitsDict[tableName].append(eval(row[1]))
+            unitsDict[tableName].append((row[1], row[2]))
         return unitsDict
 
     # Closes connection to server
