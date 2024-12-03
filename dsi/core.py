@@ -17,7 +17,7 @@ class Terminal():
     An instantiated Terminal is the DSI human/machine interface.
 
     Terminals are a home for Plugins and an interface for Backends. Backends may be
-    back-reads or back-writes. Plugins may be Writers or readers. See documentation
+    back-reads or back-writes. Plugins may be writers or readers. See documentation
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
@@ -146,9 +146,9 @@ class Terminal():
                                 # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                 #     raise ValueError(f"Mismatched column input for table {table_name}")
                 elif mod_type == "backend":
-                    self.active_modules[mod_function].append(class_(run_table = self.runTable, **kwargs))
-                else:
-                    self.active_modules[mod_function].append(class_(**kwargs))
+                    if "run_table" in class_.__init__.__code__.co_varnames:
+                        kwargs['run_table'] = self.runTable
+                self.active_modules[mod_function].append(class_(**kwargs))
                 load_success = True
                 print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()
@@ -270,13 +270,14 @@ class Terminal():
                     raise ValueError("Can only call put artifact handler with a back-WRITE backend")
                 
                 elif interaction_type == 'get':
-                    self.logger.info(f"Query to get data: {query}")
-                    if query != None:
-                        get_artifact_data = obj.get_artifacts(query, **kwargs)
-                    else:
-                        #raise ValueError("Need to specify a query of the database to return data")
-                        # This is a valid use-case, may give a warning for now
-                        get_artifact_data = obj.get_artifacts(**kwargs)
+                    if "query" in obj.get_artifacts.__code__.co_varnames:
+                        self.logger.info(f"Query to get data: {query}")
+                        kwargs['query'] = query
+                    get_artifact_data = obj.get_artifacts(**kwargs)
+                    # else:
+                    #     #raise ValueError("Need to specify a query of the database to return data")
+                    #     # This is a valid use-case, may give a warning for now
+                    #     get_artifact_data = obj.get_artifacts(**kwargs)
                     operation_success = True
 
                 elif interaction_type == 'inspect':
