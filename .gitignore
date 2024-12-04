@@ -15,6 +15,7 @@ __pycache__/
 .Python
 build/
 dist/
+*.dist/
 lib/
 lib64/
 parts/
@@ -59,10 +60,16 @@ dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
 
+# Intermediate data types
+# Unless manually specified in a git add
+*.csv
+*.cdb
+
 # Force coverage svg include
 !coverage.svg
 # Misc
 .vscode
 docs/_build
 dsi.egg-info/
+*.egg-info/
 .DS_Store
