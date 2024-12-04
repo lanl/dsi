@@ -81,7 +81,14 @@ class Terminal():
             )
 
     def list_available_modules(self, mod_type):
+        """
+        List available DSI modules of an arbitrary module type.
 
+        This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
+        are supported, but this getter can be extended to support any new DSI module
+        types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
+        however, DSI Modules are classes, hence the naming idiosynchrocies below.
+        """
         # "DSI Modules" are Python Classes
         class_collector = []
         # Below, "module" refers to Python modules,
