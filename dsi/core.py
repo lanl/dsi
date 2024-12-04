@@ -32,7 +32,17 @@ class Terminal():
     VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read']
 
     def __init__(self, debug_flag = False, backup_db_flag = False, run_table_flag = True):
-        # Helper function to get parent module names.
+        """
+        Initialization helper function to pass through optional parameters for DSI core.
+
+        Optional flags can be set and defined:
+
+        `debug_flag`: Undefined False as default. If set to True, Debug information will be printed to the terminal output and written to a local debug.log text file with runtime benchmarks.
+
+        `backup_db_flag`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
+
+        `run_table_flag`: Undefined True as default. When new metadata is ingested, a 'run_table' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
+        """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
 
@@ -64,21 +74,14 @@ class Terminal():
 
         if debug_flag:
             logging.basicConfig(
-                filename='logger.txt',         # Name of the log file
+                filename='debug.log',         # Name of the log file
                 filemode='w',               # Overwrite mode ('a' for append)
                 format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
                 level=logging.INFO          # Minimum log level to capture
             )
 
     def list_available_modules(self, mod_type):
-        """
-        List available DSI modules of an arbitrary module type.
 
-        This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
-        are supported, but this getter can be extended to support any new DSI module
-        types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
-        however, DSI Modules are classes, hence the naming idiosynchrocies below.
-        """
         # "DSI Modules" are Python Classes
         class_collector = []
         # Below, "module" refers to Python modules,
