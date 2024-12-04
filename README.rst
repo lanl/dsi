@@ -20,7 +20,7 @@ DSI Core middleware provides the user/machine interface. The Core middleware def
 DSI Core Requirements
 =====================
 * python3 (3.11 tested)
-* Linux OS (RHEL- and Debian-based distributions tested)
+* Cross-platform (Unix / macOS / Windows)
 * Git
 * Plugins and Backends introduce further requirements
 
