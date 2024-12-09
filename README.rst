@@ -20,7 +20,7 @@ DSI Core middleware provides the user/machine interface. The Core middleware def
 DSI Core Requirements
 =====================
 * python3 (3.11 tested)
-* Linux OS (RHEL- and Debian-based distributions tested)
+* Cross-platform (Unix / macOS / Windows)
 * Git
 * Plugins and Backends introduce further requirements
 
@@ -28,7 +28,7 @@ DSI Core Requirements
 Getting Started
 ===============
 
-DSI does not yet have a versioned release and should be considered pre-alpha. Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. Consequently a PyPA release is planned but incomplete. It is possible to install DSI locally instead.
+DSI has several versioned releases and cloning from 'main' can be considered as alpha-versions. Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. It is possible to install DSI locally instead with the following.
 
 We recommend Miniconda3 for managing virtual environments for DSI::
 
@@ -48,6 +48,14 @@ After activating your environment::
 	cd dsi/
 	python3 -m pip install .
 	
+=====================
+Release Versions
+=====================
+
+Install release versions of DSI can be found in (https://pypi.org/project/dsi-workflow/), to install the latest try the following::
+
+	python3 -m pip install dsi-workflow
+
 =====================
 Copyright and License
 =====================

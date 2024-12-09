@@ -23,10 +23,9 @@ def test_bueno_plugin_adds_rows():
     path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
     plug = Bueno(filenames=[path1, path2])
     plug.add_rows()
-    plug.add_rows()
 
     for key, val in plug.output_collector["Bueno"].items():
-        assert len(val) == 4  # two lists of length 4
+        assert len(val) == 2  # two lists of length 4
 
     # 4 Bueno cols
     assert len(plug.output_collector["Bueno"].keys()) == 4

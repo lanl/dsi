@@ -1,4 +1,4 @@
-import csv
+import pandas as pd
 from matplotlib import pyplot as plt
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -234,83 +234,107 @@ class Csv_Writer(FileWriter):
     # Default value is False.
     strict_mode = False
 
-    def __init__(self, filenames, **kwargs):
-        super().__init__(filenames, **kwargs)
-        self.csv_data = {}
-
-    def pack_header(self) -> None:
-        """ Set schema based on the CSV columns """
-
-        column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
-        self.set_schema(column_names)
-
-    # Given an output of a sql query, reformat and write a csv of the subset data
-    def export_csv_query(self,query,fname):
-        """
-        Function that outputs a csv file of a return query, given an initial query.
-
-        `query`: raw SQL query to be executed on current table
-
-        `fname`: target filename (including path) that will output the return query as a csv file
-
-        `return`: none
-        """
-        #if isVerbose:
-        #   print(query)
-
-        # Parse the table out of the query
-        tname = query.split("FROM ",1)[1]
-        tname = tname[:-1]
-
-        self.cur = self.con.cursor()
-        cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-        cnames = [entry[1] for entry in cdata]
-        #if isVerbose:
-        #    print(cnames)
-
-        with open(fname,"w+") as ocsv:
-            csvWriter = csv.writer(ocsv,delimiter=',')
-            csvWriter.writerow(cnames)
-
-            for row in query:
-                print(row)
-                csvWriter.writerow(row)
+    def __init__(self, table_name, filename, cols_to_export = None, **kwargs):
+        '''
+        `table_name`: name of table to be exported to a csv
+        `filename`: name of output file that the table will be stored in
+        '''
+        super().__init__(filename, **kwargs)
+        self.csv_file_name = filename
+        self.table_name = table_name
+        self.export_cols = cols_to_export
         
-        return 1
+
+    # def pack_header(self) -> None:
+    #     """ Set schema based on the CSV columns """
+
+    #     column_names = list(self.file_info.keys()) + list(self.csv_data.keys())
+    #     self.set_schema(column_names)
+
+    def get_rows(self, collection) -> None:
+        if self.table_name not in collection.keys():
+            raise ValueError(f"{self.table_name} does not exist in this database")
+        
+        df = pd.DataFrame(collection[self.table_name])
+        
+        if self.export_cols is not None:
+            try:
+                df = df.iloc[:, self.export_cols]
+            except:
+                try:
+                    df = df[self.export_cols]
+                except:
+                    raise ValueError(f"Could not export to csv as specified column input {self.export_cols} is incorrect")
+        df.to_csv(self.csv_file_name, index=False)
+
+        
+    # # Given an output of a sql query, reformat and write a csv of the subset data
+    # def export_csv_query(self,query,fname):
+    #     """
+    #     Function that outputs a csv file of a return query, given an initial query.
+
+    #     `query`: raw SQL query to be executed on current table
+
+    #     `fname`: target filename (including path) that will output the return query as a csv file
+
+    #     `return`: none
+    #     """
+    #     #if isVerbose:
+    #     #   print(query)
+
+    #     # Parse the table out of the query
+    #     tname = query.split("FROM ",1)[1]
+    #     tname = tname[:-1]
+
+    #     self.cur = self.con.cursor()
+    #     cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+    #     cnames = [entry[1] for entry in cdata]
+    #     #if isVerbose:
+    #     #    print(cnames)
+
+    #     with open(fname,"w+") as ocsv:
+    #         csvWriter = csv.writer(ocsv,delimiter=',')
+    #         csvWriter.writerow(cnames)
+
+    #         for row in query:
+    #             print(row)
+    #             csvWriter.writerow(row)
+        
+    #     return 1
     
-    # Given an output of a list, reformat and write a csv of the subset data
-    def export_csv(self,qlist,tname,fname):
-        """
-        Function that outputs a csv file of a return query, given an initial query.
+    # # Given an output of a list, reformat and write a csv of the subset data
+    # def export_csv(self,qlist,tname,fname):
+    #     """
+    #     Function that outputs a csv file of a return query, given an initial query.
 
-        `qlist`: a python list to be executed on current table
+    #     `qlist`: a python list to be executed on current table
 
-        `tname`: a sql table name that originated qlist
+    #     `tname`: a sql table name that originated qlist
 
-        `fname`: target filename (including path) that will output the return query as a csv file
+    #     `fname`: target filename (including path) that will output the return query as a csv file
 
-        `return`: none
-        """
+    #     `return`: none
+    #     """
 
-        self.cur = self.con.cursor()
-        cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-        cnames = [entry[1] for entry in cdata]
+    #     self.cur = self.con.cursor()
+    #     cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
+    #     cnames = [entry[1] for entry in cdata]
 
-        with open(fname,"w+") as ocsv:
-            csvWriter = csv.writer(ocsv,delimiter=',')
-            csvWriter.writerow(cnames)
+    #     with open(fname,"w+") as ocsv:
+    #         csvWriter = csv.writer(ocsv,delimiter=',')
+    #         csvWriter.writerow(cnames)
 
-            for row in qlist:
-                print(row)
-                csvWriter.writerow(row)
+    #         for row in qlist:
+    #             print(row)
+    #             csvWriter.writerow(row)
         
-        return 1
+    #     return 1
 
 class Table_Plot(FileWriter):
     '''
     Plugin that plots all numeric column data for a specified table
     '''
-    def __init__(self, table_name, filename, **kwargs):
+    def __init__(self, table_name, filename, display_cols = None, **kwargs):
         '''
         `table_name`: name of table to be plotted
         `filename`: name of output file that plot be stored in
@@ -318,12 +342,18 @@ class Table_Plot(FileWriter):
         super().__init__(filename, **kwargs)
         self.output_name = filename
         self.table_name = table_name
+        self.display_cols = display_cols
 
     def get_rows(self, collection) -> None:
+        if self.table_name not in collection.keys():
+            raise ValueError(f"{self.table_name} not in the dataset")
+        if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
+            raise ValueError(f"Inputted list of columns to plot for {self.table_name} is incorrect")
+        
         numeric_cols = []
         col_len = None
         for colName, colData in collection[self.table_name].items():
-            if colName == "run_id":
+            if colName == "run_id" or (self.display_cols is not None and colName not in self.display_cols):
                 continue
             if col_len == None:
                 col_len = len(colData)
