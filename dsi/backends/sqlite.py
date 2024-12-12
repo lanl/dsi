@@ -186,7 +186,7 @@ class Sqlite(Filesystem):
 
     # Returns text list from query
     def get_artifacts(self, query, isVerbose=False, dict_return = False):
-        if query[:6].lower() == "select":
+        if query[:6].lower() == "select" or query[:6].lower() == "pragma" :
             try:
                 data = self.cur.execute(query).fetchall()
                 if isVerbose:
@@ -194,7 +194,7 @@ class Sqlite(Filesystem):
             except:
                 raise ValueError("Error in get_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            raise ValueError("Error in get_artifacts handler: Can only run SELECT queries on the data")
+            raise ValueError("Error in get_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
