@@ -170,13 +170,18 @@ class Sqlite(Filesystem):
             self.cur.execute(create_query)
             for tableName, tableData in artifacts["dsi_units"].items():
                 if len(tableData) > 0:
-                    for col_unit_pair in tableData:
-                        str_query = f'INSERT OR IGNORE INTO dsi_units VALUES ("{tableName}", "{col_unit_pair[0]}", "{col_unit_pair[1]}")'
-                        try:
-                            self.cur.execute(str_query)
-                        except sqlite3.Error as e:
+                    for col, unit in tableData.items():
+                        str_query = f'INSERT INTO dsi_units VALUES ("{tableName}", "{col}", "{unit}")'
+                        unit_result = self.cur.execute(f"SELECT unit FROM dsi_units WHERE column = '{col}';").fetchone()
+                        if unit_result and unit_result[0] != unit:
                             self.con.rollback()
-                            return e
+                            return f"Cannot ingest different units for the column {col} in {tableName}"
+                        elif not unit_result:
+                            try:
+                                self.cur.execute(str_query)
+                            except sqlite3.Error as e:
+                                self.con.rollback()
+                                return e
                         
         try:
             self.con.commit()
@@ -218,10 +223,11 @@ class Sqlite(Filesystem):
         else:
             return data
 
-    def inspect_artifacts(self, collection, interactive=False):
+    def inspect_artifacts(self, interactive=False):
         import nbconvert as nbc
         import nbformat as nbf
         dsi_relations, dsi_units = None, None
+        collection = self.read_to_artifact(only_units_relations=True)
         if "dsi_relations" in collection.keys():
             dsi_relations = dict(collection["dsi_relations"])
         if "dsi_units" in collection.keys():
@@ -319,7 +325,7 @@ class Sqlite(Filesystem):
                 fh.write(html_content)
 
     # SQLITE READER FUNCTION
-    def read_to_artifact(self):
+    def read_to_artifact(self, only_units_relations = False):
         artifact = OrderedDict()
         artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
 
@@ -340,14 +346,15 @@ class Sqlite(Filesystem):
                 if colInfo[5] == 1:
                     pkList.append((tableName, colInfo[1]))
 
-            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
-            for row in data:
-                for colName, val in zip(colDict.keys(), row):
-                    if val == "NULL":
-                        colDict[colName].append(None)
-                    else:
-                        colDict[colName].append(val)
-            artifact[tableName] = colDict
+            if only_units_relations == False:
+                data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
+                for row in data:
+                    for colName, val in zip(colDict.keys(), row):
+                        if val == "NULL":
+                            colDict[colName].append(None)
+                        else:
+                            colDict[colName].append(val)
+                artifact[tableName] = colDict
 
             fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
             for row in fkData:
@@ -372,8 +379,8 @@ class Sqlite(Filesystem):
         for row in unitsTable:
             tableName = row[0]
             if tableName not in unitsDict.keys():
-                unitsDict[tableName] = []
-            unitsDict[tableName].append((row[1], row[2]))
+                unitsDict[tableName] = {}
+            unitsDict[tableName][row[1]] = row[2]
         return unitsDict
 
     # Closes connection to server

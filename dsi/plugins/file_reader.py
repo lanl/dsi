@@ -168,10 +168,10 @@ class Bueno(FileReader):
         #             self.bueno_data[key] = new_list
         #         self.bueno_data[key].append(val)
         #     file_counter += 1
-
-        # max_length = max(len(lst) for lst in self.bueno_data.values())
-
+        
+        # SAVE FOR LATER PLUGINS TO USE - YAML AND TOML USE THIS NOW
         # # Fill the shorter lists with None (or another value)
+        # max_length = max(len(lst) for lst in self.bueno_data.values())
         # for key, value in self.bueno_data.items():
         #     if len(value) < max_length:
         #         # Pad the list with None (or any other value)
@@ -371,7 +371,7 @@ class YAML1(FileReader):
                         tableName = self.target_table_prefix + "__" + table["segment"]
                     if tableName not in self.yaml_data.keys():
                         self.yaml_data[tableName] = OrderedDict()
-                    unitsList = []
+                    unitsDict = {}
                     for col_name, data in table["columns"].items():
                         unit_data = None
                         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
@@ -380,13 +380,17 @@ class YAML1(FileReader):
                         if col_name not in self.yaml_data[tableName].keys():
                             self.yaml_data[tableName][col_name] = [None] * (file_counter)
                         self.yaml_data[tableName][col_name].append(data)
-                        if unit_data is not None and (col_name, unit_data) not in unitsList:
-                            unitsList.append((col_name, unit_data))
-                    if len(unitsList) > 0:
+                        if unit_data is not None and col_name not in unitsDict.keys():
+                            unitsDict[col_name] = unit_data
+                    if unitsDict:
                         if tableName not in self.yaml_data["dsi_units"].keys():
-                            self.yaml_data["dsi_units"][tableName] = unitsList
+                            self.yaml_data["dsi_units"][tableName] = unitsDict
                         else:
-                            self.yaml_data["dsi_units"][tableName] += list(set(unitsList) - set(self.yaml_data["dsi_units"][tableName]))
+                            overlap_cols = set(self.yaml_data["dsi_units"][tableName].keys()) & set(unitsDict)
+                            for col in overlap_cols:
+                                if self.yaml_data["dsi_units"][tableName][col] != unitsDict[col]:
+                                    raise ValueError(f"Cannot have a different set of units for column {col} in {tableName}")
+                            self.yaml_data["dsi_units"][tableName].update(unitsDict)
 
                     max_length = max(len(lst) for lst in self.yaml_data[tableName].values())
                     for key, value in self.yaml_data[tableName].items():
@@ -481,7 +485,7 @@ class TOML1(FileReader):
                     tableName = self.target_table_prefix + "__" + tableName
                 if tableName not in self.toml_data.keys():
                     self.toml_data[tableName] = OrderedDict()
-                unitsList = []
+                unitsDict = {}
                 for col_name, data in tableData.items():
                     unit_data = None
                     if isinstance(data, dict):
@@ -495,13 +499,17 @@ class TOML1(FileReader):
                     if col_name not in self.toml_data[tableName].keys():
                         self.toml_data[tableName][col_name] = [None] * (file_counter)
                     self.toml_data[tableName][col_name].append(data)
-                    if unit_data is not None and (col_name, unit_data) not in unitsList:
-                        unitsList.append((col_name, unit_data))
-                if len(unitsList) > 0:
+                    if unit_data is not None and col_name not in unitsDict.keys():
+                        unitsDict[col_name] = unit_data
+                if unitsDict:
                         if tableName not in self.toml_data["dsi_units"].keys():
-                            self.toml_data["dsi_units"][tableName] = unitsList
+                            self.toml_data["dsi_units"][tableName] = unitsDict
                         else:
-                            self.toml_data["dsi_units"][tableName] += list(set(unitsList) - set(self.toml_data["dsi_units"][tableName]))
+                            overlap_cols = set(self.toml_data["dsi_units"][tableName].keys()) & set(unitsDict)
+                            for col in overlap_cols:
+                                if self.toml_data["dsi_units"][tableName][col] != unitsDict[col]:
+                                    raise ValueError(f"Cannot have a different set of units for column {col} in {tableName}")
+                            self.toml_data["dsi_units"][tableName].update(unitsDict)
 
                 max_length = max(len(lst) for lst in self.toml_data[tableName].values())
                 for key, value in self.toml_data[tableName].items():
