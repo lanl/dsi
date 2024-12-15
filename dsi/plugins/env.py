@@ -9,7 +9,7 @@ from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
-    GitInfoModel, HostnameModel, SystemKernelModel
+    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
 )
 
 

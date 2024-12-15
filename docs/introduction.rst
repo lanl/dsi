@@ -1,7 +1,7 @@
 
 
 
-The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI  capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:
+The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:
 
 - Data management is subject to strict, POSIX-enforced, file security.
 - DSI capabilities support a wide range of common metadata queries.
