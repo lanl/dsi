@@ -9,7 +9,7 @@ from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
-    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
+    GitInfoModel, HostnameModel, SystemKernelModel
 )
 
 
@@ -49,52 +49,12 @@ class Hostname(Environment):
         column_names = list(self.posix_info.keys()) + ["hostname"]
         self.set_schema(column_names, validation_model=HostnameModel)
 
-    def add_row(self) -> None:
+    def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()
 
         row = list(self.posix_info.values()) + [socket.gethostname()]
-        self.add_to_output(row)
-
-
-class Bueno(Environment):
-    """
-    A Plugin to capture performance data from Bueno (github.com/lanl/bueno)
-
-    Bueno outputs performance data in keyvalue pairs in a file. Keys and values
-    are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
-    """
-
-    def __init__(self, filename, **kwargs) -> None:
-        super().__init__()
-        self.bueno_data = OrderedDict()
-        self.filename = filename
-
-    def pack_header(self) -> None:
-        """Set schema with POSIX and Bueno data."""
-        bueno_names = list(self.bueno_data.keys())
-        column_names = list(self.posix_info.keys()) + bueno_names
-        model = create_dynamic_model("BuenoModel", col_names=bueno_names,
-                                     col_types=[str] * len(bueno_names), base=EnvironmentModel)
-        self.set_schema(column_names, validation_model=model)
-
-    def add_row(self) -> None:
-        """Parses environment provenance data and adds the row."""
-        if not self.schema_is_set():
-            with open(self.filename, 'r') as fh:
-                file_content = (fh.read())
-            rows = file_content.split('\n')
-            drop_rows = [row for row in rows if row != '']
-            rows = drop_rows
-            for row in rows:
-                colon_split = row.split(':', maxsplit=1)
-                if len(colon_split) != 2:
-                    raise TypeError
-                self.bueno_data[colon_split[0]] = colon_split[1]
-            self.pack_header()
-
-        row = list(self.posix_info.values()) + list(self.bueno_data.values())
         self.add_to_output(row)
 
 
@@ -125,7 +85,7 @@ class GitInfo(Environment):
             list(self.git_info.keys())
         self.set_schema(column_names, validation_model=GitInfoModel)
 
-    def add_row(self) -> None:
+    def add_rows(self) -> None:
         """ Adds a row to the output with POSIX info, git remote, and git commit """
         if not self.schema_is_set():
             self.pack_header()
@@ -159,7 +119,7 @@ class SystemKernel(Environment):
         column_names = list(self.posix_info.keys()) + self.column_names
         self.set_schema(column_names, validation_model=SystemKernelModel)
 
-    def add_row(self) -> None:
+    def add_rows(self) -> None:
         """Parses environment provenance data and adds the row."""
         if not self.schema_is_set():
             self.pack_header()

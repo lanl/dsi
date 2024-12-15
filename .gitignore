@@ -14,6 +14,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+dist/
+*.dist/
 lib/
 lib64/
 parts/
@@ -22,6 +24,10 @@ var/
 wheels/
 share/python-wheels/
 MANIFEST
+
+# Local environment
+pcenv/
+dsienv/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -50,9 +56,14 @@ cover/
 
 # Testing artifacts
 *query.csv
-dsi_parquet_driver_output.ipynb
+dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
+
+# Intermediate data types
+# Unless manually specified in a git add
+*.csv
+*.cdb
 
 # Force coverage svg include
 !coverage.svg
@@ -60,3 +71,5 @@ parquet.data
 .vscode
 docs/_build
 dsi.egg-info/
+*.egg-info/
+.DS_Store

@@ -2,36 +2,33 @@
 DSI
 =============
 
-.. image:: coverage.svg
-      :target: https://lanl.github.io/dsi/htmlcov/index.html
-
 The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and shared data repositories. DSI enables flexible, data-intensive scientific workflows that meet researcher needs.
 
 DSI is implemented in three parts:
 
-* Plugins
-* Drivers
+* Plugins (Readers and Writers)
+* Backends
 * Core middleware
 
-Plugins curate metadata for query and data return. Plugins can have producer or consumer funcitonality. Plugins acting as consumers harvest data from files and streams. Plugins acting as producers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Plugins curate metadata for query and data return. Plugins can have read or write funcitonality acting as Readers and Writers for DSI. Plugins acting as readers harvest data from files and streams. Plugins acting as writers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
-Drivers are interfaces for the Core middleware. Drivers can have front-end or back-end functionalities. Driver front-ends are the interface between a DSI user and the Core middleware. Driver back-ends are the interface between the Core Middleware and a data store. Drivers may be user contributed and a default set of drivers is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Backends are interfaces for the Core middleware. Backends consist mostly of back-end/storage functionalities and are the interface between the Core Middleware and a data store. Backends may also have some front-end functionality interfacing between a DSI user and the Core middleware. Backends may be user contributed and a default set of backends are available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
 
-DSI Core middleware provides the user/machine interface. The Core middleware defines a Terminal object. An instantiated Core Terminal can load zero or more plugins and drivers. A Terminal object can be used in scripting workflows and program loops.
+DSI Core middleware provides the user/machine interface. The Core middleware defines a Terminal object. An instantiated Core Terminal can load zero or more plugins and backends. A Terminal object can be used in scripting workflows and program loops.
 
 =====================
 DSI Core Requirements
 =====================
 * python3 (3.11 tested)
-* Linux OS (RHEL- and Debian-based distributions tested)
+* Cross-platform (Unix / macOS / Windows)
 * Git
-* Plugins and Drivers introduce further requirements
+* Plugins and Backends introduce further requirements
 
 ===============
 Getting Started
 ===============
 
-DSI does not yet have a versioned release and should be considered pre-alpha. Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. Consequently a PyPA release is planned but incomplete. It is possible to install DSI locally instead.
+DSI has several versioned releases and cloning from 'main' can be considered as alpha-versions. Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. It is possible to install DSI locally instead with the following.
 
 We recommend Miniconda3 for managing virtual environments for DSI::
 
@@ -39,12 +36,25 @@ We recommend Miniconda3 for managing virtual environments for DSI::
 	conda create -n dsi python=3.11
 	conda activate dsi
 
+Python virtual environments can also be used for DSI::
+
+	python3 -m venv dsienv
+	source dsienv/bin/activate
+	pip install --upgrade pip
+
 After activating your environment::
 
 	git clone https://github.com/lanl/dsi.git
 	cd dsi/
-	python -m pip install .
+	python3 -m pip install .
 	
+=====================
+Release Versions
+=====================
+
+Install release versions of DSI can be found in (https://pypi.org/project/dsi-workflow/), to install the latest try the following::
+
+	python3 -m pip install dsi-workflow
 
 =====================
 Copyright and License

@@ -1,0 +1,31 @@
+********************
+Running PENNANT v0.9
+********************
+
+--- Mesh Information ---
+Points:  1001
+Zones:  900
+Sides:  3600
+Edges:  1900
+Side chunks:  8
+Point chunks:  2
+Zone chunks:  2
+Chunk size:  512
+------------------------
+Energy check:  total energy  =   9.424778e-01
+(internal =   9.424778e-01, kinetic =   0.000000e+00)
+End cycle      1, time = 1.00000e-02, dt = 1.00000e-02, wall = 7.19070e-04
+dt limiter: Initial timestep
+End cycle     10, time = 2.59587e-01, dt = 5.15978e-02, wall = 5.30887e-03
+dt limiter: Recovery: Initial timestep
+
+Run complete
+cycle =     10,         cstop =     10
+time  =   2.595868e-01, tstop =   6.000000e+00
+
+************************************
+hydro cycle run time=   6.058931e-03
+************************************
+Energy check:  total energy  =   9.424778e-01
+(internal =   9.359219e-01, kinetic =   6.555903e-03)
+Writing .xy file...

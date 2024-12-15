@@ -10,16 +10,16 @@ all: html
 # Build HTML
 html:
 	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
-	python ./drivers/generate_driver_class_hierarchy.py ../dsi/drivers/
+	python ./backends/generate_backend_class_hierarchy.py ../dsi/backends/
 	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
-	mv DriverClassHierarchy.gv.png DriverClassHierarchy.png
+	mv BackendClassHierarchy.gv.png BackendClassHierarchy.png
+	rm -rf $(BUILDDIR)/html
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
-	rm -rf $(BUILDDIR)/html/htmlcov
-	pytest --cov --cov-report=html ../
-	mv ./htmlcov $(BUILDDIR)/html
+#	pytest --cov --cov-report=html ../
+#	mv ./htmlcov $(BUILDDIR)/html
 	rm -f ../coverage.svg
-	coverage-badge -o ../coverage.svg
-	git add ../coverage.svg
+#	coverage-badge -o ../coverage.svg
+#	git add ../coverage.svg
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
@@ -29,6 +29,8 @@ html:
 # github for some reason runs jekyll automatically on gh-pages
 # files, but we don't want that.  'touch .nojekyll' takes care
 # of it.
+#	git add --force ./htmlcov && \
+
 gh-pages: _build/html
 	root="$$(git rev-parse --show-toplevel)" && \
 	cd _build/html && \
@@ -36,7 +38,6 @@ gh-pages: _build/html
 	touch .nojekyll && \
 	git init && \
 	git add . && \
-	git add --force ./htmlcov && \
 	git commit -m "DSI Documentation" && \
 	git push -f $$root master:gh-pages && \
 	rm -rf .git
@@ -60,4 +61,4 @@ help:
 	@echo "  publish    upload documentation to github"
 
 clean:
-	-rm -rf $(BUILDDIR)/* *ClassHierarchy.gv *Hierarchy.png 
+	-rm -rf $(BUILDDIR)/* *ClassHierarchy.gv *Hierarchy.png
