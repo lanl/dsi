@@ -2,7 +2,7 @@
 Making a Reader for Your Application
 ====================================
 
-DSI readers are the primary way to transform outside data to metadata that DSI can ingest. Readers are Python classes that must include a few methods, namely ``__init__``, ``pack_header``, and ``add_row``.
+DSI readers are the primary way to transform outside data to metadata that DSI can ingest. Readers are Python classes that must include a few methods, namely ``__init__``, ``pack_header``, and ``add_rows``.
 
 Initializer: ``__init__(self) -> None:``
 -------------------------------------------
@@ -18,7 +18,7 @@ Pack Header: ``pack_header(self) -> None``
 ---------------------------------------------
 
 ``pack_header`` is responsible for setting a schema, registering which columns 
-will be populated by the reader. The ``set_schema(self, column_names: list, validation_model=None) -> None`` method 
+will be populated by the reader. The ``set_schema(self, table_data: list, validation_model=None) -> None`` method 
 is available to subclasses of ``StructuredMetadata``, which allows one to simply give a list of column names to register. 
 ``validation_model`` is an pydantic model that can help you enforce types, but is completely optional.
 
@@ -28,19 +28,19 @@ Example ``pack_header``: ::
     column_names = ["foo", "bar", "baz"]
     self.set_schema(column_names)
 
-Add Row: ``add_row(self) -> None``
+Add Rows: ``add_rows(self) -> None``
 -------------------------------------
 
-``add_row`` is responsible for appending to the internal metadata buffer. 
+``add_rows`` is responsible for appending to the internal metadata buffer. 
 Whatever data is being ingested, it's done here. The ``add_to_output(self, row: list) -> None`` method is available to subclasses 
 of ``StructuredMetadata``, which takes a list of data that matches the schema and appends it to the internal metadata buffer.
 
-Note: ``pack_header`` must be called before metadata is appended in ``add_row``. Another helper method of 
+Note: ``pack_header`` must be called before metadata is appended in ``add_rows``. Another helper method of 
 ``StructuredMetadata`` is ``schema_is_set``, which provides a way to tell if this restriction is met.
 
-Example ``add_row``: ::
+Example ``add_rows``: ::
 
-  def add_row(self) -> None:
+  def add_rows(self) -> None:
     if not self.schema_is_set():
       self.pack_header()
 
@@ -48,6 +48,24 @@ Example ``add_row``: ::
     my_data = [1, 2, 3]
 
     self.add_to_output(my_data)
+
+*Alternate* Add Rows: ``add_rows(self) -> None``
+-------------------------------------
+If you are confident that the the data you read in ``add_rows`` is in the form of an OrderedDict (the data structure used to store all ingested data), you can bypass the use of ``pack_header`` and ``add_to_output`` with an alternate ``set_schema`` function.
+
+This function, ``set_schema_2(self, collection, validation_model=None) -> None``, directly assigns the data you read in ``add_rows`` to the internal DSI abstraction layer, provided that the data you pass as the ``collection`` variable is an OrderedDict. This method allows you to quickly append data to the abstraction wholesale, rather than row-by-row.
+
+Example alternate ``add_rows``: ::
+
+  def add_rows(self) -> None:
+
+    # data is stored as an OrderedDict so can use set_schema2
+    my_data = OrderedDict()
+    my_data["jack"] = 10
+    my_data["joey"] = 20
+    my_data["amy"] = 30
+
+    self.set_schema2(my_data)
 
 Implemented Examples
 --------------------------------
