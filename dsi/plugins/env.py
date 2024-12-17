@@ -3,7 +3,6 @@ import os
 import socket
 import subprocess
 from getpass import getuser
-from git import Repo
 import git.exc
 from json import dumps
 
@@ -69,6 +68,7 @@ class GitInfo(Environment):
         """ Initializes the git repo in the given directory and access to git commands """
         super().__init__()
         try:
+            from git import Repo
             self.repo = Repo(git_repo_path, search_parent_directories=True)
         except git.exc.InvalidGitRepositoryError:
             raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
