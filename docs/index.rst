@@ -15,6 +15,7 @@ The Data Science Infrastructure Project (DSI)
    plugins
    backends
    core
+   contributing_readers
    tiers
    examples
 
