@@ -9,9 +9,8 @@ a.transload()
 cnames = a.artifact_handler(interaction_type='get', query = "PRAGMA table_info(wfdata);")
 data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM wfdata;")#, isVerbose = True)
 
-# a.artifact_handler(interaction_type="read")
 clist = [i[1] for i in cnames]
-dlist = list(data)
-print(clist)
-print(dlist)
+table = [clist] + [list(row) for row in data]
+
+print(table)
 # a.unload_module('backend', 'Sqlite', 'back-write')
