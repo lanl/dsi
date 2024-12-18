@@ -34,24 +34,24 @@ def test_hostname_plugin_row_shape():
 # SYSTEM KERNEL FUNCTIONS ONLY WORK ON LINUX
 def test_systemkernel_plugin_type():
     plug = SystemKernel()
-    assert type(plug.output_collector["SystemKernel"]) == collections.OrderedDict
+    assert type(plug.output_collector) == collections.OrderedDict
 
 def test_systemkernel_plugin_adds_rows():
     plug = SystemKernel()
     plug.add_rows()
     plug.add_rows()
 
-    for key, val in plug.output_collector["SystemKernel"].items():
+    for key, val in plug.output_collector.items():
         assert len(val) == 2
 
     # 1 SystemKernel column + 4 inherited Env cols
-    assert len(plug.output_collector["SystemKernel"].keys()) == 5
+    assert len(plug.output_collector.keys()) == 5
 
 def test_systemkernel_plugin_blob_is_big():
     plug = SystemKernel()
     plug.add_rows()
 
-    blob = plug.output_collector["SystemKernel"]["kernel_info"][0]
+    blob = plug.output_collector["kernel_info"][0]
     info_dict = loads(blob)
 
     # dict should have more than 1000 (~7000) keys
