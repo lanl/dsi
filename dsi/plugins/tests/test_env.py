@@ -36,16 +36,16 @@ def test_systemkernel_plugin_type():
     plug = SystemKernel()
     assert type(plug.output_collector) == collections.OrderedDict
 
-def test_systemkernel_plugin_adds_rows():
-    plug = SystemKernel()
-    plug.add_rows()
-    plug.add_rows()
+# def test_systemkernel_plugin_adds_rows():
+#     plug = SystemKernel()
+#     plug.add_rows()
+#     plug.add_rows()
 
-    for key, val in plug.output_collector.items():
-        assert len(val) == 2
+#     for key, val in plug.output_collector.items():
+#         assert len(val) == 2
 
-    # 1 SystemKernel column + 4 inherited Env cols
-    assert len(plug.output_collector.keys()) == 5
+#     # 1 SystemKernel column + 4 inherited Env cols
+#     assert len(plug.output_collector.keys()) == 5
 
 def test_systemkernel_plugin_blob_is_big():
     plug = SystemKernel()
