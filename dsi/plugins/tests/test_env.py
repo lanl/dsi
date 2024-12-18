@@ -52,10 +52,10 @@ def test_systemkernel_plugin_blob_is_big():
     plug.add_rows()
 
     blob = plug.output_collector["SystemKernel"]["kernel_info"][0]
-    #info_dict = loads(blob)
+    info_dict = loads(blob)
 
     # dict should have more than 1000 (~7000) keys
-    assert len(blob.keys()) > 1000
+    assert len(info_dict.keys()) > 1000
 
 def test_git_plugin_type():
     root = get_git_root('.')
