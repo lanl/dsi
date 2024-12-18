@@ -20,7 +20,6 @@ isVerbose = True
 class Base(DeclarativeBase):
     pass
 
-
 class Wildfire(Base):
     __tablename__ = "wildfire"
     
