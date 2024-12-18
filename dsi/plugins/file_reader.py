@@ -8,7 +8,6 @@ import re
 import yaml
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
-import h5py
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -586,60 +585,6 @@ class TextFile(FileReader):
             else:
                 self.text_file_data["text_file"] = OrderedDict(df.to_dict(orient='list'))
             self.set_schema_2(self.text_file_data)
-
-class HDF5Reader1(FileReader):
-
-    def __init__(self, filenames, target_table_prefix = None, **kwargs):
-        '''
-        `filenames`: one hdf5 file or a list of hdf5 files to be ingested
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other hdf5 file sources
-        '''
-        super().__init__(filenames, **kwargs)
-        if isinstance(filenames, str):
-            self.hdf5_files = [filenames]
-        else:
-            self.hdf5_files = filenames
-        self.hdf5_file_data = OrderedDict()
-        self.target_table_prefix = target_table_prefix
-    
-    def add_rows(self) -> None:
-        """
-        Parses hdf5 files and creates an ordered dict whose keys are group names and values are an ordered dict of each group's data (metadata of several datasets).
-        """
-        file_counter = 0
-        for filename in self.hdf5_files:
-            with h5py.File(filename, 'r') as h5_file:
-                for group_name in h5_file.keys():
-                    if self.target_table_prefix is not None:
-                        group_name = self.target_table_prefix + "__" + group_name
-                    if group_name not in self.hdf5_file_data.keys():
-                        self.hdf5_file_data[group_name] = OrderedDict()
-
-                    # group_dict = OrderedDict()
-                    group = h5_file[group_name]
-                    for col_name, col_data in group.items():
-                        dataset = col_data[:]
-
-                        if f"{col_name}_shape" not in self.hdf5_file_data[group_name].keys():
-                            self.hdf5_file_data[group_name][col_name + "_shape"] = [None] * (file_counter)
-                            self.hdf5_file_data[group_name][col_name + "_min"] = [None] * (file_counter)
-                            self.hdf5_file_data[group_name][col_name + "_max"] = [None] * (file_counter)
-                        self.hdf5_file_data[group_name][col_name + "_shape"].append(dataset.shape)
-                        self.hdf5_file_data[group_name][col_name + "_min"].append(dataset.min())
-                        self.hdf5_file_data[group_name][col_name + "_max"].append(dataset.max())
-
-                        # group_dict[col_name + "_shape"] = dataset.shape
-                        # group_dict[col_name + "_min"] = dataset.min()
-                        # group_dict[col_name + "_max"] = dataset.max()
-                    # self.hdf5_file_data[group_name] = group_dict
-
-                    # PADDING MISMATCHED COLUMNS SIZE
-                    max_length = max(len(lst) for lst in self.hdf5_file_data[group_name].values())
-                    for key, value in self.hdf5_file_data[group_name].items():
-                        if len(value) < max_length:
-                            self.hdf5_file_data[group_name][key] = value + [None] * (max_length - len(value))
-            file_counter += 1
-        self.set_schema2(self.hdf5_file_data)
 
 class MetadataReader1(FileReader):
 
