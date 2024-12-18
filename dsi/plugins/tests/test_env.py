@@ -2,6 +2,7 @@ import collections
 
 from dsi.plugins.env import Hostname, SystemKernel, GitInfo
 import git
+from json import loads
 
 def get_git_root(path):
     git_repo = git.Repo(path, search_parent_directories=True)
