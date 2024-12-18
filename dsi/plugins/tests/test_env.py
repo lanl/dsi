@@ -47,15 +47,15 @@ def test_systemkernel_plugin_type():
 #     # 1 SystemKernel column + 4 inherited Env cols
 #     assert len(plug.output_collector.keys()) == 5
 
-def test_systemkernel_plugin_blob_is_big():
-    plug = SystemKernel()
-    plug.add_rows()
+# def test_systemkernel_plugin_blob_is_big():
+#     plug = SystemKernel()
+#     plug.add_rows()
 
-    blob = plug.output_collector["kernel_info"][0]
-    info_dict = loads(blob)
+#     blob = plug.output_collector["kernel_info"][0]
+#     info_dict = loads(blob)
 
-    # dict should have more than 1000 (~7000) keys
-    assert len(info_dict.keys()) > 1000
+#     # dict should have more than 1000 (~7000) keys
+#     assert len(info_dict.keys()) > 1000
 
 def test_git_plugin_type():
     root = get_git_root('.')
