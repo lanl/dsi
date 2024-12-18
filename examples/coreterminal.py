@@ -3,7 +3,7 @@ from dsi.core import Terminal
 
 '''This is an example workflow using core.py'''
 
-a=Terminal(debug_flag=False, backup_db_flag=False)
+a=Terminal(debug_flag=False)
 
 a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
 a.load_module('plugin','Hostname','reader')
@@ -14,7 +14,7 @@ a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data
 
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
-a.transload()
+# a.transload()
 
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
 # a.load_module('backend','Parquet','back-write',filename='data/bueno.pq')

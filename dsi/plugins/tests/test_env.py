@@ -30,31 +30,31 @@ def test_hostname_plugin_row_shape():
         for col in column_values[1:]:
             assert len(col) == row_shape == row_cnt
 
-# SYSTEM KERNEL FUNCTIONS DONT WORK
-# def test_systemkernel_plugin_type():
-#     plug = SystemKernel()
-#     assert type(plug.output_collector) == collections.OrderedDict
+# SYSTEM KERNEL FUNCTIONS ONLY WORK ON LINUX
+def test_systemkernel_plugin_type():
+    plug = SystemKernel()
+    assert type(plug.output_collector["SystemKernel"]) == collections.OrderedDict
 
-# def test_systemkernel_plugin_adds_rows():
-#     plug = SystemKernel()
-#     plug.add_rows()
-#     plug.add_rows()
+def test_systemkernel_plugin_adds_rows():
+    plug = SystemKernel()
+    plug.add_rows()
+    plug.add_rows()
 
-#     for key, val in plug.output_collector.items():
-#         assert len(val) == 2
+    for key, val in plug.output_collector["SystemKernel"].items():
+        assert len(val) == 2
 
-#     # 1 SystemKernel column + 4 inherited Env cols
-#     assert len(plug.output_collector.keys()) == 5
+    # 1 SystemKernel column + 4 inherited Env cols
+    assert len(plug.output_collector["SystemKernel"].keys()) == 5
 
-# def test_systemkernel_plugin_blob_is_big():
-#     plug = SystemKernel()
-#     plug.add_rows()
+def test_systemkernel_plugin_blob_is_big():
+    plug = SystemKernel()
+    plug.add_rows()
 
-#     blob = plug.output_collector["kernel_info"][0]
-#     info_dict = loads(blob)
+    blob = plug.output_collector["SystemKernel"]["kernel_info"][0]
+    #info_dict = loads(blob)
 
-#     # dict should have more than 1000 (~7000) keys
-#     assert len(info_dict.keys()) > 1000
+    # dict should have more than 1000 (~7000) keys
+    assert len(blob.keys()) > 1000
 
 def test_git_plugin_type():
     root = get_git_root('.')

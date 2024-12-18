@@ -24,7 +24,7 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer"]
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer", "HDF5Reader1", "MetadataReader1"]
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
