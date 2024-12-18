@@ -359,8 +359,9 @@ class Table_Plot(FileWriter):
                 col_len = len(colData)
             if isinstance(colData[0], str) == False:
                 unit_tuple = "NULL"
-                if "dsi_units" in collection.keys() and self.table_name in collection["dsi_units"].keys():
-                    unit_tuple = next((t[1] for t in collection["dsi_units"][self.table_name] if t[0] == colName), "NULL")
+                if "dsi_units" in collection.keys() and self.table_name in collection["dsi_units"].keys() and colName in collection["dsi_units"][self.table_name].keys():
+                    unit_tuple = collection["dsi_units"][self.table_name][colName]
+                    # unit_tuple = next((unit for col, unit in collection["dsi_units"][self.table_name].items() if col == colName), "NULL")
                 if unit_tuple != "NULL":
                     numeric_cols.append((colName + f" ({unit_tuple})", colData))
                 else:
