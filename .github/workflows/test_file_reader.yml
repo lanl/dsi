@@ -9,7 +9,6 @@ on:
     - main
   
 
-
 jobs:
   linux:
     runs-on: ubuntu-latest
@@ -27,8 +26,8 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install -r requirements.extras.txt
         pip install .  
-        pip install graphviz
     - name: Test reader
       run: |
         pip install pytest
