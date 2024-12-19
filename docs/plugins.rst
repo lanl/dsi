@@ -30,4 +30,3 @@ Plugins take data in an arbitrary format, and transform it into metadata which i
 
 .. automodule:: dsi.plugins.plugin_models
    :members:
-
