@@ -21,3 +21,13 @@ Note that any contributed plugins or extension should include unit tests in  ``p
 
 .. automodule:: dsi.plugins.env
    :members:
+
+Optional Plugin Type Enforcement
+==================================
+
+Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. Plugins may enforce types, but they are not required to enforce types. Plugin type enforcement can be static, like the Hostname default plugin. Plugin type enforcement can also be dynamic, like the Bueno default plugin.
+
+
+.. automodule:: dsi.plugins.plugin_models
+   :members:
+
