@@ -591,7 +591,7 @@ class MetadataReader1(FileReader):
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
         '''
         `filenames`: one metadata json file or a list of metadata json files to be ingested
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other metadata json file sources
+        `target_table_prefix`: prefix to be added to every table created to differentiate between other metadata file sources
         '''
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -632,10 +632,10 @@ class MetadataReader1(FileReader):
                         json_data[col_name] = [str(col_data)]
                     else:
                         json_data[col_name] = [col_data]
-                
+
+            filename = filename[filename.rfind("/") + 1:]
+            filename = filename[:filename.rfind(".")]
             if self.target_table_prefix is not None:
                 filename = self.target_table_prefix + "__" + filename
             self.metadata_file_data[filename] = json_data
-            json_data.clear()
-        
         self.set_schema_2(self.metadata_file_data)
