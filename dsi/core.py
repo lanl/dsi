@@ -328,16 +328,6 @@ class Terminal():
         if not isinstance(table_data, OrderedDict):
             raise ValueError("table_data needs to be in the form of an Ordered Dictionary")
         self.active_metadata[table_name] = table_data
-        
-        #allow more plugins to be loaded and can call transload again
-        # self.transload_lock = False
-
-        #need to unload all loaded plugins to prevent duplicate reading when transload called again
-        # mods = self.active_modules
-        # for obj in mods['reader']:
-        #     self.unload_module('plugin', obj.__class__.__name__, "reader")
-        # for obj in mods['writer']:
-        #     self.unload_module('plugin', obj.__class__.__name__, "writer")
             
 
 class Sync():
