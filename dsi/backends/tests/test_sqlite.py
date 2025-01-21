@@ -67,7 +67,7 @@ def test_artifact_inspect():
         os.remove(dbpath)
     store = Sqlite(dbpath, run_table=False)
     store.put_artifacts(valid_middleware_datastructure)
-    store.inspect_artifacts(valid_middleware_datastructure)
+    store.inspect_artifacts()
     assert True
 
 def test_artifact_read():

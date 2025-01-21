@@ -24,7 +24,7 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer"]
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer", "MetadataReader1"]
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
@@ -151,10 +151,14 @@ class Terminal():
                             for colName, colData in table_metadata.items():
                                 if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
                                     self.active_metadata[table_name][colName] += colData
-                                elif colName not in self.active_metadata[table_name].keys():# and table_name == "dsi_units":
+                                elif colName in self.active_metadata[table_name].keys() and table_name == "dsi_units":
+                                    for key, col_unit in colData.items():
+                                        if key not in self.active_metadata[table_name][colName]:
+                                            self.active_metadata[table_name][colName][key] = col_unit
+                                        elif key in self.active_metadata[table_name][colName] and self.active_metadata[table_name][colName][key] != col_unit:
+                                            raise ValueError(f"Cannot have a different set of units for column {key} in {colName}")
+                                elif colName not in self.active_metadata[table_name].keys():
                                     self.active_metadata[table_name][colName] = colData
-                                # elif colName not in self.active_metadata[table_name].keys() and table_name != "dsi_units":
-                                #     raise ValueError(f"Mismatched column input for table {table_name}")
                 elif mod_type == "backend":
                     if "run_table" in class_.__init__.__code__.co_varnames:
                         kwargs['run_table'] = self.runTable
@@ -207,7 +211,6 @@ class Terminal():
 
         term = Terminal()
         term.add_external_python_module('plugin', 'my_python_file',
-
                                         '/the/path/to/my_python_file.py')
 
         term.load_module('plugin', 'MyPlugin', 'reader')
@@ -270,7 +273,8 @@ class Terminal():
 
                 if interaction_type in ['put', 'set'] and module_type == 'back-write':
                     if self.backup_db_flag == True and os.path.getsize(obj.filename) > 100:
-                        backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup" + obj.filename[obj.filename.rfind('.'):]
+                        formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+                        backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup_" + formatted_datetime + obj.filename[obj.filename.rfind('.'):]
                         shutil.copyfile(obj.filename, backup_file)
                     errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
                     if errorMessage is not None:
@@ -284,28 +288,20 @@ class Terminal():
                         self.logger.info(f"Query to get data: {query}")
                         kwargs['query'] = query
                     get_artifact_data = obj.get_artifacts(**kwargs)
-                    # else:
-                    #     #raise ValueError("Need to specify a query of the database to return data")
-                    #     # This is a valid use-case, may give a warning for now
-                    #     get_artifact_data = obj.get_artifacts(**kwargs)
                     operation_success = True
 
                 elif interaction_type == 'inspect':
-                    # if module_type == 'back-write':
-                    #     errorMessage = obj.put_artifacts(
-                    #         collection=self.active_metadata, **kwargs)
-                    #     if errorMessage is not None:
-                    #         print("Error in ingesting data to db in inspect artifact handler. Generating Jupyter notebook with previous instance of db")
-                    if not self.active_metadata:
-                        raise ValueError("Error in inspect artifact handler: Need to ingest data to DSI abstraction before generating Jupyter notebook")
-                    obj.inspect_artifacts(collection=self.active_metadata, **kwargs)
-                    operation_success = True
+                    if os.path.getsize(obj.filename) > 100:
+                        obj.inspect_artifacts(**kwargs)
+                        operation_success = True
+                    else:
+                        raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
 
                 elif interaction_type == "read" and module_type == 'back-read':
                     self.active_metadata = obj.read_to_artifact()
                     operation_success = True
                 elif interaction_type == "read" and module_type == 'back-write':
-                    raise ValueError("Can only call read to artifact handler with a back-READ backend")
+                    raise ValueError("Can only call read artifact handler with a back-READ backend")
                 
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
@@ -332,16 +328,6 @@ class Terminal():
         if not isinstance(table_data, OrderedDict):
             raise ValueError("table_data needs to be in the form of an Ordered Dictionary")
         self.active_metadata[table_name] = table_data
-        
-        #allow more plugins to be loaded and can call transload again
-        # self.transload_lock = False
-
-        #need to unload all loaded plugins to prevent duplicate reading when transload called again
-        # mods = self.active_modules
-        # for obj in mods['reader']:
-        #     self.unload_module('plugin', obj.__class__.__name__, "reader")
-        # for obj in mods['writer']:
-        #     self.unload_module('plugin', obj.__class__.__name__, "writer")
             
 
 class Sync():

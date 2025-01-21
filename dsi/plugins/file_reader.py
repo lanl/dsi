@@ -168,10 +168,10 @@ class Bueno(FileReader):
         #             self.bueno_data[key] = new_list
         #         self.bueno_data[key].append(val)
         #     file_counter += 1
-
-        # max_length = max(len(lst) for lst in self.bueno_data.values())
-
+        
+        # SAVE FOR LATER PLUGINS TO USE - YAML AND TOML USE THIS NOW
         # # Fill the shorter lists with None (or another value)
+        # max_length = max(len(lst) for lst in self.bueno_data.values())
         # for key, value in self.bueno_data.items():
         #     if len(value) < max_length:
         #         # Pad the list with None (or any other value)
@@ -224,12 +224,12 @@ class JSON(FileReader):
         objs = []
         for idx, filename in enumerate(self.filenames):
             with open(filename, 'r') as fh:
-                    file_content = json.load(fh)
-                    objs.append(file_content)
-                    for key, val in file_content.items():
-                        # Check if column already exists
-                        if key not in self.key_data:
-                            self.key_data.append(key)
+                file_content = json.load(fh)
+                objs.append(file_content)
+                for key, val in file_content.items():
+                    # Check if column already exists
+                    if key not in self.key_data:
+                        self.key_data.append(key)
         if not self.schema_is_set():
             self.pack_header()
             for key in self.key_data:
@@ -371,7 +371,7 @@ class YAML1(FileReader):
                         tableName = self.target_table_prefix + "__" + table["segment"]
                     if tableName not in self.yaml_data.keys():
                         self.yaml_data[tableName] = OrderedDict()
-                    unitsList = []
+                    unitsDict = {}
                     for col_name, data in table["columns"].items():
                         unit_data = None
                         if isinstance(data, str) and not isinstance(self.check_type(data[:data.find(" ")]), str):
@@ -380,13 +380,17 @@ class YAML1(FileReader):
                         if col_name not in self.yaml_data[tableName].keys():
                             self.yaml_data[tableName][col_name] = [None] * (file_counter)
                         self.yaml_data[tableName][col_name].append(data)
-                        if unit_data is not None and (col_name, unit_data) not in unitsList:
-                            unitsList.append((col_name, unit_data))
-                    if len(unitsList) > 0:
+                        if unit_data is not None and col_name not in unitsDict.keys():
+                            unitsDict[col_name] = unit_data
+                    if unitsDict:
                         if tableName not in self.yaml_data["dsi_units"].keys():
-                            self.yaml_data["dsi_units"][tableName] = unitsList
+                            self.yaml_data["dsi_units"][tableName] = unitsDict
                         else:
-                            self.yaml_data["dsi_units"][tableName] += list(set(unitsList) - set(self.yaml_data["dsi_units"][tableName]))
+                            overlap_cols = set(self.yaml_data["dsi_units"][tableName].keys()) & set(unitsDict)
+                            for col in overlap_cols:
+                                if self.yaml_data["dsi_units"][tableName][col] != unitsDict[col]:
+                                    raise ValueError(f"Cannot have a different set of units for column {col} in {tableName}")
+                            self.yaml_data["dsi_units"][tableName].update(unitsDict)
 
                     max_length = max(len(lst) for lst in self.yaml_data[tableName].values())
                     for key, value in self.yaml_data[tableName].items():
@@ -481,7 +485,7 @@ class TOML1(FileReader):
                     tableName = self.target_table_prefix + "__" + tableName
                 if tableName not in self.toml_data.keys():
                     self.toml_data[tableName] = OrderedDict()
-                unitsList = []
+                unitsDict = {}
                 for col_name, data in tableData.items():
                     unit_data = None
                     if isinstance(data, dict):
@@ -495,13 +499,17 @@ class TOML1(FileReader):
                     if col_name not in self.toml_data[tableName].keys():
                         self.toml_data[tableName][col_name] = [None] * (file_counter)
                     self.toml_data[tableName][col_name].append(data)
-                    if unit_data is not None and (col_name, unit_data) not in unitsList:
-                        unitsList.append((col_name, unit_data))
-                if len(unitsList) > 0:
+                    if unit_data is not None and col_name not in unitsDict.keys():
+                        unitsDict[col_name] = unit_data
+                if unitsDict:
                         if tableName not in self.toml_data["dsi_units"].keys():
-                            self.toml_data["dsi_units"][tableName] = unitsList
+                            self.toml_data["dsi_units"][tableName] = unitsDict
                         else:
-                            self.toml_data["dsi_units"][tableName] += list(set(unitsList) - set(self.toml_data["dsi_units"][tableName]))
+                            overlap_cols = set(self.toml_data["dsi_units"][tableName].keys()) & set(unitsDict)
+                            for col in overlap_cols:
+                                if self.toml_data["dsi_units"][tableName][col] != unitsDict[col]:
+                                    raise ValueError(f"Cannot have a different set of units for column {col} in {tableName}")
+                            self.toml_data["dsi_units"][tableName].update(unitsDict)
 
                 max_length = max(len(lst) for lst in self.toml_data[tableName].values())
                 for key, value in self.toml_data[tableName].items():
@@ -577,3 +585,57 @@ class TextFile(FileReader):
             else:
                 self.text_file_data["text_file"] = OrderedDict(df.to_dict(orient='list'))
             self.set_schema_2(self.text_file_data)
+
+class MetadataReader1(FileReader):
+
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        '''
+        `filenames`: one metadata json file or a list of metadata json files to be ingested
+        `target_table_prefix`: prefix to be added to every table created to differentiate between other metadata file sources
+        '''
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.metadata_files = [filenames]
+        else:
+            self.metadata_files = filenames
+        self.metadata_file_data = OrderedDict()
+        self.target_table_prefix = target_table_prefix
+    
+    def add_rows(self) -> None:
+        """
+        Parses metadata json files and creates an ordered dict whose keys are file names and values are an ordered dict of that file's data
+        """
+        file_counter = 0
+        for filename in self.metadata_files:
+            json_data = OrderedDict()
+            with open(filename, 'r') as meta_file:
+                file_content = json.load(meta_file)
+                for key, col_data in file_content.items():
+                    col_name = key
+                    if isinstance(col_data, dict):
+                        for inner_key, inner_val in col_data.items():
+                            old_col_name = col_name
+                            col_name = col_name + "__" + inner_key
+                            if isinstance(inner_val, dict):
+                                for key2, val2 in inner_val.items():
+                                    old_col_name2 = col_name
+                                    col_name = col_name + "__" + key2
+                                    json_data[col_name] = [val2]
+                                    col_name = old_col_name2
+                            elif isinstance(inner_val, list):
+                                json_data[col_name] = [str(inner_val)]
+                            else:
+                                json_data[col_name] = [inner_val]
+                            col_name = old_col_name
+
+                    elif isinstance(col_data, list):
+                        json_data[col_name] = [str(col_data)]
+                    else:
+                        json_data[col_name] = [col_data]
+
+            filename = filename[filename.rfind("/") + 1:]
+            filename = filename[:filename.rfind(".")]
+            if self.target_table_prefix is not None:
+                filename = self.target_table_prefix + "__" + filename
+            self.metadata_file_data[filename] = json_data
+        self.set_schema_2(self.metadata_file_data)
