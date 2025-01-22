@@ -16,11 +16,27 @@ class Backend(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_artifacts(self, query):
+    def get_artifacts(self, query, kwargs):
         pass
 
     @abstractmethod
-    def inspect_artifacts(self):
+    def write_artifacts(self, artifacts, kwargs) -> None:
+        pass
+
+    @abstractmethod
+    def process_artifacts(self, query, kwargs):
+        pass
+
+    @abstractmethod
+    def inspect_artifacts(self, kwargs):
+        pass
+    
+    @abstractmethod
+    def read_to_artifacts(self, kwargs):
+        pass
+
+    @abstractmethod
+    def find(self, query_object, kwargs):
         pass
 
 
@@ -48,8 +64,20 @@ class Filesystem(Backend):
     def put_artifacts(self, artifacts, kwargs) -> None:
         pass
 
-    def get_artifacts(self, query):
+    def get_artifacts(self, query, kwargs):
         pass
 
-    def inspect_artifacts(self):
+    def write_artifacts(self, artifacts, kwargs) -> None:
+        pass
+
+    def process_artifacts(self, query, kwargs):
+        pass
+
+    def inspect_artifacts(self, kwargs):
+        pass
+    
+    def read_to_artifacts(self, kwargs):
+        pass
+
+    def find(self, query_object, kwargs):
         pass
