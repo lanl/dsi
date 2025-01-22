@@ -6,9 +6,9 @@ from dsi.core import Terminal
 a=Terminal(debug_flag=False, run_table_flag=True)
 
 a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
-a.load_module('plugin','Hostname','reader')
+# a.load_module('plugin','Hostname','reader')
 
-a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json", target_table_prefix = "student")
+# a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json", target_table_prefix = "student")
 a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"], target_table_prefix = "student")
 a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
