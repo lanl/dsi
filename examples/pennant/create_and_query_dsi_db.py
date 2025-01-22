@@ -57,7 +57,7 @@ if __name__ == "__main__":
     output_csv = "pennant_read_query.csv"
 
     #read in csv
-    core = Terminal(run_table_flag=False)
+    core = Terminal()
     core.load_module('plugin', "Csv", "reader", filenames = csvpath, table_name = table_name)
 
     if os.path.exists(dbpath):
@@ -65,10 +65,12 @@ if __name__ == "__main__":
 
     #load data into sqlite db
     core.load_module('backend','Sqlite','back-write', filename=dbpath)
-    core.artifact_handler(interaction_type='put')
+    # using 'write' instead of 'put' but both do the same thing -- 'write' is new name that will replace 'put'
+    core.artifact_handler(interaction_type='write')
 
     # update dsi abstraction using a query to the sqlite db
-    query_data = core.artifact_handler(interaction_type='get', query = f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", dict_return = True)
+    # using 'process' instead of 'get' but both do the same thing -- 'process' is new name that will replace 'get'
+    query_data = core.artifact_handler(interaction_type='process', query = f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", dict_return = True)
     core.update_abstraction(table_name, query_data)
 
     #export to csv
