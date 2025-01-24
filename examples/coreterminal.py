@@ -25,8 +25,26 @@ a.artifact_handler(interaction_type='write')
 # print(data)
 # a.artifact_handler(interaction_type="inspect")
 
+### FIND FUNCTION EXAMPLES
+## table match                   - return table data
 # data = a.find("data.db", "student")
-# data = a.find("data.db", "student", colFlag = True) #return list of col names from the table instead of the whole table
+# print(data)
+
+## table match (colFlag = True)  - return cols of matching table
+# data = a.find("data.db", "student", colFlag = True)
+# print(data)
+
+## col match                     - return data of matching cols
+# data = a.find("data.db", "specification")
+# print(data)
+
+## col match (data_range = True) - return data of matching cols and the min/max of that col too
+# data = a.find("data.db", "j", data_range = True)
+# print(data)
+
+## value match                   - return list of locations and the values which match the search term
+# data = a.find("data.db", 5.9)
+# data = a.find("data.db", "cm")
 # print(data)
 
 # a.unload_module('backend', 'Sqlite', 'back-write')

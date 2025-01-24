@@ -150,7 +150,8 @@ class Terminal():
                 elif mod_type == "backend":
                     if "run_table" in class_.__init__.__code__.co_varnames:
                         kwargs['run_table'] = self.runTable
-                self.active_modules[mod_function].append(class_(**kwargs))
+                if mod_function != "reader":
+                    self.active_modules[mod_function].append(class_(**kwargs))
                 load_success = True
                 print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()

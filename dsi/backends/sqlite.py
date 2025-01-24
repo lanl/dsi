@@ -378,44 +378,56 @@ class Sqlite(Filesystem):
             unitsDict[tableName][row[1]] = row[2]
         return unitsDict
     
-    def find(self, query_object, colFlag = False):
+    def find(self, query_object, colFlag = False, data_range = False):
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         
         if isinstance(query_object, str):
             #table name check - returns either list of cols in table or the whole table as the second part of a tuple. First part is the table name
+            table_return_list = []
             for table in tableList:
                 if query_object in table[0]:
                     if colFlag == True:
                         colData = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
                         return_cols = [column[1] for column in colData]
-                        return (table[0], return_cols)
+                        table_return_list.append((table[0], return_cols))
                     else:
                         returned_table = self.cur.execute(f"SELECT * FROM {table[0]};").fetchall()
-                        return (table[0], returned_table)
+                        table_return_list.append((table[0], returned_table))
             
-            #col name check - ONLY RETURNS FIRST INSTANCE OF COLUMN FOR NOW as a tuple (table name, column)
+            if len(table_return_list) > 0:
+                return table_return_list
+            
+            #col name check - return is list of all cols that match. ex:[(table1, data_range, col_data) ] -- data range only included if flag is on
+            col_return_list = []
             for table in tableList:
                 colList = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
                 for col in colList:
                     if query_object in col[1]:
                         returned_col = self.cur.execute(f"SELECT {col[1]} FROM {table[0]};").fetchall()
-                        return (table[0], returned_col)
+                        returned_col = [row[0] for row in returned_col]
+                        if data_range == True and not isinstance(returned_col[0], str):
+                            col_return_list.append((table[0], f"data range = {(min(returned_col), max(returned_col))}", returned_col))
+                        else:
+                            col_return_list.append((table[0], returned_col))
+            
+            if len(col_return_list) > 0:
+                return col_return_list
                     
-        #datapoint search - List of all instances where a datapoint exists. ex: [(table1, col2), (table2, col1), (table3, col4)]
+        #value search - List of all instances where a value exists. ex: [(table1, col2, value), (table2, col1, value), (table3, col4, value)]
         query_list = []
         for table in tableList:
             colList = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
             for col in colList:
                 if isinstance(query_object, str):
-                    col_query = f"SELECT '{table[0]}', '{col[1]}' FROM {table[0]} WHERE {col[1]} LIKE '%{query_object}%'" 
+                    col_query = f"SELECT '{table[0]}', '{col[1]}', {col[1]} FROM {table[0]} WHERE {col[1]} LIKE '%{query_object}%'" 
                 else:
-                    col_query = f"SELECT '{table[0]}', '{col[1]}' FROM {table[0]} WHERE CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
+                    col_query = f"SELECT '{table[0]}', '{col[1]}', {col[1]} FROM {table[0]} WHERE CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
                 query_list.append(col_query)
         
-        datapoint_query = " UNION ".join(query_list) + ";"
-        datapoint_return = self.cur.execute(datapoint_query).fetchall()
-        if len(datapoint_return) > 0:
-            return datapoint_return
+        value_query = " UNION ".join(query_list) + ";"
+        value_return = self.cur.execute(value_query).fetchall()
+        if len(value_return) > 0:
+            return value_return
 
         raise ValueError(f"{query_object} does not exist in this database")
 
