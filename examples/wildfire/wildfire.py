@@ -106,7 +106,7 @@ if __name__ == "__main__":
         shutil.rmtree(path_to_cinema_images)
     os.rename(imgDstFolder, path_to_cinema_images)
 
-    core = Terminal(run_table_flag=False)
+    core = Terminal()
     core.load_module('plugin', "Csv", "reader", filenames = path_to_csv_input, table_name = dbName)
 
     # update DSI abstraction directly
@@ -128,6 +128,7 @@ if __name__ == "__main__":
 
     #load data to a sqlite database
     core.load_module('backend','Sqlite','back-write', filename=path_to_sqlite_db)
-    core.artifact_handler(interaction_type='put')
+    # using 'write' instead of 'put' but both do the same thing -- 'write' is new name that will replace 'put'
+    core.artifact_handler(interaction_type='write')
 
 

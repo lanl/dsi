@@ -1,6 +1,4 @@
-# import csv
 import sqlite3
-# import json
 import re
 import subprocess
 from datetime import datetime
@@ -10,7 +8,6 @@ from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
 
 # Declare supported named types for sql
-
 DOUBLE = "DOUBLE"
 STRING = "VARCHAR"
 FLOAT = "FLOAT"
@@ -19,7 +16,7 @@ JSON = "TEXT"
 
 # Holds table name and data properties
 class DataType:
-    name = "" # Note: using the word DEFAULT outputs a syntax error
+    name = ""
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
 
@@ -34,14 +31,6 @@ class Artifact:
 
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
-    """
-        Primary storage class, inherits sql class
-    """
-    filename = "fs.db"
-    types = None
-    con = None
-    cur = None
-
     def __init__(self, filename, run_table = True):
         self.filename = filename
         self.con = sqlite3.connect(filename)
@@ -97,6 +86,10 @@ class Sqlite(Filesystem):
             self.cur.execute(str_query)
             self.types = types
 
+    #newer name for put_artifacts. eventually delete put_artifacts
+    def write_artifacts(self, collection, isVerbose=False):
+        return self.put_artifacts(collection, isVerbose)
+
     def put_artifacts(self, collection, isVerbose=False):
         """
         Primary class for insertion of collection of Artifacts metadata into a defined schema
@@ -105,7 +98,6 @@ class Sqlite(Filesystem):
                      filled with rows to insert.
         `return`: none
         """
-        # Core compatibility name assignment
         artifacts = collection
         
         if self.run_flag:
@@ -189,7 +181,10 @@ class Sqlite(Filesystem):
             self.con.rollback()
             return e
 
-    # Returns text list from query
+    #newer name for get_artifacts. eventually delete get_artifacts
+    def process_artifacts(self, query, isVerbose=False, dict_return = False):
+        return self.get_artifacts(query, isVerbose, dict_return)
+    
     def get_artifacts(self, query, isVerbose=False, dict_return = False):
         if query[:6].lower() == "select" or query[:6].lower() == "pragma" :
             try:
@@ -197,9 +192,9 @@ class Sqlite(Filesystem):
                 if isVerbose:
                     print(data)
             except:
-                raise ValueError("Error in get_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                raise ValueError("Error in get_artifacts/process_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            raise ValueError("Error in get_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            raise ValueError("Error in get_artifacts/process_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
@@ -207,7 +202,7 @@ class Sqlite(Filesystem):
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
             # table_names = [table[0] or table[1] for table in tables]
             if len(tables) > 1:
-                raise ValueError("Error in get_artifacts handler: Can only return ordered dictionary if query with one table")
+                raise ValueError("Error in get_artifacts/process_artifacts handler: Can only return ordered dictionary if query with one table")
             # col_info = self.cur.execute(f"PRAGMA table_info({table_names[0]});").fetchall()
             # complete_cols = [column[1] for column in col_info]
             # if not set(query_cols).issubset(set(complete_cols)):
@@ -382,6 +377,59 @@ class Sqlite(Filesystem):
                 unitsDict[tableName] = {}
             unitsDict[tableName][row[1]] = row[2]
         return unitsDict
+    
+    def find(self, query_object, colFlag = False, data_range = False):
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        
+        if isinstance(query_object, str):
+            #table name check - returns either list of cols in table or the whole table as the second part of a tuple. First part is the table name
+            table_return_list = []
+            for table in tableList:
+                if query_object in table[0]:
+                    if colFlag == True:
+                        colData = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
+                        return_cols = [column[1] for column in colData]
+                        table_return_list.append((table[0], return_cols))
+                    else:
+                        returned_table = self.cur.execute(f"SELECT * FROM {table[0]};").fetchall()
+                        table_return_list.append((table[0], returned_table))
+            
+            if len(table_return_list) > 0:
+                return table_return_list
+            
+            #col name check - return is list of all cols that match. ex:[(table1, data_range, col_data) ] -- data range only included if flag is on
+            col_return_list = []
+            for table in tableList:
+                colList = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
+                for col in colList:
+                    if query_object in col[1]:
+                        returned_col = self.cur.execute(f"SELECT {col[1]} FROM {table[0]};").fetchall()
+                        returned_col = [row[0] for row in returned_col]
+                        if data_range == True and not isinstance(returned_col[0], str):
+                            col_return_list.append((table[0], f"data range = {(min(returned_col), max(returned_col))}", returned_col))
+                        else:
+                            col_return_list.append((table[0], returned_col))
+            
+            if len(col_return_list) > 0:
+                return col_return_list
+                    
+        #value search - List of all instances where a value exists. ex: [(table1, col2, value), (table2, col1, value), (table3, col4, value)]
+        query_list = []
+        for table in tableList:
+            colList = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
+            for col in colList:
+                if isinstance(query_object, str):
+                    col_query = f"SELECT '{table[0]}', '{col[1]}', {col[1]} FROM {table[0]} WHERE {col[1]} LIKE '%{query_object}%'" 
+                else:
+                    col_query = f"SELECT '{table[0]}', '{col[1]}', {col[1]} FROM {table[0]} WHERE CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
+                query_list.append(col_query)
+        
+        value_query = " UNION ".join(query_list) + ";"
+        value_return = self.cur.execute(value_query).fetchall()
+        if len(value_return) > 0:
+            return value_return
+
+        raise ValueError(f"{query_object} does not exist in this database")
 
     # Closes connection to server
     def close(self):
@@ -403,68 +451,6 @@ class Sqlite(Filesystem):
         self.types = DataType()
         self.types.name = tableName
         self.put_artifacts(collection, isVerbose)
-    
-    # OLD GET ARTIFACTS FUNCTION
-    # OLD GET ARTIFACTS FUNCTION
-    # OLD GET ARTIFACTS FUNCTION
-    # def get_artifact_list(self, query, isVerbose=False):
-    #     """
-    #     Function that returns a list of all of the Artifact names (represented as sql tables)
-
-    #     `return`: list of Artifact names
-    #     """
-    #     str_query = query
-    #     if isVerbose:
-    #         print(str_query)
-
-    #     resout = self.cur.execute(str_query).fetchall()
-
-    #     if isVerbose:
-    #         print(resout)
-
-    #     return resout
-
-    """
-    OLD PASS THROUGH PUT ARTIFACT FUNCTIONS
-    OLD PASS THROUGH PUT ARTIFACT FUNCTIONS
-    OLD PASS THROUGH PUT ARTIFACT FUNCTIONS
-    """
-    # def put_artifacts_only(self, artifacts, isVerbose=False):
-    #     """
-    #     Function for insertion of Artifact metadata into a defined schema as a Tuple
-
-    #     `Artifacts`: DataType derived class that has a regular structure of a defined schema,
-    #                  filled with rows to insert.
-
-    #     `return`: none
-    #     """
-    #     self.types = artifacts
-
-    #     #self.types already defined previous
-    #     col_names = ', '.join(self.types.properties.keys())
-    #     placeholders = ', '.join('?' * len(self.types.properties))
-
-    #     str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(self.types.name), col_names, placeholders)
-        
-    #     if isVerbose:
-    #         print(str_query)
-
-    #     # col_list helps access the specific keys of the dictionary in the for loop
-    #     col_list = col_names.split(', ')
-
-    #     # loop through the contents of each column and insert into table as a row
-    #     for ind1 in range(len(self.types.properties[col_list[0]])):
-    #         vals = []
-    #         for ind2 in range(len(self.types.properties.keys())):
-    #             if len(self.types.properties[col_list[ind2]]) <= ind1:
-    #                 vals.append(str(''))
-    #                 continue
-    #             vals.append(str(self.types.properties[col_list[ind2]][ind1]))
-    #         # Make sure this works if types.properties[][] is already a string
-    #         tup_vals = tuple(vals)
-    #         self.cur.execute(str_query,tup_vals)
-
-    #     self.con.commit()
 
      # Adds rows to the columns defined previously
     def put_artifacts_lgcy(self,artifacts, isVerbose=False):
@@ -492,300 +478,3 @@ class Sqlite(Filesystem):
         
         self.cur.execute(str_query)
         self.con.commit()
-
-    # def put_artifacts_json(self, fname, tname, isVerbose=False):
-    #     """
-    #     Function for insertion of Artifact metadata into a defined schema by using a JSON file
-    #     `fname`: filepath to the .json file to be read and inserted into the database
-
-    #     `tname`: String name of the table to be inserted
-
-    #     `return`: none
-    #     """
-
-    #     json_str = None
-    #     try:
-    #         j = open(fname)
-    #         data = json.load(j)
-    #         json_str = json.dumps(data)
-    #         json_str = "'" + json_str + "'"
-    #         j.close()
-    #     except IOError as i:
-    #         print(i)
-    #         return
-    #     except ValueError as v:
-    #         print(v)
-    #         return
-
-    #     types = DataType()
-    #     types.properties = {}
-    #     types.name = tname
-        
-    #     # Check if this has been defined from helper function
-    #     if self.types != None:
-    #         types.name = self.types.name
-
-    #     col_name = re.sub(r'.json', '', fname)
-    #     col_name = re.sub(r'.*/', '', col_name)
-    #     col_name = "'" + col_name + "'"
-    #     types.properties[col_name] = JSON
-           
-    #     self.put_artifact_type(types)
-    #     col_names = ', '.join(types.properties.keys())
-    #     str_query = "INSERT INTO {} ({}) VALUES ({});".format(str(types.name), col_names, json_str)
-    #     if isVerbose:
-    #         print(str_query)
-
-    #     self.types = types
-    #     self.cur.execute(str_query)
-    #     self.con.commit()
-
-    # Adds columns and rows automaticallly based on a csv file
-    #[NOTE 3] This method should be deprecated in favor of put_artifacts.
-    # def put_artifacts_csv(self, fname, tname, isVerbose=False):
-    #     """
-    #     Function for insertion of Artifact metadata into a defined schema by using a CSV file,
-    #     where the first row of the CSV contains the column names of the schema. Any rows
-    #     thereafter contain data to be inserted. Data types are automatically assigned based on
-    #     typecasting and default to a string type if none can be found.
-
-    #     `fname`: filepath to the .csv file to be read and inserted into the database
-
-    #     `tname`: String name of the table to be inserted
-
-    #     `return`: none
-    #     """
-    #     if isVerbose:
-    #         print("Opening " + fname)
-
-    #     print('Entering csv method')
-    #     #[BEGIN NOTE 1] This is a csv getter. Does it belong? QW
-    #     with open(fname) as csv_file:
-    #         csv_reader = csv.reader(csv_file, delimiter=',')
-    #         header = next(csv_reader)
-
-    #         line_count = 0
-    #         for row in csv_reader:
-    #             if line_count == 0:
-    #                 str_query = "CREATE TABLE IF NOT EXISTS " + \
-    #                     str(tname) + " ( "
-    #                 for columnd, columnh in zip(row, header):
-    #                     DataType = self.check_type(columnd)
-    #                     str_query = str_query + \
-    #                         str(columnh) + str(DataType) + ","
-
-    #                 str_query = str_query.rstrip(',')
-    #                 str_query = str_query + " )"
-
-    #                 if isVerbose:
-    #                     print(str_query)
-
-    #                 self.cur.execute(str_query)
-    #                 self.con.commit()
-    #                 line_count += 1
-    #     #[END NOTE 1] QW
-    #     #[BEGIN NOTE 2]  This puts each row into a potentially new table. It does not take existing metadata as input. QW
-    #             str_query = "INSERT INTO " + str(tname) + " VALUES ( "
-    #             for column in row:
-    #                 str_query = str_query + " '" + str(column) + "'"
-    #                 str_query = str_query + ","
-
-    #             str_query = str_query.rstrip(',')
-    #             str_query = str_query + " )"
-
-    #             if isVerbose:
-    #                 print(str_query)
-
-    #             self.cur.execute(str_query)
-    #             self.con.commit()
-    #             line_count += 1
-
-    #         if isVerbose:
-    #             print("Read " + str(line_count) + " rows.")
-    #   #[END NOTE 2]
-
-    # ------- Query related functions -----
-    # Raw sql query
-    # def sqlquery(self, query, isVerbose=False):
-    #     """
-    #     Function that provides a direct sql query passthrough to the database.
-
-    #     `query`: raw SQL query to be executed on current table
-
-    #     `return`: raw sql query list that contains result of the original query
-    #     """
-    #     if isVerbose:
-    #         print(query)
-
-    #     self.cur = self.con.cursor()
-    #     self.res = self.cur.execute(query)
-    #     resout = self.res.fetchall()
-    #     self.con.commit()
-
-    #     if isVerbose:
-    #         print(resout)
-
-    #     return resout
-
-    # Given an output of a sql query, reformat and write a csv of the subset data
-    # def export_csv_query(self, query, fname, isVerbose=False):
-    #     """
-    #     Function that outputs a csv file of a return query, given an initial query.
-
-    #     `query`: raw SQL query to be executed on current table
-
-    #     `fname`: target filename (including path) that will output the return query as a csv file
-
-    #     `return`: none
-    #     """
-    #     if isVerbose:
-    #         print(query)
-        
-    #     # Parse the table out of the query
-    #     tname = query.split("FROM ",1)[1]
-    #     # Check to see if query is delimited
-    #     if ";" in query:
-    #         tname = tname[:-1]
-
-    #     # Isolate table name from other commands
-    #     if "WHERE" in tname:
-    #         tname = tname.split("WHERE ",1)[0][:-1]
-        
-    #     if isVerbose:
-    #         print("Table: " + tname)
-
-    #     self.cur = self.con.cursor()
-    #     # Carry out query
-    #     qdata = self.con.execute(query)
-        
-    #     # Gather column names
-    #     if "*" in query:
-    #         cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-    #         cnames = [entry[1] for entry in cdata]
-    #     else:
-    #         cnames = query.split("SELECT ",1)[1]
-    #         cnames = cnames.split("FROM ",1)[0][:-1]
-    #         cnames = cnames.split(',')
-
-    #     if isVerbose:
-    #         print(cnames)
-
-    #     with open(fname, "w+") as ocsv:
-    #         csvWriter = csv.writer(ocsv, delimiter=',')
-    #         csvWriter.writerow(cnames)
-
-    #         for row in qdata:
-    #             print(row)
-    #             csvWriter.writerow(row)
-
-    #     return 1
-
-    # def export_csv(self, rquery, tname, fname, isVerbose=False):
-    #     """
-    #     Function that outputs a csv file of a return query, not the query itself
-
-    #     `rquery`: return of an already called query output
-
-    #     `tname`: name of the table for (all) columns to export
-
-    #     `fname`: target filename (including path) that will output the return query as a csv file
-
-    #     `return`: none
-    #     """
-    #     if isVerbose:
-    #         print(rquery)
-
-    #     self.cur = self.con.cursor()
-    #     cdata = self.con.execute(f'PRAGMA table_info({tname});').fetchall()
-    #     cnames = [entry[1] for entry in cdata]
-    #     if isVerbose:
-    #         print(cnames)
-
-    #     with open(fname, "w+") as ocsv:
-    #         csvWriter = csv.writer(ocsv, delimiter=',')
-    #         csvWriter.writerow(cnames)
-
-    #         for row in rquery:
-    #             print(row)
-    #             csvWriter.writerow(row)
-
-    #     return 1
-
-    '''UNUSED QUERY FUNCTIONS'''
-    
-    # Query file name
-    # def query_fname(self, name, isVerbose=False):
-    #     """
-    #     Function that queries filenames within the filesystem metadata store
-
-    #     `name`: string name of a subsection of a filename to be searched
-
-    #     `return`: query list of filenames matching `name` string
-    #     """
-    #     table = "filesystem"
-    #     str_query = "SELECT * FROM " + \
-    #         str(table) + " WHERE file LIKE '%" + str(name) + "%'"
-    #     if isVerbose:
-    #         print(str_query)
-
-    #     self.cur = self.con.cursor()
-    #     self.res = self.cur.execute(str_query)
-    #     resout = self.res.fetchall()
-
-    #     if isVerbose:
-    #         print(resout)
-
-    #     return resout
-
-    # # Query file size
-
-    # def query_fsize(self, operator, size, isVerbose=False):
-    #     """
-    #     Function that queries ranges of file sizes within the filesystem metadata store
-
-    #     `operator`: operator input GT, LT, EQ as a modifier for a filesize search
-
-    #     `size`: size in bytes
-
-    #     `return`: query list of filenames matching filesize criteria with modifiers
-    #     """
-    #     str_query = "SELECT * FROM " + \
-    #         str(self.types.name) + " WHERE st_size " + \
-    #         str(operator) + " " + str(size)
-    #     if isVerbose:
-    #         print(str_query)
-
-    #     self.cur = self.con.cursor()
-    #     self.res = self.cur.execute(str_query)
-    #     resout = self.res.fetchall()
-
-    #     if isVerbose:
-    #         print(resout)
-
-    #     return resout
-
-    # # Query file creation time
-    # def query_fctime(self, operator, ctime, isVerbose=False):
-    #     """
-    #     Function that queries file creation times within the filesystem metadata store
-
-    #     `operator`: operator input GT, LT, EQ as a modifier for a creation time search
-
-    #     `ctime`: creation time in POSIX format, see the utils `dateToPosix` conversion function
-
-    #     `return`: query list of filenames matching the creation time criteria with modifiers
-    #     """
-    #     str_query = "SELECT * FROM " + \
-    #         str(self.types.name) + " WHERE st_ctime " + \
-    #         str(operator) + " " + str(ctime)
-    #     if isVerbose:
-    #         print(str_query)
-
-    #     self.cur = self.con.cursor()
-    #     self.res = self.cur.execute(str_query)
-    #     resout = self.res.fetchall()
-
-    #     if isVerbose:
-    #         print(resout)
-
-    #     return resout

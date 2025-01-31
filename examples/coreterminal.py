@@ -3,12 +3,12 @@ from dsi.core import Terminal
 
 '''This is an example workflow using core.py'''
 
-a=Terminal(debug_flag=False)
+a=Terminal(debug_flag=False, run_table_flag=True)
 
 a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
-a.load_module('plugin','Hostname','reader')
+# a.load_module('plugin','Hostname','reader')
 
-a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json", target_table_prefix = "student")
+# a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json", target_table_prefix = "student")
 a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"], target_table_prefix = "student")
 a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
@@ -20,10 +20,32 @@ a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
 # a.load_module('backend','Parquet','back-write',filename='data/bueno.pq')
 
-a.artifact_handler(interaction_type='put')
-# data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM runTable;")#, isVerbose = True)
+a.artifact_handler(interaction_type='write')
+# data = a.artifact_handler(interaction_type='process', query = "SELECT * FROM runTable;")#, isVerbose = True)
 # print(data)
 # a.artifact_handler(interaction_type="inspect")
+
+### FIND FUNCTION EXAMPLES
+## table match                   - return table data
+# data = a.find("data.db", "student")
+# print(data)
+
+## table match (colFlag = True)  - return cols of matching table
+# data = a.find("data.db", "student", colFlag = True)
+# print(data)
+
+## col match                     - return data of matching cols
+# data = a.find("data.db", "specification")
+# print(data)
+
+## col match (data_range = True) - return data of matching cols and the min/max of that col too
+# data = a.find("data.db", "j", data_range = True)
+# print(data)
+
+## value match                   - return list of locations and the values which match the search term
+# data = a.find("data.db", 5.9)
+# data = a.find("data.db", "cm")
+# print(data)
 
 # a.unload_module('backend', 'Sqlite', 'back-write')
 
