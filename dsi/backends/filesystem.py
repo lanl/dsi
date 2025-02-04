@@ -38,7 +38,10 @@ class Backend(metaclass=ABCMeta):
     @abstractmethod
     def find(self, query_object, kwargs):
         pass
-
+    
+    @abstractmethod
+    def close(self):
+        pass
 
 class Filesystem(Backend):
     git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
@@ -80,4 +83,7 @@ class Filesystem(Backend):
         pass
 
     def find(self, query_object, kwargs):
+        pass
+
+    def close(self):
         pass
