@@ -1,0 +1,3 @@
+pysqlite3
+numpy
+jupyterlab
