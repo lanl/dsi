@@ -33,7 +33,7 @@ class Store:
         Args:
             path (str) : path to where to create or db to connect to
         """
-        print(f"path: {path}")
+        #print(f"path: {path}")
         self.conn = sqlite3.connect(path)
 
         cursor = self.conn.cursor()
@@ -142,7 +142,7 @@ class Store:
         Get data out from a table
 
         Args:
-            query (str) : query to run on the 
+            query (str) : query to run on the database
 
         Returns:
              list[tuple] : all the data from the table

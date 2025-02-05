@@ -1,20 +1,12 @@
 import sqlite3
 import shutil
-import sys
+import os
 import logging
-import random
-import string
+import hashlib
+import uuid
+import time
 
 from db import Store
-
-
-
-def random_string(length: int) -> str:
-    """
-    Generates a random string of letters with the given length.
-    """
-    letters = string.ascii_letters  # 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    return ''.join(random.choices(letters, k=length))
 
 
 class ParallelDB:
@@ -22,46 +14,111 @@ class ParallelDB:
     A class that allows data to be ingested in parallel in a sqlite database
 
     Attributes:
-        db_name (str): The path of the original database
-        dbs (list)   : list of parallel databases
+        database: the actual database to connect to
 
     """
 
-    
-    dbs = []           # list of databases
-    initialized_params = {}     # count how many times this class has been called
+    # Class variables
+    initialized_params = {}  # count how many times this class has been called
+    db_status = {}           # dictionary of object ids and their status
 
 
-    def __init__(self, db_name: str, n: int) -> None:
+    def __init__(self, db_name: str, n: int, use_mpi: bool = False, mpi_rank: int = 0) -> None:
         """
         Initialize a database
 
         Args;
             db_name (str): path of the orinal database
-            n (int)      : number of parallel ranks being used to ingest data in the database
+            n (int)      : number of parallel shards being used to ingest data in the database
         """
 
-        
+        # Exit is the file does not exist
+        if not os.path.isfile(db_name):
+            print(f"{db_name} does not exist. Exiting!")
+            logging.info(f"{db_name} does not exist. Exiting!")
+            return
+
+
+        # store the number of databases we want
+        self.n = n  
+        self.db_name = db_name
+        self.dbs = []               # list of databases
+        self.use_mpi = use_mpi
+
+
+        # Creating temp databases
         if db_name in ParallelDB.initialized_params:
-            print("Already initilized")
             pass
         else:
-            print("New initialization")
-            # Save the name of the database
-            
+            logging.debug(f"New initialization for {db_name}.")
 
-            ParallelDB.initialized_params[db_name] = 0   # add this parameter
+            ParallelDB.initialized_params[db_name] = 0   # keep track of shard number of database
 
             # Create n temporary databases
             for i in range(n):
-                temp_db = f"_temp_db_{i}.db"
+                temp_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{i}.db"    # Create a temporary name
                 shutil.copy(db_name, temp_db)           # Create a copy of the databse
-                self.dbs.append(f"_temp_db_{i}.db")     # save the name of the database
+                self.dbs.append(temp_db)                # save the name of the database
 
+
+        # Exit if more databases are created than allowed
+        if ParallelDB.initialized_params[db_name] >= n:
+            print(f"Too many allocated. Exiting!")
+            logging.info(f"Too many allocated. Exiting!")
+            return
+        
 
         # Connect to the database
-        self.database = Store( self.dbs[ ParallelDB.initialized_params[db_name] ] )
+        if use_mpi:
+            my_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{ParallelDB.initialized_params[db_name]}.db"
+        else:
+            my_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{mpi_rank}.db"
+        
+        self.database = Store( my_db )
+
+
+        self.uuid = uuid.uuid4().hex
+        self.db_status[self.uuid] = 0 # in reading data mode
+        #print(self.uuid)
+
+        
+        print(f"Starting shard {ParallelDB.initialized_params[db_name] +1} of {n} for {db_name}.")
+        logging.debug(f"Starting shard {ParallelDB.initialized_params[db_name] +1} of {n} for {db_name}.")
+
+        # increment counter
         ParallelDB.initialized_params[db_name] = ParallelDB.initialized_params[db_name] + 1
+
+
+
+
+
+    def all_done(self) -> None:
+        """
+        To be called by each rank once all the data has been ingested
+        """
+        
+        self.db_status[self.uuid] = 1   # done!
+
+        sum = 0
+        for k in self.db_status:
+            sum = sum + self.db_status[k]
+        
+
+        if sum != self.n:
+            # some databases are still reading
+            return
+        else:
+            print("Merging databases")
+            self.__merge_tables()
+
+
+
+            for file_path in self.dbs:
+                if os.path.exists(file_path):   # Check if file exists
+                    os.remove(file_path)        # Delete the file
+                    print(f"{file_path} deleted successfully")
+
+
 
 
 
@@ -81,6 +138,7 @@ class ParallelDB:
 
 
 
+
     def __merge_table(self, target_db: str, source_db: str, table_name: str) -> int:
         """
         Merge a table from source_db into target_db, avoiding exact duplicates.
@@ -93,6 +151,9 @@ class ParallelDB:
         Return:
             int: status; 1 is success and 0 is failure
         """
+
+        start_time = time.perf_counter()
+
 
         target_conn = sqlite3.connect(target_db)
         target_cursor = target_conn.cursor()
@@ -125,7 +186,7 @@ class ParallelDB:
             exact_match = target_cursor.fetchone()
 
             if exact_match:
-                print(f"Skipping duplicate in {table_name}: {row}")
+                #print(f"Skipping duplicate in {table_name}: {row}")
                 logging.debug(f"Skipping duplicate in {table_name}: {row}") 
             else:
                 #print(f"Inserting new entry in {table_name}: {row}")
@@ -136,13 +197,15 @@ class ParallelDB:
         target_conn.close()
         source_conn.close()
 
-        print(f"Merging for {table_name} completed.")
-        logging.into(f"Merging for {table_name} completed.") 
+        end_time = time.perf_counter()
+
+        #print(f"Merging table {table_name} took {end_time - start_time} s.")
+        logging.debug(f"Merging table {table_name} took {end_time - start_time} s.") 
         return 1
 
 
 
-    def merge_tables(self):
+    def __merge_tables(self) -> None:
         """
         Merge all the tables in a database
         """
@@ -154,11 +217,19 @@ class ParallelDB:
         tables = [table[0] for table in cursor.fetchall()]
         conn.close()
 
+
         # Merge the tables
         for db in self.dbs:
-            print(f"Merging table {db}")
+            start_time = time.perf_counter()
+
+            #print(f"Merging table {db}")
             for table in tables:
                 merge_status = self.__merge_table(self.db_name, db, table)
+
+            end_time = time.perf_counter()
+            logging.info(f"Merging {db} took {end_time - start_time} s.") 
+            print(f"Merging {db} took {end_time - start_time} s.") 
+            
 
 
 
