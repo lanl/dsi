@@ -8,6 +8,7 @@ import re
 import yaml
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
+from datetime import datetime
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -35,9 +36,14 @@ class FileReader(StructuredMetadata):
 
 class Csv(FileReader):
     """
-    A Plugin to ingest CSV data
+    A Structured Data Plugin to ingest CSV data
     """
     def __init__(self, filenames, table_name = None, **kwargs):
+        """
+        Initializes CSV Reader with user specified parameters. INCLUDE NECESSARY PARAMETERS WHEN LOADING THIS PLUGIN WITH CORE.LOAD_MODULE()
+        `filenames`: Required input. List of CSV files, or just one CSV files to store in DSI. If a list, data in all files must be for the same table
+        `table_name`: default None. User can specify table name when loading CSV file. Otherwise DSI uses table_name = "Csv"
+        """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
         if isinstance(filenames, str):
@@ -68,15 +74,79 @@ class Csv(FileReader):
         
         self.set_schema_2(self.csv_data)
 
+class Wildfire(FileReader):
+    """
+    A Structured Data Plugin to ingest Wildfire data stored as a CSV
+    Can be used for other cases if data is post-processed and running only once.
+    Can create a manual simulation table
+    """
+    def __init__(self, filenames, table_name = None, sim_table = False, **kwargs):
+        """
+        Initializes Wildfire Reader with user specified parameters.
+        `filenames`: Required input -- Wildfire data files
+        `table_name`: default None. User can specify table name when loading the wildfire file.        
+        `sim_table`: default False. Set to True if creating manual simulation table where each row of Wildfire file is a separate sim
+            - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
+        """
+        super().__init__(filenames, **kwargs)
+        self.csv_data = OrderedDict()
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
+        self.table_name = table_name
+        self.sim_table = sim_table
+
+    def add_rows(self) -> None:
+        """ 
+        Creates Ordered Dictionary for the wildfire data. 
+        If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
+        """
+        if self.table_name is None:
+            self.table_name = "Wildfire"
+
+        total_df = DataFrame()
+        for filename in self.filenames:
+            temp_df = read_csv(filename)
+            try:
+                total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
+            except:
+                return (ValueError, f"Error in adding {filename} to the existing wildfire data. Please recheck column names and data structure")
+        
+        if self.sim_table:
+            total_df['sim_id'] = range(1, len(total_df) + 1)
+            total_df = total_df[['sim_id'] + [col for col in total_df.columns if col != 'sim_id']]
+
+        total_data = OrderedDict(total_df.to_dict(orient='list'))
+        for col, coldata in total_data.items():  # replace NaNs with None
+            total_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+        
+        self.csv_data[self.table_name] = total_data
+        
+        if self.sim_table:
+            sim_list = list(range(1, len(total_df) + 1))
+            sim_dict = OrderedDict([('sim_id', sim_list)])
+            self.csv_data["simulation"] = sim_dict
+
+            relation_dict = OrderedDict([('primary_key', []), ('foreign_key', [])])
+            relation_dict["primary_key"].append(("simulation", "sim_id"))
+            relation_dict["foreign_key"].append((self.table_name, "sim_id"))
+            self.csv_data["dsi_relations"] = relation_dict
+       
+        self.set_schema_2(self.csv_data)
+
 class Bueno(FileReader):
     """
-    A Plugin to capture performance data from Bueno (github.com/lanl/bueno)
+    A Structured Data Plugin to capture performance data from Bueno (github.com/lanl/bueno)
 
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values
     are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
 
     def __init__(self, filenames, **kwargs) -> None:
+        """
+        `filenames`: one Bueno file or a list of Bueno files to be ingested
+        """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.filenames = [filenames]
@@ -85,7 +155,9 @@ class Bueno(FileReader):
         self.bueno_data = OrderedDict()
 
     def add_rows(self) -> None:
-        """Parses Bueno data and adds a list containing 1 or more rows."""
+        """
+        Parses Bueno data and adds a list containing 1 or more rows.
+        """
         file_counter = 0
         total_df = DataFrame()
         for filename in self.filenames:
@@ -110,7 +182,7 @@ class Bueno(FileReader):
 
 class JSON(FileReader):
     """
-    A Plugin to capture JSON data
+    A Structured Data Plugin to capture JSON data
 
     The JSON data's keys are used as columns and values are rows
    
@@ -149,18 +221,26 @@ class JSON(FileReader):
             self.add_to_output(list(new_row.values()))
 
 class Schema(FileReader):
-    '''
-    Plugin to parse schema of a data source that is about to be ingested.
+    """
+    Structured Data Plugin to parse schema of a data source that is about to be ingested.
     Schema file input should be a JSON file that stores primary and foreign keys for all tables in the data source.
     Store all relations in global dsi_relations table used for creating backends/writers
-    '''
+    """
     def __init__(self, filename, target_table_prefix = None, **kwargs):
+        """
+        `filename`: file name of the json file to be ingested
+        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        """
         super().__init__(filename, **kwargs)
         self.schema_file = filename
         self.target_table_prefix = target_table_prefix
         self.schema_data = OrderedDict()
 
-    def add_rows(self) -> None:    
+    def add_rows(self) -> None:
+        """
+        Generates the dsi_relations OrderedDict to be added to the internal DSI abstraction. 
+        The Ordered Dict has 2 keys, primary key and foreign key, with their values a list of PK and FK tuples associating tables and columns 
+        """
         self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
         with open(self.schema_file, 'r') as fh:
             schema_content = json.load(fh)
@@ -170,11 +250,12 @@ class Schema(FileReader):
                     tableName = self.target_table_prefix + "__" + tableName
                 
                 pkList = []
-                for colName, colData in tableData["foreign_key"].items():
-                    if self.target_table_prefix is not None:
-                        colData[0] = self.target_table_prefix + "__" + colData[0]
-                    self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
-                    self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
+                if "foreign_key" in tableData.keys():
+                    for colName, colData in tableData["foreign_key"].items():
+                        if self.target_table_prefix is not None:
+                            colData[0] = self.target_table_prefix + "__" + colData[0]
+                        self.schema_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
+                        self.schema_data["dsi_relations"]["foreign_key"].append((tableName, colName))
 
                 if "primary_key" in tableData.keys():
                     pkList.append((tableName, tableData["primary_key"]))
@@ -186,16 +267,16 @@ class Schema(FileReader):
             self.set_schema_2(self.schema_data)
 
 class YAML1(FileReader):
-    '''
-    Plugin to read in an individual or a set of YAML files
+    """
+    Structured Data Plugin to read in an individual or a set of YAML files
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
-    '''
+    """
     def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
-        '''
+        """
         `filenames`: one yaml file or a list of yaml files to be ingested
         `target_table_prefix`: prefix to be added to every table created to differentiate between other yaml sources
         `yamlSpace`: indent used in ingested yaml files - default 2 spaces but can change to the indentation used in input
-        '''
+        """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.yaml_files = [filenames]
@@ -223,7 +304,7 @@ class YAML1(FileReader):
             
     def add_rows(self) -> None:
         """
-        Parses YAML data and creates an ordered dict which stores an ordered dict for each table.
+        Parses YAML data to create a nested Ordered Dict where each table is a key and its data as another Ordered Dict with keys as cols and vals as col data
         """
         file_counter = 0        
         for filename in self.yaml_files:
@@ -259,7 +340,7 @@ class YAML1(FileReader):
                             overlap_cols = set(self.yaml_data["dsi_units"][tableName].keys()) & set(unitsDict)
                             for col in overlap_cols:
                                 if self.yaml_data["dsi_units"][tableName][col] != unitsDict[col]:
-                                    raise ValueError(f"Cannot have a different set of units for column {col} in {tableName}")
+                                    return (TypeError, f"Cannot have a different set of units for column {col} in {tableName}")
                             self.yaml_data["dsi_units"][tableName].update(unitsDict)
 
                     max_length = max(len(lst) for lst in self.yaml_data[tableName].values())
@@ -273,15 +354,15 @@ class YAML1(FileReader):
         self.set_schema_2(self.yaml_data)
 
 class TOML1(FileReader):
-    '''
-    Plugin to read in an individual or a set of TOML files
+    """
+    Structured Data Plugin to read in an individual or a set of TOML files
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
-    '''
+    """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
-        '''
+        """
         `filenames`: one toml file or a list of toml files to be ingested
         `target_table_prefix`: prefix to be added to every table created to differentiate between other toml sources
-        '''
+        """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.toml_files = [filenames]
@@ -338,7 +419,7 @@ class TOML1(FileReader):
                             overlap_cols = set(self.toml_data["dsi_units"][tableName].keys()) & set(unitsDict)
                             for col in overlap_cols:
                                 if self.toml_data["dsi_units"][tableName][col] != unitsDict[col]:
-                                    raise ValueError(f"Cannot have a different set of units for column {col} in {tableName}")
+                                    return (TypeError, f"Cannot have a different set of units for column {col} in {tableName}")
                             self.toml_data["dsi_units"][tableName].update(unitsDict)
 
                 max_length = max(len(lst) for lst in self.toml_data[tableName].values())
@@ -352,15 +433,15 @@ class TOML1(FileReader):
         self.set_schema_2(self.toml_data)
 
 class TextFile(FileReader):
-    '''
-    Plugin to read in an individual or a set of text files
+    """
+    Structured Data Plugin to read in an individual or a set of text files
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
-    '''
+    """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
-        '''
+        """
         `filenames`: one text file or a list of text files to be ingested
         `target_table_prefix`: prefix to be added to every table created to differentiate between other text file sources
-        '''
+        """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.text_files = [filenames]
@@ -382,11 +463,14 @@ class TextFile(FileReader):
             self.set_schema_2(self.text_file_data)
 
 class MetadataReader1(FileReader):
+    """
+    Structured Data Plugin to read in an individual or a set of JSON metadata files
+    """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
-        '''
+        """
         `filenames`: one metadata json file or a list of metadata json files to be ingested
         `target_table_prefix`: prefix to be added to every table created to differentiate between other metadata file sources
-        '''
+        """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.metadata_files = [filenames]

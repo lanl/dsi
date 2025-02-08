@@ -14,7 +14,7 @@ class CollectionReader(StructuredMetadata):
     they are ingesting, namely absolute path and hash.
     """
 
-    def __init__(self, collections, **kwargs):
+    def __init__(self, collections, filenames, **kwargs):
         super().__init__(**kwargs)
         if type(collections) == dict:
                  self.collections = [collections]

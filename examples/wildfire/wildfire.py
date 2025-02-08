@@ -94,7 +94,7 @@ if __name__ == "__main__":
     path_to_cinema_images = path_to_cinema_db + imageFolderName
     path_to_cinema_csv = path_to_cinema_db + "data.csv"
     dbName = "wfdata"
-    columns_to_keep = [0,1,2,9,10]
+    columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "FILE"]
 
     #external work from DSI
     downloadImages(path_to_csv_input, imgDstFolder)
@@ -107,7 +107,9 @@ if __name__ == "__main__":
     os.rename(imgDstFolder, path_to_cinema_images)
 
     core = Terminal()
-    core.load_module('plugin', "Csv", "reader", filenames = path_to_csv_input, table_name = dbName)
+
+    #creating manual simulation table where each row of wildfire is its own simulation
+    core.load_module('plugin', "Wildfire", "reader", filenames = path_to_csv_input, table_name = dbName, sim_table = True)
 
     # update DSI abstraction directly
     updatedFilePaths = []
@@ -120,7 +122,7 @@ if __name__ == "__main__":
     core.update_abstraction(dbName, wildfire_table)
 
     # export data with revised filepaths to CSV
-    core.load_module('plugin', "Csv_Writer", "writer", filename = path_to_cinema_csv, table_name = dbName, cols_to_export = columns_to_keep)
+    core.load_module('plugin', "Csv_Writer", "writer", filename = path_to_cinema_csv, table_name = dbName, export_cols = columns_to_keep)
     core.transload()
 
     if os.path.exists(path_to_sqlite_db):
@@ -128,6 +130,7 @@ if __name__ == "__main__":
 
     #load data to a sqlite database
     core.load_module('backend','Sqlite','back-write', filename=path_to_sqlite_db)
+    
     # using 'write' instead of 'put' but both do the same thing -- 'write' is new name that will replace 'put'
     core.artifact_handler(interaction_type='write')
 

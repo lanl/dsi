@@ -29,36 +29,55 @@ class Artifact:
     name = ""
     properties = {}
 
+class ValueObject:
+    t_name = "" # table name
+    c_name = [] # column name(s) 
+    row_num = None # row number
+    value = None # value stored from that match. Ex: table data, col data, cell data etc.
+    type = "" #type of match, {table, column, range, cell, row}
+
+    # implement this later once filesystem table incoroporated into dsi
+    filesystem_match = [] #list of all elements in that matching row in filesystem table
+
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
-    def __init__(self, filename, run_table = True):
+    """
+    SQLite Filesystem Backend to which a user can ingest/read data, generate a Jupyter notebook, and find all occurences of a search term
+    """
+    runTable = False
+
+    def __init__(self, filename):
+        """
+        Initializes a SQLite backend with a user inputted filename, and creates other internal variables
+        """
         self.filename = filename
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
-        self.run_flag = run_table
+        self.runTable = Sqlite.runTable
 
-    def check_type(self, text):
+    def check_type(self, input_list):
         """
-        Tests input text and returns a predicted compatible SQL Type
-        `text`: text string
-        `return`: string description of a SQL data type
+        Evaluates a list and returns what the predicted compatible SQLite Type is
+        `input_list`: list of values to evaluate
+        `return`: string description of the list's SQLite data type
         """
-        try:
-            _ = int(text)
-            return " INT"
-        except ValueError:
-            try:
-                _ = float(text)
+        for item in input_list:
+            if isinstance(item, int):
+                return " INT"
+            elif isinstance(item, float):
                 return " FLOAT"
-            except ValueError:
+            elif isinstance(item, str):
                 return " VARCHAR"
+        return ""
 
     def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
         """
-        Primary class for defining metadata Artifact schema.
+        Helper function to create SQLite table based on the passed in schema.
 
         `types`: DataType derived class that defines the string name, properties
-                 (named SQL type), and units for each column in the schema.
+                 (dictionary of table names and table data), and units for each column in the schema.
+        `foreign_query`: defaut is None. It is a SQLite string detailing the foreign keys in this table
+        `isVerbose`: default is False. Flag to print all create table SQLite statements
         `return`: none
         """
         if self.cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{types.name}';").fetchone():
@@ -68,16 +87,16 @@ class Sqlite(Filesystem):
             diff_cols = list(set(col_names) - set(query_cols))
             if len(diff_cols) > 0:
                 for col in diff_cols:
-                    temp_name = col + self.check_type(str(types.properties[col][0]))
+                    temp_name = col + self.check_type(types.properties[col])
                     self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
         else:
             sql_cols = ', '.join(types.unit_keys)
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
-            if self.run_flag:
+            if self.runTable:
                 str_query = "CREATE TABLE IF NOT EXISTS {} (run_id, {}".format(str(types.name), sql_cols)            
             if foreign_query != None:
                 str_query += foreign_query
-            if self.run_flag:
+            if self.runTable:
                 str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
             str_query += ");"
 
@@ -92,18 +111,19 @@ class Sqlite(Filesystem):
 
     def put_artifacts(self, collection, isVerbose=False):
         """
-        Primary class for insertion of collection of Artifacts metadata into a defined schema
+        Primary function to insert a collection of tables into the defined SQLite database.
+        Creates the auto runTable and dsi_units tables in SQLite if needed as well.
+        Can only be called if the SQLite database is a BACK-WRITE backend (check core.py for distinction)
 
-        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
-                     filled with rows to insert.
-        `return`: none
+        `collection`: A Python Collection of several tables and their data structured as a nested Ordered Dictionary.
+        `isVerbose`: default is False. Flag to print all insert table SQLite statements
+        `return`: None when stable ingesting. When errors occur, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
         """
         artifacts = collection
         
-        if self.run_flag:
+        if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
-            self.con.commit()
 
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
@@ -130,9 +150,9 @@ class Sqlite(Filesystem):
                 types.properties[key.replace('-','_minus_')] = tableData[key]
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(key + f"{self.check_type(str(tableData[key][0]))} PRIMARY KEY")
+                    types.unit_keys.append(key + self.check_type(tableData[key]) + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(key + self.check_type(str(tableData[key][0])))
+                    types.unit_keys.append(key + self.check_type(tableData[key]))
             
             self.put_artifact_type(types, foreign_query)
             
@@ -140,7 +160,7 @@ class Sqlite(Filesystem):
             placeholders = ', '.join('?' * len(types.properties))
 
             str_query = "INSERT INTO "
-            if self.run_flag:
+            if self.runTable:
                 run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
                 str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
             else:
@@ -153,60 +173,67 @@ class Sqlite(Filesystem):
                 self.cur.executemany(str_query,rows)
             except sqlite3.Error as e:
                 self.con.rollback()
-                return e
+                return (sqlite3.Error, e)
                 
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
-            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column TEXT UNIQUE, unit TEXT)"
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column TEXT, unit TEXT)"
             self.cur.execute(create_query)
             for tableName, tableData in artifacts["dsi_units"].items():
                 if len(tableData) > 0:
                     for col, unit in tableData.items():
                         str_query = f'INSERT INTO dsi_units VALUES ("{tableName}", "{col}", "{unit}")'
-                        unit_result = self.cur.execute(f"SELECT unit FROM dsi_units WHERE column = '{col}';").fetchone()
-                        if unit_result and unit_result[0] != unit:
+                        unit_result = self.cur.execute(f"SELECT unit FROM dsi_units WHERE table_name = '{tableName}' AND column = '{col}';").fetchone()
+                        if unit_result and unit_result[0] != unit: #checking if unit for same table and col exists in db and if units match
                             self.con.rollback()
-                            return f"Cannot ingest different units for the column {col} in {tableName}"
+                            return (TypeError, f"Cannot ingest different units for the column {col} in {tableName}")
                         elif not unit_result:
                             try:
                                 self.cur.execute(str_query)
                             except sqlite3.Error as e:
                                 self.con.rollback()
-                                return e
-                        
+                                return (sqlite3.Error, e)
+                            
         try:
             self.con.commit()
         except Exception as e:
             self.con.rollback()
-            return e
+            return (sqlite3.Error, e)
 
     #newer name for get_artifacts. eventually delete get_artifacts
     def process_artifacts(self, query, isVerbose=False, dict_return = False):
         return self.get_artifacts(query, isVerbose, dict_return)
     
     def get_artifacts(self, query, isVerbose=False, dict_return = False):
-        if query[:6].lower() == "select" or query[:6].lower() == "pragma" :
+        """
+        Function that returns data from a SQLite database based on a specified SQLite query.
+        Data returned as either a list of rows from the database, or an Ordered Dictionary of data from one table.
+
+        `query`: Must be a SELECT or PRAGMA query. If dict_return is True, then this can only be a simple query on one table, NO joins.
+                 Query can also create new aggregate columns such as COUNT to include in the result.
+        `isVerbose`: default is False. Flag to print all insert table SQLite statements
+        `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from a specified table.
+        
+        `return`: When 'query' is of correct format and dict_return = False, returns a list of database rows
+                  When 'query' is of correct format and dict_return = True, returns an Ordered Dictionary for the table with data from the query result
+                  When 'query' is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+        """
+        if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
                 data = self.cur.execute(query).fetchall()
                 if isVerbose:
                     print(data)
             except:
-                raise ValueError("Error in get_artifacts/process_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                return (ValueError, "Error in get_artifacts/process_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            raise ValueError("Error in get_artifacts/process_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            return (ValueError, "Error in get_artifacts/process_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
-
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
-            # table_names = [table[0] or table[1] for table in tables]
             if len(tables) > 1:
-                raise ValueError("Error in get_artifacts/process_artifacts handler: Can only return ordered dictionary if query with one table")
-            # col_info = self.cur.execute(f"PRAGMA table_info({table_names[0]});").fetchall()
-            # complete_cols = [column[1] for column in col_info]
-            # if not set(query_cols).issubset(set(complete_cols)):
-            #     raise ValueError("Select query cannot create non-table columns when trying to return an ordered dictionary")
+                return (ValueError, "Error in get_artifacts/process_artifacts handler: Can only return ordered dictionary if query with one table")
             
             queryDict = OrderedDict()
             for row in data:
@@ -218,7 +245,20 @@ class Sqlite(Filesystem):
         else:
             return data
 
+    #newer name for inspect_artifacts, eventually delete inspect_artifacts
+    def notebook(self, interactive=False):
+        return self.inspect_artifacts(interactive)
+    
     def inspect_artifacts(self, interactive=False):
+        """
+        Generates a Jupyter notebook displaying all the data in the specified SQLite database.
+        To account for multiple tables, the database is stored as a list of dataframes, where each table is a dataframe.
+        If database has table relations, it is stored as a separate dataframe
+        If database has a units table, each table's units are stored in its corresponding dataframe 'attrs' variable
+
+        `interactive`: default is False. When set to True, creates ipnyb notebook, otherwise just creates html file.
+        `return`: None
+        """
         import nbconvert as nbc
         import nbformat as nbf
         dsi_relations, dsi_units = None, None
@@ -227,7 +267,7 @@ class Sqlite(Filesystem):
             dsi_relations = dict(collection["dsi_relations"])
         if "dsi_units" in collection.keys():
             dsi_units = dict(collection["dsi_units"])
-
+        print(collection)
         nb = nbf.v4.new_notebook()
         text = """\
         This notebook was auto-generated by a DSI Backend for SQLite.
@@ -320,7 +360,17 @@ class Sqlite(Filesystem):
                 fh.write(html_content)
 
     # SQLITE READER FUNCTION
-    def read_to_artifact(self, only_units_relations = False):
+    def read_to_artifact(self, only_units_relations = False, isVerbose = False):
+        """
+        Reads in data from the SQLite database into a nested Ordered Dictionary, where keys are table names and values are Ordered Dictionary of table data.
+        If there are PK/FK relations in the database it is stored in a table called dsi_relations.
+        Can only be called if the SQLite database is a BACK-READ backend (check core.py for distinction)
+
+        `only_units_relations`: default is False. Used by another internal sqlite.py function. USERS CAN IGNORE THIS FLAG
+        `isVerbose`: default is False. When set to True, prints all SQLite queries to select data and store in abstraction
+        `return`: Nested Ordered Dictionary of all data from the SQLite database
+        
+        """
         artifact = OrderedDict()
         artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
 
@@ -369,6 +419,12 @@ class Sqlite(Filesystem):
         return artifact
       
     def read_units_helper(self):
+        """
+        Helper function to create the SQLite database's units table as an Ordered Dictionary
+        Only called if dsi_units table exists in the database.
+        DSI Users should not call this function, only specify a 'read' interaction when calling the core artifact handler.
+        `return`: units table as an Ordered Dictionary
+        """
         unitsDict = OrderedDict()
         unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
         for row in unitsTable:
@@ -378,63 +434,194 @@ class Sqlite(Filesystem):
             unitsDict[tableName][row[1]] = row[2]
         return unitsDict
     
-    def find(self, query_object, colFlag = False, data_range = False):
+    def find_table(self, query_object):
+        """
+        Function that finds all tables whose name matches the query object. 
+        This includes any partial hits if the query_object is part of a table name
+
+        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `return`: List of ValueObjects if there is a match. 
+                  Structure of ValueObjects for this function
+                    - t_name:   string of table name
+                    - c_name:   list of all columns in matching table
+                    - value:    table's data as a list of lists (each row is a list)
+                    - row_num:  None
+                    - type:     'table'
+        """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        
+        tableList = [table[0] for table in tableList]
+        if "sqlite_sequence" in tableList:
+            tableList.remove("sqlite_sequence")
+
         if isinstance(query_object, str):
-            #table name check - returns either list of cols in table or the whole table as the second part of a tuple. First part is the table name
             table_return_list = []
             for table in tableList:
-                if query_object in table[0]:
-                    if colFlag == True:
-                        colData = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
-                        return_cols = [column[1] for column in colData]
-                        table_return_list.append((table[0], return_cols))
-                    else:
-                        returned_table = self.cur.execute(f"SELECT * FROM {table[0]};").fetchall()
-                        table_return_list.append((table[0], returned_table))
+                if query_object in table:
+                    colData = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
+                    col_names = [column[1] for column in colData]
+                    table_data = self.cur.execute(f"SELECT * FROM {table};").fetchall()
+                    val = ValueObject()
+                    val.t_name = table
+                    val.c_name = col_names
+                    val.value = table_data
+                    val.type = "table"
+                    table_return_list.append(val)
             
             if len(table_return_list) > 0:
                 return table_return_list
-            
-            #col name check - return is list of all cols that match. ex:[(table1, data_range, col_data) ] -- data range only included if flag is on
+            return (ValueObject(), f"{query_object} is not a table name in this database")
+        return (ValueObject(), f"{query_object} needs to be a string if finding among table names")
+    
+    def find_column(self, query_object, range = False):
+        """
+        Function that finds all columns whose name matches the query object. 
+        This includes any partial hits if the query_object is part of a column name
+
+        `query_object`: Object to find in all column names. HAS TO BE A STRING
+        `range`: default is False. Flag that returns min/max of a numerical column that matches the query object
+        `return`: List of ValueObjects if there is a match. 
+                  Structure of ValueObjects for this function
+                    - t_name:   string of table name
+                    - c_name:   list of one, which is the name of the matching column
+                    - value:    range = True, [min, max] of the column
+                                range = False, column data as a list
+                    - row_num:  None
+                    - type:     range = True, 'range'
+                                range = False, 'column'
+        """
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        tableList = [table[0] for table in tableList]
+        if "sqlite_sequence" in tableList:
+            tableList.remove("sqlite_sequence")
+
+        if isinstance(query_object, str):
             col_return_list = []
             for table in tableList:
-                colList = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
+                colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
                 for col in colList:
                     if query_object in col[1]:
-                        returned_col = self.cur.execute(f"SELECT {col[1]} FROM {table[0]};").fetchall()
-                        returned_col = [row[0] for row in returned_col]
-                        if data_range == True and not isinstance(returned_col[0], str):
-                            col_return_list.append((table[0], f"data range = {(min(returned_col), max(returned_col))}", returned_col))
-                        else:
-                            col_return_list.append((table[0], returned_col))
+                        returned_col = self.cur.execute(f"SELECT {col[1]} FROM {table};").fetchall()
+                        colData = [row[0] for row in returned_col]
+                        not_numeric = any(isinstance(item, str) for item in colData)
+
+                        val = ValueObject()
+                        val.t_name = table
+                        val.c_name = [col[1]]
+                        if range == True and not not_numeric:
+                            numeric_col = [0 if item is None else item for item in colData]
+                            val.value = [min(numeric_col), max(numeric_col)]
+                            val.type = "range"
+                            col_return_list.append(val)
+                        elif range == False:
+                            val.value = colData
+                            val.type = "column"
+                            col_return_list.append(val)
             
             if len(col_return_list) > 0:
                 return col_return_list
+            return (ValueObject(), f"{query_object} is not a column name in this database")
+        return (ValueObject(), f"{query_object} needs to be a string if finding among column names")
+
+    def find_cell(self, query_object, row = False):
+        """
+        Function that finds all cells that match the query object. 
+        This includes any partial hits if the query_object is part of a cell
+
+        `query_object`: Object to find in all cells. Can be of any type (string, float, int).
+        `row`: default is False. Used for a row search, if want to return whole row where there is a match between a cell and query object
+        `return`: List of ValueObjects if there is a match. 
+                  Structure of ValueObjects for this function
+                    - t_name:   string of table name
+                    - c_name:   list of column names. 
+                                    row = True, list is all columns in this table
+                                    row = False, list is one item -- column of cell that matched query object
+                    - value:    row = True, list of whole row where cell matches query object
+                                row = False, value of cell that matched query object
+                    - row_num:  row number where cell matched
+                    - type:     row = True, 'row'
+                                row = False, 'cell'
+        """
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        tableList = [table[0] for table in tableList]
+        if "sqlite_sequence" in tableList:
+            tableList.remove("sqlite_sequence")
                     
-        #value search - List of all instances where a value exists. ex: [(table1, col2, value), (table2, col1, value), (table3, col4, value)]
         query_list = []
         for table in tableList:
-            colList = self.cur.execute(f"PRAGMA table_info({table[0]});").fetchall()
+            colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
+            all_cols = [column[1] for column in colList]
+            row_list = []
             for col in colList:
-                if isinstance(query_object, str):
-                    col_query = f"SELECT '{table[0]}', '{col[1]}', {col[1]} FROM {table[0]} WHERE {col[1]} LIKE '%{query_object}%'" 
+                middle= None
+                if row:
+                    middle = f'"{all_cols}", *'
                 else:
-                    col_query = f"SELECT '{table[0]}', '{col[1]}', {col[1]} FROM {table[0]} WHERE CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
-                query_list.append(col_query)
-        
-        value_query = " UNION ".join(query_list) + ";"
-        value_return = self.cur.execute(value_query).fetchall()
-        if len(value_return) > 0:
-            return value_return
+                    middle = f"'{col[1]}', {col[1]}"
+                # query = f"SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, {middle} FROM {table} AS t1 WHERE "
+                query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
+                if isinstance(query_object, str):
+                    query += f"{col[1]} LIKE '%{query_object}%'" 
+                else:
+                    query += f"CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
+                row_list.append(query)            
 
-        raise ValueError(f"{query_object} does not exist in this database")
+            table_row_query = " UNION ".join(row_list) + ";"
+            table_row_return = self.cur.execute(table_row_query).fetchall()
+            query_list += table_row_return
+
+        if len(query_list) > 0:
+            value_obj_list = []
+            for value_row in query_list:
+                val = ValueObject()
+                val.t_name = value_row[0]
+                val.row_num = value_row[1]
+                val.c_name = [value_row[2]]
+                val.value = value_row[3]
+                val.type = "cell"
+                if row:
+                    val.c_name = eval(value_row[2])
+                    val.value = list(value_row[3:])
+                    val.type = "row"
+                value_obj_list.append(val)
+
+            return value_obj_list
+
+        return (ValueObject(), f"{query_object} is not a cell in this database")
+    
+    def find(self, query_object):
+        """
+        Function that finds all instances of a query object in a SQLite database. 
+        This includes any partial hits if query_object is part of a table/col/cell
+        
+        `query_object`: Object to find in this database. Can be of any type (string, float, int).   
+        `return`: List of ValueObjects if there is a match. Else returns tuple of empty ValueObject() and an error message.
+            - Note: Return list can have ValueObjects with different structure due to table/column/cell matches having different value variables
+            - refer to other find functions (table, column and cell) to understand each one's ValueObject structure
+        """
+        table_match = self.find_table(query_object)
+        col_match = self.find_column(query_object)
+        cell_match = self.find_cell(query_object)
+        all_return = []
+        if isinstance(table_match, list):
+            all_return+= table_match
+        if isinstance(col_match, list):
+            all_return+= col_match
+        if isinstance(cell_match, list):
+            all_return+= cell_match
+        if len(all_return) > 0:
+            return all_return
+        else:
+            return (ValueObject(),  f"{query_object} was not found in this database")
 
     # Closes connection to server
     def close(self):
+        """
+        Closes the SQLite database's connection.
+        `return`: None
+        """
         self.con.close()
 
+    # OLD FUNCTION TO DEPRECATE
     def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
         """
         Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
@@ -451,30 +638,3 @@ class Sqlite(Filesystem):
         self.types = DataType()
         self.types.name = tableName
         self.put_artifacts(collection, isVerbose)
-
-     # Adds rows to the columns defined previously
-    def put_artifacts_lgcy(self,artifacts, isVerbose=False):
-        """
-        Legacy function for insertion of artifact metadata into a defined schema
-
-        `artifacts`: data_type derived class that has a regular structure of a defined schema, filled with rows to insert.
-
-        `return`: none
-        """
-        str_query = "INSERT INTO " + str(self.types.name) + " VALUES ( "
-        for key, value in artifacts.properties.items():
-            if 'file' in key: # Todo, use this to detect str type
-                str_query = str_query + " '" + str(value) +"' "
-            else:
-                str_query = str_query + " " + str(value)
-
-            str_query = str_query +  ","
-
-        str_query = str_query.rstrip(',')
-        str_query = str_query + " )"
-
-        if isVerbose:
-            print(str_query)
-        
-        self.cur.execute(str_query)
-        self.con.commit()

@@ -3,51 +3,59 @@ from dsi.core import Terminal
 
 '''This is an example workflow using core.py'''
 
-a=Terminal(debug_flag=False, run_table_flag=True)
+a=Terminal(debug=0, runTable=False)
 
-a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
+# a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
 
 # a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json", target_table_prefix = "student")
 a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"], target_table_prefix = "student")
-a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
+# a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
 
-# a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")
+# a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "test", display_cols = ["n", "o"])
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
 # a.transload()
 
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
-# a.load_module('backend','Parquet','back-write',filename='data/bueno.pq')
 
 a.artifact_handler(interaction_type='write')
 # data = a.artifact_handler(interaction_type='process', query = "SELECT * FROM runTable;")#, isVerbose = True)
 # print(data)
 # a.artifact_handler(interaction_type="inspect")
+# a.artifact_handler(interaction_type="read")
+# print(a.active_metadata)
 
 ### FIND FUNCTION EXAMPLES
-## table match                   - return table data
-# data = a.find("data.db", "student")
-# print(data)
+## TABLE match                      - return matching table data
+# data = a.find_table("people")
+# for val in data:
+#     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-## table match (colFlag = True)  - return cols of matching table
-# data = a.find("data.db", "student", colFlag = True)
-# print(data)
+## COLUMN match                     - return matching column data
+# data = a.find_column("a")
+# for val in data:
+#     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-## col match                     - return data of matching cols
-# data = a.find("data.db", "specification")
-# print(data)
+## RANGE match (range = True) - return [min, max] of matching cols
+# data = a.find_column("avg", range = True)
+# for val in data:
+#     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-## col match (data_range = True) - return data of matching cols and the min/max of that col too
-# data = a.find("data.db", "j", data_range = True)
-# print(data)
+## CELL match                       - return the cells which match the search term
+# data = a.find_cell(5.5)
+# for val in data:
+#     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-## value match                   - return list of locations and the values which match the search term
-# data = a.find("data.db", 5.9)
-# data = a.find("data.db", "cm")
-# print(data)
+## ROW match (row_return = True)    - return the rows where cells match the search term
+# data = a.find_cell(5.9, row = True)
+# for val in data:
+#     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-# a.unload_module('backend', 'Sqlite', 'back-write')
+## ALL match                        - return all instances where the search term is found: table, column, cell
+# data = a.find("a")
+# for val in data:
+#     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
 # LIST MODULES
 # a.list_available_modules('plugin')
@@ -62,14 +70,6 @@ a.artifact_handler(interaction_type='write')
 # #  'back-read': [],
 # #  'back-write': []}
 
-
-# Example use 1
-# a.load_module('plugin','Bueno','reader',filenames='data/bueno1.data')
-# a.load_module('backend','Sqlite','back-write',filename='data/bueno.db')
-# a.transload()
-# a.artifact_handler(interaction_type='put')
-# data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM sqlite_master WHERE type='table';")#, isVerbose = True)
-# print(data)
 
 
 #Example use 2
