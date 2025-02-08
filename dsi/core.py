@@ -25,7 +25,11 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer", "TextFile", "MetadataReader1", "Wildfire"]
+    # VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
+    # VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'TextFile', 'MetadataReader1', 'Wildfire']
+    # VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
+    # VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
+    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', 'Table_Plot', 'Schema', 'Csv_Writer', 'TextFile', 'MetadataReader1', 'Wildfire']
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
@@ -109,6 +113,9 @@ class Terminal():
         This flexibility ensures that advanced users can access higher level abstractions.
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
+
+        If a loaded module has mod_type='plugin' & mod_function='reader', it is automatically activated and then unloaded as well.
+        Therefore, a user does not have to activate it separately with transload() (only used by plugin writers) or call unload_module()
         """
         if self.debug_level != 0:
             self.logger.info(f"-------------------------------------")
@@ -340,11 +347,14 @@ class Terminal():
 
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
-        Store or retrieve using all loaded DSI Backends with storage functionality.
+        Interact with loaded DSI backends by ingesting or retrieving data from them.
+            - interaction_type = 'put' or 'write', ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored)
+                - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
+            - interaction_type = 'get' or 'process', retrieves data from first loaded backend based on a specified 'query'
+            - interaction_type = 'inspect' or 'notebook', generates an interactive Python notebook with all data from first loaded backend
+            - interaction_type = 'read', overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
-        Calling artifact_handler will execute all back-write functionality currently loaded, given
-        the provided ``interaction_type``.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
             if self.debug_level != 0:
@@ -459,7 +469,61 @@ class Terminal():
                 self.logger.error('Remember that backend writers cannot read a db and backend readers cannot write to a db')
             raise NotImplementedError
     
+    def find(self, query_object):
+        """
+        Find all function that searches for all instances of 'query_object' in first loaded backend. Searches among all tables/column/cells
+        `return`: List of backend-specific objects that each contain details of a match for 'query_object'. Can be tables/column/cells
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find(query_object)
+        return self.find_helper(query_object, return_object, start, "")
+    
+    def find_table(self, query_object):
+        """
+        Find table function that searches for all tables whose names matches the 'query_object' in first loaded backend.
+        `return`: List of backend-specific objects that each contain all data from a table matching 'query_object'.
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find_table(query_object)
+        return self.find_helper(query_object, return_object, start, "table ")
+    
+    def find_column(self, query_object, range = False):
+        """
+        Find column function that searches for all columns whose names matches the 'query_object' in first loaded backend.
+
+        `range`: default False. If True, then data-range of all numerical columns which match 'query_object' is included in retrun
+                                If False, then data for each column that matches 'query_object' is included in retrun
+        `return`: List of backend-specific objects that each contain data/numerical range about a column matching 'query_object'.
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find_column(query_object, range)
+        return self.find_helper(query_object, return_object, start, "column ")
+
+    def find_cell(self, query_object, row = False):
+        """
+        Find cell function that searches for all cells which match the 'query_object' in first loaded backend.
+
+        `row`: default False. If True, then full row of data where a cell matches 'query_object' is included in retrun
+                                If False, then the value of the cell that matches 'query_object' is included in retrun
+        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'.
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find_cell(query_object, row)
+        return self.find_helper(query_object, return_object, start, "cell ")
+
     def find_helper(self, query_object, return_object, start, find_type):
+        """
+        Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
+        Users should not call this externally, only to be used by internal core functions.
+        """
         if isinstance(query_object, str): 
             print(f"Finding all {find_type}matches of '{query_object}' in first backend loaded")
         else:
@@ -478,30 +542,6 @@ class Terminal():
                 self.logger.info(f"Runtime: {end-start}")
         return return_object
     
-    def find(self, query_object):
-        backend = self.loaded_backends[0]
-        start = datetime.now()
-        return_object = backend.find(query_object)
-        return self.find_helper(query_object, return_object, start, "")
-    
-    def find_table(self, query_object):
-        backend = self.loaded_backends[0]
-        start = datetime.now()
-        return_object = backend.find_table(query_object)
-        return self.find_helper(query_object, return_object, start, "table ")
-    
-    def find_column(self, query_object, range = False):
-        backend = self.loaded_backends[0]
-        start = datetime.now()
-        return_object = backend.find_column(query_object, range)
-        return self.find_helper(query_object, return_object, start, "column ")
-
-    def find_cell(self, query_object, row = False):
-        backend = self.loaded_backends[0]
-        start = datetime.now()
-        return_object = backend.find_cell(query_object, row)
-        return self.find_helper(query_object, return_object, start, "cell ")
-
     def get_current_abstraction(self, table_name = None):
         """
         Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict

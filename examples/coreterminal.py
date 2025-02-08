@@ -3,7 +3,7 @@ from dsi.core import Terminal
 
 '''This is an example workflow using core.py'''
 
-a=Terminal(debug=0, runTable=False)
+a=Terminal(debug=0, backup_db = False, runTable=True)
 
 # a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
