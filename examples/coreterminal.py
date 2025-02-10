@@ -19,11 +19,15 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", 
 
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
 
-a.artifact_handler(interaction_type='write')
-# data = a.artifact_handler(interaction_type='process', query = "SELECT * FROM runTable;")#, isVerbose = True)
+a.artifact_handler(interaction_type='put')
+## a.artifact_handler(interaction_type='ingest') # newer name for 'put'
+# data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM runTable;")#, isVerbose = True)
+## data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")#, isVerbose = True) # newer name for 'put'
 # print(data)
 # a.artifact_handler(interaction_type="inspect")
+## a.artifact_handler(interaction_type="notebook") # newer name for 'put'
 # a.artifact_handler(interaction_type="read")
+## a.artifact_handler(interaction_type="process") # newer name for 'put'
 # print(a.active_metadata)
 
 ### FIND FUNCTION EXAMPLES

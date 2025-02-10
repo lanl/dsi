@@ -25,16 +25,15 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    # VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    # VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'TextFile', 'MetadataReader1', 'Wildfire']
-    # VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
-    # VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', 'Table_Plot', 'Schema', 'Csv_Writer', 'TextFile', 'MetadataReader1', 'Wildfire']
+    VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'TextFile', 'MetadataReader1', 'Wildfire']
+    VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
+    VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
-    VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read', 'write', 'process', 'notebook']
+    VALID_ARTIFACT_INTERACTION_TYPES = ['put', 'get', 'inspect', 'read', 'ingest', 'query', 'notebook', 'process']
 
     def __init__(self, debug = 0, backup_db = False, runTable = False):
         """
@@ -348,11 +347,11 @@ class Terminal():
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
-            - interaction_type = 'put' or 'write', ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored)
+            - interaction_type = 'put' or 'ingest', ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored)
                 - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
-            - interaction_type = 'get' or 'process', retrieves data from first loaded backend based on a specified 'query'
+            - interaction_type = 'get' or 'query', retrieves data from first loaded backend based on a specified 'query'
             - interaction_type = 'inspect' or 'notebook', generates an interactive Python notebook with all data from first loaded backend
-            - interaction_type = 'read', overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+            - interaction_type = 'read' or 'process', overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -360,114 +359,103 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error('Could not find artifact interaction type in VALID_ARTIFACT_INTERACTION_TYPES')
             raise NotImplementedError('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+        
         operation_success = False
-        get_artifact_data = None
-
-        first_backend = self.loaded_backends[0]
-        early_exit = False
-        selected_active_backends = dict((k, self.active_modules[k]) for k in (['back-write', 'back-read']))
-        for module_type, objs in selected_active_backends.items():
-            for obj in objs:
+        backread_active = False
+        if interaction_type in ['put', 'ingest']:
+            for obj in self.active_modules['back-write']:
                 if self.debug_level != 0:
                     self.logger.info("-------------------------------------")
+                    self.logger.info(f"{obj.__class__.__name__} backend - {interaction_type.upper()} the data")
                 start = datetime.now()
                 parent_class = obj.__class__.__bases__[0].__name__
-
-                if interaction_type in ['put', 'write'] and module_type == 'back-write':
+                if self.backup_db == True and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
                     if self.debug_level != 0:
-                        self.logger.info(f"{obj.__class__.__name__} backend - {interaction_type.upper()} the data")
-                    if self.backup_db == True and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
-                        if self.debug_level != 0:
-                            self.logger.info(f"   Creating backup file before ingesting data into {obj.__class__.__name__} backend")
-                        backup_start = datetime.now()
-                        formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-                        backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup_" + formatted_datetime + obj.filename[obj.filename.rfind('.'):]
-                        shutil.copyfile(obj.filename, backup_file)
-                        backup_end = datetime.now()
-                        if self.debug_level != 0:
-                            self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
-                    if interaction_type == "write":
-                        errorMessage = obj.write_artifacts(collection = self.active_metadata, **kwargs)
-                    else:
-                        errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
-                    if errorMessage is not None:
-                        if self.debug_level != 0:
-                            self.logger.error(f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
-                        raise errorMessage[0](f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
-                    operation_success = True
-                elif interaction_type in ['put', 'write'] and module_type == 'back-read':
+                        self.logger.info(f"   Creating backup file before ingesting data into {obj.__class__.__name__} backend")
+                    backup_start = datetime.now()
+                    formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+                    backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup_" + formatted_datetime + obj.filename[obj.filename.rfind('.'):]
+                    shutil.copyfile(obj.filename, backup_file)
+                    backup_end = datetime.now()
                     if self.debug_level != 0:
-                        self.logger.warning("Can only call put/write artifact handler with a back-WRITE backend not a back-READ backend")
-                    warnings.warn("Can only call put/write artifact handler with a back-WRITE backend not a back-READ backend")
+                        self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
-                elif interaction_type in ['get', 'process']:
+                if interaction_type == "ingest":
+                    errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
+                elif interaction_type == "put":
+                    errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
+                if errorMessage is not None:
                     if self.debug_level != 0:
-                        self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
-                    if "query" in first_backend.get_artifacts.__code__.co_varnames: #need to change this to process_artifacts eventually
-                        self.logger.info(f"Query to get data: {query}")
-                        kwargs['query'] = query
-                    if interaction_type == "get":
-                        get_artifact_data = first_backend.get_artifacts(**kwargs)
-                    else:
-                        get_artifact_data = first_backend.process_artifacts(**kwargs)
-                    if isinstance(get_artifact_data, tuple):
-                        if self.debug_level != 0:
-                            self.logger.error(get_artifact_data[1])
-                        raise get_artifact_data[0](get_artifact_data[1])
-                    operation_success = True
-                    early_exit = True
-                    end = datetime.now()
-                    if self.debug_level != 0:
-                        self.logger.info(f"Runtime: {end-start}")
-                    break
-
-                elif interaction_type in ['inspect', 'notebook']:
-                    if self.debug_level != 0:
-                        self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
-                    if parent_class == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
-                        if interaction_type == "inspect":
-                            first_backend.inspect_artifacts(**kwargs)
-                        elif interaction_type == "notebook":
-                            first_backend.notebook(**kwargs)
-                    elif parent_class == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
-                        pass
-                    else: #backend is empty - cannot inspect
-                        if self.debug_level != 0:
-                            self.logger.error("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
-                        raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
-                    operation_success = True
-                    early_exit = True
-                    end = datetime.now()
-                    if self.debug_level != 0:
-                        self.logger.info(f"Runtime: {end-start}")
-                    break
-
-                elif interaction_type == "read":
-                    first_backread = self.active_modules['back-read'][0]
-                    if self.debug_level != 0:
-                        self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
-                    self.active_metadata = first_backread.read_to_artifact()
-                    operation_success = True
-                    early_exit = True
-                    end = datetime.now()
-                    if self.debug_level != 0:
-                        self.logger.info(f"Runtime: {end-start}")
-                    break
+                        self.logger.error(f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
+                    raise errorMessage[0](f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
+                operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
-            if early_exit:
-                break
-        
+        if interaction_type in ['put', 'ingest'] and len(self.active_modules['back-read']) > 0:
+            backread_active = True
+
+        get_artifact_data = None
+        first_backend = self.loaded_backends[0]
+        if interaction_type not in ['put', 'ingest', "read", "process"] and self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
+        start = datetime.now()
+        if interaction_type in ['get', 'query']:
+            if "query" in first_backend.get_artifacts.__code__.co_varnames: #need to change this to query_artifacts eventually
+                self.logger.info(f"Query to get data: {query}")
+                kwargs['query'] = query
+            if interaction_type == "get":
+                get_artifact_data = first_backend.get_artifacts(**kwargs)
+            elif interaction_type == "query":
+                get_artifact_data = first_backend.query_artifacts(**kwargs)
+            if isinstance(get_artifact_data, tuple):
+                if self.debug_level != 0:
+                    self.logger.error(get_artifact_data[1])
+                raise get_artifact_data[0](get_artifact_data[1])
+            operation_success = True
+
+        elif interaction_type in ['inspect', 'notebook']:
+            parent_class = first_backend.__class__.__bases__[0].__name__
+            if parent_class == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+                if interaction_type == "inspect":
+                    first_backend.inspect_artifacts(**kwargs)
+                elif interaction_type == "notebook":
+                    first_backend.notebook(**kwargs)
+            elif parent_class == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
+                pass
+            else: #backend is empty - cannot inspect
+                if self.debug_level != 0:
+                    self.logger.error("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+            operation_success = True
+
+        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) > 0:
+            first_backread = self.active_modules['back-read'][0]
+            if self.debug_level != 0:
+                self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
+            if interaction_type == "process":
+                self.active_metadata = first_backread.process_artifacts()
+            elif interaction_type == "read":
+                self.active_metadata = first_backread.read_to_artifact()
+            operation_success = True
+        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) == 0:
+            backread_active = True
+
         if operation_success:
-            if interaction_type in ['get', 'process'] and get_artifact_data is not None:
+            end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"Runtime: {end-start}")
+            if interaction_type in ['get', 'query'] and get_artifact_data is not None:
                 return get_artifact_data
         else:
-            print('Is your artifact interaction spelled correct and is it implemented in your backend?')
-            print('Remember that backend writers cannot read a db and backend readers cannot write to a db')            
+            not_run_msg = None
+            if backread_active:
+                not_run_msg = 'Remember that back-WRITE backends cannot read/process data and back-READ backends cannot put/ingest'
+            else:
+                not_run_msg = 'Is your artifact interaction implemented in your backend?'
             if self.debug_level != 0:
-                self.logger.error('Is your artifact interaction spelled correct and is it implemented in your backend?')
-                self.logger.error('Remember that backend writers cannot read a db and backend readers cannot write to a db')
-            raise NotImplementedError
+                self.logger.error(not_run_msg)
+            raise NotImplementedError(not_run_msg)
     
     def find(self, query_object):
         """
