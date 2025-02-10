@@ -17,7 +17,8 @@ comm.Barrier()
 
 
 
-db = ParallelDB(db_name, size)
+db = ParallelDB(db_name, size, True, rank)
+
 
 col_cus = ['customer_id', 'name', 'email']
 col_order = ['order_id', 'customer_id', 'order_date', 'amount']
@@ -27,11 +28,11 @@ val = [rank*10 + count, 'peter Smith', 'peter@example.com']
 db.database.insert_col_data("Customers",col_cus, val)
 
 count = 1
-val = [rank*10 + count, 'peter Smith', 'peter@example.com']
+val = [rank*10 + count, 'peta Smith', 'peta@example.com']
 db.database.insert_col_data("Customers",col_cus, val)
 
 count = 2
-val = [rank*10 + count, 'peter Smith', 'peter@example.com']
+val = [rank*10 + count, 'peti Smith', 'peti@example.com']
 db.database.insert_col_data("Customers",col_cus, val)
 
 db.all_done()

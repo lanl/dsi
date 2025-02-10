@@ -37,7 +37,13 @@ class Store:
         self.conn = sqlite3.connect(path)
 
         cursor = self.conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        except sqlite3.Error as e:  # Catch database errors
+            print(f"Error inserting data: {e}")
+            self.conn.rollback()  # Rollback transaction on failure
+            cursor.close()
+            return
 
 
         # Fetch and print all table names
@@ -60,9 +66,14 @@ class Store:
         placeholders = ', '.join('?' for _ in data)
 
         cursor = self.conn.cursor()
-        cursor.execute(f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders});", data)
-        self.conn.commit()
-        cursor.close()
+        try:
+            cursor.execute(f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders});", data)
+            self.conn.commit()
+        except sqlite3.Error as e:  # Catch database errors
+            logging.debug(f"Error inserting data: {e}")
+            self.conn.rollback()  # Rollback transaction on failure
+        finally:
+            cursor.close()
 
 
 
@@ -77,9 +88,14 @@ class Store:
         placeholders = ', '.join('?' for _ in data)
         
         cursor = self.conn.cursor()
-        cursor.execute(f"INSERT INTO {table_name} VALUES ({placeholders});", data)
-        self.conn.commit()
-        cursor.close()
+        try:
+            cursor.execute(f"INSERT INTO {table_name} VALUES ({placeholders});", data)
+            self.conn.commit()
+        except sqlite3.Error as e:  # Catch database errors
+            logging.debug(f"Error inserting data: {e}")
+            self.conn.rollback()  # Rollback transaction on failure
+        finally:
+            cursor.close()
 
 
 
@@ -99,9 +115,9 @@ class Store:
         for index, column_name in enumerate(column_names):
             try:
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_types[index]}")
-                print(f"Column '{column_name}' added successfully.")
+                logging.debug(f"Column '{column_name}' added successfully.")
             except sqlite3.OperationalError as e:
-                print(f"Error adding column '{column_name}': {e}")
+                logging.debug(f"Error adding column '{column_name}': {e}")
 
         self.conn.commit()
         cursor.close()
@@ -122,10 +138,14 @@ class Store:
         """
 
         cursor = self.conn.cursor()
-        cursor.execute(f"PRAGMA table_info({table_name})")
+        try:
+            cursor.execute(f"PRAGMA table_info({table_name})")
 
-        columns = cursor.fetchall()
-        column_exists = any(col[1] == column_name for col in columns)
+            columns = cursor.fetchall()
+            column_exists = any(col[1] == column_name for col in columns)
+        except sqlite3.Error as e:  # Catch database errors
+            logging.debug(f"Error inserting data: {e}")
+            return None
 
         cursor.close()
 
@@ -156,7 +176,7 @@ class Store:
             cursor.execute(query)
             results = cursor.fetchall()
         except sqlite3.Error as e:
-            print(f"Invalid SQL query: {e}")
+            logging.debug(f"Invalid SQL query: {e}")
             results = None
         
 
@@ -186,7 +206,7 @@ class Store:
             cursor.executescript(script)
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"Invalid SQL query: {e}")
+            logging.debug(f"Invalid SQL query: {e}")
         
 
         stop_time = time.time()

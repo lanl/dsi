@@ -9,7 +9,7 @@ DROP TABLE IF EXISTS Customers;
 CREATE TABLE Customers (
     customer_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL
+    email TEXT NOT NULL
 );
 
 -- Create Orders table with a foreign key (No AUTOINCREMENT)

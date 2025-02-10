@@ -7,7 +7,9 @@ import uuid
 import time
 
 from db import Store
+from mpi4py import MPI
 
+from db_utils import *
 
 class ParallelDB:
     """
@@ -19,16 +21,16 @@ class ParallelDB:
     """
 
     # Class variables
-    initialized_params = {}  # count how many times this class has been called
-    db_status = {}           # dictionary of object ids and their status
+    db_counter = {}  # counts how many times this class has been called; for local parallelism
+    db_status = {}   # dictionary of object ids and their status; for local parallelism
 
 
     def __init__(self, db_name: str, n: int, use_mpi: bool = False, mpi_rank: int = 0) -> None:
         """
         Initialize a database
 
-        Args;
-            db_name (str): path of the orinal database
+        Args:
+            db_name (str): path of the master/original database
             n (int)      : number of parallel shards being used to ingest data in the database
         """
 
@@ -38,56 +40,17 @@ class ParallelDB:
             logging.info(f"{db_name} does not exist. Exiting!")
             return
 
+        
+        self.n = n                  # store the number of databases we want
+        self.db_name = db_name      # path of the master/original database
 
-        # store the number of databases we want
-        self.n = n  
-        self.db_name = db_name
-        self.dbs = []               # list of databases
-        self.use_mpi = use_mpi
+        self.dbs = []               # list of databases; for local parallelism
+        self.use_mpi = use_mpi      
 
-
-        # Creating temp databases
-        if db_name in ParallelDB.initialized_params:
-            pass
+        if self.use_mpi:
+            self.__init_mpi_parallelism(db_name, n, mpi_rank)
         else:
-            logging.debug(f"New initialization for {db_name}.")
-
-            ParallelDB.initialized_params[db_name] = 0   # keep track of shard number of database
-
-            # Create n temporary databases
-            for i in range(n):
-                temp_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{i}.db"    # Create a temporary name
-                shutil.copy(db_name, temp_db)           # Create a copy of the databse
-                self.dbs.append(temp_db)                # save the name of the database
-
-
-        # Exit if more databases are created than allowed
-        if ParallelDB.initialized_params[db_name] >= n:
-            print(f"Too many allocated. Exiting!")
-            logging.info(f"Too many allocated. Exiting!")
-            return
-        
-
-        # Connect to the database
-        if use_mpi:
-            my_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{ParallelDB.initialized_params[db_name]}.db"
-        else:
-            my_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{mpi_rank}.db"
-        
-        self.database = Store( my_db )
-
-
-        self.uuid = uuid.uuid4().hex
-        self.db_status[self.uuid] = 0 # in reading data mode
-        #print(self.uuid)
-
-        
-        print(f"Starting shard {ParallelDB.initialized_params[db_name] +1} of {n} for {db_name}.")
-        logging.debug(f"Starting shard {ParallelDB.initialized_params[db_name] +1} of {n} for {db_name}.")
-
-        # increment counter
-        ParallelDB.initialized_params[db_name] = ParallelDB.initialized_params[db_name] + 1
-
+            self.__init_local_parallelism(db_name, n)
 
 
 
@@ -96,7 +59,18 @@ class ParallelDB:
         """
         To be called by each rank once all the data has been ingested
         """
+
+        if (self.use_mpi):
+            self.__all_done_mpi()
+        else:
+            self.__all_done_local()
         
+
+
+    def __all_done_local(self) -> None:
+        """
+        To be called by each rank once all the data has been ingested
+        """
         self.db_status[self.uuid] = 1   # done!
 
         sum = 0
@@ -108,100 +82,127 @@ class ParallelDB:
             # some databases are still reading
             return
         else:
-            print("Merging databases")
+            print("Merging databases ...")
             self.__merge_tables()
-
 
 
             for file_path in self.dbs:
                 if os.path.exists(file_path):   # Check if file exists
                     os.remove(file_path)        # Delete the file
-                    print(f"{file_path} deleted successfully")
+                    logging.debug(f"{file_path} deleted successfully")
 
 
-
-
-
-    def __get_columns(self, cursor: sqlite3.Cursor, table_name: str) -> list[str]:
+    def __all_done_mpi(self) -> None:
         """
-        Retrieve column names for a given table.
+        To be called by each rank once all the data has been ingested
+        """
+        comm = MPI.COMM_WORLD
+        if self.mpi_rank != 0:
+            req = comm.isend(self.mpi_rank, dest=0, tag=100)
+            req.Free()  # Free the request to avoid memory leaks
+
+
+        if self.mpi_rank == 0:
+            completed_ranks = 1  # Rank 0 is automatically done
+            while completed_ranks < self.n:
+                status = MPI.Status()
+                if comm.Iprobe(source=MPI.ANY_SOURCE, tag=100, status=status):
+                    msg = comm.recv(source=status.source, tag=100)
+                    #print(msg)
+                    completed_ranks += 1
+
+            print("Merging databases ...")
+
+            self.__merge_tables()
+
+            for file_path in self.dbs:
+                if os.path.exists(file_path):   # Check if file exists
+                    os.remove(file_path)        # Delete the file
+                    logging.debug(f"{file_path} deleted successfully")
+
+
+            print("All ranks have completed.")
+
+
+
+
+
+
+    def __init_mpi_parallelism(self, db_name: str, n: int, mpi_rank: int ) -> None:
+        """
+        Initialize parallelism for MPI
 
         Args:
-            cursor (sqlite3.Cursor): reference to the database
-            table_name (str): name of the table
-
-        Return:
-            list: list of columns in the table
-        """
-        cursor.execute(f"PRAGMA table_info({table_name})")
-        return [row[1] for row in cursor.fetchall()]  # Extract column names
-
-
-
-
-    def __merge_table(self, target_db: str, source_db: str, table_name: str) -> int:
-        """
-        Merge a table from source_db into target_db, avoiding exact duplicates.
-
-        Args:
-            target_db (str) : destination to merge
-            source_db (str) : origin database
-            table_name (str) :name of the table
-
-        Return:
-            int: status; 1 is success and 0 is failure
+            db_name (str)  : path of the orinal database
+            n (int)        : number of parallel shards being used to ingest data in the database
+            mpi_rank (int) : my rank
         """
 
-        start_time = time.perf_counter()
+        comm = MPI.COMM_WORLD
+        self.mpi_rank = mpi_rank
+        my_temp_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{mpi_rank}.db"    # Create a temporary name
+        shutil.copy(db_name, my_temp_db)           # Create a copy of the databse
+        self.database = Store( my_temp_db )        # Connect to the DB
+        self.db_status = [0] * n                   # initialize the status of all the databases to 0
 
-
-        target_conn = sqlite3.connect(target_db)
-        target_cursor = target_conn.cursor()
+        self.dbs = comm.gather(my_temp_db, root=0) # gather the names of the temporaty database on rank 0
         
-        source_conn = sqlite3.connect(source_db)
-        source_cursor = source_conn.cursor()
 
-        # Get column names dynamically
-        source_columns = self.__get_columns(source_cursor, table_name)
-        target_columns = self.__get_columns(target_cursor, table_name)
+        #print(f"Starting shard {my_temp_db} on rank {mpi_rank} of {n}.")
+        logging.debug(f"Starting shard {my_temp_db} on rank {mpi_rank} of {n}.")
 
-        # Ensure both tables have the same structure
-        if set(source_columns) != set(target_columns):
-            print(f"Schema mismatch: {table_name} has different columns in source and target.")
-            logging.error(f"Schema mismatch: {table_name} has different columns in source and target.")
-            return 0
 
-        # Create placeholders for SQL query (e.g., ?, ?, ?)
-        placeholders = ", ".join(["?"] * len(source_columns))
-        column_names_str = ", ".join(source_columns)
 
-        # Select all data from the source table
-        source_cursor.execute(f"SELECT {column_names_str} FROM {table_name}")
-        rows = source_cursor.fetchall()
 
-        for row in rows:
-            # Check if an exact match exists in the target database
-            conditions = " AND ".join([f"{col} = ?" for col in source_columns])
-            target_cursor.execute(f"SELECT * FROM {table_name} WHERE {conditions}", row)
-            exact_match = target_cursor.fetchone()
+    def __init_local_parallelism(self, db_name: str, n: int) -> None:
+        """
+        Initialize parallelism for local; non MPI
 
-            if exact_match:
-                #print(f"Skipping duplicate in {table_name}: {row}")
-                logging.debug(f"Skipping duplicate in {table_name}: {row}") 
-            else:
-                #print(f"Inserting new entry in {table_name}: {row}")
-                target_cursor.execute(f"INSERT INTO {table_name} ({column_names_str}) VALUES ({placeholders})", row)
+        Args:
+            db_name (str): path of the orinal database
+            n (int)      : number of parallel shards being used to ingest data in the database
+        """
 
-        # Commit changes and close connections
-        target_conn.commit()
-        target_conn.close()
-        source_conn.close()
+        # Creating temp databases
+        if db_name in ParallelDB.db_counter:
+            pass
+        else:
+            logging.debug(f"New initialization for {db_name}.")
 
-        end_time = time.perf_counter()
+            ParallelDB.db_counter[db_name] = 0   # keep track of shard number of database
 
-        #print(f"Merging table {table_name} took {end_time - start_time} s.")
-        logging.debug(f"Merging table {table_name} took {end_time - start_time} s.") 
-        return 1
+            # Create n temporary databases
+            for i in range(n):
+                temp_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{i}.db"    # Create a temporary name
+                shutil.copy(db_name, temp_db)           # Create a copy of the databse
+                self.dbs.append(temp_db)                # save the name of the database
+
+
+        # Exit if more databases are created than allowed
+        if ParallelDB.db_counter[db_name] >= n:
+            print(f"Too many allocated. Exiting!")
+            logging.info(f"Too many allocated. Exiting!")
+            return
+        
+
+        # Connect to the database
+        my_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{ParallelDB.db_counter[db_name]}.db"
+        self.database = Store( my_db )
+
+
+        self.uuid = uuid.uuid4().hex
+        self.db_status[self.uuid] = 0 # in reading data mode
+        #print(self.uuid)
+
+        
+        #print(f"Starting shard {ParallelDB.db_counter[db_name] +1} of {n} for {db_name}.")
+        logging.debug(f"Starting shard {ParallelDB.db_counter[db_name] +1} of {n} for {db_name}.")
+
+        # increment counter
+        ParallelDB.db_counter[db_name] = ParallelDB.db_counter[db_name] + 1
+
+
+
 
 
 
@@ -219,17 +220,19 @@ class ParallelDB:
 
 
         # Merge the tables
+        start_time = time.perf_counter()
         for db in self.dbs:
             start_time = time.perf_counter()
 
             #print(f"Merging table {db}")
             for table in tables:
-                merge_status = self.__merge_table(self.db_name, db, table)
+                merge_status = merge_table(self.db_name, db, table)
 
             end_time = time.perf_counter()
             logging.info(f"Merging {db} took {end_time - start_time} s.") 
-            print(f"Merging {db} took {end_time - start_time} s.") 
+            logging.debug(f"Merging {db} took {end_time - start_time} s.") 
+
+        end_time = time.perf_counter()
+        print(f"Merging databases took {end_time - start_time} s.") 
+        logging.info(f"Merging databases took {end_time - start_time} s.") 
             
-
-
-
