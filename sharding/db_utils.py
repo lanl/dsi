@@ -30,6 +30,7 @@ def create_sqlite_db(sql_database_template: str, target_db: str) -> None:
         conn.commit()
     except sqlite3.Error as e:
         print(f"Invalid SQL query: {e}")
+        logging.error(f"Invalid SQL query: {sql_commands}, error: {e}")
         cursor.close()
         return
 
@@ -103,14 +104,13 @@ def merge_table(target_db: str, source_db: str, table_name: str) -> int:
         exact_match = target_cursor.fetchone()
 
         if exact_match:
-            #print(f"Skipping duplicate in {table_name}: {row}")
             logging.debug(f"Skipping duplicate in {table_name}: {row}") 
         else:
             try:
-                #print(f"Inserting new entry in {table_name}: {row}")
                 target_cursor.execute(f"INSERT INTO {table_name} ({column_names_str}) VALUES ({placeholders})", row)
             except sqlite3.Error as e:  # Catch database errors
-                logging.debug(f"Error inserting data: {e}")
+                print(f"Inserting new entry in {table_name}: {row}")
+                logging.error(f"Error inserting data: {e}")
                 
     # Commit changes and close connections
     target_conn.commit()

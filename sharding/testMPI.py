@@ -1,9 +1,14 @@
+import logging
 from mpi4py import MPI
+
 from parallelDB import ParallelDB
 from db_utils import *
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
+
+logging.basicConfig(filename='sharding_mpi_test.log', level=logging.DEBUG,  format='%(asctime)s - %(levelname)s - %(message)s')
+
 size = comm.Get_size()
 
 print(f"Hello from process {rank} of {size}")

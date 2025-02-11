@@ -1,5 +1,8 @@
+import logging
 from parallelDB import ParallelDB
 from db_utils import *
+
+logging.basicConfig(filename='sharding_local_test.log', level=logging.DEBUG,  format='%(asctime)s - %(levelname)s - %(message)s')
 
 db_name = "test.db"
 db_schema = "database/table_template.sql"

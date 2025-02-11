@@ -1,6 +1,7 @@
 import sqlite3
 import logging
 import time
+import os
 
 class Store:
     """
@@ -26,29 +27,38 @@ class Store:
 
 
 
-    def connect_to_db(self, path: str) -> None:
+    def connect_to_db(self, path: str) -> list[str]:
         """
         Create or connect to a database with the path specified
 
         Args:
             path (str) : path to where to create or db to connect to
+
+        Return:
+            list (str) : list of tables in database
         """
-        #print(f"path: {path}")
+
+        if not os.path.isfile(path):
+            print(f"{path} does not exist. Exiting!")
+            logging.error(f"{path} does not exist. Exiting!")
+            return []
+        
         self.conn = sqlite3.connect(path)
 
         cursor = self.conn.cursor()
         try:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         except sqlite3.Error as e:  # Catch database errors
-            print(f"Error inserting data: {e}")
+            print(f"Error finding tables: {e}")
+            logging.error(f"Error finding tables: {e}")
             self.conn.rollback()  # Rollback transaction on failure
             cursor.close()
-            return
+            return []
 
 
         # Fetch and print all table names
         tables = cursor.fetchall()
-        logging.debug(f"List of tables: '{tables}'")
+        return tables
         logging.info(f"Database '{path}' connected to.")
 
 
@@ -70,7 +80,8 @@ class Store:
             cursor.execute(f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders});", data)
             self.conn.commit()
         except sqlite3.Error as e:  # Catch database errors
-            logging.debug(f"Error inserting data: {e}")
+            logging.error(f"insert_col_data: Error inserting data: {e}")
+            print(f"insert_col_data: Error inserting data: {e}")
             self.conn.rollback()  # Rollback transaction on failure
         finally:
             cursor.close()
@@ -92,7 +103,8 @@ class Store:
             cursor.execute(f"INSERT INTO {table_name} VALUES ({placeholders});", data)
             self.conn.commit()
         except sqlite3.Error as e:  # Catch database errors
-            logging.debug(f"Error inserting data: {e}")
+            logging.error(f"insert_data: Error inserting data: {e}")
+            print(f"insert_data: Error inserting data: {e}")
             self.conn.rollback()  # Rollback transaction on failure
         finally:
             cursor.close()
@@ -117,7 +129,8 @@ class Store:
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_types[index]}")
                 logging.debug(f"Column '{column_name}' added successfully.")
             except sqlite3.OperationalError as e:
-                logging.debug(f"Error adding column '{column_name}': {e}")
+                logging.error(f"Error adding column '{column_name}': {e}")
+                print(f"Error adding column '{column_name}': {e}")
 
         self.conn.commit()
         cursor.close()
@@ -144,7 +157,8 @@ class Store:
             columns = cursor.fetchall()
             column_exists = any(col[1] == column_name for col in columns)
         except sqlite3.Error as e:  # Catch database errors
-            logging.debug(f"Error inserting data: {e}")
+            logging.error(f"Error inserting data: {e}")
+            print(f"Error inserting data: {e}")
             return None
 
         cursor.close()
@@ -176,7 +190,8 @@ class Store:
             cursor.execute(query)
             results = cursor.fetchall()
         except sqlite3.Error as e:
-            logging.debug(f"Invalid SQL query: {e}")
+            logging.error(f"Invalid SQL query: {e}")
+            print(f"Invalid SQL query: {e}")
             results = None
         
 
@@ -206,7 +221,8 @@ class Store:
             cursor.executescript(script)
             self.conn.commit()
         except sqlite3.Error as e:
-            logging.debug(f"Invalid SQL query: {e}")
+            logging.error(f"Invalid SQL query: {e}")
+            print(f"Invalid SQL query: {e}")
         
 
         stop_time = time.time()
