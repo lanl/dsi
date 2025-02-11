@@ -40,4 +40,5 @@ count = 2
 val = [rank*10 + count, 'peti Smith', 'peti@example.com']
 db.database.insert_col_data("Customers",col_cus, val)
 
+
 db.all_done()

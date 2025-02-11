@@ -1,3 +1,4 @@
 pysqlite3
 numpy
 jupyterlab
+mpi4py
