@@ -89,7 +89,6 @@ def test_find():
         os.remove(dbpath)
     store = Sqlite(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
-    store.close()
 
     find_data = store.find("f")
     assert len(find_data) == 3
@@ -107,6 +106,8 @@ def test_find():
     assert find_data[2].type == 'cell'
     assert find_data[2].row_num == 1
 
+    store.close()
+
 def test_find_table():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
     dbpath = 'test_artifact.db'
@@ -114,12 +115,12 @@ def test_find_table():
         os.remove(dbpath)
     store = Sqlite(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
-    store.close()
 
     table_data = store.find_table("f")
     assert table_data[0].t_name == "wildfire"
     assert table_data[0].c_name == ['foo', 'bar']
     assert table_data[0].type == 'table'
+    store.close()
 
 def test_find_column():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
@@ -128,13 +129,13 @@ def test_find_column():
         os.remove(dbpath)
     store = Sqlite(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
-    store.close()
 
     col_data = store.find_column("f")
     assert col_data[0].t_name == "wildfire"
     assert col_data[0].c_name == ['foo']
     assert col_data[0].value == [1,2,3]
     assert col_data[0].type == 'column'
+    store.close()
 
 def test_find_range():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
@@ -143,13 +144,13 @@ def test_find_range():
         os.remove(dbpath)
     store = Sqlite(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
-    store.close()
 
     range_data = store.find_column("f", range=True)
     assert range_data[0].t_name == "wildfire"
     assert range_data[0].c_name == ['foo']
     assert range_data[0].value == [1,3]
     assert range_data[0].type == 'range'
+    store.close()
 
 def test_find_cell():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
@@ -158,7 +159,6 @@ def test_find_cell():
         os.remove(dbpath)
     store = Sqlite(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
-    store.close()
 
     cell_data = store.find_cell("f")
     assert cell_data[0].t_name == "wildfire"
@@ -166,6 +166,7 @@ def test_find_cell():
     assert cell_data[0].value == "f"
     assert cell_data[0].row_num == 1
     assert cell_data[0].type == 'cell'
+    store.close()
 
 def test_find_row():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
@@ -174,7 +175,6 @@ def test_find_row():
         os.remove(dbpath)
     store = Sqlite(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
-    store.close()
 
     row_data = store.find_cell("f", row = True)
     assert row_data[0].t_name == "wildfire"
@@ -182,3 +182,4 @@ def test_find_row():
     assert row_data[0].value == [1,"f"]
     assert row_data[0].row_num == 1
     assert row_data[0].type == 'row'
+    store.close()
