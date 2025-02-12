@@ -34,7 +34,7 @@ def test_artifact_put():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
     # No error implies success
     assert True
@@ -54,7 +54,7 @@ def test_artifact_get():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     query_data = store.process_artifacts(query = "SELECT * FROM wildfire;")
     store.close()
     correct_output = [(1, 3), (2, 2), (3, 1)]
@@ -66,7 +66,7 @@ def test_artifact_inspect():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.inspect_artifacts()
     store.close()
     assert True
@@ -77,7 +77,7 @@ def test_artifact_read():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     artifact = store.read_to_artifact()
     store.close()
     assert artifact == valid_middleware_datastructure
@@ -88,7 +88,7 @@ def test_find():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
 
     find_data = store.find("f")
@@ -113,7 +113,7 @@ def test_find_table():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
 
     table_data = store.find_table("f")
@@ -127,7 +127,7 @@ def test_find_column():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
 
     col_data = store.find_column("f")
@@ -142,7 +142,7 @@ def test_find_range():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
 
     range_data = store.find_column("f", range=True)
@@ -157,7 +157,7 @@ def test_find_cell():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
 
     cell_data = store.find_cell("f")
@@ -173,7 +173,7 @@ def test_find_row():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.write_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
 
     row_data = store.find_cell("f", row = True)
