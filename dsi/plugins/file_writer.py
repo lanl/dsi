@@ -111,8 +111,8 @@ class ER_Diagram(FileWriter):
                 fk_string = f"{f_table}:{f_col}"
                 pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
                 
-                if manual_dot: dot_file.write(f"{fk_string} -> {pk_string}; ")
-                else: dot.edge(fk_string, pk_string)
+                if manual_dot: dot_file.write(f"{pk_string} -> {fk_string}; ")
+                else: dot.edge(pk_string, fk_string)
 
         if manual_dot:
             dot_file.write("}")
