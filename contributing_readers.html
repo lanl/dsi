@@ -1,0 +1,223 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Making a Reader for Your Application &mdash; DSI 0.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Plugins" href="plugins.html" />
+    <link rel="prev" title="Quick Start: Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Making a Reader for Your Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#initializer-init-self-none">Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pack-header-pack-header-self-none">Pack Header: <code class="docutils literal notranslate"><span class="pre">pack_header(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#add-rows-add-rows-self-none">Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#alternate-add-rows-add-rows-self-none"><em>Alternate</em> Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implemented-examples">Implemented Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#loading-your-reader">Loading Your Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#contributing-your-reader">Contributing Your Reader</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Making a Reader for Your Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#initializer-init-self-none">Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pack-header-pack-header-self-none">Pack Header: <code class="docutils literal notranslate"><span class="pre">pack_header(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#add-rows-add-rows-self-none">Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#alternate-add-rows-add-rows-self-none"><em>Alternate</em> Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implemented-examples">Implemented Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#loading-your-reader">Loading Your Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#contributing-your-reader">Contributing Your Reader</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Making a Reader for Your Application</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/contributing_readers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="making-a-reader-for-your-application">
+<h1>Making a Reader for Your Application<a class="headerlink" href="#making-a-reader-for-your-application" title="Link to this heading"></a></h1>
+<p>DSI readers are the primary way to transform outside data to metadata that DSI can ingest. Readers are Python classes that must include a few methods, namely <code class="docutils literal notranslate"><span class="pre">__init__</span></code>, <code class="docutils literal notranslate"><span class="pre">pack_header</span></code>, and <code class="docutils literal notranslate"><span class="pre">add_rows</span></code>.</p>
+<section id="initializer-init-self-none">
+<h2>Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code><a class="headerlink" href="#initializer-init-self-none" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">__init__</span></code> is where you can include all of your initialization logic, just make sure to initialize your superclass.
+Note: <code class="docutils literal notranslate"><span class="pre">__init__</span></code> can also take whatever parameters needed for a given application.</p>
+<p>Example <code class="docutils literal notranslate"><span class="pre">__init__</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+  <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>  <span class="c1"># see &quot;plugins&quot; to determine which superclass your reader should extend</span>
+</pre></div>
+</div>
+</section>
+<section id="pack-header-pack-header-self-none">
+<h2>Pack Header: <code class="docutils literal notranslate"><span class="pre">pack_header(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code><a class="headerlink" href="#pack-header-pack-header-self-none" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">pack_header</span></code> is responsible for setting a schema, registering which columns
+will be populated by the reader. The <code class="docutils literal notranslate"><span class="pre">set_schema(self,</span> <span class="pre">table_data:</span> <span class="pre">list,</span> <span class="pre">validation_model=None)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code> method
+is available to subclasses of <code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code>, which allows one to simply give a list of column names to register.
+<code class="docutils literal notranslate"><span class="pre">validation_model</span></code> is an pydantic model that can help you enforce types, but is completely optional.</p>
+<p>Example <code class="docutils literal notranslate"><span class="pre">pack_header</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">pack_header</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+  <span class="n">column_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="s2">&quot;bar&quot;</span><span class="p">,</span> <span class="s2">&quot;baz&quot;</span><span class="p">]</span>
+  <span class="bp">self</span><span class="o">.</span><span class="n">set_schema</span><span class="p">(</span><span class="n">column_names</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="add-rows-add-rows-self-none">
+<h2>Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code><a class="headerlink" href="#add-rows-add-rows-self-none" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">add_rows</span></code> is responsible for appending to the internal metadata buffer.
+Whatever data is being ingested, it’s done here. The <code class="docutils literal notranslate"><span class="pre">add_to_output(self,</span> <span class="pre">row:</span> <span class="pre">list)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code> method is available to subclasses
+of <code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code>, which takes a list of data that matches the schema and appends it to the internal metadata buffer.</p>
+<p>Note: <code class="docutils literal notranslate"><span class="pre">pack_header</span></code> must be called before metadata is appended in <code class="docutils literal notranslate"><span class="pre">add_rows</span></code>. Another helper method of
+<code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code> is <code class="docutils literal notranslate"><span class="pre">schema_is_set</span></code>, which provides a way to tell if this restriction is met.</p>
+<p>Example <code class="docutils literal notranslate"><span class="pre">add_rows</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">add_rows</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+  <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">schema_is_set</span><span class="p">():</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">pack_header</span><span class="p">()</span>
+
+  <span class="c1"># data parsing can go here (or abstracted to other functions)</span>
+  <span class="n">my_data</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+
+  <span class="bp">self</span><span class="o">.</span><span class="n">add_to_output</span><span class="p">(</span><span class="n">my_data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="alternate-add-rows-add-rows-self-none">
+<h2><em>Alternate</em> Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code><a class="headerlink" href="#alternate-add-rows-add-rows-self-none" title="Link to this heading"></a></h2>
+<p>If you are confident that the the data you read in <code class="docutils literal notranslate"><span class="pre">add_rows</span></code> is in the form of an OrderedDict (the data structure used to store all ingested data), you can bypass the use of <code class="docutils literal notranslate"><span class="pre">pack_header</span></code> and <code class="docutils literal notranslate"><span class="pre">add_to_output</span></code> with an alternate <code class="docutils literal notranslate"><span class="pre">set_schema</span></code> function.</p>
+<p>This function, <code class="docutils literal notranslate"><span class="pre">set_schema_2(self,</span> <span class="pre">collection,</span> <span class="pre">validation_model=None)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code>, directly assigns the data you read in <code class="docutils literal notranslate"><span class="pre">add_rows</span></code> to the internal DSI abstraction layer, provided that the data you pass as the <code class="docutils literal notranslate"><span class="pre">collection</span></code> variable is an OrderedDict. This method allows you to quickly append data to the abstraction wholesale, rather than row-by-row.</p>
+<p>Example alternate <code class="docutils literal notranslate"><span class="pre">add_rows</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">add_rows</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+
+  <span class="c1"># data is stored as an OrderedDict so can use set_schema2</span>
+  <span class="n">my_data</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+  <span class="n">my_data</span><span class="p">[</span><span class="s2">&quot;jack&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">10</span>
+  <span class="n">my_data</span><span class="p">[</span><span class="s2">&quot;joey&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">20</span>
+  <span class="n">my_data</span><span class="p">[</span><span class="s2">&quot;amy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">30</span>
+
+  <span class="bp">self</span><span class="o">.</span><span class="n">set_schema2</span><span class="p">(</span><span class="n">my_data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="implemented-examples">
+<h2>Implemented Examples<a class="headerlink" href="#implemented-examples" title="Link to this heading"></a></h2>
+<p>If you want to see some full reader examples in-code, some can be found in
+<a class="reference external" href="https://github.com/lanl/dsi/blob/main/dsi/plugins/env.py">dsi/plugins/env.py</a>.
+<code class="docutils literal notranslate"><span class="pre">Hostname</span></code> is an especially simple example to go off of.</p>
+</section>
+<section id="loading-your-reader">
+<h2>Loading Your Reader<a class="headerlink" href="#loading-your-reader" title="Link to this heading"></a></h2>
+<p>There are two ways to load your reader, internally and externally.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Internally: If you want your reader loadable internally with the rest of the provided implementations (in <a class="reference external" href="https://github.com/lanl/dsi/tree/main/dsi/plugins">dsi/plugins</a>), it must be registered in the class variables of <code class="docutils literal notranslate"><span class="pre">Terminal</span></code> in <a class="reference external" href="https://github.com/lanl/dsi/blob/main/dsi/core.py">dsi/core.py</a>. If this is done correctly, your reader will be loadable by the <code class="docutils literal notranslate"><span class="pre">load_module</span></code> method of <code class="docutils literal notranslate"><span class="pre">Terminal</span></code>.</p></li>
+<li><p>Externally: If your reader is not along side the other provided implementations, possibly somewhere else on the filesystem, your reader will be loaded externally. This is done by using the <code class="docutils literal notranslate"><span class="pre">add_external_python_module</span></code> method of <code class="docutils literal notranslate"><span class="pre">Terminal</span></code>. If you load an external Python module this way (ex. <code class="docutils literal notranslate"><span class="pre">term.add_external_python_module('plugin','my_python_file','/the/path/to/my_python_file.py')</span></code>), your reader will then be loadable by the <code class="docutils literal notranslate"><span class="pre">load_module</span></code> method of <code class="docutils literal notranslate"><span class="pre">Terminal</span></code>.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="contributing-your-reader">
+<h2>Contributing Your Reader<a class="headerlink" href="#contributing-your-reader" title="Link to this heading"></a></h2>
+<p>If your reader is helpful and acceptable for public use, you should consider making a pull request (PR) into DSI.</p>
+<dl class="simple">
+<dt>Please note that any accepted PRs into DSI should satisfy the following:</dt><dd><ul class="simple">
+<li><p>Passes all tests in <code class="docutils literal notranslate"><span class="pre">dsi/plugins/tests</span></code></p></li>
+<li><p>Has no <code class="docutils literal notranslate"><span class="pre">pylama</span></code> errors/warnings (see <a class="reference external" href="https://github.com/lanl/dsi/tree/main/.githooks">dsi/.githooks</a>)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Quick Start: Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="plugins.html" class="btn btn-neutral float-right" title="Plugins" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Triad National Security, LLC. All rights reserved..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

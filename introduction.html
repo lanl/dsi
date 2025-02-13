@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
@@ -5,19 +7,15 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Implementation Overview &mdash; DSI 0.0.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=7026087e"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -53,9 +51,12 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
 </ul>
@@ -84,7 +85,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <p>The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI  capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:</p>
+  <p>The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:</p>
 <ul class="simple">
 <li><p>Data management is subject to strict, POSIX-enforced, file security.</p></li>
 <li><p>DSI capabilities support a wide range of common metadata queries.</p></li>
@@ -93,7 +94,8 @@
 <li><p>The DSI API can be used to develop user-specific workflows.</p></li>
 </ul>
 <figure class="align-default" id="id1">
-<a class="with-shadow reference internal image-reference" href="_images/data_lifecycle.png"><img alt="Figure depicting the data life cycle" class="with-shadow" src="_images/data_lifecycle.png" style="width: 305.0px; height: 315.0px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/data_lifecycle.png"><img alt="Figure depicting the data life cycle" class="with-shadow" src="_images/data_lifecycle.png" style="width: 305.0px; height: 315.0px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">A depiction of data life cycle can be seen here. The Data Science Infrastructure API supports the user to manage the life cycle aspects of their data.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
@@ -120,7 +122,8 @@
 </ul>
 </div></blockquote>
 <figure class="align-default" id="id2">
-<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current plugin class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 1042.0px; height: 347.0px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current plugin class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 2164.0px; height: 347.0px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Figure depicting the current DSI plugin class hierarchy.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
 </figcaption>
@@ -131,7 +134,8 @@
 <p>Backends are an interface between the core and a storage medium.
 Backends are designed to support a user-needed functionality.  Given a set of user metadata captured by a DSI frontend, a typical functionality needed by DSI users is to query that metadata by SQL query. Because the files associated with the queryable metadata may be spread across filesystems and security domains, a supporting backend is required to assemble query results and present them to the DSI core for transformation and return.</p>
 <figure class="align-default" id="id3">
-<a class="with-shadow reference internal image-reference" href="_images/user_story.png"><img alt="This figure depicts a user asking a typical query on the user's metadata" class="with-shadow" src="_images/user_story.png" style="width: 494.0px; height: 373.0px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/user_story.png"><img alt="This figure depicts a user asking a typical query on the user's metadata" class="with-shadow" src="_images/user_story.png" style="width: 494.0px; height: 373.0px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">In this typical <strong>user story</strong>, the user has metadata about their data stored in DSI storage of some type.  The user needs to extract all files with the variable <strong>foo</strong> above a specific threshold.  DSI backends query the DSI metadata store to locate and return all such files.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
 </figcaption>

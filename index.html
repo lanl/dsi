@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
@@ -5,19 +7,15 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Data Science Infrastructure Project (DSI) &mdash; DSI 0.0.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=7026087e"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -47,9 +45,12 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
 </ul>
@@ -90,6 +91,16 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#initializer-init-self-none">Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#pack-header-pack-header-self-none">Pack Header: <code class="docutils literal notranslate"><span class="pre">pack_header(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#add-rows-add-rows-self-none">Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#alternate-add-rows-add-rows-self-none"><em>Alternate</em> Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#implemented-examples">Implemented Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#loading-your-reader">Loading Your Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#contributing-your-reader">Contributing Your Reader</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.plugin.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.metadata.StructuredMetadata"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code></a></li>
@@ -99,9 +110,12 @@
 <li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.env.SystemKernel"><code class="docutils literal notranslate"><span class="pre">SystemKernel</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html#dsi.plugins.plugin_models.create_dynamic_model"><code class="docutils literal notranslate"><span class="pre">create_dynamic_model()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.sqlite.Artifact"><code class="docutils literal notranslate"><span class="pre">Artifact</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.sqlite.Sqlite"><code class="docutils literal notranslate"><span class="pre">Sqlite</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.gufi.Gufi"><code class="docutils literal notranslate"><span class="pre">Gufi</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="backends.html#dsi.backends.parquet.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a></li>
 </ul>
@@ -109,6 +123,16 @@
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="core.html#core-sync">Core:Sync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="core.html#module-dsi.core">Core Modules and Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#initializer-init-self-none">Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#pack-header-pack-header-self-none">Pack Header: <code class="docutils literal notranslate"><span class="pre">pack_header(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#add-rows-add-rows-self-none">Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#alternate-add-rows-add-rows-self-none"><em>Alternate</em> Add Rows: <code class="docutils literal notranslate"><span class="pre">add_rows(self)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#implemented-examples">Implemented Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#loading-your-reader">Loading Your Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing_readers.html#contributing-your-reader">Contributing Your Reader</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a><ul>

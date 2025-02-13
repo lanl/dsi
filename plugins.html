@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
@@ -5,24 +7,20 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Plugins &mdash; DSI 0.0.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=7026087e"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Backends" href="backends.html" />
-    <link rel="prev" title="Quick Start: Installation" href="installation.html" /> 
+    <link rel="prev" title="Making a Reader for Your Application" href="contributing_readers.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -48,6 +46,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Plugins</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.plugin.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.plugin.Plugin.add_to_output"><code class="docutils literal notranslate"><span class="pre">Plugin.add_to_output()</span></code></a></li>
@@ -84,8 +83,13 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dsi.plugins.plugin_models.create_dynamic_model"><code class="docutils literal notranslate"><span class="pre">create_dynamic_model()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
 </ul>
@@ -120,7 +124,8 @@
 <p>Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. In order to be compatible with DSI core, Plugins should produce data in Python built-in data structures or data structures sourced from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library.</p>
 <p>Note that any contributed plugins or extension should include unit tests in  <code class="docutils literal notranslate"><span class="pre">plugins/tests</span></code> to demonstrate the new Plugin capability.</p>
 <figure class="align-default" id="id1">
-<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current plugin class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 1042.0px; height: 347.0px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current plugin class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 2164.0px; height: 347.0px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Figure depicts the current DSI plugin class hierarchy.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
@@ -146,7 +151,7 @@ data structure.</p>
 <dd><p>plugin superclass that provides handy methods for structured data</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.add_to_output">
-<span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.add_to_output" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tableName</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.add_to_output" title="Link to this definition"></a></dt>
 <dd><p>Adds a row of data to the output_collector and guarantees good structure.
 Useful in a plugin’s add_rows method.</p>
 </dd></dl>
@@ -159,9 +164,16 @@ Useful in a plugin’s add_rows method.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.set_schema">
-<span class="sig-name descname"><span class="pre">set_schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">column_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validation_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.set_schema" title="Link to this definition"></a></dt>
-<dd><p>Initializes columns in the output_collector and column_cnt.
+<span class="sig-name descname"><span class="pre">set_schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validation_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.set_schema" title="Link to this definition"></a></dt>
+<dd><p>Initializes columns in the output_collector and table_cnt.
 Useful in a plugin’s pack_header method.</p>
+<dl class="simple">
+<dt><cite>table_data</cite>: </dt><dd><ul class="simple">
+<li><p>for ingested data with multiple tables, table_data is list of tuples where each tuple is structured as (table name, column name list)</p></li>
+<li><p>for data without multiple tables, table_data is just a list of column names</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -290,12 +302,26 @@ The option = value pairs are added to the output dict.</p>
 </dd></dl>
 
 </section>
+<section id="optional-plugin-type-enforcement">
+<h1>Optional Plugin Type Enforcement<a class="headerlink" href="#optional-plugin-type-enforcement" title="Link to this heading"></a></h1>
+<p>Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. Plugins may enforce types, but they are not required to enforce types. Plugin type enforcement can be static, like the Hostname default plugin. Plugin type enforcement can also be dynamic, like the Bueno default plugin.</p>
+<p id="module-dsi.plugins.plugin_models">A collection of pydantic models for Plugin schema validation</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.create_dynamic_model">
+<span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin_models.</span></span><span class="sig-name descname"><span class="pre">create_dynamic_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_types</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">type</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">BaseModel</span></span></span><a class="headerlink" href="#dsi.plugins.plugin_models.create_dynamic_model" title="Link to this definition"></a></dt>
+<dd><p>Creates a pydantic model at runtime with given name, column names
+and types, and an optional base model to extend.</p>
+<p>This is useful for when column names are not known until
+they are retrieved at runtime.</p>
+</dd></dl>
+
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="installation.html" class="btn btn-neutral float-left" title="Quick Start: Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="contributing_readers.html" class="btn btn-neutral float-left" title="Making a Reader for Your Application" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="backends.html" class="btn btn-neutral float-right" title="Backends" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

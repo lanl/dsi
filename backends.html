@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
@@ -5,19 +7,15 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Backends &mdash; DSI 0.0.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=7026087e"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -48,26 +46,11 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Backends</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#dsi.backends.sqlite.Artifact"><code class="docutils literal notranslate"><span class="pre">Artifact</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite"><code class="docutils literal notranslate"><span class="pre">Sqlite</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.check_type"><code class="docutils literal notranslate"><span class="pre">Sqlite.check_type()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.export_csv"><code class="docutils literal notranslate"><span class="pre">Sqlite.export_csv()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.export_csv_query"><code class="docutils literal notranslate"><span class="pre">Sqlite.export_csv_query()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.get_artifact_list"><code class="docutils literal notranslate"><span class="pre">Sqlite.get_artifact_list()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.put_artifact_type"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifact_type()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.put_artifacts"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.put_artifacts_csv"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts_csv()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.put_artifacts_lgcy"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts_lgcy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.put_artifacts_only"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts_only()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.put_artifacts_t"><code class="docutils literal notranslate"><span class="pre">Sqlite.put_artifacts_t()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.query_fctime"><code class="docutils literal notranslate"><span class="pre">Sqlite.query_fctime()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.query_fname"><code class="docutils literal notranslate"><span class="pre">Sqlite.query_fname()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.query_fsize"><code class="docutils literal notranslate"><span class="pre">Sqlite.query_fsize()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite.sqlquery"><code class="docutils literal notranslate"><span class="pre">Sqlite.sqlquery()</span></code></a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="#dsi.backends.gufi.Gufi"><code class="docutils literal notranslate"><span class="pre">Gufi</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#dsi.backends.gufi.Gufi.get_artifacts"><code class="docutils literal notranslate"><span class="pre">Gufi.get_artifacts()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dsi.backends.gufi.Gufi.isVerbose"><code class="docutils literal notranslate"><span class="pre">Gufi.isVerbose</span></code></a></li>
@@ -76,13 +59,13 @@
 <li class="toctree-l2"><a class="reference internal" href="#dsi.backends.parquet.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#dsi.backends.parquet.Parquet.get_artifacts"><code class="docutils literal notranslate"><span class="pre">Parquet.get_artifacts()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dsi.backends.parquet.Parquet.get_cmd_output"><code class="docutils literal notranslate"><span class="pre">Parquet.get_cmd_output()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#dsi.backends.parquet.Parquet.inspect_artifacts"><code class="docutils literal notranslate"><span class="pre">Parquet.inspect_artifacts()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dsi.backends.parquet.Parquet.put_artifacts"><code class="docutils literal notranslate"><span class="pre">Parquet.put_artifacts()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
 </ul>
@@ -116,7 +99,8 @@
 <p>Backends connect users to DSI Core middleware and backends allow DSI middleware data structures to read and write to persistent external storage. Backends are modular to support user contribution.  Backend contributors are encouraged to offer custom backend abstract classes and backend implementations.  A contributed backend abstract class may extend another backend to inherit the properties of the parent. In order to be compatible with DSI core middleware, backends should create an interface to Python built-in data structures or data structures from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library. Backend extensions will be accepted conditional to the extention of <code class="docutils literal notranslate"><span class="pre">backends/tests</span></code> to demonstrate new Backend capability. We can not accept pull requests that are not tested.</p>
 <p>Note that any contributed backends or extensions should include unit tests in  <code class="docutils literal notranslate"><span class="pre">backends/tests</span></code> to demonstrate the new Backend capability.</p>
 <figure class="align-default" id="id1">
-<a class="with-shadow reference internal image-reference" href="_images/BackendClassHierarchy.png"><img alt="Figure depicting the current backend class hierarchy." class="with-shadow" src="_images/BackendClassHierarchy.png" style="width: 323.0px; height: 251.0px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/BackendClassHierarchy.png"><img alt="Figure depicting the current backend class hierarchy." class="with-shadow" src="_images/BackendClassHierarchy.png" style="width: 323.0px; height: 251.0px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Figure depicts the current DSI backend class hierarchy.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
@@ -127,145 +111,6 @@
 <dd><p>Primary Artifact class that holds database schema in memory.
 An Artifact is a generic construct that defines the schema for metadata that
 defines the tables inside of SQL</p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.sqlite.</span></span><span class="sig-name descname"><span class="pre">Sqlite</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite" title="Link to this definition"></a></dt>
-<dd><p>Primary storage class, inherits sql class</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.check_type">
-<span class="sig-name descname"><span class="pre">check_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.check_type" title="Link to this definition"></a></dt>
-<dd><p>Tests input text and returns a predicted compatible SQL Type
-<cite>text</cite>: text string
-<cite>return</cite>: string description of a SQL data type</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.export_csv">
-<span class="sig-name descname"><span class="pre">export_csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rquery</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.export_csv" title="Link to this definition"></a></dt>
-<dd><p>Function that outputs a csv file of a return query, not the query itself</p>
-<p><cite>rquery</cite>: return of an already called query output</p>
-<p><cite>tname</cite>: name of the table for (all) columns to export</p>
-<p><cite>fname</cite>: target filename (including path) that will output the return query as a csv file</p>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.export_csv_query">
-<span class="sig-name descname"><span class="pre">export_csv_query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.export_csv_query" title="Link to this definition"></a></dt>
-<dd><p>Function that outputs a csv file of a return query, given an initial query.</p>
-<p><cite>query</cite>: raw SQL query to be executed on current table</p>
-<p><cite>fname</cite>: target filename (including path) that will output the return query as a csv file</p>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.get_artifact_list">
-<span class="sig-name descname"><span class="pre">get_artifact_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.get_artifact_list" title="Link to this definition"></a></dt>
-<dd><p>Function that returns a list of all of the Artifact names (represented as sql tables)</p>
-<p><cite>return</cite>: list of Artifact names</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifact_type">
-<span class="sig-name descname"><span class="pre">put_artifact_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">types</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifact_type" title="Link to this definition"></a></dt>
-<dd><p>Primary class for defining metadata Artifact schema.</p>
-<dl class="simple">
-<dt><cite>types</cite>: DataType derived class that defines the string name, properties</dt><dd><p>(named SQL type), and units for each column in the schema.</p>
-</dd>
-</dl>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifacts">
-<span class="sig-name descname"><span class="pre">put_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifacts" title="Link to this definition"></a></dt>
-<dd><p>Primary class for insertion of collection of Artifacts metadata into a defined schema</p>
-<dl class="simple">
-<dt><cite>collection</cite>: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,</dt><dd><p>filled with rows to insert.</p>
-</dd>
-</dl>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifacts_csv">
-<span class="sig-name descname"><span class="pre">put_artifacts_csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifacts_csv" title="Link to this definition"></a></dt>
-<dd><p>Function for insertion of Artifact metadata into a defined schema by using a CSV file,
-where the first row of the CSV contains the column names of the schema. Any rows
-thereafter contain data to be inserted. Data types are automatically assigned based on
-typecasting and default to a string type if none can be found.</p>
-<p><cite>fname</cite>: filepath to the .csv file to be read and inserted into the database</p>
-<p><cite>tname</cite>: String name of the table to be inserted</p>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifacts_lgcy">
-<span class="sig-name descname"><span class="pre">put_artifacts_lgcy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifacts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifacts_lgcy" title="Link to this definition"></a></dt>
-<dd><p>Legacy function for insertion of artifact metadata into a defined schema</p>
-<p><cite>artifacts</cite>: data_type derived class that has a regular structure of a defined schema, filled with rows to insert.</p>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifacts_only">
-<span class="sig-name descname"><span class="pre">put_artifacts_only</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">artifacts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifacts_only" title="Link to this definition"></a></dt>
-<dd><p>Function for insertion of Artifact metadata into a defined schema as a Tuple</p>
-<dl class="simple">
-<dt><cite>Artifacts</cite>: DataType derived class that has a regular structure of a defined schema,</dt><dd><p>filled with rows to insert.</p>
-</dd>
-</dl>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifacts_t">
-<span class="sig-name descname"><span class="pre">put_artifacts_t</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tableName</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'TABLENAME'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifacts_t" title="Link to this definition"></a></dt>
-<dd><p>Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough</p>
-<dl class="simple">
-<dt><cite>collection</cite>: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,</dt><dd><p>filled with rows to insert.</p>
-</dd>
-</dl>
-<p><cite>tableName</cite>: A passthrough to define a table and set the name of a table</p>
-<p><cite>return</cite>: none</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.query_fctime">
-<span class="sig-name descname"><span class="pre">query_fctime</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">operator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ctime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.query_fctime" title="Link to this definition"></a></dt>
-<dd><p>Function that queries file creation times within the filesystem metadata store</p>
-<p><cite>operator</cite>: operator input GT, LT, EQ as a modifier for a creation time search</p>
-<p><cite>ctime</cite>: creation time in POSIX format, see the utils <cite>dateToPosix</cite> conversion function</p>
-<p><cite>return</cite>: query list of filenames matching the creation time criteria with modifiers</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.query_fname">
-<span class="sig-name descname"><span class="pre">query_fname</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.query_fname" title="Link to this definition"></a></dt>
-<dd><p>Function that queries filenames within the filesystem metadata store</p>
-<p><cite>name</cite>: string name of a subsection of a filename to be searched</p>
-<p><cite>return</cite>: query list of filenames matching <cite>name</cite> string</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.query_fsize">
-<span class="sig-name descname"><span class="pre">query_fsize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">operator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.query_fsize" title="Link to this definition"></a></dt>
-<dd><p>Function that queries ranges of file sizes within the filesystem metadata store</p>
-<p><cite>operator</cite>: operator input GT, LT, EQ as a modifier for a filesize search</p>
-<p><cite>size</cite>: size in bytes</p>
-<p><cite>return</cite>: query list of filenames matching filesize criteria with modifiers</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.sqlquery">
-<span class="sig-name descname"><span class="pre">sqlquery</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.sqlquery" title="Link to this definition"></a></dt>
-<dd><p>Function that provides a direct sql query passthrough to the database.</p>
-<p><cite>query</cite>: raw SQL query to be executed on current table</p>
-<p><cite>return</cite>: raw sql query list that contains result of the original query</p>
-</dd></dl>
-
 </dd></dl>
 
 <dl class="py class" id="module-dsi.backends.gufi">
@@ -307,12 +152,6 @@ column: column name from the DSI db to join on</p>
 <em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cmd_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.backends.parquet.Parquet.get_cmd_output" title="Link to this definition"></a></dt>
 <dd><p>Runs a given command and returns the stdout if successful.</p>
 <p>If stderr is not empty, an exception is raised with the stderr text.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet.inspect_artifacts">
-<span class="sig-name descname"><span class="pre">inspect_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.parquet.Parquet.inspect_artifacts" title="Link to this definition"></a></dt>
-<dd><p>Populate a Jupyter notebook with tools required to look at Parquet data.</p>
 </dd></dl>
 
 <dl class="py method">

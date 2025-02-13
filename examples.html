@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
@@ -5,19 +7,15 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DSI Examples &mdash; DSI 0.0.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=7026087e"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -47,9 +45,12 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">DSI Examples</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#pennant-mini-app">PENNANT mini-app</a></li>
@@ -102,12 +103,12 @@ typical memory access patterns for an HPC simulation code.</p>
 <span class="sd">Parses the slurm output from PENNANT runs and creates a csv file</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">argparse</span>
-<span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">import</span> <span class="nn">re</span>
-<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">glob</span>
 
-<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot; A testname argument is required &quot;&quot;&quot;</span>
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
     <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--testname&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;the test name&#39;</span><span class="p">)</span>
@@ -190,50 +191,47 @@ typical memory access patterns for an HPC simulation code.</p>
 <span class="sd">Then it creates a DSI db from the csv file and performs a query.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">argparse</span>
-<span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">from</span> <span class="nn">dsi.backends.sqlite</span> <span class="kn">import</span> <span class="n">Sqlite</span><span class="p">,</span> <span class="n">DataType</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsi.backends.sqlite</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sqlite</span><span class="p">,</span> <span class="n">DataType</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsi.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Terminal</span>
 
 <span class="n">isVerbose</span> <span class="o">=</span> <span class="kc">True</span>
 
-<span class="k">def</span> <span class="nf">import_pennant_data</span><span class="p">(</span><span class="n">test_name</span><span class="p">):</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+<span class="w">   </span><span class="sd">&quot;&quot;&quot; The testname argument is required &quot;&quot;&quot;</span>
+   <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
+   <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--testname&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;the test name&#39;</span><span class="p">)</span>
+   <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+   <span class="n">test_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">testname</span>
+   <span class="k">if</span> <span class="n">test_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+      <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+      <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+   <span class="n">table_name</span> <span class="o">=</span> <span class="s2">&quot;rundata&quot;</span>
    <span class="n">csvpath</span> <span class="o">=</span> <span class="s1">&#39;pennant_&#39;</span> <span class="o">+</span> <span class="n">test_name</span> <span class="o">+</span> <span class="s1">&#39;.csv&#39;</span>
    <span class="n">dbpath</span> <span class="o">=</span> <span class="s1">&#39;pennant_&#39;</span> <span class="o">+</span> <span class="n">test_name</span> <span class="o">+</span> <span class="s1">&#39;.db&#39;</span>
-   <span class="n">store</span> <span class="o">=</span> <span class="n">Sqlite</span><span class="p">(</span><span class="n">dbpath</span><span class="p">)</span>
-   <span class="n">store</span><span class="o">.</span><span class="n">put_artifacts_csv</span><span class="p">(</span><span class="n">csvpath</span><span class="p">,</span> <span class="s2">&quot;rundata&quot;</span><span class="p">,</span> <span class="n">isVerbose</span><span class="o">=</span><span class="n">isVerbose</span><span class="p">)</span>
-   <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-   <span class="c1"># No error implies success</span>
-</pre></div>
-</div>
-<p>Finally, the database is queried:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="w"> </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd"> Performs a sample query on the DSI db</span>
-<span class="sd"> &quot;&quot;&quot;</span>
- <span class="k">def</span> <span class="nf">test_artifact_query</span><span class="p">(</span><span class="n">test_name</span><span class="p">):</span>
-    <span class="n">dbpath</span> <span class="o">=</span> <span class="s2">&quot;pennant_&quot;</span> <span class="o">+</span> <span class="n">test_name</span> <span class="o">+</span> <span class="s2">&quot;.db&quot;</span>
-    <span class="n">store</span> <span class="o">=</span> <span class="n">Sqlite</span><span class="p">(</span><span class="n">dbpath</span><span class="p">)</span>
-    <span class="n">_</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">get_artifact_list</span><span class="p">(</span><span class="n">isVerbose</span><span class="o">=</span><span class="n">isVerbose</span><span class="p">)</span>
-    <span class="n">data_type</span> <span class="o">=</span> <span class="n">DataType</span><span class="p">()</span>
-    <span class="n">data_type</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;rundata&quot;</span>
-    <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT * FROM &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">data_type</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="o">+</span> \
-      <span class="s2">&quot; where hydro_cycle_run_time &gt; 0.006&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running Query&quot;</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">sqlquery</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-    <span class="n">store</span><span class="o">.</span><span class="n">export_csv</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;pennant_query.csv&quot;</span><span class="p">)</span>
-    <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+   <span class="n">output_csv</span> <span class="o">=</span> <span class="s2">&quot;pennant_read_query.csv&quot;</span>
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot; The testname argument is required &quot;&quot;&quot;</span>
-    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
-    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--testname&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;the test name&#39;</span><span class="p">)</span>
-    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
-    <span class="n">test_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">testname</span>
-    <span class="k">if</span> <span class="n">test_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
-        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+   <span class="c1">#read in csv</span>
+   <span class="n">core</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">(</span><span class="n">run_table_flag</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+   <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Csv&quot;</span><span class="p">,</span> <span class="s2">&quot;reader&quot;</span><span class="p">,</span> <span class="n">filenames</span> <span class="o">=</span> <span class="n">csvpath</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span><span class="p">)</span>
 
-    <span class="n">import_pennant_data</span><span class="p">(</span><span class="n">test_name</span><span class="p">)</span>
-    <span class="n">test_artifact_query</span><span class="p">(</span><span class="n">test_name</span><span class="p">)</span>
+   <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dbpath</span><span class="p">):</span>
+      <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">dbpath</span><span class="p">)</span>
+
+   <span class="c1">#load data into sqlite db</span>
+   <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="n">dbpath</span><span class="p">)</span>
+   <span class="n">core</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;put&#39;</span><span class="p">)</span>
+
+   <span class="c1"># update dsi abstraction using a query to the sqlite db</span>
+   <span class="n">query_data</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;get&#39;</span><span class="p">,</span> <span class="n">query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;SELECT * FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE hydro_cycle_run_time &gt; 0.006;&quot;</span><span class="p">,</span> <span class="n">dict_return</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+   <span class="n">core</span><span class="o">.</span><span class="n">update_abstraction</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">query_data</span><span class="p">)</span>
+
+   <span class="c1">#export to csv</span>
+   <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Csv_Writer&quot;</span><span class="p">,</span> <span class="s2">&quot;writer&quot;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">output_csv</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span><span class="p">)</span>
+   <span class="n">core</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
 </pre></div>
 </div>
 <p>Resulting in the output of the query:</p>
@@ -270,7 +268,8 @@ python3 -m pip install jupyterlab
 </div>
 <p>and navigate to <code class="docutils literal notranslate"><span class="pre">wildfire_plotly.ipynb</span></code>.  Run the cells to visualize the results of the DSI pipeline.</p>
 <figure class="align-default" id="id2">
-<a class="with-shadow reference internal image-reference" href="_images/example-wildfire-jupyter.png"><img alt="User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot." class="with-shadow" src="_images/example-wildfire-jupyter.png" style="width: 724.5px; height: 469.5px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/example-wildfire-jupyter.png"><img alt="User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot." class="with-shadow" src="_images/example-wildfire-jupyter.png" style="width: 724.5px; height: 469.5px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Screenshot of the JupyterLab workflow.  The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
 </figcaption>
@@ -281,7 +280,8 @@ cinema examples<span class="s">/wildfire/wildfire_pycinema.py</span>
 </pre></div>
 </div>
 <figure class="align-default" id="id3">
-<a class="with-shadow reference internal image-reference" href="_images/example-wildfire-pycinema.png"><img alt="Pycinema user interface showing the minimal set of components. Left: the nodeview showing the various pycinema components in the visualization pipeline; upper-right: the table-view; lower-right: the image view.  Pycinema components are linked such that making a selection in one view will propagate to the other views." class="with-shadow" src="_images/example-wildfire-pycinema.png" style="width: 912.8000000000001px; height: 416.8px;" /></a>
+<a class="with-shadow reference internal image-reference" href="_images/example-wildfire-pycinema.png"><img alt="Pycinema user interface showing the minimal set of components. Left: the nodeview showing the various pycinema components in the visualization pipeline; upper-right: the table-view; lower-right: the image view.  Pycinema components are linked such that making a selection in one view will propagate to the other views." class="with-shadow" src="_images/example-wildfire-pycinema.png" style="width: 912.8000000000001px; height: 416.8px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Screenshot of the Pycinema user interface showing the minimal set of components. Left: the nodeview showing the various pycinema components in the visualization pipeline; upper-right: the table-view; lower-right: the image view.  Pycinema components are linked such that making a selection in one view will propagate to the other views.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
 </figcaption>

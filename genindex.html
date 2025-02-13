@@ -1,22 +1,20 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Index &mdash; DSI 0.0.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=7026087e"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="#" />
     <link rel="search" title="Search" href="search.html" /> 
@@ -45,9 +43,12 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Implementation Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
 </ul>
@@ -89,7 +90,6 @@
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
  | <a href="#P"><strong>P</strong></a>
- | <a href="#Q"><strong>Q</strong></a>
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
  | <a href="#U"><strong>U</strong></a>
@@ -126,11 +126,11 @@
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.check_type">check_type() (dsi.backends.sqlite.Sqlite method)</a>
+      <li><a href="core.html#dsi.core.Sync.copy">copy() (dsi.core.Sync method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="core.html#dsi.core.Sync.copy">copy() (dsi.core.Sync method)</a>
+      <li><a href="plugins.html#dsi.plugins.plugin_models.create_dynamic_model">create_dynamic_model() (in module dsi.plugins.plugin_models)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -198,6 +198,13 @@
         <li><a href="plugins.html#module-dsi.plugins.plugin">module</a>
 </li>
       </ul></li>
+      <li>
+    dsi.plugins.plugin_models
+
+      <ul>
+        <li><a href="plugins.html#module-dsi.plugins.plugin_models">module</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -207,20 +214,12 @@
       <li><a href="plugins.html#dsi.plugins.env.Environment">Environment (class in dsi.plugins.env)</a>
 </li>
   </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.export_csv">export_csv() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.export_csv_query">export_csv_query() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-  </ul></td>
 </tr></table>
 
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="core.html#dsi.core.Sync.get">get() (dsi.core.Sync method)</a>
-</li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.get_artifact_list">get_artifact_list() (dsi.backends.sqlite.Sqlite method)</a>
 </li>
       <li><a href="backends.html#dsi.backends.gufi.Gufi.get_artifacts">get_artifacts() (dsi.backends.gufi.Gufi method)</a>
 
@@ -266,10 +265,6 @@
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.parquet.Parquet.inspect_artifacts">inspect_artifacts() (dsi.backends.parquet.Parquet method)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="backends.html#dsi.backends.gufi.Gufi.isVerbose">isVerbose (dsi.backends.gufi.Gufi attribute)</a>
 </li>
   </ul></td>
@@ -312,6 +307,8 @@
 </li>
         <li><a href="plugins.html#module-dsi.plugins.plugin">dsi.plugins.plugin</a>
 </li>
+        <li><a href="plugins.html#module-dsi.plugins.plugin_models">dsi.plugins.plugin_models</a>
+</li>
       </ul></li>
   </ul></td>
 </tr></table>
@@ -327,43 +324,15 @@
         <li><a href="plugins.html#dsi.plugins.env.SystemKernel.pack_header">(dsi.plugins.env.SystemKernel method)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="backends.html#dsi.backends.parquet.Parquet">Parquet (class in dsi.backends.parquet)</a>
 </li>
       <li><a href="plugins.html#dsi.plugins.plugin.Plugin">Plugin (class in dsi.plugins.plugin)</a>
 </li>
       <li><a href="core.html#dsi.core.Sync.populate">populate() (dsi.core.Sync method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.put_artifact_type">put_artifact_type() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
       <li><a href="backends.html#dsi.backends.parquet.Parquet.put_artifacts">put_artifacts() (dsi.backends.parquet.Parquet method)</a>
-
-      <ul>
-        <li><a href="backends.html#dsi.backends.sqlite.Sqlite.put_artifacts">(dsi.backends.sqlite.Sqlite method)</a>
-</li>
-      </ul></li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.put_artifacts_csv">put_artifacts_csv() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.put_artifacts_lgcy">put_artifacts_lgcy() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.put_artifacts_only">put_artifacts_only() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.put_artifacts_t">put_artifacts_t() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="Q">Q</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.query_fctime">query_fctime() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.query_fname">query_fname() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.query_fsize">query_fsize() (dsi.backends.sqlite.Sqlite method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -375,12 +344,8 @@
 </li>
       <li><a href="plugins.html#dsi.plugins.metadata.StructuredMetadata.set_schema">set_schema() (dsi.plugins.metadata.StructuredMetadata method)</a>
 </li>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite">Sqlite (class in dsi.backends.sqlite)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="backends.html#dsi.backends.sqlite.Sqlite.sqlquery">sqlquery() (dsi.backends.sqlite.Sqlite method)</a>
-</li>
       <li><a href="plugins.html#dsi.plugins.metadata.StructuredMetadata">StructuredMetadata (class in dsi.plugins.metadata)</a>
 </li>
       <li><a href="core.html#dsi.core.Sync">Sync (class in dsi.core)</a>
