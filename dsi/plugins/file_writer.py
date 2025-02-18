@@ -106,7 +106,7 @@ class ER_Diagram(FileWriter):
         for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
             if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
                 continue
-            if f_table != "NULL":
+            if f_table != None:
                 foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
                 fk_string = f"{f_table}:{f_col}"
                 pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
