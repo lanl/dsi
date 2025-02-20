@@ -3,6 +3,7 @@ from dsi.backends.filesystem import Backend
 import os
 import sys
 import graphviz
+import sqlalchemy
 
 # This is a hacky way to import all modules in a given directory
 sys.path.insert(0, sys.argv[1])
