@@ -1,0 +1,26 @@
+[
+	{
+		"database_name": "testing view: sphere",
+		"datasets": 
+		[
+			{
+				"name": "testing view: sphere",
+				"location": "data/sphere.cdb"
+			}
+		]
+	},
+	{
+		"database_name": "testing view: sedov",
+		"datasets": 
+		[
+			{
+				"name": "testing view: sedov1",
+				"location": "data/sedov1.cdb"
+			},
+			{
+				"name": "testing view: sedov2",
+				"location": "data/sedov2.cdb"
+			}
+		]
+	}
+]
