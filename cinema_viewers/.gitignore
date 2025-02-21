@@ -1,0 +1,14 @@
+.DS_Store
+data/GF-HP.cdb/
+data/test.cdb
+databases_toIgnore.json
+getBuild.sh
+copyCSS.sh
+test/
+data/3A_Largest5.cdb
+.vscode/
+data/3A_BigHalos_Largest.cdb/
+data/2PARAM_Step_624_HaloGalaxy_5.cdb/
+data/2PARAM_Step_624_HaloGalaxy_5_Overview_Zoom.cdb/
+data/2PARAM_Step_624_HaloGalaxy_5_Zoom.cdb/
+data/2PARAM_Step_624_Halo_5.cdb/

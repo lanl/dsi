@@ -1,0 +1,14 @@
+[
+	{
+		"name" : "testing explorer: sphere",
+		"directory" : "data/sphere.cdb"
+	},
+	{
+		"name" : "testing explorer: Sphere Multi-Image",
+		"directory" : "data/sphere_multi-image.cdb"
+	},
+	{
+		"name" : "testing explorer: Many File Types",
+		"directory" : "data/file_types.cdb"
+	}
+]
