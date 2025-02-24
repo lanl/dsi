@@ -32,7 +32,27 @@ class FileReader(StructuredMetadata):
             sha = sha1(open(filename, 'rb').read())
             self.file_info[abspath(filename)] = sha.hexdigest()
 
-
+class HACC(FileReader):
+    """
+    A Plugin to ingest HACC Suite
+    """
+    def __init__(self, filename, hacc_suite_path = None, target_table_prefix = None, **kwargs):
+        super().__init__(filename, **kwargs)
+        self.hacc_suite_path = hacc_suite_path
+        self.schema_file = filename # schema_filename is used for setting primary key and foreign_key
+        self.target_table_prefix = target_table_prefix
+        self.hacc_data = OrderedDict()
+    
+    def add_rows(self) -> None:
+        self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+        with open(self.schema_file, 'r') as fh:
+            schema_content = json.load(fh)
+            
+            for tableName, tableData in schema_content.items():
+                if self.target_table_prefix is not None:
+                    tableName = self.target_table_prefix + "__" + tableName
+                    print("tableName:", tableName)
+        
 class Csv(FileReader):
     """
     A Plugin to ingest CSV data
@@ -45,7 +65,7 @@ class Csv(FileReader):
         else:
             self.filenames = filenames
         self.table_name = table_name
-
+    
     def add_rows(self) -> None:
         """ Adds a list containing one or more rows of the CSV along with file_info to output. """
 
