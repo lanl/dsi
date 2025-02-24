@@ -2,7 +2,7 @@ from dsi.core import Terminal
 from collections import OrderedDict
 import git
 
-from dsi.plugins.file_reader import JSON, Bueno, Csv
+from dsi.plugins.file_reader import JSON, Bueno, Csv, HACC
 
 
 def get_git_root(path):
@@ -130,3 +130,12 @@ def test_schema_reader():
     for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         assert len(tableData["primary_key"]) == len(tableData["foreign_key"])
+
+def test_hacc_reader():
+    a = Terminal()
+    a.load_module('plugin', 'HACC', 'reader', filename = "examples/data/example_hacc.json", hacc_suite_path = "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/256MPC_RUNS_HACC_2PARAM", target_table_prefix = 'hacc')
+    a.transload()
+
+
+if __name__ == "__main__":
+    test_hacc_reader()
