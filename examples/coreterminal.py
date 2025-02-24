@@ -1,10 +1,11 @@
-#Loading using plugins and backends
 from dsi.core import Terminal
+from collections import OrderedDict
 
 '''This is an example workflow using core.py'''
 
 a=Terminal(debug=0, backup_db = False, runTable=True)
 
+''' Example uses of loading open DSI readers '''
 # a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
 
@@ -13,24 +14,26 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", 
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
 
+''' Example uses of loading open DSI writers. Need to call transload() after loading to execute them. '''
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "test", display_cols = ["n", "o"])
-# a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
+# a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.png')#, target_table_prefix = "physics")
 # a.transload()
 
+''' Example of loading a DSI backend - Sqlite - and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
 
 a.artifact_handler(interaction_type='put')
 ## a.artifact_handler(interaction_type='ingest') # newer name for 'put'
 # data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM runTable;")#, isVerbose = True)
-## data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")#, isVerbose = True) # newer name for 'put'
+## data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")#, isVerbose = True) # newer name for 'get'
 # print(data)
 # a.artifact_handler(interaction_type="inspect")
-## a.artifact_handler(interaction_type="notebook") # newer name for 'put'
+## a.artifact_handler(interaction_type="notebook") # newer name for 'inspect'
 # a.artifact_handler(interaction_type="read")
-## a.artifact_handler(interaction_type="process") # newer name for 'put'
+## a.artifact_handler(interaction_type="process") # newer name for 'read'
 # print(a.active_metadata)
 
-### FIND FUNCTION EXAMPLES
+''' Example uses of the DSI FIND feature: find_table, find_column, find_cell, find (is a find all) '''
 ## TABLE match                      - return matching table data
 # data = a.find_table("people")
 # for val in data:
@@ -61,22 +64,21 @@ a.artifact_handler(interaction_type='put')
 # for val in data:
 #     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-# LIST MODULES
+''' Listing available modules that can be loaded (readers, writers, and backends) '''
 # a.list_available_modules('plugin')
 # # ['GitInfo', 'Hostname', 'SystemKernel', 'Bueno', 'Csv']
 
 # a.list_available_modules('backend')
 # # ['Gufi', 'Sqlite', 'Parquet']
 
+''' Listing all loaded modules (writers and backends) '''
 # print(a.list_loaded_modules())
 # # {'writer': [],
 # #  'reader': [],
 # #  'back-read': [],
 # #  'back-write': []}
 
-
-
-#Example use 2
+''' Example use case: reading data from backend and generating an ER Diagram and table plot from its metadata '''
 # a.load_module('backend','Sqlite','back-read', filename='data/data.db')   
 # a.artifact_handler(interaction_type="read")
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")

@@ -39,7 +39,7 @@ class ER_Diagram(FileWriter):
         'return' None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         file_type = ".png"
-        if self.output_filename[-4:] == ".png" or self.output_filename[-4:] == ".pdf" or self.output_filename[-4:] == ".jpg":
+        if self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
             file_type = self.output_filename[-4:]
             self.output_filename = self.output_filename[:-4]
         elif self.output_filename[-5:] == ".jpeg":

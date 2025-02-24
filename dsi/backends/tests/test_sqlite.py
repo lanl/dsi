@@ -4,29 +4,12 @@ from collections import OrderedDict
 from dsi.backends.sqlite import Sqlite, DataType
 import os
 
-isVerbose = True
-
-
-# def get_git_root(path):
-#     git_repo = git.Repo(path, search_parent_directories=True)
-#     git_root = git_repo.git.rev_parse("--show-toplevel")
-#     return (git_root)
-
 def test_sql_artifact():
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
     store.close()
     # No error implies success
     assert True
-
-# def test_wildfire_data_csv_artifact():
-#     csvpath = '/'.join([get_git_root('.'), 'examples/data/wildfiredata.csv'])
-#     dbpath = "wildfire.db"
-#     store = Sqlite(dbpath)
-#     store.put_artifacts_csv(csvpath, "simulation", isVerbose=isVerbose)
-#     store.close()
-#     # No error implies success
-#     assert True
 
 def test_artifact_put():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
