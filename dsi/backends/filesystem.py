@@ -14,31 +14,51 @@ class Backend(metaclass=ABCMeta):
     @abstractmethod
     def put_artifacts(self, artifacts, kwargs) -> None:
         pass
+    
+    @abstractmethod
+    def ingest_artifacts(self, artifacts, kwargs) -> None:
+        pass
 
     @abstractmethod
     def get_artifacts(self, query, kwargs):
         pass
 
     @abstractmethod
-    def write_artifacts(self, artifacts, kwargs) -> None:
-        pass
-
-    @abstractmethod
-    def process_artifacts(self, query, kwargs):
+    def query_artifacts(self, query, kwargs):
         pass
 
     @abstractmethod
     def inspect_artifacts(self, kwargs):
         pass
-    
+
+    @abstractmethod
+    def notebook(self, kwargs):
+        pass
+
     @abstractmethod
     def read_to_artifacts(self, kwargs):
         pass
 
     @abstractmethod
+    def process_artifacts(self, kwargs):
+        pass
+
+    @abstractmethod
     def find(self, query_object, kwargs):
         pass
-    
+
+    @abstractmethod
+    def find_table(self, query_object, kwargs):
+        pass
+
+    @abstractmethod
+    def find_column(self, query_object, kwargs):
+        pass
+
+    @abstractmethod
+    def find_cell(self, query_object, kwargs):
+        pass
+
     @abstractmethod
     def close(self):
         pass
@@ -67,22 +87,37 @@ class Filesystem(Backend):
     def put_artifacts(self, artifacts, kwargs) -> None:
         pass
 
+    def ingest_artifacts(self, artifacts, kwargs) -> None:
+        pass
+
     def get_artifacts(self, query, kwargs):
         pass
 
-    def write_artifacts(self, artifacts, kwargs) -> None:
-        pass
-
-    def process_artifacts(self, query, kwargs):
+    def query_artifacts(self, query, kwargs):
         pass
 
     def inspect_artifacts(self, kwargs):
         pass
-    
+
+    def notebook(self, kwargs):
+        pass
+
     def read_to_artifacts(self, kwargs):
         pass
 
+    def process_artifacts(self, kwargs):
+        pass
+
     def find(self, query_object, kwargs):
+        pass
+
+    def find_table(self, query_object, kwargs):
+        pass
+
+    def find_column(self, query_object, kwargs):
+        pass
+
+    def find_cell(self, query_object, kwargs):
         pass
 
     def close(self):

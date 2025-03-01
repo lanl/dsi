@@ -25,24 +25,30 @@ class Terminal():
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
-    VALID_PLUGINS = ['Hostname', 'SystemKernel', 'GitInfo', 'Bueno', 'Csv', 'ER_Diagram', 'YAML1', 'TOML1', "Table_Plot", "Schema", "Csv_Writer", "MetadataReader1"]
+    VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'TextFile', 'MetadataReader1', 'Wildfire']
+    VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
+    VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
-    VALID_ARTIFACT_INTERACTION_TYPES = ['get', 'set', 'put', 'inspect', 'read', 'write', 'process']
+    VALID_ARTIFACT_INTERACTION_TYPES = ['put', 'get', 'inspect', 'read', 'ingest', 'query', 'notebook', 'process']
 
-    def __init__(self, debug_flag = False, backup_db_flag = False, run_table_flag = False):
+    def __init__(self, debug = 0, backup_db = False, runTable = False):
         """
         Initialization helper function to pass through optional parameters for DSI core.
 
         Optional flags can be set and defined:
 
-        `debug_flag`: Undefined False as default. If set to True, Debug information will be printed to the terminal output and written to a local debug.log text file with runtime benchmarks.
+        `debug`: {0: off, 1: user debug log, 2: user + developer debug log}. 
+                      When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
 
-        `backup_db_flag`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
+        `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
-        `run_table_flag`: Undefined False as default. When new metadata is ingested, a 'run_table' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
+        `runTable`: Undefined False as default. 
+                          When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. 
+                          Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -61,18 +67,18 @@ class Terminal():
             self.module_collection['plugin'][module] = import_module(module)
 
         self.active_modules = {}
-        valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + \
-            self.VALID_MODULE_FUNCTIONS['backend']
+        valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + self.VALID_MODULE_FUNCTIONS['backend']
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
         self.active_metadata = OrderedDict()
+        self.loaded_backends = []
 
-        self.runTable = run_table_flag
-        self.backup_db_flag = backup_db_flag
+        self.runTable = runTable
+        self.backup_db = backup_db
 
         self.logger = logging.getLogger(self.__class__.__name__)
-
-        if debug_flag:
+        self.debug_level = debug
+        if debug == 1 or debug == 2:
             logging.basicConfig(
                 filename='debug.log',         # Name of the log file
                 filemode='w',               # Overwrite mode ('w' for overwrite, 'a' for append)
@@ -106,25 +112,54 @@ class Terminal():
         This flexibility ensures that advanced users can access higher level abstractions.
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
+
+        If a loaded module has mod_type='plugin' & mod_function='reader', it is automatically activated and then unloaded as well.
+        Therefore, a user does not have to activate it separately with transload() (only used by plugin writers) or call unload_module()
         """
-        self.logger.info(f"-------------------------------------")
-        self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
+        if self.debug_level != 0:
+            self.logger.info(f"-------------------------------------")
+            self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
         start = datetime.now()
+        if mod_type not in ["plugin", "backend"]:
+            if self.debug_level != 0:
+                self.logger.error("Your module type was not a 'plugin' or 'backend'")
+            raise NotImplementedError('Hint: All module types must be either "plugin" or "backend"')
         if mod_function not in self.VALID_MODULE_FUNCTIONS[mod_type]:
-            print(
-                'Hint: Did you declare your Module Function in the Terminal Global vars?')
-            end = datetime.now()
-            self.logger.info(f"Runtime: {end-start}")
-            raise NotImplementedError
+            if self.debug_level != 0:
+                self.logger.error(f"Your module function was not found in VALID_MODULE_FUNCTIONS['{mod_type}']")
+            raise NotImplementedError('Hint: Did you declare your Module Function in the Terminal Global vars?')
+        if mod_type == "plugin" and (mod_function in self.VALID_MODULE_FUNCTIONS["backend"] or mod_name in self.VALID_BACKENDS):
+            if self.debug_level != 0:
+                self.logger.error("You are trying to load a mismatched plugin. Please check the VALID_MODULE_FUNCTIONS and VALID_PLUGINS again")
+            raise ValueError("You are trying to load a mismatched plugin. Please check the VALID_MODULE_FUNCTIONS and VALID_PLUGINS again")
+        if mod_type == "backend" and (mod_function in self.VALID_MODULE_FUNCTIONS["plugin"] or mod_name in self.VALID_PLUGINS):
+            if self.debug_level != 0:
+                self.logger.error("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
+            raise ValueError("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
         
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
             try:
                 this_module = import_module(python_module)
                 class_ = getattr(this_module, mod_name)
+                load_success = True
+                
                 if mod_function == "reader":
-                    obj = class_(**kwargs)
-                    obj.add_rows()
+                    try:
+                        obj = class_(**kwargs)
+                    except:
+                        if self.debug_level != 0:
+                            self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise TypeError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                    
+                    run_start = datetime.now()
+                    if self.debug_level != 0:
+                        self.logger.info("   Activating this reader in load_module")
+                    ingest_error = obj.add_rows()
+                    if ingest_error is not None:
+                        if self.debug_level != 0:
+                            self.logger.error(f"   {ingest_error[1]}")
+                        raise ingest_error[0](ingest_error[1])
                     for table_name, table_metadata in obj.output_collector.items():
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
@@ -144,46 +179,83 @@ class Terminal():
                                         if key not in self.active_metadata[table_name][colName]:
                                             self.active_metadata[table_name][colName][key] = col_unit
                                         elif key in self.active_metadata[table_name][colName] and self.active_metadata[table_name][colName][key] != col_unit:
+                                            if self.debug_level != 0:
+                                                self.logger.error(f"   Cannot have a different set of units for column {key} in {colName}")
                                             raise ValueError(f"Cannot have a different set of units for column {key} in {colName}")
                                 elif colName not in self.active_metadata[table_name].keys():
                                     self.active_metadata[table_name][colName] = colData
-                elif mod_type == "backend":
-                    if "run_table" in class_.__init__.__code__.co_varnames:
-                        kwargs['run_table'] = self.runTable
-                if mod_function != "reader":
-                    self.active_modules[mod_function].append(class_(**kwargs))
-                load_success = True
+                    run_end = datetime.now()
+                    if self.debug_level != 0:
+                        self.logger.info(f"   Activated this reader with runtime: {run_end-run_start}")
+
+                else:
+                    try:
+                        if mod_type == "backend" and hasattr(class_, 'runTable'):
+                            class_.runTable = self.runTable
+                        class_object = class_(**kwargs)
+                        self.active_modules[mod_function].append(class_object)
+                        if mod_type == "backend":
+                            self.loaded_backends.append(class_object)
+                    except:
+                        if self.debug_level != 0:
+                            self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise TypeError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                
                 print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()
-                self.logger.info(f"Runtime: {end-start}")
+                if self.debug_level != 0:
+                    self.logger.info(f"{mod_name} {mod_function} {mod_type} loaded successfully.")
+                    self.logger.info(f"Runtime: {end-start}")
+                break
             except AttributeError:
                 continue
+
         if not load_success:
-            print('Hint: Did you declare your Plugin/Backend in the Terminal Global vars?')
-            end = datetime.now()
-            self.logger.info(f"Runtime: {end-start}")
-            raise NotImplementedError
+            if self.debug_level != 0:
+                self.logger.error("Plugin/Backend not found in VALID_PLUGINS/VALID_BACKENDS")
+            raise NotImplementedError('Hint: Did you declare your Plugin/Backend in VALID_PLUGINS/VALID_BACKENDS?')
 
     def unload_module(self, mod_type, mod_name, mod_function):
         """
-        Unloads a DSI module from the active_modules collection
+        Unloads a specific DSI module from the active_modules collection. 
+        Mostly to be used for unloading backends, as plugin readers and writers are auto unloaded elsewhere.
         """
-        for i, mod in enumerate(self.active_modules[mod_function]):
+        if self.debug_level != 0:
             self.logger.info(f"-------------------------------------")
             self.logger.info(f"Unloading {mod_name} {mod_function} {mod_type}")
-            start = datetime.now()
+        start = datetime.now()
+
+        if mod_type not in ["plugin", "backend"]:
+            if self.debug_level != 0:
+                self.logger.error("Your module type was not a 'plugin' or 'backend'")
+            raise NotImplementedError('Hint: All module types must be either "plugin" or "backend"')
+        if mod_function not in self.VALID_MODULE_FUNCTIONS[mod_type]:
+            if self.debug_level != 0:
+                self.logger.error(f"Your module function was not found in VALID_MODULE_FUNCTIONS['{mod_type}']")
+            raise NotImplementedError(f'Hint: Did you declare your Module Function in VALID_MODULE_FUNCTIONS["{mod_type}"]?')
+        
+        indices = []
+        for i, mod in enumerate(self.active_modules[mod_function]):
             if mod.__class__.__name__ == mod_name:
-                if mod_type == 'backend':
-                    mod.close()
-                self.active_modules[mod_function].pop(i)
-                print(f"{mod_name} {mod_type} {mod_function} unloaded successfully.")
-                end = datetime.now()
+                indices.append(i)
+        
+        if len(indices) > 0:
+            last_loaded = indices[-1]
+            if mod_type == 'backend':
+                self.active_modules[mod_function][last_loaded].close()
+                loaded_index = self.loaded_backends.index(self.active_modules[mod_function][last_loaded])
+                self.loaded_backends[loaded_index].close()
+                self.loaded_backends.pop(loaded_index)
+            self.active_modules[mod_function].pop(last_loaded)
+            print(f"{mod_name} {mod_type} {mod_function} unloaded successfully.")
+            end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"{mod_name} {mod_function} {mod_type} unloaded successfully.")
                 self.logger.info(f"Runtime: {end-start}")
-                return
-        print(f"{mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
-        self.logger.info(f"Could not find {mod_name} {mod_function} {mod_type} to unload")
-        end = datetime.now()
-        self.logger.info(f"Runtime: {end-start}")
+        else:            
+            warnings.warn(f"{mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
+            if self.debug_level != 0:
+                self.logger.warning(f"{mod_name} {mod_function} {mod_type} could not be found in active_modules. No action taken.")
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
@@ -216,125 +288,293 @@ class Terminal():
         """
         Transloading signals to the DSI Core Terminal that Plugin set up is complete.
 
-        A DSI Core Terminal must be transloaded before queries, metadata collection, or metadata
-        storage is possible. Transloading is the process of merging Plugin metadata from many
-        data sources to a single DSI Core Middleware data structure.
+        Activates all loaded plugin writers by generating all their various output files such as an ER Diagram or an image of a table plot
+        All loaded plugin writers will be unloaded after activation, so there is no need to separately call unload_module() for them
         """
         used_writers = []
         for obj in self.active_modules['writer']:
-            self.logger.info(f"-------------------------------------")
+            self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
-            obj.get_rows(self.active_metadata, **kwargs)
+            writer_error = obj.get_rows(self.active_metadata, **kwargs)
+            if writer_error is not None:
+                if writer_error[0] == "Warning":
+                    warnings.warn(writer_error[1])
+                else:
+                    if self.debug_level != 0:
+                        self.logger.error(writer_error[1])
+                    raise writer_error[0](writer_error[1])
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
         unused_writers = list(set(self.active_modules["writer"]) - set(used_writers))
         if len(unused_writers) > 0:
             self.active_modules["writer"] = unused_writers
-            raise ValueError(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
+            if self.debug_level != 0:
+                self.logger.warning(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
+            warnings.warn(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
         else:
             self.active_modules["writer"] = []
 
+    def close(self):
+        """
+        Immediately closes all active modules: backends, plugin writers, plugin readers
+        Clears out the current DSI abstraction
+        NOTE - This step cannot be undone.
+        """
+        print("Closing the abstraction layer, and all active plugins/backends")
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info("Closing and clearing out all objects in this Terminal object")
+            
+            self.logger.info("Cleared out the abstraction layer")
+        self.active_metadata = OrderedDict()
+
+        if self.debug_level != 0:
+            self.logger.info("Closed active backends")
+        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
+        for backend in active_backends:
+            backend.close()
+        for loaded in self.loaded_backends:
+            loaded.close()
+
+        if self.debug_level != 0:
+            self.logger.info("Cleared all loaded plugins and backends")
+        for func in self.active_modules:
+            self.active_modules[func] = []
+            self.loaded_backends = []
+
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
-        Store or retrieve using all loaded DSI Backends with storage functionality.
+        Interact with loaded DSI backends by ingesting or retrieving data from them.
+            - interaction_type = 'put' or 'ingest', ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored)
+                - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
+            - interaction_type = 'get' or 'query', retrieves data from first loaded backend based on a specified 'query'
+            - interaction_type = 'inspect' or 'notebook', generates an interactive Python notebook with all data from first loaded backend
+            - interaction_type = 'read' or 'process', overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
-        Calling artifact_handler will execute all back-write functionality currently loaded, given
-        the provided ``interaction_type``.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
-            print('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
-            raise NotImplementedError
+            if self.debug_level != 0:
+                self.logger.error('Could not find artifact interaction type in VALID_ARTIFACT_INTERACTION_TYPES')
+            raise NotImplementedError('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+        
         operation_success = False
-
-        selected_active_backends = dict((k, self.active_modules[k]) for k in (['back-write', 'back-read']))
-        get_artifact_data = None
-        for module_type, objs in selected_active_backends.items():
-            for obj in objs:
-                self.logger.info(f"-------------------------------------")
-                self.logger.info(obj.__class__.__name__ + f" backend - {interaction_type} the data")
+        backread_active = False
+        if interaction_type in ['put', 'ingest']:
+            for obj in self.active_modules['back-write']:
+                if self.debug_level != 0:
+                    self.logger.info("-------------------------------------")
+                    self.logger.info(f"{obj.__class__.__name__} backend - {interaction_type.upper()} the data")
                 start = datetime.now()
                 parent_class = obj.__class__.__bases__[0].__name__
-
-                if interaction_type in ['put', 'write'] and module_type == 'back-write':
-                    if self.backup_db_flag == True and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
-                        formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-                        backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup_" + formatted_datetime + obj.filename[obj.filename.rfind('.'):]
-                        shutil.copyfile(obj.filename, backup_file)
-                    if interaction_type == "write":
-                        errorMessage = obj.write_artifacts(collection = self.active_metadata, **kwargs)
-                    else:
-                        errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
-                    if errorMessage is not None:
-                        if parent_class == "Filesystem":
-                            print(f"Error in put/write artifact handler: No data was inserted into {obj.filename} due to the error {errorMessage}")
-                        else:
-                            print(f"Error in put/write artifact handler: No data was inserted into the backend due to the error {errorMessage}")
-                    operation_success = True
-                elif interaction_type in ['put', 'write'] and module_type == 'back-read':
-                    warnings.warn("Can only call put/write artifact handler with a back-WRITE backend not a back-READ backend")
+                if self.backup_db == True and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
+                    if self.debug_level != 0:
+                        self.logger.info(f"   Creating backup file before ingesting data into {obj.__class__.__name__} backend")
+                    backup_start = datetime.now()
+                    formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+                    backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup_" + formatted_datetime + obj.filename[obj.filename.rfind('.'):]
+                    shutil.copyfile(obj.filename, backup_file)
+                    backup_end = datetime.now()
+                    if self.debug_level != 0:
+                        self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
-                elif interaction_type in ['get', 'process']:
-                    if "query" in obj.get_artifacts.__code__.co_varnames:
-                        self.logger.info(f"Query to get data: {query}")
-                        kwargs['query'] = query
-                    if interaction_type == "get":
-                        get_artifact_data = obj.get_artifacts(**kwargs)
-                    else:
-                        get_artifact_data = obj.process_artifacts(**kwargs)
-                    operation_success = True
-
-                elif interaction_type == 'inspect':
-                    if parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
-                        obj.inspect_artifacts(**kwargs)
-                        operation_success = True
-                    elif parent_class == "Connection":
-                        pass
-                    else:
-                        raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
-
-                elif interaction_type == "read" and module_type == 'back-read':
-                    self.active_metadata = obj.read_to_artifact()
-                    operation_success = True
-                elif interaction_type == "read" and module_type == 'back-write':
-                    warnings.warn("Can only call read artifact handler with a back-READ backend")
-                
+                if interaction_type == "ingest":
+                    errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
+                elif interaction_type == "put":
+                    errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
+                if errorMessage is not None:
+                    if self.debug_level != 0:
+                        self.logger.error(f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
+                    raise errorMessage[0](f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
+                operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
-        if operation_success:
-            if interaction_type in ['get', 'process'] and get_artifact_data:
-                return get_artifact_data
-            return
-        else:
-            print('Is your artifact interaction spelled correct and is it implemented in your backend?')
-            print('Remember that backend writers cannot read a db and backend readers cannot write to a db')
-            raise NotImplementedError
-    
-    def find(self, database_name, query_object, **kwargs):
-        active_backends = dict((k, self.active_modules[k]) for k in (['back-write', 'back-read']))
-        
-        for objs in active_backends.values():
-            for obj in objs:
-                parent_class = obj.__class__.__bases__[0].__name__
-                if parent_class == "Filesystem" and database_name in obj.filename: #CHECK TO SEE IF BACKEND IS A FILESYSTEM BACKEND FIRST
-                    return obj.find(query_object, **kwargs)
+        if interaction_type in ['put', 'ingest'] and len(self.active_modules['back-read']) > 0:
+            backread_active = True
 
-        raise ValueError(f"{database_name} is not a loaded database")
+        get_artifact_data = None
+        first_backend = self.loaded_backends[0]
+        if interaction_type not in ['put', 'ingest', "read", "process"] and self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
+        start = datetime.now()
+        if interaction_type in ['get', 'query']:
+            if "query" in first_backend.get_artifacts.__code__.co_varnames: #need to change this to query_artifacts eventually
+                self.logger.info(f"Query to get data: {query}")
+                kwargs['query'] = query
+            if interaction_type == "get":
+                get_artifact_data = first_backend.get_artifacts(**kwargs)
+            elif interaction_type == "query":
+                get_artifact_data = first_backend.query_artifacts(**kwargs)
+            if isinstance(get_artifact_data, tuple):
+                if self.debug_level != 0:
+                    self.logger.error(get_artifact_data[1])
+                raise get_artifact_data[0](get_artifact_data[1])
+            operation_success = True
+
+        elif interaction_type in ['inspect', 'notebook']:
+            parent_class = first_backend.__class__.__bases__[0].__name__
+            if parent_class == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+                if interaction_type == "inspect":
+                    first_backend.inspect_artifacts(**kwargs)
+                elif interaction_type == "notebook":
+                    first_backend.notebook(**kwargs)
+            elif parent_class == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
+                pass
+            else: #backend is empty - cannot inspect
+                if self.debug_level != 0:
+                    self.logger.error("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+            operation_success = True
+
+        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) > 0:
+            first_backread = self.active_modules['back-read'][0]
+            if self.debug_level != 0:
+                self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
+            if interaction_type == "process":
+                self.active_metadata = first_backread.process_artifacts()
+            elif interaction_type == "read":
+                self.active_metadata = first_backread.read_to_artifact()
+            operation_success = True
+        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) == 0:
+            backread_active = True
+
+        if operation_success:
+            end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"Runtime: {end-start}")
+            if interaction_type in ['get', 'query'] and get_artifact_data is not None:
+                return get_artifact_data
+        else:
+            not_run_msg = None
+            if backread_active:
+                not_run_msg = 'Remember that back-WRITE backends cannot read/process data and back-READ backends cannot put/ingest'
+            else:
+                not_run_msg = 'Is your artifact interaction implemented in your backend?'
+            if self.debug_level != 0:
+                self.logger.error(not_run_msg)
+            raise NotImplementedError(not_run_msg)
+    
+    def find(self, query_object):
+        """
+        Find all function that searches for all instances of 'query_object' in first loaded backend. Searches among all tables/column/cells
+        `return`: List of backend-specific objects that each contain details of a match for 'query_object'. Can be tables/column/cells
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find(query_object)
+        return self.find_helper(query_object, return_object, start, "")
+    
+    def find_table(self, query_object):
+        """
+        Find table function that searches for all tables whose names matches the 'query_object' in first loaded backend.
+        `return`: List of backend-specific objects that each contain all data from a table matching 'query_object'.
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find_table(query_object)
+        return self.find_helper(query_object, return_object, start, "table ")
+    
+    def find_column(self, query_object, range = False):
+        """
+        Find column function that searches for all columns whose names matches the 'query_object' in first loaded backend.
+
+        `range`: default False. If True, then data-range of all numerical columns which match 'query_object' is included in retrun
+                                If False, then data for each column that matches 'query_object' is included in retrun
+        `return`: List of backend-specific objects that each contain data/numerical range about a column matching 'query_object'.
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find_column(query_object, range)
+        return self.find_helper(query_object, return_object, start, "column ")
+
+    def find_cell(self, query_object, row = False):
+        """
+        Find cell function that searches for all cells which match the 'query_object' in first loaded backend.
+
+        `row`: default False. If True, then full row of data where a cell matches 'query_object' is included in retrun
+                                If False, then the value of the cell that matches 'query_object' is included in retrun
+        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'.
+            - check file of the first backend loaded to understand the structure of the objects in this list
+        """
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+        return_object = backend.find_cell(query_object, row)
+        return self.find_helper(query_object, return_object, start, "cell ")
+
+    def find_helper(self, query_object, return_object, start, find_type):
+        """
+        Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
+        Users should not call this externally, only to be used by internal core functions.
+        """
+        if isinstance(query_object, str): 
+            print(f"Finding all {find_type}matches of '{query_object}' in first backend loaded")
+        else:
+            print(f"Finding all {find_type}matches of {query_object} in first backend loaded")
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info(f"Finding all instances of '{query_object}' in first backend loaded in")
+        if isinstance(return_object, tuple):
+            if self.debug_level != 0:
+                self.logger.warning(return_object[1])
+            warnings.warn(return_object[1])
+            return_object = return_object[0]
+        else:
+            end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"Runtime: {end-start}")
+        return return_object
     
     def get_current_abstraction(self, table_name = None):
+        """
+        Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict
+        The inner table Ordered Dict has column names as keys and list of column data as the values.
+
+        `table_name`: default None. If specified, the return will only be that table's Ordered Dict, not a nested one.
+        `return`: nested Ordered Dict if table_name is None. single Ordered Dict if table_name is not None
+        """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info(f"Returning current abstraction")
+        start = datetime.now()
         if table_name is not None and table_name not in self.active_metadata.keys():
+            if self.debug_level != 0:
+                self.logger.error(f"{table_name} not in current abstraction")
             raise ValueError(f"{table_name} not in current abstraction")
-        if table_name is None:
-            return self.active_metadata
-        else:
+        if table_name is not None:
+            end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"Runtime: {end-start}")
             return self.active_metadata[table_name]
+        else:
+            end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"Runtime: {end-start}")
+            return self.active_metadata
         
     def update_abstraction(self, table_name, table_data):
+        """
+        Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
+
+        `table_name`: name of table that must be in the current abstraction
+        `table_data`: table data that must be stored as an Ordered Dict where column names are keys and column data is a list stored as values.
+        `return`: None
+        """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info(f"Updating abstraction table {table_name} with new data")
         if table_name not in self.active_metadata.keys():
+            if self.debug_level != 0:
+                self.logger.error(f"{table_name} not in current abstraction")
             raise ValueError(f"{table_name} not in current abstraction")
         if not isinstance(table_data, OrderedDict):
+            if self.debug_level != 0:
+                self.logger.error("table_data needs to be in the form of an Ordered Dictionary")
             raise ValueError("table_data needs to be in the form of an Ordered Dictionary")
         self.active_metadata[table_name] = table_data
             
