@@ -1,0 +1,5 @@
+
+[people]
+avg_height2 = {'value'= 5.5, 'units'= 'm'} # overall average height
+median_speed2 = {'value'= 6.95, 'units'= 's'} # overall median speed
+std_gravity = {'value'= 9.83, 'units'= 'm/s/s'} # overall std dev gravity

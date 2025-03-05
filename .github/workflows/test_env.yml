@@ -1,4 +1,4 @@
-name: sqlite.py test
+name: env.py test
 
 on:
   push:
@@ -31,4 +31,4 @@ jobs:
     - name: Test reader
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_sqlite.py
+        pytest dsi/plugins/tests/test_env.py

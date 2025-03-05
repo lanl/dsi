@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name="pydsinf"
+name="dsi-workflow"
 license={text = "BSD-3-Clause"}
 description="A Data Science Infrastructure Metadatabase"
 readme = "README.rst"

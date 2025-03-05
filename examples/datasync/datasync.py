@@ -33,7 +33,7 @@ store = Sqlite(dbpath)
 fs.isVerbose = 1
 
 #List the data in the database
-anames = store.get_artifact_list()
+anames = store.get_artifacts()
 for name in anames:
     print( name[0] )
 

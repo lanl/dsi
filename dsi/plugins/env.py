@@ -3,13 +3,11 @@ import os
 import socket
 import subprocess
 from getpass import getuser
-from git import Repo
-import git.exc
 from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
-    GitInfoModel, HostnameModel, SystemKernelModel
+    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
 )
 
 
@@ -68,7 +66,9 @@ class GitInfo(Environment):
     def __init__(self, git_repo_path='./') -> None:
         """ Initializes the git repo in the given directory and access to git commands """
         super().__init__()
+        import git.exc
         try:
+            from git import Repo
             self.repo = Repo(git_repo_path, search_parent_directories=True)
         except git.exc.InvalidGitRepositoryError:
             raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
