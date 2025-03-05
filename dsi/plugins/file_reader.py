@@ -44,7 +44,7 @@ class HACC(FileReader):
         self.hacc_data = OrderedDict()
     
     def add_rows(self) -> None:
-        self.schema_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
+        self.hacc_data["dsi_relations"] = OrderedDict([('primary_key', []), ('foreign_key', [])])
         with open(self.schema_file, 'r') as fh:
             schema_content = json.load(fh)
             
@@ -52,7 +52,22 @@ class HACC(FileReader):
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
                     print("tableName:", tableName)
-        
+                pkList = []
+                for colName, colData in tableData["foreign_key"].items():
+                    print("colData", colData)
+                    if self.target_table_prefix is not None:
+                        colData[0] = self.target_table_prefix + "__" + colData[0]
+                    # self.hacc_data["dsi_relations"]["primary_key"].append((colData[0], colData[1]))
+                    # self.hacc_data["dsi_relations"]["foreign_key"].append((tableName, colName))
+
+            #     if "primary_key" in tableData.keys():
+            #         pkList.append((tableName, tableData["primary_key"]))
+            
+            # for pk in pkList:
+            #     if pk not in self.hacc_data["dsi_relations"]["primary_key"]:
+            #         self.hacc_data["dsi_relations"]["primary_key"].append(pk)
+            #         self.hacc_data["dsi_relations"]["foreign_key"].append((None, None))
+            # self.set_schema_2(self.hacc_data)
 class Csv(FileReader):
     """
     A Plugin to ingest CSV data
