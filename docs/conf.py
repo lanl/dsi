@@ -5,11 +5,12 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+exec(open("../dsi/_version.py").read())
 
 project = 'DSI'
-copyright = '2023, Triad National Security, LLC. All rights reserved.'
+copyright = '2025, Triad National Security, LLC. All rights reserved.'
 author = 'The DSI Project team'
-release = '0.0.0'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
