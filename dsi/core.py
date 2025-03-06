@@ -442,8 +442,8 @@ class Terminal():
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
-                    self.logger.error("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
-                raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                    self.logger.error("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
             operation_success = True
 
         elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) > 0:

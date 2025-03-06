@@ -1,8 +1,6 @@
 from dsi.core import Terminal
-from collections import OrderedDict
 
 '''This is an example workflow using core.py'''
-
 a=Terminal(debug=0, backup_db = False, runTable=True)
 
 ''' Example uses of loading open DSI readers '''
@@ -22,16 +20,12 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", 
 ''' Example of loading a DSI backend - Sqlite - and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
 
-a.artifact_handler(interaction_type='put')
-## a.artifact_handler(interaction_type='ingest') # newer name for 'put'
-# data = a.artifact_handler(interaction_type='get', query = "SELECT * FROM runTable;")#, isVerbose = True)
-## data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")#, isVerbose = True) # newer name for 'get'
+a.artifact_handler(interaction_type='ingest')
+# data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")
 # print(data)
-# a.artifact_handler(interaction_type="inspect")
-## a.artifact_handler(interaction_type="notebook") # newer name for 'inspect'
-# a.artifact_handler(interaction_type="read")
-## a.artifact_handler(interaction_type="process") # newer name for 'read'
-# print(a.active_metadata)
+# a.artifact_handler(interaction_type="notebook") 
+# a.artifact_handler(interaction_type="process")
+# print(a.get_current_abstraction)
 
 ''' Example uses of the DSI FIND feature: find_table, find_column, find_cell, find (is a find all) '''
 ## TABLE match                      - return matching table data
@@ -80,7 +74,7 @@ a.artifact_handler(interaction_type='put')
 
 ''' Example use case: reading data from backend and generating an ER Diagram and table plot from its metadata '''
 # a.load_module('backend','Sqlite','back-read', filename='data/data.db')   
-# a.artifact_handler(interaction_type="read")
+# a.artifact_handler(interaction_type="process")
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
 # a.transload()
