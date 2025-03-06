@@ -92,7 +92,9 @@ class Terminal():
 
         This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
         are supported, but this getter can be extended to support any new DSI module
-        types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
+        types which are added. 
+        
+        Note: self.VALID_MODULES refers to _DSI_ Modules
         however, DSI Modules are classes, hence the naming idiosynchrocies below.
         """
         # "DSI Modules" are Python Classes
@@ -155,11 +157,18 @@ class Terminal():
                     run_start = datetime.now()
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
-                    ingest_error = obj.add_rows()
-                    if ingest_error is not None:
+                    
+                    try:
+                        ingest_error = obj.add_rows()
+                        if ingest_error is not None:
+                            if self.debug_level != 0:
+                                self.logger.error(f"   {ingest_error[1]}")
+                            raise ingest_error[0](ingest_error[1])
+                    except:
                         if self.debug_level != 0:
-                            self.logger.error(f"   {ingest_error[1]}")
-                        raise ingest_error[0](ingest_error[1])
+                            self.logger.error(f'   {mod_name} plugin reader add_rows() was incorrect. Check to ensure data was stored correctly')
+                        raise RuntimeError(f'{mod_name} plugin reader add_rows() was incorrect. Check to ensure data was stored correctly')
+                    
                     for table_name, table_metadata in obj.output_collector.items():
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
@@ -217,7 +226,8 @@ class Terminal():
 
     def unload_module(self, mod_type, mod_name, mod_function):
         """
-        Unloads a specific DSI module from the active_modules collection. 
+        Unloads a specific DSI module from the active_modules collection.
+
         Mostly to be used for unloading backends, as plugin readers and writers are auto unloaded elsewhere.
         """
         if self.debug_level != 0:
@@ -259,20 +269,12 @@ class Terminal():
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
-        Adds an external, meaning not from the DSI repo, Python module to the module_collection.
-
+        Adds an external, meaning not from the DSI repo, Python module to the module_collection. 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
+
         Note: mod_type is needed because each Python module only implements plugins or backends.
 
-        For example,
-
-        term = Terminal()
-        term.add_external_python_module('plugin', 'my_python_file',
-                                        '/the/path/to/my_python_file.py')
-
-        term.load_module('plugin', 'MyPlugin', 'reader')
-
-        term.list_loaded_modules() # includes MyPlugin
+        Check Examples section to see how to use this function.
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
         self.module_collection[mod_type][mod_name] = mod
@@ -280,6 +282,7 @@ class Terminal():
     def list_loaded_modules(self):
         """
         List DSI modules which have already been loaded.
+
         These Plugins and Backends are active or ready to execute a post-processing task.
         """
         return (self.active_modules)
@@ -289,6 +292,7 @@ class Terminal():
         Transloading signals to the DSI Core Terminal that Plugin set up is complete.
 
         Activates all loaded plugin writers by generating all their various output files such as an ER Diagram or an image of a table plot
+
         All loaded plugin writers will be unloaded after activation, so there is no need to separately call unload_module() for them
         """
         used_writers = []
@@ -296,14 +300,19 @@ class Terminal():
             self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
-            writer_error = obj.get_rows(self.active_metadata, **kwargs)
-            if writer_error is not None:
-                if writer_error[0] == "Warning":
-                    warnings.warn(writer_error[1])
-                else:
-                    if self.debug_level != 0:
-                        self.logger.error(writer_error[1])
-                    raise writer_error[0](writer_error[1])
+            try:
+                writer_error = obj.get_rows(self.active_metadata, **kwargs)
+                if writer_error is not None:
+                    if writer_error[0] == "Warning":
+                        warnings.warn(writer_error[1])
+                    else:
+                        if self.debug_level != 0:
+                            self.logger.error(writer_error[1])
+                        raise writer_error[0](writer_error[1])
+            except:
+                if self.debug_level != 0:
+                    self.logger.error(f'   {obj.__class__.__name__} plugin writer add_rows() was incorrect. Check to ensure data was stored correctly')
+                raise RuntimeError(f'{obj.__class__.__name__} plugin writer add_rows() was incorrect. Check to ensure data was stored correctly')
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -319,7 +328,9 @@ class Terminal():
     def close(self):
         """
         Immediately closes all active modules: backends, plugin writers, plugin readers
+
         Clears out the current DSI abstraction
+
         NOTE - This step cannot be undone.
         """
         print("Closing the abstraction layer, and all active plugins/backends")
@@ -347,11 +358,17 @@ class Terminal():
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
-            - interaction_type = 'put' or 'ingest', ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored)
+        
+        `interaction_type`:
+
+            - 'ingest' or 'put': ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored
+
                 - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
-            - interaction_type = 'get' or 'query', retrieves data from first loaded backend based on a specified 'query'
-            - interaction_type = 'inspect' or 'notebook', generates an interactive Python notebook with all data from first loaded backend
-            - interaction_type = 'read' or 'process', overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+            - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
+            - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
+            - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+
+        `query`: default None. Specify if *interaction_type* = 'query' and query_artifact function in backend file requires an input
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -460,7 +477,9 @@ class Terminal():
     def find(self, query_object):
         """
         Find all function that searches for all instances of 'query_object' in first loaded backend. Searches among all tables/column/cells
-        `return`: List of backend-specific objects that each contain details of a match for 'query_object'. Can be tables/column/cells
+
+        `return`: List of backend-specific objects that each contain details of a match for 'query_object'
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -471,7 +490,9 @@ class Terminal():
     def find_table(self, query_object):
         """
         Find table function that searches for all tables whose names matches the 'query_object' in first loaded backend.
+
         `return`: List of backend-specific objects that each contain all data from a table matching 'query_object'.
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -483,9 +504,12 @@ class Terminal():
         """
         Find column function that searches for all columns whose names matches the 'query_object' in first loaded backend.
 
-        `range`: default False. If True, then data-range of all numerical columns which match 'query_object' is included in retrun
-                                If False, then data for each column that matches 'query_object' is included in retrun
+        `range`: default False. 
+
+            - If True, then data-range of all numerical columns which match 'query_object' is included in return
+            - If False, then data for each column that matches 'query_object' is included in return
         `return`: List of backend-specific objects that each contain data/numerical range about a column matching 'query_object'.
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -497,9 +521,12 @@ class Terminal():
         """
         Find cell function that searches for all cells which match the 'query_object' in first loaded backend.
 
-        `row`: default False. If True, then full row of data where a cell matches 'query_object' is included in retrun
-                                If False, then the value of the cell that matches 'query_object' is included in retrun
-        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'.
+        `row`: default False.
+
+            - If True, then full row of data where a cell matches 'query_object' is included in return
+            - If False, then the value of the cell that matches 'query_object' is included in return
+        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -509,8 +536,9 @@ class Terminal():
 
     def find_helper(self, query_object, return_object, start, find_type):
         """
+        **Users should not call this externally, only to be used by internal core functions.**
+        
         Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
-        Users should not call this externally, only to be used by internal core functions.
         """
         if isinstance(query_object, str): 
             print(f"Finding all {find_type}matches of '{query_object}' in first backend loaded")
@@ -533,9 +561,11 @@ class Terminal():
     def get_current_abstraction(self, table_name = None):
         """
         Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict
+
         The inner table Ordered Dict has column names as keys and list of column data as the values.
 
         `table_name`: default None. If specified, the return will only be that table's Ordered Dict, not a nested one.
+
         `return`: nested Ordered Dict if table_name is None. single Ordered Dict if table_name is not None
         """
         if self.debug_level != 0:
@@ -562,7 +592,9 @@ class Terminal():
         Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
 
         `table_name`: name of table that must be in the current abstraction
+
         `table_data`: table data that must be stored as an Ordered Dict where column names are keys and column data is a list stored as values.
+        
         `return`: None
         """
         if self.debug_level != 0:
