@@ -16,9 +16,33 @@ Note that any contributed plugins or extension should include unit tests in  ``p
 .. automodule:: dsi.plugins.plugin
    :members:
 
+**Note for users:** StructuredMetadata class is used to assign data from a file_reader to the DSI abstraction in core. If data in a user-written reader is restructured as an OrderedDict, only need to call set_schema_2() at bottom of add_rows().
+
 .. automodule:: dsi.plugins.metadata
    :members:
 
+File Readers
+------------
+
+Note for users:
+   - Assume names of data structure from all data sources are consistent/stable. Ex: table/column names are consistent. Number of columns in table CAN vary.
+   - Plugin readers in DSI repo can/should handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
+   
+      - if only reading in one table, users can utilize python pandas to stack mulutiple dataframes vertically (CSV reader)
+      - if ingesting multiple tables at a time, users must pad tables with null data (YAML1 and TOML1 use this. YAML1 has example code at bottom of add_row())
+.. automodule:: dsi.plugins.file_reader
+   :members:
+
+File Writers
+------------
+
+Note for users:
+   - If runTable flag is True in Terminal instantiaton, the run table is only included in ER Diagram writer if data is processed from a backend. View Example 4 in Core Examples
+.. automodule:: dsi.plugins.file_writer
+   :members:
+
+Environment Plugins
+-------------------
 .. automodule:: dsi.plugins.env
    :members:
 
