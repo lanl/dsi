@@ -20,9 +20,9 @@ In the first step, a python script is used to parse the slurm output files and c
    ./parse_slurm_output.py --testname leblanc
 
 
-.. literalinclude:: ../examples/pennant/parse_slurm_output.py
+.. .. literalinclude:: ../examples/pennant/parse_slurm_output.py
 
-A second python script,
+In the second step, another python script,
 
 .. code-block:: unixconfig
 
@@ -31,57 +31,7 @@ A second python script,
 
 reads in the CSV file and creates a database:
 
-.. code-block:: python
-
-   """
-   Creates the DSI db from the csv file
-   """
-   """
-   This script reads in the csv file created from parse_slurm_output.py.
-   Then it creates a DSI db from the csv file and performs a query.
-   """
-
-   import argparse
-   import sys
-   from dsi.backends.sqlite import Sqlite, DataType
-   import os
-   from dsi.core import Terminal
-
-   isVerbose = True
-
-   if __name__ == "__main__":
-      """ The testname argument is required """
-      parser = argparse.ArgumentParser()
-      parser.add_argument('--testname', help='the test name')
-      args = parser.parse_args()
-      test_name = args.testname
-      if test_name is None:
-         parser.print_help()
-         sys.exit(0)
-      
-      table_name = "rundata"
-      csvpath = 'pennant_' + test_name + '.csv'
-      dbpath = 'pennant_' + test_name + '.db'
-      output_csv = "pennant_read_query.csv"
-
-      #read in csv
-      core = Terminal(run_table_flag=False)
-      core.load_module('plugin', "Csv", "reader", filenames = csvpath, table_name = table_name)
-
-      if os.path.exists(dbpath):
-         os.remove(dbpath)
-
-      #load data into sqlite db
-      core.load_module('backend','Sqlite','back-write', filename=dbpath)
-      core.artifact_handler(interaction_type='put')
-
-      # update dsi abstraction using a query to the sqlite db
-      query_data = core.artifact_handler(interaction_type='get', query = f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", dict_return = True)
-      core.update_abstraction(table_name, query_data)
-
-      #export to csv
-      core.load_module('plugin', "Csv_Writer", "writer", filename = output_csv, table_name = table_name)
-      core.transload()
+.. literalinclude:: ../examples/pennant/create_and_query_dsi_db.py
 
 Resulting in the output of the query:
 
@@ -89,9 +39,7 @@ Resulting in the output of the query:
     :alt: Screenshot of computer program output.
     :class: with-shadow
 
-
     The output of the PENNANT example.
-
 
 
 Wildfire Dataset
@@ -109,12 +57,7 @@ To run this example, load dsi and run:
 
    python3 examples/wildfire/wildfire.py
 
-Within ``wildfire.py``, Sqlite is imported from the available DSI backends and DataType is the derived class for the defined (regular) schema.
-
-.. code-block:: unixconfig
-
-   from dsi.backends.sqlite import Sqlite, DataType
-
+.. literalinclude:: ../examples/wildfire/wildfire.py
 
 This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. This cdb folder is called a `Cinema`_ database (CDB). Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.  A Cinema database is comprised of a CSV file where each row of the table is a data element (a run or ensemble member of a simulation or experiment, for example) and each column is a property of the data element. Any column name that starts with 'FILE' is a path to a file associated with the data element.  This could be an image, a plot, a simulation mesh or other data artifact.
 

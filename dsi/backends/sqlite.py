@@ -76,7 +76,7 @@ class Sqlite(Filesystem):
         """
         Helper function to create SQLite table based on the passed in schema. Used within ingest_artifact()
 
-        Users DO NOT need to call this function or interact with it. Only use 'ingest' interaction_type in core.artifact_handler()
+        Users DO NOT need to call this function or interact with it. Only use 'ingest' interaction_type when calling core.artifact_handler()
 
         `types`: DataType derived class that defines the string name, 
         properties (dictionary of table names and table data), 
@@ -236,9 +236,9 @@ class Sqlite(Filesystem):
         
         `return`: 
 
-            - When 'query' is of correct format and dict_return = False, returns a list of database rows
-            - When 'query' is of correct format and dict_return = True, returns an Ordered Dictionary for the table with data from the query result
-            - When 'query' is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+            - When `query` is of correct format and dict_return = False, returns a list of database rows
+            - When `query` is of correct format and dict_return = True, returns an Ordered Dictionary for the table with data from the query result
+            - When `query` is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
         """
         if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
@@ -456,7 +456,7 @@ class Sqlite(Filesystem):
         Helper function to create the SQLite database's units table as an Ordered Dictionary.
         Only called if dsi_units table exists in the database.
 
-        DSI Users should not call this function, only specify a 'ingest' interaction when calling core artifact handler.
+        DSI Users should not call this function, only specify a 'process' interaction when calling core artifact handler.
 
         `return`: units table as an Ordered Dictionary
         """

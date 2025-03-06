@@ -11,7 +11,7 @@ Note that any contributed plugins or extension should include unit tests in  ``p
     :class: with-shadow
     :scale: 100%
 
-    Figure depicts the current DSI plugin class hierarchy.
+    Figure depicts prominent portion of the current DSI plugin class hierarchy.
 
 .. automodule:: dsi.plugins.plugin
    :members:
@@ -29,7 +29,7 @@ Note for users:
    - Plugin readers in DSI repo can/should handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
    
       - if only reading in one table, users can utilize python pandas to stack mulutiple dataframes vertically (CSV reader)
-      - if ingesting multiple tables at a time, users must pad tables with null data (YAML1 and TOML1 use this. YAML1 has example code at bottom of add_row())
+      - if ingesting multiple tables at a time, users must pad tables with null data (YAML1 uses this and has example code at bottom of add_row() to implement this)
 .. automodule:: dsi.plugins.file_reader
    :members:
 
@@ -37,7 +37,7 @@ File Writers
 ------------
 
 Note for users:
-   - If runTable flag is True in Terminal instantiaton, the run table is only included in ER Diagram writer if data is processed from a backend. View Example 4 in Core Examples
+   - If runTable flag is True in Terminal instantiation, the run table is only included in ER Diagram writer if data is processed from a backend. View Example 4 in Core Examples
 .. automodule:: dsi.plugins.file_writer
    :members:
 

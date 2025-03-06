@@ -39,7 +39,7 @@ class ER_Diagram(FileWriter):
 
         `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
         
-        'return': None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         file_type = ".png"
         if len(self.output_filename) > 4 and self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
@@ -152,7 +152,7 @@ class Csv_Writer(FileWriter):
 
         `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
 
-        'return': None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         if self.table_name not in collection.keys():
             return (ValueError, f"{self.table_name} does not exist in memory")
@@ -191,7 +191,7 @@ class Table_Plot(FileWriter):
 
         `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
 
-        'return': None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         if self.table_name not in collection.keys():
             return (ValueError, f"{self.table_name} does not exist in memory")

@@ -2,7 +2,8 @@
 Making a Reader for Your Application
 ====================================
 
-DSI readers are the primary way to transform outside data to metadata that DSI can ingest. Readers are Python classes that must include a few methods, namely ``__init__``, ``pack_header``, and ``add_rows``.
+DSI readers are the primary way to transform outside data to metadata that DSI can ingest. 
+Readers are Python classes that must include a few methods, namely ``__init__``, ``pack_header``, and ``add_rows``.
 
 Initializer: ``__init__(self) -> None:``
 -------------------------------------------
@@ -65,13 +66,13 @@ Example alternate ``add_rows``: ::
     my_data["joey"] = 20
     my_data["amy"] = 30
 
-    self.set_schema2(my_data)
+    self.set_schema_2(my_data)
 
 Implemented Examples
 --------------------------------
 If you want to see some full reader examples in-code, some can be found in 
-`dsi/plugins/env.py <https://github.com/lanl/dsi/blob/main/dsi/plugins/env.py>`_.
-``Hostname`` is an especially simple example to go off of. 
+`dsi/plugins/file_reader.py <https://github.com/lanl/dsi/blob/main/dsi/plugins/file_reader.py>`_.
+``Csv`` is an especially simple example to go off of. 
 
 Loading Your Reader
 -------------------------

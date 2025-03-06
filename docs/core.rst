@@ -1,12 +1,17 @@
 Core
 ====
 
-The DSI Core middleware defines the Terminal concept. An instantiated Terminal is the human/machine DSI interface. The person setting up a Core Terminal only needs to know how they want to ask questions, and what metadata they want to ask questions about. If they don’t see an option to ask questions the way they like, or they don’t see the metadata they want to ask questions about, then they should ask a Backend Contributor or a Plugin Contributor, respectively.
+The DSI Core middleware defines the Terminal concept. An instantiated Terminal is the human/machine DSI interface. 
+The person setting up a Core Terminal only needs to know how they want to ask questions, and what metadata they want to ask questions about. 
+If they don’t see an option to ask questions the way they like, or they don’t see the metadata they want to ask questions about, then they should ask a Backend Contributor or a Plugin Contributor, respectively.
 
 Core: Terminal
 --------------
 
-The Terminal class is a structure through which users can interact with Plugins (Readers/Writers) and Backends as "module" objects. Each reader/writer/backend can be "loaded" to make ready for use and users can further interact with backends by ingesting, querying, or processing data as well as generating an interactive notebook with data. All relevant functions have been listed below for further clarity.
+The Terminal class is a structure through which users can interact with Plugins (Readers/Writers) and Backends as "module" objects. 
+Each reader/writer/backend can be "loaded" to make ready for use and users can further interact with backends by ingesting, querying, processing, or finding data as well as generating an interactive notebook with data. 
+
+All relevant functions have been listed below for further clarity. Examples section displays various workflows using this Terminal class.
 
 Notes for users:
       - All plugin writers that are loaded must be followed by calling transload() after to execute them. Readers are automatically executed upon loading.
@@ -44,7 +49,7 @@ Example 3: Querying data from a backend
 
 .. literalinclude:: ../examples/core/query.py
 
-Example 4: Processing data from a backend to generate an Entity Relationship diagram
+Example 4: Processing data from a backend to generate an Entity Relationship diagram using a Writer
 
 .. literalinclude:: ../examples/core/process.py
 
