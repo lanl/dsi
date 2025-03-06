@@ -15,11 +15,26 @@ Note that any contributed backends or extensions should include unit tests in  `
 .. automodule:: dsi.backends.filesystem
    :members:
 
+SQLite
+------
+
 .. automodule:: dsi.backends.sqlite
    :members:
 
+SQLAlchemy
+------
+
+.. automodule:: dsi.backends.sqlalchemy
+   :members:
+
+GUFI
+------
+
 .. automodule:: dsi.backends.gufi
    :members:
+
+Parquet
+------
 
 .. automodule:: dsi.backends.parquet
    :members:

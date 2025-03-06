@@ -42,12 +42,14 @@ class ER_Diagram(FileWriter):
         'return': None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         file_type = ".png"
-        if self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
+        if len(self.output_filename) > 4 and self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
             file_type = self.output_filename[-4:]
             self.output_filename = self.output_filename[:-4]
-        elif self.output_filename[-5:] == ".jpeg":
+        elif len(self.output_filename) > 5 and self.output_filename[-5:] == ".jpeg":
             file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
+        elif len(self.output_filename) > 4 and self.output_filename[-4:] == ".svg":
+            return (ValueError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             return (ValueError, "Your input for target_table_prefix does not exist in memory. Please enter a valid prefix for table names.")
