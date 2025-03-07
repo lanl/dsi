@@ -42,7 +42,7 @@ class ValueObject:
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
     """
-    SQLite Filesystem Backend to which a user can ingest/read data, generate a Jupyter notebook, and find all occurences of a search term
+    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find all occurences of a search term
     """
     runTable = False
 
@@ -246,15 +246,15 @@ class Sqlite(Filesystem):
                 if isVerbose:
                     print(data)
             except:
-                return (ValueError, "Error in get_artifacts/process_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                return (ValueError, "Error in query_artifacts/get_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            return (ValueError, "Error in get_artifacts/process_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
             if len(tables) > 1:
-                return (ValueError, "Error in get_artifacts/process_artifacts handler: Can only return ordered dictionary if query with one table")
+                return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only return ordered dictionary if query with one table")
             
             queryDict = OrderedDict()
             for row in data:

@@ -8,6 +8,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 import warnings
+import sys
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -158,15 +159,17 @@ class Terminal():
                         self.logger.info("   Activating this reader in load_module")
                     
                     try:
+                        sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
                         ingest_error = obj.add_rows()
                         if ingest_error is not None:
                             if self.debug_level != 0:
                                 self.logger.error(f"   {ingest_error[1]}")
-                            raise ingest_error[0](ingest_error[1])
+                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                        sys.settrace(None) # ends trace to prevent large overhead
                     except:
                         if self.debug_level != 0:
-                            self.logger.error(f'   {mod_name} plugin reader add_rows() was incorrect. Check to ensure data was stored correctly')
-                        raise RuntimeError(f'{mod_name} plugin reader add_rows() was incorrect. Check to ensure data was stored correctly')
+                            self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
+                        raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                     
                     for table_name, table_metadata in obj.output_collector.items():
                         if "hostname" in table_name.lower():
@@ -273,7 +276,7 @@ class Terminal():
 
         Note: mod_type is needed because each Python module only implements plugins or backends.
 
-        Check Examples section to see how to use this function.
+        Check Example 7 in Core:Examples on GitHub Docs to see how to use this function.
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
         self.module_collection[mod_type][mod_name] = mod
@@ -301,6 +304,7 @@ class Terminal():
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
             try:
+                sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
                 if writer_error is not None:
                     if writer_error[0] == "Warning":
@@ -308,11 +312,12 @@ class Terminal():
                     else:
                         if self.debug_level != 0:
                             self.logger.error(writer_error[1])
-                        raise writer_error[0](writer_error[1])
+                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+                sys.settrace(None) # ends trace to prevent large overhead
             except:
-                if self.debug_level != 0:
-                    self.logger.error(f'   {obj.__class__.__name__} plugin writer add_rows() was incorrect. Check to ensure data was stored correctly')
-                raise RuntimeError(f'{obj.__class__.__name__} plugin writer add_rows() was incorrect. Check to ensure data was stored correctly')
+                if self.debug_level != 0: 
+                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
+                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -379,7 +384,7 @@ class Terminal():
         
         operation_success = False
         backread_active = False
-        if interaction_type in ['put', 'ingest']:
+        if interaction_type in ['ingest', 'put']:
             for obj in self.active_modules['back-write']:
                 if self.debug_level != 0:
                     self.logger.info("-------------------------------------")
@@ -397,47 +402,55 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
+                sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
                 if interaction_type == "ingest":
                     errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 elif interaction_type == "put":
                     errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
                 if errorMessage is not None:
                     if self.debug_level != 0:
-                        self.logger.error(f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
-                    raise errorMessage[0](f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
+                        self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                    raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
-        if interaction_type in ['put', 'ingest'] and len(self.active_modules['back-read']) > 0:
+        if interaction_type in ['ingest', 'put'] and len(self.active_modules['back-read']) > 0:
             backread_active = True
 
-        get_artifact_data = None
+        query_data = None
         first_backend = self.loaded_backends[0]
-        if interaction_type not in ['put', 'ingest', "read", "process"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', 'put', "processs", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
-        if interaction_type in ['get', 'query']:
-            if "query" in first_backend.get_artifacts.__code__.co_varnames: #need to change this to query_artifacts eventually
+        if interaction_type in ['query', 'get']:
+            if "query" in first_backend.query_artifacts.__code__.co_varnames:
                 self.logger.info(f"Query to get data: {query}")
                 kwargs['query'] = query
+
+            sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
             if interaction_type == "get":
-                get_artifact_data = first_backend.get_artifacts(**kwargs)
+                query_data = first_backend.get_artifacts(**kwargs)
             elif interaction_type == "query":
-                get_artifact_data = first_backend.query_artifacts(**kwargs)
-            if isinstance(get_artifact_data, tuple):
+                query_data = first_backend.query_artifacts(**kwargs)
+            if isinstance(query_data, tuple):
                 if self.debug_level != 0:
-                    self.logger.error(get_artifact_data[1])
-                raise get_artifact_data[0](get_artifact_data[1])
+                    self.logger.error(query_data[1])
+                raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
+            sys.settrace(None) # ends trace to prevent large overhead
             operation_success = True
 
-        elif interaction_type in ['inspect', 'notebook']:
+        elif interaction_type in ['notebook', 'inspect']:
             parent_class = first_backend.__class__.__bases__[0].__name__
             if parent_class == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
-                if interaction_type == "inspect":
-                    first_backend.inspect_artifacts(**kwargs)
-                elif interaction_type == "notebook":
-                    first_backend.notebook(**kwargs)
+                try:
+                    if interaction_type == "inspect":
+                        first_backend.inspect_artifacts(**kwargs)
+                    elif interaction_type == "notebook":
+                        first_backend.notebook(**kwargs)
+                except:
+                    raise ValueError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_class == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
             else: #backend is empty - cannot inspect
@@ -446,7 +459,7 @@ class Terminal():
                 raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
             operation_success = True
 
-        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) > 0:
+        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) > 0:
             first_backread = self.active_modules['back-read'][0]
             if self.debug_level != 0:
                 self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
@@ -455,24 +468,33 @@ class Terminal():
             elif interaction_type == "read":
                 self.active_metadata = first_backread.read_to_artifact()
             operation_success = True
-        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) == 0:
+        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) == 0:
             backread_active = True
 
         if operation_success:
             end = datetime.now()
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
-            if interaction_type in ['get', 'query'] and get_artifact_data is not None:
-                return get_artifact_data
+            if interaction_type in ['query', 'get'] and query_data is not None:
+                return query_data
         else:
             not_run_msg = None
             if backread_active:
-                not_run_msg = 'Remember that back-WRITE backends cannot read/process data and back-READ backends cannot put/ingest'
+                not_run_msg = 'Remember that back-WRITE backends cannot process/read data and back-READ backends cannot ingest/put'
             else:
-                not_run_msg = 'Is your artifact interaction implemented in your backend?'
+                not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
+    
+    # Internal function used to get line numbers from return statements - should not be called by users
+    def trace_function(self, frame, event, arg):
+        global return_line_number
+        global original_file
+        if event == "return":
+            return_line_number = frame.f_lineno  # Get line number
+            original_file = frame.f_code.co_filename # Get file name
+        return self.trace_function
     
     def find(self, query_object):
         """
