@@ -15,6 +15,7 @@ DSI infrastructure is designed to be flexible and with these considerations in m
     :alt: Figure depicting the data life cycle
     :class: with-shadow
     :scale: 50%
+    :align: center
 
     A depiction of data life cycle can be seen here. The DSI API supports the user to manage the life cycle aspects of their data.
 
@@ -65,6 +66,7 @@ a supporting backend is required to assemble query results and present them to t
    :alt: This figure depicts a user asking a typical query on the user's metadata
    :class: with-shadow
    :scale: 50%
+   :align: center
 
    In this typical **user story**, the user has metadata about their data stored in DSI storage of some type.  
    The user needs to extract all files with the variable **foo** above a specific threshold.  

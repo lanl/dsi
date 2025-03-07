@@ -43,6 +43,7 @@ Note for users:
 .. automodule:: dsi.plugins.file_reader
    :members:
    :special-members: __init__
+   :exclude-members: FileReader
 
 File Writers
 ------------
@@ -53,6 +54,7 @@ Note for users:
 .. automodule:: dsi.plugins.file_writer
    :members:
    :special-members: __init__
+   :exclude-members: FileWriter
 
 Environment Plugins
 -------------------

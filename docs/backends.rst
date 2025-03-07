@@ -14,6 +14,7 @@ Note that any contributed backends or extensions should include unit tests in  `
    :alt: Figure depicting the current backend class hierarchy.
    :class: with-shadow
    :scale: 100%
+   :align: center
 
    Figure depicts the current DSI backend class hierarchy.
 

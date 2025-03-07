@@ -30,7 +30,7 @@ data = terminal_find.find_cell(5.9, row = True)
 for val in data:
     print(val.t_name, val.c_name, val.value, val.row_num, val.type)
 
-## ALL match                        - return all instances where the search term is found: table, column, cell
+## ALL match                        - find all instances where the search term is found: table, column, cell
 data = terminal_find.find("a")
 for val in data:
     print(val.t_name, val.c_name, val.value, val.row_num, val.type)

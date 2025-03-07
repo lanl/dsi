@@ -171,7 +171,7 @@ class Sqlite(Filesystem):
             
             # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
             self.put_artifact_type(types, foreign_query)
-            # self.create_table_helper(types, foreign_query)
+            # self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))

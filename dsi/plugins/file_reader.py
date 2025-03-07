@@ -39,7 +39,7 @@ class Csv(FileReader):
     """
     def __init__(self, filenames, table_name = None, **kwargs):
         """
-        Initializes CSV Reader with user specified parameters.
+        Initializes CSV Reader with user specified filenames and optional table_name.
 
         `filenames`: Required input. List of CSV files, or just one CSV files to store in DSI. If a list, data in all files must be for the same table
 
@@ -119,6 +119,7 @@ class JSON(FileReader):
    
     """
     def __init__(self, filenames, **kwargs) -> None:
+        """Initializes generic JSON reader with user-specified filenames"""
         super().__init__(filenames, **kwargs)
         self.key_data = []
         self.base_dict = OrderedDict()
@@ -225,7 +226,7 @@ class YAML1(FileReader):
 
     def check_type(self, text):
         """
-        Tests input text and returns a predicted compatible SQL Type
+        Internal helper function that tests input text and returns a predicted compatible SQL Type
 
         `text`: text string
 
