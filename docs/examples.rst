@@ -19,15 +19,11 @@ In the first step, a python script is used to parse the slurm output files and c
 
    ./parse_slurm_output.py --testname leblanc
 
-
-.. .. literalinclude:: ../examples/pennant/parse_slurm_output.py
-
 In the second step, another python script,
 
 .. code-block:: unixconfig
 
    ./create_and_query_dsi_db.py --testname leblanc
-
 
 reads in the CSV file and creates a database:
 

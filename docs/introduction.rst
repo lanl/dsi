@@ -48,7 +48,7 @@ Currently, DSI has the following readers:
 ..  figure:: PluginClassHierarchy.png
     :alt: Figure depicting the current plugin class hierarchy.
     :class: with-shadow
-    :scale: 100%
+    :scale: 70%
 
     Figure depicting the current DSI plugin class hierarchy.
 

@@ -9,17 +9,22 @@ Note that any contributed plugins or extension should include unit tests in  ``p
 ..  figure:: PluginClassHierarchy.png
     :alt: Figure depicting the current plugin class hierarchy.
     :class: with-shadow
-    :scale: 100%
+    :scale: 70%
 
     Figure depicts prominent portion of the current DSI plugin class hierarchy.
 
 .. automodule:: dsi.plugins.plugin
    :members:
+   :special-members: __init__
+
+Metadata Processing
+-------------------
 
 **Note for users:** StructuredMetadata class is used to assign data from a file_reader to the DSI abstraction in core. If data in a user-written reader is restructured as an OrderedDict, only need to call set_schema_2() at bottom of add_rows().
 
 .. automodule:: dsi.plugins.metadata
    :members:
+   :special-members: __init__
 
 File Readers
 ------------
@@ -32,6 +37,7 @@ Note for users:
       - if ingesting multiple tables at a time, users must pad tables with null data (YAML1 uses this and has example code at bottom of add_row() to implement this)
 .. automodule:: dsi.plugins.file_reader
    :members:
+   :special-members: __init__
 
 File Writers
 ------------
@@ -40,14 +46,16 @@ Note for users:
    - If runTable flag is True in Terminal instantiation, the run table is only included in ER Diagram writer if data is processed from a backend. View Example 4 in Core Examples
 .. automodule:: dsi.plugins.file_writer
    :members:
+   :special-members: __init__
 
 Environment Plugins
 -------------------
 .. automodule:: dsi.plugins.env
    :members:
+   :special-members: __init__
 
 Optional Plugin Type Enforcement
-==================================
+--------------------------------
 
 Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. Plugins may enforce types, but they are not required to enforce types. Plugin type enforcement can be static, like the Hostname default plugin. Plugin type enforcement can also be dynamic, like the Bueno default plugin.
 

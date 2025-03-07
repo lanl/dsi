@@ -25,21 +25,25 @@ SQLite
 
 .. automodule:: dsi.backends.sqlite
    :members:
+   :special-members: __init__
 
 SQLAlchemy
 ------
 
 .. automodule:: dsi.backends.sqlalchemy
    :members:
+   :special-members: __init__
 
 GUFI
 ------
 
 .. automodule:: dsi.backends.gufi
    :members:
+   :special-members: __init__
 
 Parquet
 ------
 
 .. automodule:: dsi.backends.parquet
    :members:
+   :special-members: __init__
