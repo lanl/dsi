@@ -72,6 +72,10 @@ class Sqlite(Filesystem):
                 return " VARCHAR"
         return ""
     
+    # OLD NAME OF ingest_table_helper. TO BE DEPRECATED IN FUTURE DSI RELEASE
+    def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
+        self.ingest_table_helper(types, foreign_query, isVerbose)
+        
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
         Helper function to create SQLite table based on the passed in schema. Used within ingest_artifact()
@@ -113,13 +117,9 @@ class Sqlite(Filesystem):
             self.cur.execute(str_query)
             self.types = types
 
-    # OLD NAME OF ingest_table_helper. TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
-        self.ingest_table_helper(self, types, foreign_query, isVerbose)
-
     # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifacts(self, collection, isVerbose=False):
-        return self.ingest_artifacts(self, collection, isVerbose)
+        return self.ingest_artifacts(collection, isVerbose)
     
     def ingest_artifacts(self, collection, isVerbose=False):    
         """
@@ -681,6 +681,8 @@ class Sqlite(Filesystem):
     # OLD FUNCTION TO DEPRECATE
     def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
         """
+        DSI 1.0 FUNCTIONALITY - DEPRECATING SOON, DO NOT USE
+        
         Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
 
         `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,

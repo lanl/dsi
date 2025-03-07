@@ -26,7 +26,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'TextFile', 'MetadataReader1', 'Wildfire']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
@@ -41,14 +41,13 @@ class Terminal():
 
         Optional flags can be set and defined:
 
-        `debug`: {0: off, 1: user debug log, 2: user + developer debug log}. 
-                      When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
-
+        `debug`: {0: off, 1: user debug log, 2: user + developer debug log} 
+            
+            - When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
         `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
         `runTable`: Undefined False as default. 
-                          When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. 
-                          Recommended for in-situ use-cases.
+        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -278,6 +277,7 @@ class Terminal():
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
         self.module_collection[mod_type][mod_name] = mod
+        self.VALID_MODULES.append(mod_name)
 
     def list_loaded_modules(self):
         """

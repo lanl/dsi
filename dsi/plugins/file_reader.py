@@ -39,7 +39,7 @@ class Csv(FileReader):
     """
     def __init__(self, filenames, table_name = None, **kwargs):
         """
-        Initializes CSV Reader with user specified parameters. INCLUDE NECESSARY PARAMETERS WHEN LOADING THIS PLUGIN WITH CORE.LOAD_MODULE()
+        Initializes CSV Reader with user specified parameters.
 
         `filenames`: Required input. List of CSV files, or just one CSV files to store in DSI. If a list, data in all files must be for the same table
 
@@ -73,74 +73,6 @@ class Csv(FileReader):
         else:
             self.csv_data = table_data
         
-        self.set_schema_2(self.csv_data)
-
-class Wildfire(FileReader):
-    """
-    A Structured Data Plugin to ingest Wildfire data stored as a CSV
-
-    Can be used for other cases if data is post-processed and running only once.
-
-    Can create a manual simulation table
-    """
-    def __init__(self, filenames, table_name = None, sim_table = False, **kwargs):
-        """
-        Initializes Wildfire Reader with user specified parameters.
-
-        `filenames`: Required input -- Wildfire data files
-
-        `table_name`: default None. User can specify table name when loading the wildfire file.   
-
-        `sim_table`: default False. Set to True if creating manual simulation table where each row of Wildfire file is a separate sim
-
-            - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
-        """
-        super().__init__(filenames, **kwargs)
-        self.csv_data = OrderedDict()
-        if isinstance(filenames, str):
-            self.filenames = [filenames]
-        else:
-            self.filenames = filenames
-        self.table_name = table_name
-        self.sim_table = sim_table
-
-    def add_rows(self) -> None:
-        """ 
-        Creates Ordered Dictionary for the wildfire data. 
-
-        If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
-        """
-        if self.table_name is None:
-            self.table_name = "Wildfire"
-
-        total_df = DataFrame()
-        for filename in self.filenames:
-            temp_df = read_csv(filename)
-            try:
-                total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
-            except:
-                return (ValueError, f"Error in adding {filename} to the existing wildfire data. Please recheck column names and data structure")
-        
-        if self.sim_table:
-            total_df['sim_id'] = range(1, len(total_df) + 1)
-            total_df = total_df[['sim_id'] + [col for col in total_df.columns if col != 'sim_id']]
-
-        total_data = OrderedDict(total_df.to_dict(orient='list'))
-        for col, coldata in total_data.items():  # replace NaNs with None
-            total_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
-        
-        self.csv_data[self.table_name] = total_data
-        
-        if self.sim_table:
-            sim_list = list(range(1, len(total_df) + 1))
-            sim_dict = OrderedDict([('sim_id', sim_list)])
-            self.csv_data["simulation"] = sim_dict
-
-            relation_dict = OrderedDict([('primary_key', []), ('foreign_key', [])])
-            relation_dict["primary_key"].append(("simulation", "sim_id"))
-            relation_dict["foreign_key"].append((self.table_name, "sim_id"))
-            self.csv_data["dsi_relations"] = relation_dict
-       
         self.set_schema_2(self.csv_data)
 
 class Bueno(FileReader):
@@ -449,37 +381,72 @@ class TOML1(FileReader):
             del self.toml_data["dsi_units"]
         self.set_schema_2(self.toml_data)
 
-class TextFile(FileReader):
+class Wildfire(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of text files
+    A Structured Data Plugin to ingest Wildfire data stored as a CSV
 
-    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    Can be used for other cases if data is post-processed and running only once.
+    Can create a manual simulation table
     """
-    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+    def __init__(self, filenames, table_name = None, sim_table = False, **kwargs):
         """
-        `filenames`: one text file or a list of text files to be ingested
+        Initializes Wildfire Reader with user specified parameters.
 
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other text file sources
+        `filenames`: Required input -- Wildfire data files
+
+        `table_name`: default None. User can specify table name when loading the wildfire file.   
+
+        `sim_table`: default False. Set to True if creating manual simulation table where each row of Wildfire file is a separate sim
+
+            - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
         """
         super().__init__(filenames, **kwargs)
+        self.csv_data = OrderedDict()
         if isinstance(filenames, str):
-            self.text_files = [filenames]
+            self.filenames = [filenames]
         else:
-            self.text_files = filenames
-        self.text_file_data = OrderedDict()
-        self.target_table_prefix = target_table_prefix
+            self.filenames = filenames
+        self.table_name = table_name
+        self.sim_table = sim_table
 
     def add_rows(self) -> None:
+        """ 
+        Creates Ordered Dictionary for the wildfire data. 
+
+        If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
         """
-        Parses text file data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
-        """
-        for filename in self.text_files:
-            df = read_csv(filename)
-            if self.target_table_prefix is not None:
-                self.text_file_data[f"{self.target_table_prefix}__text_file"] = OrderedDict(df.to_dict(orient='list'))
-            else:
-                self.text_file_data["text_file"] = OrderedDict(df.to_dict(orient='list'))
-            self.set_schema_2(self.text_file_data)
+        if self.table_name is None:
+            self.table_name = "Wildfire"
+
+        total_df = DataFrame()
+        for filename in self.filenames:
+            temp_df = read_csv(filename)
+            try:
+                total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
+            except:
+                return (ValueError, f"Error in adding {filename} to the existing wildfire data. Please recheck column names and data structure")
+        
+        if self.sim_table:
+            total_df['sim_id'] = range(1, len(total_df) + 1)
+            total_df = total_df[['sim_id'] + [col for col in total_df.columns if col != 'sim_id']]
+
+        total_data = OrderedDict(total_df.to_dict(orient='list'))
+        for col, coldata in total_data.items():  # replace NaNs with None
+            total_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+        
+        self.csv_data[self.table_name] = total_data
+        
+        if self.sim_table:
+            sim_list = list(range(1, len(total_df) + 1))
+            sim_dict = OrderedDict([('sim_id', sim_list)])
+            self.csv_data["simulation"] = sim_dict
+
+            relation_dict = OrderedDict([('primary_key', []), ('foreign_key', [])])
+            relation_dict["primary_key"].append(("simulation", "sim_id"))
+            relation_dict["foreign_key"].append((self.table_name, "sim_id"))
+            self.csv_data["dsi_relations"] = relation_dict
+       
+        self.set_schema_2(self.csv_data)
 
 class MetadataReader1(FileReader):
     """

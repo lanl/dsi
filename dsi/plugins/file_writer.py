@@ -139,7 +139,7 @@ class Csv_Writer(FileWriter):
 
         `export_cols`: default None. When specified, this must be a list of column names to keep in output csv file
 
-            - Ex: all columns are ["a", "b", "c", "d", "e"]. export_cols = ["a", "c", "e"]
+            - Ex: all columns are [a, b, c, d, e]. export_cols = [a, c, e]
         """
         super().__init__(filename, **kwargs)
         self.csv_file_name = filename
