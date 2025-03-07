@@ -9,7 +9,8 @@ Core: Terminal
 --------------
 
 The Terminal class is a structure through which users can interact with Plugins (Readers/Writers) and Backends as "module" objects. 
-Each reader/writer/backend can be "loaded" to make ready for use and users can further interact with backends by ingesting, querying, processing, or finding data as well as generating an interactive notebook with data. 
+Each reader/writer/backend can be "loaded" to be ready for use and users can interact with backends by ingesting, querying, processing, or finding data, 
+as well as generating an interactive notebook of the data. 
 
 All relevant functions have been listed below for further clarity. Examples section displays various workflows using this Terminal class.
 
@@ -21,7 +22,8 @@ Notes for users:
       - Terminal.artifact_handler: 'notebook' interaction_type stores data from first loaded backend, not existing DSI abstraction, in new notebook file
       - Terminal find functions only access the first loaded backend
       - Terminal.unload_module: removes last loaded backend of specified mod_name. ex: 2 loaded Sqlite backends, second is unloaded
-      - Terminal handles errors from any loaded DSI/user-written modules (plugins/backends). If writing an external plugin/backend, return a caught error as a tuple (error, error_message_string). Do not print in a new class
+      - Terminal handles errors from any loaded DSI/user-written modules (plugins/backends). 
+        If writing an external plugin/backend, return a caught error as a tuple (error, error_message_string). Do not print in a new class
 .. autoclass:: dsi.core.Terminal
       :members:
       :special-members: __init__
@@ -31,8 +33,11 @@ Core: Sync
 
 The DSI Core middleware also defines data management functionality in ``Sync``. 
 The purpose of ``Sync`` is to provide file metadata documentation and data movement capabilities when moving data to/from local and remote locations. 
-The purpose of data documentation is to capture and archive metadata (i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates) and track their movement to the remote location for future access. 
-The primary functions, ``Copy``, ``Move``, and ``Get`` serve as mechanisms to copy data, move data, or retrieve data from remote locations by creating a DSI database in the process, or retrieving an existing DSI database that contains the location(s) of the target data.
+The purpose of data documentation is to capture and archive metadata 
+(i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates) 
+and track their movement to the remote location for future access. 
+The primary functions, ``Copy``, ``Move``, and ``Get`` serve as mechanisms to copy data, move data, or retrieve data from remote locations by creating a DSI database in the process, 
+or retrieving an existing DSI database that contains the location(s) of the target data.
 
 .. autoclass:: dsi.core.Sync
       :members:
@@ -62,6 +67,7 @@ Querying data from a backend
 
 .. literalinclude:: ../examples/core/query.py
 
+.. _example4_label:
 Example 4: Process data
 ~~~~~~~~~~
 Processing data from a backend to generate an Entity Relationship diagram using a Writer

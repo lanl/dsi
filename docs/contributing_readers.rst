@@ -52,9 +52,12 @@ Example ``add_rows``: ::
 
 *Newer* Add Rows: ``add_rows(self) -> None``
 -------------------------------------
-If you are confident that the the data you read in ``add_rows`` is in the form of an OrderedDict (the data structure used to store all ingested data), you can bypass the use of ``pack_header`` and ``add_to_output`` with an alternate ``set_schema`` function.
+If you are confident that the the data you read in ``add_rows`` is in the form of an OrderedDict (the data structure used to store all ingested data), 
+you can bypass the use of ``pack_header`` and ``add_to_output`` with an alternate ``set_schema`` function.
 
-This function, ``set_schema_2(self, collection, validation_model=None) -> None``, directly assigns the data you read in ``add_rows`` to the internal DSI abstraction layer, provided that the data you pass as the ``collection`` variable is an OrderedDict. This method allows you to quickly append data to the abstraction wholesale, rather than row-by-row.
+This function, ``set_schema_2(self, collection, validation_model=None) -> None``, directly assigns the data you read in ``add_rows`` to the internal DSI abstraction layer, 
+provided that the data you pass as the ``collection`` variable is an OrderedDict. 
+This method allows you to quickly append data to the abstraction wholesale, rather than row-by-row.
 
 Example alternate ``add_rows``: ::
 
@@ -78,8 +81,13 @@ Loading Your Reader
 -------------------------
 There are two ways to load your reader, internally and externally.
 
- - Internally: If you want your reader loadable internally with the rest of the provided implementations (in `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_), it must be registered in the class variables of ``Terminal`` in `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_. If this is done correctly, your reader will be loadable by the ``load_module`` method of ``Terminal``.
- - Externally: If your reader is not along side the other provided implementations, possibly somewhere else on the filesystem, your reader will be loaded externally. This is done by using the ``add_external_python_module`` method of ``Terminal``. If you load an external Python module this way (ex. ``term.add_external_python_module('plugin','my_python_file','/the/path/to/my_python_file.py')``), your reader will then be loadable by the ``load_module`` method of ``Terminal``.
+ - Internally: If you want your reader loadable internally with the rest of the provided implementations (in `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_), 
+   it must be registered in the class variables of ``Terminal`` in `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_. 
+   If this is done correctly, your reader will be loadable by the ``load_module`` method of ``Terminal``.
+ - Externally: If your reader is not along side the other provided implementations, possibly somewhere else on the filesystem, your reader will be loaded externally. 
+   This is done by using the ``add_external_python_module`` method of ``Terminal``. 
+   If you load an external Python module this way (ex. ``term.add_external_python_module('plugin','plugin_class_name','/path/to/python_file.py')``), 
+   your reader will then be loadable by the ``load_module`` method of ``Terminal``.
  
 
 Contributing Your Reader

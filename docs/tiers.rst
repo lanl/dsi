@@ -4,7 +4,8 @@ DSI Development Plans
 DSI |version_num| has a core set of capabilities with plans to add functionality in future releases.  
 This is user-driven so feel free to raise an issue on the `DSI GitHub repo <https://github.com/lanl/dsi>`_ for suggested capabilities.
 
-Current capabilities include the DSI Core and associated DSI data services.  The DSI data services include the functionality to store and retrieve user metadata in DSI accessible storage.
+Current capabilities include the DSI Core and associated DSI data services. 
+The DSI data services include the functionality to store and retrieve user metadata in DSI accessible storage.
 
 DSI Functionalities
 ^^^^^^^^^^^^^^^^^^^^^^^^

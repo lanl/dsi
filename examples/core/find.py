@@ -2,7 +2,7 @@ from dsi.core import Terminal
 
 terminal_find = Terminal(debug=0, backup_db = False, runTable=False)
 
-# Assuming there is existing data in data.db (Run Example 2 to ingest data that can be found)
+# Run Example 2 so data.db is not empty and data can then be found here
 terminal_find.load_module('backend','Sqlite','back-write', filename='data.db')
 
 ## TABLE match                      - return matching table data

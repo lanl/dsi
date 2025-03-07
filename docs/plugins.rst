@@ -1,8 +1,12 @@
 Plugins
 =======
-Plugins connect data-producing applications to DSI core functionalities. Plugins have *writers* or *readers* functions. A Plugin reader function deals with existing data files or input streams. A Plugin writer deals with generating new data. Plugins are modular to support user contribution.
+Plugins connect data-producing applications to DSI core functionalities. Plugins have *writers* or *readers* functions. 
+A Plugin reader function deals with existing data files or input streams. 
+A Plugin writer deals with generating new data. Plugins are modular to support user contribution.
 
-Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. In order to be compatible with DSI core, Plugins should produce data in Python built-in data structures or data structures sourced from the Python ``collections`` library.
+Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. 
+A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. 
+In order to be compatible with DSI core, Plugins should produce data in Python built-in data structures or data structures sourced from the Python ``collections`` library.
 
 Note that any contributed plugins or extension should include unit tests in  ``plugins/tests`` to demonstrate the new Plugin capability.
 
@@ -20,7 +24,8 @@ Note that any contributed plugins or extension should include unit tests in  ``p
 Metadata Processing
 -------------------
 
-**Note for users:** StructuredMetadata class is used to assign data from a file_reader to the DSI abstraction in core. If data in a user-written reader is restructured as an OrderedDict, only need to call set_schema_2() at bottom of add_rows().
+**Note for users:** StructuredMetadata class is used to assign data from a file_reader to the DSI abstraction in core. 
+If data in a user-written reader is restructured as an OrderedDict, only need to call set_schema_2() at bottom of add_rows().
 
 .. automodule:: dsi.plugins.metadata
    :members:
@@ -43,7 +48,8 @@ File Writers
 ------------
 
 Note for users:
-   - If runTable flag is True in Terminal instantiation, the run table is only included in ER Diagram writer if data is processed from a backend. View Example 4 in Core Examples
+   - If runTable flag is True in Terminal instantiation, the run table is only included in ER Diagram writer if data is processed from a backend. 
+     View :ref:`example4_label` to see an instance of a runTable included in an ER diagram
 .. automodule:: dsi.plugins.file_writer
    :members:
    :special-members: __init__

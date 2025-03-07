@@ -73,7 +73,8 @@ a supporting backend is required to assemble query results and present them to t
 Current DSI backends include:
 
 - SQLite: Python based SQL database and backend; the default DSI API backend.
-- GUFI: the `Grand Unified File Index system <https://github.com/mar-file-system/GUFI>`_ ; developed at LANL. GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.
+- GUFI: the `Grand Unified File Index system <https://github.com/mar-file-system/GUFI>`_ ; developed at LANL. 
+  GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.
 - Parquet: a columnar storage format for `Apache Hadoop <https://hadoop.apache.org>`_.
 
 DSI Core
