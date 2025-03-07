@@ -1,8 +1,9 @@
 from dsi.core import Terminal
 
-terminal_find=Terminal(debug=0, backup_db = False, runTable=False)
+terminal_find = Terminal(debug=0, backup_db = False, runTable=False)
 
-terminal_find.load_module('backend','Sqlite','back-write', filename='data/data.db')
+# Assuming there is existing data in data.db (Run Example 2 to ingest data that can be found)
+terminal_find.load_module('backend','Sqlite','back-write', filename='data.db')
 
 ## TABLE match                      - return matching table data
 data = terminal_find.find_table("people")
