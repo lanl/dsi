@@ -19,7 +19,7 @@ def test_csv_plugin_type():
     
     #assert type(plug.output_collector) == OrderedDict
 
-def test_export_db_erd():
+def test_er_diagram():
     a=Terminal()
     a.load_module('plugin', 'Schema', 'reader', filename="examples/data/example_schema.json" , target_table_prefix = "student")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
@@ -32,4 +32,17 @@ def test_export_db_erd():
     
     pixel_mean = np.mean(er_image)
     os.remove("erd_test_output.png")
+    assert pixel_mean != 255 #check if image is all white pixels (no diagram generated)
+
+def test_table_plot():
+    a=Terminal()
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student_physics_plot")
+    a.transload()
+
+    plot_image = cv2.imread("student_physics_plot.png")
+    assert plot_image is not None #check if image generated at all
+    
+    pixel_mean = np.mean(plot_image)
+    os.remove("student_physics_plot.png")
     assert pixel_mean != 255 #check if image is all white pixels (no diagram generated)

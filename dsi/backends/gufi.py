@@ -15,7 +15,6 @@ class Gufi(Filesystem):
     '''
     GUFI Datastore
     '''
-
     prefix = ""
     index = ""
     dbfile = ""
@@ -23,22 +22,19 @@ class Gufi(Filesystem):
     column = ""
     isVerbose = False
 
-    """
-    prefix: prefix to GUFI commands
-    index: directory with GUFI indexes
-    dbfile: sqlite db file from DSI
-    table: table name from the DSI db we want to join on
-    column: column name from the DSI db to join on
-    """
-
     def __init__(self, prefix, index, dbfile, table, column, verbose=False):
         '''
-        prefix: prefix to GUFI commands
-        index: directory with GUFI indexes
-        dbfile: sqlite db file from DSI
-        table: table name from the DSI db we want to join on
-        column: column name from the DSI db to join on
-        verbose: print debugging statements or not
+        `prefix`: prefix to GUFI commands
+
+        `index`: directory with GUFI indexes
+
+        `dbfile`: sqlite db file from DSI
+
+        `table`: table name from the DSI db we want to join on
+
+        `column`: column name from the DSI db to join on
+
+        `verbose`: print debugging statements or not
         '''
 
         super().__init__(dbfile)
@@ -55,8 +51,12 @@ class Gufi(Filesystem):
 
         self.isVerbose = verbose
 
-    # Query GUFI and DSI db
+    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def get_artifacts(self, query):
+        return self.query_artifacts(query)
+    
+    # Query GUFI and DSI db
+    def query_artifacts(self, query):
         '''
         Retrieves GUFI's metadata joined with a dsi database
         query: an sql query into the dsi_entries table
@@ -68,7 +68,11 @@ class Gufi(Filesystem):
 
         return resout
 
+    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifacts(self, query):
+        return self.ingest_artifacts(query)
+    
+    def ingest_artifacts(self, query):
         pass
 
     # Runs the gufi query command

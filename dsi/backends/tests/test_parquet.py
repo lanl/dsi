@@ -11,19 +11,19 @@ def get_git_root(path):
     git_root = git_repo.git.rev_parse("--show-toplevel")
     return (git_root)
 
-def test_get_artifacts():
+def test_query_artifacts():
     a = Parquet(filename='/'.join([get_git_root('.'), 'dsi/data/wildfiredata.pq']))
-    b = a.get_artifacts()
+    b = a.query_artifacts()
     cnt = 0
     for key in b:
         cnt = cnt + 1
         assert 4 == len(b[key])
     assert 11 == cnt
 
-def test_inspect_artifact():
+def test_notebook():
     a = Parquet(filename='/'.join([get_git_root('.'), 'dsi/data/wildfiredata.pq']))
-    b = a.get_artifacts()
-    a.inspect_artifacts(b)
-    # No error on inspect_artifact return implies success
+    b = a.query_artifacts()
+    a.notebook(b)
+    # No error on notebook return implies success
     assert True
 

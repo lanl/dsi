@@ -26,10 +26,8 @@ if __name__ == "__main__":
     dbpath = 'pennant_' + test_name + '.db'
     output_csv = "pennant_read_query.csv"
 
-    #read in csv
     core = Terminal()
 
-    # using Wildfire reader instead of Csv, because it can be used for any post-process data that is not meant for in-situ analysis
     # This reader creates a manual simulation table where each row of pennant is its own simulation
     core.load_module('plugin', "Wildfire", "reader", filenames = csvpath, table_name = table_name, sim_table = True)
 
@@ -38,11 +36,9 @@ if __name__ == "__main__":
 
     #load data into sqlite db
     core.load_module('backend','Sqlite','back-write', filename=dbpath)
-    # using 'ingest' instead of 'put' but both do the same thing -- 'ingest' is new name that will replace 'put'
     core.artifact_handler(interaction_type='ingest')
 
     # update dsi abstraction using a query to the sqlite db
-    # using 'query' instead of 'get' but both do the same thing -- 'query' is new name that will replace 'get'
     query_data = core.artifact_handler(interaction_type='query', query = f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", dict_return = True)
     core.update_abstraction(table_name, query_data)
 

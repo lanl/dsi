@@ -71,8 +71,6 @@ if __name__ == "__main__":
 
     #load data to a sqlite database
     core.load_module('backend','Sqlite','back-write', filename=path_to_sqlite_db)
-    
-    # using 'ingest' instead of 'put' but both do the same thing -- 'ingest' is new name that will replace 'put'
     core.artifact_handler(interaction_type='ingest')
 
 
