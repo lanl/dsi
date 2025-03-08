@@ -1,0 +1,159 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Code Performance Analyzer
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  # push:
+  #   branches: [ "main" ]
+  # pull_request:
+  #   branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    # inputs:
+    #   hashes:
+    #     required: true
+    #     type: choice
+    #     description: Make a choice
+    #     options:
+    #     - foo
+    #     - bar
+    #     - baz
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+
+    outputs:
+      hashes: ${{ steps.hashes.outputs.hashes }}
+
+    steps:
+      - name: Define Hashes
+        id: hashes
+        run: |
+          echo 'hashes=["158e23d08f73d36f71e144851451955b3ae02dff", "89cc919b28f687a25d30b44ddf547201da930c14"]' >> "$GITHUB_OUTPUT"
+  
+  produce-performance-artifacts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    needs: define-matrix
+    strategy:
+      matrix:
+        hashes: ${{ fromJSON(needs.define-matrix.outputs.hashes) }}
+
+    steps:      
+      - uses: actions/checkout@v4
+        with:
+          repository: UK-MAC/CloverLeaf_ref
+          ref: ${{ matrix.hashes }}
+
+      - uses: fortran-lang/setup-fortran@v1.6.1
+
+      - name: Install OpenMPI
+        run: sudo apt install -y openmpi-bin libopenmpi-dev
+
+    # check all the requirements and their versions
+      - name: Check installed dependencies
+        run: |
+            gcc --version
+            gfortran --version
+            mpirun --version
+            lscpu | grep -E '^Thread|^Core|^Socket|^CPU\('
+
+      - name: Compile cloverleaf
+        run: |
+            make COMPILER=GNU
+    
+      - name: Run cloverleaf
+        run: |
+            mpirun -np 2 clover_leaf
+            mv clover.out clover_output_${{ matrix.hashes }}.out
+    
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+            name: clover_artifact_${{ matrix.hashes }}
+            path: clover_output_${{ matrix.hashes }}.out
+
+  consume-artifacts:
+    runs-on: macos-latest
+    needs:
+    - produce-performance-artifacts
+
+    steps:
+    - name: Download all workflow run artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: clover_artifact
+        pattern: clover_artifact_*
+        merge-multiple: true
+
+    - name: Check artifact files
+      run: |
+        ls -R clover_artifact
+        cd clover_artifact
+        tail -n 10 clover_output_*
+#   # This workflow contains a single job called "build"
+#   build:
+#     # The type of runner that the job will run on
+#     runs-on: macos-latest
+
+#     defaults:
+#       run:
+#         shell: bash -el {0}
+
+#     # Steps represent a sequence of tasks that will be executed as part of the job
+#     steps:
+#       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+#       - uses: actions/checkout@v4
+#         # with:
+#         #   repository: UK-MAC/CloverLeaf_ref
+#         #   ref: 0ddf495cf21cc59f84e274617522a1383e2c328c
+    
+#     #   - uses: actions/setup-python@v5
+#     #     with:
+#     #         python-version: '3.10'
+
+#     #   - name: Add conda to system path
+#     #     run: |
+#     #         # $CONDA is an environment variable pointing to the root of the miniconda directory
+#     #         echo $CONDA/bin >> $GITHUB_PATH
+
+      
+      
+    #   - uses: conda-incubator/setup-miniconda@v3
+    #     with:
+    #         channels: defaults,conda-forge,spyder-ide
+    #         activate-environment: cdsi
+    #         environment-file: examples/cloverleaf/environment.yml
+    #         auto-activate-base: false
+      
+#     #   - uses: s-weigand/setup-conda@v1.2.2
+      
+#     #   - name: Install dependencies
+#     #     run: |
+#     #         cd examples/cloverleaf
+#     #         conda env create --file environment.yml --name cdsi
+#     #         conda activate cdsi
+
+    #   # check all the requirements and their versions
+    #   - name: Check installed dependencies
+    #     run: |
+    #       python3 --version
+    #       gcc --version
+    #       conda --version
+    #       gfortran --version
+    #       conda info
+    #       conda list
+
+#       # Runs a set of commands using the runners shell
+#       - name: Run a multi-line script
+#         run: |
+#           echo Add other actions to build,
+#           echo test, and deploy your project.
+#           ls .
