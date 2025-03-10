@@ -8,6 +8,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 import warnings
+import sys
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -26,7 +27,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'TextFile', 'MetadataReader1', 'Wildfire']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
@@ -41,14 +42,13 @@ class Terminal():
 
         Optional flags can be set and defined:
 
-        `debug`: {0: off, 1: user debug log, 2: user + developer debug log}. 
-                      When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
-
+        `debug`: {0: off, 1: user debug log, 2: user + developer debug log} 
+            
+            - When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
         `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
         `runTable`: Undefined False as default. 
-                          When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. 
-                          Recommended for in-situ use-cases.
+        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -92,7 +92,9 @@ class Terminal():
 
         This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
         are supported, but this getter can be extended to support any new DSI module
-        types which are added. Note: self.VALID_MODULES refers to _DSI_ Modules
+        types which are added. 
+        
+        Note: self.VALID_MODULES refers to _DSI_ Modules
         however, DSI Modules are classes, hence the naming idiosynchrocies below.
         """
         # "DSI Modules" are Python Classes
@@ -155,11 +157,20 @@ class Terminal():
                     run_start = datetime.now()
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
-                    ingest_error = obj.add_rows()
-                    if ingest_error is not None:
+                    
+                    try:
+                        sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
+                        ingest_error = obj.add_rows()
+                        if ingest_error is not None:
+                            if self.debug_level != 0:
+                                self.logger.error(f"   {ingest_error[1]}")
+                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                        sys.settrace(None) # ends trace to prevent large overhead
+                    except:
                         if self.debug_level != 0:
-                            self.logger.error(f"   {ingest_error[1]}")
-                        raise ingest_error[0](ingest_error[1])
+                            self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
+                        raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
+                    
                     for table_name, table_metadata in obj.output_collector.items():
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
@@ -217,7 +228,8 @@ class Terminal():
 
     def unload_module(self, mod_type, mod_name, mod_function):
         """
-        Unloads a specific DSI module from the active_modules collection. 
+        Unloads a specific DSI module from the active_modules collection.
+
         Mostly to be used for unloading backends, as plugin readers and writers are auto unloaded elsewhere.
         """
         if self.debug_level != 0:
@@ -259,27 +271,21 @@ class Terminal():
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
-        Adds an external, meaning not from the DSI repo, Python module to the module_collection.
-
+        Adds an external, meaning not from the DSI repo, Python module to the module_collection. 
         Afterwards, load_module can be used to load a DSI module from the added Python module.
+
         Note: mod_type is needed because each Python module only implements plugins or backends.
 
-        For example,
-
-        term = Terminal()
-        term.add_external_python_module('plugin', 'my_python_file',
-                                        '/the/path/to/my_python_file.py')
-
-        term.load_module('plugin', 'MyPlugin', 'reader')
-
-        term.list_loaded_modules() # includes MyPlugin
+        Check Example 7 in Core:Examples on GitHub Docs to see how to use this function.
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
         self.module_collection[mod_type][mod_name] = mod
+        self.VALID_MODULES.append(mod_name)
 
     def list_loaded_modules(self):
         """
         List DSI modules which have already been loaded.
+
         These Plugins and Backends are active or ready to execute a post-processing task.
         """
         return (self.active_modules)
@@ -289,6 +295,7 @@ class Terminal():
         Transloading signals to the DSI Core Terminal that Plugin set up is complete.
 
         Activates all loaded plugin writers by generating all their various output files such as an ER Diagram or an image of a table plot
+
         All loaded plugin writers will be unloaded after activation, so there is no need to separately call unload_module() for them
         """
         used_writers = []
@@ -296,14 +303,21 @@ class Terminal():
             self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
-            writer_error = obj.get_rows(self.active_metadata, **kwargs)
-            if writer_error is not None:
-                if writer_error[0] == "Warning":
-                    warnings.warn(writer_error[1])
-                else:
-                    if self.debug_level != 0:
-                        self.logger.error(writer_error[1])
-                    raise writer_error[0](writer_error[1])
+            try:
+                sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
+                writer_error = obj.get_rows(self.active_metadata, **kwargs)
+                if writer_error is not None:
+                    if writer_error[0] == "Warning":
+                        warnings.warn(writer_error[1])
+                    else:
+                        if self.debug_level != 0:
+                            self.logger.error(writer_error[1])
+                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+                sys.settrace(None) # ends trace to prevent large overhead
+            except:
+                if self.debug_level != 0: 
+                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
+                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -319,7 +333,9 @@ class Terminal():
     def close(self):
         """
         Immediately closes all active modules: backends, plugin writers, plugin readers
+
         Clears out the current DSI abstraction
+
         NOTE - This step cannot be undone.
         """
         print("Closing the abstraction layer, and all active plugins/backends")
@@ -347,11 +363,17 @@ class Terminal():
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
-            - interaction_type = 'put' or 'ingest', ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored)
+        
+        `interaction_type`:
+
+            - 'ingest' or 'put': ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored
+
                 - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
-            - interaction_type = 'get' or 'query', retrieves data from first loaded backend based on a specified 'query'
-            - interaction_type = 'inspect' or 'notebook', generates an interactive Python notebook with all data from first loaded backend
-            - interaction_type = 'read' or 'process', overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+            - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
+            - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
+            - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+
+        `query`: default None. Specify if *interaction_type* = 'query' and query_artifact function in backend file requires an input
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -362,7 +384,7 @@ class Terminal():
         
         operation_success = False
         backread_active = False
-        if interaction_type in ['put', 'ingest']:
+        if interaction_type in ['ingest', 'put']:
             for obj in self.active_modules['back-write']:
                 if self.debug_level != 0:
                     self.logger.info("-------------------------------------")
@@ -380,56 +402,64 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
+                sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
                 if interaction_type == "ingest":
                     errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 elif interaction_type == "put":
                     errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
                 if errorMessage is not None:
                     if self.debug_level != 0:
-                        self.logger.error(f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
-                    raise errorMessage[0](f"Error inserting data to the {obj.__class__.__name__} backend: {errorMessage[1]}")
+                        self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                    raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
-        if interaction_type in ['put', 'ingest'] and len(self.active_modules['back-read']) > 0:
+        if interaction_type in ['ingest', 'put'] and len(self.active_modules['back-read']) > 0:
             backread_active = True
 
-        get_artifact_data = None
+        query_data = None
         first_backend = self.loaded_backends[0]
-        if interaction_type not in ['put', 'ingest', "read", "process"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', 'put', "processs", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
-        if interaction_type in ['get', 'query']:
-            if "query" in first_backend.get_artifacts.__code__.co_varnames: #need to change this to query_artifacts eventually
+        if interaction_type in ['query', 'get']:
+            if "query" in first_backend.query_artifacts.__code__.co_varnames:
                 self.logger.info(f"Query to get data: {query}")
                 kwargs['query'] = query
+
+            sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
             if interaction_type == "get":
-                get_artifact_data = first_backend.get_artifacts(**kwargs)
+                query_data = first_backend.get_artifacts(**kwargs)
             elif interaction_type == "query":
-                get_artifact_data = first_backend.query_artifacts(**kwargs)
-            if isinstance(get_artifact_data, tuple):
+                query_data = first_backend.query_artifacts(**kwargs)
+            if isinstance(query_data, tuple):
                 if self.debug_level != 0:
-                    self.logger.error(get_artifact_data[1])
-                raise get_artifact_data[0](get_artifact_data[1])
+                    self.logger.error(query_data[1])
+                raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
+            sys.settrace(None) # ends trace to prevent large overhead
             operation_success = True
 
-        elif interaction_type in ['inspect', 'notebook']:
+        elif interaction_type in ['notebook', 'inspect']:
             parent_class = first_backend.__class__.__bases__[0].__name__
             if parent_class == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
-                if interaction_type == "inspect":
-                    first_backend.inspect_artifacts(**kwargs)
-                elif interaction_type == "notebook":
-                    first_backend.notebook(**kwargs)
+                try:
+                    if interaction_type == "inspect":
+                        first_backend.inspect_artifacts(**kwargs)
+                    elif interaction_type == "notebook":
+                        first_backend.notebook(**kwargs)
+                except:
+                    raise ValueError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_class == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
-                    self.logger.error("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
-                raise ValueError("Error in inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                    self.logger.error("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
             operation_success = True
 
-        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) > 0:
+        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) > 0:
             first_backread = self.active_modules['back-read'][0]
             if self.debug_level != 0:
                 self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
@@ -438,29 +468,40 @@ class Terminal():
             elif interaction_type == "read":
                 self.active_metadata = first_backread.read_to_artifact()
             operation_success = True
-        elif interaction_type in ["read", "process"] and len(self.active_modules['back-read']) == 0:
+        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) == 0:
             backread_active = True
 
         if operation_success:
             end = datetime.now()
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
-            if interaction_type in ['get', 'query'] and get_artifact_data is not None:
-                return get_artifact_data
+            if interaction_type in ['query', 'get'] and query_data is not None:
+                return query_data
         else:
             not_run_msg = None
             if backread_active:
-                not_run_msg = 'Remember that back-WRITE backends cannot read/process data and back-READ backends cannot put/ingest'
+                not_run_msg = 'Remember that back-WRITE backends cannot process/read data and back-READ backends cannot ingest/put'
             else:
-                not_run_msg = 'Is your artifact interaction implemented in your backend?'
+                not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
     
+    # Internal function used to get line numbers from return statements - should not be called by users
+    def trace_function(self, frame, event, arg):
+        global return_line_number
+        global original_file
+        if event == "return":
+            return_line_number = frame.f_lineno  # Get line number
+            original_file = frame.f_code.co_filename # Get file name
+        return self.trace_function
+    
     def find(self, query_object):
         """
         Find all function that searches for all instances of 'query_object' in first loaded backend. Searches among all tables/column/cells
-        `return`: List of backend-specific objects that each contain details of a match for 'query_object'. Can be tables/column/cells
+
+        `return`: List of backend-specific objects that each contain details of a match for 'query_object'
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -471,7 +512,9 @@ class Terminal():
     def find_table(self, query_object):
         """
         Find table function that searches for all tables whose names matches the 'query_object' in first loaded backend.
+
         `return`: List of backend-specific objects that each contain all data from a table matching 'query_object'.
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -483,9 +526,12 @@ class Terminal():
         """
         Find column function that searches for all columns whose names matches the 'query_object' in first loaded backend.
 
-        `range`: default False. If True, then data-range of all numerical columns which match 'query_object' is included in retrun
-                                If False, then data for each column that matches 'query_object' is included in retrun
+        `range`: default False. 
+
+            - If True, then data-range of all numerical columns which match 'query_object' is included in return
+            - If False, then data for each column that matches 'query_object' is included in return
         `return`: List of backend-specific objects that each contain data/numerical range about a column matching 'query_object'.
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -497,9 +543,12 @@ class Terminal():
         """
         Find cell function that searches for all cells which match the 'query_object' in first loaded backend.
 
-        `row`: default False. If True, then full row of data where a cell matches 'query_object' is included in retrun
-                                If False, then the value of the cell that matches 'query_object' is included in retrun
-        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'.
+        `row`: default False.
+
+            - If True, then full row of data where a cell matches 'query_object' is included in return
+            - If False, then the value of the cell that matches 'query_object' is included in return
+        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'
+
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
@@ -509,8 +558,9 @@ class Terminal():
 
     def find_helper(self, query_object, return_object, start, find_type):
         """
+        **Users should not call this externally, only to be used by internal core functions.**
+        
         Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
-        Users should not call this externally, only to be used by internal core functions.
         """
         if isinstance(query_object, str): 
             print(f"Finding all {find_type}matches of '{query_object}' in first backend loaded")
@@ -533,9 +583,11 @@ class Terminal():
     def get_current_abstraction(self, table_name = None):
         """
         Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict
+
         The inner table Ordered Dict has column names as keys and list of column data as the values.
 
         `table_name`: default None. If specified, the return will only be that table's Ordered Dict, not a nested one.
+
         `return`: nested Ordered Dict if table_name is None. single Ordered Dict if table_name is not None
         """
         if self.debug_level != 0:
@@ -562,7 +614,9 @@ class Terminal():
         Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
 
         `table_name`: name of table that must be in the current abstraction
+
         `table_data`: table data that must be stored as an Ordered Dict where column names are keys and column data is a list stored as values.
+        
         `return`: None
         """
         if self.debug_level != 0:

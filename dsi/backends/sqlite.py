@@ -42,7 +42,7 @@ class ValueObject:
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
     """
-    SQLite Filesystem Backend to which a user can ingest/read data, generate a Jupyter notebook, and find all occurences of a search term
+    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find all occurences of a search term
     """
     runTable = False
 
@@ -57,8 +57,10 @@ class Sqlite(Filesystem):
 
     def check_type(self, input_list):
         """
-        Evaluates a list and returns what the predicted compatible SQLite Type is
+        Evaluates a list and returns the predicted compatible SQLite Type
+
         `input_list`: list of values to evaluate
+
         `return`: string description of the list's SQLite data type
         """
         for item in input_list:
@@ -69,15 +71,25 @@ class Sqlite(Filesystem):
             elif isinstance(item, str):
                 return " VARCHAR"
         return ""
-
+    
+    # OLD NAME OF ingest_table_helper. TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
+        self.ingest_table_helper(types, foreign_query, isVerbose)
+        
+    def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
-        Helper function to create SQLite table based on the passed in schema.
+        Helper function to create SQLite table based on the passed in schema. Used within ingest_artifact()
 
-        `types`: DataType derived class that defines the string name, properties
-                 (dictionary of table names and table data), and units for each column in the schema.
+        Users DO NOT need to call this function or interact with it. Only use 'ingest' interaction_type when calling core.artifact_handler()
+
+        `types`: DataType derived class that defines the string name, 
+        properties (dictionary of table names and table data), 
+        and units for each column in the schema.
+
         `foreign_query`: defaut is None. It is a SQLite string detailing the foreign keys in this table
+
         `isVerbose`: default is False. Flag to print all create table SQLite statements
+
         `return`: none
         """
         if self.cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{types.name}';").fetchone():
@@ -105,18 +117,21 @@ class Sqlite(Filesystem):
             self.cur.execute(str_query)
             self.types = types
 
-    #newer name for put_artifacts. eventually delete put_artifacts
-    def ingest_artifacts(self, collection, isVerbose=False):
-        return self.put_artifacts(collection, isVerbose)
-
+    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifacts(self, collection, isVerbose=False):
+        return self.ingest_artifacts(collection, isVerbose)
+    
+    def ingest_artifacts(self, collection, isVerbose=False):    
         """
-        Primary function to insert a collection of tables into the defined SQLite database.
+        Primary function to ingest a collection of tables into the defined SQLite database.
         Creates the auto runTable and dsi_units tables in SQLite if needed as well.
-        Can only be called if the SQLite database is a BACK-WRITE backend (check core.py for distinction)
+
+        Can only be called if a SQLite database is loaded as a BACK-WRITE backend (check core.py for distinction)
 
         `collection`: A Python Collection of several tables and their data structured as a nested Ordered Dictionary.
+
         `isVerbose`: default is False. Flag to print all insert table SQLite statements
+
         `return`: None when stable ingesting. When errors occur, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
         """
         artifacts = collection
@@ -154,7 +169,9 @@ class Sqlite(Filesystem):
                 else:
                     types.unit_keys.append(key + self.check_type(tableData[key]))
             
+            # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
             self.put_artifact_type(types, foreign_query)
+            # self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -201,23 +218,27 @@ class Sqlite(Filesystem):
             self.con.rollback()
             return (sqlite3.Error, e)
 
-    #newer name for get_artifacts. eventually delete get_artifacts
-    def query_artifacts(self, query, isVerbose=False, dict_return = False):
-        return self.get_artifacts(query, isVerbose, dict_return)
-    
+    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def get_artifacts(self, query, isVerbose=False, dict_return = False):
+        return self.query_artifacts(query, isVerbose, dict_return)
+    
+    def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
         Function that returns data from a SQLite database based on a specified SQLite query.
         Data returned as either a list of rows from the database, or an Ordered Dictionary of data from one table.
 
         `query`: Must be a SELECT or PRAGMA query. If dict_return is True, then this can only be a simple query on one table, NO joins.
-                 Query can also create new aggregate columns such as COUNT to include in the result.
+        Query can also create new aggregate columns such as COUNT to include in the result.
+
         `isVerbose`: default is False. Flag to print all insert table SQLite statements
+
         `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from a specified table.
         
-        `return`: When 'query' is of correct format and dict_return = False, returns a list of database rows
-                  When 'query' is of correct format and dict_return = True, returns an Ordered Dictionary for the table with data from the query result
-                  When 'query' is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+        `return`: 
+
+            - When `query` is of correct format and dict_return = False, returns a list of database rows
+            - When `query` is of correct format and dict_return = True, returns an Ordered Dictionary for the table with data from the query result
+            - When `query` is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
         """
         if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
@@ -225,15 +246,15 @@ class Sqlite(Filesystem):
                 if isVerbose:
                     print(data)
             except:
-                return (ValueError, "Error in get_artifacts/process_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                return (ValueError, "Error in query_artifacts/get_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            return (ValueError, "Error in get_artifacts/process_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
             if len(tables) > 1:
-                return (ValueError, "Error in get_artifacts/process_artifacts handler: Can only return ordered dictionary if query with one table")
+                return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only return ordered dictionary if query with one table")
             
             queryDict = OrderedDict()
             for row in data:
@@ -245,24 +266,31 @@ class Sqlite(Filesystem):
         else:
             return data
 
-    #newer name for inspect_artifacts, eventually delete inspect_artifacts
-    def notebook(self, interactive=False):
-        return self.inspect_artifacts(interactive)
-    
+    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def inspect_artifacts(self, interactive=False):
+        return self.notebook(interactive)
+    
+    def notebook(self, interactive=False):
         """
         Generates a Jupyter notebook displaying all the data in the specified SQLite database.
+
         To account for multiple tables, the database is stored as a list of dataframes, where each table is a dataframe.
-        If database has table relations, it is stored as a separate dataframe
+
+        If database has table relations, it is stored as a separate dataframe. 
         If database has a units table, each table's units are stored in its corresponding dataframe 'attrs' variable
 
         `interactive`: default is False. When set to True, creates ipnyb notebook, otherwise just creates html file.
+
         `return`: None
         """
         import nbconvert as nbc
         import nbformat as nbf
         dsi_relations, dsi_units = None, None
+
+        # DEPRECATE WITH NEWER NAME process_artifacts() IN FUTURE DSI RELEASE
         collection = self.read_to_artifact(only_units_relations=True)
+        # collection = self.process_artifacts(only_units_relations=True)
+        
         if "dsi_relations" in collection.keys():
             dsi_relations = dict(collection["dsi_relations"])
         if "dsi_units" in collection.keys():
@@ -358,19 +386,21 @@ class Sqlite(Filesystem):
             with open(html_filename, 'w', encoding='utf-8') as fh:
                 fh.write(html_content)
 
-    # SQLITE READER FUNCTION
-    #newer name for read_to_artifact, eventually delete read_to_artifact
-    def process_artifacts(self, only_units_relations = False, isVerbose = False):
-        return self.read_to_artifact(only_units_relations, isVerbose)
-    
+    # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def read_to_artifact(self, only_units_relations = False, isVerbose = False):
+        return self.process_artifacts(only_units_relations, isVerbose)
+    
+    def process_artifacts(self, only_units_relations = False, isVerbose = False):
         """
         Reads in data from the SQLite database into a nested Ordered Dictionary, where keys are table names and values are Ordered Dictionary of table data.
-        If there are PK/FK relations in the database it is stored in a table called dsi_relations.
+        If there are PK/FK relations in a database it is stored in a table called dsi_relations.
+
         Can only be called if the SQLite database is a BACK-READ backend (check core.py for distinction)
 
-        `only_units_relations`: default is False. Used by another internal sqlite.py function. USERS CAN IGNORE THIS FLAG
+        `only_units_relations`: default is False. Used by another internal sqlite.py function. USERS SHOULD IGNORE THIS FLAG
+
         `isVerbose`: default is False. When set to True, prints all SQLite queries to select data and store in abstraction
+
         `return`: Nested Ordered Dictionary of all data from the SQLite database
         
         """
@@ -382,7 +412,7 @@ class Sqlite(Filesystem):
         for item in tableList:
             tableName = item[0]
             if tableName == "dsi_units":
-                artifact["dsi_units"] = self.read_units_helper()
+                artifact["dsi_units"] = self.process_units_helper()
                 continue
             if tableName == "sqlite_sequence":
                 continue
@@ -421,11 +451,13 @@ class Sqlite(Filesystem):
 
         return artifact
       
-    def read_units_helper(self):
+    def process_units_helper(self):
         """
-        Helper function to create the SQLite database's units table as an Ordered Dictionary
+        Helper function to create the SQLite database's units table as an Ordered Dictionary.
         Only called if dsi_units table exists in the database.
-        DSI Users should not call this function, only specify a 'read' interaction when calling the core artifact handler.
+
+        DSI Users should not call this function, only specify a 'process' interaction when calling core artifact handler.
+
         `return`: units table as an Ordered Dictionary
         """
         unitsDict = OrderedDict()
@@ -442,10 +474,12 @@ class Sqlite(Filesystem):
         Function that finds all instances of a query object in a SQLite database. 
         This includes any partial hits if query_object is part of a table/col/cell
         
-        `query_object`: Object to find in this database. Can be of any type (string, float, int).   
+        `query_object`: Object to find in this database. Can be of any type (string, float, int).
+
         `return`: List of ValueObjects if there is a match. Else returns tuple of empty ValueObject() and an error message.
+
             - Note: Return list can have ValueObjects with different structure due to table/column/cell matches having different value variables
-            - refer to other find functions (table, column and cell) to understand each one's ValueObject structure
+            - Refer to other find functions (table, column and cell) to understand each one's ValueObject structure
         """
         table_match = self.find_table(query_object)
         col_match = self.find_column(query_object)
@@ -468,13 +502,15 @@ class Sqlite(Filesystem):
         This includes any partial hits if the query_object is part of a table name
 
         `query_object`: Object to find in all table names. HAS TO BE A STRING
+
         `return`: List of ValueObjects if there is a match. 
-                  Structure of ValueObjects for this function
-                    - t_name:   string of table name
-                    - c_name:   list of all columns in matching table
-                    - value:    table's data as a list of lists (each row is a list)
-                    - row_num:  None
-                    - type:     'table'
+
+        Structure of ValueObjects for this function:
+            - t_name:   string of table name
+            - c_name:   list of all columns in matching table
+            - value:    table's data as a list of lists (each row is a list)
+            - row_num:  None
+            - type:     'table'
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         tableList = [table[0] for table in tableList]
@@ -506,16 +542,24 @@ class Sqlite(Filesystem):
         This includes any partial hits if the query_object is part of a column name
 
         `query_object`: Object to find in all column names. HAS TO BE A STRING
+
         `range`: default is False. Flag that returns min/max of a numerical column that matches the query object
+
         `return`: List of ValueObjects if there is a match. 
-                  Structure of ValueObjects for this function
-                    - t_name:   string of table name
-                    - c_name:   list of one, which is the name of the matching column
-                    - value:    range = True, [min, max] of the column
-                                range = False, column data as a list
-                    - row_num:  None
-                    - type:     range = True, 'range'
-                                range = False, 'column'
+        
+        **Structure of ValueObjects for this function:**
+
+            - t_name:   string of table name
+            - c_name:   list of one, which is the name of the matching column
+            - value:
+
+                - range = True, [min, max] of the column
+                - range = False, column data as a list
+            - row_num:  None
+            - type:
+            
+                - range = True, 'range'
+                - range = False, 'column'
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         tableList = [table[0] for table in tableList]
@@ -553,21 +597,30 @@ class Sqlite(Filesystem):
     def find_cell(self, query_object, row = False):
         """
         Function that finds all cells that match the query object. 
-        This includes any partial hits if the query_object is part of a cell
+        This includes any partial hits if the query_object is part of a cell value
 
         `query_object`: Object to find in all cells. Can be of any type (string, float, int).
+
         `row`: default is False. Used for a row search, if want to return whole row where there is a match between a cell and query object
-        `return`: List of ValueObjects if there is a match. 
-                  Structure of ValueObjects for this function
-                    - t_name:   string of table name
-                    - c_name:   list of column names. 
-                                    row = True, list is all columns in this table
-                                    row = False, list is one item -- column of cell that matched query object
-                    - value:    row = True, list of whole row where cell matches query object
-                                row = False, value of cell that matched query object
-                    - row_num:  row number where cell matched
-                    - type:     row = True, 'row'
-                                row = False, 'cell'
+
+        `return`: List of ValueObjects if there is a match.
+
+        **Structure of ValueObjects for this function:**
+
+            - t_name:   string of table name
+            - c_name:   list of column names. 
+
+                - row = True, list is all columns in this table
+                - row = False, list is one item -- column of cell that matched query object
+            - value:
+
+                - row = True, list of whole row where cell matches query object
+                - row = False, value of cell that matched query object
+            - row_num:  row number where cell matched
+            - type:
+
+                - row = True, 'row'
+                - row = False, 'cell'
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         tableList = [table[0] for table in tableList]
@@ -620,6 +673,7 @@ class Sqlite(Filesystem):
     def close(self):
         """
         Closes the SQLite database's connection.
+
         `return`: None
         """
         self.con.close()
@@ -627,10 +681,12 @@ class Sqlite(Filesystem):
     # OLD FUNCTION TO DEPRECATE
     def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
         """
+        DSI 1.0 FUNCTIONALITY - DEPRECATING SOON, DO NOT USE
+        
         Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
 
         `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
-                     filled with rows to insert.
+        filled with rows to insert.
 
         `tableName`: A passthrough to define a table and set the name of a table
 

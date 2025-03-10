@@ -100,11 +100,17 @@ class SystemKernel(Environment):
     Plugin for reading environment provenance data.
 
     An environment provenance plugin which does the following:
+
     1. System Kernel Version
+
     2. Kernel compile-time config
+
     3. Kernel boot config
+
     4. Kernel runtime config
+
     5. Kernel modules and module config
+    
     6. Container information, if containerized
     """
 

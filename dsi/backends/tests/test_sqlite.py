@@ -4,14 +4,6 @@ from collections import OrderedDict
 from dsi.backends.sqlite import Sqlite, DataType
 import os
 
-isVerbose = True
-
-
-# def get_git_root(path):
-#     git_repo = git.Repo(path, search_parent_directories=True)
-#     git_root = git_repo.git.rev_parse("--show-toplevel")
-#     return (git_root)
-
 def test_sql_artifact():
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
@@ -19,22 +11,13 @@ def test_sql_artifact():
     # No error implies success
     assert True
 
-# def test_wildfire_data_csv_artifact():
-#     csvpath = '/'.join([get_git_root('.'), 'examples/data/wildfiredata.csv'])
-#     dbpath = "wildfire.db"
-#     store = Sqlite(dbpath)
-#     store.put_artifacts_csv(csvpath, "simulation", isVerbose=isVerbose)
-#     store.close()
-#     # No error implies success
-#     assert True
-
-def test_artifact_put():
+def test_artifact_ingest():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
     # No error implies success
     assert True
@@ -48,37 +31,37 @@ def test_wildfiredata_artifact_put_t():
    # No error implies success
    assert True
 
-def test_artifact_get():
+def test_artifact_query():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
-    query_data = store.get_artifacts(query = "SELECT * FROM wildfire;")
+    store.ingest_artifacts(valid_middleware_datastructure)
+    query_data = store.query_artifacts(query = "SELECT * FROM wildfire;")
     store.close()
     correct_output = [(1, 3), (2, 2), (3, 1)]
     assert query_data == correct_output
 
-def test_artifact_inspect():
+def test_artifact_notebook():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
-    store.inspect_artifacts()
+    store.ingest_artifacts(valid_middleware_datastructure)
+    store.notebook()
     store.close()
     assert True
 
-def test_artifact_read():
+def test_artifact_process():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
-    artifact = store.read_to_artifact()
+    store.ingest_artifacts(valid_middleware_datastructure)
+    artifact = store.process_artifacts()
     store.close()
     assert artifact == valid_middleware_datastructure
 
@@ -88,7 +71,7 @@ def test_find():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
 
     find_data = store.find("f")
     assert len(find_data) == 3
@@ -114,7 +97,7 @@ def test_find_table():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
 
     table_data = store.find_table("f")
     assert table_data[0].t_name == "wildfire"
@@ -128,7 +111,7 @@ def test_find_column():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
 
     col_data = store.find_column("f")
     assert col_data[0].t_name == "wildfire"
@@ -143,7 +126,7 @@ def test_find_range():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
 
     range_data = store.find_column("f", range=True)
     assert range_data[0].t_name == "wildfire"
@@ -158,7 +141,7 @@ def test_find_cell():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
 
     cell_data = store.find_cell("f")
     assert cell_data[0].t_name == "wildfire"
@@ -174,7 +157,7 @@ def test_find_row():
     if os.path.exists(dbpath):
         os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts(valid_middleware_datastructure)
+    store.ingest_artifacts(valid_middleware_datastructure)
 
     row_data = store.find_cell("f", row = True)
     assert row_data[0].t_name == "wildfire"

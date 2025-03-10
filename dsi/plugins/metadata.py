@@ -29,9 +29,11 @@ class StructuredMetadata(Plugin):
         """
         Initializes columns in the output_collector and table_cnt.
         Useful in a plugin's pack_header method.
+
         DO NOT USE THIS WITH SET_SCHEMA_2()
 
         `table_data`: 
+
             - for ingested data with multiple tables, table_data is list of tuples where each tuple is structured as (table name, column name list)
             - for data without multiple tables, table_data is just a list of column names
         """
@@ -66,9 +68,12 @@ class StructuredMetadata(Plugin):
     def set_schema_2(self, collection, validation_model=None) -> None:
         """
         Faster version (time and space) of updating output_collector by directly setting 'collection' to it, if collection is an Ordered Dict
-        DO NOT USE THIS WITH SET_SCHEMA(), ADD_TO_OUTPUT() OR SCHEMA_IS_SET()
+
+        DO NOT USE THIS WITH SET_SCHEMA(), ADD_TO_OUTPUT(), OR SCHEMA_IS_SET()
+
         `collection`: data passed in from a plugin as an Ordered Dict. 
-                      If only one table of data in there, it is nested in another Ordered Dict with table name as the plugin class name
+
+            - If only one table of data in there, it is nested in another Ordered Dict with table name as the plugin class name
         """
         # Finds file_reader class that called set_schema and assigns that as table_name for this data
         if not isinstance(collection[next(iter(collection))], OrderedDict):
@@ -84,9 +89,11 @@ class StructuredMetadata(Plugin):
         """
         Adds a row of data to the output_collector and guarantees good structure.
         Useful in a plugin's add_rows method.
+
         DO NOT USE THIS WITH SET_SCHEMA_2()
 
         `row`: list of row of data
+
         `tableName`: default None. Specified name of table to ingest row into.
         """
         #POTENTIALLY REFACTOR AND AVOID FOR LOOP OF INGESTING DATA ROW BY ROW - MAYBE INGEST WHOLE DATA
@@ -114,6 +121,7 @@ class StructuredMetadata(Plugin):
     def schema_is_set(self) -> bool:
         """ 
         Helper method to see if the schema has been set 
+
         DO NOT USE THIS WITH SET_SCHEMA_2()
         """
         return self.table_cnt is not None
