@@ -1,0 +1,202 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; DSI 1.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=56dcb7b8"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick Start: Installation" href="installation.html" />
+    <link rel="prev" title="The Data Science Infrastructure Project (DSI)" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#implementation-overview">Implementation Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#plugin-abstract-classes">Plugin Abstract Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#backend-abstract-classes">Backend Abstract Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi-core">DSI Core</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing_readers.html">Making a Reader for Your Application</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h1>
+<p>The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.
+DSI capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.</p>
+<dl class="simple">
+<dt>DSI infrastructure is designed to be flexible and with these considerations in mind:</dt><dd><ul class="simple">
+<li><p>Data management is subject to strict, POSIX-enforced, file security.</p></li>
+<li><p>DSI capabilities support a wide range of common metadata queries.</p></li>
+<li><p>DSI interfaces with multiple database technologies and archival storage options.</p></li>
+<li><p>Query-driven data movement is supported and is transparent to the user.</p></li>
+<li><p>The DSI API can be used to develop user-specific workflows.</p></li>
+</ul>
+</dd>
+</dl>
+<figure class="align-center" id="id1">
+<a class="with-shadow reference internal image-reference" href="_images/data_lifecycle.png"><img alt="Figure depicting the data life cycle" class="with-shadow" src="_images/data_lifecycle.png" style="width: 305.0px; height: 315.0px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">A depiction of data life cycle can be seen here. The DSI API supports the user to manage the life cycle aspects of their data.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>DSI system design has been driven by specific use cases, both AI/ML and more generic usage.
+These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities.
+DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.  The DSI API is Python-based.</p>
+<section id="implementation-overview">
+<h2>Implementation Overview<a class="headerlink" href="#implementation-overview" title="Link to this heading"></a></h2>
+<p>The DSI API is broken into three main categories:</p>
+<ul class="simple">
+<li><p>Plugins: these are frontend capabilities that will be commonly used by the generic DSI user.  These include readers and writers.</p></li>
+<li><p>Backends: these are used to interact with storage devices and other ways of moving data.</p></li>
+<li><p>DSI Core: the <em>middleware</em> that contains the basic functionality to use the DSI API.</p></li>
+</ul>
+<section id="plugin-abstract-classes">
+<h3>Plugin Abstract Classes<a class="headerlink" href="#plugin-abstract-classes" title="Link to this heading"></a></h3>
+<p>Plugins transform an arbitrary data source into a format that is compatible with the DSI core.
+The parsed and queryable attributes of the data are called <em>metadata</em> – data about the data. Metadata share the same security profile as the source data.</p>
+<p>Plugins can operate as data readers or data writers.
+A simple data reader might parse an application’s output file and place it into a core-compatible data structure such as Python built-ins and members of the popular Python <code class="docutils literal notranslate"><span class="pre">collection</span></code> module.
+A simple data writer might execute an application to supplement existing data and queryable metadata, e.g., adding locations of outputs data or plots after running an analysis workflow.</p>
+<p>Plugins are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.</p>
+<p>Currently, DSI has the following readers:</p>
+<figure class="align-default" id="id2">
+<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current plugin class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 845.5999999999999px; height: 242.89999999999998px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Figure depicting the current DSI plugin class hierarchy.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="backend-abstract-classes">
+<h3>Backend Abstract Classes<a class="headerlink" href="#backend-abstract-classes" title="Link to this heading"></a></h3>
+<p>Backends are an interface between the core and a storage medium.
+Backends are designed to support a user-needed functionality.
+Given a set of user metadata captured by a DSI frontend, a typical functionality needed by DSI users is to query that metadata by SQL query.
+Because the files associated with the queryable metadata may be spread across filesystems and security domains,
+a supporting backend is required to assemble query results and present them to the DSI core for transformation and return.</p>
+<figure class="align-center" id="id3">
+<a class="with-shadow reference internal image-reference" href="_images/user_story.png"><img alt="This figure depicts a user asking a typical query on the user's metadata" class="with-shadow" src="_images/user_story.png" style="width: 494.0px; height: 373.0px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">In this typical <strong>user story</strong>, the user has metadata about their data stored in DSI storage of some type.
+The user needs to extract all files with the variable <strong>foo</strong> above a specific threshold.
+DSI backends query the DSI metadata store to locate and return all such files.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Current DSI backends include:</p>
+<ul class="simple">
+<li><p>SQLite: Python based SQL database and backend; the default DSI API backend.</p></li>
+<li><p>GUFI: the <a class="reference external" href="https://github.com/mar-file-system/GUFI">Grand Unified File Index system</a> ; developed at LANL.
+GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.</p></li>
+<li><p>Parquet: a columnar storage format for <a class="reference external" href="https://hadoop.apache.org">Apache Hadoop</a>.</p></li>
+</ul>
+</section>
+<section id="dsi-core">
+<h3>DSI Core<a class="headerlink" href="#dsi-core" title="Link to this heading"></a></h3>
+<p>DSI basic functionality is contained within the middleware known as the <em>core</em>.
+The DSI core is focused on delivering user-queries on unified metadata which can be distributed across many files and security domains.
+DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions. The DSI core is a home for DSI Plugins and an interface for DSI Backends.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="The Data Science Infrastructure Project (DSI)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="installation.html" class="btn btn-neutral float-right" title="Quick Start: Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
