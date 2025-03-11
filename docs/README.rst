@@ -31,17 +31,17 @@ Note that if graphviz does not install, you may need to install via homebrew or 
 
 to build the documents.  When complete, push the changes to the repo.
 
-5. Then trigger the changes to the gh-pages via:
+5. Then trigger the changes to the gh-pages which updates the official documentation on Github:
 
 .. code-block:: unixconfig
 
    make gh-pages
 
-6. And update the official documentation on Github (this may take a few minutes to propogate):
+.. 6. And update the official documentation on Github (this may take a few minutes to propogate):
 
-.. code-block:: unixconfig
+.. .. code-block:: unixconfig
 
-   make publish
+..    make publish
 
 .. _label_virtual:
 

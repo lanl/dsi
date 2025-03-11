@@ -66,7 +66,7 @@ To run this example, load dsi and run:
 This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. 
 This cdb folder is called a `Cinema`_ database (CDB). 
 Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.  
-A Cinema database is comprised of a CSV file where each row of the table is a data element (a run or ensemble member of a simulation or experiment, for example) and each column is a property of the data element. 
+A Cinema database is comprised of a CSV file where each row of the table is a data element (ex: run or ensemble member of a simulation) and each column is a property of the data element. 
 Any column name that starts with 'FILE' is a path to a file associated with the data element.  
 This could be an image, a plot, a simulation mesh or other data artifact.
 
@@ -119,3 +119,25 @@ To open a pycinema viewer, first install pycinema and then run the example scrip
 .. _PENNANT: https://github.com/lanl/PENNANT
 .. _Cinema: https://github.com/cinemascience
 .. _PyCinema: https://github.com/cinemascience/pycinema
+
+Jupyter Notebook
+----------------
+
+This example displays an example workflow for a user to read data into DSI, ingest it into a backend and then view the data interactively with a Jupyter notebook.
+
+``examples/core/jupyter_example.py``:
+
+.. literalinclude:: ../examples/core/jupyter_example.py
+
+The above workflow generates ``dsi_sqlite_backend_output.ipynb`` which can be seen below.
+Users can make further edits to the Jupyter notebook to interact with the data.
+
+..  figure:: jupyter_1.png
+    :scale: 65%
+    :align: center
+
+..  figure:: jupyter_2.png
+    :scale: 65%
+    :align: center
+
+    Screenshots of an example Jupyter notebook with loaded data.
