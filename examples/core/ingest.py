@@ -1,3 +1,4 @@
+# examples/core/ingest.py
 from dsi.core import Terminal
 
 terminal_ingest = Terminal(debug=0, backup_db = False, runTable=True)

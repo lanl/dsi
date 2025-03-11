@@ -1,3 +1,4 @@
+# examples/core/query.py
 from dsi.core import Terminal
 
 terminal_query = Terminal(debug=0, backup_db = False, runTable=True)

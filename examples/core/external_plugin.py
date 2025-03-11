@@ -1,3 +1,4 @@
+# examples/core/external_plugin.py
 from dsi.core import Terminal
 
 term = Terminal(debug=0, backup_db = False, runTable=False)

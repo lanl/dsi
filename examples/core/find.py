@@ -1,3 +1,4 @@
+# examples/core/find.py
 from dsi.core import Terminal
 
 terminal_find = Terminal(debug=0, backup_db = False, runTable=False)
