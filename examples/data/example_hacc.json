@@ -1,7 +1,4 @@
 {
-    "runs": {
-        "primary_key": "run_id"
-    }, 
     "files": {
         "primary_key": "id",
         "foreign_key": {

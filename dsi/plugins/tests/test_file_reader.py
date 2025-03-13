@@ -133,9 +133,10 @@ def test_schema_reader():
 
 def test_hacc_reader():
     a = Terminal()
-    a.load_module('plugin', 'HACC', 'reader', filename = "examples/data/example_hacc.json", hacc_suite_path = "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/256MPC_RUNS_HACC_2PARAM", target_table_prefix = 'hacc')
+    a.load_module('plugin', 'HACC', 'reader', filename = "examples/data/example_hacc.json", hacc_suite_path = "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/256MPC_RUNS_HACC_2PARAM", hacc_run_prefix = 'VKIN', target_table_prefix = 'hacc')
     a.transload()
 
 
 if __name__ == "__main__":
+    # test_csv_plugin_adds_rows()
     test_hacc_reader()
