@@ -67,6 +67,8 @@ class Sqlite(Filesystem):
 
     def check_type(self, input_list):
         """
+        **Users should not use this function. Only used by internal sqlite functions**
+
         Evaluates a list and returns the predicted compatible SQLite Type
 
         `input_list`: list of values to evaluate

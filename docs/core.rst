@@ -1,9 +1,9 @@
 Core
 ====
 
-The DSI Core middleware defines the Terminal and Sync concepts. 
-An instantiated Terminal is the human/machine DSI interface to connect Reader/Writer plugins and DSI backends.
-An instantiated Sync supports data movement capabilities between local and remote locations and captures metadata documentation
+The DSI Core middleware defines the `Terminal` and `Sync` concepts. 
+An instantiated `Terminal` is the human/machine DSI interface to connect Reader/Writer plugins and DSI backends.
+An instantiated `Sync` supports data movement capabilities between local and remote locations and captures metadata documentation
 
 Core: Terminal
 --------------
@@ -15,12 +15,12 @@ as well as generating an interactive notebook of the data.
 All relevant functions have been listed below for further clarity. :ref:`example_section_label` displays different workflows using this Terminal class.
 
 Notes for users:
-      - All plugin writers that are loaded must be followed by calling transload() after to execute them. Readers are automatically executed upon loading.
+      - All plugin writers that are loaded must be followed by calling ``Terminal.transload`` after to execute them. Readers are automatically executed upon loading.
       - ``Terminal.load_module``: if users wants to group related tables of data from a plugin reader under the same name, 
         they can use the `target_table_prefix` input to specify a shared prefix.
 
-            - users must remember that when accessing data from these tables the table names will include specified prefix. Ex: collection1__math, collection1__english 
-      - ``Terminal.artifact_handler``: 'notebook' interaction_type stores data from first loaded backend, not existing DSI abstraction, in new notebook file
+            - users must remember that when accessing data from these tables, their names will include the specified prefix. Ex: collection1__math, collection1__english 
+      - ``Terminal.artifact_handler``: 'notebook' interaction_type stores data from first loaded backend, NOT the existing DSI abstraction, in new notebook file
       - ``Terminal.artifact_handler``: review this function description below to clarify which backends are targeted by which interaction_types
       - Terminal find functions only access the first loaded backend
       - ``Terminal.unload_module``: removes last loaded backend of specified mod_name. Ex: if 2 loaded Sqlite backends, second is unloaded

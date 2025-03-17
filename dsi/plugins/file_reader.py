@@ -228,7 +228,9 @@ class YAML1(FileReader):
 
     def check_type(self, text):
         """
-        Internal helper function that tests input text and returns a predicted compatible SQL Type
+        **Internal helper function, not used by DSI Users** 
+        
+        Function tests input text and returns a predicted compatible SQL Type
 
         `text`: text string
 
