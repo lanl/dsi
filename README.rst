@@ -9,9 +9,9 @@ DSI enables flexible, data-intensive scientific workflows that meet researcher n
 
 DSI is implemented in three parts:
 
-* `Plugins (Readers and Writers) <https://lanl.github.io/dsi/plugins.html>`_.
-* `Backends <https://lanl.github.io/dsi/backends.html>`_.
-* `Core middleware <https://lanl.github.io/dsi/core.html>`_.
+* `Plugins (Readers and Writers) <https://lanl.github.io/dsi/plugins.html>`_
+* `Backends <https://lanl.github.io/dsi/backends.html>`_
+* `Core middleware <https://lanl.github.io/dsi/core.html>`_
 
 Plugins curate data and metadata for query and data return. 
 Plugins can either be Readers to read data into DSI or Writers to export data from DSI into another format. 
@@ -26,9 +26,10 @@ DSI Core middleware provides the user/machine interface.
 The Core middleware defines a Terminal object. 
 An instantiated Core Terminal can load zero or more plugins and backends. 
 A Terminal object can be used in scripting workflows and program loops.
+Users should view our `Core documentation <https://lanl.github.io/dsi/core.html>`_ to see how to use the Core Terminal object to interact with Plugins and Backends
 
 =====================
-DSI Core Requirements
+DSI Baseline Requirements
 =====================
 * python3 (3.11 tested)
 * Cross-platform (Unix / macOS / Windows)
