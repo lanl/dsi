@@ -2,19 +2,30 @@
 DSI
 =============
 
-The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and shared data repositories. DSI enables flexible, data-intensive scientific workflows that meet researcher needs.
+The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, 
+AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. 
+The data lifecycle for AI/ML requires seamless transitions from data-intensive/AI/ML research activity to long-term archiving and shared data repositories. 
+DSI enables flexible, data-intensive scientific workflows that meet researcher needs.
 
 DSI is implemented in three parts:
 
-* Plugins (Readers and Writers)
-* Backends
-* Core middleware
+* `Plugins (Readers and Writers) <https://lanl.github.io/dsi/plugins.html>`_.
+* `Backends <https://lanl.github.io/dsi/backends.html>`_.
+* `Core middleware <https://lanl.github.io/dsi/core.html>`_.
 
-Plugins curate metadata for query and data return. Plugins can have read or write funcitonality acting as Readers and Writers for DSI. Plugins acting as readers harvest data from files and streams. Plugins acting as writers execute containerized or baremetal applications to supplement queriable metadata and data. Plugins may be user contributed and a default set of plugins is available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Plugins curate data and metadata for query and data return. 
+Plugins can either be Readers to read data into DSI or Writers to export data from DSI into another format. 
+Users can contribute to our Plugins with a default set available in our `Plugin documentation <https://lanl.github.io/dsi/plugins.html>`_.
 
-Backends are interfaces for the Core middleware. Backends consist mostly of back-end/storage functionalities and are the interface between the Core Middleware and a data store. Backends may also have some front-end functionality interfacing between a DSI user and the Core middleware. Backends may be user contributed and a default set of backends are available with usage examples in our `Core documentation <https://lanl.github.io/dsi/core.html>`_.
+Backends are interfaces between the Core middleware and a data storage system. 
+While they mostly consist of storage functionalities, users may interact with them to either ingest, process (read), query, or find data.
+Users can also generate Python notebooks from certain Backends to visually interact with the data as well.
+Users can contribute to our Backends with a default set available in our `Backend documentation <https://lanl.github.io/dsi/backends.html>`_.
 
-DSI Core middleware provides the user/machine interface. The Core middleware defines a Terminal object. An instantiated Core Terminal can load zero or more plugins and backends. A Terminal object can be used in scripting workflows and program loops.
+DSI Core middleware provides the user/machine interface. 
+The Core middleware defines a Terminal object. 
+An instantiated Core Terminal can load zero or more plugins and backends. 
+A Terminal object can be used in scripting workflows and program loops.
 
 =====================
 DSI Core Requirements
@@ -28,7 +39,9 @@ DSI Core Requirements
 Getting Started
 ===============
 
-DSI has several versioned releases and cloning from 'main' can be considered as alpha-versions. Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. It is possible to install DSI locally instead with the following.
+DSI has several versioned releases and cloning from 'main' can be considered the alpha-version. 
+Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. 
+It is possible to install DSI locally instead with the following.
 
 We recommend Miniconda3 for managing virtual environments for DSI::
 
@@ -52,7 +65,7 @@ After activating your environment::
 Release Versions
 =====================
 
-Install release versions of DSI can be found in (https://pypi.org/project/dsi-workflow/), to install the latest try the following::
+Install release versions of DSI can be found in (https://pypi.org/project/dsi-workflow/). To install the latest version, try the following::
 
 	python3 -m pip install dsi-workflow
 
@@ -62,7 +75,7 @@ Copyright and License
 
 This program is open source under the BSD-3 License.
 
-© 2023. Triad National Security, LLC. All rights reserved.
+© 2025. Triad National Security, LLC. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted
 provided that the following conditions are met:

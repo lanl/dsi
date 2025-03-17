@@ -373,7 +373,7 @@ class Terminal():
             - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
             - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
-        `query`: default None. Specify if *interaction_type* = 'query' and query_artifact function in backend file requires an input
+        `query`: default None. Specify if *interaction_type* = 'query' and ``query_artifact`` function in a backend file accepts an input
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -498,9 +498,11 @@ class Terminal():
     
     def find(self, query_object):
         """
-        Find all function that searches for all instances of 'query_object' in first loaded backend. Searches among all tables/column/cells
+        Find all function that searches for all instances of `query_object` in first loaded backend. Searches among all tables/column/cells
+       
+        `query_object`: Object to find in first loaded backend. Can be of any type (string, float, int).
 
-        `return`: List of backend-specific objects that each contain details of a match for 'query_object'
+        `return`: List of backend-specific objects that each contain details of a match for `query_object`
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
@@ -511,9 +513,11 @@ class Terminal():
     
     def find_table(self, query_object):
         """
-        Find table function that searches for all tables whose names matches the 'query_object' in first loaded backend.
+        Find table function that searches for all tables whose names matches the `query_object` in first loaded backend.
 
-        `return`: List of backend-specific objects that each contain all data from a table matching 'query_object'.
+        `query_object`: Object to find in all table names. HAS TO BE A STRING
+
+        `return`: List of backend-specific objects that each contain all data from a table matching `query_object`.
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
@@ -524,13 +528,15 @@ class Terminal():
     
     def find_column(self, query_object, range = False):
         """
-        Find column function that searches for all columns whose names matches the 'query_object' in first loaded backend.
+        Find column function that searches for all columns whose names matches the `query_object` in first loaded backend.
+
+        `query_object`: Object to find in all table names. HAS TO BE A STRING
 
         `range`: default False. 
 
-            - If True, then data-range of all numerical columns which match 'query_object' is included in return
-            - If False, then data for each column that matches 'query_object' is included in return
-        `return`: List of backend-specific objects that each contain data/numerical range about a column matching 'query_object'.
+            - If True, then data-range of all numerical columns which match `query_object` is included in return
+            - If False, then data for each column that matches `query_object` is included in return
+        `return`: List of backend-specific objects that each contain data/numerical range about a column matching `query_object`.
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
@@ -541,13 +547,15 @@ class Terminal():
 
     def find_cell(self, query_object, row = False):
         """
-        Find cell function that searches for all cells which match the 'query_object' in first loaded backend.
+        Find cell function that searches for all cells which match the `query_object` in first loaded backend.
+
+        `query_object`: Object to find in all cells. Can be of any type (string, float, int).
 
         `row`: default False.
 
-            - If True, then full row of data where a cell matches 'query_object' is included in return
-            - If False, then the value of the cell that matches 'query_object' is included in return
-        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches 'query_object'
+            - If True, then full row of data where a cell matches `query_object` is included in return
+            - If False, then the value of the cell that matches `query_object` is included in return
+        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches `query_object`
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
@@ -558,7 +566,7 @@ class Terminal():
 
     def find_helper(self, query_object, return_object, start, find_type):
         """
-        **Users should not call this externally, only to be used by internal core functions.**
+        **Users should not call this. Used by internal core functions.**
         
         Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
         """

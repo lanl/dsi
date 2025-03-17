@@ -54,12 +54,12 @@ DSI Functionalities
      - DSI |version_num|
 
    * - Find
-     - Core: Find, Find_Table, Find_Column, Find_Cell
+     - Core: find, find_table, find_column, find_cell
      - Search across all parts of a backend to retrieve data matching a query
      - DSI |version_num|
 
    * - Move
-     - Core:Sync
+     - Core: Sync
      - Move data between file store types
      - DSI |version_num|
 

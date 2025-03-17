@@ -158,6 +158,8 @@ class Schema(FileReader):
 
     Schema file input should be a JSON file that stores primary and foreign keys for all tables in the data source. 
     Stores all relations in global dsi_relations table used for creating backends/writers
+
+    Users ingesting complex schemas should load this reader. View ``/examples/data/example_schema.json`` to see how a schema file should be structured
     """
     def __init__(self, filename, target_table_prefix = None, **kwargs):
         """
@@ -172,7 +174,7 @@ class Schema(FileReader):
 
     def add_rows(self) -> None:
         """
-        Generates the dsi_relations OrderedDict to be added to the internal DSI abstraction. 
+        Generates a dsi_relations OrderedDict to be added to the internal DSI abstraction. 
 
         The Ordered Dict has 2 keys, primary key and foreign key, with their values a list of PK and FK tuples associating tables and columns 
         """
