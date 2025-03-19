@@ -29,7 +29,7 @@ jobs:
         pip install -r requirements.extras.txt
         pip install .
         sudo apt-get install graphviz
-    - name: Test reader
+    - name: Test File Writer Plugins
       run: |
         pip install pytest
         pytest dsi/plugins/tests/test_file_writer.py
