@@ -1,4 +1,7 @@
 #Loading using plugins and backends
+import sys
+sys.path.append('/home/pascalgrosset/projects/dsi')
+
 from dsi.core import Terminal
 
 '''This is an example workflow using core.py'''

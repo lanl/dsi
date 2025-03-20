@@ -140,6 +140,7 @@ class ParallelDB:
 
         comm = MPI.COMM_WORLD
         self.mpi_rank = mpi_rank
+        n = comm.Get_size()
         my_temp_db = f"_temp_{hashlib.sha256(db_name.encode()).hexdigest()}_{mpi_rank}.db"    # Create a temporary name
         shutil.copy(db_name, my_temp_db)           # Create a copy of the databse
         self.database = Store( my_temp_db )        # Connect to the DB

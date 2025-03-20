@@ -22,7 +22,7 @@ comm.Barrier()
 
 
 
-db = ParallelDB(db_name, size, True, rank)
+db = ParallelDB(db_name, size, True)
 
 
 col_cus = ['customer_id', 'name', 'email']
