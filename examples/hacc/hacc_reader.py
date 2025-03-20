@@ -88,13 +88,26 @@ class HACC(FileReader):
                 print("ts:", halo_ts)
                 index = r * n_ts + t
                 full_snapshot_path = ""
+                new_simulation_folder_structure = False
                 if (halo_ts in full_res_ts):
                     ## read num_elems and num_variables from genericIO file 
-                    full_snapshot_path = 'output/full_snapshots/step_' + str(halo_ts) + '/m000p.full.mpicosmo.' + str(halo_ts)
-                haloproperties_path = 'analysis/haloproperties/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.haloproperties'
-                bighaloparticles_path = 'analysis/bighaloparticles/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.bighaloparticles'
-                galaxyproperties_path = 'analysis/galaxyproperties/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.galaxyproperties'
-                galaxyparticles_path = 'analysis/galaxyparticles/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.galaxyparticles'
+                    ## the folder structure for the new simulation is different 
+                    check_path = os.path.join(self.hacc_suite_path, run_folder, 'output/full_snapshots')
+                    if (os.path.exist(check_path)):
+                        new_simulation_folder_structure = True
+                        full_snapshot_path = 'output/full_snapshots/step_' + str(halo_ts) + '/m000p.full.mpicosmo.' + str(halo_ts)
+                    else:
+                        full_snapshot_path = 'output/m000p.full.mpicosmo.' + str(halo_ts)
+                if new_simulation_folder_structure:
+                    haloproperties_path = 'analysis/haloproperties/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.haloproperties'
+                    bighaloparticles_path = 'analysis/bighaloparticles/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.bighaloparticles'
+                    galaxyproperties_path = 'analysis/galaxyproperties/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.galaxyproperties'
+                    galaxyparticles_path = 'analysis/galaxyparticles/step_' + str(halo_ts) + '/m000p-' + str(halo_ts) + '.galaxyparticles'
+                else:
+                    haloproperties_path = 'analysis/m000p-' + str(halo_ts) + '.haloproperties'
+                    bighaloparticles_path = 'analysis/m000p-' + str(halo_ts) + '.bighaloparticles'
+                    galaxyproperties_path = 'analysis/m000p-' + str(halo_ts) + '.galaxyproperties'
+                    galaxyparticles_path = 'analysis/m000p-' + str(halo_ts) + '.galaxyparticles'
                 temp_dict = {"key": index, "run_id": r, "ts": halo_ts, "full_snapshot_path": full_snapshot_path, \
                             "haloproperties_path": haloproperties_path, "bighaloparticles_path": bighaloparticles_path,\
                             "galaxyproperties_path": galaxyproperties_path, "galaxyparticles_path": galaxyparticles_path}
