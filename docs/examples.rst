@@ -121,7 +121,7 @@ To open a pycinema viewer, first install pycinema and then run the example scrip
 .. _PyCinema: https://github.com/cinemascience/pycinema
 
 .. _schema_section:
-DSI Schema Structure
+Structuring DSI Schemas
 --------------
 
 This example details how to structure a JSON file for the DSI Schema Reader to store all table primary key - foreign key relations.

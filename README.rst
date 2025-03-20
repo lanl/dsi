@@ -29,7 +29,7 @@ A Terminal object can be used in scripting workflows and program loops.
 Users should view our `Core documentation <https://lanl.github.io/dsi/core.html>`_ to see how to use the Core Terminal object to interact with Plugins and Backends
 
 =====================
-DSI Baseline Requirements
+DSI Minimum Requirements
 =====================
 * python3 (3.11 tested)
 * Cross-platform (Unix / macOS / Windows)

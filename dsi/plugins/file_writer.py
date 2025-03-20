@@ -214,6 +214,9 @@ class Table_Plot(FileWriter):
                         if id in run_dict['run_id']:
                             id_index = run_dict['run_id'].index(id)
                             run_table_timesteps.append(run_dict['run_timestamp'][id_index])
+                        else:
+                            run_table_timesteps = []
+                            continue
                 continue
 
             if col_len == None:
@@ -239,7 +242,7 @@ class Table_Plot(FileWriter):
         if len(run_table_timesteps) > 0:
             plt.xlabel("Timestamp")
         else:
-            plt.xlabel("Sim Number")
+            plt.xlabel("Row Number")
         plt.ylabel("Units")
         plt.title(f"{self.table_name} Values")
         plt.legend()
