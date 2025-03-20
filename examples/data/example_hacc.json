@@ -1,8 +1,0 @@
-{
-    "files": {
-        "primary_key": "id",
-        "foreign_key": {
-            "run_id": ["runs", "run_id"]
-        }
-    }
-}
