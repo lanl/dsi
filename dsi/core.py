@@ -172,6 +172,10 @@ class Terminal():
                         raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                     
                     for table_name, table_metadata in obj.output_collector.items():
+                        if self.runTable == True and table_name == "runTable":
+                            if self.debug_level != 0:
+                                self.logger.error(f'   Cannot read in a manual runTable when the runTable flag is on')
+                            raise ValueError('Cannot read in a manual runTable when the runTable flag is on')
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
                                 if isinstance(colData[0], list):
@@ -420,30 +424,34 @@ class Terminal():
 
         query_data = None
         first_backend = self.loaded_backends[0]
+        parent_backend = first_backend.__class__.__bases__[0].__name__
         if interaction_type not in ['ingest', 'put', "processs", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
-            if "query" in first_backend.query_artifacts.__code__.co_varnames:
-                self.logger.info(f"Query to get data: {query}")
-                kwargs['query'] = query
-
-            sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
-            if interaction_type == "get":
-                query_data = first_backend.get_artifacts(**kwargs)
-            elif interaction_type == "query":
-                query_data = first_backend.query_artifacts(**kwargs)
-            if isinstance(query_data, tuple):
+            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+                if "query" in first_backend.query_artifacts.__code__.co_varnames:
+                    self.logger.info(f"Query to get data: {query}")
+                    kwargs['query'] = query
+                sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
+                if interaction_type == "get":
+                    query_data = first_backend.get_artifacts(**kwargs)
+                elif interaction_type == "query":
+                    query_data = first_backend.query_artifacts(**kwargs)
+                if isinstance(query_data, tuple):
+                    if self.debug_level != 0:
+                        self.logger.error(query_data[1])
+                    raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
+                sys.settrace(None) # ends trace to prevent large overhead
+                operation_success = True
+            else: #backend is empty - cannot query
                 if self.debug_level != 0:
-                    self.logger.error(query_data[1])
-                raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
-            sys.settrace(None) # ends trace to prevent large overhead
-            operation_success = True
+                    self.logger.error("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
+                raise ValueError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
-            parent_class = first_backend.__class__.__bases__[0].__name__
-            if parent_class == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
                 try:
                     if interaction_type == "inspect":
                         first_backend.inspect_artifacts(**kwargs)
@@ -451,23 +459,28 @@ class Terminal():
                         first_backend.notebook(**kwargs)
                 except:
                     raise ValueError("Error in generating notebook. Please ensure data in the actual backend is stable")
-            elif parent_class == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
+            elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
-                    self.logger.error("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
-                raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into a backend before generating Jupyter notebook")
+                    self.logger.error("Error in notebook/inspect artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
+                raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
 
         elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) > 0:
             first_backread = self.active_modules['back-read'][0]
-            if self.debug_level != 0:
-                self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
-            if interaction_type == "process":
-                self.active_metadata = first_backread.process_artifacts()
-            elif interaction_type == "read":
-                self.active_metadata = first_backread.read_to_artifact()
-            operation_success = True
+            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+                if self.debug_level != 0:
+                    self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
+                if interaction_type == "process":
+                    self.active_metadata = first_backread.process_artifacts()
+                elif interaction_type == "read":
+                    self.active_metadata = first_backread.read_to_artifact()
+                operation_success = True
+            else: #back-READ backend is empty - cannot process data
+                if self.debug_level != 0:
+                    self.logger.error("Error in process/read artifact handler: First loaded back-READ backend needs to have data to be able to process data to DSI")
+                raise ValueError("Error in process/read artifact handler: First loaded back-READ backend needs to have data to be able to process data to DSI")
         elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) == 0:
             backread_active = True
 
@@ -487,7 +500,7 @@ class Terminal():
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
     
-    # Internal function used to get line numbers from return statements - should not be called by users
+    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
     def trace_function(self, frame, event, arg):
         global return_line_number
         global original_file
@@ -507,6 +520,11 @@ class Terminal():
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+            if self.debug_level != 0:
+                self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
+            raise ValueError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
@@ -522,6 +540,11 @@ class Terminal():
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+            if self.debug_level != 0:
+                self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
+            raise ValueError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
@@ -541,6 +564,11 @@ class Terminal():
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+            if self.debug_level != 0:
+                self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
+            raise ValueError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_column(query_object, range)
         return self.find_helper(query_object, return_object, start, "column ")
@@ -560,6 +588,11 @@ class Terminal():
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+            if self.debug_level != 0:
+                self.logger.error("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
+            raise ValueError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_cell(query_object, row)
         return self.find_helper(query_object, return_object, start, "cell ")
