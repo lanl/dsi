@@ -67,6 +67,13 @@ Ingesting data from a Reader to a backend
 
 .. literalinclude:: ../examples/core/ingest.py
 
+Example 2.5: Ingest complex schema and data
+~~~~~~~~~~
+Ingesting data from a Reader to a backend with a complex schema stored in a separate JSON file. 
+Read :ref:`schema_section` to understand how to structure this schema JSON file for the Schema Reader
+
+.. literalinclude:: ../examples/core/ingest_schema.py
+
 Example 3: Query data
 ~~~~~~~~~~
 Querying data from a backend

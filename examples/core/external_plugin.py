@@ -1,7 +1,7 @@
 # examples/core/external_plugin.py
 from dsi.core import Terminal
 
-term = Terminal(debug=0, backup_db = False, runTable=False)
+term = Terminal(debug = 0, backup_db = False, runTable = False)
 
 # Second input is name of plugin class in the other file
 # Third input is name of the python file where the Reader/Writer is written

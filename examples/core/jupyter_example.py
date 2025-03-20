@@ -1,6 +1,7 @@
+# examples/core/jupyter_example.py
 from dsi.core import Terminal
 
-term = Terminal(debug=0, backup_db = False, runTable=False) #do not need a runTable here
+term = Terminal(debug = 0, backup_db = False, runTable = False) #do not need a runTable here
 
 #read data
 term.load_module('plugin', 'Schema', 'reader', filename="../data/example_schema.json")
