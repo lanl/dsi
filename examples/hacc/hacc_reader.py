@@ -120,7 +120,7 @@ class HACC(FileReader):
                 for h in range(self.n_halos):
                     print("halo:", h)
                     halo_index = r  * (self.n_halos * n_ts) + t * self.n_halos + h
-                    temp_dict = {'key': halo_index, 'run_ts_id': index,\
+                    temp_dict = {'key': halo_index, 'run_id': r, "ts": halo_ts,
                                 'halo_rank': h,  'halo_tag': int(halo_values[0][h]), 'halo_count': int(halo_values[1][h]), \
                                 'halo_center_x': float(halo_values[2][h]), 'halo_center_y': float(halo_values[3][h]), 'halo_center_z': float(halo_values[4][h]), 'halo_radius': float(halo_values[5][h])}
                     halo_temp.append(temp_dict)
