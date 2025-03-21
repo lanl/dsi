@@ -120,7 +120,7 @@ def test_toml_reader():
 
 def test_schema_reader():
     a=Terminal()
-    a.load_module('plugin', 'Schema', 'reader', filename="examples/data/example_schema.json" , target_table_prefix = "student")
+    a.load_module('plugin', 'Schema', 'reader', filename="examples/data/testcase_schema.json" , target_table_prefix = "student")
 
     assert len(a.active_metadata.keys()) == 1
     assert "dsi_relations" in a.active_metadata.keys()

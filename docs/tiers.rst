@@ -26,42 +26,42 @@ DSI Functionalities
    * - Read data
      - Plugins: Readers
      - Ability to read in data; users can create data-specific readers
-     - DSI |version_num|
+     - DSI 1.0
 
    * - Write data
      - Plugins: Writers
      - Ability to write data; users can create data-specific writers
-     - DSI |version_num|
+     - DSI 1.0
 
    * - Ingest data
      - Core: Terminal.artifact_handler ('ingest')
      - Store metadata and data from Readers into backends
-     - DSI |version_num|
-  
-   * - Process data
-     - Core: Terminal.artifact_handler ('process')
-     - Store metadata and data from backends in DSI abstraction layer
-     - DSI |version_num|
+     - DSI 1.0
   
    * - Query data
      - Core: Terminal.artifact_handler ('query')
      - Query data from backends
-     - DSI |version_num|
+     - DSI 1.0
+     
+   * - Process data
+     - Core: Terminal.artifact_handler ('process')
+     - Store metadata and data from backends in DSI abstraction layer
+     - DSI 1.1
 
    * - Interact with data
      - Core: Terminal.artifact_handler ('notebook')
      - Generate Python notebook filled with data from a backend
-     - DSI |version_num|
+     - DSI 1.1
 
    * - Find
-     - Core: Find, Find_Table, Find_Column, Find_Cell
+     - Core: find, find_table, find_column, find_cell
      - Search across all parts of a backend to retrieve data matching a query
-     - DSI |version_num|
+     - DSI 1.1
 
    * - Move
-     - Core:Sync
+     - Core: Sync
      - Move data between file store types
-     - DSI |version_num|
+     - DSI 1.1
 
    * - Versioning
      - Core

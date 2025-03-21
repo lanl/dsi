@@ -28,7 +28,7 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements.extras.txt
         pip install .
-    - name: Test reader
+    - name: Test SQLite
       run: |
         pip install pytest
         pytest dsi/backends/tests/test_sqlite.py

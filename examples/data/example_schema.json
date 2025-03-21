@@ -2,22 +2,20 @@
     "math": {
         "primary_key": "specification",
         "foreign_key": {
-            "b": ["address", "specification"],
-            "d": ["physics", "specification"]
-        }
+            "b": ["address", "specification"]
+        },
+        "comment": "The value of 'primary_key' is this table's column that is a primary key (PK). There can only be ONE PK per table"
     }, 
     "address": {
         "primary_key": "specification",
         "foreign_key": {
-            "g": ["math", "specification"],
             "h": ["physics", "specification"]
-        }
+        },
+        "comment1": "The value of 'foreign_key' is a dictionary. There can be multiple foreign keys (FK) for a table.",
+        "comment2": "For each entry, the key is this table's column that is a FK and the value is a list of the associated table and column that form the PK",
+        "comment3": "Ex: 'address' table has a FK at the column 'h'. The associated PK is in the table 'physics' at column 'specification' "
     }, 
     "physics": {
-        "primary_key": "specification",
-        "foreign_key": {
-            "o": ["math", "specification"],
-            "q": ["address", "specification"]
-        }
+        "primary_key": "specification"
     }
 }

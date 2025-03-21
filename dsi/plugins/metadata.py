@@ -8,7 +8,7 @@ class StructuredMetadata(Plugin):
 
     def __init__(self, **kwargs):
         """
-        Initializes a StructuredDataPlugin with an output collector
+        Initializes StructuredMetadata class with an output collector (Ordered Dictionary)
         """
         self.output_collector = OrderedDict()
         self.table_cnt = None # schema not set until pack_header
@@ -30,7 +30,7 @@ class StructuredMetadata(Plugin):
         Initializes columns in the output_collector and table_cnt.
         Useful in a plugin's pack_header method.
 
-        DO NOT USE THIS WITH SET_SCHEMA_2()
+        DO NOT use this with ``SET_SCHEMA_2()``
 
         `table_data`: 
 
@@ -67,9 +67,9 @@ class StructuredMetadata(Plugin):
 
     def set_schema_2(self, collection, validation_model=None) -> None:
         """
-        Faster version (time and space) of updating output_collector by directly setting 'collection' to it, if collection is an Ordered Dict
+        Faster version to update the DSI abstraction as long as `collection` input is structured as an Ordered Dict
 
-        DO NOT USE THIS WITH SET_SCHEMA(), ADD_TO_OUTPUT(), OR SCHEMA_IS_SET()
+        DO NOT use this with ``SET_SCHEMA()``, ``ADD_TO_OUTPUT()``, OR ``SCHEMA_IS_SET()``
 
         `collection`: data passed in from a plugin as an Ordered Dict. 
 
@@ -90,7 +90,7 @@ class StructuredMetadata(Plugin):
         Adds a row of data to the output_collector and guarantees good structure.
         Useful in a plugin's add_rows method.
 
-        DO NOT USE THIS WITH SET_SCHEMA_2()
+        DO NOT use this with ``SET_SCHEMA_2()``
 
         `row`: list of row of data
 
@@ -122,6 +122,6 @@ class StructuredMetadata(Plugin):
         """ 
         Helper method to see if the schema has been set 
 
-        DO NOT USE THIS WITH SET_SCHEMA_2()
+        DO NOT use this with ``SET_SCHEMA_2()``
         """
         return self.table_cnt is not None

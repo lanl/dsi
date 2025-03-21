@@ -1,6 +1,7 @@
+# examples/core/process.py
 from dsi.core import Terminal
 
-terminal_process = Terminal(debug=0, backup_db = False, runTable=True)
+terminal_process = Terminal(debug = 0, backup_db = False, runTable = True)
 
 # Run Example 2 so data.db is not empty and data can be processed back into the abstraction
 terminal_process.load_module('backend','Sqlite','back-read', filename='data.db')   
