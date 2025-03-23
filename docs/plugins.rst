@@ -4,8 +4,8 @@ Plugins connect data-producing applications to DSI core functionalities. Plugins
 A Plugin reader function deals with existing data files or input streams. 
 A Plugin writer deals with generating new data. Plugins are modular to support user contribution.
 
-Plugin contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. 
-A contributed Plugin abstract class may extend another plugin to inherit the properties of the parent. 
+DSI contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. 
+A contributed Plugin abstract class may either extend another plugin to inherit the properties of the parent, or be of a completely new structure. 
 In order to be compatible with DSI core, Plugins should produce data in Python built-in data structures or data structures sourced from the Python ``collections`` library.
 
 Note that any contributed plugins or extension should include unit tests in  ``plugins/tests`` to demonstrate the new Plugin capability.
@@ -24,8 +24,8 @@ Note that any contributed plugins or extension should include unit tests in  ``p
 Metadata Processing
 -------------------
 
-**Note for users:** StructuredMetadata class is used to assign data from a file_reader to the DSI abstraction in core. 
-If data in a user-written reader is restructured as an OrderedDict, only need to call set_schema_2() at bottom of add_rows().
+**Note for users:** ``StructuredMetadata`` class is used to assign data from a file_reader to the DSI abstraction in core. 
+If data in a user-written reader is structured as an OrderedDict, only need to call ``set_schema_2()`` at the end of the reader's ``add_rows()``
 
 .. automodule:: dsi.plugins.metadata
    :members:
@@ -35,11 +35,11 @@ File Readers
 ------------
 
 Note for users:
-   - Assume names of data structure from all data sources are consistent/stable. Ex: table/column names are consistent. Number of columns in table CAN vary.
-   - Plugin readers in DSI repo can/should handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
+   - Assume names of data structure from all data sources are consistent/stable. Ex: table/column names MUST be consistent. Number of columns in a table CAN vary.
+   - Plugin readers in DSI repo can handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
    
-      - if only reading in one table, users can utilize python pandas to stack mulutiple dataframes vertically (CSV reader)
-      - if ingesting multiple tables at a time, users must pad tables with null data (YAML1 uses this and has example code at bottom of add_row() to implement this)
+      - if only reading in one table at a time, users can utilize python pandas to stack mulutiple dataframes vertically (ex: CSV reader)
+      - if multiple tables in a file, users must pad tables with null values (ex: YAML1, which has example code at bottom of ``add_rows()`` to implement this)
 .. automodule:: dsi.plugins.file_reader
    :members:
    :special-members: __init__
@@ -49,8 +49,8 @@ File Writers
 ------------
 
 Note for users:
-   - If runTable flag is True in Terminal instantiation, the run table is only included in ER Diagram writer if data is processed from a backend. 
-     View :ref:`example4_label` to see an instance of a runTable included in an ER diagram
+   - DSI `runTable` is only included in File Writers if data was previously ingested into a backend in a Core.Terminal workflow where `runTable` was set to True.
+     In :ref:`example4_label`, `runTable` is included in a generated ER Diagram since it uses ingested data from :ref:`example2_label` where `runTable` = True
 .. automodule:: dsi.plugins.file_writer
    :members:
    :special-members: __init__
@@ -65,7 +65,10 @@ Environment Plugins
 Optional Plugin Type Enforcement
 --------------------------------
 
-Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. Plugins may enforce types, but they are not required to enforce types. Plugin type enforcement can be static, like the Hostname default plugin. Plugin type enforcement can also be dynamic, like the Bueno default plugin.
+Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. 
+Plugins may enforce types, but they are not required to enforce types. 
+Plugin type enforcement can be static, like the Hostname default plugin. 
+Plugin type enforcement can also be dynamic, like the Bueno default plugin.
 
 
 .. automodule:: dsi.plugins.plugin_models

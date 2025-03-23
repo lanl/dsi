@@ -32,19 +32,20 @@ html:
 #	git add --force ./htmlcov && \
 
 gh-pages: _build/html
-	root="$$(git rev-parse --show-toplevel)" && \
 	cd _build/html && \
 	rm -rf .git && \
 	touch .nojekyll && \
 	git init && \
 	git add . && \
 	git commit -m "DSI Documentation" && \
-	git push -f $$root master:gh-pages && \
+	git branch -M gh-pages && \
+	git remote add origin https://github.com/lanl/dsi.git && \
+	git push -f origin gh-pages && \
 	rm -rf .git
 
-# Push to external docs site
-publish:
-	git push -f origin gh-pages
+# # Push to external docs site
+# publish:
+# 	git push -f origin gh-pages
 
 # Make a PDF
 latexpdf:

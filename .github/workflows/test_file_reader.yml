@@ -28,7 +28,7 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements.extras.txt
         pip install .  
-    - name: Test reader
+    - name: Test File Reader Plugins
       run: |
         pip install pytest
         pytest dsi/plugins/tests/test_file_reader.py
