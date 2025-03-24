@@ -9,7 +9,7 @@ term.add_external_python_module('plugin', 'HACC', 'hacc_reader.py')
 # print(term.list_available_modules('plugin')) # includes TextFile at end of list
 
 # term.load_module('plugin', 'HACC', 'reader', filenames = "../data/test.txt")
-term.load_module('plugin', 'HACC', 'reader', filename = "./hacc.json", hacc_suite_path = "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/128MPC_RUNS_FLAMINGO_DESIGN_3A/", hacc_run_prefix= 'FSN', target_table_prefix = 'hacc')
+term.load_module('plugin', 'HACC', 'reader', filename = "./hacc.json", hacc_suite_path = "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/128MPC_RUNS_FLAMINGO_DESIGN_3A/", hacc_run_prefix= 'FSN', target_table_prefix = 'hacc', n_halos = 2)
 # /lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/128MPC_RUNS_FLAMINGO_DESIGN_3A/
 # "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/256MPC_RUNS_HACC_2PARAM"
 print("load module Done!")
