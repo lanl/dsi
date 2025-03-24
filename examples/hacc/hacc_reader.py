@@ -116,9 +116,9 @@ class HACC(FileReader):
                 h_start_time = time.perf_counter()
                 halo_values = self.readHalos(os.path.join(os.path.join(self.hacc_suite_path, run_folder), haloproperties_path), self.halo_vars, self.n_halos)
                 h_end_time = time.perf_counter()
-                print("reading halo time", h_end_time - h_start_time)
+                print(f"reading halo from haloproperties file {(h_end_time - h_start_time):.4f} seconds")
                 for h in range(self.n_halos):
-                    print("halo:", h)
+                    # print("halo:", h)
                     halo_index = r  * (self.n_halos * n_ts) + t * self.n_halos + h
                     temp_dict = {'key': halo_index, 'run_id': r, "ts": halo_ts,
                                 'halo_rank': h,  'halo_tag': int(halo_values[0][h]), 'halo_count': int(halo_values[1][h]), \

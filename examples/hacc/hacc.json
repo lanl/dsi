@@ -1,14 +1,15 @@
 {
-    "hacc__files": {
+    "files": {
         "primary_key": "key",
         "foreign_key": {
             "run_id": ["hacc__runs", "run_id"]
         }
     },
-    "hacc__halos": {
+    "halos": {
         "primary_key": "key",
         "foreign_key": {
-            "run_ts_id": ["hacc__files", "key"]
+            "run_id": ["hacc__runs", "run_id"],
+            "ts":     ["hacc__files", "ts"]
         }
     }
 }
