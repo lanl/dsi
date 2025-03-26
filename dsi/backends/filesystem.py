@@ -11,6 +11,7 @@ class Backend(metaclass=ABCMeta):
     def git_commit_sha(self):
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE ingest_artifacts()
     @abstractmethod
     def put_artifacts(self, artifacts, kwargs) -> None:
         pass
@@ -19,6 +20,7 @@ class Backend(metaclass=ABCMeta):
     def ingest_artifacts(self, artifacts, kwargs) -> None:
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE query_artifacts()
     @abstractmethod
     def get_artifacts(self, query, kwargs):
         pass
@@ -27,6 +29,7 @@ class Backend(metaclass=ABCMeta):
     def query_artifacts(self, query, kwargs):
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE notebook()
     @abstractmethod
     def inspect_artifacts(self, kwargs):
         pass
@@ -35,6 +38,7 @@ class Backend(metaclass=ABCMeta):
     def notebook(self, kwargs):
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE process_artifacts()
     @abstractmethod
     def read_to_artifacts(self, kwargs):
         pass
@@ -84,24 +88,28 @@ class Filesystem(Backend):
     def __init__(self, filename) -> None:
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE ingest_artifacts()
     def put_artifacts(self, artifacts, kwargs) -> None:
         pass
 
     def ingest_artifacts(self, artifacts, kwargs) -> None:
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE query_artifacts()
     def get_artifacts(self, query, kwargs):
         pass
 
     def query_artifacts(self, query, kwargs):
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE notebook()
     def inspect_artifacts(self, kwargs):
         pass
 
     def notebook(self, kwargs):
         pass
 
+    # DEPRECATING IN FUTURE DSI RELEASE. USE process_artifacts()
     def read_to_artifacts(self, kwargs):
         pass
 

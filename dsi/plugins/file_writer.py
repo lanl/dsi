@@ -5,8 +5,7 @@ from dsi.plugins.metadata import StructuredMetadata
 
 class FileWriter(StructuredMetadata):
     """
-    FileWriter Plugins keep information about the file that
-    they are ingesting, namely absolute path and hash.
+    FileWriter Plugins keep information about the file that they are ingesting, namely absolute path and hash.
     """
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
@@ -25,8 +24,10 @@ class ER_Diagram(FileWriter):
     def __init__(self, filename, target_table_prefix = None, **kwargs):
         """
         `filename`: file name of the ER Diagram to be generated
+
         `target_table_prefix`: if generating diagram for only a select set of tables, can specify prefix to search for all alike tables
-            - Ex: prefix = "student" so only "student__address", "student__math", "student__physics" tables are displayed here
+
+            - Ex: If prefix = "student", only "student__address", "student__math", "student__physics" tables are included
         """
         super().__init__(filename, **kwargs)
         self.output_filename = filename
@@ -34,17 +35,21 @@ class ER_Diagram(FileWriter):
 
     def get_rows(self, collection) -> None:
         """
-        Function called in core.py that generates the ER Diagram.
+        Function that generates the ER Diagram.
+
         `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
-        'return' None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        
+        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         file_type = ".png"
-        if self.output_filename[-4:] == ".png" or self.output_filename[-4:] == ".pdf" or self.output_filename[-4:] == ".jpg":
+        if len(self.output_filename) > 4 and self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
             file_type = self.output_filename[-4:]
             self.output_filename = self.output_filename[:-4]
-        elif self.output_filename[-5:] == ".jpeg":
+        elif len(self.output_filename) > 5 and self.output_filename[-5:] == ".jpeg":
             file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
+        elif len(self.output_filename) > 4 and self.output_filename[-4:] == ".svg":
+            return (ValueError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             return (ValueError, "Your input for target_table_prefix does not exist in memory. Please enter a valid prefix for table names.")
@@ -129,9 +134,12 @@ class Csv_Writer(FileWriter):
     def __init__(self, table_name, filename, export_cols = None, **kwargs):
         """
         `table_name`: name of table to be exported to a csv
+
         `filename`: name of the CSV file that will be generated
+
         `export_cols`: default None. When specified, this must be a list of column names to keep in output csv file
-            - Ex: all columns are ["a", "b", "c", "d", "e"]. export_cols = ["a", "c", "e"]
+
+            - Ex: all columns are [a, b, c, d, e]. export_cols = [a, c, e]
         """
         super().__init__(filename, **kwargs)
         self.csv_file_name = filename
@@ -140,9 +148,11 @@ class Csv_Writer(FileWriter):
 
     def get_rows(self, collection) -> None:
         """
-        Function called in core.py that generates the output CSV file.
+        Function that generates the output CSV file.
+
         `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
-        'return' None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+
+        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         if self.table_name not in collection.keys():
             return (ValueError, f"{self.table_name} does not exist in memory")
@@ -165,8 +175,10 @@ class Table_Plot(FileWriter):
     def __init__(self, table_name, filename, display_cols = None, **kwargs):
         """
         `table_name`: name of table to be plotted
+
         `filename`: name of output file the plot will be stored in
-        `display_cols`: default None. When specified, must be a list of column names, whose data is NUMERICAL, to plot 
+        
+        `display_cols`: default None. When specified, must be a list of column names, whose data is NUMERICAL
         """
         super().__init__(filename, **kwargs)
         self.output_name = filename
@@ -175,9 +187,11 @@ class Table_Plot(FileWriter):
 
     def get_rows(self, collection) -> None:
         """
-        Function called in core.py that generates the table plot image file.
+        Function that generates the table plot image file.
+
         `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
-        'return' None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+
+        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
         """
         if self.table_name not in collection.keys():
             return (ValueError, f"{self.table_name} does not exist in memory")
@@ -188,10 +202,23 @@ class Table_Plot(FileWriter):
         
         numeric_cols = []
         not_plot_cols = []
+        run_table_timesteps = []
         col_len = None
         for colName, colData in collection[self.table_name].items():
-            if colName == "run_id" or (self.display_cols is not None and colName not in self.display_cols):
+            if self.display_cols is not None and colName not in self.display_cols:
                 continue
+            if colName == "run_id":
+                if len(colData) == len(set(colData)):
+                    run_dict = collection["runTable"]
+                    for id in colData:
+                        if id in run_dict['run_id']:
+                            id_index = run_dict['run_id'].index(id)
+                            run_table_timesteps.append(run_dict['run_timestamp'][id_index])
+                        else:
+                            run_table_timesteps = []
+                            continue
+                continue
+
             if col_len == None:
                 col_len = len(colData)
             if not any(isinstance(item, str) for item in colData):
@@ -204,12 +231,18 @@ class Table_Plot(FileWriter):
             elif self.display_cols is not None and colName in self.display_cols:
                 not_plot_cols.append(colName)
 
-        sim_list = list(range(1, col_len + 1))
+        if len(run_table_timesteps) > 0:
+            sim_list = run_table_timesteps
+        else:
+            sim_list = list(range(1, col_len + 1))
 
         for colName, colData in numeric_cols:
             plt.plot(sim_list, colData, label = colName)
         plt.xticks(sim_list)
-        plt.xlabel("Sim Number")
+        if len(run_table_timesteps) > 0:
+            plt.xlabel("Timestamp")
+        else:
+            plt.xlabel("Row Number")
         plt.ylabel("Units")
         plt.title(f"{self.table_name} Values")
         plt.legend()

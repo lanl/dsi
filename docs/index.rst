@@ -12,12 +12,11 @@ The Data Science Infrastructure Project (DSI)
 
    introduction
    installation
-   contributing_readers
+   tiers
    plugins
    backends
    core
    contributing_readers
-   tiers
    examples
 
 Indices and tables

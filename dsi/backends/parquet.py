@@ -20,14 +20,22 @@ class Parquet(Filesystem):
         except KeyError:
             self.compression = None
 
+    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def get_artifacts(self):
-        """Get Parquet data from filename."""
+        return self.query_artifacts()
+    
+    def query_artifacts(self):
+        """Query Parquet data from filename."""
         table = pq.read_table(self.filename)
         resout = table.to_pydict()
         return resout
 
+    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifacts(self, collection):
-        """Put artifacts into file at filename path."""
+        return self.ingest_artifacts(collection)
+    
+    def ingest_artifacts(self, collection):
+        """Ingest artifacts into file at filename path."""
         table = pa.table(collection)
         pq.write_table(table, self.filename, compression=self.compression)
 
@@ -43,7 +51,12 @@ class Parquet(Filesystem):
             raise Exception(proc.stderr)
         return proc.stdout.strip().decode("utf-8")
 
+    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def inspect_artifacts(self, collection, interactive=False):
+        return self.notebook(collection, interactive)
+    
+    def notebook(self, collection, interactive=False):
+        """Generate Jupyter notebook of Parquet data from filename."""
         import nbconvert as nbc
         import nbformat as nbf
 
