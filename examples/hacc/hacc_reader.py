@@ -93,7 +93,7 @@ class HACC(FileReader):
                     ## read num_elems and num_variables from genericIO file 
                     ## the folder structure for the new simulation is different 
                     check_path = os.path.join(self.hacc_suite_path, run_folder, 'output/full_snapshots')
-                    if (os.path.exist(check_path)):
+                    if (os.path.exists(check_path)):
                         new_simulation_folder_structure = True
                         full_snapshot_path = 'output/full_snapshots/step_' + str(halo_ts) + '/m000p.full.mpicosmo.' + str(halo_ts)
                     else:
