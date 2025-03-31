@@ -48,6 +48,15 @@ python3 prepare_database.py --suite_paths /data/suite1 /data/suite2 --output_db_
 
 ##  Part 2: Halos and Galaxies Extraction  
 
+### Prerequirement
+
+To extract and save halos and galaxies, the following libraries are required.
+(1) GenericIO (https://git.cels.anl.gov/hacc/genericio): replace the second line in extractParticles.py to your path to legacy_python in GenericIO. 
+
+(2) PyEVTK (https://github.com/paulo-herrera/PyEVTK): pip install pyevtk
+
+
+### Halos and Galaxies Extraction
 There are two methods for extracting halos and galaxies:  
 
 1. **Extracting a subregion** by defining a center and radius.  
@@ -55,7 +64,7 @@ There are two methods for extracting halos and galaxies:
 
 The extraction functions are located in `DataExtraction/extractParticles.py`.  
 
-### Extracting a Subregion  
+#### Extracting a Subregion  
 
 This method places a cubic region centered at a specified point, with a side length of `2 × radius`.  
 All particles within this region are extracted.  
@@ -64,7 +73,7 @@ All particles within this region are extracted.
 - `extractFromBighaloparticlesByRegion`  
 - `extractFromGalaxyparticlesByRegion`  
 
-### Extracting Specific Halos & Galaxies  
+#### Extracting Specific Halos & Galaxies  
 
 In this method, halos and galaxies are extracted based on predefined tags.  
 All particles belonging to a selected halo or galaxy are included in the extraction.  

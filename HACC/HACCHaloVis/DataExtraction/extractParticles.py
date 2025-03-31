@@ -3,7 +3,7 @@ sys.path.append("/home/mhan/genericio/legacy_python/")
 import genericio as gio
 import os
 import numpy as np 
-from evtk.hl import pointsToVTK 
+from pyevtk.hl import pointsToVTK 
 import math
 
 '''
@@ -45,7 +45,10 @@ def extractFromBighaloparticles(bighaloparticles_path, halo_tag, fof_halo_center
         selected_vx.extend(_vx)
         selected_vy.extend(_vy)
         selected_vz.extend(_vz)
-    attributes = {"phi" : selected_phi, "vx": selected_vx, "vy": selected_vy, "vz": selected_vz}
+    selected_x = np.array(selected_x)
+    selected_y = np.array(selected_y)
+    selected_z = np.array(selected_z)
+    attributes = {"phi" : np.array(selected_phi), "vx": np.array(selected_vx), "vy": np.array(selected_vy), "vz": np.array(selected_vz)}
     return selected_x, selected_y, selected_z, attributes
     # if(len(selected_x) != 0):
     #     pointsToVTK(output_filename, selected_x, selected_y, selected_z, data = {"phi" : selected_phi, "vx": selected_vx, "vy": selected_vy, "vz": selected_vz})
@@ -93,7 +96,11 @@ def extractFromBighaloparticlesByRegion(bighaloparticles_path, fof_halo_center_x
     selected_vx = np.array(selected_vx)
     selected_vy = np.array(selected_vy)
     selected_vz = np.array(selected_vz)
+    selected_x = np.array(selected_x)
+    selected_y = np.array(selected_y)
+    selected_z = np.array(selected_z)
     selected_vmag = np.sqrt(selected_vx**2 + selected_vy**2 + selected_vz**2)
+    selected_phi = np.array(selected_phi)
     attributes = {"phi" : selected_phi, "vx": selected_vx, "vy": selected_vy, "vz": selected_vz, "v_mag": selected_vmag}
     return selected_x, selected_y, selected_z, attributes
 
@@ -144,7 +151,10 @@ def extractFromGalaxyparticles(galaxyproperties_path, galaxyparticles_path, vars
             selected_z.extend(_z)
             # selected_rho.extend(_rho)
             selected_mass.extend(_gal_mass_arrray)
-    attributes = {"mass": selected_mass}
+    selected_x = np.array(selected_x)
+    selected_y = np.array(selected_y)
+    selected_z = np.array(selected_z)
+    attributes = {"mass": np.array(selected_mass)}
     return selected_x, selected_y, selected_z, attributes
     # if(len(_x) != 0):
     #     pointsToVTK(output_filename, selected_x, selected_y, selected_z, data = {"rho" : selected_rho, "mass": selected_mass})
@@ -194,7 +204,10 @@ def extractFromGalaxyparticlesByRegion(galaxyproperties_path, galaxyparticles_pa
             selected_z.extend(_z)
             # selected_rho.extend(_rho)
             selected_mass.extend(_gal_mass_arrray)
-    attributes = {"mass": selected_mass}
+    selected_x = np.array(selected_x)
+    selected_y = np.array(selected_y)
+    selected_z = np.array(selected_z)
+    attributes = {"mass": np.array(selected_mass)}
     return selected_x, selected_y, selected_z, attributes
     # if(len(_x) != 0):
     #     pointsToVTK(output_filename, selected_x, selected_y, selected_z, data = {"rho" : selected_rho, "mass": selected_mass})
