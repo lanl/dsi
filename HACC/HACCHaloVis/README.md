@@ -138,21 +138,23 @@ The following sections provide examples for using **ParaView** or a **VTK-based 
 
 The extracted halos and their associated galaxies should be saved in the following directory structure in order to use the script directly:  
 
-├── suite_name
-│   ├── run0
-│   │   ├── ts0
-│   │   │   ├── halo_0.vtu
-│   │   │   ├── halo_1.vtu
-│   │   ├── ts1
-│   │   │   ├── halo_0.vtu
-│   │   │   ├── halo_1.vtu
-│   ├── run1
-│   │   ├── ts0
-│   │   │   ├── halo_0.vtu
-│   │   │   ├── halo_1.vtu
-│   │   ├── ts1
-│   │   │   ├── halo_0.vtu
-│   │   │   ├── halo_1.vtu
+```md
+suite_name 
+├── run0
+│   ├── ts0
+│   ├── ├── halo_0.vtu
+│   ├── ├── halo_1.vtu
+│   ├── ts1
+│   ├── ├── halo_0.vtu
+│   ├── ├── halo_1.vtu
+├── run1
+│   ├── ts0
+│   ├── ├── halo_0.vtu
+│   ├── ├── halo_1.vtu
+│   ├── ts1
+│   ├── ├── halo_0.vtu
+│   ├── ├── halo_1.vtu
+```
 
 ### VTK Renderer 
 

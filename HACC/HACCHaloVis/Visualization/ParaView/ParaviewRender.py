@@ -16,8 +16,8 @@ import math
 import sqlite3
 import time 
 import sys 
-sys.path.append('/Users/mhan/Desktop/HACCHaloVis/DBGenerator/')  
-sys.path.append('/Users/mhan/Desktop/HACCHaloVis/utils/')  
+sys.path.append('../DBGenerator/')  
+sys.path.append('../HACCHaloVis/utils/')  
 from database import Database 
 from cdb import *
 
