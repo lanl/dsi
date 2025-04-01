@@ -19,7 +19,9 @@ Detailed instructions for each component are outlined below.
 
 ## Part 1: Meta Database Creation
 
-This section will guide you through creating a meta-database using [DSI](https://github.com/lanl/dsi/tree/main) to efficiently organize and manage your simulation data.
+This section guides you through creating a metadata database using SQLite3 to efficiently organize and manage your simulation data.
+
+For examples of using DSI to create a metadata database, refer to the HACC reader in the DSI repository: [DSI HACC Reader](https://github.com/lanl/dsi/tree/hacc_dev/examples/hacc).
 
 ### Steps to Create a Metadata Database
 
@@ -51,18 +53,36 @@ python3 prepare_database.py --suite_paths /data/suite1 /data/suite2 --output_db_
 ### Prerequirement
 
 To extract and save halos and galaxies, the following libraries are required.
-(1) GenericIO (https://git.cels.anl.gov/hacc/genericio): replace the second line in extractParticles.py to your path to legacy_python in GenericIO. 
+(1) [GenericIO](https://git.cels.anl.gov/hacc/genericio): replace the second line in extractParticles.py to point to your own GenericIO path. Modify the path to: "genericio/legacy_python/"
 
-(2) PyEVTK (https://github.com/paulo-herrera/PyEVTK): pip install pyevtk
-
+(2) [PyEVTK](https://github.com/paulo-herrera/PyEVTK): pip install pyevtk
 
 ### Halos and Galaxies Extraction
+The two steps for extracting halos and galaxies including (1) finding which halos and galaxies to extract by their properties (2) extract and save halo and galaxies as a VTU file. 
+
+The script `DataExtraction/extraction_example.py` demonstrates how to retrieve essential halo and galaxy information using SQL commands first and then process extraction.  
+
+#### Step 1: Finding Halo and Galaxy Properties  
+
+Before performing extraction, it is important to determine which region, halo, or galaxy needs to be extracted.  
+This can be done efficiently using the metadata database created with DSI.  
+
+For example, the following SQL query selects all rows from the `halos` table where `halo_rank = 0` (i.e., the largest halo):  
+
+```sql
+SELECT * FROM halos WHERE halo_rank = 0;
+```
+
+#### Step 2: Extraction and Saving  
+
 There are two methods for extracting halos and galaxies:  
 
 1. **Extracting a subregion** by defining a center and radius.  
 2. **Extracting specific halos and their associated galaxies** based on predefined tags.  
 
 The extraction functions are located in `DataExtraction/extractParticles.py`.  
+
+To use other extraction functions, modify line 67 in `extraction_example.py`: [View the file here](https://github.com/lanl/dsi/blob/5523f1bc989b2387d8ed37c595376faf20867ad3/HACC/HACCHaloVis/DataExtraction/extraction_example.py#L67).  
 
 #### Extracting a Subregion  
 
@@ -82,20 +102,7 @@ All particles belonging to a selected halo or galaxy are included in the extract
 - `extractFromBighaloparticles`  
 - `extractFromGalaxyparticles`  
 
-### Finding Halo and Galaxy Properties  
-
-Before performing extraction, it is important to determine which region, halo, or galaxy needs to be extracted.  
-This can be done efficiently using the metadata database created with DSI.  
-
-The script `DataExtraction/extraction_example.py` demonstrates how to retrieve essential halo and galaxy information using SQL commands first and then process extraction.  
-
-For example, the following SQL query selects all rows from the `halos` table where `halo_rank = 0` (i.e., the largest halo):  
-
-```sql
-SELECT * FROM halos WHERE halo_rank = 0;
-```
-
-### Parallel Extraction  
+### Parallel using MPI 
 
 For extracting multiple halos and galaxies efficiently, use `haloExtractionMPI.py`, which leverages MPI for parallel processing.  
 This script requires the `mpi4py` package.  
@@ -106,6 +113,8 @@ Ensure `mpi4py` is installed before running the script:
 pip install mpi4py
 ```
 ---
+
+
 
 ##  Part 3: Cinema Database Creation  
 
