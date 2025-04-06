@@ -1,0 +1,112 @@
+(venv_dsi) (base) pascalgrosset@pn2301251 examples % python cli_2.py
+DSI version XXX
+Enter "help" for usage hints.
+
+dsi> fetch "https://raw.githubusercontent.com/dtaivpp/car_company_database/master/Car_Database.db"
+File downloaded successfully as Car_Database.db
+Database has 11 table/s.
+Car_Database.db successfully loaded.
+
+dsi> list
+Table: Customers
+  Number of Columns: 8
+  Row count: 6
+
+Table: Models
+  Number of Columns: 4
+  Row count: 17
+
+Table: Customer_Ownership
+  Number of Columns: 6
+  Row count: 5
+
+Table: Dealer_Brand
+  Number of Columns: 2
+  Row count: 13
+
+Table: Car_Parts
+  Number of Columns: 6
+  Row count: 7
+
+Table: Manufacture_Plant
+  Number of Columns: 5
+  Row count: 5
+
+Table: Brands
+  Number of Columns: 2
+  Row count: 6
+
+Table: Dealers
+  Number of Columns: 3
+  Row count: 4
+
+Table: Car_Options
+  Number of Columns: 8
+  Row count: 26
+
+Table: Car_Vins
+  Number of Columns: 5
+  Row count: 5
+
+dsi> schema Car_Options
+
+Schema for table 'Car_Options:'
+
+Column           | Type        | Not Null | PK    | Default
+-----------------------------------------------------------
+option_set_id    | INTEGER     | False    | True  | None   
+model_id         | INTEGER     | False    | False | None   
+engine_id        | INTEGER     | True     | False | None   
+transmission_id  | INTEGER     | True     | False | None   
+chassis_id       | INTEGER     | True     | False | None   
+premium_sound_id | INTEGER     | False    | False | None   
+color            | VARCHAR(30) | True     | False | None   
+option_set_price | INTEGER     | True     | False | None   
+
+
+dsi> display Car_Options
+option_set_id | model_id | engine_id | transmission_id | chassis_id | premium_sound_id | color         | option_set_price
+-------------------------------------------------------------------------------------------------------------------------
+1             | 4        | 2         | 4               | 6          | 5                | Blue          | 2000            
+2             | 5        | 2         | 4               | 6          | 5                | Yellow        | 1200            
+3             | 6        | 1         | 4               | 7          | 5                | Green         | 1100            
+4             | 15       | 1         | 4               | 7          | 5                | Red           | 4000            
+5             | 14       | 2         | 4               | 7          | 5                | Sky           | 3000            
+6             | 16       | 2         | 4               | 7          | 5                | Birthday Cake | 2500            
+7             | 17       | 3         | 4               | 6          | 5                | Cyan          | 7000            
+8             | 10       | 1         | 4               | 6          | 5                | Purple        | 2500            
+9             | 11       | 2         | 4               | 6          | 5                | Red           | 10000           
+10            | 12       | 2         | 4               | 7          | 5                | Blue          | 11300           
+11            | 13       | 1         | 4               | 7          | 5                | Green         | 23000           
+12            | 1        | 1         | 4               | 7          | None             | Black         | 1100            
+13            | 2        | 1         | 4               | 7          | None             | Blue          | 2000            
+14            | 3        | 1         | 4               | 6          | None             | Red           | 1500            
+15            | 4        | 3         | 4               | 6          | None             | Yellow        | 4000            
+16            | 5        | 2         | 4               | 6          | None             | Black         | 3600            
+17            | 7        | 2         | 4               | 6          | None             | White         | 2300            
+18            | 8        | 2         | 4               | 7          | None             | Pretty        | 2200            
+19            | 9        | 3         | 4               | 7          | None             | Glitter BomB  | 2900            
+20            | 14       | 1         | 4               | 7          | None             | Nyan          | 7999            
+21            | 12       | 1         | 4               | 7          | None             | Ultraviolet   | 25000           
+22            | 11       | 1         | 4               | 7          | None             | Transparent   | 40000           
+23            | 6        | 2         | 4               | 6          | None             | Green         | 1200            
+24            | 2        | 1         | 4               | 6          | None             | Purple        | 3900            
+25            | 1        | 2         | 4               | 7          | None             | Red           | 900             
+26            | 11       | 2         | 4               | 6          | None             | Magenta       | 200             
+
+...showing only the top 25 rows
+Total number of rows: 26
+
+
+dsi> export_table Car_Options Car_Options.csv
+Query results exported to 'Car_Options.csv'.
+
+
+dsi> export_table Car_Options Car_Options.csv
+Query results exported to 'Car_Options.csv'.
+
+
+dsi> save local_car.sqlite
+Database saved to 'local_car.sqlite'.
+dsi> exit
+Exiting...

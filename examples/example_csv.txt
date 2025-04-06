@@ -1,0 +1,85 @@
+(venv_dsi) (base) pascalgrosset@pn2301251 examples % python cli_2.py
+DSI version XXX
+Enter "help" for usage hints.
+
+dsi> help
+display <table name>                 Display the contents of that table
+exit                                 Exit the DSI command line Interface
+export_table <table name> <csv_file> Export the contents of that table database to csv
+fetch <database url>                 Fetch and loads a remote databse
+help                                 Shows this help
+import <filename>                    Import the contents of this file to the current DSI database
+list                                 Lists the tables in the databse
+load <filename>                      Loads this file to a DSI database
+query <SQL query>                    Queries the database
+query_export <SQL query> <csv_file>  Queries the database and output to CSV
+save <filename>                      Save the local database as filename
+schema <table>                       Get the schema of a specific table
+
+dsi> load data/yosemite5.csv
+Loaded 'data/yosemite5.csv' into table 'yosemite5.
+Database has 1 table/s.
+data/yosemite5.csv successfully loaded.
+
+dsi> import data/wildfiredata.csv
+Loaded 'data/wildfiredata.csv' into table 'wildfiredata.
+Database has 2 table/s.
+
+
+dsi> list
+Table: yosemite5
+  Number of Columns: 9
+  Row count: 4
+
+Table: wildfiredata
+  Number of Columns: 11
+  Row count: 4
+
+dsi> schema wildfiredata
+
+Schema for table 'wildfiredata:'
+
+Column                       | Type    | Not Null | PK    | Default
+-------------------------------------------------------------------
+wind_speed                   | INTEGER | False    | False | None   
+wdir                         | INTEGER | False    | False | None   
+smois                        | REAL    | False    | False | None   
+fuels                        | TEXT    | False    | False | None   
+ignition                     | TEXT    | False    | False | None   
+safe_unsafe_ignition_pattern | TEXT    | False    | False | None   
+safe_unsafe_fire_behavior    | TEXT    | False    | False | None   
+does_fire_meet_objectives    | TEXT    | False    | False | None   
+rationale_if_unsafe          | INTEGER | False    | False | None   
+burned_area                  | INTEGER | False    | False | None   
+FILE                         | TEXT    | False    | False | None   
+
+
+dsi> display wildfirewildfiredata
+Query error: no such table: wildfirewildfiredata
+
+
+dsi> display wildfiredata
+wind_speed | wdir | smois | fuels          | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET    | ST5_ignite_contour.dat | safe                         | safe                      | yes                       |                     | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
+8          | 225  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_contour.dat | safe                         | unsafe                    | no                        |                     | 169302      | https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png
+8          | 195  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_ring.dat    | safe                         | unsafe                    | no                        |                     | 187542      | https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png
+5          | 240  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_strip.dat   | safe                         | unsafe                    | no                        |                     | 181583      | https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png
+Total number of rows: 4
+
+
+dsi> query "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'"
+wind_speed | wdir | smois | fuels       | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET | ST5_ignite_contour.dat | safe                         | safe                      | yes                       |                     | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
+Total number of rows: 1
+
+
+dsi> save wildfiredb.sqlite
+Database saved to 'wildfiredb.sqlite'.
+dsi> query_export "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'" safe_db.csv
+Query results exported to 'safe_db.csv'.
+
+
+dsi> exit
+Exiting...

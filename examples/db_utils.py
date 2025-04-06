@@ -162,7 +162,7 @@ class Store:
     def get_schema(self, table_name):
         cursor = self.conn.cursor()
 
-        print(f"\n=== Schema for table '{table_name}' ===")
+        print(f"\nSchema for table '{table_name}:'")
 
         # Get column metadata
         cursor.execute(f"PRAGMA table_info({table_name})")
@@ -185,6 +185,8 @@ class Store:
         # Print each row
         for row in rows:
             print(" | ".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row))))
+        
+        print("\n")
 
 
 
@@ -201,7 +203,7 @@ class Store:
             # Get column names (headers)
             cursor.execute(f"PRAGMA table_info({table})")
             columns = [col[1] for col in cursor.fetchall()]
-            print(f"  Columns: {columns}")
+            print(f"  Number of Columns: {len(columns)}")
 
             # Get row count
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
@@ -346,8 +348,16 @@ class Store:
             print("-" * len(header))
 
             # Print each row
+            count = 0
             for row in rows:
                 print(" | ".join(f"{str(value):<{col_widths[i]}}" for i, value in enumerate(row)))
+                
+                count = count + 1
+                if count > 25:
+                    print("\n...showing only the top 25 rows")
+                    break
+            
+            print(f"Total number of rows: {len(rows)}")
 
         except sqlite3.Error as e:
             print(f"Query error: {e}")
