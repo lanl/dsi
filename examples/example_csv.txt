@@ -1,43 +1,42 @@
-(venv_dsi) (base) pascalgrosset@pn2301251 examples % python cli_2.py
-DSI version XXX
+(env_dsi) pascalgrosset@pn2035929:~/projects/dsi/examples$ python dsi_cli.py 
+DSI version 1.1
 Enter "help" for usage hints.
 
 dsi> help
-display <table name>                 Display the contents of that table
-exit                                 Exit the DSI command line Interface
-export_table <table name> <csv_file> Export the contents of that table database to csv
-fetch <database url>                 Fetch and loads a remote databse
+display <table name>  [num rows]     Displays the contents of that table, num rows is optional
+exit                                 Exit the DSI Command Line Interface (CLI)
+export_table <table name> <csv_file> Export the contents of that table to a CSV file
+fetch <database url>                 Fetch and loads a remote database
 help                                 Shows this help
-import <filename>                    Import the contents of this file to the current DSI database
-list                                 Lists the tables in the databse
+import <filename>                    Imports file to the current DSI database
+list                                 Lists the tables in the current DSI databse
 load <filename>                      Loads this file to a DSI database
-query <SQL query>                    Queries the database
-query_export <SQL query> <csv_file>  Queries the database and output to CSV
-save <filename>                      Save the local database as filename
-schema <table>                       Get the schema of a specific table
+query <SQL query> [num rows]         Runs a query, num rows is optional
+query_export <SQL query> <csv_file>  Export the result of thje query to a CSV file
+save <filename>                      Save the local database as <filename>
+schema <table>                       Get the schema of a table
 
 dsi> load data/yosemite5.csv
 Loaded 'data/yosemite5.csv' into table 'yosemite5.
-Database has 1 table/s.
+Database has 1 table
 data/yosemite5.csv successfully loaded.
 
 dsi> import data/wildfiredata.csv
 Loaded 'data/wildfiredata.csv' into table 'wildfiredata.
-Database has 2 table/s.
-
+Database now has 2 table
 
 dsi> list
+
 Table: yosemite5
-  Number of Columns: 9
-  Row count: 4
+  - num of columns: 9
+  - num of rows: 4
 
 Table: wildfiredata
-  Number of Columns: 11
-  Row count: 4
+  - num of columns: 11
+  - num of rows: 4
+
 
 dsi> schema wildfiredata
-
-Schema for table 'wildfiredata:'
 
 Column                       | Type    | Not Null | PK    | Default
 -------------------------------------------------------------------
@@ -54,32 +53,30 @@ burned_area                  | INTEGER | False    | False | None
 FILE                         | TEXT    | False    | False | None   
 
 
-dsi> display wildfirewildfiredata
-Query error: no such table: wildfirewildfiredata
-
-
 dsi> display wildfiredata
+<class 'list'>
+
 wind_speed | wdir | smois | fuels          | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 2          | 180  | 0.05  | ST5_FF_DUET    | ST5_ignite_contour.dat | safe                         | safe                      | yes                       |                     | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
 8          | 225  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_contour.dat | safe                         | unsafe                    | no                        |                     | 169302      | https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png
 8          | 195  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_ring.dat    | safe                         | unsafe                    | no                        |                     | 187542      | https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png
 5          | 240  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_strip.dat   | safe                         | unsafe                    | no                        |                     | 181583      | https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png
-Total number of rows: 4
 
 
 dsi> query "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'"
+
 wind_speed | wdir | smois | fuels       | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 2          | 180  | 0.05  | ST5_FF_DUET | ST5_ignite_contour.dat | safe                         | safe                      | yes                       |                     | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
-Total number of rows: 1
+
+
 
 
 dsi> save wildfiredb.sqlite
 Database saved to 'wildfiredb.sqlite'.
 dsi> query_export "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'" safe_db.csv
 Query results exported to 'safe_db.csv'.
-
 
 dsi> exit
 Exiting...

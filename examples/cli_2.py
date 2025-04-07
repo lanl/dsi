@@ -47,7 +47,7 @@ readline.parse_and_bind('tab: complete')
 
 
 def help_fn(args):
-    print("display <table name>                 Display the contents of that table")
+    print("display <table name>  [rows]         Display the contents of that table, num rows is optional")
     print("exit                                 Exit the DSI command line Interface")
     print("export_table <table name> <csv_file> Export the contents of that table database to csv")
     print("fetch <database url>                 Fetch and loads a remote databse")
@@ -55,36 +55,94 @@ def help_fn(args):
     print("import <filename>                    Import the contents of this file to the current DSI database")
     print("list                                 Lists the tables in the databse")
     print("load <filename>                      Loads this file to a DSI database")
-    print("query <SQL query>                    Queries the database")
+    print("query <SQL query> [num rows]         Queries the database, num rows is optional")
     print("query_export <SQL query> <csv_file>  Queries the database and output to CSV")
     print("save <filename>                      Save the local database as filename")
     print("schema <table>                       Get the schema of a specific table\n")
     
 
-def version():
-    print("DSI version XXX")
-    print("Enter \"help\" for usage hints.\n")
-
-
-def info(args):
-    a.info()
-    
     
 def clear(args):
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-def schema(args):
-    try:
-        a.get_schema(args[0])
-    except Exception as e:
-        print(f"An error {e} occurred getting the schema of table {args[0]}\n")   
+def display(args):
+    
+    num_rows = 25
+    if (len(args) > 1):
+        num_rows = args[1]
 
+    results, headers = a.query(f"Select * from {args[0]}")
+    a.pretty_print(headers, results, num_rows)
+    print("\n")
+
+
+def exit_shell(args):
+    print("Exiting...")
+    exit(0)
+
+
+def export_csv(args):
+    results, headers = a.query(f"Select * from {args[0]}")
+    a.output_csv(headers, results, args[1])
+    print("\n")
+
+
+def export_to_file(args):
+    query = f"select * from {args[0]}"
+    a.query_to_csv(query, args[1])
+    print("\n")
+
+
+def fetch(args):
+    url = args[0]    
+    output_path = url.split('/')[-1]    
+
+    try:
+       # Use certifi's trusted certificate bundle
+        context = ssl._create_unverified_context()
+
+        # Use urlopen instead of urlretrieve
+        with urllib.request.urlopen(url, context=context) as response:
+            with open(output_path, 'wb') as out_file:
+                out_file.write(response.read())
+        
+        print(f"File downloaded successfully as {output_path}")
+        
+        load([output_path])
+    except Exception as e:
+        print(f"Download failed: {e}")
+    
+         
+def import_file(args):
+    db_filename = args[0]
+    file_extension = db_filename.rsplit(".", 1)[-1]
+    
+    if file_extension == 'csv':
+        try:
+            a.load_csv_to_sqlite(args[0])
+            a.get_num_tables()
+            print("\n")
+        except Exception as e:
+            print(f"An error {e} occurred loading {db_filename}\n") 
+    else:
+        print("This database format is not supported. Currently supported imports formats are: ")
+        print("   - csv (extension: .csv)\n")
+
+
+def info(args):
+    db_info = a.info()
+    for table in db_info:
+        print(f"Table: f{table[0]}")
+        print(f"  num of columns: f{table[1]}")
+        print(f"  num of rows: f{table[2]}")
+    print("\n")
+    
 
 def load(args):
     db_filename = args[0]
     file_extension = db_filename.rsplit(".", 1)[-1]
-    if file_extension == 'db' or file_extension == 'sqlite' or file_extension == 'sqlite3':
+    if a.is_sqlite3_file(db_filename):
         try:
             a.connect_to_db(db_filename)
             a.get_num_tables()
@@ -110,76 +168,39 @@ def load(args):
         print("   - sqlite (extension: .db, .sqlite, .sqlite3)\n")
 
 
-def import_file(args):
-    db_filename = args[0]
-    file_extension = db_filename.rsplit(".", 1)[-1]
-    
-    if file_extension == 'csv':
-        try:
-            a.load_csv_to_sqlite(args[0])
-            a.get_num_tables()
-            print("\n")
-        except Exception as e:
-            print(f"An error {e} occurred loading {db_filename}\n") 
-    else:
-        print("This database format is not supported. Currently supported imports formats are: ")
-        print("   - csv (extension: .csv)\n")
-
-
-def save_to_file(args):
-    a.copy_sqlite_db(args[0])
-
-
-def export_csv(args):
-    a.query_to_csv(f"Select * from {args[0]}", args[1])
-    print("\n")
-
-
-def display(args):
-    a.pretty_query(f"Select * from {args[0]}")
-    print("\n")
-
-
 def query(args):
-    a.pretty_query(args[0])
+    num_rows = 25
+    if (len(args) > 1):
+        num_rows = args[1]
+
+    results, headers = a.query(args[0])
+    a.pretty_print(headers, results, num_rows)
     print("\n")
 
-
-def fetch(args):
-    url = args[0]    
-    output_path = url.split('/')[-1]    
-
-    try:
-       # Use certifi's trusted certificate bundle
-        context = ssl._create_unverified_context()
-
-        # Use urlopen instead of urlretrieve
-        with urllib.request.urlopen(url, context=context) as response:
-            with open(output_path, 'wb') as out_file:
-                out_file.write(response.read())
-        
-        print(f"File downloaded successfully as {output_path}")
-        
-        load([output_path])
-    except Exception as e:
-        print(f"Download failed: {e}")
-    
-         
 
 def query_export(args):
     a.query_to_csv(args[0], args[1])
     print("\n")
 
 
-def exit_shell(args):
-    print("Exiting...")
-    exit(0)
+def save_to_file(args):
+    a.copy_sqlite_db(args[0])
 
 
-def export_to_file(args):
-    query = f"select * from {args[0]}"
-    a.query_to_csv(query, args[1])
-    print("\n")
+def schema(args):
+    try:
+        headers, rows = a.get_schema(args[0])
+        a.pretty_print(headers, rows, -1)
+    except Exception as e:
+        print(f"An error {e} occurred getting the schema of table {args[0]}\n")   
+
+
+def version():
+    print("DSI version XXX")
+    print("Enter \"help\" for usage hints.\n")
+
+
+
 
 
 COMMANDS = {

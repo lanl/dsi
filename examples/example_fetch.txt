@@ -1,56 +1,52 @@
-(venv_dsi) (base) pascalgrosset@pn2301251 examples % python cli_2.py
-DSI version XXX
-Enter "help" for usage hints.
-
 dsi> fetch "https://raw.githubusercontent.com/dtaivpp/car_company_database/master/Car_Database.db"
 File downloaded successfully as Car_Database.db
-Database has 11 table/s.
+Database has 11 table
 Car_Database.db successfully loaded.
 
 dsi> list
+
 Table: Customers
-  Number of Columns: 8
-  Row count: 6
+  - num of columns: 8
+  - num of rows: 6
 
 Table: Models
-  Number of Columns: 4
-  Row count: 17
+  - num of columns: 4
+  - num of rows: 17
 
 Table: Customer_Ownership
-  Number of Columns: 6
-  Row count: 5
+  - num of columns: 6
+  - num of rows: 5
 
 Table: Dealer_Brand
-  Number of Columns: 2
-  Row count: 13
+  - num of columns: 2
+  - num of rows: 13
 
 Table: Car_Parts
-  Number of Columns: 6
-  Row count: 7
+  - num of columns: 6
+  - num of rows: 7
 
 Table: Manufacture_Plant
-  Number of Columns: 5
-  Row count: 5
+  - num of columns: 5
+  - num of rows: 5
 
 Table: Brands
-  Number of Columns: 2
-  Row count: 6
+  - num of columns: 2
+  - num of rows: 6
 
 Table: Dealers
-  Number of Columns: 3
-  Row count: 4
+  - num of columns: 3
+  - num of rows: 4
 
 Table: Car_Options
-  Number of Columns: 8
-  Row count: 26
+  - num of columns: 8
+  - num of rows: 26
 
 Table: Car_Vins
-  Number of Columns: 5
-  Row count: 5
+  - num of columns: 5
+  - num of rows: 5
+
 
 dsi> schema Car_Options
-
-Schema for table 'Car_Options:'
 
 Column           | Type        | Not Null | PK    | Default
 -----------------------------------------------------------
@@ -65,6 +61,7 @@ option_set_price | INTEGER     | True     | False | None
 
 
 dsi> display Car_Options
+
 option_set_id | model_id | engine_id | transmission_id | chassis_id | premium_sound_id | color         | option_set_price
 -------------------------------------------------------------------------------------------------------------------------
 1             | 4        | 2         | 4               | 6          | 5                | Blue          | 2000            
@@ -92,21 +89,11 @@ option_set_id | model_id | engine_id | transmission_id | chassis_id | premium_so
 23            | 6        | 2         | 4               | 6          | None             | Green         | 1200            
 24            | 2        | 1         | 4               | 6          | None             | Purple        | 3900            
 25            | 1        | 2         | 4               | 7          | None             | Red           | 900             
-26            | 11       | 2         | 4               | 6          | None             | Magenta       | 200             
-
-...showing only the top 25 rows
-Total number of rows: 26
+  ... showing 25 of 26 rows
 
 
-dsi> export_table Car_Options Car_Options.csv
-Query results exported to 'Car_Options.csv'.
-
-
-dsi> export_table Car_Options Car_Options.csv
-Query results exported to 'Car_Options.csv'.
-
+dsi> export_table Car_Options car_options.csv
+Query results exported to 'car_options.csv'.
 
 dsi> save local_car.sqlite
 Database saved to 'local_car.sqlite'.
-dsi> exit
-Exiting...

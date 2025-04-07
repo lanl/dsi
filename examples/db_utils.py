@@ -45,9 +45,17 @@ class Store:
         self.conn.close()
 
 
+    def is_sqlite3_file(self, filename):
+        if not os.path.isfile(filename):
+            return False
+        with open(filename, 'rb') as f:
+            header = f.read(16)
+        return header == b'SQLite format 3\x00'
+
+
     def copy_sqlite_db(self, dest_path):
         shutil.copyfile(self.path , dest_path)
-        print(f"Database saved to '{dest_path}'.")
+        
 
 
     def connect_to_db(self, path):
@@ -71,13 +79,32 @@ class Store:
         self.logger.info(f"Database '{path}' connected to.")
 
 
+    def sql_to_db(self, sql_file_path, db_path):
+        if not os.path.isfile(sql_file_path):
+            raise FileNotFoundError(f"SQL file not found: {sql_file_path}")
+
+        with open(sql_file_path, 'r') as f:
+            sql_script = f.read()
+
+        self.path = path
+        self.conn = sqlite3.connect(path)
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.executescript(sql_script)
+            self.conn.commit()
+            print("SQL script executed successfully.")
+        except sqlite3.Error as e:
+            print("An error occurred while executing SQL:")
+            print(e)
+
 
     def get_num_tables(self):
         cursor = self.conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         
         tables = cursor.fetchall()
-        print(f"Database has {len(tables)} table/s.")
+        return len(tables)
 
 
 
@@ -122,6 +149,7 @@ class Store:
         return "INTEGER"
 
 
+
     def load_csv_to_sqlite(self, csv_path, table_name=None, sample_size=100):
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"CSV file '{csv_path}' not found.")
@@ -159,10 +187,34 @@ class Store:
 
 
 
+    def pretty_print(self, headers, rows, max_rows=25):
+        #Determine max width for each column
+        col_widths = [max(len(str(h)), max((len(r[i]) for r in rows), default=0)) for i, h in enumerate(headers)]
+
+        # Print header
+        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
+        print("\n" + header_row)
+        print("-" * len(header_row))
+
+        # Print each row
+        count = 0
+        for row in rows:
+            print(" | ".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row))))
+
+            count = count + 1
+            if count == max_rows:
+                print(f"  ... showing 25 of {len(rows)}")
+                break
+
+
+        
+        print("\n")
+
+
     def get_schema(self, table_name):
         cursor = self.conn.cursor()
 
-        print(f"\nSchema for table '{table_name}:'")
+        #print(f"\nSchema for table '{table_name}:'")
 
         # Get column metadata
         cursor.execute(f"PRAGMA table_info({table_name})")
@@ -174,41 +226,35 @@ class Store:
         for _, name, dtype, notnull, default, pk in columns:
             rows.append([str(name), str(dtype), str(bool(notnull)), str(bool(pk)), str(default)])
 
-        # Determine max width for each column
-        col_widths = [max(len(str(h)), max((len(r[i]) for r in rows), default=0)) for i, h in enumerate(headers)]
-
-        # Print header
-        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-        print("\n" + header_row)
-        print("-" * len(header_row))
-
-        # Print each row
-        for row in rows:
-            print(" | ".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row))))
-        
-        print("\n")
+        return headers, rows
 
 
 
-    def info(self):
+    def get_tables_info(self):
         cursor = self.conn.cursor()
 
         # Step 1: Get all table names
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         tables = [row[0] for row in cursor.fetchall()]
 
+        db_info = []
         for table in tables:
-            print(f"Table: {table}")
+            table_info = []
+            table_info.append(table)
 
             # Get column names (headers)
             cursor.execute(f"PRAGMA table_info({table})")
             columns = [col[1] for col in cursor.fetchall()]
-            print(f"  Number of Columns: {len(columns)}")
+            table_info.append(len(columns))
 
             # Get row count
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             row_count = cursor.fetchone()[0]
-            print(f"  Row count: {row_count}\n")
+            table_info.append(row_count)
+
+            db_info.append(table_info)
+
+        return db_info
 
 
 
@@ -332,54 +378,13 @@ class Store:
             return False
         
 
-    def pretty_query(self, query):
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            col_names = [description[0] for description in cursor.description]
+    def output_csv(self, column_names, rows, csv_path):
+        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(column_names)  # write header
+            writer.writerows(rows)         # write data
 
-            # Determine column widths
-            col_widths = [max(len(str(value)) for value in [col] + [row[i] for row in rows]) for i, col in enumerate(col_names)]
-
-            # Print header
-            header = " | ".join(f"{col:<{col_widths[i]}}" for i, col in enumerate(col_names))
-            print(header)
-            print("-" * len(header))
-
-            # Print each row
-            count = 0
-            for row in rows:
-                print(" | ".join(f"{str(value):<{col_widths[i]}}" for i, value in enumerate(row)))
-                
-                count = count + 1
-                if count > 25:
-                    print("\n...showing only the top 25 rows")
-                    break
-            
-            print(f"Total number of rows: {len(rows)}")
-
-        except sqlite3.Error as e:
-            print(f"Query error: {e}")
-
-
-    def query_to_csv(self, query, csv_path):
-        cursor = self.conn.cursor()
-
-        try:
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            column_names = [description[0] for description in cursor.description]
-
-            with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(column_names)  # write header
-                writer.writerows(rows)         # write data
-
-            print(f"Query results exported to '{csv_path}'.")
-
-        except sqlite3.Error as e:
-            print(f"Query failed: {e}")
+        print(f"Query results exported to '{csv_path}'.\n")
 
 
 
@@ -401,6 +406,7 @@ class Store:
             # Try executing the query
             cursor.execute(query)
             results = cursor.fetchall()
+            col_names = [description[0] for description in cursor.description]
         except sqlite3.Error as e:
             print(f"Invalid SQL query: {e}")
             results = None
@@ -411,7 +417,7 @@ class Store:
 
         cursor.close()
 
-        return results
+        return results, col_names
     
 
 
