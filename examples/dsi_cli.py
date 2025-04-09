@@ -1,11 +1,26 @@
 import shlex
 import readline 
+from urllib.parse import urlparse
 import urllib.request
+import importlib.util
 import glob
 import ssl
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from db_utils import *
 
+
+def is_url(s: str) -> bool:
+    try:
+        result = urlparse(s)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
+
+def is_package_installed(pkg_name: str) -> bool:
+    return importlib.util.find_spec(pkg_name) is not None
+    
 
 def path_completer(text, state):
     """
@@ -56,23 +71,24 @@ class DSI_Cli:
     
 
     def help_fn(self, args):
-        print("display <table name>  [num rows]     Displays the contents of that table, num rows is optional")
+        print("display <table name> [num rows]      Displays the contents of that table, num rows is optional")
         print("exit                                 Exit the DSI Command Line Interface (CLI)")
-        print("export_table <table name> <csv_file> Export the contents of that table to a CSV file")
-        print("fetch <database url>                 Fetch and loads a remote database")
+        print("export_table <table> <filename>      Export the contents of that table to a CSV/parquet file")
+        #print("fetch <database url>                 Fetch and loads a remote database")
         print("help                                 Shows this help")
         print("import <filename>                    Imports file to the current DSI database")
         print("list                                 Lists the tables in the current DSI databse")
-        print("load <filename>                      Loads this file to a DSI database")
+        print("load <database>                      Loads this filename/url to a DSI database")
         print("query <SQL query> [num rows]         Runs a query, num rows is optional")
-        print("query_export <SQL query> <csv_file>  Export the result of thje query to a CSV file")
+        print("query_export <SQL query> <filename>  Export the result of thje query to a CSV/parquet file")
         print("save <filename>                      Save the local database as <filename>")
-        print("schema <table>                       Get the schema of a table\n")
+        print("schema <table>                       Get the schema of a table")
+        print("summary [table]                      Get a summary of the database or just a table\n")
     
     
     def clear(self, args):
         '''
-        Clears the comman line
+        Clears the command line
         '''
         os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -99,13 +115,21 @@ class DSI_Cli:
 
     def export_csv(self, args):
         '''
-        Exports to a csv file
+        Exports to a csv/parquet file
         '''
         results, headers = self.a.query(f"Select * from {args[0]}")
-        self._output_csv(headers, results, args[1])
+
+        extension = args[1].rsplit('.', 1)[-1]
+        if extension  == "csv":
+            self._output_csv(headers, results, args[1])
+        elif extension == "pq" or extension == "parquet":
+            self._output_parquet(headers, results, args[1])
+        else:
+            print("Export format not supported!\n")
+            
 
 
-    def fetch(self, args):
+    def _fetch(self, args):
         '''
         Fetches a remote file and opens it
         '''
@@ -140,7 +164,8 @@ class DSI_Cli:
                 self.a.load_csv_to_sqlite(args[0])
                 print(f"Database now has {self.a.get_num_tables()} table\n")
             except Exception as e:
-                print(f"An error {e} occurred loading {db_filename}\n") 
+                print(f"An error {e} occurred loading {db_filename}") 
+                print("Hint: when the database is empty, please use load.\n")
         else:
             print("This database format is not supported. Currently supported imports formats are: ")
             print("   - csv (extension: .csv)\n")
@@ -162,6 +187,17 @@ class DSI_Cli:
         '''
         Loads a database
         '''
+        if len(args) == 0:
+            if os.path.exists(".temp.db"):
+                os.remove(".temp.db")
+                self.a.connect_to_db(".temp.db")
+                print(f"Database initialized with no table. Please import some data...\n")
+                return
+
+        if is_url(args[0]): # if it's a url, do fetch
+            self._fetch(args)
+            return
+        
         db_filename = args[0]
         file_extension = db_filename.rsplit(".", 1)[-1]
         if self.a.is_sqlite3_file(db_filename):
@@ -208,7 +244,15 @@ class DSI_Cli:
         Save the result of the query to a csv file
         '''
         results, headers = self.a.query(args[0])
-        self._output_csv(headers, results, args[1])
+        #self._output_csv(headers, results, args[1])
+        
+        extension = args[1].rsplit('.', 1)[-1]
+        if extension  == "csv":
+            self._output_csv(headers, results, args[1])
+        elif extension == "pq" or extension == "parquet":
+            self._output_parquet(headers, results, args[1])
+        else:
+            print("Export format not supported!\n")
 
 
     def save_to_file(self, args):
@@ -228,6 +272,19 @@ class DSI_Cli:
             self._pretty_print(headers, rows, -1)
         except Exception as e:
             print(f"An error {e} occurred getting the schema of table {args[0]}\n")   
+
+
+    def summary(self, args):
+        '''
+        Get the summary of a table or database
+        '''
+        if len(args) > 0:
+            print(f"Summary of table {args[0]}:")
+        else:
+            print(f"Summary for database:")
+        
+        return 
+
 
 
     def version(self):
@@ -284,6 +341,16 @@ class DSI_Cli:
         print(f"Query results exported to '{csv_path}'.\n")
 
 
+    def _output_parquet(self, headers, data, file_path):
+        # Convert to PyArrow Table
+        columns = list(zip(*data)) if data else [[] for _ in headers]
+        arrays = [pa.array(col) for col in columns]
+        table = pa.table(arrays, names=headers)
+        pq.write_table(table, file_path)
+
+        print(f"Query results exported to '{file_path}'.\n")
+
+
 
 cli = DSI_Cli()
 
@@ -293,7 +360,7 @@ COMMANDS = {
     'display' : cli.display,
     'exit': cli.exit_cli,
     'export_table' : cli.export_csv,
-    'fetch' : cli.fetch,
+    #'fetch' : cli.fetch,
     'help': cli.help_fn,
     'import' : cli.import_file,
     'list' : cli.info,
@@ -301,7 +368,8 @@ COMMANDS = {
     'query' : cli.query,
     'query_export' : cli.query_export,
     'save' : cli.save_to_file,
-    'schema' : cli.schema
+    'schema' : cli.schema,
+    'summary' : cli.summary,
 }
 
 

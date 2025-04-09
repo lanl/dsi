@@ -1,4 +1,8 @@
-dsi> fetch "https://raw.githubusercontent.com/dtaivpp/car_company_database/master/Car_Database.db"
+(env_dsi) pascalgrosset@pn2035929:~/projects/dsi/examples$ python dsi_cli.py 
+DSI version 1.1
+Enter "help" for usage hints.
+
+dsi> load "https://raw.githubusercontent.com/dtaivpp/car_company_database/master/Car_Database.db"
 File downloaded successfully as Car_Database.db
 Database has 11 table
 Car_Database.db successfully loaded.
@@ -97,3 +101,6 @@ Query results exported to 'car_options.csv'.
 
 dsi> save local_car.sqlite
 Database saved to 'local_car.sqlite'.
+
+dsi> exit
+Exiting...

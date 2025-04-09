@@ -1,20 +1,19 @@
-(env_dsi) pascalgrosset@pn2035929:~/projects/dsi/examples$ python dsi_cli.py 
 DSI version 1.1
 Enter "help" for usage hints.
 
 dsi> help
-display <table name>  [num rows]     Displays the contents of that table, num rows is optional
+display <table name> [num rows]      Displays the contents of that table, num rows is optional
 exit                                 Exit the DSI Command Line Interface (CLI)
-export_table <table name> <csv_file> Export the contents of that table to a CSV file
-fetch <database url>                 Fetch and loads a remote database
+export_table <table> <filename>      Export the contents of that table to a CSV/parquet file
 help                                 Shows this help
 import <filename>                    Imports file to the current DSI database
 list                                 Lists the tables in the current DSI databse
-load <filename>                      Loads this file to a DSI database
+load <database>                      Loads this filename/url to a DSI database
 query <SQL query> [num rows]         Runs a query, num rows is optional
-query_export <SQL query> <csv_file>  Export the result of thje query to a CSV file
+query_export <SQL query> <filename>  Export the result of thje query to a CSV/parquet file
 save <filename>                      Save the local database as <filename>
 schema <table>                       Get the schema of a table
+summary [table]                      Get a summary of the database or just a table
 
 dsi> load data/yosemite5.csv
 Loaded 'data/yosemite5.csv' into table 'yosemite5.
@@ -24,16 +23,6 @@ data/yosemite5.csv successfully loaded.
 dsi> import data/wildfiredata.csv
 Loaded 'data/wildfiredata.csv' into table 'wildfiredata.
 Database now has 2 table
-
-dsi> list
-
-Table: yosemite5
-  - num of columns: 9
-  - num of rows: 4
-
-Table: wildfiredata
-  - num of columns: 11
-  - num of rows: 4
 
 
 dsi> schema wildfiredata
@@ -54,7 +43,6 @@ FILE                         | TEXT    | False    | False | None
 
 
 dsi> display wildfiredata
-<class 'list'>
 
 wind_speed | wdir | smois | fuels          | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -73,10 +61,8 @@ wind_speed | wdir | smois | fuels       | ignition               | safe_unsafe_i
 
 
 
-dsi> save wildfiredb.sqlite
-Database saved to 'wildfiredb.sqlite'.
-dsi> query_export "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'" safe_db.csv
-Query results exported to 'safe_db.csv'.
+dsi> query_export "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'" safe_db.parquet
+Query results exported to 'safe_db.parquet'.
 
 dsi> exit
 Exiting...
