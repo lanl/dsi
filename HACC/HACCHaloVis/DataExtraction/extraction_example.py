@@ -13,7 +13,7 @@ if __name__ == "__main__":
     output_path = "/lus/eagle/projects/CosDiscover/mengjiao/test/"
     ## link your metadata database
     # database = Database("/home/mhan/projects/HACCReader/test.db")
-    database_path = "/home/mhan/projects/HACCReader/test.db"
+    database_path = "/home/mhan/projects/dsi/examples/hacc/hacc.db"
     conn = sqlite3.connect(database_path) 
     ## a SQL query command which select all rows, where halo_rank = 0 (largest) from halos table 
     sql = "SELECT * FROM hacc__halos WHERE halo_rank = 0;"
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         paths = cursor.fetchall()
         path = paths[0]['run_path']
         basename = os.path.basename(os.path.normpath(path))
-        print(basename)
+        # print(basename, halo_center_x, halo_center_y, halo_center_z)
         bighaloparticles_path = os.path.join(path, bighaloparticles_path)
         galaxyproperties_path = os.path.join(path, galaxyproperties_path)
         galaxyparticles_path = os.path.join(path, galaxyparticles_path)
@@ -64,7 +64,17 @@ if __name__ == "__main__":
         print(cur_output_path)
         create_directory(cur_output_path)
         output_halo_filename = os.path.join(cur_output_path, "halo_" + str(halo_rank))
-        [x, y, z, attributes] = extractFromBighaloparticlesByRegion(bighaloparticles_path, halo_center_x, halo_center_y, halo_center_z, halo_radius, vars)
-        # [x, y, z, attributes] = extractFromBighaloparticles(bighaloparticles_path, halo_tag, halo_center_x, halo_center_y, halo_center_z, halo_radius, vars)
+        print("big halo", bighaloparticles_path)
+        # [x, y, z, attributes] = extractFromBighaloparticlesByRegion(bighaloparticles_path, halo_center_x, halo_center_y, halo_center_z, halo_radius, vars)
+        [x, y, z, attributes] = extractFromBighaloparticles(bighaloparticles_path, halo_tag, halo_center_x, halo_center_y, halo_center_z, halo_radius, vars)
         if(len(x) != 0):
             saveToVTK(output_halo_filename, x, y, z, attributes)
+        else:
+            print("no halo found")
+        vars = ['gal_tag', 'gal_mass', 'fof_halo_tag']
+        output_galaxy_filename = os.path.join(cur_output_path, "galaxy_ " + str(halo_rank))
+        [x, y, z, attributes] = extractFromGalaxyparticles(galaxyproperties_path, galaxyparticles_path, vars, halo_tag, halo_center_x, halo_center_y, halo_center_z, halo_radius)
+        if(len(x) != 0):
+            saveToVTK(output_galaxy_filename, x, y, z, attributes)
+        else:
+            print("no galaxy found")

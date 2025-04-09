@@ -57,7 +57,7 @@ class HACC(FileReader):
         print("run folders", run_folders)
         ## Read all existing time steps 
         haloproperties_ts, full_res_ts = self.match_time_steps(run_folders[0])
-        haloproperties_ts = haloproperties_ts[0:2]
+        haloproperties_ts = haloproperties_ts[-2:]
         n_ts = len(haloproperties_ts)
         print("num of ts:", n_ts)
 

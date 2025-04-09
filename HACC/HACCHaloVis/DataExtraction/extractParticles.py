@@ -28,8 +28,10 @@ def extractFromBighaloparticles(bighaloparticles_path, halo_tag, fof_halo_center
     selected_vy = []
     selected_vz = []
     for r in ranks:
+        print("rank", r)
         results = gio.read(bighaloparticles_path, vars, r)
         fof_halo_tag_array = results[4]
+        # print(fof_halo_tag_array)
         indices = np.where(fof_halo_tag_array == halo_tag)[0]
         _x = np.array(results[0])[indices] 
         _y = np.array(results[1])[indices] 
