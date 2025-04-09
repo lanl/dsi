@@ -53,7 +53,7 @@ class HACC(FileReader):
     def add_rows(self) -> None:
         total_start = time.perf_counter()
         ## Read run table 
-        run_folders = [f for f in os.listdir(self.hacc_suite_path) if f.startswith(self.hacc_run_prefix)][0:1]
+        run_folders = [f for f in os.listdir(self.hacc_suite_path) if f.startswith(self.hacc_run_prefix)][0:2]
         print("run folders", run_folders)
         ## Read all existing time steps 
         haloproperties_ts, full_res_ts = self.match_time_steps(run_folders[0])

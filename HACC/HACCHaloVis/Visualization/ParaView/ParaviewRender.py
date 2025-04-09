@@ -44,8 +44,10 @@ halo_galaxy_particles_path = "/lus/eagle/projects/CosDiscover/mengjiao/halo_gala
 runs = [f for f in os.listdir(halo_galaxy_particles_path) if f.startswith('VKIN')]
 
 # Load the metadata database to retrieve halo properties 
-database = Database("/home/mhan/projects/hacc_halo_vis/databases/halo_galaxy_5.db")
+database_path = "/home/mhan/projects/hacc_halo_vis/databases/halo_galaxy_5.db"
 
+conn = sqlite3.connect(database_path) 
+conn.row_factory = sqlite3.Row 
 timesteps = [624]
 
 # loop for each run 
@@ -65,8 +67,13 @@ for r, run in enumerate(runs):
         runCDB.read_data_from_file()
     ## read rows from metadata database for current run 
     sqlText = f"SELECT * FROM runs WHERE VKIN={VKIN} AND EPS ={EPS}"
-    current_run = database.query(sqlText)
+    # current_run = database.query(sqlText)
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    current_run = cursor.fetchall()
+
     runID = current_run['runID']
+
     for t, ts in enumerate(timesteps):
         ## current time step path 
         ts_path = os.path.join(halo_galaxy_particles_path, run, str(ts))
@@ -87,7 +94,10 @@ for r, run in enumerate(runs):
             galaxy_path = os.path.join(run_path, "galaxy_" + str(rank) + ".vtu")
             # find halo center
             sqlText = f"SELECT * FROM halos WHERE runID = {runID} AND ts = 624 AND halo_rank = {rank}"
-            halo_info = database.query(sqlText)
+            # halo_info = database.query(sqlText)
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            halo_info = cursor.fetchall()
             # get halo_center
             halo_center_x = halo_info['halo_center_x']
             halo_center_y = halo_info['halo_center_y']
@@ -103,7 +113,9 @@ for r, run in enumerate(runs):
             else:
                 haloCDB.read_data_from_file()
         
-
+            '''
+            ParaView Rendering 
+            '''
             # create a new 'XML Unstructured Grid Reader'
             halo_484472722_rank_0vtu = XMLUnstructuredGridReader(registrationName='halo_484472722_rank_0.vtu', FileName=[halo_path])
 

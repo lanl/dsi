@@ -156,6 +156,15 @@ suite_name
 │   ├── ├── halo_1.vtu
 ```
 
+It is recommended to transfer your data to a local machine for rendering in ParaView and saving images. Alternatively, you can use ParaView as a remote server on Darwin, similar to the setup described for Polaris (https://docs.alcf.anl.gov/polaris/visualization/paraview-manual-launch/). You may also explore methods to run ParaView on Darwin with off-screen rendering enabled.
+
+
+Make sure to update the following paths in your configuration:
+- `output_path`: Set this to the desired output location for the Cinema database.
+- `halo_galaxy_particles_path`: Set this to the location where the extracted halos and galaxies are stored.
+- `database_path`: Set this to the path of your metadata database.
+
+
 ### VTK Renderer 
 
 
