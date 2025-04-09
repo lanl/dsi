@@ -72,7 +72,7 @@ if __name__ == "__main__":
         else:
             print("no halo found")
         vars = ['gal_tag', 'gal_mass', 'fof_halo_tag']
-        output_galaxy_filename = os.path.join(cur_output_path, "galaxy_ " + str(halo_rank))
+        output_galaxy_filename = os.path.join(cur_output_path, "galaxy_" + str(halo_rank))
         [x, y, z, attributes] = extractFromGalaxyparticles(galaxyproperties_path, galaxyparticles_path, vars, halo_tag, halo_center_x, halo_center_y, halo_center_z, halo_radius)
         if(len(x) != 0):
             saveToVTK(output_galaxy_filename, x, y, z, attributes)
