@@ -17,7 +17,7 @@ def set_camera_position_spherical(camera, theta, phi, radius, center):
     camera.SetFocalPoint(center[0], center[1], center[2])  # Assuming the object is centered at the origin
     camera.SetViewUp(0, 0, 1)  # Keep the Z-axis as up
 
-def render_halos(data_path, img_width, img_height, theta, phi, center, cur_output_path):
+def render_halos_from_file(data_path, img_width, img_height):
     # Create a reader
     reader = vtk.vtkXMLUnstructuredGridReader()
     reader.SetFileName(data_path)
@@ -61,38 +61,7 @@ def render_halos(data_path, img_width, img_height, theta, phi, center, cur_outpu
     render_window.AddRenderer(renderer)
     render_window.SetSize(img_width, img_height)
     render_window.SetMultiSamples(8)
-    # # Camera setup
-    # camera = renderer.GetActiveCamera()
-    # # print(center)
-    # # print(camera.GetPosition())
-    # camera.SetPosition(center[0] + 8, center[1] + 8, center[2] + 8)
-    # camera.SetFocalPoint(center[0], center[1], center[2]) 
-    # camera.SetViewUp(0, 0, 1)
-    # for angle_phi in phi:
-    #     for a, angle_theta in enumerate(theta):
-    #         # set_camera_position_spherical(camera, angle_theta, angle_phi, 5, center)
-    #         # print(camera.GetPosition())
-    #         # Set azimuth and elevation
-    #         camera.Azimuth(90)  # Rotate 30 degrees around the view up vector
-    #         camera.Elevation(45)  # Rotate 20 degrees around the horizontal axis
-
-    #         # Ensure the view up vector is orthogonal to the view plane normal
-    #         camera.OrthogonalizeViewUp()
-    # #         # Capture image
-    #         render_window.Render()
-    #         window_to_image_filter = vtk.vtkWindowToImageFilter()
-    #         window_to_image_filter.SetInputBufferTypeToRGBA()
-    #         window_to_image_filter.SetInput(render_window)
-    #         window_to_image_filter.SetScale(1)  # No scaling
-    #         window_to_image_filter.Update()
-    #         writer = vtk.vtkPNGWriter()
-    #         image_name = "phi_" + str(angle_phi) + '_theta_' + str(angle_theta) + '.png'
-    #         image_name = os.path.join(cur_output_path, image_name)
-    #         # image_name = "./test.png"
-    #         writer.SetFileName(image_name)
-    #         writer.SetInputConnection(window_to_image_filter.GetOutputPort())
-    #         writer.Write()
-    # render_window.SetOffScreenRendering(True)
+    render_window.SetOffScreenRendering(True)
 
     # Create an interactor
     # interactor = vtk.vtkRenderWindowInteractor()
@@ -106,4 +75,45 @@ def render_halos(data_path, img_width, img_height, theta, phi, center, cur_outpu
 
     return renderer, render_window
     
+def render_halos_from_points(x, y, z, attribute, img_width, img_height):
+    points = np.hstack((x, y, z))
+    vx_np = attribute['vx']
+    vy_np = attribute['vy']
+    vz_np = attribute['vz']
+    v_mag = np.sqrt(vx_np**2 + vy_np**2 + vz_np**2)
+    # print(bounds)
+    # data = pv.read(data_path)
+    # points = data.points
+    # v_mag = data['v_mag']
+    # bounds = data.bounds 
+    ## normalize data to [-1, 1] and center is [0, 0, 0]
+    # points[:, 0] = 2 * ((points[:, 0] - bounds[0]) / (bounds[1] - bounds[0])) - 1
+    # points[:, 1] = 2 * ((points[:, 1] - bounds[2]) / (bounds[3] - bounds[2])) - 1
+    # points[:, 2] = 2 * ((points[:, 2] - bounds[4]) / (bounds[5] - bounds[4])) - 1
+    # print(bounds)
+    halo_actor = create_point_cloud(points, v_mag, 'inferno', 1.0, 8)
+
+    # Create a renderer
+    renderer = vtk.vtkRenderer()
+    renderer.AddActor(halo_actor)
+    renderer.ResetCamera()
+    renderer.SetBackground(0.0, 0.0, 0.0)  # Set background color
+
+    # Create a render window
+    render_window = vtk.vtkRenderWindow()
+    render_window.AddRenderer(renderer)
+    render_window.SetSize(img_width, img_height)
+    render_window.SetMultiSamples(8)
+    render_window.SetOffScreenRendering(True)
+
+    # Create an interactor
+    # interactor = vtk.vtkRenderWindowInteractor()
+    # interactor.SetRenderWindow(render_window)
     
+    # interactor.GetRenderWindow().SetDisplayId("_0_p_void")
+
+    # # Render and start interaction
+    # render_window.Render()
+    # interactor.Start()
+
+    return renderer, render_window

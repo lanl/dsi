@@ -8,7 +8,7 @@ from cdb import *
 from helpers import *
 
 import vtk 
-from render import render_halos, set_camera_position_spherical
+from render import *
 
 start_time = time.perf_counter()
 
@@ -105,13 +105,34 @@ for r, run in enumerate(runs):
                 haloCDB.initialize()
             else:
                 haloCDB.read_data_from_file()
-        
+
+            '''
+            The following code is used to extract halos which is from the extraction_example.py in DataExtraction folder
+            This will allow you extract the data array of position and attributes directly without saving as separate vtu file
+            '''
+            ## find the data paths from files table 
+            # sqlText = f"SELECT bighaloparticles_path, galaxyproperties_path, galaxyparticles_path FROM hacc__files WHERE run_id = {runID} AND ts = {ts};"
+            # paths = database.queryTable(sqlText)
+            # cursor.execute(sqlText)
+            # paths = cursor.fetchall()
+            ## should only have one row, we don't need a for loop here 
+            # bighaloparticles_path = paths[0]['bighaloparticles_path']
+            # galaxyproperties_path = paths[0]['galaxyproperties_path']
+            # galaxyparticles_path = paths[0]['galaxyparticles_path']
+            # vars = ['x', 'y', 'z', 'phi', 'fof_halo_tag', 'vx', 'vy', 'vz']
+            # [x, y, z, attributes] = extractFromBighaloparticles(bighaloparticles_path, halo_tag, halo_center_x, halo_center_y, halo_center_z, halo_radius, vars)
+            '''
+            End of Extraction 
+            '''
+
+
             '''
             VTK Rendering 
             '''
 
             cur_output_path = os.path.join(output_path, run + '.cdb', 'ts_624.cdb', 'halo_' + str(rank) + '.cdb')
-            renderer, render_window = render_halos(halo_path, width, height, theta, phi, [halo_center_x, halo_center_y, halo_center_z], cur_output_path)
+            renderer, render_window = render_halos_from_file(halo_path, width, height)
+            # renderer, render_window = render_halos_from_points(x, y, z, attributes, width, height)
             camera = renderer.GetActiveCamera()
             # print(center)
             # print(camera.GetPosition())

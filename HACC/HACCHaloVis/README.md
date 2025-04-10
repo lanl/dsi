@@ -129,13 +129,6 @@ There are two methods for creating visualizations:
 HACC simulation data is stored in the **GenericIO** format. However, ParaView has issues importing the legacy Python library for GenericIO.  
 To work around this, after extracting a subregion or specific halos, the extracted data must first be saved as a separate **VTU file** before being loaded into ParaView for visualization.  
 
-On the other hand, when using a **VTK-based renderer** or another Python-based renderer, the legacy Python library for GenericIO can be imported directly.  
-This allows the extracted data to be used for rendering without additional conversion steps.  
-
-The following sections provide examples for using **ParaView** or a **VTK-based renderer** for visualization.  
-
-### ParaView  
-
 The extracted halos and their associated galaxies should be saved in the following directory structure in order to use the script directly:  
 
 ```md
@@ -156,6 +149,13 @@ suite_name
 │   ├── ├── halo_1.vtu
 ```
 
+On the other hand, when using a **VTK-based renderer** or another Python-based renderer, the legacy Python library for GenericIO can be imported directly.  
+This allows the extracted data to be used for rendering without additional conversion steps.  
+
+The following sections provide examples for using **ParaView** or a **VTK-based renderer** for visualization.  
+
+### ParaView  
+
 It is recommended to transfer your data to a local machine for rendering in ParaView and saving images. Alternatively, you can use ParaView as a remote server on Darwin, similar to the setup described for Polaris (https://docs.alcf.anl.gov/polaris/visualization/paraview-manual-launch/). You may also explore methods to run ParaView on Darwin with off-screen rendering enabled.
 
 
@@ -166,5 +166,33 @@ Make sure to update the following paths in your configuration:
 
 
 ### VTK Renderer 
+Here's a polished and clearer version of your README section:
+
+---
+
+### Prerequisites
+
+Before running the code, make sure to install the required packages and GenericIO:
+
+```bash
+pip install vtk
+pip install matplotlib
+pip install pandas
+```
+
+### Using the VTK Renderer
+
+You can use the VTK Renderer in one of two ways:
+
+1. **Using pre-saved `.vtu` files** (default)
+2. **Creating visualizations directly without saving separate `.vtu` files**
+
+The current version is configured to use the **first** option (pre-saved `.vti` files).
+Make sure to update the paths described above in VTKRender.py
+
+If you prefer the **second** option, modify the code as follows:
+
+- **Comment out** line **134**
+- **Uncomment** lines **113–123** and **line 135**
 
 

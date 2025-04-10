@@ -1,5 +1,7 @@
 import os 
 from cdb import *
+import vtk
+import matplotlib.pyplot as plt 
 
 def match_time_steps(run_directory):
     # haloproperties_ts = []
@@ -30,5 +32,49 @@ def get_angles(phi_angle, theta_angle):
         theta.append( float(angle) )
     return [phi, theta]
 
+def create_point_cloud(points, attribute, colormap_name="inferno", opacity=0.5, pointsize=1):
+    
+    # Create vtkPoints and vtkFloatArray for scalars
+    vtk_points = vtk.vtkPoints()
+    scalar_array = vtk.vtkFloatArray()
+    scalar_array.SetName("scalar")
+    
+    for point, scalar in zip(points, attribute):
+        vtk_points.InsertNextPoint(point)
+        scalar_array.InsertNextValue(scalar)
+    
+    # Create vtkPolyData and add points and scalars
+    poly_data = vtk.vtkPolyData()
+    poly_data.SetPoints(vtk_points)
+    poly_data.GetPointData().SetScalars(scalar_array)
+    
+    # Create a vtkLookupTable using a Matplotlib colormap
+    colormap = plt.get_cmap(colormap_name)
+    lookup_table = vtk.vtkLookupTable()
+    lookup_table.SetNumberOfTableValues(256)
+    lookup_table.Build()
+    
+    for i in range(256):
+        rgba = colormap(i / 255.0)
+        lookup_table.SetTableValue(i, rgba[0], rgba[1], rgba[2], opacity)
+    
+    # Create a vertex glyph filter to visualize the points
+    glyph_filter = vtk.vtkVertexGlyphFilter()
+    glyph_filter.SetInputData(poly_data)
+    glyph_filter.Update()
+
+    # Create a mapper and actor for the point cloud
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(poly_data)
+    mapper.SetInputConnection(glyph_filter.GetOutputPort())
+    mapper.SetLookupTable(lookup_table)
+    mapper.SetScalarRange(min(attribute), max(attribute))
+    
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetRenderPointsAsSpheres(True)
+    actor.GetProperty().SetPointSize(pointsize)  # Set point size
+    
+    return actor
     
 # def addEntryToCDB(cdbDatabase, 
