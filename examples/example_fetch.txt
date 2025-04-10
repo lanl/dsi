@@ -1,4 +1,4 @@
-(env_dsi) pascalgrosset@pn2035929:~/projects/dsi/examples$ python dsi_cli.py 
+% python dsi_cli.py 
 DSI version 1.1
 Enter "help" for usage hints.
 
@@ -50,18 +50,18 @@ Table: Car_Vins
   - num of rows: 5
 
 
-dsi> schema Car_Options
+dsi>  schema Car_Options
 
-Column           | Type        | Not Null | PK    | Default
------------------------------------------------------------
-option_set_id    | INTEGER     | False    | True  | None   
-model_id         | INTEGER     | False    | False | None   
-engine_id        | INTEGER     | True     | False | None   
-transmission_id  | INTEGER     | True     | False | None   
-chassis_id       | INTEGER     | True     | False | None   
-premium_sound_id | INTEGER     | False    | False | None   
-color            | VARCHAR(30) | True     | False | None   
-option_set_price | INTEGER     | True     | False | None   
+Column           | Type        | Not Null | PK   
+-------------------------------------------------
+option_set_id    | INTEGER     | False    | True 
+model_id         | INTEGER     | False    | False
+engine_id        | INTEGER     | True     | False
+transmission_id  | INTEGER     | True     | False
+chassis_id       | INTEGER     | True     | False
+premium_sound_id | INTEGER     | False    | False
+color            | VARCHAR(30) | True     | False
+option_set_price | INTEGER     | True     | False
 
 
 dsi> display Car_Options
@@ -96,7 +96,7 @@ option_set_id | model_id | engine_id | transmission_id | chassis_id | premium_so
   ... showing 25 of 26 rows
 
 
-dsi> export_table Car_Options car_options.csv
+dsi>  export_table Car_Options car_options.csv
 Query results exported to 'car_options.csv'.
 
 dsi> save local_car.sqlite

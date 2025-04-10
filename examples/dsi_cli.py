@@ -11,6 +11,15 @@ import pyarrow.parquet as pq
 from db_utils import *
 
 
+def check_dependencies(packages):
+    missing = []
+    for pkg in packages:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    return missing
+
 def is_url(s: str) -> bool:
     try:
         result = urlparse(s)
@@ -67,6 +76,7 @@ class DSI_Cli:
 
     def __init__(self):
         self.a = Store()
+        self.db_initialized = False
         return
     
 
@@ -76,9 +86,9 @@ class DSI_Cli:
         print("export_table <table> <filename>      Export the contents of that table to a CSV/parquet file")
         #print("fetch <database url>                 Fetch and loads a remote database")
         print("help                                 Shows this help")
-        print("import <filename>                    Imports file to the current DSI database")
+        #print("import <filename>                    Imports file to the current DSI database")
         print("list                                 Lists the tables in the current DSI databse")
-        print("load <database>                      Loads this filename/url to a DSI database")
+        print("load <filename>                      Loads this filename/url to a DSI database")
         print("query <SQL query> [num rows]         Runs a query, num rows is optional")
         print("query_export <SQL query> <filename>  Export the result of thje query to a CSV/parquet file")
         print("save <filename>                      Save the local database as <filename>")
@@ -152,26 +162,10 @@ class DSI_Cli:
             print(f"Download failed: {e}")
     
          
-    def import_file(self, args):
-        '''
-        Imports a CSV file to the current database
-        '''
-        db_filename = args[0]
-        file_extension = db_filename.rsplit(".", 1)[-1]
-        
-        if file_extension == 'csv':
-            try:
-                self.a.load_csv_to_sqlite(args[0])
-                print(f"Database now has {self.a.get_num_tables()} table\n")
-            except Exception as e:
-                print(f"An error {e} occurred loading {db_filename}") 
-                print("Hint: when the database is empty, please use load.\n")
-        else:
-            print("This database format is not supported. Currently supported imports formats are: ")
-            print("   - csv (extension: .csv)\n")
+    
 
 
-    def info(self, args):
+    def list_tables(self, args):
         '''
         Displays information about a database
         '''
@@ -187,10 +181,15 @@ class DSI_Cli:
         '''
         Loads a database
         '''
+        if self.db_initialized == True:
+            self._import_file(args[0])
+            return
+            
         if len(args) == 0:
             if os.path.exists(".temp.db"):
                 os.remove(".temp.db")
                 self.a.connect_to_db(".temp.db")
+                self.db_initialized = True
                 print(f"Database initialized with no table. Please import some data...\n")
                 return
 
@@ -204,11 +203,12 @@ class DSI_Cli:
             try:
                 self.a.connect_to_db(db_filename)
                 print(f"Database has {self.a.get_num_tables()} table")
+                self.db_initialized = True
                 print(f"{db_filename} successfully loaded.\n")
             except Exception as e:
                 print(f"An error {e} occurred loading {db_filename}\n")    
 
-        elif file_extension == 'csv':
+        elif file_extension.lower() == 'csv':
             try:
                 if os.path.exists(".temp.db"):
                     os.remove(".temp.db")
@@ -216,6 +216,20 @@ class DSI_Cli:
                 self.a.connect_to_db(".temp.db")
                 self.a.load_csv_to_sqlite(args[0])
                 print(f"Database has {self.a.get_num_tables()} table")
+                self.db_initialized = True
+                print(f"{args[0]} successfully loaded.\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {db_filename}\n")   
+                
+        elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
+            try:
+                if os.path.exists(".temp.db"):
+                    os.remove(".temp.db")
+
+                self.a.connect_to_db(".temp.db")
+                self.a.load_pq_to_sqlite(args[0])
+                print(f"Database has {self.a.get_num_tables()} table")
+                self.db_initialized = True
                 print(f"{args[0]} successfully loaded.\n")
             except Exception as e:
                 print(f"An error {e} occurred loading {db_filename}\n")   
@@ -223,6 +237,7 @@ class DSI_Cli:
         else:
             print("This database format is not supported. Currently supported formats are: ")
             print("   - csv (extension: .csv)")
+            print("   - parquet (extension: .pq, .parquet)")
             print("   - sqlite (extension: .db, .sqlite, .sqlite3)\n")
 
 
@@ -328,6 +343,29 @@ class DSI_Cli:
         print("\n")
 
 
+    def _import_file(self, filename):
+        '''
+        Imports a CSV/parquet file to the current database
+        '''
+        file_extension = filename.rsplit(".", 1)[-1]
+        
+        if file_extension.lower() == 'csv':
+            try:
+                self.a.load_csv_to_sqlite(filename)
+                print(f"Database now has {self.a.get_num_tables()} table\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {filename}\n") 
+        elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
+            try:
+                self.a.load_pq_to_sqlite(filename)
+                print(f"Database now has {self.a.get_num_tables()} table\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {filename}\n") 
+        else:
+            print("This database format is not supported. Currently supported imports formats are: ")
+            print("   - csv (extension: .csv)")
+            print("   - parquet (extension: .pq, .parquet)\n")
+            
 
     def _output_csv(self, column_names, rows, csv_path):
         '''
@@ -362,8 +400,8 @@ COMMANDS = {
     'export_table' : cli.export_csv,
     #'fetch' : cli.fetch,
     'help': cli.help_fn,
-    'import' : cli.import_file,
-    'list' : cli.info,
+    #'import' : cli.import_file,
+    'list' : cli.list_tables,
     'load' : cli.load,
     'query' : cli.query,
     'query_export' : cli.query_export,

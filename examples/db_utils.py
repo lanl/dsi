@@ -4,7 +4,11 @@ import time
 import csv
 import shutil
 import os
+import pyarrow.parquet as pq
+import pyarrow as pa
 from datetime import datetime
+
+
 
 
 logging.basicConfig(
@@ -186,6 +190,53 @@ class Store:
         print(f"Loaded '{csv_path}' into table '{table_name}.")
 
 
+    def load_pq_to_sqlite(self, pq_path, table_name=None):
+        # Determine table name from file if not provided
+        if table_name is None:
+            table_name = os.path.splitext(os.path.basename(pq_path))[0]
+
+        # Read Parquet file using pyarrow
+        table = pq.read_table(pq_path)
+
+        # Infer SQLite-compatible types from PyArrow schema
+        def infer_sqlite_type(pa_type):
+            if pa.types.is_integer(pa_type):
+                return "INTEGER"
+            elif pa.types.is_floating(pa_type):
+                return "REAL"
+            elif pa.types.is_boolean(pa_type):
+                return "BOOLEAN"
+            elif pa.types.is_timestamp(pa_type):
+                return "TIMESTAMP"
+            else:
+                return "TEXT"
+
+        schema = table.schema
+        column_names = schema.names
+        column_types = [infer_sqlite_type(field.type) for field in schema]
+
+        # Create SQL table schema
+        columns_def = ", ".join(
+            f'"{name}" {dtype}' for name, dtype in zip(column_names, column_types)
+        )
+        create_table_sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_def});'
+
+        cursor = self.conn.cursor()
+        cursor.execute(create_table_sql)
+
+        # Prepare and execute insert statements
+        placeholders = ", ".join(["?"] * len(column_names))
+        insert_sql = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
+
+        # Convert PyArrow Table to batches and rows
+        for batch in table.to_batches():
+            records = batch.to_pylist()
+            values = [tuple(record[col] for col in column_names) for record in records]
+            cursor.executemany(insert_sql, values)
+
+        self.conn.commit()
+        print(f"Loaded '{pq_path}' into table '{table_name}.")
+
 
     def pretty_print(self, headers, rows, max_rows=25):
         #Determine max width for each column
@@ -221,10 +272,11 @@ class Store:
         columns = cursor.fetchall()
 
         # Extract and prepare data for printing
-        headers = ["Column", "Type", "Not Null", "PK", "Default"]
+        #headers = ["Column", "Type", "Not Null", "PK", "Default"]
+        headers = ["Column", "Type", "Not Null", "PK"]
         rows = []
         for _, name, dtype, notnull, default, pk in columns:
-            rows.append([str(name), str(dtype), str(bool(notnull)), str(bool(pk)), str(default)])
+            rows.append([str(name), str(dtype), str(bool(notnull)), str(bool(pk))])#, str(default)])
 
         return headers, rows
 
@@ -385,6 +437,7 @@ class Store:
             writer.writerows(rows)         # write data
 
         print(f"Query results exported to '{csv_path}'.\n")
+
 
 
 
