@@ -310,7 +310,7 @@ for r, run in enumerate(runs):
             # halo_center_x = (bounds[1] - bounds[0]) / 2 + bounds[0]
             # halo_center_y = (bounds[3] - bounds[2]) / 2 + bounds[2]
             # halo_center_z = (bounds[5] - bounds[4]) / 2 + bounds[4]
-            renderView1.CameraPosition = [halo_center_x - 15, halo_center_y - 15, halo_center_z]
+            renderView1.CameraPosition = [halo_center_x - 1, halo_center_y - 1, halo_center_z]
             renderView1.CameraFocalPoint = [halo_center_x, halo_center_y, halo_center_z]
             renderView1.CameraViewUp = [0.0, 0.0, 1.0]
             renderView1.CameraParallelScale = 10
@@ -322,7 +322,7 @@ for r, run in enumerate(runs):
 
             for angle_phi in phi:
                 for a, angle_theta in enumerate(theta):
-                    camera.Azimuth(60)      # Rotate horizontally by angle_increment
+                    camera.Azimuth(90)      # Rotate horizontally by angle_increment
                     camera.Elevation(45 * a)  
                     Render()
                     # save screenshot
