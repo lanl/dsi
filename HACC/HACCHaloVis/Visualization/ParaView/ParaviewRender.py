@@ -16,9 +16,10 @@ import math
 import sqlite3
 import time 
 import sys 
-sys.path.append('../DBGenerator/')  
-sys.path.append('../HACCHaloVis/utils/')  
-from database import Database 
+# sys.path.append('/Users/mhan/Desktop/HACCHaloVis/DBGenerator/')  
+sys.path.append('/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/utils')
+from helpers import *
+# from database import Database 
 from cdb import *
 
 start_time = time.perf_counter()
@@ -32,31 +33,33 @@ aTheta = 45
 [phi, theta] = get_angles(aPhi, aTheta)
 
 # path to save the cinema database 
-output_path = "/lus/eagle/projects/CosDiscover/mengjiao/2PARAM_step_624.cdb" 
+output_path = "/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/outputs/test.cdb" 
 ## create a cinema database 
 create_directory(output_path)
 designCDB = cdb(output_path)
 designCDB.initialize()
 
 # path to halos and galaxies data 
-halo_galaxy_particles_path = "/lus/eagle/projects/CosDiscover/mengjiao/halo_galaxy_particles_step_624/"
+halo_galaxy_particles_path = "/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/data/test"
 # find all run folders [e.g. VKIN_a_EPS_b]
-runs = [f for f in os.listdir(halo_galaxy_particles_path) if f.startswith('VKIN')]
+runs = [f for f in os.listdir(halo_galaxy_particles_path) if f.startswith('FSN')]
 
 # Load the metadata database to retrieve halo properties 
-database_path = "/home/mhan/projects/hacc_halo_vis/databases/halo_galaxy_5.db"
-
+# database = Database("/home/mhan/projects/hacc_halo_vis/databases/halo_galaxy_5.db")
+database_path = "/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/data/hacc.db"
 conn = sqlite3.connect(database_path) 
-conn.row_factory = sqlite3.Row 
+conn.row_factory = sqlite3.Row
+
+# only create visualizations for the last time step
 timesteps = [624]
 
 # loop for each run 
 for r, run in enumerate(runs):
     print(run)
     run_path = os.path.join(halo_galaxy_particles_path, run)
-    # find runId for current run 
-    VKIN = run.split("_")[1]
-    EPS = run.split("_")[3]
+    # find simulation parameter for current run 
+    FSN = run.split("_")[1]
+    VEL = run.split("_")[3]
     ## create cdb folder to runs
     runCDB_path = os.path.join(output_path, run + ".cdb")
     check = create_directory(runCDB_path)
@@ -66,14 +69,15 @@ for r, run in enumerate(runs):
     else:
         runCDB.read_data_from_file()
     ## read rows from metadata database for current run 
-    sqlText = f"SELECT * FROM runs WHERE VKIN={VKIN} AND EPS ={EPS}"
+    sqlText = f"SELECT * FROM hacc__runs WHERE FSN={FSN} and VEL = {VEL}"
+    # print(FSN, VEL)
     # current_run = database.query(sqlText)
     cursor = conn.cursor()
-    cursor.execute(sql)
+    cursor.execute(sqlText)
     current_run = cursor.fetchall()
-
-    runID = current_run['runID']
-
+    ## find run_id, then use run_id to find halos in hacc__halos table 
+    runID = current_run[0]['run_id']
+    print("runId", runID)
     for t, ts in enumerate(timesteps):
         ## current time step path 
         ts_path = os.path.join(halo_galaxy_particles_path, run, str(ts))
@@ -90,20 +94,20 @@ for r, run in enumerate(runs):
 
         for h, halo_file in enumerate(halo_files):
             rank = h
-            halo_path = os.path.join(run_path, halo_file)
-            galaxy_path = os.path.join(run_path, "galaxy_" + str(rank) + ".vtu")
+            halo_path = os.path.join(ts_path, halo_file)
+            galaxy_path = os.path.join(ts_path, "galaxy_" + str(rank) + ".vtu")
             # find halo center
-            sqlText = f"SELECT * FROM halos WHERE runID = {runID} AND ts = 624 AND halo_rank = {rank}"
+            sqlText = f"SELECT * FROM hacc__halos WHERE run_id = {runID} AND ts = 624 AND halo_rank = {rank}"
             # halo_info = database.query(sqlText)
             cursor = conn.cursor()
-            cursor.execute(sql)
+            cursor.execute(sqlText)
             halo_info = cursor.fetchall()
             # get halo_center
-            halo_center_x = halo_info['halo_center_x']
-            halo_center_y = halo_info['halo_center_y']
-            halo_center_z = halo_info['halo_center_z']
-            halo_tag = halo_info['halo_tag']
-            halo_count = halo_info['halo_count']
+            halo_center_x = halo_info[0]['halo_center_x']
+            halo_center_y = halo_info[0]['halo_center_y']
+            halo_center_z = halo_info[0]['halo_center_z']
+            halo_tag = halo_info[0]['halo_tag']
+            halo_count = halo_info[0]['halo_count']
             # create halo cdb database
             haloCDB_path = os.path.join(tsCDB_path, "halo_" + str(h) + '.cdb')
             check = create_directory(haloCDB_path)
@@ -116,6 +120,7 @@ for r, run in enumerate(runs):
             '''
             ParaView Rendering 
             '''
+
             # create a new 'XML Unstructured Grid Reader'
             halo_484472722_rank_0vtu = XMLUnstructuredGridReader(registrationName='halo_484472722_rank_0.vtu', FileName=[halo_path])
 
@@ -322,24 +327,24 @@ for r, run in enumerate(runs):
 
             for angle_phi in phi:
                 for a, angle_theta in enumerate(theta):
-                    camera.Azimuth(90)      # Rotate horizontally by angle_increment
-                    camera.Elevation(45 * a)  
+                    camera.Azimuth(aPhi)      # Rotate horizontally by angle_increment
+                    camera.Elevation(aTheta * a)  
                     Render()
                     # save screenshot
                     image_name = "phi_" + str(angle_phi) + '_theta_' + str(angle_theta) + '.png'
                     SaveScreenshot(os.path.join(output_path, run + '.cdb', 'ts_624.cdb', 'halo_' + str(rank) + '.cdb', image_name), renderView1, ImageResolution=[width, height])
                     ## write cinema database entry
                     haloCDB.add_entry({'phi': str(angle_phi), 'theta': str(angle_theta), 'FILE': image_name}) 
-                    image_name = "halo_" + str(halo_rank) + ".cdb/" + image_name
-                    tsCDB.add_entry({"halo_rank": halo_rank, "halo_tag": halo_tag, "halo_count": halo_count, 'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
+                    image_name = "halo_" + str(rank) + ".cdb/" + image_name
+                    tsCDB.add_entry({"halo_rank": rank, "halo_tag": halo_tag, "halo_count": halo_count, 'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
                     image_name = "ts_" + str(ts) + ".cdb/" + image_name
-                    runCDB.add_entry({"ts": str(ts), "halo_rank": halo_rank, "halo_tag": halo_tag, "halo_count": halo_count,  "halo_center_x": halo_center_x, "halo_center_y": halo_center_y, "halo_center_z": halo_center_z, 'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
-                    image_name = run_folder + ".cdb/" + image_name
+                    runCDB.add_entry({"ts": str(ts), "halo_rank": rank, "halo_tag": halo_tag, "halo_count": halo_count,  "halo_center_x": halo_center_x, "halo_center_y": halo_center_y, "halo_center_z": halo_center_z, 'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
+                    image_name = run + ".cdb/" + image_name
                     # designCDB.add_entry({"runID": str(runID), "FSN": FSN, "VEL": VEL, "TEXP": TEXP, "BETA": BETA, "SEED": SEED, \
                     #                         "ts": str(ts), "halo_rank": halo_rank, "halo_tag": halo_tag, "halo_count": halo_count, \
                     #                         'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
-                    designCDB.add_entry({"runID": str(runID), "VKIN": VKIN, "EPS": EPS, \
-                                            "ts": str(ts), "halo_rank": halo_rank, "halo_tag": halo_tag, "halo_count": halo_count, \
+                    designCDB.add_entry({"runID": str(runID), "FSN": FSN, "VEL": VEL, \
+                                            "ts": str(ts), "halo_rank": rank, "halo_tag": halo_tag, "halo_count": halo_count, \
                                                 "halo_center_x": halo_center_x, "halo_center_y": halo_center_y, "halo_center_z": halo_center_z, \
                                             'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
             # destroy convertToPointCloud1

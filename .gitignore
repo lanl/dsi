@@ -74,3 +74,6 @@ dsi.egg-info/
 *.egg-info/
 .DS_Store
 dsi-envs/
+
+HACC/HACCHaloVis/envs/
+HACC/HACCHaloVis/data
