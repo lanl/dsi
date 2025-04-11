@@ -265,8 +265,6 @@ class Store:
     def get_schema(self, table_name):
         cursor = self.conn.cursor()
 
-        #print(f"\nSchema for table '{table_name}:'")
-
         # Get column metadata
         cursor.execute(f"PRAGMA table_info({table_name})")
         columns = cursor.fetchall()
@@ -277,6 +275,71 @@ class Store:
         rows = []
         for _, name, dtype, notnull, default, pk in columns:
             rows.append([str(name), str(dtype), str(bool(notnull)), str(bool(pk))])#, str(default)])
+
+        return headers, rows
+    
+
+
+    def summarize_table(self, table_name: str):
+        """
+        Compute column statistics from a SQLite table and return results as headers and row data.
+
+        Parameters
+        ----------
+        db_path : str
+            Path to the SQLite database file.
+        table_name : str
+            Name of the table to analyze.
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+                - headers: list of column headers
+                - rows: list of rows, each as a list of values
+        """
+        cursor = self.conn.cursor()
+
+        # Get column metadata
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns_info = cursor.fetchall()
+
+        numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE'}
+
+        headers = ['column', 'type', 'min', 'max', 'avg', 'std_dev']
+        rows = []
+
+        for col in columns_info:
+            col_name = col[1]
+            col_type = col[2].upper()
+            is_primary = col[5] > 0
+            display_name = f"{col_name}*" if is_primary else col_name
+
+            if any(nt in col_type for nt in numeric_types):
+                cursor.execute(f"""
+                    WITH stats AS (
+                        SELECT 
+                            AVG("{col_name}") AS mean
+                        FROM {table_name}
+                        WHERE "{col_name}" IS NOT NULL
+                    )
+                    SELECT 
+                        MIN("{col_name}"),
+                        MAX("{col_name}"),
+                        AVG("{col_name}"),
+                        CASE 
+                            WHEN COUNT("{col_name}") > 1 THEN 
+                                sqrt(AVG(("{col_name}" - stats.mean) * ("{col_name}" - stats.mean)))
+                            ELSE NULL
+                        END AS std_dev
+                    FROM {table_name}, stats
+                    WHERE "{col_name}" IS NOT NULL
+                """)
+                min_val, max_val, avg_val, std_dev = cursor.fetchone()
+            else:
+                min_val = max_val = avg_val = std_dev = None
+
+            rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
 
