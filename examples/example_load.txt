@@ -1,0 +1,198 @@
+(venv_dsi_interface) pascalgrosset@pn2035929:~/projects/dsi_interface$ python dsi/cli.py
+DSI version 1.1
+Enter "help" for usage hints.
+
+dsi> load "https://raw.githubusercontent.com/dtaivpp/car_company_database/master/Car_Database.db"
+File downloaded successfully as Car_Database.db
+Importing table: Customers
+Importing table: Models
+Importing table: Customer_Ownership
+Importing table: Dealer_Brand
+Importing table: Car_Parts
+Importing table: Manufacture_Plant
+Importing table: Brands
+Importing table: Dealers
+Importing table: Car_Options
+Importing table: Car_Vins
+Database has 11 table
+Car_Database.db successfully loaded.
+
+dsi> list
+
+Table: Customers
+  - num of columns: 8
+  - num of rows: 6
+
+Table: Models
+  - num of columns: 4
+  - num of rows: 17
+
+Table: Customer_Ownership
+  - num of columns: 6
+  - num of rows: 5
+
+Table: Dealer_Brand
+  - num of columns: 2
+  - num of rows: 13
+
+Table: Car_Parts
+  - num of columns: 6
+  - num of rows: 7
+
+Table: Manufacture_Plant
+  - num of columns: 5
+  - num of rows: 5
+
+Table: Brands
+  - num of columns: 2
+  - num of rows: 6
+
+Table: Dealers
+  - num of columns: 3
+  - num of rows: 4
+
+Table: Car_Options
+  - num of columns: 8
+  - num of rows: 26
+
+Table: Car_Vins
+  - num of columns: 5
+  - num of rows: 5
+
+
+dsi> summary
+
+Table: Customers
+
+column           | type         | min        | max        | avg               | std_dev           
+--------------------------------------------------------------------------------------------------
+customer_id*     | INTEGER      | 1          | 6          | 3.5               | 1.707825127659933 
+first_name       | VARCHAR(50)  | None       | None       | None              | None              
+last_name        | VARCHAR(50)  | None       | None       | None              | None              
+gender           | STRING       | None       | None       | None              | None              
+household_income | INTEGER      | 24000      | 1200000    | 287333.3333333333 | 411827.90364692657
+birthdate        | DATE         | None       | None       | None              | None              
+phone_number     | INTEGER      | 2129990234 | 9177554315 | 6427700958.333333 | 2432579695.2465363
+email            | VARCHAR(128) | None       | None       | None              | None              
+  - num of rows: 6
+
+
+Table: Models
+
+column           | type        | min   | max    | avg                | std_dev           
+-----------------------------------------------------------------------------------------
+model_id*        | INTEGER     | 1     | 17     | 9.0                | 4.898979485566356 
+model_name       | VARCHAR(50) | None  | None   | None               | None              
+model_base_price | INTEGER     | 12000 | 125000 | 42882.35294117647  | 34730.699003722875
+brand_id         | INTEGER     | 1     | 6      | 3.2941176470588234 | 1.600173001027699 
+  - num of rows: 17
+
+
+Table: Customer_Ownership
+
+column               | type    | min   | max    | avg     | std_dev           
+------------------------------------------------------------------------------
+customer_id*         | INTEGER | 1     | 6      | 3.4     | 1.854723699099141 
+vin*                 | INTEGER | 1     | 5      | 3.0     | 1.4142135623730951
+purchase_date        | DATE    | None  | None   | None    | None              
+purchase_price       | INTEGER | 17200 | 121300 | 44300.0 | 38828.031111556505
+warantee_expire_date | DATE    | None  | None   | None    | None              
+dealer_id            | INTEGER | 1     | 4      | 2.2     | 1.16619037896906  
+  - num of rows: 5
+
+
+Table: Dealer_Brand
+
+column     | type    | min | max | avg                | std_dev           
+--------------------------------------------------------------------------
+dealer_id* | INTEGER | 1   | 4   | 2.230769230769231  | 1.0490908997681427
+brand_id*  | INTEGER | 1   | 6   | 3.4615384615384617 | 1.7371676600978792
+  - num of rows: 13
+
+
+Table: Car_Parts
+
+column                 | type         | min  | max  | avg                | std_dev           
+---------------------------------------------------------------------------------------------
+part_id*               | INTEGER      | 1    | 7    | 4.0                | 2.0               
+part_name              | VARCHAR(100) | None | None | None               | None              
+manufacture_plant_id   | INTEGER      | 1    | 5    | 2.5714285714285716 | 1.5907898179514348
+manufacture_start_date | DATE         | None | None | None               | None              
+manufacture_end_date   | DATE         | None | None | None               | None              
+part_recall            | INTEGER      | 0    | 0    | 0.0                | 0.0               
+  - num of rows: 7
+
+
+Table: Manufacture_Plant
+
+column                | type         | min  | max  | avg  | std_dev           
+------------------------------------------------------------------------------
+manufacture_plant_id* | INTEGER      | 1    | 5    | 3.0  | 1.4142135623730951
+plant_name            | VARCHAR(50)  | None | None | None | None              
+plant_type            | VARCHAR (7)  | None | None | None | None              
+plant_location        | VARCHAR(100) | None | None | None | None              
+company_owned         | INTEGER      | 0    | 1    | 0.8  | 0.4               
+  - num of rows: 5
+
+
+Table: Brands
+
+column     | type        | min  | max  | avg  | std_dev          
+-----------------------------------------------------------------
+brand_id*  | INTEGER     | 1    | 6    | 3.5  | 1.707825127659933
+brand_name | VARCHAR(50) | None | None | None | None             
+  - num of rows: 6
+
+
+Table: Dealers
+
+column         | type         | min  | max  | avg  | std_dev          
+----------------------------------------------------------------------
+dealer_id*     | INTEGER      | 1    | 4    | 2.5  | 1.118033988749895
+dealer_name    | VARCHAR(50)  | None | None | None | None             
+dealer_address | VARCHAR(100) | None | None | None | None             
+  - num of rows: 4
+
+
+Table: Car_Options
+
+column           | type        | min  | max   | avg                | std_dev            
+----------------------------------------------------------------------------------------
+option_set_id*   | INTEGER     | 1    | 26    | 13.5               | 7.5                
+model_id         | INTEGER     | 1    | 17    | 8.423076923076923  | 4.82121176056774   
+engine_id        | INTEGER     | 1    | 3     | 1.6923076923076923 | 0.6661733875264912 
+transmission_id  | INTEGER     | 4    | 4     | 4.0                | 0.0                
+chassis_id       | INTEGER     | 6    | 7     | 6.538461538461538  | 0.49851851526214314
+premium_sound_id | INTEGER     | 5    | 5     | 5.0                | 0.0                
+color            | VARCHAR(30) | None | None  | None               | None               
+option_set_price | INTEGER     | 200  | 40000 | 6399.961538461538  | 9085.780947260266  
+  - num of rows: 26
+
+
+Table: Car_Vins
+
+column                | type    | min  | max  | avg  | std_dev           
+-------------------------------------------------------------------------
+vin*                  | INTEGER | 1    | 5    | 3.0  | 1.4142135623730951
+model_id              | INTEGER | 2    | 14   | 7.8  | 4.578209256903839 
+option_set_id         | INTEGER | 1    | 17   | 9.2  | 5.670978751503131 
+manufactured_date     | DATE    | None | None | None | None              
+manufactured_plant_id | INTEGER | 3    | 4    | 3.6  | 0.4898979485566356
+  - num of rows: 5
+
+dsi> import examples/data/wildfiredata.csv
+Unknown command: import
+Type "help" to get valid commands.
+
+Error: 'import'
+
+dsi> load examples/data/wildfiredata.csv
+Loaded 'examples/data/wildfiredata.csv' into table 'wildfiredata.
+Database has 12 table
+examples/data/wildfiredata.csv successfully loaded.
+
+dsi> save mixed_things.sqlite
+Database saved to 'mixed_things.sqlite'.
+
+dsi> exit
+Exiting...

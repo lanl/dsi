@@ -1,0 +1,191 @@
+(venv_dsi_interface) pascalgrosset@pn2035929:~/projects/dsi_interface$ pwd
+/home/pascalgrosset/projects/dsi_interface
+(venv_dsi_interface) pascalgrosset@pn2035929:~/projects/dsi_interface$ python dsi/cli.py 
+DSI version 1.1
+Enter "help" for usage hints.
+
+dsi> help
+display <table name> [-n num rows] [-e filename]  Displays the contents of that table, num rows to display is 
+                                                      optional, and it can be exported to a csv/parquet file
+exit                                              Exit the DSI Command Line Interface (CLI)
+find <var>                                        Search for a variable in the dataset
+help                                              Shows this help
+list                                              Lists the tables in the current DSI databse
+load <filename>                                   Loads this filename/url to a DSI database
+query "<SQL query>" [-n num rows] [-e filename]   Runs a query, num rows to display is optional
+                                                      , and it can be exported to a csv/parquet file
+save <filename>                                   Save the local database as <filename>
+summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally 
+                                                     specify number of data rows to display
+
+dsi> load examples/data/
+examples/data/bueno1.data           examples/data/results.toml          examples/data/student_test2.yml     examples/data/viewers/              examples/data/yosemite5.csv         
+examples/data/bueno2.data           examples/data/results1.toml         examples/data/test.txt              examples/data/wildfiredata.csv      
+examples/data/example_schema.json   examples/data/student_test1.yml     examples/data/testcase_schema.json  examples/data/wildfiredata.pq       
+dsi> load examples/data/wildfiredata.pq
+Loaded 'examples/data/wildfiredata.pq' into table 'wildfiredata.
+Database has 1 table
+examples/data/wildfiredata.pq successfully loaded.
+
+dsi> load examples/data/yosemite5.csv
+Loaded 'examples/data/yosemite5.csv' into table 'yosemite5.
+Database has 2 table
+examples/data/yosemite5.csv successfully loaded.
+
+dsi> list
+
+Table: wildfiredata
+  - num of columns: 11
+  - num of rows: 4
+
+Table: yosemite5
+  - num of columns: 9
+  - num of rows: 4
+
+
+dsi> summary -t yosemite5
+
+column                    | type    | min    | max    | avg       | std_dev           
+--------------------------------------------------------------------------------------
+wind_speed                | INTEGER | 2      | 8      | 5.75      | 2.48746859276655  
+wdir                      | INTEGER | 180    | 240    | 210.0     | 23.717082451262844
+smois                     | REAL    | 0.05   | 0.05   | 0.05      | 0.0               
+fuels                     | TEXT    | None   | None   | None      | None              
+ignition                  | TEXT    | None   | None   | None      | None              
+safe_unsafe_fire_behavior | TEXT    | None   | None   | None      | None              
+FILE                      | TEXT    | None   | None   | None      | None              
+inside_burned_area        | INTEGER | 120852 | 135427 | 128252.25 | 7175.045727206204 
+outside_burned_area       | INTEGER | 1536   | 52115  | 36951.5   | 20560.57154482822 
+  - num of rows: 4
+
+dsi> summary -t yosemite5 -n 10
+
+column                    | type    | min    | max    | avg       | std_dev           
+--------------------------------------------------------------------------------------
+wind_speed                | INTEGER | 2      | 8      | 5.75      | 2.48746859276655  
+wdir                      | INTEGER | 180    | 240    | 210.0     | 23.717082451262844
+smois                     | REAL    | 0.05   | 0.05   | 0.05      | 0.0               
+fuels                     | TEXT    | None   | None   | None      | None              
+ignition                  | TEXT    | None   | None   | None      | None              
+safe_unsafe_fire_behavior | TEXT    | None   | None   | None      | None              
+FILE                      | TEXT    | None   | None   | None      | None              
+inside_burned_area        | INTEGER | 120852 | 135427 | 128252.25 | 7175.045727206204 
+outside_burned_area       | INTEGER | 1536   | 52115  | 36951.5   | 20560.57154482822 
+
+wind_speed | wdir | smois | fuels          | ignition               | safe_unsafe_fire_behavior | FILE                                                                                                                                                               | inside_burned_area | outside_burned_area
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET    | ST5_ignite_contour.dat | safe                      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png | 120852             | 1536               
+8          | 225  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_contour.dat | unsafe                    | https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png | 121306             | 47996              
+8          | 195  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_ring.dat    | unsafe                    | https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png | 135427             | 52115              
+5          | 240  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_strip.dat   | unsafe                    | https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png | 135424             | 46159              
+dsi> 
+dsi> summary -n 10
+
+Table: wildfiredata
+
+column                       | type    | min    | max    | avg       | std_dev           
+-----------------------------------------------------------------------------------------
+wind_speed                   | INTEGER | 2      | 8      | 5.75      | 2.48746859276655  
+wdir                         | INTEGER | 180    | 240    | 210.0     | 23.717082451262844
+smois                        | REAL    | 0.05   | 0.05   | 0.05      | 0.0               
+fuels                        | TEXT    | None   | None   | None      | None              
+ignition                     | TEXT    | None   | None   | None      | None              
+safe_unsafe_ignition_pattern | TEXT    | None   | None   | None      | None              
+safe_unsafe_fire_behavior    | TEXT    | None   | None   | None      | None              
+does_fire_meet_objectives    | TEXT    | None   | None   | None      | None              
+rationale_if_unsafe          | REAL    | None   | None   | None      | None              
+burned_area                  | INTEGER | 122388 | 187542 | 165203.75 | 25579.58827243902 
+FILE                         | TEXT    | None   | None   | None      | None              
+
+wind_speed | wdir | smois | fuels          | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET    | ST5_ignite_contour.dat | safe                         | safe                      | yes                       | None                | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
+8          | 225  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_contour.dat | safe                         | unsafe                    | no                        | None                | 169302      | https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png
+8          | 195  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_ring.dat    | safe                         | unsafe                    | no                        | None                | 187542      | https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png
+5          | 240  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_strip.dat   | safe                         | unsafe                    | no                        | None                | 181583      | https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png
+
+Table: yosemite5
+
+column                    | type    | min    | max    | avg       | std_dev           
+--------------------------------------------------------------------------------------
+wind_speed                | INTEGER | 2      | 8      | 5.75      | 2.48746859276655  
+wdir                      | INTEGER | 180    | 240    | 210.0     | 23.717082451262844
+smois                     | REAL    | 0.05   | 0.05   | 0.05      | 0.0               
+fuels                     | TEXT    | None   | None   | None      | None              
+ignition                  | TEXT    | None   | None   | None      | None              
+safe_unsafe_fire_behavior | TEXT    | None   | None   | None      | None              
+FILE                      | TEXT    | None   | None   | None      | None              
+inside_burned_area        | INTEGER | 120852 | 135427 | 128252.25 | 7175.045727206204 
+outside_burned_area       | INTEGER | 1536   | 52115  | 36951.5   | 20560.57154482822 
+
+wind_speed | wdir | smois | fuels          | ignition               | safe_unsafe_fire_behavior | FILE                                                                                                                                                               | inside_burned_area | outside_burned_area
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET    | ST5_ignite_contour.dat | safe                      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png | 120852             | 1536               
+8          | 225  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_contour.dat | unsafe                    | https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png | 121306             | 47996              
+8          | 195  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_ring.dat    | unsafe                    | https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png | 135427             | 52115              
+5          | 240  | 0.05  | ST5_FFDUET_TLS | ST5_ignite_strip.dat   | unsafe                    | https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png | 135424             | 46159              
+dsi> 
+dsi> 
+dsi> find "ST5_FFDUET_TLS"
+
+
+
+
+
+
+rows:
+    table: wildfiredata
+    column: fuels
+    row: (2, 8, 225, 0.05, 'ST5_FFDUET_TLS', 'ST5_ignite_contour.dat', 'safe', 'unsafe', 'no', None, 169302, 'https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png')
+    table: wildfiredata
+    column: fuels
+    row: (3, 8, 195, 0.05, 'ST5_FFDUET_TLS', 'ST5_ignite_ring.dat', 'safe', 'unsafe', 'no', None, 187542, 'https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png')
+    table: wildfiredata
+    column: fuels
+    row: (4, 5, 240, 0.05, 'ST5_FFDUET_TLS', 'ST5_ignite_strip.dat', 'safe', 'unsafe', 'no', None, 181583, 'https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png')
+    table: yosemite5
+    column: fuels
+    row: (2, 8, 225, 0.05, 'ST5_FFDUET_TLS', 'ST5_ignite_contour.dat', 'unsafe', 'https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png', 121306, 47996)
+    table: yosemite5
+    column: fuels
+    row: (3, 8, 195, 0.05, 'ST5_FFDUET_TLS', 'ST5_ignite_ring.dat', 'unsafe', 'https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png', 135427, 52115)
+    table: yosemite5
+    column: fuels
+    row: (4, 5, 240, 0.05, 'ST5_FFDUET_TLS', 'ST5_ignite_strip.dat', 'unsafe', 'https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png', 135424, 46159)
+dsi> 
+dsi> 
+dsi> 
+dsi> find "burned_area"
+
+
+
+
+columns:
+    table: wildfiredata
+    column: burned_area
+    table: yosemite5
+    column: inside_burned_area
+    table: yosemite5
+    column: outside_burned_area
+
+
+dsi> query "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'"
+
+wind_speed | wdir | smois | fuels       | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET | ST5_ignite_contour.dat | safe                         | safe                      | yes                       | None                | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
+
+
+Error: 'Namespace' object is not subscriptable
+
+dsi> query "select * from wildfiredata where safe_unsafe_fire_behavior = 'safe'" -e safe_db.parquet
+
+wind_speed | wdir | smois | fuels       | ignition               | safe_unsafe_ignition_pattern | safe_unsafe_fire_behavior | does_fire_meet_objectives | rationale_if_unsafe | burned_area | FILE                                                                                                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2          | 180  | 0.05  | ST5_FF_DUET | ST5_ignite_contour.dat | safe                         | safe                      | yes                       | None                | 122388      | https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png
+
+
+Query results exported to 'safe_db.parquet'.
+
+dsi> exit
+Exiting...

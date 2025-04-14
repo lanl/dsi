@@ -136,8 +136,26 @@ class DSI_Shim:
             table_name (str): name of the table to load the data to for CSV and parquet
         '''
         if self.__is_url(dbfile): # if it's a url, do fetch
-            self.__fetch(dbfile)
-            return
+            #self.__fetch(dbfile)
+            url = dbfile
+            output_path = url.split('/')[-1]    
+
+            try:
+                # Use certifi's trusted certificate bundle
+                context = ssl._create_unverified_context()
+
+                # Use urlopen instead of urlretrieve
+                with urllib.request.urlopen(url, context=context) as response:
+                    with open(output_path, 'wb') as out_file:
+                        out_file.write(response.read())
+                
+                print(f"File downloaded successfully as {output_path}")
+                dbfile = output_path
+
+            except Exception as e:
+                print(f"Download failed: {e}")
+                return
+        
         
         if isinstance(dbfile, pd.DataFrame):
             self.__import_dataframe(dbfile, table_name)
@@ -311,30 +329,6 @@ class DSI_Shim:
 
         print(f"Query results exported to '{file_path}'.\n")
 
-
-    def __fetch(self, url):
-        '''
-        Fetches a remote file and opens it
-        
-        Args:
-            url (string): url of the database to retreive
-        '''
-        output_path = url.split('/')[-1]    
-
-        try:
-        # Use certifi's trusted certificate bundle
-            context = ssl._create_unverified_context()
-
-            # Use urlopen instead of urlretrieve
-            with urllib.request.urlopen(url, context=context) as response:
-                with open(output_path, 'wb') as out_file:
-                    out_file.write(response.read())
-            
-            print(f"File downloaded successfully as {output_path}")
-            
-            self.load([output_path])
-        except Exception as e:
-            print(f"Download failed: {e}")
 
 
     def __import_dataframe(self, df, table_name):

@@ -82,6 +82,7 @@ class Store:
         self.logger.info(f"Database '{path}' connected to.")
 
 
+
     def import_database(self, source_db_path):
         '''
         Import the contents of a databse to this one
@@ -91,21 +92,44 @@ class Store:
         '''
         cursor = self.conn.cursor()
 
-        cursor.execute(f"ATTACH DATABASE '{source_db_path}' AS source_db")
-        cursor.execute("SELECT name FROM source_db.sqlite_master WHERE type='table'")
+        # Attach the source database
+        cursor.execute("ATTACH DATABASE ? AS source_db", (source_db_path,))
+
+        # Get all non-internal tables
+        cursor.execute("""
+            SELECT name FROM source_db.sqlite_master 
+            WHERE type='table' AND name NOT LIKE 'sqlite_%'
+        """)
         
         tables = cursor.fetchall()
-        for (table_name,) in tables:
-            cursor.execute(f"""
-                INSERT INTO {table_name}
-                SELECT * FROM source_db.{table_name}
-            """)
 
-        cursor.execute("DETACH DATABASE source_db")
-        self.conn.commit()
+        for (table_name,) in tables:
+            #print(f"Importing table: {table_name}")
+            try:
+                # Copy schema
+                cursor.execute(f"""
+                    SELECT sql FROM source_db.sqlite_master 
+                    WHERE type='table' AND name=?
+                """, (table_name,))
+                create_stmt = cursor.fetchone()[0]
+                cursor.execute(create_stmt)
+
+                # Copy data
+                cursor.execute(f"""
+                    INSERT INTO "{table_name}"
+                    SELECT * FROM source_db."{table_name}"
+                """)
+            except sqlite3.Error as e:
+                print(f"Failed on table {table_name}: {e}")
+
+            self.conn.commit()
+
+        # Detatch
+        try:
+            cursor.execute("DETACH DATABASE source_db")
+        except sqlite3.Error as e:
+            print(f"Warning: failed to detach database: {e}")
         
-        
-    import sqlite3
 
 
     def search_database(self, search_string):
