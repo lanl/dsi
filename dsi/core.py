@@ -13,7 +13,6 @@ import sys
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
 
-
 class Terminal():
     """
     An instantiated Terminal is the DSI human/machine interface.
@@ -830,10 +829,70 @@ class Sync():
     
         return file_list
     
-    def get(project_name = "Project"):
+    def get(self, project_name = "Project"):
         '''
         Helper function that searches remote location based on project name, and retrieves
         DSI database
         '''
         True
         
+class DSI():
+    '''
+    A user-facing abstration for DSI's middleware interface.
+
+    The DSI Class abstracts Terminal for managing metadata and Sync for data management
+    and movement.
+    '''
+
+    def __init__(self):
+        self.t = Terminal(debug = 2, runTable=True)
+        self.s = Sync()
+
+    def schema(self, filename):
+        self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+
+    def sqlbackend(self, filename):
+        self.t.load_module('backend','Sqlite','back-write', filename=filename)
+
+    def open(self, filename):
+        self.t.load_module('backend','Sqlite','back-read', filename=filename)
+
+
+    def ingest(self):
+        self.t.artifact_handler(interaction_type='ingest')
+        print("Ingest complete.")
+
+    def drawschema(self, filename='erd.png'):
+        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
+        self.t.artifact_handler(interaction_type="process")
+        self.t.transload()
+        print(f"Schema written to {filename} complete.")
+
+    def toml1(self, filenames):
+        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
+    def yaml1(self, filenames):
+        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
+    def json1(self, filenames):
+        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
+    
+    def findt(self, query):
+        return self.t.find_table(query)
+    def findc(self, query):
+        return self.t.find_column(query)
+    def find(self, query):
+        return self.t.find_cell(query)
+    
+    def nb(self):
+        self.t.artifact_handler(interaction_type="notebook")
+        print("Notebook .ipynb and .html generated.")
+
+    def get(self, dbname):
+        pass
+    def move(self, filepath):
+        pass
+    def fetch(self, fname):
+        pass
+
+    def preview(self, filename):
+        ''' DSI 'ls' '''
+        pass
