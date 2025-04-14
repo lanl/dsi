@@ -876,16 +876,23 @@ class DSI():
         self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
     
     def findt(self, query):
-        return self.t.find_table(query)
+        data = self.t.find_table(query)
+        for val in data:
+            print(val.t_name, val.c_name, val.value, val.row_num, val.type)
     def findc(self, query):
-        return self.t.find_column(query)
+        data = self.t.find_column(query)
+        for val in data:
+            print(val.t_name, val.c_name, val.value, val.row_num, val.type)
     def find(self, query):
-        return self.t.find_cell(query)
+        data = self.t.find_cell(query)
+        for val in data:
+            print(val.t_name, val.c_name, val.value, val.row_num, val.type)
     
     def nb(self):
         self.t.artifact_handler(interaction_type="notebook")
         print("Notebook .ipynb and .html generated.")
 
+    #help, list (tables), query?, summary, edge-finding (find this/that)
     def get(self, dbname):
         pass
     def move(self, filepath):
