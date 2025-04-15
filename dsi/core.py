@@ -26,7 +26,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
@@ -384,6 +384,10 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error('Could not find artifact interaction type in VALID_ARTIFACT_INTERACTION_TYPES')
             raise NotImplementedError('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing an action on it')
+            raise NotImplementedError('Need to load a valid backend before performing an action on it')
         
         operation_success = False
         backread_active = False
@@ -518,6 +522,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -538,6 +546,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -562,6 +574,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -586,6 +602,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -619,6 +639,28 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
         return return_object
+    
+    def list(self):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before listing all tables in it')
+            raise NotImplementedError('Need to load a valid backend before listing all tables in it')
+        backend = self.loaded_backends[0]
+        table_list = backend.list()
+
+        for table in table_list:
+            print(f"\nTable: {table[0]}")
+            print(f"  - num of columns: {table[1]}")
+            print(f"  - num of rows: {table[2]}")
+        print("\n")
+
+    def summary(self, table_name = None, num_rows = 0):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.summary(table_name, num_rows)
     
     def get_current_abstraction(self, table_name = None):
         """
