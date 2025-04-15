@@ -11,6 +11,8 @@ a=Terminal(debug=0, backup_db = False, runTable=True)
 a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"], target_table_prefix = "student")
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
+# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames="oceans11_datacard.yml")
+# a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="dublin_core.xml")
 
 ''' Example uses of loading open DSI writers. Need to call transload() after loading to execute them. '''
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "test", display_cols = ["n", "o"])
@@ -26,6 +28,10 @@ a.artifact_handler(interaction_type='ingest')
 # a.artifact_handler(interaction_type="notebook") 
 # a.artifact_handler(interaction_type="process")
 # print(a.get_current_abstraction)
+
+''' Example of printing table information'''
+# a.list()
+# a.summary(table_name='student__physics', num_rows = 3)
 
 ''' Example uses of the DSI FIND feature: find_table, find_column, find_cell, find (is a find all) '''
 ## TABLE match                      - return matching table data
