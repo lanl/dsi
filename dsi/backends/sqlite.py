@@ -116,7 +116,7 @@ class Sqlite(Filesystem):
             sql_cols = ', '.join(types.unit_keys)
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
             if self.runTable:
-                str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INT, {}".format(str(types.name), sql_cols)            
+                str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INTEGER, {}".format(str(types.name), sql_cols)            
             if foreign_query != None:
                 str_query += foreign_query
             if self.runTable:

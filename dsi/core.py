@@ -920,21 +920,43 @@ class DSI():
     def findt(self, query):
         data = self.t.find_table(query)
         for val in data:
-            print(val.t_name, val.c_name, val.value, val.row_num, val.type)
-    def findc(self, query):
-        data = self.t.find_column(query)
+            print(f"Table: {val.t_name}")
+            print(f"  - Columns: {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Value: \n{val.value}")
+    def findc(self, query, range = False):
+        data = self.t.find_column(query, range)
         for val in data:
-            print(val.t_name, val.c_name, val.value, val.row_num, val.type)
-    def find(self, query):
-        data = self.t.find_cell(query)
+            print(f"Table: {val.t_name}")
+            print(f"  - Column: {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Value: {val.value}")
+    def find(self, query, row = False):
+        data = self.t.find_cell(query, row)
         for val in data:
-            print(val.t_name, val.c_name, val.value, val.row_num, val.type)
+            print(f"Table: {val.t_name}")
+            print(f"  - Column(s): {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Row Number: {val.row_num}")
+            print(f"  - Value: {val.value}")
     
     def nb(self):
         self.t.artifact_handler(interaction_type="notebook")
         print("Notebook .ipynb and .html generated.")
+    
+    def list(self):
+        self.t.list() # terminal function already prints
 
-    #help, list (tables), query?, summary, edge-finding (find this/that)
+    def summary(self, table_name = None, num_rows = 0):
+        self.t.summary(table_name, num_rows) # terminal function already prints
+    
+    def oceans11_datacard(self, filenames):
+        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
+
+    def dublin_core_datacard(self, filenames):
+        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
+
+    #help, query?, edge-finding (find this/that)
     def get(self, dbname):
         pass
     def move(self, filepath):

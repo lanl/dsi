@@ -11,7 +11,7 @@ a=Terminal(debug=0, backup_db = False, runTable=True)
 a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"], target_table_prefix = "student")
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
-# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames="oceans11_datacard.yml")
+# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['data/wildfire_datacard.yml', 'data/pennant_datacard.yml'])
 # a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="dublin_core.xml")
 
 ''' Example uses of loading open DSI writers. Need to call transload() after loading to execute them. '''

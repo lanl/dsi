@@ -495,7 +495,7 @@ class Oceans11Datacard(FileReader):
                         field_names.append(field)
 
             if field_names != ["name", "description", "data_uses", "creators", "creation_date", 
-                                "la-ur", "owner", "funding", "publisher", "published_date", "origin_location", 
+                                "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
                                 "num_simulations", "version", "license", "live_dataset"]:
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields are included matching the example")
 
@@ -504,8 +504,8 @@ class Oceans11Datacard(FileReader):
         else:
             self.datacard_data["oceans11_datacard"] = temp_data
         
-        self.datacard_data["oceans11_datacard"]["remote"] = []
-        self.datacard_data["oceans11_datacard"]["local"] = []
+        self.datacard_data["oceans11_datacard"]["remote"] = [""] * len(self.datacard_files)
+        self.datacard_data["oceans11_datacard"]["local"] = [""] * len(self.datacard_files)
         self.set_schema_2(self.datacard_data)
 
 class DublinCoreDatacard(FileReader):
