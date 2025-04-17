@@ -26,7 +26,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
@@ -47,7 +47,8 @@ class Terminal():
         `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
         `runTable`: Undefined False as default. 
-        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
+        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. 
+        Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -158,13 +159,17 @@ class Terminal():
                         self.logger.info("   Activating this reader in load_module")
                     
                     try:
-                        sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
+                        tester = 0
+                        if sys.gettrace() is None:
+                            tester = 1
+                            sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
                         ingest_error = obj.add_rows()
                         if ingest_error is not None:
                             if self.debug_level != 0:
                                 self.logger.error(f"   {ingest_error[1]}")
                             raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
-                        sys.settrace(None) # ends trace to prevent large overhead
+                        if tester == 1:
+                            sys.settrace(None) # ends trace to prevent large overhead
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
@@ -307,7 +312,10 @@ class Terminal():
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
             try:
-                sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
                 if writer_error is not None:
                     if writer_error[0] == "Warning":
@@ -316,11 +324,12 @@ class Terminal():
                         if self.debug_level != 0:
                             self.logger.error(writer_error[1])
                         raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
-                sys.settrace(None) # ends trace to prevent large overhead
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
             except:
                 if self.debug_level != 0: 
-                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
-                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
+                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
+                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -409,7 +418,10 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
-                sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
                 if interaction_type == "ingest":
                     errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 elif interaction_type == "put":
@@ -418,7 +430,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
                     raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
-                sys.settrace(None) # ends trace to prevent large overhead
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
@@ -437,7 +450,10 @@ class Terminal():
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
-                sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
                 if interaction_type == "get":
                     query_data = first_backend.get_artifacts(**kwargs)
                 elif interaction_type == "query":
@@ -446,7 +462,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(query_data[1])
                     raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
-                sys.settrace(None) # ends trace to prevent large overhead
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
             else: #backend is empty - cannot query
                 if self.debug_level != 0:
@@ -955,6 +972,9 @@ class DSI():
 
     def dublin_core_datacard(self, filenames):
         self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
+
+    def schema_datacard(self, filenames):
+        self.t.load_module('plugin', 'SchemaDatacard', 'reader', filenames=filenames)
 
     #help, query?, edge-finding (find this/that)
     def get(self, dbname):

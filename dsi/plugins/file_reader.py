@@ -494,10 +494,10 @@ class Oceans11Datacard(FileReader):
                             temp_data[field].append(val2)
                         field_names.append(field)
 
-            if field_names != ["name", "description", "data_uses", "creators", "creation_date", 
-                                "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
-                                "num_simulations", "version", "license", "live_dataset"]:
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields are included matching the example")
+            if sorted(field_names) != sorted(["name", "description", "data_uses", "creators", "creation_date", 
+                                              "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
+                                              "num_simulations", "version", "license", "live_dataset"]):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
 
         if self.target_table_prefix is not None:
             self.datacard_data[f"{self.target_table_prefix}__oceans11_datacard"] = temp_data
@@ -544,10 +544,10 @@ class DublinCoreDatacard(FileReader):
                 else:
                     temp_data[element].append(val)
                 field_names.append(element)
-            if field_names != ['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 'Language', 
-                                'Format', 'Subject', 'Description', 'Identifier', 'Relation', 'Source', 
-                                'Type', 'Coverage', 'Rights']:
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields are included matching the example")
+            if sorted(field_names) != sorted(['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 
+                                              'Language', 'Format', 'Subject', 'Description', 'Identifier', 
+                                              'Relation', 'Source', 'Type', 'Coverage', 'Rights']):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
 
         if self.target_table_prefix is not None:
             self.datacard_data[f"{self.target_table_prefix}__dublin_core_datacard"] = temp_data
@@ -581,18 +581,24 @@ class SchemaDatacard(FileReader):
                 data = json.load(schema_file)
                 
             field_names = []
-            for element, val in next(iter(data.values())).items():
-                if val is None:
-                    val = ""
+            for element, val in data.items():
+                if element == "@type" and val.lower() == "dataset":
+                    field_names.append(element)
+                    continue
+                elif element == "@type" and val.lower() != "dataset":
+                    return (ValueError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
                 if element not in temp_data.keys():
                     temp_data[element] = [val]
                 else:
                     temp_data[element].append(val)
                 field_names.append(element)
-            if field_names != ['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 'Language', 
-                                'Format', 'Subject', 'Description', 'Identifier', 'Relation', 'Source', 
-                                'Type', 'Coverage', 'Rights']:
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields are included matching the example")
+            if sorted(field_names) != sorted(["@type", "name", "description", "keywords", "creator", "audience", 
+                                              "expires",  "isBasedOn", "isPartOf", "accountablePerson", "publisher", 
+                                              "editor", "funder", "funding", "dateCreated", "dateModified", 
+                                              "datePublished", "countryOfOrigin", "locationCreated", "sourceOrganization", 
+                                              "url", "version", "creditText", "license", "citation", "copyrightHolder", 
+                                              "copyrightNotice", "copyrightYear"]):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
 
         if self.target_table_prefix is not None:
             self.datacard_data[f"{self.target_table_prefix}__schema_datacard"] = temp_data
