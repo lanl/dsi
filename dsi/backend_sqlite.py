@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 
 
-class Store:
+class DSI_Sqlite:
     '''
     Create a storage for data, eventually will be replaced by DSI
 
@@ -52,10 +52,6 @@ class Store:
         self.conn.close()
 
 
-    def save_db(self, dest_path):
-        shutil.copyfile(self.path , dest_path)
-        
-
     def connect_to_db(self, path):
         '''
         Create or connect to a database with the path specified
@@ -69,6 +65,11 @@ class Store:
         cursor = self.conn.cursor()
         self.conn.commit()
         
+        
+    def save_db(self, dest_path):
+        shutil.copyfile(self.path , dest_path)
+        
+
 
     def import_sqlite(self, source_db_path):
         '''
@@ -118,8 +119,7 @@ class Store:
             print(f"Warning: failed to detach database: {e}")
         
 
-
-    def load_duckdb_to_sqlite(self, duckdb_path):
+    def import_duckdb(self, duckdb_path):
         """
         Transfers all tables from a DuckDB database to a SQLite3 database.
         
@@ -321,53 +321,81 @@ class Store:
 
     def import_dataframe(self, df, table_name):
         if not isinstance(df, pd.DataFrame):
-            raise ValueError("The input must be a pandas DataFrame.")
+            print("Provided data is not a valid pandas DataFrame.")
+            return False
 
-        cursor = self.conn.cursor()
+        try:
+            cursor = self.conn.cursor()
 
-        # Get DataFrame schema as (column_name, SQLite_type)
-        df_schema = [(col, str(pd.api.types.infer_dtype(df[col], skipna=True)).upper()) for col in df.columns]
+            # Check if table exists
+            cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name=?
+            """, (table_name,))
+            table_exists = cursor.fetchone() is not None
 
-        # Normalize to basic SQLite types
-        def normalize_type(dtype):
-            if "INT" in dtype: return "INTEGER"
-            if "FLOAT" in dtype or "DOUBLE" in dtype or "DECIMAL" in dtype: return "REAL"
-            if "BOOL" in dtype: return "INTEGER"
-            if "DATETIME" in dtype or "DATE" in dtype: return "TEXT"
-            if "STRING" in dtype or "OBJECT" in dtype: return "TEXT"
-            return "TEXT"
+            if not table_exists:
+                # Create table and insert
+                df.to_sql(table_name, self.conn, if_exists='replace', index=False)
+                print(f"Table '{table_name}' created and data inserted.")
+                return True
 
-        df_schema = [(col, normalize_type(dtype)) for col, dtype in df_schema]
+            # Table exists: get schema info
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            existing_schema = cursor.fetchall()  # (cid, name, type, notnull, dflt_value, pk)
+            existing_columns = [row[1] for row in existing_schema]
+            existing_types = {row[1]: row[2].upper() for row in existing_schema}
 
-        # Check if table exists
-        cursor.execute("""
-            SELECT name FROM sqlite_master
-            WHERE type='table' AND name=?
-        """, (table_name,))
-        table_exists = cursor.fetchone() is not None
+            df_columns = df.columns.tolist()
 
-        if not table_exists:
-            # Table does not exist: create and insert
-            col_defs = ", ".join([f"{col} {dtype}" for col, dtype in df_schema])
-            create_stmt = f"CREATE TABLE {table_name} ({col_defs})"
-            cursor.execute(create_stmt)
-            df.to_sql(table_name, self.conn, if_exists='append', index=False)
-            print(f"Table '{table_name}' created and data inserted.")
-            return True
+            # Ensure all DataFrame columns exist in the table
+            if not set(df_columns).issubset(set(existing_columns)):
+                print("DataFrame columns are not a subset of the existing table.")
+                print(f"Existing table columns: {existing_columns}")
+                print(f"DataFrame columns: {df_columns}")
+                return False
 
-        # Table exists: get schema
-        cursor.execute(f"PRAGMA table_info({table_name})")
-        existing_schema = [(row[1], row[2].upper()) for row in cursor.fetchall()]  # (name, type)
+            # Type compatibility check
+            def infer_sqlite_type(pd_series):
+                kind = pd.api.types.infer_dtype(pd_series, skipna=True)
+                if kind in ['integer', 'boolean']:
+                    return 'INTEGER'
+                elif kind in ['floating', 'mixed-integer-float']:
+                    return 'REAL'
+                elif kind in ['string', 'unicode', 'mixed', 'bytes', 'categorical']:
+                    return 'TEXT'
+                elif kind in ['datetime', 'datetime64', 'date']:
+                    return 'TEXT'
+                else:
+                    return 'TEXT'
 
-        # Compare schemas
-        if df_schema == existing_schema:
-            df.to_sql(table_name, self.conn, if_exists='append', index=False)
+            type_compatible = True
+            for col in df_columns:
+                df_type = infer_sqlite_type(df[col])
+                existing_type = existing_types.get(col, '').upper()
+
+                # Allow duck typing: INTEGER→REAL, TEXT↔VARCHAR, etc.
+                if df_type != existing_type:
+                    if df_type == 'INTEGER' and existing_type == 'REAL':
+                        continue
+                    elif df_type == 'TEXT' and existing_type in ('VARCHAR', 'CHAR', 'TEXT'):
+                        continue
+                    else:
+                        print(f"❌ Type mismatch for column '{col}': DataFrame has {df_type}, SQLite has {existing_type}")
+                        type_compatible = False
+                        break
+
+            if not type_compatible:
+                print(f"⚠️  Schema mismatch. Data not inserted into '{table_name}'.")
+                return False
+
+            # All checks passed: insert data
+            df[df_columns].to_sql(table_name, self.conn, if_exists='append', index=False)
             print(f"Data inserted into existing table '{table_name}'.")
             return True
-        else:
-            print(f"Schema mismatch. Table '{table_name}' exists with a different schema.")
-            print(f"  Existing schema: {existing_schema}")
-            print(f"  DataFrame schema: {df_schema}")
+
+        except Exception as e:
+            print(f"Error inserting DataFrame into SQLite: {e}")
             return False
 
 
@@ -427,7 +455,7 @@ class Store:
         return results
 
 
-    def sql_to_db(self, sql_file_path, db_path):
+    def sql_to_db(self, sql_file_path):
         if not os.path.isfile(sql_file_path):
             raise FileNotFoundError(f"SQL file not found: {sql_file_path}")
 
@@ -454,31 +482,6 @@ class Store:
         tables = cursor.fetchall()
         return len(tables)
 
-
-    
-
-
-    def import_csv(self, csv_file_path, table_name):
-        cursor = self.conn.cursor()
-
-        with open(csv_file_path, 'r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            headers = next(reader)  # First line as column names
-
-            # Create table SQL statement (all fields as TEXT for simplicity)
-            columns = ', '.join([f'"{col}" TEXT' for col in headers])
-            create_table_sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns})'
-            cursor.execute(create_table_sql)
-
-            # Prepare the insert statement
-            placeholders = ', '.join(['?'] * len(headers))
-            insert_sql = f'INSERT INTO "{table_name}" VALUES ({placeholders})'
-
-            # Insert all rows
-            for row in reader:
-                cursor.execute(insert_sql, row)
-
-        self.conn.commit()
 
 
 
@@ -799,5 +802,16 @@ class Store:
 
         cursor.close()
 
+
+
+    def table_exists(self, table_name):
+        cursor = self.conn.cursor()
+        cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name=?
+            """, (table_name,))
+        table_exists = cursor.fetchone() is not None
+        
+        return table_exists
 
 

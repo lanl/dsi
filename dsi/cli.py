@@ -1,3 +1,4 @@
+import sys
 import shlex
 import readline 
 import glob
@@ -47,7 +48,10 @@ class DSI_Cli:
     '''
 
     def __init__(self):
-        self.a = DSI_Shim()
+        return
+    
+    def startup(self, backend="sqlite3"):
+        self.a = DSI_Shim(backend)
         return
     
 
@@ -233,10 +237,14 @@ COMMANDS = {
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite and duckdb")
+
     cli.version()
     
     while True:
         try:
+            cli.a.startup(args.backend)
             user_input = input("dsi> ")
             tokens = shlex.split(user_input)
             if not tokens:
@@ -261,7 +269,6 @@ def main():
             else:
                 handler(args)
             
-
         except KeyboardInterrupt:
             print("\nUse 'exit' to leave.\n")
 
