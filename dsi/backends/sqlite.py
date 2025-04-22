@@ -683,6 +683,9 @@ class Sqlite(Filesystem):
         return (ValueObject(), f"{query_object} is not a cell in this database")
 
     def list(self):
+        """
+        Return a list of all tables and their dimensions from this SQLite backend
+        """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         tableList = [table[0] for table in tableList]
         if "sqlite_sequence" in tableList:
@@ -697,7 +700,31 @@ class Sqlite(Filesystem):
         
         return info_list
     
+    def display(self, table_name, num_rows = 25):
+        """
+        Prints data of a specified table from this SQLite backend.
+        
+        `table_name`: table whose data is printed
+         
+        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        """
+        if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
+            return (ValueError, f"{table_name} does not exist in this SQLite database")
+        headers, rows = self.summary_helper(table_name) 
+        self.table_print_helper(headers, rows, num_rows)
+    
     def summary(self, table_name = None, num_rows = 0):
+        """
+        Prints data and numerical metadata of tables from this SQLite backend. Output varies depending on parameters
+
+        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
+        Otherwise every table's numerical metdata is printed
+
+        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
+        Otherwise, only the total number of rows of a table are printed. 
+        The tables whose data is printed depends on the `table_name` parameter.
+
+        """
         if table_name is None:
             tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table' AND name != 'sqlite_sequence';").fetchall()
             if "sqlite_sequence" in tableList:
@@ -733,6 +760,11 @@ class Sqlite(Filesystem):
 
     
     def summary_helper(self, table_name):
+        """
+        **Users should not call this function**
+
+        Helper function to generate the summary of tables in this SQLite database. 
+        """
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
         numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE'}
@@ -772,14 +804,11 @@ class Sqlite(Filesystem):
         return headers, rows
     
     def table_print_helper(self, headers, rows, max_rows=25):
-        '''
-        Make the output into a nice table
-        
-        Args:
-            headers (list): the list of headers
-            rows (list of list): the actual data
-            max_rows (int): the number of rows to display
-        '''
+        """
+        **Users should not call this function**
+
+        Helper function to print table data/metdata cleanly
+        """
         # Determine max width for each column
         col_widths = [
             max(

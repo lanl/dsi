@@ -33,6 +33,7 @@ a.artifact_handler(interaction_type='ingest')
 ''' Example of printing table information'''
 # a.list()
 # a.summary(table_name='student__physics', num_rows = 3)
+# a.display(table_name='student__physics')
 
 ''' Example uses of the DSI FIND feature: find_table, find_column, find_cell, find (is a find all) '''
 ## TABLE match                      - return matching table data

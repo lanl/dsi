@@ -658,6 +658,9 @@ class Terminal():
         return return_object
     
     def list(self):
+        """
+        Prints a list of all tables and their dimensions in the first loaded backend
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before listing all tables in it')
@@ -672,12 +675,40 @@ class Terminal():
         print("\n")
 
     def summary(self, table_name = None, num_rows = 0):
+        """
+        Prints data and numerical metadata of tables from the first loaded backend. Output varies depending on parameters
+
+        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
+        Otherwise every table's numerical metdata is printed
+
+        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
+        Otherwise, only the total number of rows of a table are printed. 
+        The tables whose data is printed depends on the `table_name` parameter.
+
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
         backend.summary(table_name, num_rows)
+
+    def display(self, table_name, num_rows = 25):
+        """
+        Prints data of a specified table from the first loaded backend.
+        
+        `table_name`: table whose data is printed
+         
+        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        errorStmt = backend.display(table_name, num_rows)
+        if errorStmt is not None:
+            raise errorStmt[0](errorStmt[1])
     
     def get_current_abstraction(self, table_name = None):
         """
@@ -916,7 +947,6 @@ class DSI():
     def open(self, filename):
         self.t.load_module('backend','Sqlite','back-read', filename=filename)
 
-
     def ingest(self):
         self.t.artifact_handler(interaction_type='ingest')
         print("Ingest complete.")
@@ -941,6 +971,7 @@ class DSI():
             print(f"  - Columns: {val.c_name}")
             print(f"  - Search Type: {val.type}")
             print(f"  - Value: \n{val.value}")
+
     def findc(self, query, range = False):
         data = self.t.find_column(query, range)
         for val in data:
@@ -948,6 +979,7 @@ class DSI():
             print(f"  - Column: {val.c_name}")
             print(f"  - Search Type: {val.type}")
             print(f"  - Value: {val.value}")
+
     def find(self, query, row = False):
         data = self.t.find_cell(query, row)
         for val in data:
@@ -966,6 +998,9 @@ class DSI():
 
     def summary(self, table_name = None, num_rows = 0):
         self.t.summary(table_name, num_rows) # terminal function already prints
+
+    def summary(self, table_name = None, num_rows = 25):
+        self.t.display(table_name, num_rows)
     
     def oceans11_datacard(self, filenames):
         self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
