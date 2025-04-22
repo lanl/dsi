@@ -13,7 +13,6 @@ import sys
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
 
-
 class Terminal():
     """
     An instantiated Terminal is the DSI human/machine interface.
@@ -27,7 +26,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
@@ -48,7 +47,8 @@ class Terminal():
         `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
         `runTable`: Undefined False as default. 
-        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
+        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. 
+        Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -159,13 +159,17 @@ class Terminal():
                         self.logger.info("   Activating this reader in load_module")
                     
                     try:
-                        sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
+                        tester = 0
+                        if sys.gettrace() is None:
+                            tester = 1
+                            sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
                         ingest_error = obj.add_rows()
                         if ingest_error is not None:
                             if self.debug_level != 0:
                                 self.logger.error(f"   {ingest_error[1]}")
                             raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
-                        sys.settrace(None) # ends trace to prevent large overhead
+                        if tester == 1:
+                            sys.settrace(None) # ends trace to prevent large overhead
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
@@ -308,7 +312,10 @@ class Terminal():
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
             try:
-                sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
                 if writer_error is not None:
                     if writer_error[0] == "Warning":
@@ -317,11 +324,12 @@ class Terminal():
                         if self.debug_level != 0:
                             self.logger.error(writer_error[1])
                         raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
-                sys.settrace(None) # ends trace to prevent large overhead
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
             except:
                 if self.debug_level != 0: 
-                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
-                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
+                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
+                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -385,6 +393,10 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error('Could not find artifact interaction type in VALID_ARTIFACT_INTERACTION_TYPES')
             raise NotImplementedError('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing an action on it')
+            raise NotImplementedError('Need to load a valid backend before performing an action on it')
         
         operation_success = False
         backread_active = False
@@ -406,7 +418,10 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
-                sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
                 if interaction_type == "ingest":
                     errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 elif interaction_type == "put":
@@ -415,7 +430,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
                     raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
-                sys.settrace(None) # ends trace to prevent large overhead
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
@@ -434,7 +450,10 @@ class Terminal():
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
-                sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
                 if interaction_type == "get":
                     query_data = first_backend.get_artifacts(**kwargs)
                 elif interaction_type == "query":
@@ -443,7 +462,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(query_data[1])
                     raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
-                sys.settrace(None) # ends trace to prevent large overhead
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
             else: #backend is empty - cannot query
                 if self.debug_level != 0:
@@ -519,6 +539,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -539,6 +563,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -563,6 +591,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -587,6 +619,10 @@ class Terminal():
 
             - check file of the first backend loaded to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
@@ -620,6 +656,28 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
         return return_object
+    
+    def list(self):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before listing all tables in it')
+            raise NotImplementedError('Need to load a valid backend before listing all tables in it')
+        backend = self.loaded_backends[0]
+        table_list = backend.list()
+
+        for table in table_list:
+            print(f"\nTable: {table[0]}")
+            print(f"  - num of columns: {table[1]}")
+            print(f"  - num of rows: {table[2]}")
+        print("\n")
+
+    def summary(self, table_name = None, num_rows = 0):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.summary(table_name, num_rows)
     
     def get_current_abstraction(self, table_name = None):
         """
@@ -830,10 +888,102 @@ class Sync():
     
         return file_list
     
-    def get(project_name = "Project"):
+    def get(self, project_name = "Project"):
         '''
         Helper function that searches remote location based on project name, and retrieves
         DSI database
         '''
         True
         
+class DSI():
+    '''
+    A user-facing abstration for DSI's middleware interface.
+
+    The DSI Class abstracts Terminal for managing metadata and Sync for data management
+    and movement.
+    '''
+
+    def __init__(self):
+        self.t = Terminal(debug = 2, runTable=True)
+        self.s = Sync()
+
+    def schema(self, filename):
+        self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+
+    def sqlbackend(self, filename):
+        self.t.load_module('backend','Sqlite','back-write', filename=filename)
+
+    def open(self, filename):
+        self.t.load_module('backend','Sqlite','back-read', filename=filename)
+
+
+    def ingest(self):
+        self.t.artifact_handler(interaction_type='ingest')
+        print("Ingest complete.")
+
+    def drawschema(self, filename='erd.png'):
+        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
+        self.t.artifact_handler(interaction_type="process")
+        self.t.transload()
+        print(f"Schema written to {filename} complete.")
+
+    def toml1(self, filenames):
+        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
+    def yaml1(self, filenames):
+        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
+    def json1(self, filenames):
+        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
+    
+    def findt(self, query):
+        data = self.t.find_table(query)
+        for val in data:
+            print(f"Table: {val.t_name}")
+            print(f"  - Columns: {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Value: \n{val.value}")
+    def findc(self, query, range = False):
+        data = self.t.find_column(query, range)
+        for val in data:
+            print(f"Table: {val.t_name}")
+            print(f"  - Column: {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Value: {val.value}")
+    def find(self, query, row = False):
+        data = self.t.find_cell(query, row)
+        for val in data:
+            print(f"Table: {val.t_name}")
+            print(f"  - Column(s): {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Row Number: {val.row_num}")
+            print(f"  - Value: {val.value}")
+    
+    def nb(self):
+        self.t.artifact_handler(interaction_type="notebook")
+        print("Notebook .ipynb and .html generated.")
+    
+    def list(self):
+        self.t.list() # terminal function already prints
+
+    def summary(self, table_name = None, num_rows = 0):
+        self.t.summary(table_name, num_rows) # terminal function already prints
+    
+    def oceans11_datacard(self, filenames):
+        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
+
+    def dublin_core_datacard(self, filenames):
+        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
+
+    def schema_datacard(self, filenames):
+        self.t.load_module('plugin', 'SchemaDatacard', 'reader', filenames=filenames)
+
+    #help, query?, edge-finding (find this/that)
+    def get(self, dbname):
+        pass
+    def move(self, filepath):
+        pass
+    def fetch(self, fname):
+        pass
+
+    def preview(self, filename):
+        ''' DSI 'ls' '''
+        pass

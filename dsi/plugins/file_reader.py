@@ -453,6 +453,159 @@ class Wildfire(FileReader):
        
         self.set_schema_2(self.csv_data)
 
+class Oceans11Datacard(FileReader):
+    """
+    """
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        """
+        `filenames`: file names of the oceans11 data card yaml files to be ingested
+
+        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.datacard_files = [filenames]
+        else:
+            self.datacard_files = filenames
+        self.target_table_prefix = target_table_prefix
+        self.datacard_data = OrderedDict()
+
+    def add_rows(self) -> None:
+        """
+        """
+        temp_data = OrderedDict()
+        for filename in self.datacard_files:
+            with open(filename, 'r') as yaml_file:
+                data = yaml.safe_load(yaml_file)
+                
+            field_names = []
+            for element, val in data.items():
+                if element not in ['authorship', 'data']:
+                    if element not in temp_data.keys():
+                        temp_data[element] = [val]
+                    else:
+                        temp_data[element].append(val)
+                    field_names.append(element)
+                else:
+                    for field, val2 in val.items():
+                        if field not in temp_data.keys():
+                            temp_data[field] = [val2]
+                        else:
+                            temp_data[field].append(val2)
+                        field_names.append(field)
+
+            if sorted(field_names) != sorted(["name", "description", "data_uses", "creators", "creation_date", 
+                                              "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
+                                              "num_simulations", "version", "license", "live_dataset"]):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
+
+        if self.target_table_prefix is not None:
+            self.datacard_data[f"{self.target_table_prefix}__oceans11_datacard"] = temp_data
+        else:
+            self.datacard_data["oceans11_datacard"] = temp_data
+        
+        self.datacard_data["oceans11_datacard"]["remote"] = [""] * len(self.datacard_files)
+        self.datacard_data["oceans11_datacard"]["local"] = [""] * len(self.datacard_files)
+        self.set_schema_2(self.datacard_data)
+
+class DublinCoreDatacard(FileReader):
+    """
+    """
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        """
+        `filenames`: file names of the Dublin Core data card xml files to be ingested
+
+        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.datacard_files = [filenames]
+        else:
+            self.datacard_files = filenames
+        self.target_table_prefix = target_table_prefix
+        self.datacard_data = OrderedDict()
+
+    def add_rows(self) -> None:
+        """
+        """
+        import xmltodict
+        temp_data = OrderedDict()
+        for filename in self.datacard_files:
+            with open(filename, 'r', encoding="utf-8") as xml_file:
+                xml_data = xml_file.read()
+                data = xmltodict.parse(xml_data)
+                
+            field_names = []
+            for element, val in next(iter(data.values())).items():
+                if val is None:
+                    val = ""
+                if element not in temp_data.keys():
+                    temp_data[element] = [val]
+                else:
+                    temp_data[element].append(val)
+                field_names.append(element)
+            if sorted(field_names) != sorted(['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 
+                                              'Language', 'Format', 'Subject', 'Description', 'Identifier', 
+                                              'Relation', 'Source', 'Type', 'Coverage', 'Rights']):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
+
+        if self.target_table_prefix is not None:
+            self.datacard_data[f"{self.target_table_prefix}__dublin_core_datacard"] = temp_data
+        else:
+            self.datacard_data["dublin_core_datacard"] = temp_data
+        self.set_schema_2(self.datacard_data)
+
+class SchemaDatacard(FileReader):
+    """
+    """
+    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+        """
+        `filenames`: file names of the Schema.org data card json files to be ingested
+
+        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.datacard_files = [filenames]
+        else:
+            self.datacard_files = filenames
+        self.target_table_prefix = target_table_prefix
+        self.datacard_data = OrderedDict()
+
+    def add_rows(self) -> None:
+        """
+        """
+        temp_data = OrderedDict()
+        for filename in self.datacard_files:
+            with open(filename, 'r') as schema_file:
+                data = json.load(schema_file)
+                
+            field_names = []
+            for element, val in data.items():
+                if element == "@type" and val.lower() == "dataset":
+                    field_names.append(element)
+                    continue
+                elif element == "@type" and val.lower() != "dataset":
+                    return (ValueError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
+                if element not in temp_data.keys():
+                    temp_data[element] = [val]
+                else:
+                    temp_data[element].append(val)
+                field_names.append(element)
+            if sorted(field_names) != sorted(["@type", "name", "description", "keywords", "creator", "audience", 
+                                              "expires",  "isBasedOn", "isPartOf", "accountablePerson", "publisher", 
+                                              "editor", "funder", "funding", "dateCreated", "dateModified", 
+                                              "datePublished", "countryOfOrigin", "locationCreated", "sourceOrganization", 
+                                              "url", "version", "creditText", "license", "citation", "copyrightHolder", 
+                                              "copyrightNotice", "copyrightYear"]):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
+
+        if self.target_table_prefix is not None:
+            self.datacard_data[f"{self.target_table_prefix}__schema_datacard"] = temp_data
+        else:
+            self.datacard_data["schema_datacard"] = temp_data
+        self.set_schema_2(self.datacard_data)
+
 class MetadataReader1(FileReader):
     """
     Structured Data Plugin to read in an individual or a set of JSON metadata files

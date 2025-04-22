@@ -108,16 +108,17 @@ class ER_Diagram(FileWriter):
             if manual_dot: dot_file.write(html_table+"]; ")
             else: dot.node(tableName, label = html_table)
 
-        for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
-            if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
-                continue
-            if f_table != None:
-                foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                fk_string = f"{f_table}:{f_col}"
-                pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
-                
-                if manual_dot: dot_file.write(f"{pk_string} -> {fk_string}; ")
-                else: dot.edge(pk_string, fk_string)
+        if "dsi_relations" in collection.keys():
+            for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
+                if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
+                    continue
+                if f_table != None:
+                    foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
+                    fk_string = f"{f_table}:{f_col}"
+                    pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
+                    
+                    if manual_dot: dot_file.write(f"{pk_string} -> {fk_string}; ")
+                    else: dot.edge(pk_string, fk_string)
 
         if manual_dot:
             dot_file.write("}")
