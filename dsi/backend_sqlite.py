@@ -599,12 +599,12 @@ class DSI_Sqlite:
             table_info.append(table)
 
             # Get column names (headers)
-            cursor.execute(f"PRAGMA table_info({table})")
+            cursor.execute(f'PRAGMA table_info("{table}")')
             columns = [col[1] for col in cursor.fetchall()]
             table_info.append(len(columns))
 
             # Get row count
-            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            cursor.execute(f'SELECT COUNT(*) FROM "{table}"')
             row_count = cursor.fetchone()[0]
             table_info.append(row_count)
 

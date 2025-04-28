@@ -31,12 +31,8 @@ class DSI_Shim:
                 os.remove(".temp.sqlite")
             self.a.connect_to_db(".temp.sqlite")
         
-        # Create a temporary database to store data
-        
-            
         return
-    
-    
+     
     
     def __del__(self):
         self.close()
@@ -231,7 +227,12 @@ class DSI_Shim:
             dataframe (bool): whether to return a pandas dataframe or not
             num_rows (int): number of rows to display
         '''
+        start = time.time()
         results, headers = self.a.query(sql_query)
+        end = time.time()
+        elapsed_seconds = end - start
+        print(f"Query returned {len(results)} and took {elapsed_seconds}s")
+
         if (dataframe == True):
             return pd.DataFrame(results, columns=headers)
         else:
