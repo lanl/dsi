@@ -7,7 +7,7 @@ import os
 
 #from dsi_shim import *
 from dsi.core import Terminal
-import dsi
+from ._version import __version__
 
 def path_completer(text, state):
     """
@@ -45,17 +45,26 @@ readline.set_completer(path_completer)
 readline.parse_and_bind('tab: complete')
 
 
-class DSI_Cli:
+class DSI_cli:
     '''
     A class for command line interface for DSI
     '''
+    t = []
 
     def __init__(self):
         return
     
-    def startup(self, backend="sqlite3"):
+    def startup(self, backend="sqlite"):
+        self.t = Terminal(debug = 2, runTable=True)
         #self.a = DSI_Shim(backend)
-        self.a = Terminal(debug = 2, runTable=True)
+        if backend=="duckdb":
+            if os.path.exists(".temp.duckdb"):
+                os.remove(".temp.duckdb")
+            self.t.load_module('backend','Sqlduckdbite','back-write', filename=".temp.duckdb")
+        else:
+            if os.path.exists(".temp.sqlite"):
+                os.remove(".temp.sqlite")
+            self.t.load_module('backend','Sqlite','back-write', filename=".temp.sqlite")
         return
     
 
@@ -103,7 +112,7 @@ class DSI_Cli:
             num_rows = args.num_rows
 
         #self.a.display_table(table_name, num_rows)
-        self.a.display(table_name, num_rows)
+        self.t.display(table_name, num_rows)
         
         
         if args.export != None:
@@ -111,7 +120,7 @@ class DSI_Cli:
                 filename = args[0] + ".csv"
             else:
                 filename = args.export
-            self.a.export_table(table_name, filename)
+            self.t.export_table(table_name, filename)
 
 
     def exit_cli(self, args):
@@ -119,7 +128,7 @@ class DSI_Cli:
         Exits the CLI
         '''
         print("Exiting...")
-        self.a.close()
+        self.t.close()
         exit(0)
 
 
@@ -127,14 +136,14 @@ class DSI_Cli:
         '''
         Exports to a csv/parquet file
         '''
-        self.a.export_table(args[0], args[1])
+        self.t.export_table(args[0], args[1])
         
         
     def find(self, args):
         '''
         Global find to see where that string exists
         '''
-        self.a.find(args[0])
+        self.t.find(args[0])
               
               
     def list_tables(self, args):
@@ -142,7 +151,7 @@ class DSI_Cli:
         Lists the tables in the database
         '''
         #self.a.list_tables()
-        self.a.list()
+        self.t.list()
     
     
     def load(self, args):
@@ -175,7 +184,7 @@ class DSI_Cli:
         if args.num_rows != None:
             num_rows = args.num_rows
 
-        self.a.query(sql_query, num_rows)
+        self.t.query(sql_query, num_rows)
         
         
         if args.export != None:
@@ -183,7 +192,7 @@ class DSI_Cli:
                 filename = args[0] + ".csv"
             else:
                 filename = args.export
-            self.a.export_query(sql_query, filename)
+            self.t.export_query(sql_query, filename)
         
         
 
@@ -191,7 +200,7 @@ class DSI_Cli:
         '''
         Save the database to file
         '''
-        self.a.save_to_file(args[0])
+        self.t.save_to_file(args[0])
 
 
 
@@ -215,7 +224,7 @@ class DSI_Cli:
             num_rows = args.num_rows
         
         #self.a.summarize(table_name, num_rows)
-        self.a.summary(table_name, num_rows)
+        self.t.summary(table_name, num_rows)
 
 
 
@@ -223,11 +232,11 @@ class DSI_Cli:
         '''
         Output the version of DSI being used
         '''
-        print("DSI version " + str(dsi.__version__)+"\n")
+        print("DSI version " + str(__version__)+"\n")
         print("Enter \"help\" for usage hints.\n")
 
 
-cli = DSI_Cli()
+cli = DSI_cli()
 
 
 COMMANDS = {
@@ -248,11 +257,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite and duckdb")
 
+    args = parser.parse_args()
     cli.version()
-    
     while True:
         try:
-            cli.a.startup(args.backend)
+            cli.startup(args.backend)
             user_input = input("dsi> ")
             tokens = shlex.split(user_input)
             if not tokens:
