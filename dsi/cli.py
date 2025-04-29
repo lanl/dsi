@@ -157,16 +157,84 @@ class DSI_cli:
     def load(self, args):
         '''
         Loads data to the DSI database
+
+        Args:
+            dbfile (obj): name of the file to load or dataframe
+            table_name (str): name of the table to load the data to for CSV and parquet
         '''
         table_name = ""
         if len(args) > 1:
             table_name = args[1]
+        table_name = args[0]
         #self.a.load(args[0], table_name)
 
+        if self.__is_url(dbfile): # if it's a url, do fetch
+            from urllib.parse import urlparse
+            import urllib.request
+            import ssl
+            url = dbfile
+            output_path = url.split('/')[-1]    
+
+            try:
+                # Use certifi's trusted certificate bundle
+                context = ssl._create_unverified_context()
+
+                # Use urlopen instead of urlretrieve
+                with urllib.request.urlopen(url, context=context) as response:
+                    with open(output_path, 'wb') as out_file:
+                        out_file.write(response.read())
+
+                print(f"File downloaded successfully as {output_path}")
+                dbfile = output_path
+
+            except Exception as e:
+                print(f"Download failed: {e}")
+                return
 
 
+        #if isinstance(dbfile, pd.DataFrame):
+        #    self.a.import_dataframe(dbfile, table_name)
+        #    return
+
+        file_extension = dbfile.rsplit(".", 1)[-1]
+        if self.__is_sqlite3_file(dbfile):
+            try:
+                #self.a.import_sqlite(dbfile)
+                print(f"Database has {self.a.get_num_tables()} table")
+                print(f"{dbfile} successfully loaded.\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {dbfile}\n")    
+
+        elif self.__is_duckdb_file(dbfile):
+            try:
+                #self.a.import_duckdb(dbfile)
+                print(f"Database has {self.a.get_num_tables()} table")
+                print(f"{dbfile} successfully loaded.\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {dbfile}\n")  
+
+        elif file_extension.lower() == 'csv':
+            try:
+                #self.a.import_csv(dbfile)
+                print(f"Database has {self.a.get_num_tables()} table")
+                print(f"{dbfile} successfully loaded.\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {dbfile}\n")   
+
+        elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
+            try:
+                #self.a.import_parquet(dbfile)
+                print(f"Database has {self.a.get_num_tables()} table")
+                print(f"{dbfile} successfully loaded.\n")
+            except Exception as e:
+                print(f"An error {e} occurred loading {dbfile}\n")   
+
+        else:
+            print("This database format is not supported. Currently supported formats are: ")
+            print("   - csv (extension: .csv)")
+            print("   - parquet (extension: .pq, .parquet)")
+            print("   - sqlite (extension: .db, .sqlite, .sqlite3)\n")
         
-       
    
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='display')
@@ -234,6 +302,28 @@ class DSI_cli:
         '''
         print("DSI version " + str(__version__)+"\n")
         print("Enter \"help\" for usage hints.\n")
+
+    # TODO: Abstract later to __is_valid_file and have independent checks in the dsi.backends
+    def __is_sqlite3_file(self, filename):
+        if not os.path.isfile(filename):
+            return False
+
+        with open(filename, 'rb') as f:
+            header = f.read(16)
+        return header == b'SQLite format 3\x00'
+
+
+    def __is_duckdb_file(self, file_path):
+        if not os.path.isfile(file_path):
+            return False
+
+        try:
+            with open(file_path, 'rb') as f:
+                header = f.read(4)
+                return header == b'DUCK'
+        except Exception as e:
+            print(f"Error reading file: {e}")
+            return False
 
 
 cli = DSI_cli()
