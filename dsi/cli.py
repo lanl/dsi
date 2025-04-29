@@ -3,6 +3,7 @@ import shlex
 import readline 
 import glob
 import argparse
+import os
 
 #from dsi_shim import *
 from dsi.core import Terminal

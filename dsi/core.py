@@ -994,6 +994,12 @@ class DSI():
         """
         self.t.load_module('backend','Sqlite','back-write', filename=filename)
 
+    def duckdbbackend(self, filename):
+        """
+        Loads a duckdb backend for ingesting based on an input name and file path.
+        """
+        self.t.load_module('backend','duckdb','back-write', filename=filename)
+
     def open(self, filename):
         """
         Opens an existing SQLite backend solely for reading based on an input name and file path. 
@@ -1139,6 +1145,12 @@ class DSI():
         `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
         """
         self.t.display(table_name, num_rows)
+
+    def close(self):
+        """
+        Closes the connection and finalizes the changes to the backend
+        """
+        self.t.close()
     
     
     #help, query?, edge-finding (find this/that)
