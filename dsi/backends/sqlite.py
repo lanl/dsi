@@ -47,7 +47,7 @@ class ValueObject:
     type = "" #type of match, {table, column, range, cell, row}
 
     # implement this later once filesystem table incoroporated into dsi
-    filesystem_match = [] #list of all elements in that matching row in filesystem table
+    # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
