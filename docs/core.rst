@@ -39,7 +39,7 @@ Notes for users:
       - ``Terminal.artifact_handler``: 'notebook' interaction_type stores data from first loaded backend, NOT the existing DSI abstraction, in new notebook file
       - ``Terminal.artifact_handler``: review this function description below to clarify which backends are targeted by which interaction_types
       - Terminal find functions only access the first loaded backend
-      - ``Terminal.unload_module``: removes last loaded backend of specified mod_name. Ex: if 2 loaded Sqlite backends, second is unloaded
+      - ``Terminal.unload_module``: removes last loaded backend of specified mod_name. Ex: if there are 2 loaded Sqlite backends, second is unloaded
       - Terminal handles errors from any loaded DSI/user-written modules (plugins/backends). 
       
             - If writing an external plugin/backend, return any intentionally caught errors as a tuple (error type, error message). 
