@@ -938,33 +938,139 @@ class DSI():
         self.t = Terminal(debug = 2, runTable=True)
         self.s = Sync()
 
+    def oceans11_datacard(self, filenames):
+        """
+        DSI Reader that stores info from a datacard file meant for the Oceans11 DSI open data server
+        Input filenames should be YAML files structured exactly as examples/data/oceans11_datacard.yml
+        """
+        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
+
+    def dublin_core_datacard(self, filenames):
+        """
+        DSI Reader that stores info from a XML datacard file that follows the Dublin Core metadata standard.
+        Input filenames should be structured exactly as examples/data/dublin_core_datacard.xml
+        """
+        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
+
+    def schema_datacard(self, filenames):
+        """
+        DSI Reader that stores info from a JSON datacard file that follows the Schema.org metadata standard.
+        Input filenames should be structured exactly as examples/data/schema_datacard.json
+        """
+        self.t.load_module('plugin', 'SchemaDatacard', 'reader', filenames=filenames)
+    
     def schema(self, filename):
+        """
+        DSI Reader that stores a database schema in memory based on an input JSON file.
+        Should be similar to examples/data/example_schema.json (without the comments).
+        """
         self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
 
+    def toml1(self, filenames):
+        """
+        DSI Reader that stores TOML data in memory. Should follow format of examples/data/results.toml
+        """
+        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
+    
+    def yaml1(self, filenames):
+        """
+        DSI Reader that stores YAML data in memory. Should follow format of examples/data/student_test1.toml
+        """
+        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
+
+    def json1(self, filenames):
+        """
+        DSI Reader that stores JSON data in memory.
+        """
+        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
+
+
     def sqlbackend(self, filename):
+        """
+        Loads a SQLite backend for ingesting based on an input name and file path.
+        """
         self.t.load_module('backend','Sqlite','back-write', filename=filename)
 
     def open(self, filename):
+        """
+        Opens an existing SQLite backend solely for reading based on an input name and file path. 
+        If calling process(), must first call this function since process() can only use a reading backend not ingesting backend.
+        """
         self.t.load_module('backend','Sqlite','back-read', filename=filename)
 
+
     def ingest(self):
+        """
+        Ingests data stored in memory from all active DSI Readers into all active backends.
+        """
         self.t.artifact_handler(interaction_type='ingest')
         print("Ingest complete.")
 
+    def query(self, statement = None):
+        """
+        Queries data from first loaded backend based on specified `statement`. 
+        If backend is SQLite, `statement` can only be SELECT or PRAGMA queries.
+        """
+        print(self.t.artifact_handler(interaction_type='query', query=statement))
+    
+    def process(self):
+        """
+        Reads data from first loaded READING backend into memory. 
+        Must call open() to load a READING backend, otherwise this function will not work.
+        """
+        self.t.artifact_handler(interaction_type='process')
+    
+    def nb(self):
+        """
+        Generates a Python notebook of data stored in the first active backend
+        """
+        self.t.artifact_handler(interaction_type="notebook")
+        print("Notebook .ipynb and .html generated.")
+
+
     def drawschema(self, filename='erd.png'):
+        """
+        DSI Writer that generates an Entity Relationship Diagram based on data from first loaded READING backend.
+        
+        `filename` specifies the output file's name and file path.
+        """
         self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
         self.t.artifact_handler(interaction_type="process")
         self.t.transload()
-        print(f"Schema written to {filename} complete.")
+        print(f"ER Diagram written to {filename} complete.")
+    
+    def draw_table(self, table_name, filename='table.png'):
+        """
+        DSI Writer that generates a plot of a table's numerical data from the first loaded READING backend.
+        
+        `table_name` must be a table in the first loaded READING backend
+        
+        `filename` specifies the output file's name and file path.
+        """
+        self.t.load_module('plugin', 'Table_Plot', 'writer', table_name = table_name, filename=filename)
+        self.t.artifact_handler(interaction_type="process")
+        self.t.transload()
+        print(f"Table Plot written to {filename} complete.")
 
-    def toml1(self, filenames):
-        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
-    def yaml1(self, filenames):
-        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
-    def json1(self, filenames):
-        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
+    def export_csv(self, table_name, filename, export_cols = None):
+        """
+        DSI Writer that exports data from a table in the first loaded READING backend to a CSV.
+        
+        `table_name` must be a table in the first loaded READING backend
+        
+        `filename` specifies the output file's name and file path.
+
+        `export_cols`: optional. If only exporting subset of columns from `table_name`, specify list of column names to export.
+        """
+        self.t.load_module('plugin', 'CSV_Writer', 'writer', table_name = table_name, filename=filename)
+        self.t.artifact_handler(interaction_type="process")
+        self.t.transload()
+        print(f"Table Plot written to {filename} complete.")
     
     def findt(self, query):
+        """
+        Finds all tables that match `query` input in the first loaded backend
+        """
         data = self.t.find_table(query)
         for val in data:
             print(f"Table: {val.t_name}")
@@ -973,6 +1079,12 @@ class DSI():
             print(f"  - Value: \n{val.value}")
 
     def findc(self, query, range = False):
+        """
+        Finds all columns that match `query` input in the first loaded backend.
+
+        `range`: Default is False. If False, then the printed `value` is data of each matching column.
+        If True, then the printed `value` is the min/max of each matching column
+        """
         data = self.t.find_column(query, range)
         for val in data:
             print(f"Table: {val.t_name}")
@@ -981,6 +1093,12 @@ class DSI():
             print(f"  - Value: {val.value}")
 
     def find(self, query, row = False):
+        """
+        Finds all individual datapoints that match `query` input in the first loaded backend
+
+        `row`: Default is False. If False, then printed `value` is the actual cell that matches `query`.
+        If True, then printed `value` is whole row of data where a cell matches `query`
+        """
         data = self.t.find_cell(query, row)
         for val in data:
             print(f"Table: {val.t_name}")
@@ -989,28 +1107,37 @@ class DSI():
             print(f"  - Row Number: {val.row_num}")
             print(f"  - Value: {val.value}")
     
-    def nb(self):
-        self.t.artifact_handler(interaction_type="notebook")
-        print("Notebook .ipynb and .html generated.")
-    
     def list(self):
+        """
+        Prints a list of all tables and their dimensions in the first loaded backend
+        """
         self.t.list() # terminal function already prints
 
     def summary(self, table_name = None, num_rows = 0):
+        """
+        Prints data and numerical metadata of tables from the first loaded backend. Output varies depending on parameters
+
+        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
+        Otherwise every table's numerical metdata is printed
+
+        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
+        Otherwise, only the total number of rows of a table are printed. 
+        The tables whose data is printed depends on the `table_name` parameter.
+
+        """
         self.t.summary(table_name, num_rows) # terminal function already prints
 
-    def summary(self, table_name = None, num_rows = 25):
+    def display(self, table_name = None, num_rows = 25):
+        """
+        Prints data of a specified table from the first loaded backend.
+        
+        `table_name`: table whose data is printed
+         
+        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        """
         self.t.display(table_name, num_rows)
     
-    def oceans11_datacard(self, filenames):
-        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
-
-    def dublin_core_datacard(self, filenames):
-        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
-
-    def schema_datacard(self, filenames):
-        self.t.load_module('plugin', 'SchemaDatacard', 'reader', filenames=filenames)
-
+    
     #help, query?, edge-finding (find this/that)
     def get(self, dbname):
         pass
