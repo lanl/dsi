@@ -59,6 +59,7 @@ cover/
 dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
+debug.log
 
 # Intermediate data types
 # Unless manually specified in a git add
