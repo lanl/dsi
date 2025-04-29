@@ -1,9 +1,25 @@
 Core
 ====
 
-The DSI Core middleware defines the `Terminal` and `Sync` concepts. 
-An instantiated `Terminal` is the human/machine DSI interface to connect Reader/Writer plugins and DSI backends.
+The DSI Core middleware defines the `DSI`, `Terminal` and `Sync` concepts. 
+An instantiated `DSI` is a simplified user-level interface for the `Terminal` and `Sync` classes.
+An instantiated `Terminal` is the human/machine connection for Reader/Writer plugins and DSI backends.
 An instantiated `Sync` supports data movement capabilities between local and remote locations and captures metadata documentation
+
+Core: DSI
+----------
+The DSI class is a user-level class that encapsulates the Terminal and Sync classes within Core. 
+DSI calls several functions within Terminal and Sync without requiring the user to differentiate them.
+The names/actions of functions have also been simplified to improve user experience and reduce complexity.
+
+Notes for users:
+      - Users must call sqlbackend() prior to ingest() to first load a SQLite backend
+      - Need to call DSI Reader functions prior to calling sqlbackend() and ingest() which stores data from Readers into a SQLite backend
+      - process() and DSI Writer functions require a user to first call open() to load a SQLite READING backend
+      - Files inputted into DSI Readers that are datacards (oceans11, dublin, schema.org) must exactly follow examples in examples/data
+
+.. autoclass:: dsi.core.DSI
+      :members:
 
 Core: Terminal
 --------------

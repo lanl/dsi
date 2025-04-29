@@ -940,22 +940,25 @@ class DSI():
 
     def oceans11_datacard(self, filenames):
         """
-        DSI Reader that stores info from a datacard file meant for the Oceans11 DSI open data server
-        Input filenames should be YAML files structured exactly as examples/data/oceans11_datacard.yml
+        DSI Reader that stores info from a datacard file meant for the Oceans11 DSI open data server.
+        
+        `filenames` should be YAML files structured exactly as examples/data/oceans11_datacard.yml
         """
         self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
 
     def dublin_core_datacard(self, filenames):
         """
         DSI Reader that stores info from a XML datacard file that follows the Dublin Core metadata standard.
-        Input filenames should be structured exactly as examples/data/dublin_core_datacard.xml
+        
+        `filenames` should be structured exactly as examples/data/dublin_core_datacard.xml
         """
         self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
 
     def schema_datacard(self, filenames):
         """
         DSI Reader that stores info from a JSON datacard file that follows the Schema.org metadata standard.
-        Input filenames should be structured exactly as examples/data/schema_datacard.json
+        
+        `filenames` should be structured exactly as examples/data/schema_datacard.json
         """
         self.t.load_module('plugin', 'SchemaDatacard', 'reader', filenames=filenames)
     
@@ -1001,7 +1004,7 @@ class DSI():
 
     def ingest(self):
         """
-        Ingests data stored in memory from all active DSI Readers into all active backends.
+        Ingests data stored in memory from all active DSI Readers into all loaded backends.
         """
         self.t.artifact_handler(interaction_type='ingest')
         print("Ingest complete.")
@@ -1022,7 +1025,7 @@ class DSI():
     
     def nb(self):
         """
-        Generates a Python notebook of data stored in the first active backend
+        Generates a Python notebook of data stored in the first loaded backend
         """
         self.t.artifact_handler(interaction_type="notebook")
         print("Notebook .ipynb and .html generated.")
@@ -1146,6 +1149,6 @@ class DSI():
     def fetch(self, fname):
         pass
 
-    def preview(self, filename):
-        ''' DSI 'ls' '''
-        pass
+    # def preview(self, filename):
+    #     ''' DSI 'ls' '''
+    #     pass
