@@ -26,3 +26,6 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools]
 py-modules = ["dsi"]
+
+[project.scripts]
+dsi = "dsi.cli:main"
