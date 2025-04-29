@@ -65,6 +65,7 @@ debug.log
 # Unless manually specified in a git add
 *.csv
 *.cdb
+.temp.*
 
 # Force coverage svg include
 !coverage.svg
