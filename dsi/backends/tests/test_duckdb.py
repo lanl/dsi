@@ -1,11 +1,11 @@
 from collections import OrderedDict
 
-from dsi.backends.sqlite import Sqlite
+from dsi.backends.duckdb import DuckDB
 import os
 
-def test_sql_artifact():
+def test_duckdb_artifact():
     dbpath = "wildfire.db"
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.close()
     # No error implies success
     assert True
@@ -15,7 +15,7 @@ def test_artifact_ingest():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
     # No error implies success
@@ -24,7 +24,7 @@ def test_artifact_ingest():
 def test_wildfiredata_artifact_put_t():
    valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
    dbpath = 'test_wildfiredata_artifact.db'
-   store = Sqlite(dbpath)
+   store = DuckDB(dbpath)
    store.put_artifacts_t(OrderedDict([("wildfire", valid_middleware_datastructure)]), tableName="Wildfire")
    store.close()
    # No error implies success
@@ -35,30 +35,19 @@ def test_artifact_query():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
     query_data = store.query_artifacts(query = "SELECT * FROM wildfire;")
     store.close()
     correct_output = [(1, 3), (2, 2), (3, 1)]
     assert query_data == correct_output
 
-def test_artifact_notebook():
-    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
-    dbpath = 'test_artifact.db'
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    store = Sqlite(dbpath)
-    store.ingest_artifacts(valid_middleware_datastructure)
-    store.notebook()
-    store.close()
-    assert True
-
 def test_artifact_process():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
     artifact = store.process_artifacts()
     store.close()
@@ -69,7 +58,7 @@ def test_find():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
 
     find_data = store.find("f")
@@ -95,7 +84,7 @@ def test_find_table():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
 
     table_data = store.find_table("f")
@@ -109,7 +98,7 @@ def test_find_column():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
 
     col_data = store.find_column("f")
@@ -124,7 +113,7 @@ def test_find_range():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
 
     range_data = store.find_column("f", range=True)
@@ -139,7 +128,7 @@ def test_find_cell():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
 
     cell_data = store.find_cell("f")
@@ -155,7 +144,7 @@ def test_find_row():
     dbpath = 'test_artifact.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    store = Sqlite(dbpath)
+    store = DuckDB(dbpath)
     store.ingest_artifacts(valid_middleware_datastructure)
 
     row_data = store.find_cell("f", row = True)

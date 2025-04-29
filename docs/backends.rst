@@ -28,6 +28,13 @@ SQLite
    :members:
    :special-members: __init__
 
+DuckDB
+------
+
+.. automodule:: dsi.backends.duckdb
+   :members:
+   :special-members: __init__
+
 SQLAlchemy
 ------
 

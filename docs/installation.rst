@@ -22,6 +22,11 @@ Quick Start: Installation
       cd dsi
       pip install .
 
+#. (Optional) If using all DSI functionalities, it is necessary to install requirements.extras.txt as well:
+
+   .. code-block:: unixconfig
+
+      pip install -r requirements.extras.txt
 
 #. When you've completed work, deactivate the environment with:
 

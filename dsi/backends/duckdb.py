@@ -1,33 +1,15 @@
-import sqlite3
+import duckdb
 import re
-import subprocess
 from datetime import datetime
-import textwrap
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
-
-# Declare supported named types for sql
-DOUBLE = "DOUBLE"
-STRING = "VARCHAR"
-FLOAT = "FLOAT"
-INT = "INT"
-JSON = "TEXT"
 
 # Holds table name and data properties
 class DataType:
     name = ""
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
-
-class Artifact:
-    # """
-    #     Primary Artifact class that holds database schema in memory.
-    #     An Artifact is a generic construct that defines the schema for metadata that
-    #     defines the tables inside of SQL
-    # """
-    name = ""
-    properties = {}
 
 class ValueObject:
     """
@@ -50,30 +32,30 @@ class ValueObject:
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with SQL
-class Sqlite(Filesystem):
+class DuckDB(Filesystem):
     """
-    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term
+    DuckDB Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term
     """
     runTable = False
 
     def __init__(self, filename):
         """
-        Initializes a SQLite backend with a user inputted filename, and creates other internal variables
+        Initializes a DuckDB backend with a user inputted filename, and creates other internal variables
         """
         self.filename = filename
-        self.con = sqlite3.connect(filename)
+        self.con = duckdb.connect(filename)
         self.cur = self.con.cursor()
-        self.runTable = Sqlite.runTable
+        self.runTable = DuckDB.runTable
 
     def check_type(self, input_list):
         """
-        **Users should not use this function. Only used by internal sqlite functions**
+        **Users should not use this function. Only used by internal DuckDB functions**
 
-        Evaluates a list and returns the predicted compatible SQLite Type
+        Evaluates a list and returns the predicted compatible DuckDB Type
 
         `input_list`: list of values to evaluate
 
-        `return`: string description of the list's SQLite data type
+        `return`: string description of the list's DuckDB data type
         """
         for item in input_list:
             if isinstance(item, int):
@@ -92,18 +74,21 @@ class Sqlite(Filesystem):
         """
         **Users do not interact with this function and should ignore it. Called within ingest_artifacts()**
 
-        Helper function to create SQLite table based on a passed in schema.
+        Helper function to create DuckDB table based on a passed in schema.
 
         `types`: DataType derived class that defines the string name, properties (dictionary of table names and table data), 
         and units for each column in the schema.
 
-        `foreign_query`: defaut is None. It is a SQLite string detailing the foreign keys in this table
+        `foreign_query`: defaut is None. It is a DuckDB string detailing the foreign keys in this table
 
-        `isVerbose`: default is False. Flag to print all create table SQLite statements
+        `isVerbose`: default is False. Flag to print all create table DuckDB statements
 
         `return`: none
         """
-        if self.cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{types.name}';").fetchone():
+        if self.cur.execute(f"""
+                            SELECT table_name FROM information_schema.tables 
+                            WHERE table_type = 'BASE TABLE' AND table_name = '{types.name}'
+                            """).fetchone():
             col_names = types.properties.keys()
             col_info = self.cur.execute(f"PRAGMA table_info({types.name});").fetchall()
             query_cols = [column[1] for column in col_info]
@@ -128,22 +113,23 @@ class Sqlite(Filesystem):
             self.cur.execute(str_query)
             self.types = types
 
+
     # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifacts(self, collection, isVerbose=False):
         return self.ingest_artifacts(collection, isVerbose)
     
     def ingest_artifacts(self, collection, isVerbose=False):    
         """
-        Primary function to ingest a collection of tables into the defined SQLite database.
+        Primary function to ingest a collection of tables into the defined DuckDB database.
         
         Creates the auto generated `runTable` if flag set to True when setting up a Core.Terminal workflow
         Creates `dsi_units` table if there are units for ingested data values.
 
-        Can only be called if a SQLite database is loaded as a BACK-WRITE backend (check ``core.py`` for distinction)
+        Can only be called if a DuckDB database is loaded as a BACK-WRITE backend (check ``core.py`` for distinction)
 
         `collection`: A Python Collection of several tables and their data structured as a nested Ordered Dictionary.
 
-        `isVerbose`: default is False. Flag to print all insert table SQLite statements
+        `isVerbose`: default is False. Flag to print all insert table DuckDB statements
 
         `return`: None when stable ingesting. When errors occur, returns a tuple of (ErrorType, error message). 
         Ex: (ValueError, "this is an error")
@@ -151,7 +137,8 @@ class Sqlite(Filesystem):
         artifacts = collection
         
         if self.runTable:
-            runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
+            runTable_create = "CREATE TABLE IF NOT EXISTS runTable " \
+            "(run_id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
 
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -202,9 +189,9 @@ class Sqlite(Filesystem):
             rows = zip(*types.properties.values())
             try:
                 self.cur.executemany(str_query,rows)
-            except sqlite3.Error as e:
+            except duckdb.Error as e:
                 self.con.rollback()
-                return (sqlite3.Error, e)
+                return (duckdb.Error, e)
                 
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
@@ -216,8 +203,7 @@ class Sqlite(Filesystem):
                     for col, unit in tableData.items():
                         str_query = f'INSERT INTO dsi_units VALUES ("{tableName}", "{col}", "{unit}")'
                         unit_result = self.cur.execute(f"""
-                                                       SELECT unit 
-                                                       FROM dsi_units 
+                                                       SELECT unit FROM dsi_units 
                                                        WHERE table_name = '{tableName}' AND column = '{col}';""").fetchone()
                         if unit_result and unit_result[0] != unit: #checks if unit for same table and col exists in db and if units match
                             self.con.rollback()
@@ -225,15 +211,16 @@ class Sqlite(Filesystem):
                         elif not unit_result:
                             try:
                                 self.cur.execute(str_query)
-                            except sqlite3.Error as e:
+                            except duckdb.Error as e:
                                 self.con.rollback()
-                                return (sqlite3.Error, e)
+                                return (duckdb.Error, e)
                             
         try:
             self.con.commit()
-        except Exception as e:
+        except duckdb.Error as e:
             self.con.rollback()
-            return (sqlite3.Error, e)
+            return (duckdb.Error, e)
+
 
     # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def get_artifacts(self, query, isVerbose=False, dict_return = False):
@@ -241,13 +228,13 @@ class Sqlite(Filesystem):
     
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
-        Function that returns data from a SQLite database based on a specified SQL query.
+        Function that returns data from a DuckDB database based on a specified SQL query.
         Data returned varies based on the `dict_return` flag explained below.
 
         `query`: Must be a SELECT or PRAGMA query. If `dict_return` is True, then this can only be a simple query on one table, NO JOINS.
         Query CAN create new aggregate columns such as COUNT to include in the result regardless of `dict_return`.
 
-        `isVerbose`: default is False. Flag to print all Select table SQLite statements
+        `isVerbose`: default is False. Flag to print all Select table DuckDB statements
 
         `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from the table specified in `query`.
         
@@ -264,15 +251,15 @@ class Sqlite(Filesystem):
                 if isVerbose:
                     print(data)
             except:
-                return (ValueError, "Error in query_artifacts/get_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                return (ValueError, "Error in query_artifacts handler: Incorrect SELECT query on the data. Please try again")
         else:
-            return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            return (ValueError, "Error in query_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             query_cols = [description[0] for description in self.cur.description]
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
             if len(tables) > 1:
-                return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only return ordered dictionary if query with one table")
+                return (ValueError, "Error in query_artifacts handler: Can only return ordered dictionary if query with one table")
             
             queryDict = OrderedDict()
             for row in data:
@@ -284,164 +271,40 @@ class Sqlite(Filesystem):
         else:
             return data
 
-    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def inspect_artifacts(self, interactive=False):
-        return self.notebook(interactive)
-    
-    def notebook(self, interactive=False):
-        """
-        Generates a Jupyter notebook displaying all the data in the specified SQLite database.
-
-        To account for multiple tables, the database is stored as a list of dataframes, where each table is a dataframe.
-
-        If database has table relations, it is stored as a separate dataframe. 
-        If database has a units table, each table's units are stored in its corresponding dataframe `attrs` variable
-
-        `interactive`: default is False. When set to True, creates an interactive Jupyter notebook, otherwise creates an HTML file.
-
-        `return`: None
-        """
-        import nbconvert as nbc
-        import nbformat as nbf
-        dsi_relations, dsi_units = None, None
-
-        # DEPRECATE WITH NEWER NAME process_artifacts() IN FUTURE DSI RELEASE
-        collection = self.read_to_artifact(only_units_relations=True)
-        # collection = self.process_artifacts(only_units_relations=True)
-        
-        if "dsi_relations" in collection.keys():
-            dsi_relations = dict(collection["dsi_relations"])
-        if "dsi_units" in collection.keys():
-            dsi_units = dict(collection["dsi_units"])
-        nb = nbf.v4.new_notebook()
-        text = """\
-        This notebook was auto-generated by a DSI Backend for SQLite.
-        Depending on the data, there might be several tables stored in the DSI abstraction (OrderedDict).
-        Therefore, the data will be stored as a list of dataframes where each table corresponds to a dataframe.
-        Execute the Jupyter notebook cells below and interact with table_list to explore your data.
-        """
-        code1 = """\
-        import pandas as pd
-        import sqlite3
-        """
-        code2 = f"""\
-        dbPath = '{self.filename}'
-        conn = sqlite3.connect(dbPath)
-        tables = pd.read_sql_query('SELECT name FROM sqlite_master WHERE type="table";', conn)
-        """
-        if dsi_units is not None:
-            code2 += f"""dsi_units = {dsi_units}
-        """
-        if dsi_relations is not None:
-            code2 += f"""dsi_relations = {dsi_relations}
-        """
-            
-        code3 = """\
-        table_list = []
-        for table_name in tables['name']:
-            if table_name not in ["""
-        if dsi_units is not None:
-            code3 += "'dsi_units', "
-        if dsi_relations is not None:
-            code3 += "'dsi_relations', "
-        code3+="""'sqlite_sequence']:
-                query = 'SELECT * FROM ' + table_name
-                df = pd.read_sql_query(query, conn)
-                df.attrs['name'] = table_name
-                """
-        if dsi_units is not None:
-            code3+= """if table_name in dsi_units:
-                    df.attrs['units'] = dsi_units[table_name]
-                """
-        code3+= """table_list.append(df)
-        """
-        
-        if dsi_relations is not None:
-            code3+= """
-        df = pd.DataFrame(dsi_relations)
-        df.attrs['name'] = 'dsi_relations'
-        table_list.append(df)
-        """
-        
-        code4 = """\
-        for table_df in table_list:
-            print(table_df.attrs)
-            print(table_df)
-            # table_df.info()
-            # table_df.describe()
-        """
-
-        nb['cells'] = [nbf.v4.new_markdown_cell(text),
-                       nbf.v4.new_code_cell(textwrap.dedent(code1)),
-                       nbf.v4.new_code_cell(textwrap.dedent(code2)),
-                       nbf.v4.new_code_cell(textwrap.dedent(code3)),
-                       nbf.v4.new_code_cell(textwrap.dedent(code4))]
-        
-        fname = 'dsi_sqlite_backend_output.ipynb'
-        print('Writing Jupyter notebook...')
-        with open(fname, 'w') as fh:
-            nbf.write(nb, fh)
-
-        # open the jupyter notebook for static page generation
-        with open(fname, 'r', encoding='utf-8') as fh:
-            nb_content = nbf.read(fh, as_version=4)
-        run_nb = nbc.preprocessors.ExecutePreprocessor(timeout=-1) # No timeout
-        run_nb.preprocess(nb_content, {'metadata':{'path':'.'}})
-
-        if interactive:
-            print('Opening Jupyter notebook...')
-            
-            proc = subprocess.run(['jupyter-lab ./dsi_sqlite_backend_output.ipynb'], capture_output=True, shell=True)
-            if proc.stderr != b"":
-                raise Exception(proc.stderr)
-            return proc.stdout.strip().decode("utf-8")
-        else:
-            # Init HTML exporter
-            html_exporter = nbc.HTMLExporter()
-            html_content,_ = html_exporter.from_notebook_node(nb_content)
-            # Save HTML file
-            html_filename = 'dsi_sqlite_backend_output.html'
-            with open(html_filename, 'w', encoding='utf-8') as fh:
-                fh.write(html_content)
-
     # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def read_to_artifact(self, only_units_relations = False, isVerbose = False):
         return self.process_artifacts(only_units_relations, isVerbose)
     
     def process_artifacts(self, only_units_relations = False, isVerbose = False):
         """
-        Reads in data from the SQLite database into a nested Ordered Dictionary, 
+        Reads in data from the DuckDB database into a nested Ordered Dictionary, 
         where keys are table names and values are Ordered Dictionary of table data.
         If there are PK/FK relations in a database it is stored in a table called `dsi_relations`.
 
-        Can only be called if a loaded SQLite database is a BACK-READ backend in a Core.Terminal workflow (check core.py for distinction)
+        Can only be called if a loaded DuckDB database is a BACK-READ backend (check core.py for distinction)
 
         `only_units_relations`: default is False. **USERS SHOULD IGNORE THIS FLAG.** Used by an internal sqlite.py function. 
 
-        `isVerbose`: default is False. When set to True, prints all SQLite queries to select data and store in abstraction
+        `isVerbose`: default is False. When set to True, prints all DuckDB queries to select data and store in abstraction
 
-        `return`: Nested Ordered Dictionary of all data from the SQLite database
+        `return`: Nested Ordered Dictionary of all data from the DuckDB database
         
         """
         artifact = OrderedDict()
         artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
 
-        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        pkList = []
+        tableList = self.cur.execute("""
+                                     SELECT table_name FROM information_schema.tables
+                                     WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                     """).fetchall()
         for item in tableList:
             tableName = item[0]
             if tableName == "dsi_units":
                 artifact["dsi_units"] = self.process_units_helper()
                 continue
-            if tableName == "sqlite_sequence":
-                continue
 
-            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
-            colDict = OrderedDict()
-            for colInfo in tableInfo:
-                colDict[colInfo[1]] = []
-                if colInfo[5] == 1:
-                    pkList.append((tableName, colInfo[1]))
+            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchdf()
+            colDict = OrderedDict((col, []) for col in tableInfo['name'])
 
             if only_units_relations == False:
                 data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
@@ -453,16 +316,15 @@ class Sqlite(Filesystem):
                             colDict[colName].append(val)
                 artifact[tableName] = colDict
 
-            fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
-            for row in fkData:
-                artifact["dsi_relations"]["primary_key"].append((row[2], row[4]))
-                artifact["dsi_relations"]["foreign_key"].append((tableName, row[3]))
-                if (row[2], row[4]) in pkList:
-                    pkList.remove((row[2], row[4]))
-
-        for pk_tuple in pkList:
-            if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
-                artifact["dsi_relations"]["primary_key"].append(pk_tuple)
+        fkData = self.cur.execute(f"SELECT * FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'").fetchall()
+        for row in fkData:
+            artifact["dsi_relations"]["primary_key"].append((row[5], row[6][0]))
+            artifact["dsi_relations"]["foreign_key"].append((row[1], row[4][0]))
+        
+        if not fkData:
+            pkData = self.cur.execute(f"SELECT * FROM duckdb_constraints() WHERE constraint_type = 'PRIMARY KEY'").fetchall()
+            for pk_table, pk_col in pkData:
+                artifact["dsi_relations"]["primary_key"].append((pk_table, pk_col[0]))
                 artifact["dsi_relations"]["foreign_key"].append((None, None))
 
         if len(artifact["dsi_relations"]["primary_key"]) == 0:
@@ -474,7 +336,7 @@ class Sqlite(Filesystem):
         """
         **Users do not interact with this function and should ignore it. Called within process_artifacts()**
 
-        Helper function to create the SQLite database's units table as an Ordered Dictionary.
+        Helper function to create the DuckDB database's units table as an Ordered Dictionary.
         Only called if `dsi_units` table exists in the database.
 
         `return`: units table as an Ordered Dictionary
@@ -490,7 +352,7 @@ class Sqlite(Filesystem):
 
     def find(self, query_object):
         """
-        Function that finds all instances of a `query_object` in a SQLite database. 
+        Function that finds all instances of a `query_object` in a DuckDB database. 
         This includes any partial hits if `query_object` is part of a table/col/cell
         
         `query_object`: Object to find in this database. Can be of any type (string, float, int).
@@ -532,10 +394,11 @@ class Sqlite(Filesystem):
             - row_num:  None
             - type:     'table'
         """
-        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        tableList = self.cur.execute("""
+                                     SELECT table_name FROM information_schema.tables
+                                     WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                     """).fetchall()
         tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
 
         if isinstance(query_object, str):
             table_return_list = []
@@ -581,10 +444,11 @@ class Sqlite(Filesystem):
                 - range = True, 'range'
                 - range = False, 'column'
         """
-        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        tableList = self.cur.execute("""
+                                     SELECT table_name FROM information_schema.tables
+                                     WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                     """).fetchall()
         tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
 
         if isinstance(query_object, str):
             col_return_list = []
@@ -642,10 +506,11 @@ class Sqlite(Filesystem):
                 - row = True, 'row'
                 - row = False, 'cell'
         """
-        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        tableList = self.cur.execute("""
+                                     SELECT table_name FROM information_schema.tables
+                                     WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                     """).fetchall()
         tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
                     
         query_list = []
         for table in tableList:
@@ -655,16 +520,15 @@ class Sqlite(Filesystem):
             for col in colList:
                 middle= None
                 if row:
-                    middle = f'"{all_cols}", *'
+                    result = ', '.join(str(i) for i in all_cols)
+                    middle = f"'{result}', *"
                 else:
                     middle = f"'{col[1]}', {col[1]}"
-                # query = f"""SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, 
-                # {middle} FROM {table} AS t1 WHERE """
-                query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
-                if isinstance(query_object, str):
-                    query += f"{col[1]} LIKE '%{query_object}%'" 
-                else:
-                    query += f"CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
+                query = f"""
+                        SELECT '{table}', row_number() OVER () AS row_number, {middle} 
+                        FROM {table} 
+                        WHERE CAST({col[1]} AS TEXT) ILIKE '%{query_object}%'
+                        """
                 row_list.append(query)            
 
             table_row_query = " UNION ".join(row_list) + ";"
@@ -681,193 +545,19 @@ class Sqlite(Filesystem):
                 val.value = value_row[3]
                 val.type = "cell"
                 if row:
-                    val.c_name = eval(value_row[2])
+                    val.c_name = value_row[2].split(', ')
                     val.value = list(value_row[3:])
                     val.type = "row"
                 value_obj_list.append(val)
-
             return value_obj_list
 
         return (ValueObject(), f"{query_object} is not a cell in this database")
 
-    def list(self):
-        """
-        Return a list of all tables and their dimensions from this SQLite backend
-        """
-        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
-        
-        info_list = []
-        for table in tableList:
-            colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
-            num_cols = len(colList)
-            num_rows = self.cur.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            info_list.append((table, num_cols, num_rows))
-        
-        return info_list
-    
-    def display(self, table_name, num_rows = 25):
-        """
-        Prints data of a specified table from this SQLite backend.
-        
-        `table_name`: table whose data is printed
-         
-        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
-        """
-        if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
-            return (ValueError, f"{table_name} does not exist in this SQLite database")
-        headers, rows = self.summary_helper(table_name) 
-        self.table_print_helper(headers, rows, num_rows)
-    
-    def summary(self, table_name = None, num_rows = 0):
-        """
-        Prints data and numerical metadata of tables from this SQLite backend. Output varies depending on parameters
-
-        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
-        Otherwise every table's numerical metdata is printed
-
-        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
-        Otherwise, only the total number of rows of a table are printed. 
-        The tables whose data is printed depends on the `table_name` parameter.
-
-        """
-        if table_name is None:
-            tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table' AND name != 'sqlite_sequence';").fetchall()
-            if "sqlite_sequence" in tableList:
-                tableList.remove("sqlite_sequence")
-
-            for table in tableList:
-                print(f"\nTable: {table[0]}")
-                headers, rows = self.summary_helper(table[0]) 
-                self.table_print_helper(headers, rows, 1000)
-
-                if num_rows > 0:
-                    col_info = self.cur.execute(f"PRAGMA table_info({table[0]})").fetchall()
-                    col_names = [col[1] for col in col_info]
-                    data = self.cur.execute(f"SELECT * FROM {table[0]};").fetchall()
-                    self.table_print_helper(col_names, data, num_rows)
-                    print()
-                else:
-                    row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
-                    print(f"  - num of rows: {row_count}\n")
-        else:
-            headers, rows = self.summary_helper(table_name) 
-            self.table_print_helper(headers, rows, 1000)
-
-            if num_rows > 0:
-                col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
-                col_names = [col[1] for col in col_info]
-                data = self.cur.execute(f"SELECT * FROM {table_name};").fetchall()
-                self.table_print_helper(col_names, data, num_rows)
-                print()
-            else:
-                row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-                print(f"  - num of rows: {row_count}\n")
-
-    
-    def summary_helper(self, table_name):
-        """
-        **Users should not call this function**
-
-        Helper function to generate the summary of tables in this SQLite database. 
-        """
-        col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
-
-        numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE'}
-        headers = ['column', 'type', 'min', 'max', 'avg', 'std_dev']
-        rows = []
-
-        for col in col_info:
-            col_name = col[1]
-            col_type = col[2].upper()
-            is_primary = col[5] > 0
-            display_name = f"{col_name}*" if is_primary else col_name
-
-            if any(nt in col_type for nt in numeric_types):
-                min_val, max_val, avg_val, std_dev = self.cur.execute(f"""
-                    WITH stats AS (
-                        SELECT AVG("{col_name}") AS mean
-                        FROM {table_name}
-                        WHERE "{col_name}" IS NOT NULL
-                    )
-                    SELECT 
-                        MIN("{col_name}"),
-                        MAX("{col_name}"),
-                        AVG("{col_name}"),
-                        CASE 
-                            WHEN COUNT("{col_name}") > 1 THEN 
-                                sqrt(AVG(("{col_name}" - stats.mean) * ("{col_name}" - stats.mean)))
-                            ELSE NULL
-                        END AS std_dev
-                    FROM {table_name}, stats
-                    WHERE "{col_name}" IS NOT NULL
-                """).fetchone()
-            else:
-                min_val = max_val = avg_val = std_dev = None
-            
-            rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
-
-        return headers, rows
-    
-    def table_print_helper(self, headers, rows, max_rows=25):
-        """
-        **Users should not call this function**
-
-        Helper function to print table data/metdata cleanly
-        """
-        # Determine max width for each column
-        col_widths = [
-            max(
-                len(str(h)),
-                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
-            )
-            for i, h in enumerate(headers)
-        ]
-
-        # Print header
-        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-        print("\n" + header_row)
-        print("-" * len(header_row))
-
-        # Print each row
-        count = 0
-        for row in rows:
-            print(" | ".join(
-                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
-            ))
-
-            count += 1
-            if count == max_rows:
-                print(f"  ... showing {max_rows} of {len(rows)} rows")
-                break
-
     # Closes connection to server
     def close(self):
         """
-        Closes the SQLite database's connection.
+        Closes the DuckDB database's connection.
 
         `return`: None
         """
         self.con.close()
-
-    # OLD FUNCTION TO DEPRECATE
-    def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
-        """
-        DSI 1.0 FUNCTIONALITY - DEPRECATING SOON, DO NOT USE
-        
-        Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
-
-        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
-        filled with rows to insert.
-
-        `tableName`: A passthrough to define a table and set the name of a table
-
-        `return`: none
-        """ 
-
-        # Define table name in local class space
-        self.types = DataType()
-        self.types.name = tableName
-        self.put_artifacts(collection, isVerbose)
