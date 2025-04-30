@@ -702,6 +702,13 @@ class Sqlite(Filesystem):
         
         return info_list
     
+    def num_tables(self):
+        table_count = self.cur.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchone()
+        if table_count[0] != 1:
+            print(f"Database now has {table_count[0]} tables")
+        else:
+            print(f"Database now has {table_count[0]} table")
+    
     def display(self, table_name, num_rows = 25):
         """
         Prints data of a specified table from this SQLite backend.

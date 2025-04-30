@@ -441,11 +441,15 @@ class Terminal():
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
-        if interaction_type not in ['ingest', 'put', "processs", "read"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
+            if len(self.loaded_backends) > 1:
+                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                    first_backend = self.loaded_backends[1]
+                    parent_backend = first_backend.__class__.__bases__[0].__name__
             if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
@@ -489,7 +493,7 @@ class Terminal():
 
         elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) > 0:
             first_backread = self.active_modules['back-read'][0]
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if parent_backend == "Filesystem" and os.path.getsize(first_backread.filename) > 100:
                 if self.debug_level != 0:
                     self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
                 if interaction_type == "process":
@@ -692,6 +696,17 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
         backend.summary(table_name, num_rows)
+
+    def num_tables(self):
+        """
+        Prints number of tables in the first loaded backend
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before listing all tables in it')
+            raise NotImplementedError('Need to load a valid backend before listing all tables in it')
+        backend = self.loaded_backends[0]
+        backend.num_tables()
 
     def display(self, table_name, num_rows = 25):
         """
@@ -1135,6 +1150,12 @@ class DSI():
 
         """
         self.t.summary(table_name, num_rows) # terminal function already prints
+    
+    def num_tables(self):
+        """
+        Prints number of tables in the first loaded backend
+        """
+        self.t.num_tables() # terminal function already prints
 
     def display(self, table_name = None, num_rows = 25):
         """
@@ -1144,7 +1165,7 @@ class DSI():
          
         `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
         """
-        self.t.display(table_name, num_rows)
+        self.t.display(table_name, num_rows) # terminal function already prints
 
     def close(self):
         """

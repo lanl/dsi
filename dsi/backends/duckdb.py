@@ -568,6 +568,17 @@ class DuckDB(Filesystem):
         
         return info_list
     
+    def num_tables(self):
+        table_count = self.cur.execute("""
+                                       SELECT COUNT(*) 
+                                       FROM information_schema.tables 
+                                       WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+                                       """).fetchone()[0]
+        if table_count != 1:
+            print(f"Database now has {table_count} tables")
+        else:
+            print(f"Database now has {table_count} table")
+    
     def display(self, table_name, num_rows = 25):
         """
         Prints data of a specified table from this SQLite backend.
