@@ -3,6 +3,7 @@ import re
 import subprocess
 from datetime import datetime
 import textwrap
+import pandas as pd
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -77,7 +78,7 @@ class Sqlite(Filesystem):
         """
         for item in input_list:
             if isinstance(item, int):
-                return " INT"
+                return " INTEGER"
             elif isinstance(item, float):
                 return " FLOAT"
             elif isinstance(item, str):
@@ -253,34 +254,27 @@ class Sqlite(Filesystem):
         
         `return`: 
 
-            - When `query` is of correct format and dict_return = False, return a list of database rows
+            - When `query` is of correct format and dict_return = False, returns a Pandas dataframe of that table's data
             - When `query` is of correct format and dict_return = True, 
               return an Ordered Dictionary of data for the table specified in `query`
             - When `query` is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
         """
         if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
-                data = self.cur.execute(query).fetchall()
+                data = pd.read_sql_query(query, self.con) 
                 if isVerbose:
                     print(data)
             except:
-                return (ValueError, "Error in query_artifacts/get_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
-            return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            return (ValueError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
-            query_cols = [description[0] for description in self.cur.description]
             tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
             if len(tables) > 1:
-                return (ValueError, "Error in query_artifacts/get_artifacts handler: Can only return ordered dictionary if query with one table")
+                return (ValueError, "Error in query_artifacts/get_artifacts: Can only return ordered dictionary if query with one table")
             
-            queryDict = OrderedDict()
-            for row in data:
-                for colName, val in zip(query_cols, row):
-                    if colName not in queryDict.keys():
-                        queryDict[colName] = []
-                    queryDict[colName].append(val)
-            return queryDict
+            return OrderedDict(data.to_dict(orient='list'))
         else:
             return data
 

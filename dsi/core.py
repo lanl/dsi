@@ -996,9 +996,9 @@ class DSI():
 
     def duckdbbackend(self, filename):
         """
-        Loads a duckdb backend for ingesting based on an input name and file path.
+        Loads a DuckDB backend for ingesting based on an input name and file path.
         """
-        self.t.load_module('backend','duckdb','back-write', filename=filename)
+        self.t.load_module('backend','DuckDB','back-write', filename=filename)
 
     def open(self, filename):
         """
