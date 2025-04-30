@@ -547,6 +547,165 @@ class DuckDB(Filesystem):
 
         return (ValueObject(), f"{query_object} is not a cell in this database")
 
+    def list(self):
+        """
+        Return a list of all tables and their dimensions from this SQLite backend
+        """
+        tableList = self.cur.execute("""
+                                     SELECT table_name FROM information_schema.tables
+                                     WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                     """).fetchall()
+        tableList = [table[0] for table in tableList]
+        # if "sqlite_sequence" in tableList:
+        #     tableList.remove("sqlite_sequence")
+        
+        info_list = []
+        for table in tableList:
+            colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
+            num_cols = len(colList)
+            num_rows = self.cur.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            info_list.append((table, num_cols, num_rows))
+        
+        return info_list
+    
+    def display(self, table_name, num_rows = 25):
+        """
+        Prints data of a specified table from this SQLite backend.
+        
+        `table_name`: table whose data is printed
+         
+        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        """
+        if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
+            return (ValueError, f"{table_name} does not exist in this SQLite database")
+        headers, rows = self.summary_helper(table_name) 
+        self.table_print_helper(headers, rows, num_rows)
+    
+    def summary(self, table_name = None, num_rows = 0):
+        """
+        Prints data and numerical metadata of tables from this SQLite backend. Output varies depending on parameters
+
+        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
+        Otherwise every table's numerical metdata is printed
+
+        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
+        Otherwise, only the total number of rows of a table are printed. 
+        The tables whose data is printed depends on the `table_name` parameter.
+
+        """
+        if table_name is None:
+            tableList = self.cur.execute("""
+                                        SELECT table_name FROM information_schema.tables
+                                        WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                        """).fetchall()
+            # if "sqlite_sequence" in tableList:
+            #     tableList.remove("sqlite_sequence")
+
+            for table in tableList:
+                print(f"\nTable: {table[0]}")
+                headers, rows = self.summary_helper(table[0]) 
+                self.table_print_helper(headers, rows, 1000)
+
+                if num_rows > 0:
+                    col_info = self.cur.execute(f"PRAGMA table_info({table[0]})").fetchall()
+                    col_names = [col[1] for col in col_info]
+                    data = self.cur.execute(f"SELECT * FROM {table[0]};").fetchall()
+                    self.table_print_helper(col_names, data, num_rows)
+                    print()
+                else:
+                    row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
+                    print(f"  - num of rows: {row_count}\n")
+        else:
+            headers, rows = self.summary_helper(table_name) 
+            self.table_print_helper(headers, rows, 1000)
+
+            if num_rows > 0:
+                col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
+                col_names = [col[1] for col in col_info]
+                data = self.cur.execute(f"SELECT * FROM {table_name};").fetchall()
+                self.table_print_helper(col_names, data, num_rows)
+                print()
+            else:
+                row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                print(f"  - num of rows: {row_count}\n")
+
+    
+    def summary_helper(self, table_name):
+        """
+        **Users should not call this function**
+
+        Helper function to generate the summary of tables in this SQLite database. 
+        """
+        col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
+
+        numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE'}
+        headers = ['column', 'type', 'min', 'max', 'avg', 'std_dev']
+        rows = []
+
+        for col in col_info:
+            col_name = col[1]
+            col_type = col[2].upper()
+            is_primary = col[5] > 0
+            display_name = f"{col_name}*" if is_primary else col_name
+
+            if any(nt in col_type for nt in numeric_types):
+                min_val, max_val, avg_val, std_dev = self.cur.execute(f"""
+                    WITH stats AS (
+                        SELECT AVG("{col_name}") AS mean
+                        FROM {table_name}
+                        WHERE "{col_name}" IS NOT NULL
+                    )
+                    SELECT 
+                        MIN("{col_name}"),
+                        MAX("{col_name}"),
+                        AVG("{col_name}"),
+                        CASE 
+                            WHEN COUNT("{col_name}") > 1 THEN 
+                                sqrt(AVG(("{col_name}" - stats.mean) * ("{col_name}" - stats.mean)))
+                            ELSE NULL
+                        END AS std_dev
+                    FROM {table_name}, stats
+                    WHERE "{col_name}" IS NOT NULL
+                """).fetchone()
+            else:
+                min_val = max_val = avg_val = std_dev = None
+            
+            rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
+
+        return headers, rows
+    
+    def table_print_helper(self, headers, rows, max_rows=25):
+        """
+        **Users should not call this function**
+
+        Helper function to print table data/metdata cleanly
+        """
+        # Determine max width for each column
+        col_widths = [
+            max(
+                len(str(h)),
+                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
+            )
+            for i, h in enumerate(headers)
+        ]
+
+        # Print header
+        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
+        print("\n" + header_row)
+        print("-" * len(header_row))
+
+        # Print each row
+        count = 0
+        for row in rows:
+            print(" | ".join(
+                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
+            ))
+
+            count += 1
+            if count == max_rows:
+                print(f"  ... showing {max_rows} of {len(rows)} rows")
+                break
+
     # Closes connection to server
     def close(self):
         """
