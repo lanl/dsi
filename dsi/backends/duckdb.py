@@ -556,8 +556,6 @@ class DuckDB(Filesystem):
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
         tableList = [table[0] for table in tableList]
-        # if "sqlite_sequence" in tableList:
-        #     tableList.remove("sqlite_sequence")
         
         info_list = []
         for table in tableList:
@@ -588,8 +586,10 @@ class DuckDB(Filesystem):
         `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
         """
         if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
-            return (ValueError, f"{table_name} does not exist in this SQLite database")
-        headers, rows = self.summary_helper(table_name) 
+            return (ValueError, f"{table_name} does not exist in this DuckDB database")
+        df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
+        headers = df.columns.tolist()
+        rows = df.values.tolist()
         self.table_print_helper(headers, rows, num_rows)
     
     def summary(self, table_name = None, num_rows = 0):
@@ -609,8 +609,6 @@ class DuckDB(Filesystem):
                                         SELECT table_name FROM information_schema.tables
                                         WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                         """).fetchall()
-            # if "sqlite_sequence" in tableList:
-            #     tableList.remove("sqlite_sequence")
 
             for table in tableList:
                 print(f"\nTable: {table[0]}")
@@ -618,10 +616,10 @@ class DuckDB(Filesystem):
                 self.table_print_helper(headers, rows, 1000)
 
                 if num_rows > 0:
-                    col_info = self.cur.execute(f"PRAGMA table_info({table[0]})").fetchall()
-                    col_names = [col[1] for col in col_info]
-                    data = self.cur.execute(f"SELECT * FROM {table[0]};").fetchall()
-                    self.table_print_helper(col_names, data, num_rows)
+                    df = self.cur.execute(f"SELECT * FROM {table[0]};").fetchdf()
+                    headers = df.columns.tolist()
+                    rows = df.values.tolist()
+                    self.table_print_helper(headers, rows, num_rows)
                     print()
                 else:
                     row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
@@ -631,10 +629,10 @@ class DuckDB(Filesystem):
             self.table_print_helper(headers, rows, 1000)
 
             if num_rows > 0:
-                col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
-                col_names = [col[1] for col in col_info]
-                data = self.cur.execute(f"SELECT * FROM {table_name};").fetchall()
-                self.table_print_helper(col_names, data, num_rows)
+                df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
+                headers = df.columns.tolist()
+                rows = df.values.tolist()
+                self.table_print_helper(headers, rows, num_rows)
                 print()
             else:
                 row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
