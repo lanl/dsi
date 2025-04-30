@@ -19,7 +19,7 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", 
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.png')#, target_table_prefix = "physics")
 # a.transload()
 
-''' Example of loading a DSI backend - Sqlite - and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
+''' Example of loading a Sqlite DSI backend, and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
 
 a.artifact_handler(interaction_type='ingest')
@@ -31,6 +31,7 @@ a.artifact_handler(interaction_type='ingest')
 
 ''' Example of printing table information'''
 # a.list()
+# a.num_tables()
 # a.summary(table_name='student__physics', num_rows = 3)
 # a.display(table_name='student__physics')
 

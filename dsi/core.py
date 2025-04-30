@@ -1147,7 +1147,6 @@ class DSI():
         `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
         Otherwise, only the total number of rows of a table are printed. 
         The tables whose data is printed depends on the `table_name` parameter.
-
         """
         self.t.summary(table_name, num_rows) # terminal function already prints
     
@@ -1173,7 +1172,6 @@ class DSI():
         """
         self.t.close()
     
-    
     #help, query?, edge-finding (find this/that)
     def get(self, dbname):
         pass
@@ -1181,7 +1179,3 @@ class DSI():
         pass
     def fetch(self, fname):
         pass
-
-    # def preview(self, filename):
-    #     ''' DSI 'ls' '''
-    #     pass

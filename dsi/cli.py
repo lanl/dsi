@@ -93,6 +93,7 @@ class DSI_cli:
         '''
         os.system('cls' if os.name == 'nt' else 'clear')
 
+    
     def get_display_parser(self):
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('table_name', help='Table to display')
@@ -135,6 +136,7 @@ class DSI_cli:
         self.t.artifact_handler(interaction_type="process")
 
         self.t.load_module('plugin', 'ER_Diagram', 'writer', filename = erd_name)
+        self.t.transload()
 
         self.t.active_metadata = OrderedDict()
         if "sqlite" in self.name:
@@ -177,7 +179,6 @@ class DSI_cli:
             elif "duckdb" in self.name:
                 self.t.unload_module('backend','DuckDB','back-read')
         
-        
     def find(self, args):
         '''
         Global find to see where that string exists
@@ -198,6 +199,13 @@ class DSI_cli:
         '''
         self.t.list()
     
+
+    def get_load_parser(self):
+        parser = argparse.ArgumentParser(prog='load')
+        parser.add_argument('filename', help='File to load ito DSI')
+        parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name of csv or parquet file')
+        return parser
+    
     def load(self, args):
         '''
         Loads data to into a DSI database or loads a DSI database
@@ -207,9 +215,9 @@ class DSI_cli:
             table_name (str): name of the table to load the data to for CSV and parquet
         '''
         table_name = None
-        if len(args) > 1:
-            table_name = args[1]
-        dbfile = args[0]
+        if args.table_name != None:
+            table_name = args.table_name
+        dbfile = args.filename
 
         if self.__is_url(dbfile): # if it's a url, do fetch
             url = dbfile
@@ -232,10 +240,6 @@ class DSI_cli:
             except Exception as e:
                 print(f"Download failed: {e}")
                 return
-
-        #if isinstance(dbfile, pd.DataFrame):
-        #    self.a.import_dataframe(dbfile, table_name)
-        #    return
 
         file_extension = dbfile.rsplit(".", 1)[-1]
         if self.__is_sqlite3_file(dbfile):
@@ -414,7 +418,7 @@ COMMANDS = {
     'find' : (None, cli.find),
     'help': (None, cli.help_fn), #
     'list' : (None, cli.list_tables), #
-    'load' : (None, cli.load),
+    'load' : (cli.get_load_parser, cli.load),
     'query' : (cli.get_query_parser, cli.query),
     'save' : (None, cli.save_to_file),
     'summary' : (cli.get_summary_parser, cli.summary), #
