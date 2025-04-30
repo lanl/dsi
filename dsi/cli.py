@@ -4,6 +4,8 @@ import readline
 import glob
 import argparse
 import os
+import pandas as pd
+from collections import OrderedDict
 
 #from dsi_shim import *
 from dsi.core import Terminal
@@ -60,7 +62,7 @@ class DSI_cli:
         if backend=="duckdb":
             if os.path.exists(".temp.duckdb"):
                 os.remove(".temp.duckdb")
-            self.t.load_module('backend','Sqlduckdbite','back-write', filename=".temp.duckdb")
+            self.t.load_module('backend','DuckDB','back-write', filename=".temp.duckdb")
         else:
             if os.path.exists(".temp.sqlite"):
                 os.remove(".temp.sqlite")
@@ -90,8 +92,6 @@ class DSI_cli:
         os.system('cls' if os.name == 'nt' else 'clear')
 
 
-
-
     def get_display_parser(self):
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('table_name', help='Table to display')
@@ -103,7 +103,6 @@ class DSI_cli:
         '''
         Displays the contents of a table
         '''
-        
         print(f"table_name: {args.table_name}")
         
         table_name = args.table_name
@@ -114,14 +113,12 @@ class DSI_cli:
         #self.a.display_table(table_name, num_rows)
         self.t.display(table_name, num_rows)
         
-        
         if args.export != None:
             if args.export == "":
                 filename = args[0] + ".csv"
             else:
                 filename = args.export
-            self.t.export_table(table_name, filename)
-
+            self.export_table(table_name, filename)
 
     def exit_cli(self, args):
         '''
@@ -131,12 +128,19 @@ class DSI_cli:
         self.t.close()
         exit(0)
 
-
-    def export_table(self, args):
+    #Note: Not called by user, ONLY internally used in display()
+    def export_table(self, table_name, filename):
         '''
         Exports to a csv/parquet file
         '''
-        self.t.export_table(args[0], args[1])
+        file_extension = filename.rsplit(".", 1)[-1]
+        if file_extension.lower() == "csv":
+            self.t.load_module('plugin', "Csv_Writer", "writer", filename = filename, table_name = table_name)
+        elif file_extension.lower() in ['pq', 'parquet']:
+            table_data = self.t.active_metadata[table_name]
+            df = pd.DataFrame(table_data)
+            df.to_parquet(filename, engine='pyarrow', index=False)
+        # self.t.export_table(args[0], args[1])
         
         
     def find(self, args):
@@ -144,7 +148,7 @@ class DSI_cli:
         Global find to see where that string exists
         '''
         self.t.find(args[0])
-              
+
               
     def list_tables(self, args):
         '''
@@ -165,7 +169,7 @@ class DSI_cli:
         table_name = ""
         if len(args) > 1:
             table_name = args[1]
-        table_name = args[0]
+        dbfile = args[0]
         #self.a.load(args[0], table_name)
 
         if self.__is_url(dbfile): # if it's a url, do fetch
@@ -200,6 +204,9 @@ class DSI_cli:
         if self.__is_sqlite3_file(dbfile):
             try:
                 #self.a.import_sqlite(dbfile)
+                self.t.load_module('backend','Sqlite','back-read', filename=dbfile)
+                self.t.artifact_handler(interaction_type="process") # will only read data from first backend not the new one though
+
                 print(f"Database has {self.a.get_num_tables()} table")
                 print(f"{dbfile} successfully loaded.\n")
             except Exception as e:
@@ -208,6 +215,9 @@ class DSI_cli:
         elif self.__is_duckdb_file(dbfile):
             try:
                 #self.a.import_duckdb(dbfile)
+                self.t.load_module('backend','DuckDB','back-read', filename=dbfile)
+                self.t.artifact_handler(interaction_type="process") # will only read data from first backend not the new one though
+
                 print(f"Database has {self.a.get_num_tables()} table")
                 print(f"{dbfile} successfully loaded.\n")
             except Exception as e:
@@ -216,6 +226,8 @@ class DSI_cli:
         elif file_extension.lower() == 'csv':
             try:
                 #self.a.import_csv(dbfile)
+                self.t.load_module('plugin', "CSV", "reader", filenames = dbfile, table_name = table_name)
+
                 print(f"Database has {self.a.get_num_tables()} table")
                 print(f"{dbfile} successfully loaded.\n")
             except Exception as e:
@@ -224,6 +236,10 @@ class DSI_cli:
         elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
             try:
                 #self.a.import_parquet(dbfile)
+                self.t.load_module('backend','Parquet','back-write', filename=dbfile)
+                data = OrderedDict(self.t.artifact_handler(interaction_type="query")) #Parquet's query() returns a normal dict
+                self.t.active_metadata["Parquet"] = data
+
                 print(f"Database has {self.a.get_num_tables()} table")
                 print(f"{dbfile} successfully loaded.\n")
             except Exception as e:
@@ -252,16 +268,21 @@ class DSI_cli:
         if args.num_rows != None:
             num_rows = args.num_rows
 
-        self.t.query(sql_query, num_rows)
+        data = self.t.artifact_handler(interaction_type='query', query = sql_query).head(num_rows)
+        # self.t.query(sql_query, num_rows)
         
+        pd.set_option('display.max_rows', 1000)
+        print(data)
+        pd.reset_option('display.max_rows')
         
         if args.export != None:
             if args.export == "":
                 filename = args[0] + ".csv"
             else:
                 filename = args.export
-            self.t.export_query(sql_query, filename)
-        
+            self.t.active_metadata["temp_query"] = OrderedDict(data.to_dict(orient='list')) #temp create new orderedDict to export
+            self.export_table("temp_query", filename)
+            del self.t.active_metadata["temp_query"] # delete temp ordered dict meant for exporting
         
 
     def save_to_file(self, args):
@@ -282,8 +303,7 @@ class DSI_cli:
         '''
         Get the summary of a table or database
         '''
-        
-        table_name = ""
+        table_name = None
         if args.table != None:
             table_name = args.table
            
@@ -293,7 +313,6 @@ class DSI_cli:
         
         #self.a.summarize(table_name, num_rows)
         self.t.summary(table_name, num_rows)
-
 
 
     def version(self):
@@ -349,9 +368,12 @@ def main():
 
     args = parser.parse_args()
     cli.version()
+    first = False
     while True:
         try:
-            cli.startup(args.backend)
+            if first == False:
+                cli.startup(args.backend)
+                first = True
             user_input = input("dsi> ")
             tokens = shlex.split(user_input)
             if not tokens:
