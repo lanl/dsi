@@ -57,16 +57,19 @@ class DSI_cli:
         return
     
     def startup(self, backend="sqlite"):
-        self.t = Terminal(debug = 2, runTable=True)
+        self.t = Terminal(debug = 2, runTable=False)
         #self.a = DSI_Shim(backend)
+        self.name = None
         if backend=="duckdb":
             if os.path.exists(".temp.duckdb"):
                 os.remove(".temp.duckdb")
             self.t.load_module('backend','DuckDB','back-write', filename=".temp.duckdb")
+            self.name = ".temp.duckdb"
         else:
             if os.path.exists(".temp.sqlite"):
                 os.remove(".temp.sqlite")
             self.t.load_module('backend','Sqlite','back-write', filename=".temp.sqlite")
+            self.name = ".temp.sqlite"
         return
     
 
@@ -133,13 +136,28 @@ class DSI_cli:
         '''
         Exports to a csv/parquet file
         '''
+        if table_name != "temp_query":
+            if "sqlite" in self.name:
+                self.t.load_module('backend','Sqlite','back-read', filename=self.name)
+            elif "duckdb" in self.name:
+                self.t.load_module('backend','DuckDB','back-read', filename=self.name)
+            self.t.artifact_handler(interaction_type="process")
+
         file_extension = filename.rsplit(".", 1)[-1]
         if file_extension.lower() == "csv":
             self.t.load_module('plugin', "Csv_Writer", "writer", filename = filename, table_name = table_name)
+            self.t.transload()
         elif file_extension.lower() in ['pq', 'parquet']:
             table_data = self.t.active_metadata[table_name]
             df = pd.DataFrame(table_data)
             df.to_parquet(filename, engine='pyarrow', index=False)
+        
+        self.t.active_metadata = OrderedDict()
+        if table_name != "temp_query":
+            if "sqlite" in self.name:
+                self.t.unload_module('backend','Sqlite','back-read')
+            elif "duckdb" in self.name:
+                self.t.unload_module('backend','DuckDB','back-read')
         # self.t.export_table(args[0], args[1])
         
         
@@ -147,7 +165,15 @@ class DSI_cli:
         '''
         Global find to see where that string exists
         '''
-        self.t.find(args[0])
+        find_list = self.t.find(args[0])
+        print()
+        for val in find_list:
+            print(f"Table: {val.t_name}")
+            print(f"  - Column(s): {val.c_name}")
+            print(f"  - Search Type: {val.type}")
+            print(f"  - Row Number: {val.row_num}")
+            print(f"  - Value: {val.value}")
+        print()
 
               
     def list_tables(self, args):
@@ -166,7 +192,7 @@ class DSI_cli:
             dbfile (obj): name of the file to load or database or dataframe
             table_name (str): name of the table to load the data to for CSV and parquet
         '''
-        table_name = ""
+        table_name = None
         if len(args) > 1:
             table_name = args[1]
         dbfile = args[0]
@@ -205,9 +231,7 @@ class DSI_cli:
                 #self.a.import_sqlite(dbfile)
                 self.t.load_module('backend','Sqlite','back-read', filename=dbfile)
                 self.t.artifact_handler(interaction_type="process") # will only read data from first backend not the new one though
-
-                print(f"Database has {self.a.get_num_tables()} table")
-                print(f"{dbfile} successfully loaded.\n")
+                self.t.unload_module('backend','Sqlite','back-read')
             except Exception as e:
                 print(f"An error {e} occurred loading {dbfile}\n")    
 
@@ -216,19 +240,14 @@ class DSI_cli:
                 #self.a.import_duckdb(dbfile)
                 self.t.load_module('backend','DuckDB','back-read', filename=dbfile)
                 self.t.artifact_handler(interaction_type="process") # will only read data from first backend not the new one though
-
-                print(f"Database has {self.a.get_num_tables()} table")
-                print(f"{dbfile} successfully loaded.\n")
+                self.t.unload_module('backend','DuckDB','back-read')
             except Exception as e:
                 print(f"An error {e} occurred loading {dbfile}\n")  
 
         elif file_extension.lower() == 'csv':
             try:
                 #self.a.import_csv(dbfile)
-                self.t.load_module('plugin', "CSV", "reader", filenames = dbfile, table_name = table_name)
-
-                print(f"Database has {self.a.get_num_tables()} table")
-                print(f"{dbfile} successfully loaded.\n")
+                self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
             except Exception as e:
                 print(f"An error {e} occurred loading {dbfile}\n")   
 
@@ -238,19 +257,22 @@ class DSI_cli:
                 self.t.load_module('backend','Parquet','back-write', filename=dbfile)
                 data = OrderedDict(self.t.artifact_handler(interaction_type="query")) #Parquet's query() returns a normal dict
                 self.t.active_metadata["Parquet"] = data
-
-                print(f"Database has {self.a.get_num_tables()} table")
-                print(f"{dbfile} successfully loaded.\n")
+                self.t.unload_module('backend','Parquet','back-write')
             except Exception as e:
                 print(f"An error {e} occurred loading {dbfile}\n")   
 
+        if self.t.active_metadata:
+            self.t.artifact_handler(interaction_type='ingest')
+            self.t.num_tables()
+            self.t.active_metadata = OrderedDict()
+            print(f"{dbfile} successfully loaded.\n")
         else:
             print("This database format is not supported. Currently supported formats are: ")
             print("   - csv (extension: .csv)")
             print("   - parquet (extension: .pq, .parquet)")
             print("   - sqlite (extension: .db, .sqlite, .sqlite3)\n")
         
-   
+    
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('sql_query', help='SQL query to execute')
@@ -281,7 +303,7 @@ class DSI_cli:
                 filename = args.export
             self.t.active_metadata["temp_query"] = OrderedDict(data.to_dict(orient='list')) #temp create new orderedDict to export
             self.export_table("temp_query", filename)
-            del self.t.active_metadata["temp_query"] # delete temp ordered dict meant for exporting
+            # del self.t.active_metadata["temp_query"] # delete temp ordered dict meant for exporting
         
 
     def save_to_file(self, args):
@@ -289,7 +311,6 @@ class DSI_cli:
         Save the database to file
         '''
         self.t.save_to_file(args[0])
-
 
 
     def get_summary_parser(self):
