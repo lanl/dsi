@@ -160,10 +160,10 @@ class DSI_cli:
     
     def load(self, args):
         '''
-        Loads data to the DSI database
+        Loads data to into a DSI database or loads a DSI database
 
         Args:
-            dbfile (obj): name of the file to load or dataframe
+            dbfile (obj): name of the file to load or database or dataframe
             table_name (str): name of the table to load the data to for CSV and parquet
         '''
         table_name = ""
@@ -173,13 +173,12 @@ class DSI_cli:
         #self.a.load(args[0], table_name)
 
         if self.__is_url(dbfile): # if it's a url, do fetch
-            from urllib.parse import urlparse
-            import urllib.request
-            import ssl
             url = dbfile
             output_path = url.split('/')[-1]    
 
             try:
+                import ssl
+                import urllib.request
                 # Use certifi's trusted certificate bundle
                 context = ssl._create_unverified_context()
 
@@ -342,6 +341,20 @@ class DSI_cli:
                 return header == b'DUCK'
         except Exception as e:
             print(f"Error reading file: {e}")
+            return False
+    
+    def __is_url(self, s):
+        '''
+        Checks if the string is a url link
+        
+        Args:
+            s (str): string to check
+        '''
+        try:
+            from urllib.parse import urlparse
+            result = urlparse(s)
+            return all([result.scheme, result.netloc])
+        except ValueError:
             return False
 
 
