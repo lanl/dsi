@@ -81,6 +81,7 @@ class DSI_cli:
         print("list                                              Lists the tables in the current DSI databse")
         print("load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional")
         print("                                                      table name argument if input file is only one table")
+        print("plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument")
         print("query \"<SQL query>\" [-n num rows] [-e filename]   Runs a query, num rows to display is optional")
         print("                                                      , and it can be exported to a csv/parquet file")
         print("save <filename>                                   Save the local database as <filename>, which will be the same type.")
@@ -116,7 +117,7 @@ class DSI_cli:
         
         if args.export != None:
             if args.export == "":
-                filename = args[0] + ".csv"
+                filename = table_name + ".csv"
             else:
                 filename = args.export
             self.export_table(table_name, filename)
@@ -128,21 +129,8 @@ class DSI_cli:
         erd_name = "er_diagram.png"
         if args[0] != None:
             erd_name = args[0]
-
-        if "sqlite" in self.name:
-            self.t.load_module('backend','Sqlite','back-read', filename=self.name)
-        elif "duckdb" in self.name:
-            self.t.load_module('backend','DuckDB','back-read', filename=self.name)
-        self.t.artifact_handler(interaction_type="process")
-
-        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename = erd_name)
-        self.t.transload()
-
-        self.t.active_metadata = OrderedDict()
-        if "sqlite" in self.name:
-            self.t.unload_module('backend','Sqlite','back-read')
-        elif "duckdb" in self.name:
-            self.t.unload_module('backend','DuckDB','back-read')
+        
+        self.export_table("dsi_erd_gen", erd_name)
 
     def exit_cli(self, args):
         '''
@@ -164,7 +152,13 @@ class DSI_cli:
             self.t.artifact_handler(interaction_type="process")
 
         file_extension = filename.rsplit(".", 1)[-1]
-        if file_extension.lower() == "csv":
+        if table_name == "dsi_erd_gen":
+            self.t.load_module('plugin', "ER_Diagram", "writer", filename = filename)
+            self.t.transload()
+        elif "dsi_tb_" in table_name:
+            self.t.load_module('plugin', "Table_Plot", "writer", table_name = table_name[7:], filename = filename)
+            self.t.transload()
+        elif file_extension.lower() == "csv":
             self.t.load_module('plugin', "Csv_Writer", "writer", filename = filename, table_name = table_name)
             self.t.transload()
         elif file_extension.lower() in ['pq', 'parquet']:
@@ -302,6 +296,22 @@ class DSI_cli:
             print("   - sqlite (extension: .db, .sqlite, .sqlite3)")
             print("   - duckdb (extension: .duckdb, .db)\n")
 
+    def get_plot_table_parser(self):
+        parser = argparse.ArgumentParser(prog='plot_table')
+        parser.add_argument('table_name', help='Table to plot')
+        parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Export filename')
+        return parser
+    
+    def plot_table(self, args):
+        '''
+        Plot a table's numerical data and store in an image
+        '''
+        table_name = args.table_name
+        filename = f"{table_name}_plot.png"
+        if args.filename != "":
+            filename = args.filename
+        
+        self.export_table("dsi_tb_" + table_name, filename)
 
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='display')
@@ -414,11 +424,13 @@ cli = DSI_cli()
 COMMANDS = {
     'clear': (None, cli.clear), #
     'display' : (cli.get_display_parser, cli.display), #
+    'draw' : (None, cli.draw_schema),
     'exit': (None, cli.exit_cli), #
     'find' : (None, cli.find),
     'help': (None, cli.help_fn), #
     'list' : (None, cli.list_tables), #
     'load' : (cli.get_load_parser, cli.load),
+    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
     'save' : (None, cli.save_to_file),
     'summary' : (cli.get_summary_parser, cli.summary), #
