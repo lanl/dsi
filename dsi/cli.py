@@ -208,9 +208,13 @@ class DSI_cli:
             dbfile (obj): name of the file or database to load 
             table_name (str): name of the table to load the data to for CSV and parquet
         '''
-        table_name = None
-        if args.table_name != None:
+        table_name = ""
+        if args.table_name != "":
             table_name = args.table_name
+        else:
+            table_name = os.path.splitext(os.path.basename(args.filename))[0]
+
+            
         dbfile = args.filename
 
         if self.__is_url(dbfile): # if it's a url, do fetch
