@@ -113,44 +113,46 @@ class Bueno(FileReader):
 
 class JSON(FileReader):
     """
-    A DSI Reader that captures JSON data
+    A DSI Reader that captures generic JSON data. 
+    Assumes all key/value pairs are basic data formats, ie. string, int, float, not a nested dictionary or more
 
     The JSON data's keys are used as columns and values are rows
    
     """
-    def __init__(self, filenames, **kwargs) -> None:
-        """Initializes generic JSON reader with user-specified filenames"""
-        super().__init__(filenames, **kwargs)
-        self.key_data = []
-        self.base_dict = OrderedDict()
+    def __init__(self, filenames, table_name = None, **kwargs) -> None:
+        """
+        Initializes generic JSON reader with user-specified filenames
         
-    def pack_header(self) -> None:
-        """Set schema with POSIX and JSON data."""
-        self.set_schema(self.key_data)
+        `filenames`: Required input. List of JSON files, or just one JSON files to store in DSI. If a list, data in all files must be for the same table
+
+        `table_name`: default None. User can specify table name when loading JSON file. Otherwise DSI uses table_name = "JSON"
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
+        self.base_dict = OrderedDict()
+        self.table_name = table_name
 
     def add_rows(self) -> None:
-        """Parses JSON data and adds a list containing 1 or more rows."""
+        """Parses JSON data and stores data into a table as an Ordered Dictionary."""
 
-        objs = []
-        for idx, filename in enumerate(self.filenames):
+        temp_dict = OrderedDict()
+        for filename in self.filenames:
             with open(filename, 'r') as fh:
                 file_content = json.load(fh)
-                objs.append(file_content)
                 for key, val in file_content.items():
-                    # Check if column already exists
-                    if key not in self.key_data:
-                        self.key_data.append(key)
-        if not self.schema_is_set():
-            self.pack_header()
-            for key in self.key_data:
-                self.base_dict[key] = None
+                    if key not in temp_dict:
+                        temp_dict[key] = []
+                    temp_dict[key].append(val)
 
-        for o in objs:
-            new_row = self.base_dict.copy()
-            for key, val in o.items():
-                new_row[key] = val
-            print(new_row.values())
-            self.add_to_output(list(new_row.values()))
+        if self.table_name == None:
+            self.base_dict["JSON"] = temp_dict
+        else:
+            self.base_dict[self.table_name] = temp_dict
+        self.set_schema_2(self.base_dict)
+
 
 class Schema(FileReader):
     """
