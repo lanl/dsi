@@ -8,13 +8,6 @@ import pandas as pd
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
 
-# Declare supported named types for sql
-DOUBLE = "DOUBLE"
-STRING = "VARCHAR"
-FLOAT = "FLOAT"
-INT = "INT"
-JSON = "TEXT"
-
 # Holds table name and data properties
 class DataType:
     name = ""
@@ -185,8 +178,8 @@ class Sqlite(Filesystem):
                     types.unit_keys.append(key + self.check_type(tableData[key]))
             
             # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
-            self.put_artifact_type(types, foreign_query)
-            # self.ingest_table_helper(types, foreign_query)
+            # self.put_artifact_type(types, foreign_query)
+            self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -709,20 +702,27 @@ class Sqlite(Filesystem):
         else:
             print(f"Database now has {table_count[0]} table")
     
-    def display(self, table_name, num_rows = 25):
+    def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Prints data of a specified table from this SQLite backend.
         
         `table_name`: table whose data is printed
          
         `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+
+        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
         """
         if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
             return (ValueError, f"{table_name} does not exist in this SQLite database")
-        df = pd.read_sql_query(f"SELECT * FROM {table_name};", self.con) 
+        if display_cols == None:
+            df = pd.read_sql_query(f"SELECT * FROM {table_name};", self.con) 
+        else:
+            sql_list = ", ".join(f"'{item}'" for item in display_cols)
+            df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con) 
         headers = df.columns.tolist()
         rows = df.values.tolist()
         self.table_print_helper(headers, rows, num_rows)
+        print()
     
     def summary(self, table_name = None, num_rows = 0):
         """

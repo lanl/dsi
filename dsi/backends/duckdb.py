@@ -139,11 +139,14 @@ class DuckDB(Filesystem):
         
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable " \
-            "(run_id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY, run_timestamp TEXT UNIQUE);"
+            "(run_id INTEGER PRIMARY KEY, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
 
+            sequence_run_id = "CREATE SEQUENCE IF NOT EXISTS seq_run_id START 1;"
+            self.cur.execute(sequence_run_id)
+            
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            runTable_insert = f"INSERT INTO runTable (run_timestamp) VALUES ('{timestamp}');"
+            runTable_insert = f"INSERT INTO runTable VALUES (nextval('seq_run_id'), '{timestamp}');"
             self.cur.execute(runTable_insert)
 
         for tableName, tableData in artifacts.items():
@@ -172,8 +175,8 @@ class DuckDB(Filesystem):
                     types.unit_keys.append(key + self.check_type(tableData[key]))
             
             # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
-            self.put_artifact_type(types, foreign_query)
-            # self.ingest_table_helper(types, foreign_query)
+            # self.put_artifact_type(types, foreign_query)
+            self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -197,15 +200,15 @@ class DuckDB(Filesystem):
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
-            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column TEXT, unit TEXT)"
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
             self.cur.execute(create_query)
             for tableName, tableData in artifacts["dsi_units"].items():
                 if len(tableData) > 0:
                     for col, unit in tableData.items():
-                        str_query = f'INSERT INTO dsi_units VALUES ("{tableName}", "{col}", "{unit}")'
+                        str_query = f"INSERT INTO dsi_units VALUES ('{tableName}', '{col}', '{unit}')"
                         unit_result = self.cur.execute(f"""
                                                        SELECT unit FROM dsi_units 
-                                                       WHERE table_name = '{tableName}' AND column = '{col}';""").fetchone()
+                                                       WHERE table_name = '{tableName}' AND column_name = '{col}';""").fetchone()
                         if unit_result and unit_result[0] != unit: #checks if unit for same table and col exists in db and if units match
                             self.con.rollback()
                             return (TypeError, f"Cannot ingest different units for the column {col} in {tableName}")
@@ -264,6 +267,13 @@ class DuckDB(Filesystem):
             return OrderedDict(data.to_dict(orient='list'))
         else:
             return data
+    
+    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
+    def inspect_artifacts(self, interactive=False):
+        return self.notebook(interactive)
+    
+    def notebook(self, interactive=False):
+        pass
 
     # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def read_to_artifact(self, only_units_relations = False, isVerbose = False):
@@ -549,7 +559,7 @@ class DuckDB(Filesystem):
 
     def list(self):
         """
-        Return a list of all tables and their dimensions from this SQLite backend
+        Return a list of all tables and their dimensions from this DuckDB backend
         """
         tableList = self.cur.execute("""
                                      SELECT table_name FROM information_schema.tables
@@ -577,24 +587,30 @@ class DuckDB(Filesystem):
         else:
             print(f"Database now has {table_count} table")
     
-    def display(self, table_name, num_rows = 25):
+    def display(self, table_name, num_rows = 25, display_cols = None):
         """
-        Prints data of a specified table from this SQLite backend.
+        Prints data of a specified table from this DuckDB backend.
         
         `table_name`: table whose data is printed
          
         `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+
+        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
         """
-        if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
+        if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
             return (ValueError, f"{table_name} does not exist in this DuckDB database")
-        df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
+        if display_cols == None:
+            df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
+        else:
+            sql_list = ", ".join(f"'{item}'" for item in display_cols)
+            df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
         headers = df.columns.tolist()
         rows = df.values.tolist()
         self.table_print_helper(headers, rows, num_rows)
     
     def summary(self, table_name = None, num_rows = 0):
         """
-        Prints data and numerical metadata of tables from this SQLite backend. Output varies depending on parameters
+        Prints data and numerical metadata of tables from this DuckDB backend. Output varies depending on parameters
 
         `table_name`: default is None. When specified only that table's numerical metadata is printed. 
         Otherwise every table's numerical metdata is printed
@@ -643,7 +659,7 @@ class DuckDB(Filesystem):
         """
         **Users should not call this function**
 
-        Helper function to generate the summary of tables in this SQLite database. 
+        Helper function to generate the summary of tables in this DuckDB database. 
         """
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
@@ -659,21 +675,12 @@ class DuckDB(Filesystem):
 
             if any(nt in col_type for nt in numeric_types):
                 min_val, max_val, avg_val, std_dev = self.cur.execute(f"""
-                    WITH stats AS (
-                        SELECT AVG("{col_name}") AS mean
-                        FROM {table_name}
-                        WHERE "{col_name}" IS NOT NULL
-                    )
-                    SELECT 
+                    SELECT
                         MIN("{col_name}"),
                         MAX("{col_name}"),
                         AVG("{col_name}"),
-                        CASE 
-                            WHEN COUNT("{col_name}") > 1 THEN 
-                                sqrt(AVG(("{col_name}" - stats.mean) * ("{col_name}" - stats.mean)))
-                            ELSE NULL
-                        END AS std_dev
-                    FROM {table_name}, stats
+                        STDDEV_SAMP("{col_name}")
+                    FROM {table_name}
                     WHERE "{col_name}" IS NOT NULL
                 """).fetchone()
             else:
