@@ -1,4 +1,4 @@
-# examples/core/notebook.py
+# examples/dev_core/notebook.py
 from dsi.core import Terminal
 
 terminal_notebook = Terminal(debug = 0, backup_db = False, runTable = True)

@@ -1,4 +1,4 @@
-# examples/core/ingest_schema.py
+# examples/dev_core/ingest_schema.py
 from dsi.core import Terminal
 
 terminal_ingest = Terminal(debug = 0, backup_db = False, runTable = True)

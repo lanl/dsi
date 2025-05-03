@@ -1,4 +1,4 @@
-# examples/core/process.py
+# examples/dev_core/process.py
 from dsi.core import Terminal
 
 terminal_process = Terminal(debug = 0, backup_db = False, runTable = True)

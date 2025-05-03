@@ -1,4 +1,4 @@
-# examples/core/jupyter_example.py
+# examples/dev_core/jupyter_example.py
 from dsi.core import Terminal
 
 term = Terminal(debug = 0, backup_db = False, runTable = False) #do not need a runTable here

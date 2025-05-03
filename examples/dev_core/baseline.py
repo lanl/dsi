@@ -1,4 +1,4 @@
-# examples/core/baseline.py
+# examples/dev_core/baseline.py
 from dsi.core import Terminal
 
 base_terminal = Terminal(debug = 0, backup_db = False, runTable = False)

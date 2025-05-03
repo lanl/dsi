@@ -1,4 +1,4 @@
-# examples/core/schema.py
+# examples/dev_core/schema.py
 from dsi.core import Terminal
 
 terminal = Terminal(debug = 0, backup_db = False, runTable = True)

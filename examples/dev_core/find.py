@@ -1,4 +1,4 @@
-# examples/core/find.py
+# examples/dev_core/find.py
 from dsi.core import Terminal
 
 terminal_find = Terminal()
