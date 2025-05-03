@@ -35,15 +35,15 @@ class ClassTreeNode:
         dot.node(root.clas.__name__)
 
         def process_children(r):
-            print(r.clas.__name__)
+            # print(r.clas.__name__)
             for ch in r.subclasses:
                 dot.node(ch.clas.__name__)
                 dot.edge(r.clas.__name__, ch.clas.__name__)
                 process_children(ch)
 
         process_children(root)
-        print("Rendering the following dot source:")
-        print(dot.source)
+        # print("Rendering the following dot source:")
+        # print(dot.source)
         dot.render()
         print("done.")
 

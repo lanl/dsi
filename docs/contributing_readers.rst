@@ -51,7 +51,7 @@ Example ``add_rows``: ::
     self.add_to_output(my_data)
 
 *Newer* Add Rows: ``add_rows(self) -> None``
--------------------------------------
+--------------------------------------------
 If you are confident that the the data you read in ``add_rows`` is in the form of an OrderedDict (the data structure used to store all ingested data), 
 you can bypass the use of ``pack_header`` and ``add_to_output`` with an alternate ``set_schema`` function.
 

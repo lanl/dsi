@@ -36,7 +36,7 @@ DuckDB
    :special-members: __init__
 
 SQLAlchemy
-------
+-----------
 
 .. automodule:: dsi.backends.sqlalchemy
    :members:
@@ -50,7 +50,7 @@ GUFI
    :special-members: __init__
 
 Parquet
-------
+--------
 
 .. automodule:: dsi.backends.parquet
    :members:

@@ -40,6 +40,7 @@ Note for users:
    
       - if only reading in one table at a time, users can utilize python pandas to stack mulutiple dataframes vertically (ex: CSV reader)
       - if multiple tables in a file, users must pad tables with null values (ex: YAML1, which has example code at bottom of ``add_rows()`` to implement this)
+
 .. automodule:: dsi.plugins.file_reader
    :members:
    :special-members: __init__
@@ -51,6 +52,7 @@ File Writers
 Note for users:
    - DSI `runTable` is only included in File Writers if data was previously ingested into a backend in a Core.Terminal workflow where `runTable` was set to True.
      In :ref:`example4_label`, `runTable` is included in a generated ER Diagram since it uses ingested data from :ref:`example2_label` where `runTable` = True
+     
 .. automodule:: dsi.plugins.file_writer
    :members:
    :special-members: __init__

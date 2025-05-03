@@ -34,7 +34,7 @@ class ClassTreeNode:
         dot.node(root.clas.__name__)
 
         def process_children(r):
-            print(r.clas.__name__)
+            # print(r.clas.__name__)
             for ch in r.subclasses:
                 if ch.clas.__name__ == "Environment" or (r.clas.__name__ == "FileReader" and ch.clas.__name__ in ["Wildfire", "Bueno", "MetadataReader1"]):
                     continue
@@ -43,8 +43,8 @@ class ClassTreeNode:
                 process_children(ch)
 
         process_children(root)
-        print("Rendering the following dot source:")
-        print(dot.source)
+        # print("Rendering the following dot source:")
+        # print(dot.source)
         dot.render()
         print("done.")
 

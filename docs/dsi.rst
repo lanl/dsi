@@ -1,0 +1,84 @@
+Python API for Users
+====================
+
+Users can interact with DSI modules using the DSI class which provides an interface for our Readers, Writers, and Backends. 
+This can be seen below and in ``dsi/dsi.py``. Example workflows using these functions can be seen in the following section: :ref:`user_example_section_label`
+
+
+Dsi: DSI
+----------
+The DSI class is a user-level class that encapsulates the Terminal and Sync classes from DSI Core. 
+DSI interacts with several functions within Terminal and Sync without requiring the user to differentiate them.
+The functionality has also been simplified to improve user experience and reduce complexity.
+
+Users should call ``read()`` to load data from external data files into DSI. ``list_readers()`` prints all valid readers and a short description of each one
+
+Users should call ``write()`` to export data from DSI into external formats. ``list_writers()`` prints all valid writers and a short description of each one.
+
+Users should call ``backend()`` to activate either a Sqlite or DuckDB backend. ``list_writers()`` prints the valid backends and differences between them.
+
+ingest(), query(), process() are considered backend interactions, and require an active backend to work. Hence, backend() must be called before them.
+
+findt(), findc(), find() also require an active backend as they locate and print where a input search term matches tables/columns/datapoints respectively.
+
+list(), num_tables(), display(), summary() all print various information from an active backend. Differences are explained below.
+
+Notes for users:
+      - Must call reader() prior to ingest() to ensure there is actual data ingested into a backend
+      - If there is no data in DSI memory, ie. read() was never called, process() MUST be called on an active backend 
+        to ensure data can be exported with write()
+      - Datacard readers, Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard, must all follow respective formats found in dsi/examples/data/
+
+.. autoclass:: dsi.dsi.DSI
+      :members:
+
+
+.. _user_example_section_label:
+
+User Examples
+--------------
+Examples below display various ways users can incorporate DSI into their data science workflows.
+They can be found and run in ``examples/user/``
+
+Example 1: Intro use case
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Baseline use of DSI to list all valid Readers, Writers, and Backends, and descriptions of each.
+
+.. literalinclude:: ../examples/user/1.baseline.py
+
+Example 2: Ingest data
+~~~~~~~~~~~~~~~~~~~~~~
+Loading data from a Reader, ingesting it into a backend and displaying some of that data
+
+.. literalinclude:: ../examples/user/2.ingest.py
+
+Example 3: Query data
+~~~~~~~~~~~~~~~~~~~~~
+Querying data from a backend
+
+.. literalinclude:: ../examples/user/3.query.py
+
+Example 4: Process data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Processing (reading) data from a backend and load DSI writers to generate an Entity Relationship diagram, plot a table's data, and export to a CSV
+
+.. literalinclude:: ../examples/user/4.process.py
+
+Example 5: Find data
+~~~~~~~~~~~~~~~~~~~~
+Finding data from an active backend - tables, columns, datapoints matches
+
+.. literalinclude:: ../examples/user/5.find.py
+
+Example 6: Visualizing a database
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Printing different data and metadata from a database - number of tables, dimensions of tables, actual data in tables, and statistics from each table 
+
+.. literalinclude:: ../examples/user/6.visualize.py
+
+Example 7: Ingest complex schema with data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using the Schema Reader to load a complex JSON schema, loading the relevant data, and viewing difference between databases with a schema and no schema
+Read :ref:`schema_section` to understand how to structure this schema JSON file for the Schema Reader
+
+.. literalinclude:: ../examples/user/7.schema.py

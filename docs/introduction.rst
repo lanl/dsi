@@ -54,7 +54,7 @@ Currently, DSI has the following readers:
     Figure depicting the current DSI plugin class hierarchy.
 
 Backend Abstract Classes
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Backends are an interface between the core and a storage medium.
 Backends are designed to support a user-needed functionality.  
