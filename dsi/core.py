@@ -697,6 +697,8 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
+        if table_name != None:
+            print(f"Table: {table_name}")
         backend.summary(table_name, num_rows)
 
     def num_tables(self):

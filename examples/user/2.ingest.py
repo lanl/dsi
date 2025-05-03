@@ -5,7 +5,7 @@ ingest_dsi = DSI()
 
 ingest_dsi.read(filenames="../data/student_test1.yml", reader_name='YAML1')
 ingest_dsi.read(filenames="../data/student_test2.yml", reader_name='YAML1')
-ingest_dsi.read(filenames="../data/wildfiedata.csv", reader_name='Csv', table_name="wildfire") # table_name can be included if data file has only one table
+ingest_dsi.read(filenames="../data/wildfiredata.csv", reader_name='Csv', table_name="wildfire") # table_name can be included if data file has only one table
 
 ingest_dsi.backend(filename="data.db", backend_name='Sqlite')
 

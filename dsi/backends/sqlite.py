@@ -717,7 +717,7 @@ class Sqlite(Filesystem):
         if display_cols == None:
             df = pd.read_sql_query(f"SELECT * FROM {table_name};", self.con) 
         else:
-            sql_list = ", ".join(f"'{item}'" for item in display_cols)
+            sql_list = ", ".join(display_cols)
             df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con) 
         headers = df.columns.tolist()
         rows = df.values.tolist()

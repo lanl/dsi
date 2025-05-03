@@ -11,7 +11,8 @@ visual_dsi.num_tables() # need to call backend() before to get number of tables
 visual_dsi.list() # need to call backend() before to list all tables and their dimensions
 
 visual_dsi.display(table_name="math") # need to call backend() before to print all data from 'math'
-visual_dsi.display(table_name="math", num_rows=2, display_cols=['a', 'c', 'e']) # extra inputs to specify num rows and which columns to print
+visual_dsi.display(table_name="math", num_rows=2) # optional input to specify number of rows from 'math' to print
+visual_dsi.display(table_name="math", num_rows=2, display_cols=['a', 'c', 'e']) # another optional inputs to specify which columns to print
 
 visual_dsi.summary() # need to call backend() before to print numerical stats from every table in a backend
 visual_dsi.summary(table_name="math") # prints numerical stats for only 'math'

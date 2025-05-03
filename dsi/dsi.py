@@ -119,7 +119,7 @@ class DSI():
         """
         Prints a list of valid writers that can be specified in the 'writer_name' argument in write()
         """
-        print(self.t.VALID_READERS)
+        print(self.t.VALID_WRITERS)
 
     def write(self, filename, writer_name, table_name = None):
         """
@@ -157,6 +157,7 @@ class DSI():
             print(f"  - Columns: {val.c_name}")
             print(f"  - Search Type: {val.type}")
             print(f"  - Value: \n{val.value}")
+        print()
 
     def findc(self, query, range = False):
         """
@@ -171,6 +172,7 @@ class DSI():
             print(f"  - Column: {val.c_name}")
             print(f"  - Search Type: {val.type}")
             print(f"  - Value: {val.value}")
+        print()
 
     def find(self, query, row = False):
         """
@@ -186,7 +188,8 @@ class DSI():
             print(f"  - Search Type: {val.type}")
             print(f"  - Row Number: {val.row_num}")
             print(f"  - Value: {val.value}")
-    
+        print()
+
     def list(self):
         """
         Prints a list of all tables and their dimensions in the first loaded backend

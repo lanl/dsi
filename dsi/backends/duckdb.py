@@ -602,7 +602,7 @@ class DuckDB(Filesystem):
         if display_cols == None:
             df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
         else:
-            sql_list = ", ".join(f"'{item}'" for item in display_cols)
+            sql_list = ", ".join(display_cols)
             df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
         headers = df.columns.tolist()
         rows = df.values.tolist()
