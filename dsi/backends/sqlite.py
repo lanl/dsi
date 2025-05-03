@@ -696,6 +696,9 @@ class Sqlite(Filesystem):
         return info_list
     
     def num_tables(self):
+        """
+            Prints number of tables in this backend
+        """
         table_count = self.cur.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchone()
         if table_count[0] != 1:
             print(f"Database now has {table_count[0]} tables")

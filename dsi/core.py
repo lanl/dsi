@@ -44,6 +44,7 @@ class Terminal():
         `debug`: {0: off, 1: user debug log, 2: user + developer debug log} 
             
             - When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
+
         `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
         `runTable`: Undefined False as default. 
@@ -593,6 +594,7 @@ class Terminal():
 
             - If True, then data-range of all numerical columns which match `query_object` is included in return
             - If False, then data for each column that matches `query_object` is included in return
+            
         `return`: List of backend-specific objects that each contain data/numerical range about a column matching `query_object`.
 
             - check file of the first backend loaded to understand the structure of the objects in this list
@@ -621,6 +623,7 @@ class Terminal():
 
             - If True, then full row of data where a cell matches `query_object` is included in return
             - If False, then the value of the cell that matches `query_object` is included in return
+
         `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches `query_object`
 
             - check file of the first backend loaded to understand the structure of the objects in this list

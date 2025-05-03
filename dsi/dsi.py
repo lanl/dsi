@@ -15,13 +15,24 @@ class DSI():
         """
         Prints a list of valid readers that can be specified in the 'reader_name' argument in read()
         """
-        print(self.t.VALID_READERS)
+        print("['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'Schema', 'Bueno', 'Csv', 'YAML1', 'TOML1', 'Wildfire', 'JSON']\n")
+        print("Oceans11Datacard loads in metadata describing a dataset to be stored in the oceans11 DSI data server (oceans11.lanl.gov). Input format is YAML")
+        print("DublinCoreDatacard loads in a dataset's metadata which conforms to Dublin Core. Input format is XML")
+        print("SchemaOrgDatacard loads in a dataset's metadata which conforms to schema.org. Input format is JSON")
+        print("Schema loads in a complex JSON schema that describes tables relations for a structured relational database like Sqlite and DuckDB.")
+        print("Bueno captures performance data from Bueno (github.com/lanl/bueno). Input format is a dictionary in a text file ending in .data")
+        print("Csv loads in data from CSV files that can only be for one table in each separate call")
+        print("YAML1 loads in data from YAML files of a particular structure")
+        print("TOML1 loads in data from TOML files of a particular structure")
+        print("Wildfire loads in data from a CSV file and generates a simulation table alongside it. Each row of data will be a separate simulation run")
+        print("JSON loads in data from JSON files that can only be for one table in each separate call")
 
     def read(self, filenames, reader_name, table_name = None):
         """
         Runs a reader to load data into DSI.
 
         `filenames`: name(s) of the data file(s) to load into DSI
+
             - if reader_name = "Oceans11Datacard" ---> file extension can be .yaml, .yml
             - if reader_name = "DublinCoreDatacard" ---> file extension can be .xml
             - if reader_name = "SchemaOrgDatacard" ---> file extension can be .json
@@ -32,8 +43,13 @@ class DSI():
             - if reader_name = "TOML1" ---> file extension can be .toml
             - if reader_name = "Wildfire" ---> file extension can be .csv
             - if reader_name = "JSON" ---> file extension can be .json
+
         `reader_name`: name of the DSI reader to use. Call list_readers() to see a list of valid readers
+
         `table_name`: optional, default None. If `filenames` only stores one table of data, users can specify name for that table
+
+            - Csv, JSON, and Wildfire readers are only ones to accept this input
+        
         """
         if reader_name.lower() == "oceans11datacard":
             self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
@@ -75,6 +91,7 @@ class DSI():
         `filename`: name of the backend file
             - if backend_name = "Sqlite" ---> file extension can be .db, .sqlite, .sqlite3
             - if backend_name = "DuckDB" ---> file extension can be .duckdb, .db
+            
         `backend_name`: either 'Sqlite' or 'DuckDB. Default is Sqlite
         """
         if backend_name.lower() == 'sqlite':
@@ -127,10 +144,13 @@ class DSI():
         If data to export is in a backend, first call process() before write().
 
         `filename`: output file name
+
             - if writer_name = "ER_Diagram" ---> file extension can be .png, .pdf, .jpg, .jpeg
             - if writer_name = "Table_Plot" ---> file extension can be .png, .jpg, .jpeg
             - if writer_name = "Csv_Writer" ---> file extension can only be .csv
+
         `writer_name`: name of the DSI write to use. Call list_writers() to see a list of valid readers
+
         `table_name`: optional if writer_name = "ER_Diagram". Required for Table_Plot and Csv_Writer to export correct table
         """
         if writer_name == "ER_Diagram":

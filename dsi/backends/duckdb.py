@@ -577,6 +577,9 @@ class DuckDB(Filesystem):
         return info_list
     
     def num_tables(self):
+        """
+            Prints number of tables in this backend
+        """
         table_count = self.cur.execute("""
                                        SELECT COUNT(*) 
                                        FROM information_schema.tables 
