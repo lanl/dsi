@@ -1,30 +1,17 @@
 #!/usr/bin/env python3
-
 """
 This script reads in the csv file created from parse_slurm_output.py.
 Then it creates a DSI db from the csv file and performs a query.
 """
-
-import argparse
-import sys
-from dsi.backends.sqlite import Sqlite, DataType
 import os
 from dsi.core import Terminal
 
 if __name__ == "__main__":
-    """ The testname argument is required """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--testname', help='the test name')
-    args = parser.parse_args()
-    test_name = args.testname
-    if test_name is None:
-        parser.print_help()
-        sys.exit(0)
-    
+    test_name = "leblanc"
     table_name = "rundata"
-    csvpath = 'pennant_' + test_name + '.csv'
-    dbpath = 'pennant_' + test_name + '.db'
-    output_csv = "pennant_read_query.csv"
+    csvpath = f'pennant_{test_name}.csv'
+    dbpath = f'pennant_{test_name}.db'
+    output_csv = "pennant_output.csv"
 
     core = Terminal()
 

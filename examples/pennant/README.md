@@ -11,10 +11,10 @@ cd examples/pennant/
 ## Create a csv from the included outputs
 Create a csv file from the outputs:
 ```
-python3 parse_slurm_output.py --testname leblanc
+python3 parse_slurm_output.py
 ```
 
 ## Create a DSI db and query it
 ```
-python3 create_and_query_dsi_db.py --testname leblanc
+python3 dsi_pennant.py
 ```

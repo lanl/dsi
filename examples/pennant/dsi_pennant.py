@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""
+This script reads in the csv file created from parse_slurm_output.py.
+Then it creates a DSI db from the csv file and performs a query.
+"""
+import os
+from dsi.dsi import DSI
+
+if __name__ == "__main__":
+    test_name = "leblanc"
+    table_name = "rundata"
+    csvpath = f'pennant_{test_name}.csv'
+    dbpath = f'pennant_{test_name}.db'
+    output_csv = "pennant_output.csv"
+
+    dsi = DSI()
+    dsi.read(csvpath, "Wildfire", table_name=table_name)
+
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    
+    dsi.backend(dbpath, 'Sqlite')
+    dsi.ingest()
+
+    dsi.query(f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;")
+
+    dsi.write(output_csv, "Csv_Writer", table_name=table_name)
