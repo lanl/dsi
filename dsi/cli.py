@@ -56,7 +56,7 @@ class DSI_cli:
         return
     
     def startup(self, backend="sqlite"):
-        self.t = Terminal(debug = 2, runTable=False)
+        self.t = Terminal(debug = 0, runTable=False)
         self.name = None
         if backend=="duckdb":
             if os.path.exists(".temp.duckdb"):
@@ -99,7 +99,7 @@ class DSI_cli:
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('table_name', help='Table to display')
         parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows  for each table')
-        parser.add_argument('-e', '--export', type=str, required=False, default="", help='Export to csv or parquet file')
+        parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
 
     def display(self, args):
