@@ -32,7 +32,7 @@ reads in the CSV file and creates a database:
 
 Resulting in the output of the query:
 
-..  figure:: example-pennant-output.png
+..  figure:: images/example-pennant-output.png
     :alt: Screenshot of computer program output.
     :class: with-shadow
 
@@ -88,7 +88,7 @@ Open Jupyter Lab with:
 
 and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the results of the DSI pipeline.
 
-..  figure:: example-wildfire-jupyter.png
+..  figure:: images/example-wildfire-jupyter.png
     :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
     :class: with-shadow
     :scale: 50%
@@ -105,7 +105,7 @@ To open a pycinema viewer, first install pycinema and then run the example scrip
    cinema examples/wildfire/wildfire_pycinema.py
 
 
-..  figure:: example-wildfire-pycinema.png
+..  figure:: images/example-wildfire-pycinema.png
     :class: with-shadow
     :scale: 40%
 
@@ -138,7 +138,7 @@ where ``examples/data/example_schema.json`` is:
 
 the ER diagram looks like:
 
-..  figure:: schema_erd.png
+..  figure:: images/schema_erd.png
     :scale: 35%
     :align: center
 
@@ -203,7 +203,7 @@ Based on this, if we edit ``examples/data/example_schema.json`` by adding a fore
 
 our new ER diagram is:
 
-..  figure:: schema_erd_added.png
+..  figure:: images/schema_erd_added.png
     :scale: 35%
     :align: center
    
@@ -222,11 +222,11 @@ This example displays an example workflow for a user to read data into DSI, inge
 The above workflow generates ``dsi_sqlite_backend_output.ipynb`` which can be seen below.
 Users can make further edits to the Jupyter notebook to interact with the data.
 
-..  figure:: jupyter_1.png
+..  figure:: images/jupyter_1.png
     :scale: 65%
     :align: center
 
-..  figure:: jupyter_2.png
+..  figure:: images/jupyter_2.png
     :scale: 65%
     :align: center
 

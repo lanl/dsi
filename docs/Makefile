@@ -11,8 +11,10 @@ all: html
 html:
 	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
 	python ./backends/generate_backend_class_hierarchy.py ../dsi/backends/
-	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
-	mv BackendClassHierarchy.gv.png BackendClassHierarchy.png
+	mv PluginClassHierarchy.gv.png images/PluginClassHierarchy.png
+	mv BackendClassHierarchy.gv.png images/BackendClassHierarchy.png
+	rm PluginClassHierarchy.gv
+	rm BackendClassHierarchy.gv
 	rm -rf $(BUILDDIR)/html
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
 #	pytest --cov --cov-report=html ../

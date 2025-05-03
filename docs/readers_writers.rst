@@ -10,7 +10,7 @@ In order to be compatible with DSI core, Plugins should produce data in Python b
 
 Note that any contributed plugins or extension should include unit tests in  ``plugins/tests`` to demonstrate the new Plugin capability.
 
-..  figure:: PluginClassHierarchy.png
+..  figure:: images/PluginClassHierarchy.png
     :alt: Figure depicting the current plugin class hierarchy.
     :class: with-shadow
     :scale: 70%

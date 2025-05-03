@@ -32,7 +32,7 @@ reads in the CSV file and creates a database:
 
 Resulting in the output of the query:
 
-..  figure:: example-pennant-output.png
+..  figure:: images/example-pennant-output.png
     :alt: Screenshot of computer program output.
     :class: with-shadow
 
@@ -88,7 +88,7 @@ Open Jupyter Lab with:
 
 and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the results of the DSI pipeline.
 
-..  figure:: example-wildfire-jupyter.png
+..  figure:: images/example-wildfire-jupyter.png
     :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
     :class: with-shadow
     :scale: 50%
@@ -105,7 +105,7 @@ To open a pycinema viewer, first install pycinema and then run the example scrip
    cinema examples/wildfire/wildfire_pycinema.py
 
 
-..  figure:: example-wildfire-pycinema.png
+..  figure:: images/example-wildfire-pycinema.png
     :class: with-shadow
     :scale: 40%
 

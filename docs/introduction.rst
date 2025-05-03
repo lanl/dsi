@@ -11,7 +11,7 @@ DSI infrastructure is designed to be flexible and with these considerations in m
     - Query-driven data movement is supported and is transparent to the user.
     - The DSI API can be used to develop user-specific workflows.
 
-..  figure:: data_lifecycle.png
+..  figure:: images/data_lifecycle.png
     :alt: Figure depicting the data life cycle
     :class: with-shadow
     :scale: 50%
@@ -46,7 +46,7 @@ Plugins are defined by a base abstract class, and support child abstract classes
 
 Currently, DSI has the following readers:
 
-..  figure:: PluginClassHierarchy.png
+..  figure:: images/PluginClassHierarchy.png
     :alt: Figure depicting the current plugin class hierarchy.
     :class: with-shadow
     :scale: 70%
@@ -62,7 +62,7 @@ Given a set of user metadata captured by a DSI frontend, a typical functionality
 Because the files associated with the queryable metadata may be spread across filesystems and security domains, 
 a supporting backend is required to assemble query results and present them to the DSI core for transformation and return.
 
-.. figure:: user_story.png
+.. figure:: images/user_story.png
    :alt: This figure depicts a user asking a typical query on the user's metadata
    :class: with-shadow
    :scale: 50%
