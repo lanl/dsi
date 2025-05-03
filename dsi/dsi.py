@@ -212,7 +212,7 @@ class DSI():
         """
         self.t.num_tables() # terminal function already prints
 
-    def display(self, table_name = None, num_rows = 25, display_cols = None):
+    def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Prints data of a specified table from the first loaded backend.
         
