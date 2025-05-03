@@ -16,7 +16,7 @@ from dsi.plugins.metadata import StructuredMetadata
 
 class FileReader(StructuredMetadata):
     """
-    FileReader Plugins keep information about the file that they are ingesting, namely absolute path and hash.
+    FileReaders keep information about the file that they are ingesting, namely absolute path and hash.
     """
 
     def __init__(self, filenames, **kwargs):
@@ -35,7 +35,7 @@ class FileReader(StructuredMetadata):
 
 class Csv(FileReader):
     """
-    A Structured Data Plugin to ingest CSV data
+    A DSI Reader that reads in CSV data
     """
     def __init__(self, filenames, table_name = None, **kwargs):
         """
@@ -77,7 +77,7 @@ class Csv(FileReader):
 
 class Bueno(FileReader):
     """
-    A Structured Data Plugin to capture performance data from Bueno (github.com/lanl/bueno)
+    A DSI Reader that captures performance data from Bueno (github.com/lanl/bueno)
 
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
@@ -113,7 +113,7 @@ class Bueno(FileReader):
 
 class JSON(FileReader):
     """
-    A Structured Data Plugin to capture JSON data
+    A DSI Reader that captures JSON data
 
     The JSON data's keys are used as columns and values are rows
    
@@ -154,7 +154,7 @@ class JSON(FileReader):
 
 class Schema(FileReader):
     """
-    Structured Data Plugin to parse schema of a data source that will be ingested in same workflow.
+    DSI Reader that parses the schema of a data source to ingest in same workflow.
 
     Schema file input should be a JSON file that stores primary and foreign keys for all tables in the data source. 
     Stores all relations in global dsi_relations table used for creating backends/writers
@@ -205,7 +205,7 @@ class Schema(FileReader):
 
 class YAML1(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of YAML files
+    DSI Reader that reads in an individual or a set of YAML files
 
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     """
@@ -297,7 +297,7 @@ class YAML1(FileReader):
             del self.yaml_data["dsi_units"]
         self.set_schema_2(self.yaml_data)
 
-        # SAVE FOR PLUGINS TO USE FOR PADDING MISMATCHED COLUMNS- YAML AND TOML USE THIS NOW
+        # SAVE FOR READERS TO USE FOR PADDING MISMATCHED COLUMNS- YAML AND TOML USE THIS NOW
         # # Fill the shorter lists with None (or another value) if manually combining 2 data files together without pandas
         # max_length = max(len(lst) for lst in self.bueno_data.values())
         # for key, value in self.bueno_data.items():
@@ -307,7 +307,7 @@ class YAML1(FileReader):
 
 class TOML1(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of TOML files
+    DSI Reader that reads in an individual or a set of TOML files
 
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     """
@@ -388,12 +388,12 @@ class TOML1(FileReader):
 
 class Wildfire(FileReader):
     """
-    A Structured Data Plugin to ingest Wildfire data stored as a CSV
+    DSI Reader that ingests Wildfire data stored as a CSV
 
     Can be used for other cases if data is post-processed and running only once.
     Can create a manual simulation table
     """
-    def __init__(self, filenames, table_name = None, sim_table = False, **kwargs):
+    def __init__(self, filenames, table_name = None, sim_table = True, **kwargs):
         """
         Initializes Wildfire Reader with user specified parameters.
 
@@ -401,7 +401,7 @@ class Wildfire(FileReader):
 
         `table_name`: default None. User can specify table name when loading the wildfire file.   
 
-        `sim_table`: default False. Set to True if creating manual simulation table where each row of Wildfire file is a separate sim
+        `sim_table`: default True. Set to False if DO NOT want to create manual simulation table where each row of Wildfire file is a separate sim
 
             - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
         """
@@ -555,7 +555,7 @@ class DublinCoreDatacard(FileReader):
             self.datacard_data["dublin_core_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
-class SchemaDatacard(FileReader):
+class SchemaOrgDatacard(FileReader):
     """
     """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
@@ -608,7 +608,7 @@ class SchemaDatacard(FileReader):
 
 class MetadataReader1(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of JSON metadata files
+    DSI Reader that reads in an individual or a set of JSON metadata files
     """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
         """

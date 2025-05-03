@@ -5,7 +5,7 @@ from dsi.plugins.metadata import StructuredMetadata
 
 class FileWriter(StructuredMetadata):
     """
-    FileWriter Plugins keep information about the file that they are ingesting, namely absolute path and hash.
+    FileWriters keep information about the file that they are ingesting, namely absolute path and hash.
     """
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
@@ -18,7 +18,7 @@ class FileWriter(StructuredMetadata):
 
 class ER_Diagram(FileWriter):
     """
-    Plugin that generates an ER Diagram from the current data in the DSI abstraction
+    DSI Writer that generates an ER Diagram from the current data in the DSI abstraction
     """
 
     def __init__(self, filename, target_table_prefix = None, **kwargs):
@@ -130,7 +130,7 @@ class ER_Diagram(FileWriter):
 
 class Csv_Writer(FileWriter):
     """
-    A Plugin to output queries as CSV data
+    DSI Writer to output queries as CSV data
     """
     def __init__(self, table_name, filename, export_cols = None, **kwargs):
         """
@@ -171,7 +171,7 @@ class Csv_Writer(FileWriter):
 
 class Table_Plot(FileWriter):
     """
-    Plugin that plots all numeric column data for a specified table
+    DSI Writer that plots all numeric column data for a specified table
     """
     def __init__(self, table_name, filename, display_cols = None, **kwargs):
         """
