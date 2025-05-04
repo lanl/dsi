@@ -28,30 +28,29 @@ Implementation Overview
 
 The DSI API is broken into three main categories:
 
-- Plugins: these are frontend capabilities that will be commonly used by the generic DSI user.  These include readers and writers.
+- Readers/Writers: frontend capabilities that will be commonly used by the generic DSI user.  These include readers and writers.
 - Backends: these are used to interact with storage devices and other ways of moving data.
 - DSI Core: the *middleware* that contains the basic functionality to use the DSI API.
 
-Plugin Abstract Classes
-~~~~~~~~~~~~~~~~~~~~~~~
+Data Readers/Writers Classes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Plugins transform an arbitrary data source into a format that is compatible with the DSI core. 
+Readers/Writers transform an arbitrary data source into a format that is compatible with the DSI core. 
 The parsed and queryable attributes of the data are called *metadata* -- data about the data. Metadata share the same security profile as the source data.
 
-Plugins can operate as data readers or data writers. 
 A simple data reader might parse an application's output file and place it into a core-compatible data structure such as Python built-ins and members of the popular Python ``collection`` module. 
 A simple data writer might execute an application to supplement existing data and queryable metadata, e.g., adding locations of outputs data or plots after running an analysis workflow.
 
-Plugins are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.
+Readers/Writers are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.
 
 Currently, DSI has the following readers:
 
 ..  figure:: images/PluginClassHierarchy.png
-    :alt: Figure depicting the current plugin class hierarchy.
+    :alt: Figure depicting the current Reader/Writer class hierarchy.
     :class: with-shadow
     :scale: 70%
 
-    Figure depicting the current DSI plugin class hierarchy.
+    Figure depicting the current DSI Reader/Writer class hierarchy.
 
 Backend Abstract Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -84,4 +83,5 @@ DSI Core
 
 DSI basic functionality is contained within the middleware known as the *core*.  
 The DSI core is focused on delivering user-queries on unified metadata which can be distributed across many files and security domains. 
-DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions. The DSI core is a home for DSI Plugins and an interface for DSI Backends.
+DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions. 
+The DSI core is a home for DSI Readers/Writers and an interface for DSI Backends.

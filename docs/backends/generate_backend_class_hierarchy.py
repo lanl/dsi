@@ -13,7 +13,7 @@ for module in os.listdir(sys.argv[1]):
         modules.append(module[:-3])
         __import__(module[:-3], locals(), globals())
 print("Imported the following modules to find class hierarchy:",
-      ", ".join(modules), "\n")
+      ", ".join(modules))
 
 
 class ClassTreeNode:

@@ -10,10 +10,10 @@ The Data Science Infrastructure Project (DSI)
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
+   intro-users
    installation
-   dsi
-   cli
+   python_api
+   cli_api
    examples_user
    contributors
 

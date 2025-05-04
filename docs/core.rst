@@ -2,7 +2,7 @@ Core
 ====
 
 The DSI Core middleware defines the `Terminal` and `Sync` concepts. 
-An instantiated `Terminal` is the human/machine DSI interface to connect Reader/Writer plugins and DSI backends.
+An instantiated `Terminal` is the human/machine DSI interface to connect Readers/Writers and DSI backends.
 An instantiated `Sync` supports data movement capabilities between local and remote locations and captures metadata documentation
 
 Core: Terminal
@@ -105,6 +105,8 @@ Example 6: Find data
 Finding data from a backend - tables, columns, cells, or all matches
 
 .. literalinclude:: ../examples/dev_core/find.py
+
+.. _external_readers_writers_label:
 
 Example 7: External Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -97,6 +97,7 @@ class Sqlite(Filesystem):
 
         `return`: none
         """
+        #checking if extra column needs to be added to a table
         if self.cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{types.name}';").fetchone():
             col_names = types.properties.keys()
             col_info = self.cur.execute(f"PRAGMA table_info({types.name});").fetchall()

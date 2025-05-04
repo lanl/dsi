@@ -1,5 +1,7 @@
-Python API for Users
-====================
+.. _python_api_label:
+
+Python API
+===========
 
 Users can interact with DSI modules using the DSI class which provides an interface for our Readers, Writers, and Backends. 
 This can be seen below and in ``dsi/dsi.py``. Example workflows using these functions can be seen in the following section: :ref:`user_example_section_label`

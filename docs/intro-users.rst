@@ -1,0 +1,95 @@
+Introduction
+============
+
+The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  
+DSI capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing. 
+
+DSI infrastructure is designed to be flexible and with these considerations in mind:
+    - Data management is subject to strict, POSIX-enforced, file security.
+    - DSI capabilities support a wide range of common metadata queries.
+    - DSI interfaces with multiple database technologies and archival storage options.
+    - Query-driven data movement is supported and is transparent to the user.
+    - The DSI API can be used to develop user-specific workflows.
+
+..  figure:: images/data_lifecycle.png
+    :alt: Figure depicting the data life cycle
+    :class: with-shadow
+    :scale: 50%
+    :align: center
+
+    A depiction of data life cycle can be seen here. The DSI API supports the user to manage the life cycle aspects of their data.
+
+DSI system design has been driven by specific use cases, both AI/ML and more generic usage.  
+These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities. 
+DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.  The DSI API is Python-based.
+
+Implementation Overview
+-----------------------
+
+The DSI API is broken into three main categories:
+
+- Readers/Writers: frontend capabilities that DSI users will use to import/export data.
+- Backends: objects that are used to interact with storage devices and other ways of moving data. 
+- DSI Core: the *middleware* that contains the basic functionality to use the DSI API. 
+  This connects Readers/Writers to Backends through several modules exposed to users.
+
+DSI Readers/Writers
+~~~~~~~~~~~~~~~~~~~~
+
+Readers/Writers transform an arbitrary data source into a format that is compatible with the DSI core. 
+The parsed and queryable attributes of the data are called *metadata* -- data about the data. 
+Metadata shares the same security profile as the source data.
+
+Data Readers parse an input file of its metadata and data and stores it within DSI memory.
+Data Writers convert metadata and data stored in DSI to an output file - ex: an image or a CSV
+
+Currently, DSI has the following Readers:
+  - Csv
+  - JSON
+  - Schema (A complex schema reader)
+  - YAML1
+  - TOML1
+  - Bueno
+  - Oceans11Datacard (Data cards of a dataset on the oceans11.lanl.gov data server)
+  - DublinCoreDatacard (Data card that adheres to the Dublin Core metadata standard)
+  - SchemaOrgDatacard (Data card that adheres to the Schema.org metadata standard)
+  - Wildfire (Creates a simulation table connected to the data. Assumes each data row is a separate sim)
+
+.. ..  figure:: images/PluginClassHierarchy.png
+..     :alt: Figure depicting the current Reader/Writer class hierarchy.
+..     :class: with-shadow
+..     :scale: 70%
+
+..     Figure depicting the current DSI Reader/Writer class hierarchy.
+
+DSI Backends
+~~~~~~~~~~~~~
+
+Backends are an interface between the DSI Core and a storage medium.
+Backends are designed to support a user-needed functionality.
+
+Users can interact with a backend by ingesting data from DSI into one, and querying its data, processing its data into DSI.
+Users can also find instances of an object in a backend, display a table's data, and view statistics of each table in a backend.
+
+.. figure:: images/user_story.png
+   :alt: This figure depicts a user asking a typical query on the user's metadata
+   :class: with-shadow
+   :scale: 50%
+   :align: center
+
+   In this example **user story**, the user has metadata about their data stored in DSI storage of some type.  
+   The user needs to extract all files with the variable **foo** above a specific threshold.  
+   DSI backends query the DSI metadata to locate and return all such information.
+
+Current DSI backends include:
+
+- SQLite: Python based SQL database and backend; the default DSI API backend.
+- DuckDB: 
+- Parquet: a columnar storage format for `Apache Hadoop <https://hadoop.apache.org>`_.
+
+DSI Core
+~~~~~~~~
+
+DSI basic functionality is contained within the middleware known as the *core*.
+Users will leverage Core to employ Readers, Writers, and Backends to interact with their data.
+The two main methods are with our :ref:`python_api_label` or our :ref:`cli_api_label`

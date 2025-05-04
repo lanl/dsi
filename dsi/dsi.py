@@ -137,6 +137,9 @@ class DSI():
         Prints a list of valid writers that can be specified in the 'writer_name' argument in write()
         """
         print(self.t.VALID_WRITERS)
+        print("ER_Diagram creates an image of an ER Diagram based on data stored in DSI.")
+        print("Table_Plot generates a plot of a specified table's numerical data that is stored in DSI.")
+        print("Csv_Writer creates a CSV of a specified table whose data is stored in DSI.")
 
     def write(self, filename, writer_name, table_name = None):
         """

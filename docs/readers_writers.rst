@@ -1,21 +1,22 @@
-Plugins
-=======
-Plugins connect data-producing applications to DSI core functionalities. Plugins have *writers* or *readers* functions. 
-A Plugin reader function deals with existing data files or input streams. 
-A Plugin writer deals with generating new data. Plugins are modular to support user contribution.
+DSI Readers/Writers
+=====================
+Readers/Writers connect data-producing applications to DSI core functionalities.  
+A Reader function deals with existing data files or input streams. 
+A Writer function deals with generating new data.
 
-DSI contributors are encouraged to offer custom Plugin abstract classes and Plugin implementations. 
-A contributed Plugin abstract class may either extend another plugin to inherit the properties of the parent, or be of a completely new structure. 
-In order to be compatible with DSI core, Plugins should produce data in Python built-in data structures or data structures sourced from the Python ``collections`` library.
+Readers/Writers are modular to support user contribution and contributors are encouraged to offer custom Readers/Writers abstract classes and implementations. 
+A contributed Reader/Writer abstract class may either extend another Reader/Writer to inherit the properties of the parent, or be a completely new structure. 
+In order to be compatible with DSI, Readers should store data in data structures sourced from the Python ``collections`` library (OrderedDict).
+Similarly, Writers should be compatible by accepting data structures from Python ``collections`` (OrderedDict) to export data/generate an image.
 
-Note that any contributed plugins or extension should include unit tests in  ``plugins/tests`` to demonstrate the new Plugin capability.
+Note that any contributed Readers/Writers or extension should include unit tests in  ``plugins/tests`` to demonstrate the new capability.
 
 ..  figure:: images/PluginClassHierarchy.png
-    :alt: Figure depicting the current plugin class hierarchy.
+    :alt: Figure depicting the current Readers/Writers class hierarchy.
     :class: with-shadow
     :scale: 70%
 
-    Figure depicts prominent portion of the current DSI plugin class hierarchy.
+    Figure depicts prominent portion of the current DSI Readers/Writers class hierarchy.
 
 .. automodule:: dsi.plugins.plugin
    :members:
@@ -36,7 +37,7 @@ File Readers
 
 Note for users:
    - Assume names of data structure from all data sources are consistent/stable. Ex: table/column names MUST be consistent. Number of columns in a table CAN vary.
-   - Plugin readers in DSI repo can handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
+   - DSI Readers can handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
    
       - if only reading in one table at a time, users can utilize python pandas to stack mulutiple dataframes vertically (ex: CSV reader)
       - if multiple tables in a file, users must pad tables with null values (ex: YAML1, which has example code at bottom of ``add_rows()`` to implement this)

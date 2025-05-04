@@ -61,7 +61,7 @@ To run this example, load dsi and run:
 
    python3 examples/wildfire/wildfire.py
 
-.. literalinclude:: ../examples/wildfire/wildfire.py
+.. literalinclude:: ../examples/wildfire/wildfire_dev.py
 
 This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. 
 This cdb folder is called a `Cinema`_ database (CDB). 
