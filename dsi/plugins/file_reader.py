@@ -184,11 +184,11 @@ class Schema(FileReader):
         with open(self.schema_file, 'r') as fh:
             schema_content = json.load(fh)
 
+            pkList = []
             for tableName, tableData in schema_content.items():
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
                 
-                pkList = []
                 if "foreign_key" in tableData.keys():
                     for colName, colData in tableData["foreign_key"].items():
                         if self.target_table_prefix is not None:

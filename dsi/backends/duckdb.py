@@ -65,7 +65,7 @@ class DuckDB(Filesystem):
                 return " FLOAT"
             elif isinstance(item, str):
                 return " VARCHAR"
-        return ""
+        return " VARCHAR"
     
     # OLD NAME OF ingest_table_helper. TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
@@ -86,6 +86,7 @@ class DuckDB(Filesystem):
 
         `return`: none
         """
+        #checking if extra column needs to be added to a table
         if self.cur.execute(f"""
                             SELECT table_name FROM information_schema.tables 
                             WHERE table_type = 'BASE TABLE' AND table_name = '{types.name}'
@@ -149,9 +150,35 @@ class DuckDB(Filesystem):
             runTable_insert = f"INSERT INTO runTable VALUES (nextval('seq_run_id'), '{timestamp}');"
             self.cur.execute(runTable_insert)
 
-        for tableName, tableData in artifacts.items():
+        table_order = []
+        if "dsi_relations" in artifacts.keys(): # only do this extra manipulation if using a complex schema
+            for (tableName, key) in artifacts["dsi_relations"]["foreign_key"]:
+                if tableName == None:
+                    continue
+                foreignIndex = artifacts["dsi_relations"]["foreign_key"].index((tableName, key))
+                primaryTuple = artifacts["dsi_relations"]['primary_key'][foreignIndex]
+                
+                if tableName in table_order and primaryTuple[0] in table_order:
+                    fk_spot = table_order.index(tableName)
+                    pk_spot = table_order.index(primaryTuple[0])
+                    if fk_spot < pk_spot:
+                        table_order[pk_spot] = primaryTuple[0]
+                        table_order[fk_spot] = tableName
+                if tableName not in table_order:
+                    table_order.append(tableName)
+                if primaryTuple[0] not in table_order:
+                    table_order.insert(table_order.index(tableName), primaryTuple[0])
+
+            difference = [item for item in artifacts.keys() if item not in table_order]
+            table_order = difference + table_order
+        else:
+            table_order = artifacts.keys()
+
+        for tableName in table_order:
             if tableName == "dsi_relations" or tableName == "dsi_units":
                 continue
+
+            tableData = artifacts[tableName]
 
             types = DataType()
             types.properties = {}
@@ -320,10 +347,12 @@ class DuckDB(Filesystem):
                             colDict[colName].append(val)
                 artifact[tableName] = colDict
 
-        fkData = self.cur.execute(f"SELECT * FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'").fetchall()
+        fkData = self.cur.execute(f"""
+                                  SELECT table_name, constraint_column_names, referenced_table, referenced_column_names
+                                  FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'""").fetchall()
         for row in fkData:
-            artifact["dsi_relations"]["primary_key"].append((row[5], row[6][0]))
-            artifact["dsi_relations"]["foreign_key"].append((row[1], row[4][0]))
+            artifact["dsi_relations"]["primary_key"].append((row[2], row[3][0]))
+            artifact["dsi_relations"]["foreign_key"].append((row[0], row[1][0]))
         
         if not fkData:
             pkData = self.cur.execute(f"SELECT * FROM duckdb_constraints() WHERE constraint_type = 'PRIMARY KEY'").fetchall()
