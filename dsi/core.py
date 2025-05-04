@@ -442,6 +442,12 @@ class Terminal():
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
+        valid_backend = False
+        if parent_backend == "Filesystem":
+            if first_backend.__class__.__name__ == "Sqlite" and os.path.getsize(first_backend.filename) > 100:
+                valid_backend = True
+            if first_backend.__class__.__name__ == "DuckDB" and os.path.getsize(first_backend.filename) > 13000:
+                valid_backend = True
         if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
@@ -452,7 +458,7 @@ class Terminal():
                 if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if valid_backend:
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
@@ -477,7 +483,7 @@ class Terminal():
                 raise ValueError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if valid_backend:
                 try:
                     if interaction_type == "inspect":
                         first_backend.inspect_artifacts(**kwargs)
@@ -498,7 +504,7 @@ class Terminal():
                 if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if valid_backend:
                 if self.debug_level != 0:
                     self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
                 if interaction_type == "process":
@@ -506,7 +512,7 @@ class Terminal():
                 elif interaction_type == "read":
                     self.active_metadata = first_backend.read_to_artifact()
                 operation_success = True
-            else: #back-READ backend is empty - cannot process data
+            else: #backend is empty - cannot process data
                 if self.debug_level != 0:
                     self.logger.error("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
                 raise ValueError("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
