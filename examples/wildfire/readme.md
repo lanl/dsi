@@ -12,7 +12,7 @@ USERS -- Run DSI's wildfire example:
 
     python3 wildfire.py
 
-CONTRIBUTORS -- Run DSI's wildfire example:
+CONTRIBUTORS -- Run DSI's wildfire example: 
 
     python3 wildfire_dev.py
 

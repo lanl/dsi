@@ -18,17 +18,19 @@ Users should call ``write()`` to export data from DSI into external formats. ``l
 
 Users should call ``backend()`` to activate either a Sqlite or DuckDB backend. ``list_writers()`` prints the valid backends and differences between them.
 
-ingest(), query(), process() are considered backend interactions, and require an active backend to work. Hence, backend() must be called before them.
+``ingest()``, ``query()``, ``process()`` are considered backend interactions, and require an active backend to work. 
+Therefore, ``backend()`` must be called before them.
 
-findt(), findc(), find() also require an active backend as they locate and print where a input search term matches tables/columns/datapoints respectively.
+``findt()``, ``findc()``, ``find()`` also require an active backend as they locate and print where a input search term matches 
+tables/columns/datapoints respectively.
 
-list(), num_tables(), display(), summary() all print various information from an active backend. Differences are explained below.
+``list()``, ``num_tables()``, ``display()``, ``summary()`` all print various information from an active backend. Differences are explained below.
 
 Notes for users:
-      - Must call reader() prior to ingest() to ensure there is actual data ingested into a backend
+      - Must call ``reader()`` prior to ``ingest()`` to ensure there is actual data ingested into a backend
       - If there is no data in DSI memory, ie. read() was never called, process() MUST be called on an active backend 
         to ensure data can be exported with write()
-      - Datacard readers, Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard, must all follow respective formats found in dsi/examples/data/
+      - Inputs to the datacard readers - Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard - must all follow the formats found in dsi/examples/data/
 
 .. autoclass:: dsi.dsi.DSI
       :members:

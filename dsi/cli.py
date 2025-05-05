@@ -288,14 +288,10 @@ class DSI_cli:
                 print(f"An error {e} occurred loading {dbfile}\n")
 
         elif file_extension.lower() in ['yaml', 'yml']:
-            # handle ALL files that should end in yaml: YAML1 and Oceans11 for now.
             try:
                 self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
             except Exception as e:
-                try:
-                    self.t.load_module('plugin', "Oceans11Datacard", "reader", filenames = dbfile)
-                except Exception as e:
-                    print(f"An error occured loading {dbfile} into DSI. Please ensure your data file structure is correct\n")
+                print(f"An error {e} occurred loading {dbfile}\n")
 
         elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
             try:

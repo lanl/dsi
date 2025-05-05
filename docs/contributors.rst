@@ -1,5 +1,5 @@
-Contributors
-============
+Contributor Resources
+=====================
 
 .. toctree::
    :maxdepth: 1

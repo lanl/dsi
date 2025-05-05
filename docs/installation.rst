@@ -1,18 +1,23 @@
 Quick Start: Installation
 =========================
 
-#. If this is the first time using DSI, start by creating a DSI virtual environment with a name of your choice, e.g., **mydsi**:
+#. Users should create a DSI virtual environment with a name of your choice, e.g., **mydsi**:
+
+   Python virtual environment
 
    .. code-block:: unixconfig
 
       python -m venv mydsi
-
-#. Then activate the environment (start here if you already have a DSI virtual environment) and install the latest pip in your environment:
-
+      source mydsi/bin/activate           # start from here if virtual environment exists
+      pip install --upgrade pip
+   
+   Miniconda3 virtual environment
+   
    .. code-block:: unixconfig
 
-      source mydsi/bin/activate
-      pip install --upgrade pip
+      . ~/miniconda3/bin/activate
+      conda create -n mydsi python=3.11 
+      conda activate mydsi                # only run this if virtual environment exists
 
 #. Go down into the project space root, clone the dsi repo and use pip to install dsi:
 

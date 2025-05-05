@@ -36,7 +36,7 @@ class ClassTreeNode:
         def process_children(r):
             # print(r.clas.__name__)
             for ch in r.subclasses:
-                if ch.clas.__name__ == "Environment" or (r.clas.__name__ == "FileReader" and ch.clas.__name__ in ["Wildfire", "Bueno", "MetadataReader1"]):
+                if ch.clas.__name__ == "Environment" or (r.clas.__name__ == "FileReader" and ch.clas.__name__ not in ["Csv", "JSON", "Schema", "YAML1", "TOML1"]):
                     continue
                 dot.node(ch.clas.__name__)
                 dot.edge(r.clas.__name__, ch.clas.__name__)
