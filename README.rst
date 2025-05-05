@@ -15,10 +15,10 @@ DSI is implemented in three parts:
 
 For more information on these DSI modules, please refer to the `DSI Introduction Page <https://lanl.github.io/dsi/intro-users.html>`_.
 
-There are two methods for users to utilize DSI seamlessly:
+Users can interact with DSI seamlessly through two methods:
 
-* `<https://lanl.github.io/dsi/python_api.html>`_ for more flexibility when loading/exporting data
-* `<https://lanl.github.io/dsi/cli_api.html>`_ for streamlined DSI functionality without requiring knowledge of Python
+* `Python API <https://lanl.github.io/dsi/python_api.html>`_ for more flexibility when loading/exporting data
+* `Command Line Interface API <https://lanl.github.io/dsi/cli_api.html>`_ for streamlined DSI functionality without requiring any knowledge of Python
 
 
 ========================
