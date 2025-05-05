@@ -1,5 +1,7 @@
 import pandas as pd
-from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -237,6 +239,7 @@ class Table_Plot(FileWriter):
         else:
             sim_list = list(range(1, col_len + 1))
 
+        plt.clf()
         for colName, colData in numeric_cols:
             plt.plot(sim_list, colData, label = colName)
         plt.xticks(sim_list)
@@ -248,6 +251,7 @@ class Table_Plot(FileWriter):
         plt.title(f"{self.table_name} Values")
         plt.legend()
         plt.savefig(self.output_name, bbox_inches='tight')
+        plt.close('all')
 
         if len(not_plot_cols) > 1:
             return ("Warning", f"Even though {not_plot_cols} are in display_cols, they are not numeric and cannot be plotted")

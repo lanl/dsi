@@ -442,23 +442,19 @@ class Terminal():
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
-        valid_backend = False
-        if parent_backend == "Filesystem":
-            if first_backend.__class__.__name__ == "Sqlite" and os.path.getsize(first_backend.filename) > 100:
-                valid_backend = True
-            if first_backend.__class__.__name__ == "DuckDB" and os.path.getsize(first_backend.filename) > 13000:
-                valid_backend = True
         if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
-            # Only used when reading data from Parquet backend in CLI API (Parquet uses query not process) - TODO fix this passthrough to query all backends
+            # Only used when reading data from Parquet backend in CLI API (Parquet uses query not process) - 
+            # TODO fix this passthrough by updating Parquet to use process_artifacts()
+            # TODO query all backends
             if len(self.loaded_backends) > 1:
                 if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
-            if valid_backend:
+            if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
@@ -483,7 +479,7 @@ class Terminal():
                 raise ValueError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
-            if valid_backend:
+            if self.valid_backend(first_backend, parent_backend):
                 try:
                     if interaction_type == "inspect":
                         first_backend.inspect_artifacts(**kwargs)
@@ -504,7 +500,7 @@ class Terminal():
                 if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
-            if valid_backend:
+            if self.valid_backend(first_backend, parent_backend):
                 if self.debug_level != 0:
                     self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
                 if interaction_type == "process":
@@ -532,6 +528,16 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
+    
+    # Internal function used to check if a backend has data
+    def valid_backend(self, backend, parent_name):
+        valid = False
+        if parent_name == "Filesystem":
+            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
+                valid = True
+            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
+                valid = True
+        return valid
     
     # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
     def trace_function(self, frame, event, arg):
