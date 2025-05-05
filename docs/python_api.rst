@@ -30,10 +30,35 @@ Notes for users:
       - Must call ``reader()`` prior to ``ingest()`` to ensure there is actual data ingested into a backend
       - If there is no data in DSI memory, ie. read() was never called, process() MUST be called on an active backend 
         to ensure data can be exported with write()
-      - Inputs to the datacard readers - Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard - must all follow the formats found in dsi/examples/data/
+      - Refer to the :ref:`datacard_section_label` section to learn which/how datacard files are read into DSI 
+      Inputs to the datacard readers - Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard - must all follow the formats found in dsi/examples/data/
 
-.. autoclass:: dsi.dsi.DSI
+.. autoclass:: dsi.dsi.DSI 
       :members:
+
+
+.. _datacard_section_label:
+
+DSI Data Cards
+---------------
+
+DSI is expanding its support of several dataset metadata standards. The current supported standards are for:
+
+      - `Dublin Core <https://www.dublincore.org/resources/metadata-basics/>`_
+      - `Schema.org Dataset <https://schema.org/Dataset>`_
+      - `Oceans11 DSI Data Server <https://oceans11.lanl.gov/>`_
+
+Template file structures can be copied and found in ``dsi/examples/data/``. 
+The fields in a user's data card must exactly match its respective template to be compatible with DSI.
+However, fields can be empty if a user does not have particular information about that dataset.
+
+The supported datacards can be read into DSI by creating an instance of DSI() and calling:
+
+      - ``read(filenames="file/path/to/datacard.XML", reader_name='DublinCoreDatacard')``
+      - ``read(filenames="file/path/to/datacardh.JSON", reader_name='SchemaOrgDatacard')``
+      - ``read(filenames="file/path/to/datacard.YAML", reader_name='Oceans11Datacard')``
+
+Completed examples of each metadata standard for the Wildfire dataset can also be found in ``dsi/examples/wildfire/`` 
 
 
 .. _user_example_section_label:
