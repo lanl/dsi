@@ -4,10 +4,17 @@ This example highlights the use of the DSI Framework with QUIC-Fire fire-atmosph
 
 All paths in this example are defined as from the main dsi repository folder, then follow the instructions.
 
-To run this example, install dsi. Then run:
+To run this example, install dsi, move first into the root DSI directory, then:
 
     cd examples/wildfire/
+
+USERS -- Run DSI's wildfire example:
+
     python3 wildfire.py
+
+CONTRIBUTORS -- Run DSI's wildfire example:
+
+    python3 wildfire_dev.py
 
 This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. This *cdb* folder is called a Cinema Database (https://github.com/cinemascience). A cinema database is comprised of a *csv* file where each row of the table is a data element (a run or ensemble member of a simulation or experiment, for example) and each column is a property of a data element. Any column name that starts with 'FILE' is a path to a file corresponding to the data element. 
 

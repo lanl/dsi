@@ -14,7 +14,12 @@ Create a csv file from the outputs:
 python3 parse_slurm_output.py
 ```
 
-## Create a DSI db and query it
+## FOR USERS -- Create a DSI db and query it
 ```
 python3 dsi_pennant.py
+```
+
+## FOR CONTRIBUTORS -- Create a DSI db and query it
+```
+python3 dsi_pennant_dev.py
 ```
