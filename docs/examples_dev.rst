@@ -134,8 +134,26 @@ If we consider a workflow where we read in a complex schema for YAML data and ge
 
 where ``examples/data/example_schema.json`` is:
 
-.. literalinclude:: ../examples/data/example_schema.json
+.. code-block:: json
 
+   {
+      "math": {
+         "primary_key": "specification",
+         "foreign_key": {
+               "b": ["address", "i"]
+         }
+      }, 
+      "address": {
+         "primary_key": "i",
+         "foreign_key": {
+               "h": ["physics", "n"]
+         }
+      }, 
+      "physics": {
+         "primary_key": "n"
+      }
+   }
+   
 the ER diagram looks like:
 
 ..  figure:: images/schema_erd.png
@@ -143,9 +161,10 @@ the ER diagram looks like:
     :align: center
 
     Entity Relationship Diagram of YAML data. 
-    Shows table relations between the student__math, student__address and student__physics tables, as well as the dsi_units table separately.
+    Shows table relations between the math, address and physics tables.
 
-NOTE: The schema JSON files do not need "comment" keys. They have only been included to better explain the connection of the tables and columns.
+NOTE: The schema JSON files do not need "comment" keys. 
+They have only been included to better explain the connection of the tables and columns.
 
 For futher clarity, each schema file must be structured as a dictionary where:
 
@@ -176,7 +195,7 @@ and a foreign key 'user_name' which points to another table 'Users' whose primar
       }
    }
 
-Based on this, if we edit ``examples/data/example_schema.json`` by adding a foreign key in 'physics' pointing to 'specification' in 'math':
+Based on this, we can update ``examples/data/example_schema.json`` by adding a foreign key in 'math' pointing to 'n' in 'physics':
 
 .. code-block:: json
 
@@ -184,20 +203,18 @@ Based on this, if we edit ``examples/data/example_schema.json`` by adding a fore
       "math": {
          "primary_key": "specification",
          "foreign_key": {
-            "b": ["address", "specification"]
+               "b": ["address", "i"],
+               "c": ["physics", "n"]
          }
       }, 
       "address": {
-         "primary_key": "specification",
+         "primary_key": "i",
          "foreign_key": {
-            "h": ["physics", "specification"]
+               "h": ["physics", "n"]
          }
       }, 
       "physics": {
-         "primary_key": "specification",
-         "foreign_key": {
-            "o": ["math", "specification"]
-         }
+         "primary_key": "n"
       }
    }
 
@@ -207,7 +224,7 @@ our new ER diagram is:
     :scale: 35%
     :align: center
    
-    ER Diagram of same YAML data. However, there is now an additional foreign key from student__physics to student__math's primary key
+    ER Diagram of same YAML data. However, there is now an additional foreign key from 'math' to 'physics'
 
 
 Jupyter Notebook

@@ -3,7 +3,7 @@
 Command Line Interface API
 ==========================
 
-Users can interact with DSI Readers, Writers and Backends even easier using our own Command Line Interace (CLI).
+Users can interact with DSI Readers, Writers and Backends even easier using DSI's own Command Line Interace (CLI).
 While slightly more restrictive, the CLI allows users without any knowledge of Python to utilize DSI for their own needs.
 Users can store several files in one database, query/find/export data to other formats and save it in a database for further analysis.
 
@@ -49,4 +49,6 @@ Beyond this, users can expect basic unix commands such as clear.
 
 CLI Examples
 ------------
-The terminal outputs below display various ways users can utilize the CLI to simplify data science workflows.
+The terminal output below displays various ways users can utilize DSI's CLI to simplify data science workflows.
+
+.. literalinclude:: images/cli_output.txt

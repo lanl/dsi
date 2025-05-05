@@ -82,13 +82,14 @@ class DSI_cli:
         print("load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional")
         print("                                                      table name argument if input file is only one table")
         print("plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument")
-        print("query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows")
-        print("                                                      , and exports output to a csv/parquet file")
+        print("query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,")
+        print("                                                      and exports output to a csv/parquet file")
         print("save <filename>                                   Save the local database as <filename>, which will be the same type.")
         print("summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally ")
-        print("                                                     specify number of data rows to display\n")
+        print("                                                     specify number of data rows to display")
         print("ls                                                Lists all files in current directory or a specified path")
         print("cd <path>                                         Changes the working directory within the CLI environment")
+        print()
 
     def cd(self, args):
         '''
@@ -157,6 +158,7 @@ class DSI_cli:
             erd_name = args.filename
         
         self.export_table("dsi_erd_gen", erd_name)
+        print()
 
     def exit_cli(self, args):
         '''
@@ -358,6 +360,7 @@ class DSI_cli:
             filename = args.filename
         
         self.export_table("dsi_tb_" + table_name, filename)
+        print()
 
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='display')
@@ -389,6 +392,7 @@ class DSI_cli:
                 filename = args.export
             self.t.active_metadata["temp_query"] = OrderedDict(data.to_dict(orient='list'))
             self.export_table("temp_query", filename)
+        print()
 
     def get_save_parser(self):
         parser = argparse.ArgumentParser(prog='save')
@@ -432,6 +436,7 @@ class DSI_cli:
         
         #self.a.summarize(table_name, num_rows)
         self.t.summary(table_name, num_rows)
+        print()
 
 
     def version(self):
