@@ -98,7 +98,12 @@ class DuckDB(Filesystem):
             if len(diff_cols) > 0:
                 for col in diff_cols:
                     temp_name = col + self.check_type(types.properties[col])
-                    self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
+                    try:
+                        self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
+                    except duckdb.Error as e:
+                        self.cur.execute("ROLLBACK")
+                        self.cur.execute("CHECKPOINT")
+                        return (duckdb.Error, e)
         else:
             sql_cols = ', '.join(types.unit_keys)
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
@@ -112,7 +117,12 @@ class DuckDB(Filesystem):
 
             if isVerbose:
                 print(str_query)
-            self.cur.execute(str_query)
+            try:
+                self.cur.execute(str_query)
+            except duckdb.Error as e:
+                self.cur.execute("ROLLBACK")
+                self.cur.execute("CHECKPOINT")
+                return (duckdb.Error, e)
             self.types = types
 
 
@@ -137,7 +147,8 @@ class DuckDB(Filesystem):
         Ex: (ValueError, "this is an error")
         """
         artifacts = collection
-        
+
+        self.cur.execute("BEGIN TRANSACTION")
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable " \
             "(run_id INTEGER PRIMARY KEY, run_timestamp TEXT UNIQUE);"
@@ -221,7 +232,8 @@ class DuckDB(Filesystem):
             try:
                 self.cur.executemany(str_query,rows)
             except duckdb.Error as e:
-                self.con.rollback()
+                self.cur.execute("ROLLBACK")
+                self.cur.execute("CHECKPOINT")
                 return (duckdb.Error, e)
                 
             self.types = types #This will only copy the last table from artifacts (collections input)            
@@ -243,13 +255,16 @@ class DuckDB(Filesystem):
                             try:
                                 self.cur.execute(str_query)
                             except duckdb.Error as e:
-                                self.con.rollback()
+                                self.cur.execute("ROLLBACK")
+                                self.cur.execute("CHECKPOINT")
                                 return (duckdb.Error, e)
                             
         try:
-            self.con.commit()
+            self.cur.execute("COMMIT")
+            self.cur.execute("CHECKPOINT")
         except duckdb.Error as e:
-            self.con.rollback()
+            self.cur.execute("ROLLBACK")
+            self.cur.execute("CHECKPOINT")
             return (duckdb.Error, e)
 
 
