@@ -21,7 +21,6 @@ DSI infrastructure is designed to be flexible and with these considerations in m
 
 DSI system design has been driven by specific use cases, both AI/ML and more generic usage.  
 These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities. 
-DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.  The DSI API is Python-based.
 
 Implementation Overview
 -----------------------
@@ -55,6 +54,11 @@ Currently, DSI has the following Readers:
   - SchemaOrgDatacard (Data card that adheres to the Schema.org metadata standard)
   - Wildfire (Creates a simulation table connected to the data. Assumes each data row is a separate sim)
 
+Currently, DSI has the following Writers:
+  - Csv_Writer
+  - ER_Diagram
+  - Table_Plot
+
 .. ..  figure:: images/PluginClassHierarchy.png
 ..     :alt: Figure depicting the current Reader/Writer class hierarchy.
 ..     :class: with-shadow
@@ -67,9 +71,10 @@ DSI Backends
 
 Backends are an interface between the DSI Core and a storage medium.
 Backends are designed to support a user-needed functionality.
+The default backend used in DSI is SQLite, but there is an option to use a DuckDB backend as well.
 
-Users can interact with a backend by ingesting data from DSI into one, and querying its data, processing its data into DSI.
-Users can also find instances of an object in a backend, display a table's data, and view statistics of each table in a backend.
+Users can interact with a backend by ingesting data into one from DSI, querying its data, or processing its data into DSI.
+Users can also find instances of an object in a backend, display a table's data, or view statistics of each table in a backend.
 
 .. figure:: images/user_story.png
    :alt: This figure depicts a user asking a typical query on the user's metadata
@@ -84,12 +89,11 @@ Users can also find instances of an object in a backend, display a table's data,
 Current DSI backends include:
 
 - SQLite: Python based SQL database and backend; the default DSI API backend.
-- DuckDB: 
-- Parquet: a columnar storage format for `Apache Hadoop <https://hadoop.apache.org>`_.
+- DuckDB: In-process SQL database designed for fast queries on large data files
 
 DSI Core
 ~~~~~~~~
 
 DSI basic functionality is contained within the middleware known as the *core*.
 Users will leverage Core to employ Readers, Writers, and Backends to interact with their data.
-The two main methods are with our :ref:`python_api_label` or our :ref:`cli_api_label`
+The two primary methods to achieve this are with the :ref:`python_api_label` or the :ref:`cli_api_label`

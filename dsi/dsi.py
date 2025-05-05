@@ -26,6 +26,7 @@ class DSI():
         print("TOML1 loads in data from TOML files of a particular structure")
         print("Wildfire loads in data from a CSV file and generates a simulation table alongside it. Each row of data will be a separate simulation run")
         print("JSON loads in data from JSON files that can only be for one table in each separate call")
+        print()
 
     def read(self, filenames, reader_name, table_name = None):
         """
@@ -58,7 +59,9 @@ class DSI():
         elif reader_name.lower() == "schemaorgdatacard":
             self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
         elif reader_name.lower() == "schema":
-            self.t.load_module('plugin', 'Schema', 'reader', filenames=filenames)
+            if isinstance(filenames, list):
+                raise ValueError("Cannot ingest more than one schema at a time")
+            self.t.load_module('plugin', 'Schema', 'reader', filename=filenames)
         elif reader_name.lower() == "bueno":
             self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
         elif reader_name.lower() == "csv":
@@ -81,7 +84,9 @@ class DSI():
         Prints a list of valid backends that can be specified in the 'backend_name' argument in backend()
         """
         print("['Sqlite', 'DuckDB']")
-        # print(self.t.VALID_BACKENDS)
+        print("Sqlite: Python based SQL database and backend; the default DSI API backend.")
+        print("DuckDB: In-process SQL database designed for fast queries on large data files.")
+        print()
 
     def backend(self, filename, backend_name = "Sqlite"):
         """
@@ -140,6 +145,7 @@ class DSI():
         print("ER_Diagram creates an image of an ER Diagram based on data stored in DSI.")
         print("Table_Plot generates a plot of a specified table's numerical data that is stored in DSI.")
         print("Csv_Writer creates a CSV of a specified table whose data is stored in DSI.")
+        print()
 
     def write(self, filename, writer_name, table_name = None):
         """

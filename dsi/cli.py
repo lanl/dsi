@@ -85,8 +85,8 @@ class DSI_cli:
         print("query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,")
         print("                                                      and exports output to a csv/parquet file")
         print("save <filename>                                   Save the local database as <filename>, which will be the same type.")
-        print("summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally ")
-        print("                                                     specify number of data rows to display")
+        print("summary [-t table] [-n num_rows]                  Get a summary of the database, or just a table, and optionally ")
+        print("                                                      specify number of data rows to display")
         print("ls                                                Lists all files in current directory or a specified path")
         print("cd <path>                                         Changes the working directory within the CLI environment")
         print()
@@ -276,14 +276,10 @@ class DSI_cli:
                 print(f"An error {e} occurred loading {dbfile}\n")  
 
         elif file_extension.lower() == 'csv':
-            # handle ALL files that should end in CSV: Csv and Wildfire for now.
             try:
                 self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
             except Exception as e:
-                try:
-                    self.t.load_module('plugin', "Wildfire", "reader", filenames = dbfile, table_name = table_name)
-                except Exception as e:
-                    print(f"An error occured loading {dbfile} into DSI. Please ensure your data file structure is correct\n")
+                print(f"An error {e} occurred loading {dbfile}\n")
         
         elif file_extension.lower() == 'toml':
             try:

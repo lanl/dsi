@@ -128,7 +128,7 @@ Complex Schemas in DSI
 
 This example details how to structure a JSON file for the DSI Schema Reader to store all table primary key - foreign key relations.
 
-If we consider a workflow where we read in a complex schema for YAML data and generate an ER Diagram:
+If we consider a workflow where a user reads in a complex schema for YAML data and generates an ER Diagram:
 
 .. literalinclude:: ../examples/dev_core/schema.py
 
@@ -181,8 +181,8 @@ For futher clarity, each schema file must be structured as a dictionary where:
    - If a table does not have a primary key there is no need to include an empty key/value pair for the table
    - If a table does not have foreign keys, there is no need for an empty inner dictionary 
 
-For example, if we have a a table 'Payments' which has a primary key 'id' 
-and a foreign key 'user_name' which points to another table 'Users' whose primary key column is 'name', the schema is: 
+For example, if a user has a a table 'Payments' with a primary key 'id' 
+and a foreign key 'user_name' that points to another table 'Users' with primary key 'name', the schema is: 
 
 .. code-block:: json
    
@@ -195,7 +195,7 @@ and a foreign key 'user_name' which points to another table 'Users' whose primar
       }
    }
 
-Based on this, we can update ``examples/data/example_schema.json`` by adding a foreign key in 'math' pointing to 'n' in 'physics':
+Based on this understanding, we can update ``examples/data/example_schema.json`` too, by adding a foreign key in 'math' pointing to 'n' in 'physics':
 
 .. code-block:: json
 
