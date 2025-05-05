@@ -564,7 +564,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
@@ -588,7 +588,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
@@ -617,7 +617,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
@@ -646,7 +646,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
@@ -687,13 +687,23 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before listing all tables in it')
             raise NotImplementedError('Need to load a valid backend before listing all tables in it')
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
+            raise ValueError("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
+        start = datetime.now()
+        
         table_list = backend.list()
-
         for table in table_list:
             print(f"\nTable: {table[0]}")
             print(f"  - num of columns: {table[1]}")
             print(f"  - num of rows: {table[2]}")
         print("\n")
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
 
     def summary(self, table_name = None, num_rows = 0):
         """
@@ -712,9 +722,20 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
+            raise ValueError("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
+        start = datetime.now()
+
         if table_name != None:
             print(f"Table: {table_name}")
         backend.summary(table_name, num_rows)
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
 
     def num_tables(self):
         """
@@ -725,7 +746,18 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before listing all tables in it')
             raise NotImplementedError('Need to load a valid backend before listing all tables in it')
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
+            raise ValueError("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
+        start = datetime.now()
+
         backend.num_tables()
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
@@ -742,9 +774,20 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in display function: First loaded backend needs to have data to be able to display data from it")
+            raise ValueError("Error in display function: First loaded backend needs to have data to be able to display data from it")
+        start = datetime.now()
+
         errorStmt = backend.display(table_name, num_rows, display_cols)
         if errorStmt is not None:
             raise errorStmt[0](errorStmt[1])
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
     
     def get_current_abstraction(self, table_name = None):
         """
