@@ -2,7 +2,7 @@
 segment: math
 specification: !jack
   a: 1
-  b: "there is CM"
+  b: 2
   c: "45.98 cm"
   d: 2
   e: 34.8
@@ -12,7 +12,7 @@ segment: address
 specification: !sam
   fileLoc: '/home/sam/lib/data'
   g: "good memories"
-  h: "556place street"
+  h: "9.8 m / s / s"
   i: 2
   j: 3 
   k: 4
