@@ -36,9 +36,10 @@ def test_json_plugin_adds_rows():
     plug = JSON(filenames=[path1, path2])
     plug.add_rows()
     for key, val in plug.output_collector["JSON"].items():
-        assert len(val) == 2  # two lists of length 4
-
-    # 4 Bueno cols
+        if key in ['foo', 'bar']:
+            assert len(val) == 2  # two lists of length 2
+        elif key in ['baz', 'surprise']:
+            assert len(val) == 1  # two lists of length 1
     assert len(plug.output_collector["JSON"].keys()) == 4
 
 def test_csv_plugin_type():
