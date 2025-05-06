@@ -211,6 +211,24 @@ class Terminal():
                 else:
                     try:
                         if mod_type == "backend" and hasattr(class_, 'runTable'):
+                            parent_classes = class_.__bases__
+                            if parent_classes and parent_classes[0].__name__ == "Filesystem" and 'filename' in kwargs:
+                                backend_filename = kwargs['filename']
+                                has_data = False
+                                has_runTable = False
+                                if os.path.isfile(backend_filename):
+                                    if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
+                                        has_data = True
+                                    elif class_.__name__ == "DuckDB" and os.path.getsize(backend_filename) > 13000:
+                                        has_data = True
+                                if has_data:
+                                    with open(backend_filename, 'rb') as fb:
+                                        content = fb.read()
+                                    if b'runTable' in content:
+                                        has_runTable = True
+                                if has_runTable:
+                                    self.runTable = True
+
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
