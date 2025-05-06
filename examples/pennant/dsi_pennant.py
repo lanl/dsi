@@ -11,10 +11,12 @@ if __name__ == "__main__":
     table_name = "rundata"
     csvpath = f'pennant_{test_name}.csv'
     dbpath = f'pennant_{test_name}.db'
+    datacard = "pennant_oceans11.yml"
     output_csv = "pennant_output.csv"
 
     dsi = DSI()
     dsi.read(csvpath, "Wildfire", table_name=table_name)
+    dsi.read(datacard, "Oceans11Datacard")
 
     if os.path.exists(dbpath):
         os.remove(dbpath)

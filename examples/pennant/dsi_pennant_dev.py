@@ -11,12 +11,14 @@ if __name__ == "__main__":
     table_name = "rundata"
     csvpath = f'pennant_{test_name}.csv'
     dbpath = f'pennant_{test_name}.db'
+    datacard = "pennant_oceans11.yml"
     output_csv = "pennant_output.csv"
 
     core = Terminal()
 
     # This reader creates a manual simulation table where each row of pennant is its own simulation
     core.load_module('plugin', "Wildfire", "reader", filenames = csvpath, table_name = table_name, sim_table = True)
+    core.load_module('plugin', "Oceans11Datacard", "reader", filenames = datacard)
 
     if os.path.exists(dbpath):
         os.remove(dbpath)

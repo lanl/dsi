@@ -33,6 +33,7 @@ if __name__ == "__main__":
     db_name = dstFolder + 'wildfire.db'
     cinema_db_name = dstFolder + "wildfire.cdb/"
     path_to_cinema_images = cinema_db_name + imageFolderName
+    datacard = "wildfire_oceans11.yml"
     output_csv = cinema_db_name + "wildfire_output.csv"
     table_name = "wfdata"
     columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "FILE"]
@@ -51,6 +52,9 @@ if __name__ == "__main__":
 
     #creating manual simulation table where each row of wildfire is its own simulation
     core.load_module('plugin', "Wildfire", "reader", filenames = input_csv, table_name = table_name)
+
+    #ingest metadata information via data card
+    core.load_module('plugin', "Oceans11Datacard", "reader", filenames = datacard)
 
     # update DSI abstraction directly
     updatedFilePaths = []
