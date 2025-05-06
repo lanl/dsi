@@ -43,16 +43,16 @@ Data Readers parse an input file of its metadata and data and stores it within D
 Data Writers convert metadata and data stored in DSI to an output file - ex: an image or a CSV
 
 Currently, DSI has the following Readers:
-  - Csv
+  - CSV
   - JSON
   - Schema (A complex schema reader)
   - YAML1
   - TOML1
   - Bueno
-  - Oceans11Datacard (Data cards of a dataset on the oceans11.lanl.gov data server)
-  - DublinCoreDatacard (Data card that adheres to the Dublin Core metadata standard)
-  - SchemaOrgDatacard (Data card that adheres to the Schema.org metadata standard)
-  - Wildfire (Creates a simulation table connected to the data. Assumes each data row is a separate sim)
+  - Wildfire (Reader to ingest the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . Assumes each data row is a separate sim.)
+  - Oceans11Datacard (Data card of datasets on the <https://oceans11.lanl.gov> data server)
+  - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
+  - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
 
 Currently, DSI has the following Writers:
   - Csv_Writer
@@ -71,9 +71,9 @@ DSI Backends
 
 Backends are an interface between the DSI Core and a storage medium.
 Backends are designed to support a user-needed functionality.
-The default backend used in DSI is SQLite, but there is an option to use a DuckDB backend as well.
+The default backend used in DSI is **SQLite**, but there are an options to use others such as DuckDB as well.
 
-Users can interact with a backend by ingesting data into one from DSI, querying its data, or processing its data into DSI.
+Users can interact with a backend by ingesting data into one from DSI, querying its data through abstracted find functions, or processing its data into DSI.
 Users can also find instances of an object in a backend, display a table's data, or view statistics of each table in a backend.
 
 .. figure:: images/user_story.png
@@ -88,7 +88,7 @@ Users can also find instances of an object in a backend, display a table's data,
 
 Current DSI backends include:
 
-- SQLite: Python based SQL database and backend; the default DSI API backend.
+- SQLite: Python based SQL database and backend; the **default** DSI API backend.
 - DuckDB: In-process SQL database designed for fast queries on large data files
 
 DSI Core
