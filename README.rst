@@ -46,7 +46,7 @@ Users that want to install DSI should follow our `installation steps <https://la
 Release Versions
 =====================
 
-Install release versions of DSI can be found in (https://pypi.org/project/dsi-workflow/). To install the latest version, try the following::
+Supported release versions of DSI are tagged and found in (https://github.com/lanl/dsi/releases). Releases with minimal requirements are published on *pip* via (https://pypi.org/project/dsi-workflow/). To install the latest version, try the following::
 
 	python3 -m pip install dsi-workflow
 
