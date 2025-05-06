@@ -83,7 +83,7 @@ Users can also find instances of an object in a backend, display a table's data,
    :align: center
 
    In this example **user story**, the user has metadata about their data stored in DSI storage of some type.  
-   The user needs to extract all instances where the variable **foo** equals 2. 
+   The user needs to extract all instances of the variable **foo**. 
    DSI backends find data from the DSI metadata to locate and return all such information.
 
 Current DSI backends include:

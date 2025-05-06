@@ -1,38 +1,11 @@
-Introduction
-============
+Contributor Introduction
+========================
 
-The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  
-DSI capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing. 
+The main Introduction page gave a brief description of the Readers/Writers, Backends, and DSI Core. 
+This page will provide a more detailed explanation of them, with the following pages delving into how contributors can create their own compatible with DSI.
 
-DSI infrastructure is designed to be flexible and with these considerations in mind:
-    - Data management is subject to strict, POSIX-enforced, file security.
-    - DSI capabilities support a wide range of common metadata queries.
-    - DSI interfaces with multiple database technologies and archival storage options.
-    - Query-driven data movement is supported and is transparent to the user.
-    - The DSI API can be used to develop user-specific workflows.
 
-..  figure:: images/data_lifecycle.png
-    :alt: Figure depicting the data life cycle
-    :class: with-shadow
-    :scale: 50%
-    :align: center
-
-    A depiction of data life cycle can be seen here. The DSI API supports the user to manage the life cycle aspects of their data.
-
-DSI system design has been driven by specific use cases, both AI/ML and more generic usage.  
-These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities. 
-DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.  The DSI API is Python-based.
-
-Implementation Overview
------------------------
-
-The DSI API is broken into three main categories:
-
-- Readers/Writers: frontend capabilities that will be commonly used by the generic DSI user.  These include readers and writers.
-- Backends: these are used to interact with storage devices and other ways of moving data.
-- DSI Core: the *middleware* that contains the basic functionality to use the DSI API.
-
-Data Readers/Writers Classes
+DSI Readers/Writers Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Readers/Writers transform an arbitrary data source into a format that is compatible with the DSI core. 
@@ -43,7 +16,7 @@ A simple data writer might execute an application to supplement existing data an
 
 Readers/Writers are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.
 
-Currently, DSI has the following readers:
+A subset of DSI's Readers and Writers are:
 
 ..  figure:: images/PluginClassHierarchy.png
     :alt: Figure depicting the current Reader/Writer class hierarchy.
@@ -61,19 +34,10 @@ Given a set of user metadata captured by a DSI frontend, a typical functionality
 Because the files associated with the queryable metadata may be spread across filesystems and security domains, 
 a supporting backend is required to assemble query results and present them to the DSI core for transformation and return.
 
-.. figure:: images/user_story.png
-   :alt: This figure depicts a user asking a typical query on the user's metadata
-   :class: with-shadow
-   :scale: 50%
-   :align: center
 
-   In this typical **user story**, the user has metadata about their data stored in DSI storage of some type.  
-   The user needs to extract all files with the variable **foo** above a specific threshold.  
-   DSI backends query the DSI metadata store to locate and return all such files.
+All DSI backends include:
 
-Current DSI backends include:
-
-- SQLite: Python based SQL database and backend; the default DSI API backend.
+- SQLite: Python based SQL database and backend; the **default** DSI API backend.
 - DuckDB: In-process SQL database designed for fast queries on large data files
 - GUFI: the `Grand Unified File Index system <https://github.com/mar-file-system/GUFI>`_ ; developed at LANL. 
   GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.
