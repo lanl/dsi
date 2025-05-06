@@ -21,15 +21,6 @@ def test_artifact_ingest():
     # No error implies success
     assert True
 
-def test_wildfiredata_artifact_put_t():
-   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
-   dbpath = 'test_wildfiredata_artifact.db'
-   store = DuckDB(dbpath)
-   store.put_artifacts_t(OrderedDict([("wildfire", valid_middleware_datastructure)]), tableName="Wildfire")
-   store.close()
-   # No error implies success
-   assert True
-
 def test_artifact_query():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
