@@ -1,16 +1,15 @@
-from dsi.core import DSI
+# examples/user/3.find.py
+from dsi.dsi import DSI
 
-a = DSI()
-a.open('data.db')
-data = a.findt('people')
-for val in data:
-   print(val.t_name, val.c_name, val.value, val.row_num, val.type)
+# ASSUMING DATABASE HAS DATA FROM 2.ingest.py:
+find_dsi = DSI()
 
-data = a.findc('std_gravity')
-for val in data:
-   print(val.t_name, val.c_name, val.value, val.row_num, val.type)
+#dsi.backend(filename, reader)
+find_dsi.backend("data.db") 
 
-data = a.find('5.5')
-for val in data:
-   print(val.t_name, val.c_name, val.value, val.row_num, val.type)
+#dsi.find(value)
+find_dsi.findt("a") # finds "a" in a Table search after backend() loaded
+find_dsi.findc("c") # finds "c" in a Column search after backend() loaded
+find_dsi.find(5.9) # finds the value 5.9 in a search all cells  search after backend() loaded
 
+find_dsi.close()

@@ -16,7 +16,7 @@ from dsi.plugins.metadata import StructuredMetadata
 
 class FileReader(StructuredMetadata):
     """
-    FileReader Plugins keep information about the file that they are ingesting, namely absolute path and hash.
+    FileReaders keep information about the file that they are ingesting, namely absolute path and hash.
     """
 
     def __init__(self, filenames, **kwargs):
@@ -35,7 +35,7 @@ class FileReader(StructuredMetadata):
 
 class Csv(FileReader):
     """
-    A Structured Data Plugin to ingest CSV data
+    A DSI Reader that reads in CSV data
     """
     def __init__(self, filenames, table_name = None, **kwargs):
         """
@@ -77,7 +77,7 @@ class Csv(FileReader):
 
 class Bueno(FileReader):
     """
-    A Structured Data Plugin to capture performance data from Bueno (github.com/lanl/bueno)
+    A DSI Reader that captures performance data from Bueno (github.com/lanl/bueno)
 
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
@@ -113,48 +113,50 @@ class Bueno(FileReader):
 
 class JSON(FileReader):
     """
-    A Structured Data Plugin to capture JSON data
+    A DSI Reader that captures generic JSON data. 
+    Assumes all key/value pairs are basic data formats, ie. string, int, float, not a nested dictionary or more
 
     The JSON data's keys are used as columns and values are rows
    
     """
-    def __init__(self, filenames, **kwargs) -> None:
-        """Initializes generic JSON reader with user-specified filenames"""
-        super().__init__(filenames, **kwargs)
-        self.key_data = []
-        self.base_dict = OrderedDict()
+    def __init__(self, filenames, table_name = None, **kwargs) -> None:
+        """
+        Initializes generic JSON reader with user-specified filenames
         
-    def pack_header(self) -> None:
-        """Set schema with POSIX and JSON data."""
-        self.set_schema(self.key_data)
+        `filenames`: Required input. List of JSON files, or just one JSON files to store in DSI. If a list, data in all files must be for the same table
+
+        `table_name`: default None. User can specify table name when loading JSON file. Otherwise DSI uses table_name = "JSON"
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
+        self.base_dict = OrderedDict()
+        self.table_name = table_name
 
     def add_rows(self) -> None:
-        """Parses JSON data and adds a list containing 1 or more rows."""
+        """Parses JSON data and stores data into a table as an Ordered Dictionary."""
 
-        objs = []
-        for idx, filename in enumerate(self.filenames):
+        temp_dict = OrderedDict()
+        for filename in self.filenames:
             with open(filename, 'r') as fh:
                 file_content = json.load(fh)
-                objs.append(file_content)
                 for key, val in file_content.items():
-                    # Check if column already exists
-                    if key not in self.key_data:
-                        self.key_data.append(key)
-        if not self.schema_is_set():
-            self.pack_header()
-            for key in self.key_data:
-                self.base_dict[key] = None
+                    if key not in temp_dict:
+                        temp_dict[key] = []
+                    temp_dict[key].append(val)
 
-        for o in objs:
-            new_row = self.base_dict.copy()
-            for key, val in o.items():
-                new_row[key] = val
-            print(new_row.values())
-            self.add_to_output(list(new_row.values()))
+        if self.table_name == None:
+            self.base_dict["JSON"] = temp_dict
+        else:
+            self.base_dict[self.table_name] = temp_dict
+        self.set_schema_2(self.base_dict)
+
 
 class Schema(FileReader):
     """
-    Structured Data Plugin to parse schema of a data source that will be ingested in same workflow.
+    DSI Reader that parses the schema of a data source to ingest in same workflow.
 
     Schema file input should be a JSON file that stores primary and foreign keys for all tables in the data source. 
     Stores all relations in global dsi_relations table used for creating backends/writers
@@ -182,11 +184,11 @@ class Schema(FileReader):
         with open(self.schema_file, 'r') as fh:
             schema_content = json.load(fh)
 
+            pkList = []
             for tableName, tableData in schema_content.items():
                 if self.target_table_prefix is not None:
                     tableName = self.target_table_prefix + "__" + tableName
                 
-                pkList = []
                 if "foreign_key" in tableData.keys():
                     for colName, colData in tableData["foreign_key"].items():
                         if self.target_table_prefix is not None:
@@ -205,7 +207,7 @@ class Schema(FileReader):
 
 class YAML1(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of YAML files
+    DSI Reader that reads in an individual or a set of YAML files
 
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     """
@@ -297,7 +299,7 @@ class YAML1(FileReader):
             del self.yaml_data["dsi_units"]
         self.set_schema_2(self.yaml_data)
 
-        # SAVE FOR PLUGINS TO USE FOR PADDING MISMATCHED COLUMNS- YAML AND TOML USE THIS NOW
+        # SAVE FOR READERS TO USE FOR PADDING MISMATCHED COLUMNS- YAML AND TOML USE THIS NOW
         # # Fill the shorter lists with None (or another value) if manually combining 2 data files together without pandas
         # max_length = max(len(lst) for lst in self.bueno_data.values())
         # for key, value in self.bueno_data.items():
@@ -307,7 +309,7 @@ class YAML1(FileReader):
 
 class TOML1(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of TOML files
+    DSI Reader that reads in an individual or a set of TOML files
 
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     """
@@ -388,12 +390,12 @@ class TOML1(FileReader):
 
 class Wildfire(FileReader):
     """
-    A Structured Data Plugin to ingest Wildfire data stored as a CSV
+    DSI Reader that ingests Wildfire data stored as a CSV
 
     Can be used for other cases if data is post-processed and running only once.
     Can create a manual simulation table
     """
-    def __init__(self, filenames, table_name = None, sim_table = False, **kwargs):
+    def __init__(self, filenames, table_name = None, sim_table = True, **kwargs):
         """
         Initializes Wildfire Reader with user specified parameters.
 
@@ -401,7 +403,7 @@ class Wildfire(FileReader):
 
         `table_name`: default None. User can specify table name when loading the wildfire file.   
 
-        `sim_table`: default False. Set to True if creating manual simulation table where each row of Wildfire file is a separate sim
+        `sim_table`: default True. Set to False if DO NOT want to create manual simulation table where each row of Wildfire file is a separate sim
 
             - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
         """
@@ -555,7 +557,7 @@ class DublinCoreDatacard(FileReader):
             self.datacard_data["dublin_core_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
-class SchemaDatacard(FileReader):
+class SchemaOrgDatacard(FileReader):
     """
     """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
@@ -608,7 +610,7 @@ class SchemaDatacard(FileReader):
 
 class MetadataReader1(FileReader):
     """
-    Structured Data Plugin to read in an individual or a set of JSON metadata files
+    DSI Reader that reads in an individual or a set of JSON metadata files
     """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
         """

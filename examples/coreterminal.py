@@ -7,21 +7,23 @@ a=Terminal(debug=0, backup_db = False, runTable=True)
 # a.load_module('plugin','Bueno','reader', filenames=['data/bueno1.data', 'data/bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
 
-# a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json", target_table_prefix = "student")
-a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"], target_table_prefix = "student")
+# a.load_module('plugin', 'Schema', 'reader', filename="data/example_schema.json")
+a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"])
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
-# a.load_module('plugin', 'MetadataReader1', 'reader', filenames=["data/metadata.json"])
-# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['data/wildfire_datacard.yml', 'data/pennant_datacard.yml'])
-# a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="data/dublin_core_datacard.xml")
-# a.load_module('plugin', 'SchemaDatacard', 'reader', filenames="data/schema_datacard.json")
+# a.load_module('plugin', 'Csv', 'reader', filenames="data/yosemite5.csv")
+# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'])
+# a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="wildfire/wildfire_dublin_core.xml")
+# a.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames="wildfire/wildfire_schema_org.json")
+# a.load_module('plugin', 'Wildfire', 'reader', filenames="data/wildfiredata.csv")
 
 ''' Example uses of loading open DSI writers. Need to call transload() after loading to execute them. '''
-# a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "test", display_cols = ["n", "o"])
+# a.load_module('plugin', "Table_Plot", "writer", table_name = "physics", filename = "physics_plot.png", display_cols = ["n", "p"])
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.png')#, target_table_prefix = "physics")
 # a.transload()
 
-''' Example of loading a DSI backend - Sqlite - and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
+''' Example of loading a Sqlite DSI backend, and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
 a.load_module('backend','Sqlite','back-write', filename='data/data.db')
+# a.load_module('backend','DuckDB','back-write', filename='data/data.db')
 
 a.artifact_handler(interaction_type='ingest')
 # data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")
@@ -32,7 +34,9 @@ a.artifact_handler(interaction_type='ingest')
 
 ''' Example of printing table information'''
 # a.list()
-# a.summary(table_name='student__physics', num_rows = 3)
+# a.num_tables()
+# a.summary(table_name='physics', num_rows = 3)
+# a.display(table_name='physics')
 
 ''' Example uses of the DSI FIND feature: find_table, find_column, find_cell, find (is a find all) '''
 ## TABLE match                      - return matching table data
@@ -70,7 +74,7 @@ a.artifact_handler(interaction_type='ingest')
 # # ['GitInfo', 'Hostname', 'SystemKernel', 'Bueno', 'Csv']
 
 # a.list_available_modules('backend')
-# # ['Gufi', 'Sqlite', 'Parquet']
+# # ['Gufi', 'Sqlite', 'Parquet', 'DuckDB']
 
 ''' Listing all loaded modules (writers and backends) '''
 # print(a.list_loaded_modules())
@@ -82,6 +86,6 @@ a.artifact_handler(interaction_type='ingest')
 ''' Example use case: reading data from backend and generating an ER Diagram and table plot from its metadata '''
 # a.load_module('backend','Sqlite','back-read', filename='data/data.db')   
 # a.artifact_handler(interaction_type="process")
-# a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student__physics")
+# a.load_module('plugin', "Table_Plot", "writer", table_name = "physics", filename = "physics")
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")
 # a.transload()

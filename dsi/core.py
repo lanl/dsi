@@ -22,14 +22,14 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaDatacard']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
@@ -44,6 +44,7 @@ class Terminal():
         `debug`: {0: off, 1: user debug log, 2: user + developer debug log} 
             
             - When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
+
         `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
 
         `runTable`: Undefined False as default. 
@@ -210,6 +211,24 @@ class Terminal():
                 else:
                     try:
                         if mod_type == "backend" and hasattr(class_, 'runTable'):
+                            parent_classes = class_.__bases__
+                            if parent_classes and parent_classes[0].__name__ == "Filesystem" and 'filename' in kwargs:
+                                backend_filename = kwargs['filename']
+                                has_data = False
+                                has_runTable = False
+                                if os.path.isfile(backend_filename):
+                                    if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
+                                        has_data = True
+                                    elif class_.__name__ == "DuckDB" and os.path.getsize(backend_filename) > 13000:
+                                        has_data = True
+                                if has_data:
+                                    with open(backend_filename, 'rb') as fb:
+                                        content = fb.read()
+                                    if b'runTable' in content:
+                                        has_runTable = True
+                                if has_runTable:
+                                    self.runTable = True
+
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
@@ -441,12 +460,19 @@ class Terminal():
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
-        if interaction_type not in ['ingest', 'put', "processs", "read"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            # Only used when reading data from Parquet backend in CLI API (Parquet uses query not process) - 
+            # TODO fix this passthrough by updating Parquet to use process_artifacts()
+            # TODO query all backends
+            if len(self.loaded_backends) > 1:
+                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                    first_backend = self.loaded_backends[1]
+                    parent_backend = first_backend.__class__.__bases__[0].__name__
+            if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
@@ -471,7 +497,7 @@ class Terminal():
                 raise ValueError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if self.valid_backend(first_backend, parent_backend):
                 try:
                     if interaction_type == "inspect":
                         first_backend.inspect_artifacts(**kwargs)
@@ -483,26 +509,27 @@ class Terminal():
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
-                    self.logger.error("Error in notebook/inspect artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
-                raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
+                    self.logger.error("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
+                raise ValueError("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
-
-        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) > 0:
-            first_backread = self.active_modules['back-read'][0]
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+        # only processes data from first backend for now - TODO process data from all active backends later
+        elif interaction_type in ["process", "read"]:
+            if len(self.loaded_backends) > 1:
+                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                    first_backend = self.loaded_backends[1]
+                    parent_backend = first_backend.__class__.__bases__[0].__name__
+            if self.valid_backend(first_backend, parent_backend):
                 if self.debug_level != 0:
-                    self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
+                    self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
                 if interaction_type == "process":
-                    self.active_metadata = first_backread.process_artifacts()
+                    self.active_metadata = first_backend.process_artifacts()
                 elif interaction_type == "read":
-                    self.active_metadata = first_backread.read_to_artifact()
+                    self.active_metadata = first_backend.read_to_artifact()
                 operation_success = True
-            else: #back-READ backend is empty - cannot process data
+            else: #backend is empty - cannot process data
                 if self.debug_level != 0:
-                    self.logger.error("Error in process/read artifact handler: First loaded back-READ backend needs to have data to be able to process data to DSI")
-                raise ValueError("Error in process/read artifact handler: First loaded back-READ backend needs to have data to be able to process data to DSI")
-        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) == 0:
-            backread_active = True
+                    self.logger.error("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
+                raise ValueError("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
 
         if operation_success:
             end = datetime.now()
@@ -513,12 +540,22 @@ class Terminal():
         else:
             not_run_msg = None
             if backread_active:
-                not_run_msg = 'Remember that back-WRITE backends cannot process/read data and back-READ backends cannot ingest/put'
+                not_run_msg = 'Remember that back-READ backends cannot ingest/put data'
             else:
                 not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
+    
+    # Internal function used to check if a backend has data
+    def valid_backend(self, backend, parent_name):
+        valid = False
+        if parent_name == "Filesystem":
+            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
+                valid = True
+            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
+                valid = True
+        return valid
     
     # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
     def trace_function(self, frame, event, arg):
@@ -545,7 +582,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
@@ -569,7 +606,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
@@ -587,6 +624,7 @@ class Terminal():
 
             - If True, then data-range of all numerical columns which match `query_object` is included in return
             - If False, then data for each column that matches `query_object` is included in return
+            
         `return`: List of backend-specific objects that each contain data/numerical range about a column matching `query_object`.
 
             - check file of the first backend loaded to understand the structure of the objects in this list
@@ -597,7 +635,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
@@ -615,6 +653,7 @@ class Terminal():
 
             - If True, then full row of data where a cell matches `query_object` is included in return
             - If False, then the value of the cell that matches `query_object` is included in return
+
         `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches `query_object`
 
             - check file of the first backend loaded to understand the structure of the objects in this list
@@ -625,7 +664,7 @@ class Terminal():
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
             raise ValueError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
@@ -658,26 +697,123 @@ class Terminal():
         return return_object
     
     def list(self):
+        """
+        Prints a list of all tables and their dimensions in the first loaded backend
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before listing all tables in it')
             raise NotImplementedError('Need to load a valid backend before listing all tables in it')
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
+            raise ValueError("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
+        start = datetime.now()
+        
         table_list = backend.list()
-
         for table in table_list:
             print(f"\nTable: {table[0]}")
             print(f"  - num of columns: {table[1]}")
             print(f"  - num of rows: {table[2]}")
         print("\n")
 
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
     def summary(self, table_name = None, num_rows = 0):
+        """
+        Prints data and numerical metadata of tables from the first loaded backend. Output varies depending on parameters
+
+        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
+        Otherwise every table's numerical metdata is printed
+
+        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
+        Otherwise, only the total number of rows of a table are printed. 
+        The tables whose data is printed depends on the `table_name` parameter.
+
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
+            raise ValueError("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
+        start = datetime.now()
+
+        if table_name != None:
+            print(f"Table: {table_name}")
         backend.summary(table_name, num_rows)
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+    def num_tables(self):
+        """
+        Prints number of tables in the first loaded backend
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before listing all tables in it')
+            raise NotImplementedError('Need to load a valid backend before listing all tables in it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
+            raise ValueError("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
+        start = datetime.now()
+
+        backend.num_tables()
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+    def display(self, table_name, num_rows = 25, display_cols = None):
+        """
+        Prints data of a specified table from the first loaded backend.
+        
+        `table_name`: table whose data is printed
+         
+        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+
+        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in display function: First loaded backend needs to have data to be able to display data from it")
+            raise ValueError("Error in display function: First loaded backend needs to have data to be able to display data from it")
+        start = datetime.now()
+
+        errorStmt = backend.display(table_name, num_rows, display_cols)
+        if errorStmt is not None:
+            raise errorStmt[0](errorStmt[1])
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+    def table_print_helper(self, headers, rows, num_rows=25):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.table_print_helper(headers, rows, num_rows)
     
     def get_current_abstraction(self, table_name = None):
         """
@@ -894,96 +1030,3 @@ class Sync():
         DSI database
         '''
         True
-        
-class DSI():
-    '''
-    A user-facing abstration for DSI's middleware interface.
-
-    The DSI Class abstracts Terminal for managing metadata and Sync for data management
-    and movement.
-    '''
-
-    def __init__(self):
-        self.t = Terminal(debug = 2, runTable=True)
-        self.s = Sync()
-
-    def schema(self, filename):
-        self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
-
-    def sqlbackend(self, filename):
-        self.t.load_module('backend','Sqlite','back-write', filename=filename)
-
-    def open(self, filename):
-        self.t.load_module('backend','Sqlite','back-read', filename=filename)
-
-
-    def ingest(self):
-        self.t.artifact_handler(interaction_type='ingest')
-        print("Ingest complete.")
-
-    def drawschema(self, filename='erd.png'):
-        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
-        self.t.artifact_handler(interaction_type="process")
-        self.t.transload()
-        print(f"Schema written to {filename} complete.")
-
-    def toml1(self, filenames):
-        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
-    def yaml1(self, filenames):
-        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
-    def json1(self, filenames):
-        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
-    
-    def findt(self, query):
-        data = self.t.find_table(query)
-        for val in data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Columns: {val.c_name}")
-            print(f"  - Search Type: {val.type}")
-            print(f"  - Value: \n{val.value}")
-    def findc(self, query, range = False):
-        data = self.t.find_column(query, range)
-        for val in data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Column: {val.c_name}")
-            print(f"  - Search Type: {val.type}")
-            print(f"  - Value: {val.value}")
-    def find(self, query, row = False):
-        data = self.t.find_cell(query, row)
-        for val in data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Column(s): {val.c_name}")
-            print(f"  - Search Type: {val.type}")
-            print(f"  - Row Number: {val.row_num}")
-            print(f"  - Value: {val.value}")
-    
-    def nb(self):
-        self.t.artifact_handler(interaction_type="notebook")
-        print("Notebook .ipynb and .html generated.")
-    
-    def list(self):
-        self.t.list() # terminal function already prints
-
-    def summary(self, table_name = None, num_rows = 0):
-        self.t.summary(table_name, num_rows) # terminal function already prints
-    
-    def oceans11_datacard(self, filenames):
-        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
-
-    def dublin_core_datacard(self, filenames):
-        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
-
-    def schema_datacard(self, filenames):
-        self.t.load_module('plugin', 'SchemaDatacard', 'reader', filenames=filenames)
-
-    #help, query?, edge-finding (find this/that)
-    def get(self, dbname):
-        pass
-    def move(self, filepath):
-        pass
-    def fetch(self, fname):
-        pass
-
-    def preview(self, filename):
-        ''' DSI 'ls' '''
-        pass

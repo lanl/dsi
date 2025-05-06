@@ -1,0 +1,128 @@
+(mydsi) viyer@pn2405703 data % dsi
+DSI version 1.1.1
+
+Enter "help" for usage hints.
+
+Sqlite backend back-write loaded successfully.
+dsi> help
+display <table name> [-n num rows] [-e filename]  Displays the contents of that table, num rows to display is 
+                                                      optional, and it can be exported to a csv/parquet file
+exit                                              Exit the DSI Command Line Interface (CLI)
+draw [-f filename]                                Draws an ER Diagram of all tables in the current DSI database
+find <var>                                        Search for a variable in the dataset
+help                                              Shows this help
+list                                              Lists the tables in the current DSI databse
+load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional
+                                                      table name argument if input file is only one table
+plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument
+query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,
+                                                      and exports output to a csv/parquet file
+save <filename>                                   Save the local database as <filename>, which will be the same type.
+summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally 
+                                                     specify number of data rows to display
+ls                                                Lists all files in current directory or a specified path
+cd <path>                                         Changes the working directory within the CLI environment
+
+
+dsi> load student_test1.yml
+YAML1 plugin reader loaded successfully.
+Database now has 4 tables
+student_test1.yml successfully loaded.
+
+
+dsi> load student_test2.yml
+YAML1 plugin reader loaded successfully.
+Database now has 4 tables
+student_test2.yml successfully loaded.
+
+
+dsi> load results.toml
+TOML1 plugin reader loaded successfully.
+Database now has 5 tables
+results.toml successfully loaded.
+
+
+dsi> load yosemite5.csv
+Csv plugin reader loaded successfully.
+Database now has 6 tables
+yosemite5.csv successfully loaded.
+
+
+dsi> list
+
+Table: math
+  - num of columns: 7
+  - num of rows: 2
+
+Table: address
+  - num of columns: 9
+  - num of rows: 2
+
+Table: physics
+  - num of columns: 7
+  - num of rows: 2
+
+Table: dsi_units
+  - num of columns: 3
+  - num of rows: 8
+
+Table: people
+  - num of columns: 3
+  - num of rows: 1
+
+Table: yosemite5
+  - num of columns: 9
+  - num of rows: 4
+
+
+dsi> query "SELECT * FROM physics" -e physics_output.csv
+  specification     n        o    p        q   r       s
+0          !amy   9.8  gravity   23  home 23   1 -0.0012
+1         !amy1  91.8  gravity  233  home 23  12 -0.0122
+Csv_Writer plugin writer loaded successfully.
+
+
+dsi> display math -e math_output.csv
+table_name: math
+
+specification | a | b | c     | d | e    | f     
+-------------------------------------------------
+!jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
+!jack1        | 2 | 3 | 45.98 | 3 | 44.8 | 0.0099
+
+Csv_Writer plugin writer loaded successfully.
+
+
+dsi> draw -f dsi_er_diagram.png
+ER_Diagram plugin writer loaded successfully.
+
+
+dsi> plot_table physics -f physics_plot.png
+Table_Plot plugin writer loaded successfully.
+
+
+dsi> summary -t physics -n 1
+Table: physics
+
+column        | type    | min     | max     | avg     | std_dev              
+-----------------------------------------------------------------------------
+specification | VARCHAR | None    | None    | None    | None                 
+n             | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
+o             | VARCHAR | None    | None    | None    | None                 
+p             | INTEGER | 23      | 233     | 128.0   | 105.0                
+q             | VARCHAR | None    | None    | None    | None                 
+r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
+s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
+
+specification | n    | o       | p   | q       | r  | s      
+-------------------------------------------------------------
+!amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+  ... showing 1 of 2 rows
+
+
+dsi> save dsi_output.db
+
+dsi> exit
+Exiting...
+Closing the abstraction layer, and all active plugins/backends
+(mydsi) viyer@pn2405703 data % 

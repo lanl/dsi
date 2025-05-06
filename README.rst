@@ -9,66 +9,54 @@ DSI enables flexible, data-intensive scientific workflows that meet researcher n
 
 DSI is implemented in three parts:
 
-* `Plugins (Readers and Writers) <https://lanl.github.io/dsi/plugins.html>`_
-* `Backends <https://lanl.github.io/dsi/backends.html>`_
-* `Core middleware <https://lanl.github.io/dsi/core.html>`_
+* Readers and Writers
+* Backends 
+* Core middleware
 
-Plugins curate data and metadata for query and data return. 
-Plugins can either be Readers to read data into DSI or Writers to export data from DSI into another format. 
-Users can contribute to our Plugins with a default set available in our `Plugin documentation <https://lanl.github.io/dsi/plugins.html>`_.
+For more information on these DSI modules, please refer to the `DSI Introduction Page <https://lanl.github.io/dsi/intro-users.html>`_.
 
-Backends are interfaces between the Core middleware and a data storage system. 
-While they mostly consist of storage functionalities, users may interact with them to either ingest, process (read), query, or find data.
-Users can also generate Python notebooks from certain Backends to visually interact with the data as well.
-Users can contribute to our Backends with a default set available in our `Backend documentation <https://lanl.github.io/dsi/backends.html>`_.
+Users can interact with DSI seamlessly through two methods:
 
-DSI Core middleware provides the user/machine interface. 
-The Core middleware defines a Terminal object. 
-An instantiated Core Terminal can load zero or more plugins and backends. 
-A Terminal object can be used in scripting workflows and program loops.
-Users should view our `Core documentation <https://lanl.github.io/dsi/core.html>`_ to see how to use the Core Terminal object to interact with Plugins and Backends
+* `Python API <https://lanl.github.io/dsi/python_api.html>`_ for more flexibility when loading/exporting data
+* `Command Line Interface API <https://lanl.github.io/dsi/cli_api.html>`_ for streamlined DSI functionality without requiring any knowledge of Python
 
-=====================
-DSI Minimum Requirements
-=====================
+
+========================
+DSI Base Requirements
+========================
 * python3 (3.11 tested)
 * Cross-platform (Unix / macOS / Windows)
 * Git
 * Plugins and Backends introduce further requirements
 
 ===============
-Getting Started
+Installation
 ===============
 
-DSI has several versioned releases and cloning from 'main' can be considered the alpha-version. 
-Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. 
-It is possible to install DSI locally instead with the following.
+DSI has several versioned releases and cloning from 'main' is the alpha-version. 
 
-We recommend Miniconda3 for managing virtual environments for DSI::
+.. Prior to installing DSI, users that want to use Miniconda3 for managing virtual environments should::
 
-	. ~/miniconda3/bin/activate
-	conda create -n dsi python=3.11
-	conda activate dsi
-
-Python virtual environments can also be used for DSI::
-
-	python3 -m venv dsienv
-	source dsienv/bin/activate
-	pip install --upgrade pip
-
-After activating your environment::
-
-	git clone https://github.com/lanl/dsi.git
-	cd dsi/
-	python3 -m pip install .
+.. 	. ~/miniconda3/bin/activate
+.. 	conda create -n dsi python=3.11
+.. 	conda activate dsi
+Users that want to install DSI should follow our `installation steps <https://lanl.github.io/dsi/installation.html>`_.
 	
 =====================
 Release Versions
 =====================
 
-Install release versions of DSI can be found in (https://pypi.org/project/dsi-workflow/). To install the latest version, try the following::
+Supported release versions of DSI are tagged and found in (https://github.com/lanl/dsi/releases). Releases with minimal requirements are published on *pip* via (https://pypi.org/project/dsi-workflow/). To install the latest version, try the following::
 
 	python3 -m pip install dsi-workflow
+
+=====================
+Contributor Resources
+=====================
+DSI Contributors can view our more developer-focused documentation in the `Contributor Resources <https://lanl.github.io/dsi/contributors.html>`_.
+
+These pages further explain DSI Readers/Writers/Backends, as well as how to write your own Reader/Writer compatible with DSI.
+Project contributors are encouraged to prototype solutions which do not contain sensitive data at this time. 
 
 =====================
 Copyright and License

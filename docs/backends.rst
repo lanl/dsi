@@ -10,7 +10,7 @@ In order to be compatible with DSI core middleware, backends need to interface w
 Note that any contributed backends or extensions must include unit tests in ``backends/tests`` to demonstrate new Backend capability. 
 We can not accept pull requests that are not tested.
 
-.. figure:: BackendClassHierarchy.png
+.. figure:: images/BackendClassHierarchy.png
    :alt: Figure depicting the current backend class hierarchy.
    :class: with-shadow
    :scale: 100%
@@ -28,8 +28,15 @@ SQLite
    :members:
    :special-members: __init__
 
-SQLAlchemy
+DuckDB
 ------
+
+.. automodule:: dsi.backends.duckdb
+   :members:
+   :special-members: __init__
+
+SQLAlchemy
+-----------
 
 .. automodule:: dsi.backends.sqlalchemy
    :members:
@@ -43,7 +50,7 @@ GUFI
    :special-members: __init__
 
 Parquet
-------
+--------
 
 .. automodule:: dsi.backends.parquet
    :members:

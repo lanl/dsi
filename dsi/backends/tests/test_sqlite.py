@@ -1,7 +1,6 @@
-import git
 from collections import OrderedDict
 
-from dsi.backends.sqlite import Sqlite, DataType
+from dsi.backends.sqlite import Sqlite
 import os
 
 def test_sql_artifact():
@@ -40,8 +39,8 @@ def test_artifact_query():
     store.ingest_artifacts(valid_middleware_datastructure)
     query_data = store.query_artifacts(query = "SELECT * FROM wildfire;")
     store.close()
-    correct_output = [(1, 3), (2, 2), (3, 1)]
-    assert query_data == correct_output
+    correct_output = [[1, 3], [2, 2], [3, 1]]
+    assert query_data.values.tolist() == correct_output
 
 def test_artifact_notebook():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
