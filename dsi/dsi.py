@@ -122,7 +122,10 @@ class DSI():
 
         `statement`: query to run on a backend. `statement` can only be a SELECT or PRAGMA query.
         """
-        print(self.t.artifact_handler(interaction_type='query', query=statement))
+        df = self.t.artifact_handler(interaction_type='query', query=statement)
+        headers = df.columns.tolist()
+        rows = df.values.tolist()
+        self.t.table_print_helper(headers, rows)
     
     def process(self):
         """

@@ -370,11 +370,10 @@ class DSI_cli:
         if args.num_rows != None:
             num_rows = args.num_rows
 
-        data = self.t.artifact_handler(interaction_type='query', query = sql_query).head(num_rows)
-        
-        pd.set_option('display.max_rows', 1000)
-        print(data)
-        pd.reset_option('display.max_rows')
+        data = self.t.artifact_handler(interaction_type='query', query = sql_query)
+        headers = data.columns.tolist()
+        rows = data.values.tolist()
+        self.t.table_print_helper(headers, rows, num_rows)
         
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''

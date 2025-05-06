@@ -806,6 +806,14 @@ class Terminal():
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
+
+    def table_print_helper(self, headers, rows, num_rows=25):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.table_print_helper(headers, rows, num_rows)
     
     def get_current_abstraction(self, table_name = None):
         """

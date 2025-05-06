@@ -4,9 +4,9 @@ from dsi.dsi import DSI
 test = DSI()
 
 ''' Printing all valid readers, writers, backends '''
-test.list_readers()
-test.list_writers()
-test.list_backends()
+# test.list_readers()
+# test.list_writers()
+# test.list_backends()
 
 ''' Example uses of loading open DSI readers '''
 # test.read(filenames="data/example_schema.json", reader_name='Schema')
