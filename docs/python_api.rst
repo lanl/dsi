@@ -31,7 +31,7 @@ Notes for users:
       - If there is no data in DSI memory, ie. read() was never called, process() MUST be called on an active backend 
         to ensure data can be exported with write()
       - Refer to the :ref:`datacard_section_label` section to learn which/how datacard files are read into DSI 
-      Inputs to the datacard readers - Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard - must all follow the formats found in dsi/examples/data/
+        Inputs to the datacard readers - Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard - must all follow the formats found in dsi/examples/data/
 
 .. autoclass:: dsi.dsi.DSI 
       :members:
@@ -80,11 +80,11 @@ Loading data from a Reader, ingesting it into a backend and displaying some of t
 
 .. literalinclude:: ../examples/user/2.ingest.py
 
-Example 3: Query data
-~~~~~~~~~~~~~~~~~~~~~
-Querying data from a backend
+Example 3: Find data
+~~~~~~~~~~~~~~~~~~~~
+Finding data from an active backend - tables, columns, datapoints matches
 
-.. literalinclude:: ../examples/user/3.query.py
+.. literalinclude:: ../examples/user/3.find.py
 
 Example 4: Process data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,11 +92,11 @@ Processing (reading) data from a backend and load DSI writers to generate an Ent
 
 .. literalinclude:: ../examples/user/4.process.py
 
-Example 5: Find data
-~~~~~~~~~~~~~~~~~~~~
-Finding data from an active backend - tables, columns, datapoints matches
+Example 5: Query data
+~~~~~~~~~~~~~~~~~~~~~
+Querying data from a backend
 
-.. literalinclude:: ../examples/user/5.find.py
+.. literalinclude:: ../examples/user/5.query.py
 
 Example 6: Visualizing a database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -50,7 +50,7 @@ Currently, DSI has the following Readers:
   - TOML1
   - Bueno
   - Wildfire (Reader to ingest the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . Assumes each data row is a separate sim.)
-  - Oceans11Datacard (Data card of datasets on the <https://oceans11.lanl.gov> data server)
+  - Oceans11Datacard (Data card of datasets on the `Oceans11 data server <https://oceans11.lanl.gov>`_)
   - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
   - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
 
@@ -83,8 +83,8 @@ Users can also find instances of an object in a backend, display a table's data,
    :align: center
 
    In this example **user story**, the user has metadata about their data stored in DSI storage of some type.  
-   The user needs to extract all files with the variable **foo** above a specific threshold.  
-   DSI backends query the DSI metadata to locate and return all such information.
+   The user needs to extract all instances where the variable **foo** equals 2. 
+   DSI backends find data from the DSI metadata to locate and return all such information.
 
 Current DSI backends include:
 
