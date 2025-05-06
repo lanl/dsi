@@ -653,6 +653,8 @@ class DuckDB(Filesystem):
             df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
         headers = df.columns.tolist()
         rows = df.values.tolist()
+        
+        print("\nTable: " + table_name)
         self.table_print_helper(headers, rows, num_rows)
     
     def summary(self, table_name = None, num_rows = 0):

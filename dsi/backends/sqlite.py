@@ -725,6 +725,8 @@ class Sqlite(Filesystem):
             df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con) 
         headers = df.columns.tolist()
         rows = df.values.tolist()
+
+        print("\nTable: " + table_name)
         self.table_print_helper(headers, rows, num_rows)
         print()
     
