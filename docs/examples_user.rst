@@ -63,59 +63,59 @@ To run this example, load dsi and run:
 
 .. literalinclude:: ../examples/wildfire/wildfire.py
 
-This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. 
-This cdb folder is called a `Cinema`_ database (CDB). 
-Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.  
-A Cinema database is comprised of a CSV file where each row of the table is a data element (ex: run or ensemble member of a simulation) and each column is a property of the data element. 
-Any column name that starts with 'FILE' is a path to a file associated with the data element.  
-This could be an image, a plot, a simulation mesh or other data artifact.
+.. This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. 
+.. This cdb folder is called a `Cinema`_ database (CDB). 
+.. Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.  
+.. A Cinema database is comprised of a CSV file where each row of the table is a data element (ex: run or ensemble member of a simulation) and each column is a property of the data element. 
+.. Any column name that starts with 'FILE' is a path to a file associated with the data element.  
+.. This could be an image, a plot, a simulation mesh or other data artifact.
 
-Cinema databases can be visualized through various tools. We illustrate two options below:
+.. Cinema databases can be visualized through various tools. We illustrate two options below:
 
-To visualize the results using Jupyter Lab and Plotly, run:
+.. To visualize the results using Jupyter Lab and Plotly, run:
 
-.. code-block:: unixconfig
+.. .. code-block:: unixconfig
 
-   python3 -m pip install plotly
-   python3 -m pip install jupyterlab
-
-
-Open Jupyter Lab with:
-
-.. code-block:: unixconfig
-
-  jupyter lab --browser Firefox
-
-and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the results of the DSI pipeline.
-
-..  figure:: images/example-wildfire-jupyter.png
-    :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
-    :class: with-shadow
-    :scale: 50%
-
-    Screenshot of the JupyterLab workflow. 
-    The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.
-
-Another option is to use `Pycinema`_, a QT-based GUI that supports visualization and analysis of Cinema databases. 
-To open a pycinema viewer, first install pycinema and then run the example script.
-
-.. code-block:: unixconfig
-
-   python3 -m pip install pycinema
-   cinema examples/wildfire/wildfire_pycinema.py
+..    python3 -m pip install plotly
+..    python3 -m pip install jupyterlab
 
 
-..  figure:: images/example-wildfire-pycinema.png
-    :class: with-shadow
-    :scale: 40%
+.. Open Jupyter Lab with:
 
-    Screenshot of the Pycinema user interface showing the minimal set of components. 
-    Left: the nodeview showing the various pycinema components in the visualization pipeline; 
-    upper-right: the table-view; 
-    lower-right: the image view. 
-    Pycinema components are linked such that making a selection in one view will propagate to the other views.
+.. .. code-block:: unixconfig
+
+..   jupyter lab --browser Firefox
+
+.. and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the results of the DSI pipeline.
+
+.. ..  figure:: images/example-wildfire-jupyter.png
+..     :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
+..     :class: with-shadow
+..     :scale: 50%
+
+..     Screenshot of the JupyterLab workflow. 
+..     The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.
+
+.. Another option is to use `Pycinema`_, a QT-based GUI that supports visualization and analysis of Cinema databases. 
+.. To open a pycinema viewer, first install pycinema and then run the example script.
+
+.. .. code-block:: unixconfig
+
+..    python3 -m pip install pycinema
+..    cinema examples/wildfire/wildfire_pycinema.py
 
 
-.. _PENNANT: https://github.com/lanl/PENNANT
-.. _Cinema: https://github.com/cinemascience
-.. _PyCinema: https://github.com/cinemascience/pycinema
+.. ..  figure:: images/example-wildfire-pycinema.png
+..     :class: with-shadow
+..     :scale: 40%
+
+..     Screenshot of the Pycinema user interface showing the minimal set of components. 
+..     Left: the nodeview showing the various pycinema components in the visualization pipeline; 
+..     upper-right: the table-view; 
+..     lower-right: the image view. 
+..     Pycinema components are linked such that making a selection in one view will propagate to the other views.
+
+
+.. .. _PENNANT: https://github.com/lanl/PENNANT
+.. .. _Cinema: https://github.com/cinemascience
+.. .. _PyCinema: https://github.com/cinemascience/pycinema
