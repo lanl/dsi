@@ -1,0 +1,787 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backends &mdash; DSI 1.1.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=58fbf978"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Core" href="core.html" />
+    <link rel="prev" title="Custom DSI Writer" href="dev_writers.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro-users.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli_api.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples_user.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="intro-dev.html">Contributor Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="readers_writers.html">DSI Readers/Writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_readers.html">Custom DSI Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_writers.html">Custom DSI Writer</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Backends</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-dsi.backends.sqlite">SQLite</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.backends.sqlite.Sqlite"><code class="docutils literal notranslate"><span class="pre">Sqlite</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.backends.sqlite.ValueObject"><code class="docutils literal notranslate"><span class="pre">ValueObject</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-dsi.backends.duckdb">DuckDB</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.backends.duckdb.DuckDB"><code class="docutils literal notranslate"><span class="pre">DuckDB</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.backends.duckdb.ValueObject"><code class="docutils literal notranslate"><span class="pre">ValueObject</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-dsi.backends.sqlalchemy">SQLAlchemy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-dsi.backends.gufi">GUFI</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.backends.gufi.Gufi"><code class="docutils literal notranslate"><span class="pre">Gufi</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-dsi.backends.parquet">Parquet</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.backends.parquet.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tiers.html">DSI Development Plans</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples_dev.html">DSI Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">Backends</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/backends.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="backends">
+<h1>Backends<a class="headerlink" href="#backends" title="Link to this heading"></a></h1>
+<p>Backends connect users to DSI Core middleware and allow DSI middleware data structures to read and write to persistent external storage.</p>
+<p>Backends are modular to support user contribution, and users are encouraged to offer custom backend abstract classes and backend implementations.
+A contributed backend abstract class may extend another backend to inherit the properties of the parent.
+In order to be compatible with DSI core middleware, backends need to interface with Python built-in data structures and with the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library.</p>
+<p>Note that any contributed backends or extensions must include unit tests in <code class="docutils literal notranslate"><span class="pre">backends/tests</span></code> to demonstrate new Backend capability.
+We can not accept pull requests that are not tested.</p>
+<figure class="align-center" id="id1">
+<a class="with-shadow reference internal image-reference" href="_images/BackendClassHierarchy.png"><img alt="Figure depicting the current backend class hierarchy." class="with-shadow" src="_images/BackendClassHierarchy.png" style="width: 463.0px; height: 251.0px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Figure depicts the current DSI backend class hierarchy.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<section id="module-dsi.backends.sqlite">
+<span id="sqlite"></span><span id="module-dsi.backends.filesystem"></span><h2>SQLite<a class="headerlink" href="#module-dsi.backends.sqlite" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.sqlite.</span></span><span class="sig-name descname"><span class="pre">Sqlite</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite" title="Link to this definition"></a></dt>
+<dd><p>SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes a SQLite backend with a user inputted filename, and creates other internal variables</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.check_type">
+<span class="sig-name descname"><span class="pre">check_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.check_type" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not use this function. Only used by internal sqlite functions</strong></p>
+<p>Evaluates a list and returns the predicted compatible SQLite Type</p>
+<p><cite>input_list</cite>: list of values to evaluate</p>
+<p><cite>return</cite>: string description of the list’s SQLite data type</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.close" title="Link to this definition"></a></dt>
+<dd><p>Closes the SQLite database’s connection.</p>
+<p><cite>return</cite>: None</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.display">
+<span class="sig-name descname"><span class="pre">display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.display" title="Link to this definition"></a></dt>
+<dd><p>Prints data of a specified table from this SQLite backend.</p>
+<p><cite>table_name</cite>: table whose data is printed</p>
+<p><cite>num_rows</cite>: Optional numerical parameter limiting how many rows are printed. Default is 25.</p>
+<p><cite>display_cols</cite>: Optional parameter specifying which columns in <cite>table_name</cite> to display. Must be a Python list object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.find">
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.find" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all instances of a <cite>query_object</cite> in a SQLite database. 
+This includes any partial hits if <cite>query_object</cite> is part of a table/col/cell</p>
+<p><cite>query_object</cite>: Object to find in this database. Can be of any type (string, float, int).</p>
+<p><cite>return</cite>: List of ValueObjects if there is a match. Else returns tuple of empty ValueObject() and an error message.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Note: Return list can have ValueObjects with different structure 
+due to table/column/cell matches having different <cite>value</cite> variables</p></li>
+<li><p>Refer to other find functions (table, column and cell) to clearly understand each one’s ValueObject structure</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.find_cell">
+<span class="sig-name descname"><span class="pre">find_cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.find_cell" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all cells that match the <cite>query_object</cite>. 
+This includes any partial hits if the <cite>query_object</cite> is part of a cell value</p>
+<p><cite>query_object</cite>: Object to find in all cells. Can be of any type (string, float, int).</p>
+<p><cite>row</cite>: default is False. Set to True, if want to return whole row where there is a match between a cell and <cite>query_object</cite></p>
+<p><cite>return</cite>: List of ValueObjects if there is a match.</p>
+<p><strong>Structure of ValueObjects for this function:</strong></p>
+<blockquote>
+<div><ul>
+<li><p>t_name:   string of table name</p></li>
+<li><p>c_name:   list of column names.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>row = True, list is all columns in this table</p></li>
+<li><p>row = False, list is one item – column of cell that matched <cite>query_object</cite></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>value:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>row = True, list of whole row where a cell matches <cite>query_object</cite></p></li>
+<li><p>row = False, value of the cell that matches <cite>query_object</cite></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>row_num:  row number of the cell that matched</p></li>
+<li><p>type:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>row = True, ‘row’</p></li>
+<li><p>row = False, ‘cell’</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.find_column">
+<span class="sig-name descname"><span class="pre">find_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.find_column" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all columns whose name matches the <cite>query_object</cite>. 
+This includes any partial hits if the <cite>query_object</cite> is part of a column name</p>
+<p><cite>query_object</cite>: Object to find in all column names. HAS TO BE A STRING</p>
+<p><cite>range</cite>: default is False. If True, min/max of a numerical column that matches <cite>query_object</cite> is included, not column data.</p>
+<p><cite>return</cite>: List of ValueObjects if there is a match.</p>
+<p><strong>Structure of ValueObjects for this function:</strong></p>
+<blockquote>
+<div><ul>
+<li><p>t_name:   string of table name</p></li>
+<li><p>c_name:   list of one, which is the name of the matching column</p></li>
+<li><p>value:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>range = True, [min, max] of the column</p></li>
+<li><p>range = False, column data as a list</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>row_num:  None</p></li>
+<li><p>type:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>range = True, ‘range’</p></li>
+<li><p>range = False, ‘column’</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.find_table">
+<span class="sig-name descname"><span class="pre">find_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.find_table" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all tables whose name matches the <cite>query_object</cite>. 
+This includes any partial hits if the <cite>query_object</cite> is part of a table name</p>
+<p><cite>query_object</cite>: Object to find in all table names. HAS TO BE A STRING</p>
+<p><cite>return</cite>: List of ValueObjects if there is a match.</p>
+<dl class="simple">
+<dt>Structure of ValueObjects for this function:</dt><dd><ul class="simple">
+<li><p>t_name:   string of table name</p></li>
+<li><p>c_name:   list of all columns in matching table</p></li>
+<li><p>value:    table’s data as a list of lists (each row is a list)</p></li>
+<li><p>row_num:  None</p></li>
+<li><p>type:     ‘table’</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.ingest_artifacts">
+<span class="sig-name descname"><span class="pre">ingest_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.ingest_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Primary function to ingest a collection of tables into the defined SQLite database.</p>
+<p>Creates the auto generated <cite>runTable</cite> if flag set to True when setting up a Core.Terminal workflow
+Creates <cite>dsi_units</cite> table if there are units for ingested data values.</p>
+<p>Can only be called if a SQLite database is loaded as a BACK-WRITE backend (check <code class="docutils literal notranslate"><span class="pre">core.py</span></code> for distinction)</p>
+<p><cite>collection</cite>: A Python Collection of several tables and their data structured as a nested Ordered Dictionary.</p>
+<p><cite>isVerbose</cite>: default is False. Flag to print all insert table SQLite statements</p>
+<p><cite>return</cite>: None when stable ingesting. When errors occur, returns a tuple of (ErrorType, error message). 
+Ex: (ValueError, “this is an error”)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.ingest_table_helper">
+<span class="sig-name descname"><span class="pre">ingest_table_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">types</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">foreign_query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.ingest_table_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users do not interact with this function and should ignore it. Called within ingest_artifacts()</strong></p>
+<p>Helper function to create SQLite table based on a passed in schema.</p>
+<p><cite>types</cite>: DataType derived class that defines the string name, properties (dictionary of table names and table data), 
+and units for each column in the schema.</p>
+<p><cite>foreign_query</cite>: defaut is None. It is a SQLite string detailing the foreign keys in this table</p>
+<p><cite>isVerbose</cite>: default is False. Flag to print all create table SQLite statements</p>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.list">
+<span class="sig-name descname"><span class="pre">list</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.list" title="Link to this definition"></a></dt>
+<dd><p>Return a list of all tables and their dimensions from this SQLite backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.notebook">
+<span class="sig-name descname"><span class="pre">notebook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.notebook" title="Link to this definition"></a></dt>
+<dd><p>Generates a Jupyter notebook displaying all the data in the specified SQLite database.</p>
+<p>To account for multiple tables, the database is stored as a list of dataframes, where each table is a dataframe.</p>
+<p>If database has table relations, it is stored as a separate dataframe. 
+If database has a units table, each table’s units are stored in its corresponding dataframe <cite>attrs</cite> variable</p>
+<p><cite>interactive</cite>: default is False. When set to True, creates an interactive Jupyter notebook, otherwise creates an HTML file.</p>
+<p><cite>return</cite>: None</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.num_tables">
+<span class="sig-name descname"><span class="pre">num_tables</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.num_tables" title="Link to this definition"></a></dt>
+<dd><p>Prints number of tables in this backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.process_artifacts">
+<span class="sig-name descname"><span class="pre">process_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">only_units_relations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.process_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Reads in data from the SQLite database into a nested Ordered Dictionary, 
+where keys are table names and values are Ordered Dictionary of table data.
+If there are PK/FK relations in a database it is stored in a table called <cite>dsi_relations</cite>.</p>
+<p>Can only be called if a loaded SQLite database is a BACK-READ backend in a Core.Terminal workflow (check core.py for distinction)</p>
+<p><cite>only_units_relations</cite>: default is False. <strong>USERS SHOULD IGNORE THIS FLAG.</strong> Used by an internal sqlite.py function.</p>
+<p><cite>isVerbose</cite>: default is False. When set to True, prints all SQLite queries to select data and store in abstraction</p>
+<p><cite>return</cite>: Nested Ordered Dictionary of all data from the SQLite database</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.process_units_helper">
+<span class="sig-name descname"><span class="pre">process_units_helper</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.process_units_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users do not interact with this function and should ignore it. Called within process_artifacts()</strong></p>
+<p>Helper function to create the SQLite database’s units table as an Ordered Dictionary.
+Only called if <cite>dsi_units</cite> table exists in the database.</p>
+<p><cite>return</cite>: units table as an Ordered Dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.put_artifacts_t">
+<span class="sig-name descname"><span class="pre">put_artifacts_t</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tableName</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'TABLENAME'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.put_artifacts_t" title="Link to this definition"></a></dt>
+<dd><p>DSI 1.0 FUNCTIONALITY - DEPRECATING SOON, DO NOT USE</p>
+<p>Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough</p>
+<p><cite>collection</cite>: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
+filled with rows to insert.</p>
+<p><cite>tableName</cite>: A passthrough to define a table and set the name of a table</p>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.query_artifacts">
+<span class="sig-name descname"><span class="pre">query_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dict_return</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.query_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Function that returns data from a SQLite database based on a specified SQL query.
+Data returned varies based on the <cite>dict_return</cite> flag explained below.</p>
+<p><cite>query</cite>: Must be a SELECT or PRAGMA query. If <cite>dict_return</cite> is True, then this can only be a simple query on one table, NO JOINS.
+Query CAN create new aggregate columns such as COUNT to include in the result regardless of <cite>dict_return</cite>.</p>
+<p><cite>isVerbose</cite>: default is False. Flag to print all Select table SQLite statements</p>
+<p><cite>dict_return</cite>: default is False. When set to True, return type is an Ordered Dict of data from the table specified in <cite>query</cite>.</p>
+<p><cite>return</cite>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>When <cite>query</cite> is of correct format and dict_return = False, returns a Pandas dataframe of that table’s data</p></li>
+<li><p>When <cite>query</cite> is of correct format and dict_return = True, 
+return an Ordered Dictionary of data for the table specified in <cite>query</cite></p></li>
+<li><p>When <cite>query</cite> is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, “this is an error”)</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.summary" title="Link to this definition"></a></dt>
+<dd><p>Prints data and numerical metadata of tables from this SQLite backend. Output varies depending on parameters</p>
+<p><cite>table_name</cite>: default is None. When specified only that table’s numerical metadata is printed. 
+Otherwise every table’s numerical metdata is printed</p>
+<p><cite>num_rows</cite>: default is 0. When specified, data from the first N rows of a table are printed. 
+Otherwise, only the total number of rows of a table are printed. 
+The tables whose data is printed depends on the <cite>table_name</cite> parameter.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.summary_helper">
+<span class="sig-name descname"><span class="pre">summary_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.summary_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not call this function</strong></p>
+<p>Helper function to generate the summary of tables in this SQLite database.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.Sqlite.table_print_helper">
+<span class="sig-name descname"><span class="pre">table_print_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">headers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.sqlite.Sqlite.table_print_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not call this function</strong></p>
+<p>Helper function to print table data/metdata cleanly</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.backends.sqlite.ValueObject">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.sqlite.</span></span><span class="sig-name descname"><span class="pre">ValueObject</span></span><a class="headerlink" href="#dsi.backends.sqlite.ValueObject" title="Link to this definition"></a></dt>
+<dd><p>Data Structure used when returning search results from <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">find_table</span></code>, <code class="docutils literal notranslate"><span class="pre">find_column</span></code>, or <code class="docutils literal notranslate"><span class="pre">find_cell</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>t_name: table name</p></li>
+<li><p>c_name: column name as a list. The length of the list varies based on the find function. 
+Read the description of each one to understand the differences</p></li>
+<li><p>row_num: row number. Is useful when finding a value in <code class="docutils literal notranslate"><span class="pre">find_cell</span></code> or <code class="docutils literal notranslate"><span class="pre">find</span></code> (which includes results from <code class="docutils literal notranslate"><span class="pre">find_cell</span></code>)</p></li>
+<li><p>type: type of match for this specific ValueObject. {table, column, range, cell, row}</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="module-dsi.backends.duckdb">
+<span id="duckdb"></span><h2>DuckDB<a class="headerlink" href="#module-dsi.backends.duckdb" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.duckdb.</span></span><span class="sig-name descname"><span class="pre">DuckDB</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB" title="Link to this definition"></a></dt>
+<dd><p>DuckDB Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes a DuckDB backend with a user inputted filename, and creates other internal variables</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.check_type">
+<span class="sig-name descname"><span class="pre">check_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.check_type" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not use this function. Only used by internal DuckDB functions</strong></p>
+<p>Evaluates a list and returns the predicted compatible DuckDB Type</p>
+<p><cite>input_list</cite>: list of values to evaluate</p>
+<p><cite>return</cite>: string description of the list’s DuckDB data type</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.close" title="Link to this definition"></a></dt>
+<dd><p>Closes the DuckDB database’s connection.</p>
+<p><cite>return</cite>: None</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.display">
+<span class="sig-name descname"><span class="pre">display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.display" title="Link to this definition"></a></dt>
+<dd><p>Prints data of a specified table from this DuckDB backend.</p>
+<p><cite>table_name</cite>: table whose data is printed</p>
+<p><cite>num_rows</cite>: Optional numerical parameter limiting how many rows are printed. Default is 25.</p>
+<p><cite>display_cols</cite>: Optional parameter specifying which columns in <cite>table_name</cite> to display. Must be a Python list object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.find">
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.find" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all instances of a <cite>query_object</cite> in a DuckDB database. 
+This includes any partial hits if <cite>query_object</cite> is part of a table/col/cell</p>
+<p><cite>query_object</cite>: Object to find in this database. Can be of any type (string, float, int).</p>
+<p><cite>return</cite>: List of ValueObjects if there is a match. Else returns tuple of empty ValueObject() and an error message.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Note: Return list can have ValueObjects with different structure 
+due to table/column/cell matches having different <cite>value</cite> variables</p></li>
+<li><p>Refer to other find functions (table, column and cell) to clearly understand each one’s ValueObject structure</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.find_cell">
+<span class="sig-name descname"><span class="pre">find_cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.find_cell" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all cells that match the <cite>query_object</cite>. 
+This includes any partial hits if the <cite>query_object</cite> is part of a cell value</p>
+<p><cite>query_object</cite>: Object to find in all cells. Can be of any type (string, float, int).</p>
+<p><cite>row</cite>: default is False. Set to True, if want to return whole row where there is a match between a cell and <cite>query_object</cite></p>
+<p><cite>return</cite>: List of ValueObjects if there is a match.</p>
+<p><strong>Structure of ValueObjects for this function:</strong></p>
+<blockquote>
+<div><ul>
+<li><p>t_name:   string of table name</p></li>
+<li><p>c_name:   list of column names.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>row = True, list is all columns in this table</p></li>
+<li><p>row = False, list is one item – column of cell that matched <cite>query_object</cite></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>value:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>row = True, list of whole row where a cell matches <cite>query_object</cite></p></li>
+<li><p>row = False, value of the cell that matches <cite>query_object</cite></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>row_num:  row number of the cell that matched</p></li>
+<li><p>type:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>row = True, ‘row’</p></li>
+<li><p>row = False, ‘cell’</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.find_column">
+<span class="sig-name descname"><span class="pre">find_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.find_column" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all columns whose name matches the <cite>query_object</cite>. 
+This includes any partial hits if the <cite>query_object</cite> is part of a column name</p>
+<p><cite>query_object</cite>: Object to find in all column names. HAS TO BE A STRING</p>
+<p><cite>range</cite>: default is False. If True, min/max of a numerical column that matches <cite>query_object</cite> is included, not column data.</p>
+<p><cite>return</cite>: List of ValueObjects if there is a match.</p>
+<p><strong>Structure of ValueObjects for this function:</strong></p>
+<blockquote>
+<div><ul>
+<li><p>t_name:   string of table name</p></li>
+<li><p>c_name:   list of one, which is the name of the matching column</p></li>
+<li><p>value:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>range = True, [min, max] of the column</p></li>
+<li><p>range = False, column data as a list</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>row_num:  None</p></li>
+<li><p>type:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>range = True, ‘range’</p></li>
+<li><p>range = False, ‘column’</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.find_table">
+<span class="sig-name descname"><span class="pre">find_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.find_table" title="Link to this definition"></a></dt>
+<dd><p>Function that finds all tables whose name matches the <cite>query_object</cite>. 
+This includes any partial hits if the <cite>query_object</cite> is part of a table name</p>
+<p><cite>query_object</cite>: Object to find in all table names. HAS TO BE A STRING</p>
+<p><cite>return</cite>: List of ValueObjects if there is a match.</p>
+<dl class="simple">
+<dt>Structure of ValueObjects for this function:</dt><dd><ul class="simple">
+<li><p>t_name:   string of table name</p></li>
+<li><p>c_name:   list of all columns in matching table</p></li>
+<li><p>value:    table’s data as a list of lists (each row is a list)</p></li>
+<li><p>row_num:  None</p></li>
+<li><p>type:     ‘table’</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.ingest_artifacts">
+<span class="sig-name descname"><span class="pre">ingest_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.ingest_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Primary function to ingest a collection of tables into the defined DuckDB database.</p>
+<p>Creates the auto generated <cite>runTable</cite> if flag set to True when setting up a Core.Terminal workflow
+Creates <cite>dsi_units</cite> table if there are units for ingested data values.</p>
+<p>Can only be called if a DuckDB database is loaded as a BACK-WRITE backend (check <code class="docutils literal notranslate"><span class="pre">core.py</span></code> for distinction)</p>
+<p><cite>collection</cite>: A Python Collection of several tables and their data structured as a nested Ordered Dictionary.</p>
+<p><cite>isVerbose</cite>: default is False. Flag to print all insert table DuckDB statements</p>
+<p><cite>return</cite>: None when stable ingesting. When errors occur, returns a tuple of (ErrorType, error message). 
+Ex: (ValueError, “this is an error”)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.ingest_table_helper">
+<span class="sig-name descname"><span class="pre">ingest_table_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">types</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">foreign_query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.ingest_table_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users do not interact with this function and should ignore it. Called within ingest_artifacts()</strong></p>
+<p>Helper function to create DuckDB table based on a passed in schema.</p>
+<p><cite>types</cite>: DataType derived class that defines the string name, properties (dictionary of table names and table data), 
+and units for each column in the schema.</p>
+<p><cite>foreign_query</cite>: defaut is None. It is a DuckDB string detailing the foreign keys in this table</p>
+<p><cite>isVerbose</cite>: default is False. Flag to print all create table DuckDB statements</p>
+<p><cite>return</cite>: none</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.list">
+<span class="sig-name descname"><span class="pre">list</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.list" title="Link to this definition"></a></dt>
+<dd><p>Return a list of all tables and their dimensions from this DuckDB backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.num_tables">
+<span class="sig-name descname"><span class="pre">num_tables</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.num_tables" title="Link to this definition"></a></dt>
+<dd><p>Prints number of tables in this backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.process_artifacts">
+<span class="sig-name descname"><span class="pre">process_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">only_units_relations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.process_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Reads in data from the DuckDB database into a nested Ordered Dictionary, 
+where keys are table names and values are Ordered Dictionary of table data.
+If there are PK/FK relations in a database it is stored in a table called <cite>dsi_relations</cite>.</p>
+<p>Can only be called if a loaded DuckDB database is a BACK-READ backend (check core.py for distinction)</p>
+<p><cite>only_units_relations</cite>: default is False. <strong>USERS SHOULD IGNORE THIS FLAG.</strong> Used by an internal sqlite.py function.</p>
+<p><cite>isVerbose</cite>: default is False. When set to True, prints all DuckDB queries to select data and store in abstraction</p>
+<p><cite>return</cite>: Nested Ordered Dictionary of all data from the DuckDB database</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.process_units_helper">
+<span class="sig-name descname"><span class="pre">process_units_helper</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.process_units_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users do not interact with this function and should ignore it. Called within process_artifacts()</strong></p>
+<p>Helper function to create the DuckDB database’s units table as an Ordered Dictionary.
+Only called if <cite>dsi_units</cite> table exists in the database.</p>
+<p><cite>return</cite>: units table as an Ordered Dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.query_artifacts">
+<span class="sig-name descname"><span class="pre">query_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dict_return</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.query_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Function that returns data from a DuckDB database based on a specified SQL query.
+Data returned varies based on the <cite>dict_return</cite> flag explained below.</p>
+<p><cite>query</cite>: Must be a SELECT or PRAGMA query. If <cite>dict_return</cite> is True, then this can only be a simple query on one table, NO JOINS.
+Query CAN create new aggregate columns such as COUNT to include in the result regardless of <cite>dict_return</cite>.</p>
+<p><cite>isVerbose</cite>: default is False. Flag to print all Select table DuckDB statements</p>
+<p><cite>dict_return</cite>: default is False. When set to True, return type is an Ordered Dict of data from the table specified in <cite>query</cite>.</p>
+<p><cite>return</cite>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>When <cite>query</cite> is of correct format and dict_return = False, returns a Pandas dataframe of that table’s data</p></li>
+<li><p>When <cite>query</cite> is of correct format and dict_return = True, 
+return an Ordered Dictionary of data for the table specified in <cite>query</cite></p></li>
+<li><p>When <cite>query</cite> is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, “this is an error”)</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.summary" title="Link to this definition"></a></dt>
+<dd><p>Prints data and numerical metadata of tables from this DuckDB backend. Output varies depending on parameters</p>
+<p><cite>table_name</cite>: default is None. When specified only that table’s numerical metadata is printed. 
+Otherwise every table’s numerical metdata is printed</p>
+<p><cite>num_rows</cite>: default is 0. When specified, data from the first N rows of a table are printed. 
+Otherwise, only the total number of rows of a table are printed. 
+The tables whose data is printed depends on the <cite>table_name</cite> parameter.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.summary_helper">
+<span class="sig-name descname"><span class="pre">summary_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.summary_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not call this function</strong></p>
+<p>Helper function to generate the summary of tables in this DuckDB database.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.DuckDB.table_print_helper">
+<span class="sig-name descname"><span class="pre">table_print_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">headers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.duckdb.DuckDB.table_print_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not call this function</strong></p>
+<p>Helper function to print table data/metdata cleanly</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.backends.duckdb.ValueObject">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.duckdb.</span></span><span class="sig-name descname"><span class="pre">ValueObject</span></span><a class="headerlink" href="#dsi.backends.duckdb.ValueObject" title="Link to this definition"></a></dt>
+<dd><p>Data Structure used when returning search results from <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">find_table</span></code>, <code class="docutils literal notranslate"><span class="pre">find_column</span></code>, or <code class="docutils literal notranslate"><span class="pre">find_cell</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>t_name: table name</p></li>
+<li><p>c_name: column name as a list. The length of the list varies based on the find function. 
+Read the description of each one to understand the differences</p></li>
+<li><p>row_num: row number. Is useful when finding a value in <code class="docutils literal notranslate"><span class="pre">find_cell</span></code> or <code class="docutils literal notranslate"><span class="pre">find</span></code> (which includes results from <code class="docutils literal notranslate"><span class="pre">find_cell</span></code>)</p></li>
+<li><p>type: type of match for this specific ValueObject. {table, column, range, cell, row}</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="module-dsi.backends.sqlalchemy">
+<span id="sqlalchemy"></span><h2>SQLAlchemy<a class="headerlink" href="#module-dsi.backends.sqlalchemy" title="Link to this heading"></a></h2>
+</section>
+<section id="module-dsi.backends.gufi">
+<span id="gufi"></span><h2>GUFI<a class="headerlink" href="#module-dsi.backends.gufi" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.backends.gufi.Gufi">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.gufi.</span></span><span class="sig-name descname"><span class="pre">Gufi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dbfile</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.gufi.Gufi" title="Link to this definition"></a></dt>
+<dd><p>GUFI Datastore</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.gufi.Gufi.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dbfile</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.gufi.Gufi.__init__" title="Link to this definition"></a></dt>
+<dd><p><cite>prefix</cite>: prefix to GUFI commands</p>
+<p><cite>index</cite>: directory with GUFI indexes</p>
+<p><cite>dbfile</cite>: sqlite db file from DSI</p>
+<p><cite>table</cite>: table name from the DSI db we want to join on</p>
+<p><cite>column</cite>: column name from the DSI db to join on</p>
+<p><cite>verbose</cite>: print debugging statements or not</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.gufi.Gufi.query_artifacts">
+<span class="sig-name descname"><span class="pre">query_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.gufi.Gufi.query_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Retrieves GUFI’s metadata joined with a dsi database
+query: an sql query into the dsi_entries table</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-dsi.backends.parquet">
+<span id="parquet"></span><h2>Parquet<a class="headerlink" href="#module-dsi.backends.parquet" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.backends.parquet.</span></span><span class="sig-name descname"><span class="pre">Parquet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.parquet.Parquet" title="Link to this definition"></a></dt>
+<dd><p>Support for a Parquet back-end.</p>
+<p>Parquet is a convenient format when metadata are larger than SQLite supports.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.parquet.Parquet.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet.get_cmd_output">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cmd_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.backends.parquet.Parquet.get_cmd_output" title="Link to this definition"></a></dt>
+<dd><p>Runs a given command and returns the stdout if successful.</p>
+<p>If stderr is not empty, an exception is raised with the stderr text.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet.ingest_artifacts">
+<span class="sig-name descname"><span class="pre">ingest_artifacts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.parquet.Parquet.ingest_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Ingest artifacts into file at filename path.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet.notebook">
+<span class="sig-name descname"><span class="pre">notebook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.parquet.Parquet.notebook" title="Link to this definition"></a></dt>
+<dd><p>Generate Jupyter notebook of Parquet data from filename.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.backends.parquet.Parquet.query_artifacts">
+<span class="sig-name descname"><span class="pre">query_artifacts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.backends.parquet.Parquet.query_artifacts" title="Link to this definition"></a></dt>
+<dd><p>Query Parquet data from filename.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dev_writers.html" class="btn btn-neutral float-left" title="Custom DSI Writer" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="core.html" class="btn btn-neutral float-right" title="Core" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

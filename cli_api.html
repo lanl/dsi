@@ -1,0 +1,305 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command Line Interface API &mdash; DSI 1.1.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=58fbf978"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="DSI Examples" href="examples_user.html" />
+    <link rel="prev" title="Python API" href="python_api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro-users.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Command Line Interface API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#cli-setup-and-actions">CLI Setup and Actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cli-examples">CLI Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples_user.html">DSI Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributors.html">Contributor Resources</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Command Line Interface API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/cli_api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="command-line-interface-api">
+<span id="cli-api-label"></span><h1>Command Line Interface API<a class="headerlink" href="#command-line-interface-api" title="Link to this heading"></a></h1>
+<p>Users can interact with DSI Readers, Writers and Backends even easier using DSI’s own Command Line Interace (CLI).
+While slightly more restrictive, the CLI allows users without any knowledge of Python to utilize DSI for their own needs.
+Users can store several files in one database, query/find/export data to other formats and save it in a database for further analysis.</p>
+<p>The CLI actions and example workflows are shown below.</p>
+<section id="cli-setup-and-actions">
+<h2>CLI Setup and Actions<a class="headerlink" href="#cli-setup-and-actions" title="Link to this heading"></a></h2>
+<p>Once a user is within a dsi virtual environment, they should enter <code class="docutils literal notranslate"><span class="pre">dsi</span></code> in their command line to active the CLI environment.
+By default, this creates a hidden DSI Sqlite database that users can interact with.
+However, if a user wants to use a hidden DuckDB database, they should enter <code class="docutils literal notranslate"><span class="pre">dsi</span> <span class="pre">-b</span> <span class="pre">duckdb</span></code> into their command line.
+From here on out, all actions will be with this DuckDB database.</p>
+<dl class="simple">
+<dt>A comprehensive list of all actions within the CLI environment are:</dt><dd><ul class="simple">
+<li><p>help : displays a help menu for CLI actions and their inputs</p></li>
+<li><p>display &lt;table name&gt; [-n num rows] [-e filename] : displays data from a specified table, with optional num rows and export filename</p>
+<ul>
+<li><p>table_name is a mandatory input to display that table</p></li>
+<li><p>num_rows is an optional input that limits the display to the first N rows</p></li>
+<li><p>filename is an optional input that exports this display to either a CSV or Parquet file</p></li>
+</ul>
+</li>
+<li><p>exit : exits the CLI and closes all active DSI Readers/Writers/Backends</p></li>
+<li><p>draw [-f filename] : Draws an ER diagram of all data that has been loaded into DSI.</p>
+<ul>
+<li><p>filename is an optional input to which the ER diagram is saved. Default is “er_diagram.png”</p></li>
+</ul>
+</li>
+<li><p>find &lt;var&gt; : searches for an input variable from all data loaded into DSI. Can be tables, columns or datapoints</p></li>
+<li><p>list : lists the names of all tables of data and their dimensions</p></li>
+<li><p>load &lt;filename&gt; [-t table name] : loads a filename/url into DSI. Optional table_name input if data is only table. Accepted data files:</p>
+<ul>
+<li><p>CSV, TOML, YAML, Parquet, Sqlite databases, DuckDB databases</p></li>
+</ul>
+</li>
+<li><p>plot_table &lt;table_name&gt; [-f filename]: plots a specified table’s numerical data to an optional file name input. Default is table_name + “_plot.png”</p></li>
+<li><p>query &lt;SQL query&gt; [-n num rows] [-e filename] : Runs the specified query with optional num_rows to display and export filename</p>
+<ul>
+<li><p>SQL query is a mandatory input that must be compatible with hidden database: Sqlite or DuckDB</p></li>
+<li><p>num_rows is an optional input that limits the display to the first N rows</p></li>
+<li><p>filename is an optional input that exports this display to either a CSV or Parquet file</p></li>
+</ul>
+</li>
+<li><p>save &lt;filename&gt; : Saves the hidden DSI database to an official name which must be same type. Ex: sqlite database cannot have a .duckdb extension</p></li>
+<li><p>summary [-t table] [-n num_rows] : displays statistics of each table in the database, with optional input to limit to just one table</p>
+<ul>
+<li><p>table is an optional input that specifies one table’s statistics to display</p></li>
+<li><p>num_rows is an optional input that when specified prints N rows of that table’s data.</p></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+<p>Beyond this, users can expect basic unix commands such as clear.</p>
+</section>
+<section id="cli-examples">
+<h2>CLI Examples<a class="headerlink" href="#cli-examples" title="Link to this heading"></a></h2>
+<p>The terminal output below displays various ways users can utilize DSI’s CLI to simplify data science workflows.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(mydsi) viyer@pn2405703 data % dsi
+DSI version 1.1.1
+
+Enter &quot;help&quot; for usage hints.
+
+Sqlite backend back-write loaded successfully.
+dsi&gt; help
+display &lt;table name&gt; [-n num rows] [-e filename]  Displays the contents of that table, num rows to display is 
+                                                      optional, and it can be exported to a csv/parquet file
+exit                                              Exit the DSI Command Line Interface (CLI)
+draw [-f filename]                                Draws an ER Diagram of all tables in the current DSI database
+find &lt;var&gt;                                        Search for a variable in the dataset
+help                                              Shows this help
+list                                              Lists the tables in the current DSI databse
+load &lt;filename&gt; [-t table name]                   Loads this filename/url to a DSI database. optional
+                                                      table name argument if input file is only one table
+plot_table &lt;table_name&gt; [-f filename]             Plots a table&#39;s numerical data to an optional file name argument
+query &lt;SQL query&gt; [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,
+                                                      and exports output to a csv/parquet file
+save &lt;filename&gt;                                   Save the local database as &lt;filename&gt;, which will be the same type.
+summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally 
+                                                     specify number of data rows to display
+ls                                                Lists all files in current directory or a specified path
+cd &lt;path&gt;                                         Changes the working directory within the CLI environment
+
+
+dsi&gt; load student_test1.yml
+YAML1 plugin reader loaded successfully.
+Database now has 4 tables
+student_test1.yml successfully loaded.
+
+
+dsi&gt; load student_test2.yml
+YAML1 plugin reader loaded successfully.
+Database now has 4 tables
+student_test2.yml successfully loaded.
+
+
+dsi&gt; load results.toml
+TOML1 plugin reader loaded successfully.
+Database now has 5 tables
+results.toml successfully loaded.
+
+
+dsi&gt; load yosemite5.csv
+Csv plugin reader loaded successfully.
+Database now has 6 tables
+yosemite5.csv successfully loaded.
+
+
+dsi&gt; list
+
+Table: math
+  - num of columns: 7
+  - num of rows: 2
+
+Table: address
+  - num of columns: 9
+  - num of rows: 2
+
+Table: physics
+  - num of columns: 7
+  - num of rows: 2
+
+Table: dsi_units
+  - num of columns: 3
+  - num of rows: 8
+
+Table: people
+  - num of columns: 3
+  - num of rows: 1
+
+Table: yosemite5
+  - num of columns: 9
+  - num of rows: 4
+
+
+dsi&gt; query &quot;SELECT * FROM physics&quot; -e physics_output.csv
+  specification     n        o    p        q   r       s
+0          !amy   9.8  gravity   23  home 23   1 -0.0012
+1         !amy1  91.8  gravity  233  home 23  12 -0.0122
+Csv_Writer plugin writer loaded successfully.
+
+
+dsi&gt; display math -e math_output.csv
+table_name: math
+
+specification | a | b | c     | d | e    | f     
+-------------------------------------------------
+!jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
+!jack1        | 2 | 3 | 45.98 | 3 | 44.8 | 0.0099
+
+Csv_Writer plugin writer loaded successfully.
+
+
+dsi&gt; draw -f dsi_er_diagram.png
+ER_Diagram plugin writer loaded successfully.
+
+
+dsi&gt; plot_table physics -f physics_plot.png
+Table_Plot plugin writer loaded successfully.
+
+
+dsi&gt; summary -t physics -n 1
+Table: physics
+
+column        | type    | min     | max     | avg     | std_dev              
+-----------------------------------------------------------------------------
+specification | VARCHAR | None    | None    | None    | None                 
+n             | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
+o             | VARCHAR | None    | None    | None    | None                 
+p             | INTEGER | 23      | 233     | 128.0   | 105.0                
+q             | VARCHAR | None    | None    | None    | None                 
+r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
+s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
+
+specification | n    | o       | p   | q       | r  | s      
+-------------------------------------------------------------
+!amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+  ... showing 1 of 2 rows
+
+
+dsi&gt; save dsi_output.db
+
+dsi&gt; exit
+Exiting...
+Closing the abstraction layer, and all active plugins/backends
+(mydsi) viyer@pn2405703 data % 
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="python_api.html" class="btn btn-neutral float-left" title="Python API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="examples_user.html" class="btn btn-neutral float-right" title="DSI Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
