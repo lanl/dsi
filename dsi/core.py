@@ -55,14 +55,16 @@ class Terminal():
             return (['.'.join(i) for i in product(prefix, implementations)])
 
         self.module_collection = {}
-        backend_modules = static_munge(
-            self.BACKEND_PREFIX, self.BACKEND_IMPLEMENTATIONS)
+        backend_modules = static_munge(self.BACKEND_PREFIX, self.BACKEND_IMPLEMENTATIONS)
         self.module_collection['backend'] = {}
         for module in backend_modules:
-            self.module_collection['backend'][module] = import_module(module)
+            try:
+                imported = import_module(module)
+                self.module_collection['backend'][module] = imported
+            except ImportError as e:
+                continue
 
-        plugin_modules = static_munge(
-            self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
+        plugin_modules = static_munge(self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
         self.module_collection['plugin'] = {}
         for module in plugin_modules:
             self.module_collection['plugin'][module] = import_module(module)
@@ -139,6 +141,10 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
             raise ValueError("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
+        if mod_type == "backend" and mod_name.lower() not in self.module_collection[mod_type].keys():
+            if self.debug_level != 0:
+                self.logger.error("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
+            raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
         
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
