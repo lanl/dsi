@@ -561,6 +561,8 @@ class Terminal():
                 valid = True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
+            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
+                valid = True
         return valid
     
     # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
