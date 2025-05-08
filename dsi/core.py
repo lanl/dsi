@@ -29,7 +29,7 @@ class Terminal():
     VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy', 'HPSS']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
