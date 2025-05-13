@@ -26,9 +26,10 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble']
+    VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
-    VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
+    VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
@@ -147,6 +148,8 @@ class Terminal():
             raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
         if mod_type == "plugin" and mod_name.lower() == "wildfire":
             mod_name = "Ensemble"
+        if mod_type == "plugin" and mod_name.lower() == "csv":
+            mod_name = "Csv"
         
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):

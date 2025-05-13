@@ -54,6 +54,7 @@ Currently, DSI has the following Readers:
   - Oceans11Datacard (Data card of datasets on the `Oceans11 data server <https://oceans11.lanl.gov>`_)
   - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
   - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
+  - GoogleDatacard (Data card that adheres to the `Google Data Cards Playbook metadata standard <https://sites.research.google/datacardsplaybook/>`_ )
 
 Currently, DSI has the following Writers:
   - Csv_Writer

@@ -15,7 +15,7 @@ class DSI():
         """
         Prints a list of valid readers that can be specified in the 'reader_name' argument in read()
         """
-        print("['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'Schema', 'Bueno', 'Csv', 'YAML1', 'TOML1', 'Ensemble', 'JSON']\n")
+        print("Valid Readers: Csv, YAML1, TOML1, JSON, Schema, Ensemble, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard \n")
         print("Oceans11Datacard loads in metadata describing a dataset to be stored in the oceans11 DSI data server (oceans11.lanl.gov). Input format is YAML")
         print("DublinCoreDatacard loads in a dataset's metadata which conforms to Dublin Core. Input format is XML")
         print("SchemaOrgDatacard loads in a dataset's metadata which conforms to schema.org. Input format is JSON")
@@ -33,17 +33,18 @@ class DSI():
         Runs a reader to load data into DSI.
 
         `filenames`: name(s) of the data file(s) to load into DSI
-
-            - if reader_name = "Oceans11Datacard" ---> file extension can be .yaml, .yml
-            - if reader_name = "DublinCoreDatacard" ---> file extension can be .xml
-            - if reader_name = "SchemaOrgDatacard" ---> file extension can be .json
-            - if reader_name = "Schema" ---> file extension can be .json
-            - if reader_name = "Bueno" ---> file extension can be .data
-            - if reader_name = "Csv" ---> file extension can be .csv
-            - if reader_name = "YAML1" ---> file extension can be .yaml, .yml
-            - if reader_name = "TOML1" ---> file extension can be .toml
-            - if reader_name = "Ensemble" ---> file extension can be .csv
-            - if reader_name = "JSON" ---> file extension can be .json
+            
+            - if reader_name = "Csv" ---> file extension should be .csv
+            - if reader_name = "YAML1" ---> file extension should be .yaml or .yml
+            - if reader_name = "TOML1" ---> file extension should be .toml
+            - if reader_name = "JSON" ---> file extension should be .json
+            - if reader_name = "Schema" ---> file extension should be .json
+            - if reader_name = "Ensemble" ---> file extension should be .csv
+            - if reader_name = "Bueno" ---> file extension should be .data
+            - if reader_name = "DublinCoreDatacard" ---> file extension should be .xml
+            - if reader_name = "SchemaOrgDatacard" ---> file extension should be .json
+            - if reader_name = "GoogleDatacard" ---> file extension should be .yaml or .yml
+            - if reader_name = "Oceans11Datacard" ---> file extension should be .yaml or .yml
 
         `reader_name`: name of the DSI reader to use. Call list_readers() to see a list of valid readers
 
@@ -58,6 +59,8 @@ class DSI():
             self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
         elif reader_name.lower() == "schemaorgdatacard":
             self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
+        elif reader_name.lower() == "googledatacard":
+            self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
         elif reader_name.lower() == "schema":
             if isinstance(filenames, list):
                 raise ValueError("Cannot ingest more than one schema at a time")
@@ -73,17 +76,17 @@ class DSI():
         elif reader_name.lower() == "ensemble":
             self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name = table_name)
         elif reader_name.lower() == "json":
-            self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
+            self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name = table_name)
         else:
-            print("Please check your spelling of the 'reader_name' argument as it does not exist in DSI")
-            print(f"Eligible readers are: {self.list_readers()}")
-            return
+            print("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
+            print("Eligible readers are: Csv, YAML1, TOML1, JSON, Schema, Ensemble, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard")
+            print()
 
     def list_backends(self):
         """
         Prints a list of valid backends that can be specified in the 'backend_name' argument in backend()
         """
-        print("['Sqlite', 'DuckDB']")
+        print("Sqlite, DuckDB\n")
         print("Sqlite: Python based SQL database and backend; the default DSI API backend.")
         print("DuckDB: In-process SQL database designed for fast queries on large data files.")
         print()
@@ -105,9 +108,7 @@ class DSI():
             self.t.load_module('backend','DuckDB','back-write', filename=filename)
         else:
             print("Please check the 'backend_name' argument as that is not supported by DSI now")
-            # print(f"Eligible backend_names are: {self.list_backends()}")
-            print(f"Eligible backend_names are: ['Sqlite', 'DuckDB']")
-            return
+            print(f"Eligible backend_names are: Sqlite, DuckDB")
 
     def ingest(self):
         """
