@@ -51,7 +51,7 @@ if __name__ == "__main__":
     core = Terminal()
 
     #creating manual simulation table where each row of wildfire is its own simulation
-    core.load_module('plugin', "Wildfire", "reader", filenames = input_csv, table_name = table_name)
+    core.load_module('plugin', "Ensemble", "reader", filenames = input_csv, table_name = table_name)
 
     #ingest metadata information via data card
     core.load_module('plugin', "Oceans11Datacard", "reader", filenames = datacard)
