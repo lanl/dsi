@@ -54,9 +54,9 @@ However, fields can be empty if a user does not have particular information abou
 
 The supported datacards can be read into DSI by creating an instance of DSI() and calling:
 
-      - ``read(filenames="file/path/to/datacard.XML", reader_name='DublinCoreDatacard')``
-      - ``read(filenames="file/path/to/datacardh.JSON", reader_name='SchemaOrgDatacard')``
-      - ``read(filenames="file/path/to/datacard.YAML", reader_name='Oceans11Datacard')``
+      - ``read("file/path/to/datacard.XML", 'DublinCoreDatacard')``
+      - ``read("file/path/to/datacardh.JSON", 'SchemaOrgDatacard')``
+      - ``read("file/path/to/datacard.YAML", 'Oceans11Datacard')``
 
 Completed examples of each metadata standard for the Wildfire dataset can also be found in ``dsi/examples/wildfire/`` 
 

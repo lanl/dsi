@@ -15,7 +15,7 @@ class DSI():
         """
         Prints a list of valid readers that can be specified in the 'reader_name' argument in read()
         """
-        print("['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'Schema', 'Bueno', 'Csv', 'YAML1', 'TOML1', 'Wildfire', 'JSON']\n")
+        print("['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'Schema', 'Bueno', 'Csv', 'YAML1', 'TOML1', 'Ensemble', 'JSON']\n")
         print("Oceans11Datacard loads in metadata describing a dataset to be stored in the oceans11 DSI data server (oceans11.lanl.gov). Input format is YAML")
         print("DublinCoreDatacard loads in a dataset's metadata which conforms to Dublin Core. Input format is XML")
         print("SchemaOrgDatacard loads in a dataset's metadata which conforms to schema.org. Input format is JSON")
@@ -24,7 +24,7 @@ class DSI():
         print("Csv loads in data from CSV files that can only be for one table in each separate call")
         print("YAML1 loads in data from YAML files of a particular structure")
         print("TOML1 loads in data from TOML files of a particular structure")
-        print("Wildfire loads in data from a CSV file and generates a simulation table alongside it. Each row of data will be a separate simulation run")
+        print("Ensemble loads in data from a CSV file and generates a simulation table alongside it. Each row of data should be a separate simulation run")
         print("JSON loads in data from JSON files that can only be for one table in each separate call")
         print()
 
@@ -42,14 +42,14 @@ class DSI():
             - if reader_name = "Csv" ---> file extension can be .csv
             - if reader_name = "YAML1" ---> file extension can be .yaml, .yml
             - if reader_name = "TOML1" ---> file extension can be .toml
-            - if reader_name = "Wildfire" ---> file extension can be .csv
+            - if reader_name = "Ensemble" ---> file extension can be .csv
             - if reader_name = "JSON" ---> file extension can be .json
 
         `reader_name`: name of the DSI reader to use. Call list_readers() to see a list of valid readers
 
         `table_name`: optional, default None. If `filenames` only stores one table of data, users can specify name for that table
 
-            - Csv, JSON, and Wildfire readers are only ones to accept this input
+            - Csv, JSON, and Ensemble readers are only ones to accept this input
         
         """
         if reader_name.lower() == "oceans11datacard":
@@ -70,8 +70,8 @@ class DSI():
             self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
         elif reader_name.lower() == "toml1":
             self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
-        elif reader_name.lower() == "wildfire":
-            self.t.load_module('plugin', 'Wildfire', 'reader', filenames=filenames, table_name = table_name)
+        elif reader_name.lower() == "ensemble":
+            self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name = table_name)
         elif reader_name.lower() == "json":
             self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames)
         else:

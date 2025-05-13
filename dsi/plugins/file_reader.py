@@ -388,24 +388,24 @@ class TOML1(FileReader):
             del self.toml_data["dsi_units"]
         self.set_schema_2(self.toml_data)
 
-class Wildfire(FileReader):
+class Ensemble(FileReader):
     """
-    DSI Reader that ingests Wildfire data stored as a CSV
+    DSI Reader that ingests Ensemble data stored as a CSV
 
     Can be used for other cases if data is post-processed and running only once.
     Can create a manual simulation table
     """
     def __init__(self, filenames, table_name = None, sim_table = True, **kwargs):
         """
-        Initializes Wildfire Reader with user specified parameters.
+        Initializes Ensemble Reader with user specified parameters.
 
-        `filenames`: Required input -- Wildfire data files
+        `filenames`: Required input -- Ensemble data files all for only one table
 
-        `table_name`: default None. User can specify table name when loading the wildfire file.   
+        `table_name`: default None. User can specify table name when loading the Ensemble data.   
 
-        `sim_table`: default True. Set to False if DO NOT want to create manual simulation table where each row of Wildfire file is a separate sim
+        `sim_table`: default True. Set to False if DO NOT want to create manual simulation table where each row of an input data table is a separate sim
 
-            - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
+            - also creates new column in Ensemble data for each row to associate to a corresponding row/simulation in sim_table
         """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
@@ -418,12 +418,12 @@ class Wildfire(FileReader):
 
     def add_rows(self) -> None:
         """ 
-        Creates Ordered Dictionary for the wildfire data. 
+        Creates Ordered Dictionary for the Ensemble data. 
 
         If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
         """
         if self.table_name is None:
-            self.table_name = "Wildfire"
+            self.table_name = "Ensemble"
 
         total_df = DataFrame()
         for filename in self.filenames:
@@ -431,7 +431,7 @@ class Wildfire(FileReader):
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
             except:
-                return (ValueError, f"Error in adding {filename} to the existing wildfire data. Please recheck column names and data structure")
+                return (ValueError, f"Error in adding {filename} to the existing Ensemble data. Please recheck column names and data structure")
         
         if self.sim_table:
             total_df['sim_id'] = range(1, len(total_df) + 1)

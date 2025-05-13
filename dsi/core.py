@@ -26,7 +26,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Wildfire', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy']
@@ -145,6 +145,8 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
             raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
+        if mod_type == "plugin" and mod_name.lower() == "wildfire":
+            mod_name = "Ensemble"
         
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):

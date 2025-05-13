@@ -14,7 +14,7 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", 
 # a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'])
 # a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="wildfire/wildfire_dublin_core.xml")
 # a.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames="wildfire/wildfire_schema_org.json")
-# a.load_module('plugin', 'Wildfire', 'reader', filenames="data/wildfiredata.csv")
+# a.load_module('plugin', 'Ensemble', 'reader', filenames="data/wildfiredata.csv")
 
 ''' Example uses of loading open DSI writers. Need to call transload() after loading to execute them. '''
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "physics", filename = "physics_plot.png", display_cols = ["n", "p"])
