@@ -11,10 +11,12 @@ a=Terminal(debug=0, backup_db = False, runTable=True)
 a.load_module('plugin', 'YAML1', 'reader', filenames=["data/student_test1.yml", "data/student_test2.yml"])
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["data/results.toml", "data/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'Csv', 'reader', filenames="data/yosemite5.csv")
+# a.load_module('plugin', 'Ensemble', 'reader', filenames="data/wildfiredata.csv")
+
 # a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'])
 # a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="wildfire/wildfire_dublin_core.xml")
 # a.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames="wildfire/wildfire_schema_org.json")
-# a.load_module('plugin', 'Wildfire', 'reader', filenames="data/wildfiredata.csv")
+# a.load_module('plugin', 'GoogleDatacard', 'reader', filenames="data/template_dc_google.yml")
 
 ''' Example uses of loading open DSI writers. Need to call transload() after loading to execute them. '''
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "physics", filename = "physics_plot.png", display_cols = ["n", "p"])

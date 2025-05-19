@@ -388,24 +388,24 @@ class TOML1(FileReader):
             del self.toml_data["dsi_units"]
         self.set_schema_2(self.toml_data)
 
-class Wildfire(FileReader):
+class Ensemble(FileReader):
     """
-    DSI Reader that ingests Wildfire data stored as a CSV
+    DSI Reader that ingests Ensemble data stored as a CSV
 
     Can be used for other cases if data is post-processed and running only once.
     Can create a manual simulation table
     """
     def __init__(self, filenames, table_name = None, sim_table = True, **kwargs):
         """
-        Initializes Wildfire Reader with user specified parameters.
+        Initializes Ensemble Reader with user specified parameters.
 
-        `filenames`: Required input -- Wildfire data files
+        `filenames`: Required input -- Ensemble data files. All files must only store data for one table
 
-        `table_name`: default None. User can specify table name when loading the wildfire file.   
+        `table_name`: default None. User can specify table name when loading the Ensemble data.   
 
-        `sim_table`: default True. Set to False if DO NOT want to create manual simulation table where each row of Wildfire file is a separate sim
+        `sim_table`: default True. Set to False if DO NOT want to create a simulation table where each row of an input data table is a separate sim
 
-            - also creates new column in wildfire data for each row to associate to a corresponding row/simulation in sim_table
+            - also creates new column in Ensemble data for each row to associate to a corresponding row/simulation in sim_table
         """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
@@ -418,12 +418,12 @@ class Wildfire(FileReader):
 
     def add_rows(self) -> None:
         """ 
-        Creates Ordered Dictionary for the wildfire data. 
+        Creates Ordered Dictionary for the Ensemble data. 
 
         If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
         """
         if self.table_name is None:
-            self.table_name = "Wildfire"
+            self.table_name = "Ensemble"
 
         total_df = DataFrame()
         for filename in self.filenames:
@@ -431,7 +431,7 @@ class Wildfire(FileReader):
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
             except:
-                return (ValueError, f"Error in adding {filename} to the existing wildfire data. Please recheck column names and data structure")
+                return (ValueError, f"Error in adding {filename} to the existing Ensemble data. Please recheck column names and data structure")
         
         if self.sim_table:
             total_df['sim_id'] = range(1, len(total_df) + 1)
@@ -458,18 +458,15 @@ class Wildfire(FileReader):
 class Oceans11Datacard(FileReader):
     """
     """
-    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+    def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file names of the oceans11 data card yaml files to be ingested
-
-        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        `filenames`: file name(s) of YAML data card files to ingest that adhere to the Oceans 11 LANL Data Server metadata standard
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.datacard_files = [filenames]
         else:
             self.datacard_files = filenames
-        self.target_table_prefix = target_table_prefix
         self.datacard_data = OrderedDict()
 
     def add_rows(self) -> None:
@@ -499,12 +496,9 @@ class Oceans11Datacard(FileReader):
             if sorted(field_names) != sorted(["name", "description", "data_uses", "creators", "creation_date", 
                                               "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
                                               "num_simulations", "version", "license", "live_dataset"]):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
 
-        if self.target_table_prefix is not None:
-            self.datacard_data[f"{self.target_table_prefix}__oceans11_datacard"] = temp_data
-        else:
-            self.datacard_data["oceans11_datacard"] = temp_data
+        self.datacard_data["oceans11_datacard"] = temp_data
         
         self.datacard_data["oceans11_datacard"]["remote"] = [""] * len(self.datacard_files)
         self.datacard_data["oceans11_datacard"]["local"] = [""] * len(self.datacard_files)
@@ -513,18 +507,15 @@ class Oceans11Datacard(FileReader):
 class DublinCoreDatacard(FileReader):
     """
     """
-    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+    def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file names of the Dublin Core data card xml files to be ingested
-
-        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        `filenames`: file name(s) of XML data card files to ingest that adhere to the Dublin Core metadata standard
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.datacard_files = [filenames]
         else:
             self.datacard_files = filenames
-        self.target_table_prefix = target_table_prefix
         self.datacard_data = OrderedDict()
 
     def add_rows(self) -> None:
@@ -549,29 +540,23 @@ class DublinCoreDatacard(FileReader):
             if sorted(field_names) != sorted(['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 
                                               'Language', 'Format', 'Subject', 'Description', 'Identifier', 
                                               'Relation', 'Source', 'Type', 'Coverage', 'Rights']):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
 
-        if self.target_table_prefix is not None:
-            self.datacard_data[f"{self.target_table_prefix}__dublin_core_datacard"] = temp_data
-        else:
-            self.datacard_data["dublin_core_datacard"] = temp_data
+        self.datacard_data["dublin_core_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
 class SchemaOrgDatacard(FileReader):
     """
     """
-    def __init__(self, filenames, target_table_prefix = None, **kwargs):
+    def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file names of the Schema.org data card json files to be ingested
-
-        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        `filenames`: file name(s) of JSON data card files to ingest that adhere to the Schema.org metadata standard
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
             self.datacard_files = [filenames]
         else:
             self.datacard_files = filenames
-        self.target_table_prefix = target_table_prefix
         self.datacard_data = OrderedDict()
 
     def add_rows(self) -> None:
@@ -600,12 +585,72 @@ class SchemaOrgDatacard(FileReader):
                                               "datePublished", "countryOfOrigin", "locationCreated", "sourceOrganization", 
                                               "url", "version", "creditText", "license", "citation", "copyrightHolder", 
                                               "copyrightNotice", "copyrightYear"]):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the example")
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
 
-        if self.target_table_prefix is not None:
-            self.datacard_data[f"{self.target_table_prefix}__schema_datacard"] = temp_data
+        self.datacard_data["schema_org_datacard"] = temp_data
+        self.set_schema_2(self.datacard_data)
+
+class GoogleDatacard(FileReader):
+    """
+    """
+    def __init__(self, filenames, **kwargs):
+        """
+        `filenames`: file name(s) of YAML data card files to ingest that adhere to the Google Data Cards Playbook metadata standard
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.datacard_files = [filenames]
         else:
-            self.datacard_data["schema_datacard"] = temp_data
+            self.datacard_files = filenames
+        self.datacard_data = OrderedDict()
+
+    def add_rows(self) -> None:
+        """
+        """
+        temp_data = OrderedDict()
+
+        for filename in self.datacard_files:
+            with open(filename, 'r') as yaml_file:
+                data = yaml.safe_load(yaml_file)
+                
+            if not set(data.keys()).issubset(["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
+            
+            field_names = []
+            sampling_fields = []
+            ml_fields = []
+            for element, val in data.items():
+                for inner_key, inner_val in val.items():
+                    if inner_key not in temp_data.keys():
+                        temp_data[inner_key] = [inner_val]
+                    else:
+                        temp_data[inner_key].append(inner_val)
+                        
+                    if element == "sampling_methods":
+                        sampling_fields.append(inner_key)
+                    elif element == "known_applications_and_benchmarks":
+                        ml_fields.append(inner_key)
+                    else:
+                        field_names.append(inner_key)
+
+            if not set(field_names).issubset(['dataset_name', 'summary', 'dataset_link', 'documentation_link', 'datacard_author1', 
+                                              'datacard_author2', 'datacard_author3', 'publishing_organization', 'publishing_POC', 
+                                              'publishing_POC_affiliation', 'publishing_POC_contact', 'dataset_owner1', 'dataset_owner2', 
+                                              'dataset_owner3', 'dataset_owners_affiliation', 'dataset_owners_contact', 'funding_institution', 
+                                              'funding_summary', 'data_subjects', 'data_sensitivity', 'version', 'maintenance_status', 
+                                              'last_updated', 'release_date', 'motivation', 'dataset_uses', 'citation_guidelines', 
+                                              'citation_bibtex', 'collection_methods_used', 'collection_type', 'source', 'platform', 
+                                              'dates_of_collection', 'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
+            
+            if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
+                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields in 'sampling_methods' match the template")
+            
+            if not set(ml_fields).issubset(['ml_applications', 'ml_model_name', 'evaluation_accuracy', 'evaluation_precision', 
+                                                  'evaluation_recall', 'evaluation_performance_metric']):
+                return (ValueError, f"Error in reading {filename} data card. \
+                        Please ensure all fields in 'known_applications_and_benchmarks' match the template")
+        self.datacard_data["google_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
 class MetadataReader1(FileReader):

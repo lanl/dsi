@@ -53,20 +53,24 @@ class DSI_cli:
     t = []
 
     def __init__(self):
+        self.name = None
+        self.start_dir = os.getcwd() + "/"
         return
     
     def startup(self, backend="sqlite"):
         self.t = Terminal(debug = 0, runTable=False)
-        self.name = None
+        self.start_dir = os.getcwd()
         if backend=="duckdb":
-            if os.path.exists(".temp.duckdb"):
-                os.remove(".temp.duckdb")
-            self.t.load_module('backend','DuckDB','back-write', filename=".temp.duckdb")
+            db_path = os.path.join(self.start_dir, ".temp.duckdb")
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            self.t.load_module('backend','DuckDB','back-write', filename = db_path)
             self.name = ".temp.duckdb"
         else:
-            if os.path.exists(".temp.sqlite"):
-                os.remove(".temp.sqlite")
-            self.t.load_module('backend','Sqlite','back-write', filename=".temp.sqlite")
+            db_path = os.path.join(self.start_dir, ".temp.sqlite")
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            self.t.load_module('backend','Sqlite','back-write', filename = db_path)
             self.name = ".temp.sqlite"
         return
     
@@ -99,15 +103,11 @@ class DSI_cli:
             print("Usage: cd <directory>")
             return
         path = os.path.expanduser(args[0])
-        try:
+        if os.path.isdir(path):
             os.chdir(path)
             print(f"Changed directory to {os.getcwd()}")
-        except FileNotFoundError:
-            print(f"No such directory: {path}")
-        except NotADirectoryError:
+        else:
             print(f"{path} is not a directory.")
-        except Exception as e:
-            print(f"Error: {e}")
 
     def clear(self, args):
         '''
@@ -396,16 +396,17 @@ class DSI_cli:
         '''
         new_name = args.filename
         file_extension = new_name.rsplit(".", 1)[-1] if '.' in new_name else ''
+        dsi_db_path = os.path.join(self.start_dir, self.name)
         if "sqlite" in self.name:
             if file_extension.lower() in ["db", "sqlite", "sqlite3"]:
-                shutil.copyfile(self.name, new_name)
+                shutil.copyfile(dsi_db_path, new_name)
             else:
-                shutil.copyfile(self.name, new_name + ".sqlite")
+                shutil.copyfile(dsi_db_path, new_name + ".sqlite")
         elif "duckdb" in self.name:
             if file_extension.lower() in ["db", "duckdb"]:
-                shutil.copyfile(self.name, new_name)
+                shutil.copyfile(dsi_db_path, new_name)
             else:
-                shutil.copyfile(self.name, new_name + ".duckdb")
+                shutil.copyfile(dsi_db_path, new_name + ".duckdb")
 
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')

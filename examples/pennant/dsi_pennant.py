@@ -15,7 +15,7 @@ if __name__ == "__main__":
     output_csv = "pennant_output.csv"
 
     dsi = DSI()
-    dsi.read(csvpath, "Wildfire", table_name=table_name)
+    dsi.read(csvpath, "Ensemble", table_name=table_name)
     dsi.read(datacard, "Oceans11Datacard")
 
     if os.path.exists(dbpath):

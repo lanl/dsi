@@ -11,8 +11,6 @@ ingest_dsi.read("../data/student_test2.yml", 'YAML1')
 ingest_dsi.backend("data.db") # Target a backend, defaults to SQLite if not defined
 ingest_dsi.ingest() # need to call backend() before ingest()
 
-ingest_dsi.summary() # Print the overall summary of the ingest
-
 #dsi.display(table_name)
 ingest_dsi.display("math") # Print the specific table name in student_test1.yml
 
