@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 import warnings
 import sys
+import pandas as pd
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -38,19 +39,21 @@ class Terminal():
 
     def __init__(self, debug = 0, backup_db = False, runTable = False):
         """
-        Initialization helper function to pass through optional parameters for DSI core.
+        Initialization function to configure optional DSI core parameters.
 
-        Optional flags can be set and defined:
-
-        `debug`: {0: off, 1: user debug log, 2: user + developer debug log} 
+        Optional flags
+        --------------
+        `debug` : int, default=0 
+            {0: off, 1: user debug log, 2: user + developer debug log} 
             
-            - When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
+            When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
 
-        `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
+        `backup_db` : bool, default=False
+            - If True, creates a backup of the current backend database before committing any new changes.
 
-        `runTable`: Undefined False as default. 
-        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. 
-        Recommended for in-situ use-cases.
+        `runTable` : bool, default=False
+            - If True, a 'runTable' is created, and timestamped each time new metadata is ingested.
+              Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
@@ -95,11 +98,9 @@ class Terminal():
         List available DSI modules of an arbitrary module type.
 
         This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
-        are supported, but this getter can be extended to support any new DSI module
-        types which are added. 
+        are supported, but this getter can be extended to support any new DSI module types which are added. 
         
-        Note: self.VALID_MODULES refers to _DSI_ Modules
-        however, DSI Modules are classes, hence the naming idiosynchrocies below.
+        Note: self.VALID_MODULES refers to _DSI_ Modules however, DSI Modules are classes, hence the naming idiosynchrocies below.
         """
         # "DSI Modules" are Python Classes
         class_collector = []
@@ -116,6 +117,7 @@ class Terminal():
 
         DSI modules may be loaded which are not explicitly listed by the list_available_modules.
         This flexibility ensures that advanced users can access higher level abstractions.
+        
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
 
@@ -150,6 +152,8 @@ class Terminal():
             mod_name = "Ensemble"
         if mod_type == "plugin" and mod_name.lower() == "csv":
             mod_name = "Csv"
+        if mod_type == "plugin" and mod_name.lower() == "csv_writer":
+            mod_name = "Csv_Writer"
         
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
@@ -170,22 +174,25 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
                     
+                    tester = 0
+                    if sys.gettrace() is None:
+                        tester = 1
+                        sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
+
+                    ingest_error = None
                     try:
-                        tester = 0
-                        if sys.gettrace() is None:
-                            tester = 1
-                            sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
                         ingest_error = obj.add_rows()
-                        if ingest_error is not None:
-                            if self.debug_level != 0:
-                                self.logger.error(f"   {ingest_error[1]}")
-                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
-                        if tester == 1:
-                            sys.settrace(None) # ends trace to prevent large overhead
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                         raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
+                    
+                    if ingest_error is not None:
+                            if self.debug_level != 0:
+                                self.logger.error(f"   {ingest_error[1]}")
+                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                    if tester == 1:
+                        sys.settrace(None) # ends trace to prevent large overhead
                     
                     for table_name, table_metadata in obj.output_collector.items():
                         if self.runTable == True and table_name == "runTable":
@@ -268,7 +275,7 @@ class Terminal():
         """
         Unloads a specific DSI module from the active_modules collection.
 
-        Mostly to be used for unloading backends, as plugin readers and writers are auto unloaded elsewhere.
+        Primarily used when unloading backends, as plugin readers and writers are automatically unloaded elsewhere.
         """
         if self.debug_level != 0:
             self.logger.info(f"-------------------------------------")
@@ -314,7 +321,7 @@ class Terminal():
 
         Note: mod_type is needed because each Python module only implements plugins or backends.
 
-        Check Example 7 in Core:Examples on GitHub Docs to see how to use this function.
+        View :ref:`external_readers_writers_label` to see how to use this function.
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
         self.module_collection[mod_type][mod_name] = mod
@@ -332,7 +339,7 @@ class Terminal():
         """
         Transloading signals to the DSI Core Terminal that Plugin set up is complete.
 
-        Activates all loaded plugin writers by generating all their various output files such as an ER Diagram or an image of a table plot
+        Activates all loaded plugin writers by generating their various output files such as an ER Diagram or an image of a table plot
 
         All loaded plugin writers will be unloaded after activation, so there is no need to separately call unload_module() for them
         """
@@ -341,25 +348,30 @@ class Terminal():
             self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
+
+            tester = 0
+            if sys.gettrace() is None:
+                tester = 1
+                sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
+            
+            writer_error = None
             try:
-                tester = 0
-                if sys.gettrace() is None:
-                    tester = 1
-                    sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
-                if writer_error is not None:
-                    if writer_error[0] == "Warning":
-                        warnings.warn(writer_error[1])
-                    else:
-                        if self.debug_level != 0:
-                            self.logger.error(writer_error[1])
-                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
-                if tester == 1:
-                    sys.settrace(None) # ends trace to prevent large overhead
             except:
                 if self.debug_level != 0: 
                     self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
                 raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
+            
+            if writer_error is not None:
+                if writer_error[0] == "Warning":
+                    warnings.warn(writer_error[1])
+                else:
+                    if self.debug_level != 0:
+                        self.logger.error(writer_error[1])
+                    raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+            if tester == 1:
+                sys.settrace(None) # ends trace to prevent large overhead
+
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -372,50 +384,28 @@ class Terminal():
         else:
             self.active_modules["writer"] = []
 
-    def close(self):
-        """
-        Immediately closes all active modules: backends, plugin writers, plugin readers
-
-        Clears out the current DSI abstraction
-
-        NOTE - This step cannot be undone.
-        """
-        print("Closing the abstraction layer, and all active plugins/backends")
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.info("Closing and clearing out all objects in this Terminal object")
-            
-            self.logger.info("Cleared out the abstraction layer")
-        self.active_metadata = OrderedDict()
-
-        if self.debug_level != 0:
-            self.logger.info("Closed active backends")
-        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
-        for backend in active_backends:
-            backend.close()
-        for loaded in self.loaded_backends:
-            loaded.close()
-
-        if self.debug_level != 0:
-            self.logger.info("Cleared all loaded plugins and backends")
-        for func in self.active_modules:
-            self.active_modules[func] = []
-            self.loaded_backends = []
-
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
         
-        `interaction_type`:
+        `interaction_type` : str
+            Specifies the type of action to perform. Accepted values:
 
-            - 'ingest' or 'put': ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored
+                - 'ingest' or 'put': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
 
-                - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
-            - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
-            - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
-            - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+                    - if backup_db flag = True in Core instance, a backup is created prior to ingesting data
+                - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
+                - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
+                - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
-        `query`: default None. Specify if *interaction_type* = 'query' and ``query_artifact`` function in a backend file accepts an input
+        `query` : str, optional
+            Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
+
+        \**kwargs : 
+            Additional keyword arguments passed to underlying backend functions.
+        
+        `return`: only when `interaction_type` = 'query'
+            By default stores query result as a Pandas.DataFrame. If specified, returns it as an OrderedDict
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -556,38 +546,20 @@ class Terminal():
                 not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
-            raise NotImplementedError(not_run_msg)
-    
-    # Internal function used to check if a backend has data
-    def valid_backend(self, backend, parent_name):
-        valid = False
-        if parent_name == "Filesystem":
-            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
-                valid = True
-            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
-                valid = True
-            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
-                valid = True
-        return valid
-    
-    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
-    def trace_function(self, frame, event, arg):
-        global return_line_number
-        global original_file
-        if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
-            original_file = frame.f_code.co_filename # Get file name
-        return self.trace_function
+            raise NotImplementedError(not_run_msg)    
     
     def find(self, query_object):
         """
-        Find all function that searches for all instances of `query_object` in first loaded backend. Searches among all tables/column/cells
+        Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
        
-        `query_object`: Object to find in first loaded backend. Can be of any type (string, float, int).
+        `query_object` : any
+            The object to search for in the backend. Can be of any type, including str, float, or int.
 
-        `return`: List of backend-specific objects that each contain details of a match for `query_object`
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -604,14 +576,17 @@ class Terminal():
         return self.find_helper(query_object, return_object, start, "")
     
     def find_table(self, query_object):
-        """
-        Find table function that searches for all tables whose names matches the `query_object` in first loaded backend.
+        """   
+        Find all tables whose name matches `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. HAS TO BE A str.
 
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-        `return`: List of backend-specific objects that each contain all data from a table matching `query_object`.
-
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -629,18 +604,21 @@ class Terminal():
     
     def find_column(self, query_object, range = False):
         """
-        Find column function that searches for all columns whose names matches the `query_object` in first loaded backend.
+        Find all columns whose name matches `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. HAS TO BE A str.
 
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `range`: bool, optional, default False. 
+            If True, then data-range of all numerical columns which match `query_object` is included in return
 
-        `range`: default False. 
+            If False, then data for each column that matches `query_object` is included in return
 
-            - If True, then data-range of all numerical columns which match `query_object` is included in return
-            - If False, then data for each column that matches `query_object` is included in return
-            
-        `return`: List of backend-specific objects that each contain data/numerical range about a column matching `query_object`.
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -658,18 +636,21 @@ class Terminal():
 
     def find_cell(self, query_object, row = False):
         """
-        Find cell function that searches for all cells which match the `query_object` in first loaded backend.
+        Find all cells that match the `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. Can be of any type, including str, float, or int.
 
-        `query_object`: Object to find in all cells. Can be of any type (string, float, int).
+        `row` : bool, default=False
+            If True, includes the entire row of data for each matching cell in return.
 
-        `row`: default False.
+            If False, includes only the value of the matching cell
 
-            - If True, then full row of data where a cell matches `query_object` is included in return
-            - If False, then the value of the cell that matches `query_object` is included in return
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches `query_object`
-
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -738,15 +719,17 @@ class Terminal():
 
     def summary(self, table_name = None, num_rows = 0):
         """
-        Prints data and numerical metadata of tables from the first loaded backend. Output varies depending on parameters
+        Prints numerical metadata and (optionally) sample data from tables in the first loaded backend.
 
-        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
-        Otherwise every table's numerical metdata is printed
+        `table_name` : str, optional
+            If specified, only the numerical metadata for that table will be printed.
 
-        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
-        Otherwise, only the total number of rows of a table are printed. 
-        The tables whose data is printed depends on the `table_name` parameter.
+            If None (default), metadata for all available tables is printed.
 
+        `num_rows` : int, optional, default=0
+            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
+
+            If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -792,13 +775,18 @@ class Terminal():
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
-        Prints data of a specified table from the first loaded backend.
+        Prints data from a specified table in the first loaded backend.
         
-        `table_name`: table whose data is printed
+        `table_name` : str
+            Name of the table to display.
          
-        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
-        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
+        `display_cols` : list of str, optional
+            List of specific column names to display from the table. 
+
+            If None (default), all columns are displayed.
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -813,30 +801,65 @@ class Terminal():
         start = datetime.now()
 
         errorStmt = backend.display(table_name, num_rows, display_cols)
-        if errorStmt is not None:
+        if errorStmt is not None and isinstance(errorStmt, tuple):
             raise errorStmt[0](errorStmt[1])
 
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
+        if errorStmt is not None and isinstance(errorStmt, pd.DataFrame):
+            return errorStmt
 
-    def table_print_helper(self, headers, rows, num_rows=25):
+    def overwrite_table(self, table_name, dataframe):
+        """
+        Overwrites a specified table in the first loaded backend with the provided Pandas DataFrame.
+
+        If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
+        **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
+
+        `table_name` : str
+            Name of the table to overwrite in the backend.
+
+        `dataframe` : pandas.DataFrame
+            A DataFrame containing the updated data to be written to the table.
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
-        backend.table_print_helper(headers, rows, num_rows)
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
+            raise ValueError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
+        start = datetime.now()
+
+        errorStmt = backend.overwrite_table(table_name, dataframe)
+        if errorStmt is not None and isinstance(errorStmt, tuple):
+            raise errorStmt[0](errorStmt[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
     
     def get_current_abstraction(self, table_name = None):
         """
-        Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict
+        Returns the current DSI abstraction as a nested Ordered Dict.
 
-        The inner table Ordered Dict has column names as keys and list of column data as the values.
+        The abstraction is organized such that:
+            - The outer OrderedDict has table names as keys.
+            - Each value is an inner OrderedDict representing a table, where keys are column names and values are lists of column data.
 
-        `table_name`: default None. If specified, the return will only be that table's Ordered Dict, not a nested one.
+        `table_name` : str, optional, default is None.
+            If specified, returns only the OrderedDict corresponding to that table.
 
-        `return`: nested Ordered Dict if table_name is None. single Ordered Dict if table_name is not None
+            If None (default), returns the full nested OrderedDict containing all tables.
+
+        `return` : OrderedDict
+            If `table_name` is None: returns a nested OrderedDict of all tables.
+            
+            If `table_name` is provided: returns a single OrderedDict for that table.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -861,11 +884,14 @@ class Terminal():
         """
         Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
 
-        `table_name`: name of table that must be in the current abstraction
+        `table_name`: str
+            Name of the table to update. This table must already exist in the current abstraction.
 
-        `table_data`: table data that must be stored as an Ordered Dict where column names are keys and column data is a list stored as values.
-        
-        `return`: None
+        `table_data` : OrderedDict
+            The new data to store in the table. Must be an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -874,12 +900,74 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(f"{table_name} not in current abstraction")
             raise ValueError(f"{table_name} not in current abstraction")
-        if not isinstance(table_data, OrderedDict):
+        if not isinstance(table_data, (OrderedDict, pd.DataFrame)):
             if self.debug_level != 0:
-                self.logger.error("table_data needs to be in the form of an Ordered Dictionary")
-            raise ValueError("table_data needs to be in the form of an Ordered Dictionary")
-        self.active_metadata[table_name] = table_data
+                self.logger.error("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
+            raise ValueError("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
+        if isinstance(table_data, OrderedDict):
+            self.active_metadata[table_name] = table_data
+        elif isinstance(table_data, pd.DataFrame):
+            self.active_metadata[table_name] = OrderedDict(table_data.to_dict(orient='list'))
+    
+    def close(self):
+        """
+        Immediately closes all active modules: backends, plugin writers, plugin readers
+
+        Clears out the current DSI abstraction
+
+        NOTE - This step cannot be undone.
+        """
+        print("Closing the abstraction layer, and all active readers/writers/backends")
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info("Closing and clearing out all objects in this Terminal object")
             
+            self.logger.info("Cleared out the abstraction layer")
+        self.active_metadata = OrderedDict()
+
+        if self.debug_level != 0:
+            self.logger.info("Closed active backends")
+        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
+        for backend in active_backends:
+            backend.close()
+        for loaded in self.loaded_backends:
+            loaded.close()
+
+        if self.debug_level != 0:
+            self.logger.info("Cleared all loaded plugins and backends")
+        for func in self.active_modules:
+            self.active_modules[func] = []
+            self.loaded_backends = []
+    
+    # Internal function used to print a table cleanly
+    def table_print_helper(self, headers, rows, num_rows=25):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.table_print_helper(headers, rows, num_rows)
+
+    # Internal function used to check if a backend has data
+    def valid_backend(self, backend, parent_name):
+        valid = False
+        if parent_name == "Filesystem":
+            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
+                valid = True
+            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
+                valid = True
+            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
+                valid = True
+        return valid
+    
+    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
+    def trace_function(self, frame, event, arg):
+        global return_line_number
+        global original_file
+        if event == "return":
+            return_line_number = frame.f_lineno  # Get line number
+            original_file = frame.f_code.co_filename # Get file name
+        return self.trace_function
 
 class Sync():
     """
@@ -1043,3 +1131,19 @@ class Sync():
         DSI database
         '''
         True
+
+class FindObject:
+    """
+    Data Structure used when returning search results from ``dsi.find()``
+
+        - table_name: table name 
+        - column_name: first column in this table where a datapoint matched user-defined query
+        - row_numbers: list of all row numbers where user-defined query was found
+        - collection: Pandas dataframe of all rows in this table where user-defined query is found
+
+    """
+    table_name = "" # table name
+    column_name = "" # first column name 
+    # column_name = [] # list of all column matches 
+    row_numbers = [] # list of row numbers
+    collection = None # collection of data. Default is empty

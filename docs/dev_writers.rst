@@ -11,14 +11,14 @@ Before explaining the structure of Writers, it is important to note there are tw
  - If your Writer is intended for use within your own code base and not added to DSI's modules or for public use, you must load it externally.
    Doing so allows you to store your Writer separately from DSI yet compatible with all versions of DSI.
 
-    - With the ``Core.Terminal.add_external_python_module`` method, you can make your Writer temporarily accessible to DSI in a workflow and load normally.
+    - With the ``Core.Terminal.add_external_python_module()`` method, you can make your Writer temporarily accessible to DSI in a workflow and load normally.
     - A similar example can be better seen at :ref:`external_readers_writers_label` where you can try loading an external TextFile reader class.
       While that example is meant for DSI Readers, the process to load them is the same
 
  - If you want your Writer loadable internally with the rest of the provided implementations (in 
    `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_), it must be registered in the ``VALID_WRITERS`` class variable of ``Terminal`` in 
    `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_. 
-   If this is done correctly, your Writers will be loadable by the ``load_module`` method of ``Terminal``.
+   If this is done correctly, your Writers will be loadable by the ``load_module()`` method of ``Terminal``.
 
 Initializer: ``__init__(self) -> None:``
 -----------------------------------------

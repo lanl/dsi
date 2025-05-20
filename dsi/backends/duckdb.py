@@ -212,8 +212,6 @@ class DuckDB(Filesystem):
                 else:
                     types.unit_keys.append(key + self.check_type(tableData[key]))
             
-            # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
-            # self.put_artifact_type(types, foreign_query)
             self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
@@ -651,6 +649,8 @@ class DuckDB(Filesystem):
         else:
             sql_list = ", ".join(display_cols)
             df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
+        if num_rows == -101:
+            return df
         headers = df.columns.tolist()
         rows = df.values.tolist()
         
@@ -771,6 +771,28 @@ class DuckDB(Filesystem):
             if count == max_rows:
                 print(f"  ... showing {max_rows} of {len(rows)} rows")
                 break
+
+    def overwrite_table(self, table_name, dataframe):
+        temp_data = self.process_artifacts()
+        temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
+
+        result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if table_name in pk_tuple[0]), None)
+
+        if result:
+            pk_data = temp_data[table_name][result]
+            if any(isinstance(x, str) for x in pk_data) and any(isinstance(x, (int, float)) for x in pk_data):
+                return (ValueError, f"User edited {table_name}'s primary key column, {result}, with mismatched data types. Table not updated.")
+            
+            rows = self.cur.execute(f"SELECT {result} FROM {table_name}").fetchall()
+            data = [row[0] for row in rows]
+            if data != pk_data:
+                print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
+
+        self.cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+        self.con.commit()
+
+        self.ingest_artifacts(temp_data)
+        self.con.commit()
 
     # Closes connection to server
     def close(self):

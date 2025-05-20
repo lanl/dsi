@@ -144,6 +144,10 @@ class Sqlite(Filesystem):
         Ex: (ValueError, "this is an error")
         """
         artifacts = collection
+
+        # if "dsi_relations" in artifacts.keys():
+        #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
+        #     self.con.commit()
         
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
@@ -293,9 +297,7 @@ class Sqlite(Filesystem):
         import nbformat as nbf
         dsi_relations, dsi_units = None, None
 
-        # DEPRECATE WITH NEWER NAME process_artifacts() IN FUTURE DSI RELEASE
-        collection = self.read_to_artifact(only_units_relations=True)
-        # collection = self.process_artifacts(only_units_relations=True)
+        collection = self.process_artifacts(only_units_relations=True)
         
         if "dsi_relations" in collection.keys():
             dsi_relations = dict(collection["dsi_relations"])
@@ -646,9 +648,8 @@ class Sqlite(Filesystem):
                     middle = f'"{all_cols}", *'
                 else:
                     middle = f"'{col[1]}', {col[1]}"
-                # query = f"""SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, 
-                # {middle} FROM {table} AS t1 WHERE """
-                query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
+                query = f"SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, {middle} FROM {table} AS t1 WHERE "
+                # query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
                 if isinstance(query_object, str):
                     query += f"{col[1]} LIKE '%{query_object}%'" 
                 else:
@@ -723,6 +724,8 @@ class Sqlite(Filesystem):
         else:
             sql_list = ", ".join(display_cols)
             df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con) 
+        if num_rows == -101:
+            return df
         headers = df.columns.tolist()
         rows = df.values.tolist()
 
@@ -851,6 +854,45 @@ class Sqlite(Filesystem):
             if count == max_rows:
                 print(f"  ... showing {max_rows} of {len(rows)} rows")
                 break
+
+    def overwrite_table(self, table_name, dataframe):
+        temp_data = OrderedDict()
+        temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
+
+        relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
+        old_data = None
+        pk_col = None
+        tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
+        for colInfo in tableInfo:
+            if colInfo[5] == 1:
+                relations["primary_key"].append((table_name, colInfo[1]))
+                relations["foreign_key"].append((None, None))
+
+                pk_col = colInfo[1]
+                rows = self.cur.execute(f"SELECT {colInfo[1]} FROM {table_name}").fetchall()
+                old_data = [row[0] for row in rows]
+                break
+        
+        fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
+        for row in fkData:
+            relations["primary_key"].append((row[2], row[4]))
+            relations["foreign_key"].append((table_name, row[3]))
+        
+        if len(relations["primary_key"]) > 0:
+            temp_data["dsi_relations"] = relations
+        
+        if pk_col:
+            pk_data = temp_data[table_name][pk_col]
+            if any(isinstance(x, str) for x in pk_data) and any(isinstance(x, (int, float)) for x in pk_data):
+                return (ValueError, f"User edited {table_name}'s primary key column, {pk_col}, with mismatched data types. Table not updated.")
+            if old_data != pk_data:
+                print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
+
+        self.cur.execute(f'DROP TABLE IF EXISTS "{table_name}";')
+        self.con.commit()
+
+        self.ingest_artifacts(temp_data)
+        self.con.commit()
 
     # Closes connection to server
     def close(self):

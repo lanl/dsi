@@ -15,12 +15,14 @@ as well as generating an interactive notebook of the data.
 All relevant functions have been listed below for further clarity. :ref:`example_section_label` displays different workflows using this Terminal class.
 
 Notes for users:
-      - All DSI Writers that are loaded must be followed by calling ``Terminal.transload`` after to execute them. Readers are automatically executed upon loading.
+      - All DSI Writers that are loaded must be followed by calling ``Terminal.transload`` after to execute them. 
+        Readers are automatically executed upon loading.
       - ``Terminal.load_module``: if users wants to group related tables of data from a DSI Reader under the same name, 
         they can use the `target_table_prefix` input to specify a shared prefix.
 
-            - users must remember that when accessing data from these tables, their names will include the specified prefix. Ex: collection1__math, collection1__english 
-      - ``Terminal.artifact_handler``: 'notebook' interaction_type stores data from first loaded backend, NOT the existing DSI abstraction, in new notebook file
+            - users must remember that when accessing data from these tables, their names will include the specified prefix. 
+              Ex: collection1__math, collection1__english 
+      - ``Terminal.artifact_handler``: 'notebook' interaction_type stores data from first loaded backend, NOT existing DSI abstraction, in new notebook file
       - ``Terminal.artifact_handler``: review this function description below to clarify which backends are targeted by which interaction_types
       - Terminal find functions only access the first loaded backend
       - ``Terminal.unload_module``: removes last loaded backend of specified mod_name. Ex: if there are 2 loaded Sqlite backends, second is unloaded
@@ -37,12 +39,14 @@ Core: Sync
 ----------
 
 The DSI Core middleware also defines data management functionality in ``Sync``. 
+
 The purpose of ``Sync`` is to provide file metadata documentation and data movement capabilities when moving data to/from local and remote locations. 
 The purpose of data documentation is to capture and archive metadata 
 (i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates) 
 and track their movement to the remote location for future access. 
-The primary functions, ``Copy``, ``Move``, and ``Get`` serve as mechanisms to copy data, move data, or retrieve data from remote locations by creating a DSI database in the process, 
-or retrieving an existing DSI database that contains the location(s) of the target data.
+
+The primary functions, ``Copy``, ``Move``, and ``Get`` serve as mechanisms to copy data, move data, or retrieve data from remote locations 
+by creating a DSI database in the process, or retrieving an existing DSI database that contains the location(s) of the target data.
 
 .. autoclass:: dsi.core.Sync
       :members:

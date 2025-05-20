@@ -8,8 +8,6 @@ find_dsi = DSI()
 find_dsi.backend("data.db") 
 
 #dsi.find(value)
-find_dsi.findt("a") # finds "a" in a Table search after backend() loaded
-find_dsi.findc("c") # finds "c" in a Column search after backend() loaded
 find_dsi.find(5.9) # finds the value 5.9 in an all Cells search after backend() loaded
 
 find_dsi.close()
