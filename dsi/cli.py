@@ -396,16 +396,22 @@ class DSI_cli:
         new_name = args.filename
         file_extension = new_name.rsplit(".", 1)[-1] if '.' in new_name else ''
         dsi_db_path = os.path.join(self.start_dir, self.name)
+        final_name = None
         if "sqlite" in self.name:
             if file_extension.lower() in ["db", "sqlite", "sqlite3"]:
                 shutil.copyfile(dsi_db_path, new_name)
+                final_name = new_name
             else:
                 shutil.copyfile(dsi_db_path, new_name + ".sqlite")
+                final_name = new_name + ".sqlite"
         elif "duckdb" in self.name:
             if file_extension.lower() in ["db", "duckdb"]:
                 shutil.copyfile(dsi_db_path, new_name)
+                final_name = new_name
             else:
                 shutil.copyfile(dsi_db_path, new_name + ".duckdb")
+                final_name = new_name + ".duckdb"
+        print(f"Saved data to {final_name}\n")
 
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')
