@@ -1,6 +1,7 @@
 from dsi.core import Terminal, Sync, FindObject
-import pandas as pd
 from collections import OrderedDict
+import numpy as np
+import pandas as pd
 import re
 
 class DSI():
@@ -239,6 +240,7 @@ class DSI():
                 - Corresponding table in the backend will be completely overwritten.
                   Ensure the data is complete and properly structured
 
+        - NOTE: Edited table cannot delete columns from the original table, only edit or append new ones.
         - NOTE: If a DataFrame includes edits to a column that is a user-defined primary key, row order may change upon reinsertion.
         """
         if isinstance(collection, (list, FindObject)):
@@ -261,6 +263,11 @@ class DSI():
                         actual_df[col] = None
                     actual_df = actual_df[input_df.columns]
                 
+                for col in actual_df.columns:
+                    common_dtype = np.find_common_type([actual_df[col].dtype, input_df[col].dtype], [])
+                    actual_df[col] = actual_df[col].astype(common_dtype)
+                    input_df[col] = input_df[col].astype(common_dtype)
+
                 # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
                 id_list = [x - 1 for x in find_obj.row_numbers]
                 actual_df.loc[id_list] = input_df.values
