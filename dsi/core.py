@@ -803,8 +803,10 @@ class Terminal():
             raise ValueError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
         start = datetime.now()
 
-        backend.overwrite_table(table_name, dataframe)
-
+        errorStmt = backend.overwrite_table(table_name, dataframe)
+        if errorStmt is not None and isinstance(errorStmt, tuple):
+            raise errorStmt[0](errorStmt[1])
+        
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")

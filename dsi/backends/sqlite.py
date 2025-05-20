@@ -860,7 +860,7 @@ class Sqlite(Filesystem):
         temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
 
         relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
-        data = None
+        old_data = None
         pk_col = None
         tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
         for colInfo in tableInfo:
@@ -870,7 +870,7 @@ class Sqlite(Filesystem):
 
                 pk_col = colInfo[1]
                 rows = self.cur.execute(f"SELECT {colInfo[1]} FROM {table_name}").fetchall()
-                data = [row[0] for row in rows]
+                old_data = [row[0] for row in rows]
                 break
         
         fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
@@ -881,8 +881,12 @@ class Sqlite(Filesystem):
         if len(relations["primary_key"]) > 0:
             temp_data["dsi_relations"] = relations
         
-        if pk_col and data != temp_data[table_name][pk_col]:
-            print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
+        if pk_col:
+            pk_data = temp_data[table_name][pk_col]
+            if any(isinstance(x, str) for x in pk_data) and any(isinstance(x, (int, float)) for x in pk_data):
+                return (ValueError, f"User edited {table_name}'s primary key column, {pk_col}, with mismatched data types. Table not updated.")
+            if old_data != pk_data:
+                print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
 
         self.cur.execute(f'DROP TABLE IF EXISTS "{table_name}";')
         self.con.commit()

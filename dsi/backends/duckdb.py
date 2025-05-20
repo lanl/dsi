@@ -779,9 +779,13 @@ class DuckDB(Filesystem):
         result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if table_name in pk_tuple[0]), None)
 
         if result:
+            pk_data = temp_data[table_name][result]
+            if any(isinstance(x, str) for x in pk_data) and any(isinstance(x, (int, float)) for x in pk_data):
+                return (ValueError, f"User edited {table_name}'s primary key column, {result}, with mismatched data types. Table not updated.")
+            
             rows = self.cur.execute(f"SELECT {result} FROM {table_name}").fetchall()
             data = [row[0] for row in rows]
-            if data != temp_data[table_name][result]:
+            if data != pk_data:
                 print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
 
         self.cur.execute(f"DROP TABLE IF EXISTS {table_name};")

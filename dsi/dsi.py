@@ -150,6 +150,7 @@ class DSI():
             headers = df.columns.tolist()
             rows = df.values.tolist()
             self.t.table_print_helper(headers, rows)
+            print()
         else:
             df.attrs['table_name'] = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', statement, re.IGNORECASE)[0][0]
             return df
