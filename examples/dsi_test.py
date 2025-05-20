@@ -4,15 +4,21 @@ from dsi.dsi import DSI
 test = DSI()
 
 ''' Printing all valid readers, writers, backends '''
+# test.list_backends()
 # test.list_readers()
 # test.list_writers()
-# test.list_backends()
+
+
+''' Example of loading a Sqlite DSI backend'''
+test.backend("data.db", backend_name="Sqlite")
+# test.backend("data.duckdb", backend_name="DuckDB")
+
 
 ''' Example uses of loading open DSI readers '''
-# test.read(filenames="data/example_schema.json", reader_name='Schema')
+# test.schema(filename="data/example_schema.json")
 test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader_name='YAML1')
 # test.read(filenames=["data/results.toml", "data/results1.toml"], reader_name='TOML1')
-# test.read(filenames="data/yosemite5.csv", reader_name='Csv', table_name = "yosemite") # data table is named yosemite not Csv
+# test.read(filenames="data/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
 # test.read(filenames="data/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
 # test.read(filenames=['data/bueno1.data', 'data/bueno2.data'], reader_name='Bueno')
 
@@ -28,41 +34,39 @@ test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader
 # test.write(filename="physics.csv", writer_name="Csv_Writer", table_name="physics")
 
 
-''' Example of loading a Sqlite DSI backend, and its data interactions: put (ingest), get (query), inspect (notebook), read (process) '''
-test.backend("data.db", backend_name="Sqlite")
-# test.backend("data.duckdb", backend_name="DuckDB")
+''' Backend data interactions: query() and find(). Manipulating their outputs to update() the backend'''
+query_df = test.query("SELECT * FROM math", collection=True)
+test.display("math")
+query_df['f'] = 123
+query_df["new_col"] = "test"
+print(query_df)
+test.update(query_df)
+test.display("math")
 
-test.ingest()
-# test.query("SELECT * FROM physics")
-# test.process()
-# test.nb() # UPDATING SOON
+# find_list = test.find(query=2, collection=True)
+# for obj in find_list:
+#     test.display(table_name=obj.table_name)
+# for obj in find_list:
+#     address_table = obj
+#     address_df = address_table.collection
+#     address_df['i'] = 200
+#     address_df['j'] = 123.456
+#     address_df["new_col"] = "test"
+#     address_table.collection = address_df
+#     obj = address_table
+# test.update(find_list)
+# for obj in find_list:
+#     test.display(table_name=obj.table_name)
 
 
-# ''' Example of printing table information'''
+''' Printing table information'''
 # test.list()
 # test.num_tables()
 
 # test.summary()
-# test.summary(table_name='student__physics')
-# test.summary(table_name='student__physics', num_rows = 3)
+# test.summary(table_name='physics')
+# test.summary(table_name='physics', num_rows = 3)
 
-# test.display(table_name='student__physics')
-# test.display(table_name='student__physics', num_rows = 3)
-# test.display(table_name='student__physics', num_rows = 3, display_cols=['n', 'p', 'r'])
-
-
-# ''' Example uses of the DSI FIND feature: find_table, find_column, find '''
-# ## TABLE match                      - prints matching table data
-# test.findt(query="people")
-
-# ## COLUMN match                     - prints matching column data
-# test.findc(query="a")
-
-# ## RANGE match (range = True)       - prints [min, max] of matching cols
-# test.findc(query="avg", range=True)
-
-# ## CELL match                       - prints the cells which match the search term
-# test.find(query=5.5)
-
-# ## ROW match (row_return = True)    - prints the rows where cells match the search term
-# test.find(query=5.5, row=True)
+# test.display(table_name='physics')
+# test.display(table_name='physics', num_rows = 3)
+# test.display(table_name='physics', num_rows = 3, display_cols=['n', 'p', 'r'])

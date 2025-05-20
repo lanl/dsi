@@ -212,8 +212,6 @@ class DuckDB(Filesystem):
                 else:
                     types.unit_keys.append(key + self.check_type(tableData[key]))
             
-            # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
-            # self.put_artifact_type(types, foreign_query)
             self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
@@ -651,6 +649,8 @@ class DuckDB(Filesystem):
         else:
             sql_list = ", ".join(display_cols)
             df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
+        if num_rows == -101:
+            return df
         headers = df.columns.tolist()
         rows = df.values.tolist()
         
@@ -771,6 +771,10 @@ class DuckDB(Filesystem):
             if count == max_rows:
                 print(f"  ... showing {max_rows} of {len(rows)} rows")
                 break
+
+    def drop_table(self, table_name):
+        self.cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+        self.con.commit()
 
     # Closes connection to server
     def close(self):

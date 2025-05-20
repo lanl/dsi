@@ -144,6 +144,10 @@ class Sqlite(Filesystem):
         Ex: (ValueError, "this is an error")
         """
         artifacts = collection
+
+        # if "dsi_relations" in artifacts.keys():
+        #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
+        #     self.con.commit()
         
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
@@ -293,9 +297,7 @@ class Sqlite(Filesystem):
         import nbformat as nbf
         dsi_relations, dsi_units = None, None
 
-        # DEPRECATE WITH NEWER NAME process_artifacts() IN FUTURE DSI RELEASE
-        collection = self.read_to_artifact(only_units_relations=True)
-        # collection = self.process_artifacts(only_units_relations=True)
+        collection = self.process_artifacts(only_units_relations=True)
         
         if "dsi_relations" in collection.keys():
             dsi_relations = dict(collection["dsi_relations"])
@@ -646,9 +648,8 @@ class Sqlite(Filesystem):
                     middle = f'"{all_cols}", *'
                 else:
                     middle = f"'{col[1]}', {col[1]}"
-                # query = f"""SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, 
-                # {middle} FROM {table} AS t1 WHERE """
-                query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
+                query = f"SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, {middle} FROM {table} AS t1 WHERE "
+                # query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
                 if isinstance(query_object, str):
                     query += f"{col[1]} LIKE '%{query_object}%'" 
                 else:
@@ -723,6 +724,8 @@ class Sqlite(Filesystem):
         else:
             sql_list = ", ".join(display_cols)
             df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con) 
+        if num_rows == -101:
+            return df
         headers = df.columns.tolist()
         rows = df.values.tolist()
 
@@ -851,6 +854,20 @@ class Sqlite(Filesystem):
             if count == max_rows:
                 print(f"  ... showing {max_rows} of {len(rows)} rows")
                 break
+
+    def drop_table(self, table_name):
+        columns_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
+        primary_keys = [col[1] for col in columns_info if col[5] == 1]
+
+        data = None
+        if primary_keys:
+            data = self.cur.execute(f"SELECT {primary_keys[0]} FROM {table_name}").fetchall()
+            data = [row[0] for row in data]
+
+        self.cur.execute(f'DROP TABLE IF EXISTS "{table_name}";')
+        self.con.commit()
+
+        return (primary_keys[0], data)
 
     # Closes connection to server
     def close(self):

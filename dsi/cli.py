@@ -83,12 +83,12 @@ class DSI_cli:
         print("find <var>                                        Search for a variable in the dataset")
         print("help                                              Shows this help")
         print("list                                              Lists the tables in the current DSI databse")
-        print("load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional")
+        print("read <filename> [-t table name]                   Reads in a filename/url to a DSI database. optional")
         print("                                                      table name argument if input file is only one table")
         print("plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument")
         print("query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,")
         print("                                                      and exports output to a csv/parquet file")
-        print("save <filename>                                   Save the local database as <filename>, which will be the same type.")
+        print("write <filename>                                  Writes data in DSI to a database location")
         print("summary [-t table] [-n num_rows]                  Get a summary of the database, or just a table, and optionally ")
         print("                                                      specify number of data rows to display")
         print("ls                                                Lists all files in current directory or a specified path")
@@ -196,14 +196,13 @@ class DSI_cli:
         '''
         Global find to see where that string exists
         '''
-        find_list = self.t.find(args[0])
+        find_list = self.t.find_cell(args[0], row=True)
         print()
         for val in find_list:
             print(f"Table: {val.t_name}")
-            print(f"  - Column(s): {val.c_name}")
-            print(f"  - Search Type: {val.type}")
+            print(f"  - Columns: {val.c_name}")
             print(f"  - Row Number: {val.row_num}")
-            print(f"  - Value: {val.value}")
+            print(f"  - Data: {val.value}")
         print()
               
     def list_tables(self, args):
@@ -485,10 +484,10 @@ COMMANDS = {
     'find' : (None, cli.find),
     'help': (None, cli.help_fn), #
     'list' : (None, cli.list_tables), #
-    'load' : (cli.get_load_parser, cli.load),
+    'read' : (cli.get_load_parser, cli.load),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
-    'save' : (cli.get_save_parser, cli.save_to_file),
+    'write' : (cli.get_save_parser, cli.save_to_file),
     'summary' : (cli.get_summary_parser, cli.summary), #
     'ls' : (None, cli.ls), #
     'cd' : (None, cli.cd) #

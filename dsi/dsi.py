@@ -1,8 +1,11 @@
-from dsi.core import Terminal, Sync
+from dsi.core import Terminal, Sync, FindObject
+import pandas as pd
+from collections import OrderedDict
+import re
 
 class DSI():
     '''
-    A user-facing abstration for DSI's Core middleware interface.
+    A user-facing interface for DSI's Core middleware.
 
     The DSI Class abstracts Core.Terminal for managing metadata and Core.Sync for data management and movement.
     '''
@@ -11,48 +14,98 @@ class DSI():
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
 
+    def list_backends(self):
+        """
+        Prints a list of valid backends that can be used in the `backend_name` argument in `backend()`
+        """
+        print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
+        print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
+        print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
+        print()
+
+    def backend(self, filename, backend_name = "Sqlite"):
+        """
+        Activates a backend for data operations; default is Sqlite unless user specifies.. 
+        Uses can call read(), find(), query(), write() or any backend printing operations
+
+        `filename` : str
+            Name of the backend file to create.
+            
+            Accepted file extensions:
+                - If backend_name = "Sqlite" → .db, .sqlite, .sqlite3
+                - If backend_name = "DuckDB" → .duckdb, .db
+            
+        `backend_name` : str, optional
+            Name of the backend to activate. Must be either "Sqlite" or "DuckDB".
+            Default is "Sqlite".
+        """
+        if backend_name.lower() == 'sqlite':
+            self.t.load_module('backend','Sqlite','back-write', filename=filename)
+        elif backend_name.lower() == 'duckdb':
+            self.t.load_module('backend','DuckDB','back-write', filename=filename)
+        else:
+            print("Please check the 'backend_name' argument as that is not supported by DSI now")
+            print(f"Eligible backend_names are: Sqlite, DuckDB")
+
+    def schema(self, filename):
+        """
+       Loads a relational database schema into DSI from a specified `filename`
+
+        `filename` : str
+        Path to a JSON file describing the structure of a relational database.
+        The schema should follow the format defined in `examples/data/example_schema.json`.
+
+        **Must be called before reading in any data files associated with the schema**
+        """
+        self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+
     def list_readers(self):
         """
-        Prints a list of valid readers that can be specified in the 'reader_name' argument in read()
+        Prints a list of valid readers that can be used in the `reader_name` argument in `read()`
         """
-        print("Valid Readers: Csv, YAML1, TOML1, JSON, Schema, Ensemble, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard \n")
-        print("Oceans11Datacard loads in metadata describing a dataset to be stored in the oceans11 DSI data server (oceans11.lanl.gov). Input format is YAML")
-        print("DublinCoreDatacard loads in a dataset's metadata which conforms to Dublin Core. Input format is XML")
-        print("SchemaOrgDatacard loads in a dataset's metadata which conforms to schema.org. Input format is JSON")
-        print("Schema loads in a complex JSON schema that describes tables relations for a structured relational database like Sqlite and DuckDB.")
-        print("Bueno captures performance data from Bueno (github.com/lanl/bueno). Input format is a dictionary in a text file ending in .data")
-        print("Csv loads in data from CSV files that can only be for one table in each separate call")
-        print("YAML1 loads in data from YAML files of a particular structure")
-        print("TOML1 loads in data from TOML files of a particular structure")
-        print("Ensemble loads in data from a CSV file and generates a simulation table alongside it. Each row of data should be a separate simulation run")
-        print("JSON loads in data from JSON files that can only be for one table in each separate call")
+        print("\nValid Readers for `reader_name` in read():\n" + "-"*50)
+        print("CSV                  : Loads data from CSV files (one table per call)")
+        print("YAML1                : Loads data from YAML files of a certain structure")
+        print("TOML1                : Loads data from TOML files of a certain structure")
+        print("JSON                 : Loads single-table data from JSON files")
+        print("Ensemble             : Loads a CSV file where each row is a simulation run; creates a simulation table")
+        print("Bueno                : Loads performance data from Bueno (github.com/lanl/bueno) (.data text file format)")
+        print("DublinCoreDatacard   : Loads dataset metadata adhering to the Dublin Core format (XML)")
+        print("SchemaOrgDatacard    : Loads dataset metadata adhering to schema.org (JSON)")
+        print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
+        print("Oceans11Datacard     : Loads dataset metadata for Oceans11 DSI data server (oceans11.lanl.gov) (YAML)")
         print()
 
     def read(self, filenames, reader_name, table_name = None):
         """
-        Runs a reader to load data into DSI.
+        Loads data into DSI using the specified parameter `reader_name`
 
-        `filenames`: name(s) of the data file(s) to load into DSI
-            
-            - if reader_name = "Csv" ---> file extension should be .csv
-            - if reader_name = "YAML1" ---> file extension should be .yaml or .yml
-            - if reader_name = "TOML1" ---> file extension should be .toml
-            - if reader_name = "JSON" ---> file extension should be .json
-            - if reader_name = "Schema" ---> file extension should be .json
-            - if reader_name = "Ensemble" ---> file extension should be .csv
-            - if reader_name = "Bueno" ---> file extension should be .data
-            - if reader_name = "DublinCoreDatacard" ---> file extension should be .xml
-            - if reader_name = "SchemaOrgDatacard" ---> file extension should be .json
-            - if reader_name = "GoogleDatacard" ---> file extension should be .yaml or .yml
-            - if reader_name = "Oceans11Datacard" ---> file extension should be .yaml or .yml
+        `filenames` : str or list of str
+            Path(s) to the data file(s) to be loaded.
 
-        `reader_name`: name of the DSI reader to use. Call list_readers() to see a list of valid readers
+            The expected file extension depends on the selected `reader_name`:
+                - "CSV"                  → .csv
+                - "YAML1"                → .yaml or .yml
+                - "TOML1"                → .toml
+                - "JSON"                 → .json
+                - "Ensemble"             → .csv
+                - "Bueno"                → .data
+                - "DublinCoreDatacard"   → .xml
+                - "SchemaOrgDatacard"    → .json
+                - "GoogleDatacard"       → .yaml or .yml
+                - "Oceans11Datacard"     → .yaml or .yml
 
-        `table_name`: optional, default None. If `filenames` only stores one table of data, users can specify name for that table
+        `reader_name` : str
+            Name of the DSI reader to use for loading the data. 
+            Call `list_readers()` to see a list of supported reader names.
 
-            - Csv, JSON, and Ensemble readers are only ones to accept this input
-        
+        `table_name` : str, optional
+            Name to assign to the loaded table. 
+            Only used when the input file contains a single table for the `CSV`, `JSON`, or `Ensemble` reader
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        
         if reader_name.lower() == "oceans11datacard":
             self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
         elif reader_name.lower() == "dublincoredatacard":
@@ -61,10 +114,6 @@ class DSI():
             self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
         elif reader_name.lower() == "googledatacard":
             self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
-        elif reader_name.lower() == "schema":
-            if isinstance(filenames, list):
-                raise ValueError("Cannot ingest more than one schema at a time")
-            self.t.load_module('plugin', 'Schema', 'reader', filename=filenames)
         elif reader_name.lower() == "bueno":
             self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
         elif reader_name.lower() == "csv":
@@ -79,60 +128,153 @@ class DSI():
             self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name = table_name)
         else:
             print("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-            print("Eligible readers are: Csv, YAML1, TOML1, JSON, Schema, Ensemble, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard")
-            print()
-
-    def list_backends(self):
-        """
-        Prints a list of valid backends that can be specified in the 'backend_name' argument in backend()
-        """
-        print("Sqlite, DuckDB\n")
-        print("Sqlite: Python based SQL database and backend; the default DSI API backend.")
-        print("DuckDB: In-process SQL database designed for fast queries on large data files.")
-        print()
-
-    def backend(self, filename, backend_name = "Sqlite"):
-        """
-        Activates a backend, default is Sqlite unless specified. 
-        Uses can now call the ingest(), query(), or process() functions.
-
-        `filename`: name of the backend file
-            - if backend_name = "Sqlite" ---> file extension can be .db, .sqlite, .sqlite3
-            - if backend_name = "DuckDB" ---> file extension can be .duckdb, .db
-            
-        `backend_name`: either 'Sqlite' or 'DuckDB. Default is Sqlite
-        """
-        if backend_name.lower() == 'sqlite':
-            self.t.load_module('backend','Sqlite','back-write', filename=filename)
-        elif backend_name.lower() == 'duckdb':
-            self.t.load_module('backend','DuckDB','back-write', filename=filename)
-        else:
-            print("Please check the 'backend_name' argument as that is not supported by DSI now")
-            print(f"Eligible backend_names are: Sqlite, DuckDB")
-
-    def ingest(self):
-        """
-        Ingests data from all previously called read() functions into active backends from backend().
-        """
+            print("Eligible readers are: CSV, YAML1, TOML1, JSON, Ensemble, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard")
+            raise ValueError
         self.t.artifact_handler(interaction_type='ingest')
-        print("Ingest complete.")
+        self.t.active_metadata = OrderedDict()
 
-    def query(self, statement):
+    def query(self, statement, collection = False):
         """
-        Queries data from first activated backend based on specified `statement`. Prints data as a dataframe
+        Executes a SQL query on the first activated backend.
 
-        `statement`: query to run on a backend. `statement` can only be a SELECT or PRAGMA query.
+        `statement` : str
+            A SQL query to execute. Only `SELECT` and `PRAGMA` statements are allowed.
+
+        `collection` : bool, optional, default False.
+            If True, returns the result as a pandas.DataFrame
+            If False, (default), prints the result.
         """
         df = self.t.artifact_handler(interaction_type='query', query=statement)
-        headers = df.columns.tolist()
-        rows = df.values.tolist()
-        self.t.table_print_helper(headers, rows)
+        if not collection:
+            headers = df.columns.tolist()
+            rows = df.values.tolist()
+            self.t.table_print_helper(headers, rows)
+        else:
+            df.attrs['table_name'] = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', statement, re.IGNORECASE)[0][0]
+            print(re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', statement, re.IGNORECASE)[0][0])
+            return df
+        
+    def find(self, query, collection = False):
+        """
+        Finds all individual datapoints matching the `query` input from the first activated backend
+
+        `query`: int, float, or str
+            The value to search for across all tables in the backend. Matching is performed
+            at the individual cell level.
+
+        `collection` : bool, optional, default False. 
+            If True, returns a list of structured objects (one for each table with data matching `query`) 
+            that include data/metadata for each match. Each object follows the FindObject structure:
+
+                - table_name : str
+                    Name of table where 'query' was found.
+                    **DO NOT modify this if you plan to call DSI.update()**
+
+                - column_name : str
+                    The first column where 'query` was matched in this table
+
+                - row_numbers : list of int
+                    Indices (row numbers) where `query` was found in this table. 
+                    **DO NOT modify this list if you plan to cal DSI.update()**
+
+                - collection : Pandas.DataFrame
+                    Subset of the table containing all rows where `query` was found
+            
+            If False (default), prints the matches in the table
+        """
+        find_data = self.t.find_cell(query, row=True)
+        if collection == False:
+            for val in find_data:
+                print(f"Table: {val.t_name}")
+                print(f"  - Columns: {val.c_name}")
+                print(f"  - Row Number: {val.row_num}")
+                print(f"  - Data: {val.value}")
+            print()
+        else:
+            find_dict = {}
+            for val in find_data:
+                # ALL COLS WHERE QUERY IS FOUND
+                # all_cols = [i for i, x in enumerate(val.value) if str(query) in str(x)]
+
+                if val.t_name not in find_dict:
+                    find_dict[val.t_name] = FindObject()
+                    find_dict[val.t_name].table_name = val.t_name
+                    index = next((i for i, x in enumerate(val.value) if str(query) in str(x)), -1)
+                    find_dict[val.t_name].column_name = index
+                    # find_dict[val.t_name].column_name = sorted(all_cols)
+                    find_dict[val.t_name].row_numbers = []
+                    find_dict[val.t_name].row_numbers.append(val.row_num)
+                    find_dict[val.t_name].collection = pd.DataFrame([val.value], columns=val.c_name)
+
+                if val.row_num not in find_dict[val.t_name].row_numbers:
+                    find_dict[val.t_name].row_numbers.append(val.row_num)
+                    find_dict[val.t_name].collection.loc[len(find_dict[val.t_name].collection)] = val.value
+                    
+                    # CHECK IF COLUMNS LIST NEEDS TO BE UPDATED
+                    # curr_cols = find_dict[val.t_name].column_name
+                    # diff = set(all_cols) - set(curr_cols)
+                    # if diff:
+                    #     find_dict[val.t_name].column_name = sorted(set(curr_cols).union(diff))
+            
+            table_list = list(find_dict.values())
+            for ind, item in enumerate(table_list):
+                table_list[ind].column_name = item.collection.columns[item.column_name]
+
+                # IF COLUMN IS A LIST OF MATCHING COLS
+                # table_list[ind].column_name = [item.column_name[i] for i in item.collection.columns] 
+            
+            return table_list
+
+    def update(self, collection):
+        """
+        Updates data in one or more tables in the first activated backend using the provided input. 
+        Expected to be used after manipulating outputs of `find()` or `query()`
+
+        `collection` : List of FindObject, FindObject, or pandas.DataFrame
+            The object used to update table data. Valid inputs are:
+
+            - List of `FindObject` (from `find()` output when collection = True)
+            - Single `FindObject`  (one element in `find()` output when collection = True)
+            - `pandas.DataFrame` (from `query()` output when collection = True)
+
+                - Corresponding table in the backend will be completely overwritten.
+                  Ensure the data is complete and properly structured
+
+        - NOTE: If a DataFrame includes edits to a column that is a user-defined primary key, row order may change upon reinsertion.
+        """
+        if isinstance(collection, (list, FindObject)):
+            if isinstance(collection, FindObject):
+                collection = [collection]
+            if isinstance(collection, list) and len(collection) > 0 and isinstance(collection[0], FindObject):
+                pass
+            else:
+                raise ValueError("If input is a list, must be a list of FindObjects which was the output of find()")
+
+            for find_obj in collection:
+                actual_df = self.t.display(find_obj.table_name, num_rows=-101)
+                input_df = find_obj.collection
+                if not set(actual_df.columns).issubset(set(input_df.columns)):
+                    errorStmt = f"The columns in {find_obj.table_name} object's dataframe, must contain all columns from the table in the backend"
+                    raise ValueError(errorStmt)
+                new_cols = list(set(input_df.columns) - set(actual_df.columns))
+                if new_cols:
+                    for col in new_cols:
+                        actual_df[col] = None
+                    actual_df = actual_df[input_df.columns]
+                
+                # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
+                id_list = [x - 1 for x in find_obj.row_numbers]
+                actual_df.loc[id_list] = input_df.values
+
+                # IF ROW NUMBERS ARE 0-INDEXED
+                # actual_df.loc[find_obj.row_numbers] = input_df.values
+
+                self.t.overwrite_table(find_obj.table_name, actual_df)
     
-    def process(self):
-        """
-        Reads data from first activated backend into DSI memory. 
-        """
-        self.t.artifact_handler(interaction_type='process')
+        elif isinstance(collection, pd.DataFrame):
+            self.t.overwrite_table(collection.attrs['table_name'], collection)
+        else:
+            raise ValueError("collection can only be a FindObject, list of FindObjects, or Pandas DataFrame to update the backend")
     
     def nb(self):
         """
@@ -143,29 +285,36 @@ class DSI():
 
     def list_writers(self):
         """
-        Prints a list of valid writers that can be specified in the 'writer_name' argument in write()
+        Prints a list of valid writers that can be used in the `writer_name` argument in `write()`
         """
-        print(self.t.VALID_WRITERS)
-        print("ER_Diagram creates an image of an ER Diagram based on data stored in DSI.")
-        print("Table_Plot generates a plot of a specified table's numerical data that is stored in DSI.")
-        print("Csv_Writer creates a CSV of a specified table whose data is stored in DSI.")
+        print("\nValid Readers for `reader_name` in read():", self.t.VALID_WRITERS, "\n")
+        print("ER_Diagram  : Creates a visual ER diagram image based on all tables in DSI.")
+        print("Table_Plot  : Generates a plot of numerical data from a specified table.")
+        print("Csv_Writer  : Exports the data of a specified table to a CSV file.")
         print()
 
     def write(self, filename, writer_name, table_name = None):
         """
-        Runs a writer to export data from DSI.
-        If data to export is in a backend, first call process() before write().
+        Exports data from a DSI backend using the specified `writer_name`.
 
-        `filename`: output file name
+        `filename` : str
+            Name of the output file to write.
 
-            - if writer_name = "ER_Diagram" ---> file extension can be .png, .pdf, .jpg, .jpeg
-            - if writer_name = "Table_Plot" ---> file extension can be .png, .jpg, .jpeg
-            - if writer_name = "Csv_Writer" ---> file extension can only be .csv
+            Expected file extensions based on `writer_name`:
+                - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
+                - "Table_Plot"   → .png, .jpg, .jpeg
+                - "Csv_Writer"   → .csv
 
-        `writer_name`: name of the DSI write to use. Call list_writers() to see a list of valid readers
+        `writer_name` : str
+            Name of the DSI writer to use. Call `list_writers()` to view all available writers.
 
-        `table_name`: optional if writer_name = "ER_Diagram". Required for Table_Plot and Csv_Writer to export correct table
+        `table_name`: str, optional
+            Required when using "Table_Plot" or "Csv_Writer" to specify which table to export.
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        
+        self.t.artifact_handler(interaction_type='process')
         if writer_name == "ER_Diagram":
             self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
         elif writer_name == "Table_Plot":
@@ -178,87 +327,51 @@ class DSI():
             print(f"Eligible writers are: {self.list_writers()}")
             return
         self.t.transload()
+        self.t.active_metadata = OrderedDict()
         print(f"{writer_name} written to {filename} complete.")
     
-    def findt(self, query):
-        """
-        Finds all tables that match `query` input in the first loaded backend
-        """
-        data = self.t.find_table(query)
-        for val in data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Columns: {val.c_name}")
-            print(f"  - Search Type: {val.type}")
-            print(f"  - Value: \n{val.value}")
-        print()
-
-    def findc(self, query, range = False):
-        """
-        Finds all columns that match `query` input in the first loaded backend.
-
-        `range`: Default is False. If False, then the printed `value` is data of each matching column.
-        If True, then the printed `value` is the min/max of each matching column
-        """
-        data = self.t.find_column(query, range)
-        for val in data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Column: {val.c_name}")
-            print(f"  - Search Type: {val.type}")
-            print(f"  - Value: {val.value}")
-        print()
-
-    def find(self, query, row = False):
-        """
-        Finds all individual datapoints that match `query` input in the first loaded backend
-
-        `row`: Default is False. If False, then printed `value` is the actual cell that matches `query`.
-        If True, then printed `value` is whole row of data where a cell matches `query`
-        """
-        data = self.t.find_cell(query, row)
-        for val in data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Column(s): {val.c_name}")
-            print(f"  - Search Type: {val.type}")
-            print(f"  - Row Number: {val.row_num}")
-            print(f"  - Value: {val.value}")
-        print()
-
     def list(self):
         """
-        Prints a list of all tables and their dimensions in the first loaded backend
+        Prints the names and dimensions (rows x columns) of all tables in the first active backend
         """
-        self.t.list() # terminal function already prints
+        self.t.list()
 
     def summary(self, table_name = None, num_rows = 0):
         """
-        Prints data and numerical metadata of tables from the first loaded backend. Output varies depending on parameters
+        Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
 
-        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
-        Otherwise every table's numerical metdata is printed
+        `table_name` : str, optional
+            If specified, only the numerical metadata for that table will be printed.
+            If None (default), metadata for all available tables is printed.
 
-        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
-        Otherwise, only the total number of rows of a table are printed. 
-        The tables whose data is printed depends on the `table_name` parameter.
+        `num_rows` : int, optional, default=0
+            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
+
+            If 0 (default), only the total number of rows is printed (no row-level data).
         """
-        self.t.summary(table_name, num_rows) # terminal function already prints
+        self.t.summary(table_name, num_rows)
     
     def num_tables(self):
         """
-        Prints number of tables in the first loaded backend
+        Prints the number of tables in the first activated backend
         """
-        self.t.num_tables() # terminal function already prints
+        self.t.num_tables()
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
-        Prints data of a specified table from the first loaded backend.
+        Prints data from a specified table in the first activated backend.
         
-        `table_name`: table whose data is printed
+        `table_name` : str
+            Name of the table to display.
          
-        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
-        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
+        `display_cols` : list of str, optional
+            List of specific column names to display from the table. 
+            If None (default), all columns are displayed.
         """
-        self.t.display(table_name, num_rows, display_cols) # terminal function already prints
+        self.t.display(table_name, num_rows, display_cols)
 
     def close(self):
         """
@@ -266,7 +379,7 @@ class DSI():
         """
         self.t.close()
     
-    #help, query?, edge-finding (find this/that)
+    #help, edge-finding (find this/that)
     def get(self, dbname):
         pass
     def move(self, filepath):
