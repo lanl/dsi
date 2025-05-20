@@ -117,6 +117,7 @@ class Terminal():
 
         DSI modules may be loaded which are not explicitly listed by the list_available_modules.
         This flexibility ensures that advanced users can access higher level abstractions.
+        
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
 
@@ -389,6 +390,7 @@ class Terminal():
         
         `interaction_type` : str
             Specifies the type of action to perform. Accepted values:
+
                 - 'ingest' or 'put': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
 
                     - if backup_db flag = True in Core instance, a backup is created prior to ingesting data
@@ -401,6 +403,9 @@ class Terminal():
 
         \**kwargs : 
             Additional keyword arguments passed to underlying backend functions.
+        
+        `return`: only when `interaction_type` = 'query'
+            By default stores query result as a Pandas.DataFrame. If specified, returns it as an OrderedDict
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -545,13 +550,16 @@ class Terminal():
     
     def find(self, query_object):
         """
-        Find all function that searches for all instances of `query_object` in first loaded backend. Searches among all tables/column/cells
+        Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
        
-        `query_object`: Object to find in first loaded backend. Can be of any type (string, float, int).
+        `query_object` : any
+            The object to search for in the backend. Can be of any type, including str, float, or int.
 
-        `return`: List of backend-specific objects that each contain details of a match for `query_object`
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -568,14 +576,17 @@ class Terminal():
         return self.find_helper(query_object, return_object, start, "")
     
     def find_table(self, query_object):
-        """
-        Find table function that searches for all tables whose names matches the `query_object` in first loaded backend.
+        """   
+        Find all tables whose name matches `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. HAS TO BE A str.
 
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-        `return`: List of backend-specific objects that each contain all data from a table matching `query_object`.
-
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -593,18 +604,21 @@ class Terminal():
     
     def find_column(self, query_object, range = False):
         """
-        Find column function that searches for all columns whose names matches the `query_object` in first loaded backend.
+        Find all columns whose name matches `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. HAS TO BE A str.
 
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `range`: bool, optional, default False. 
+            If True, then data-range of all numerical columns which match `query_object` is included in return
 
-        `range`: default False. 
+            If False, then data for each column that matches `query_object` is included in return
 
-            - If True, then data-range of all numerical columns which match `query_object` is included in return
-            - If False, then data for each column that matches `query_object` is included in return
-            
-        `return`: List of backend-specific objects that each contain data/numerical range about a column matching `query_object`.
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -622,18 +636,21 @@ class Terminal():
 
     def find_cell(self, query_object, row = False):
         """
-        Find cell function that searches for all cells which match the `query_object` in first loaded backend.
+        Find all cells that match the `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. Can be of any type, including str, float, or int.
 
-        `query_object`: Object to find in all cells. Can be of any type (string, float, int).
+        `row` : bool, default=False
+            If True, includes the entire row of data for each matching cell in return.
 
-        `row`: default False.
+            If False, includes only the value of the matching cell
 
-            - If True, then full row of data where a cell matches `query_object` is included in return
-            - If False, then the value of the cell that matches `query_object` is included in return
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches `query_object`
-
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -702,15 +719,17 @@ class Terminal():
 
     def summary(self, table_name = None, num_rows = 0):
         """
-        Prints data and numerical metadata of tables from the first loaded backend. Output varies depending on parameters
+        Prints numerical metadata and (optionally) sample data from tables in the first loaded backend.
 
-        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
-        Otherwise every table's numerical metdata is printed
+        `table_name` : str, optional
+            If specified, only the numerical metadata for that table will be printed.
 
-        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
-        Otherwise, only the total number of rows of a table are printed. 
-        The tables whose data is printed depends on the `table_name` parameter.
+            If None (default), metadata for all available tables is printed.
 
+        `num_rows` : int, optional, default=0
+            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
+
+            If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -756,13 +775,18 @@ class Terminal():
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
-        Prints data of a specified table from the first loaded backend.
+        Prints data from a specified table in the first loaded backend.
         
-        `table_name`: table whose data is printed
+        `table_name` : str
+            Name of the table to display.
          
-        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
-        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
+        `display_cols` : list of str, optional
+            List of specific column names to display from the table. 
+
+            If None (default), all columns are displayed.
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -821,13 +845,21 @@ class Terminal():
     
     def get_current_abstraction(self, table_name = None):
         """
-        Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict
+        Returns the current DSI abstraction as a nested Ordered Dict.
 
-        The inner table Ordered Dict has column names as keys and list of column data as the values.
+        The abstraction is organized such that:
+            - The outer OrderedDict has table names as keys.
+            - Each value is an inner OrderedDict representing a table, where keys are column names and values are lists of column data.
 
-        `table_name`: default None. If specified, the return will only be that table's Ordered Dict, not a nested one.
+        `table_name` : str, optional, default is None.
+            If specified, returns only the OrderedDict corresponding to that table.
 
-        `return`: nested Ordered Dict if table_name is None. single Ordered Dict if table_name is not None
+            If None (default), returns the full nested OrderedDict containing all tables.
+
+        `return` : OrderedDict
+            If `table_name` is None: returns a nested OrderedDict of all tables.
+            
+            If `table_name` is provided: returns a single OrderedDict for that table.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -852,11 +884,14 @@ class Terminal():
         """
         Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
 
-        `table_name`: name of table that must be in the current abstraction
+        `table_name`: str
+            Name of the table to update. This table must already exist in the current abstraction.
 
-        `table_data`: table data that must be stored as an Ordered Dict where column names are keys and column data is a list stored as values.
-        
-        `return`: None
+        `table_data` : OrderedDict
+            The new data to store in the table. Must be an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")

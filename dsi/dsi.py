@@ -350,6 +350,7 @@ class DSI():
 
         `table_name` : str, optional
             If specified, only the numerical metadata for that table will be printed.
+            
             If None (default), metadata for all available tables is printed.
 
         `num_rows` : int, optional, default=0
@@ -377,6 +378,7 @@ class DSI():
 
         `display_cols` : list of str, optional
             List of specific column names to display from the table. 
+
             If None (default), all columns are displayed.
         """
         self.t.display(table_name, num_rows, display_cols)

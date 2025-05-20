@@ -107,9 +107,10 @@ Printing different data and metadata from a database - number of tables, dimensi
 
 .. literalinclude:: ../examples/user/6.visualize.py
 
-Example 7: Read complex schema with data
+Example 7: Complex schema with data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Loading complex JSON schema with ``schema()``, loading associated data with ``read()``, and an ER Diagram to display the relations
-.. Read ref`user_schema_example_label` to understand how to structure this schema JSON file for ``schema()`
+Loading complex JSON schema with ``schema()``, loading associated data with ``read()``, and an ER Diagram to display the relations.
+
+.. Read :ref:`user_schema_example_label` to understand how to structure this schema JSON file for ``schema()``
 
 .. literalinclude:: ../examples/user/7.schema.py
