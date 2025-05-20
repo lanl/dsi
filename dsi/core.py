@@ -173,22 +173,25 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
                     
+                    tester = 0
+                    if sys.gettrace() is None:
+                        tester = 1
+                        sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
+
+                    ingest_error = None
                     try:
-                        tester = 0
-                        if sys.gettrace() is None:
-                            tester = 1
-                            sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
                         ingest_error = obj.add_rows()
-                        if ingest_error is not None:
-                            if self.debug_level != 0:
-                                self.logger.error(f"   {ingest_error[1]}")
-                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
-                        if tester == 1:
-                            sys.settrace(None) # ends trace to prevent large overhead
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                         raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
+                    
+                    if ingest_error is not None:
+                            if self.debug_level != 0:
+                                self.logger.error(f"   {ingest_error[1]}")
+                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                    if tester == 1:
+                        sys.settrace(None) # ends trace to prevent large overhead
                     
                     for table_name, table_metadata in obj.output_collector.items():
                         if self.runTable == True and table_name == "runTable":
@@ -344,25 +347,30 @@ class Terminal():
             self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
+
+            tester = 0
+            if sys.gettrace() is None:
+                tester = 1
+                sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
+            
+            writer_error = None
             try:
-                tester = 0
-                if sys.gettrace() is None:
-                    tester = 1
-                    sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
-                if writer_error is not None:
-                    if writer_error[0] == "Warning":
-                        warnings.warn(writer_error[1])
-                    else:
-                        if self.debug_level != 0:
-                            self.logger.error(writer_error[1])
-                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
-                if tester == 1:
-                    sys.settrace(None) # ends trace to prevent large overhead
             except:
                 if self.debug_level != 0: 
                     self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
                 raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
+            
+            if writer_error is not None:
+                if writer_error[0] == "Warning":
+                    warnings.warn(writer_error[1])
+                else:
+                    if self.debug_level != 0:
+                        self.logger.error(writer_error[1])
+                    raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+            if tester == 1:
+                sys.settrace(None) # ends trace to prevent large overhead
+                
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
