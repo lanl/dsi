@@ -174,6 +174,38 @@ class Schema(FileReader):
         self.target_table_prefix = target_table_prefix
         self.schema_data = OrderedDict()
 
+    def has_circular_dependency(self, relation_dict):
+        """
+        Helper function to check if a user-loaded schema for DSI has circular dependencies. 
+        Only used for internal functions
+        """
+        from collections import defaultdict
+        pk_list = relation_dict['primary_key']
+        fk_list = relation_dict['foreign_key']
+
+        # Build graph: FK table -> PK table
+        graph = defaultdict(list)
+        for (pk_table, _), (fk_table, _) in zip(pk_list, fk_list):
+            if fk_table is not None and pk_table is not None:
+                graph[fk_table].append(pk_table)
+
+        visited = set()
+        stack = set()
+        def visit(node):
+            if node in stack:
+                return True  # cycle detected
+            if node in visited:
+                return False
+            stack.add(node)
+            visited.add(node)
+            for neighbor in graph[node]:
+                if visit(neighbor):
+                    return True
+            stack.remove(node)
+            return False
+
+        return any(visit(node) for node in list(graph.keys()))
+
     def add_rows(self) -> None:
         """
         Generates a dsi_relations OrderedDict to be added to the internal DSI abstraction. 
@@ -203,7 +235,11 @@ class Schema(FileReader):
                 if pk not in self.schema_data["dsi_relations"]["primary_key"]:
                     self.schema_data["dsi_relations"]["primary_key"].append(pk)
                     self.schema_data["dsi_relations"]["foreign_key"].append((None, None))
-            self.set_schema_2(self.schema_data)
+            
+            if self.has_circular_dependency(self.schema_data["dsi_relations"]):
+                return (ValueError, f"There is a circular dependency in {self.schema_file}. Please remove it.")
+            else:
+                self.set_schema_2(self.schema_data)
 
 class YAML1(FileReader):
     """
@@ -639,8 +675,8 @@ class GoogleDatacard(FileReader):
                                               'dataset_owner3', 'dataset_owners_affiliation', 'dataset_owners_contact', 'funding_institution', 
                                               'funding_summary', 'data_subjects', 'data_sensitivity', 'version', 'maintenance_status', 
                                               'last_updated', 'release_date', 'motivation', 'dataset_uses', 'citation_guidelines', 
-                                              'citation_bibtex', 'collection_methods_used', 'collection_type', 'source', 'platform', 
-                                              'dates_of_collection', 'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
+                                              'citation_bibtex', 'collection_methods_used', 'source', 'platform', 'dates_of_collection',
+                                              'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
             
             if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
