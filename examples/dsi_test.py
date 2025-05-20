@@ -3,19 +3,19 @@ from dsi.dsi import DSI
 '''This is an example workflow using core.py'''
 test = DSI()
 
-''' Printing all valid readers, writers, backends '''
+''' Printing all valid backends, readers, writers '''
 # test.list_backends()
 # test.list_readers()
 # test.list_writers()
 
 
-''' Example of loading a Sqlite DSI backend'''
+''' Example of loading a Sqlite DSI backend '''
 test.backend("data.db", backend_name="Sqlite")
 # test.backend("data.duckdb", backend_name="DuckDB")
 
 
-''' Example uses of loading open DSI readers '''
-# test.schema(filename="data/example_schema.json")
+''' Example uses of loading DSI readers '''
+test.schema(filename="data/example_schema.json")
 test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader_name='YAML1')
 # test.read(filenames=["data/results.toml", "data/results1.toml"], reader_name='TOML1')
 # test.read(filenames="data/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
@@ -28,22 +28,24 @@ test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader
 # test.read(filenames="data/template_dc_google.yml", reader_name='GoogleDatacard')
 
 
-''' Example uses of loading open DSI writers. '''
+''' Example uses of loading DSI writers '''
 # test.write(filename="er_diagram.png", writer_name="ER_Diagram")
 # test.write(filename="physics_plot.png", writer_name="Table_Plot", table_name="physics")
 # test.write(filename="physics.csv", writer_name="Csv_Writer", table_name="physics")
 
 
-''' Backend data interactions: query() and find(). Manipulating their outputs to update() the backend'''
-query_df = test.query("SELECT * FROM math", collection=True)
-test.display("math")
-query_df['f'] = 123
-query_df["new_col"] = "test"
-print(query_df)
-test.update(query_df)
-test.display("math")
+''' Backend data interactions: query() and find(). Manipulating their outputs to update() the backend '''
+test.query("SELECT * FROM math")                              # print output
+# query_df = test.query("SELECT * FROM math", collection=True)  # return output
+# test.display("math")
+# query_df['f'] = 123
+# query_df["new_col"] = "test"
+# print(query_df)
+# test.update(query_df)
+# test.display("math")
 
-# find_list = test.find(query=2, collection=True)
+test.find(query=2)                                # print output
+# find_list = test.find(query=2, collection=True)   # return output
 # for obj in find_list:
 #     test.display(table_name=obj.table_name)
 # for obj in find_list:
@@ -59,7 +61,7 @@ test.display("math")
 #     test.display(table_name=obj.table_name)
 
 
-''' Printing table information'''
+''' Printing table information '''
 # test.list()
 # test.num_tables()
 

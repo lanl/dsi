@@ -44,8 +44,8 @@ If metadata is crucial to data representation, users should ensure it is stored 
 
 Users expecting to load a complex schema into DSI should also consider which columns in tables will be related to each other.
 This requires prior knowledge of primary and foreign keys, and writing a JSON file to represent this schema. 
-For more information on a schema compatible with DSI, please view ________.
-
+For a template DSI-compatible schema, review ``examples/data/example_schema.json``
+.. For more information on a schema compatible with DSI, please view ________.
 
 DSI Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~
@@ -75,13 +75,6 @@ Currently, DSI has the following Writers:
   - Csv_Writer
   - ER_Diagram
   - Table_Plot
-
-.. ..  figure:: images/PluginClassHierarchy.png
-..     :alt: Figure depicting the current Reader/Writer class hierarchy.
-..     :class: with-shadow
-..     :scale: 70%
-
-..     Figure depicting the current DSI Reader/Writer class hierarchy.
 
 DSI Backends
 ~~~~~~~~~~~~~

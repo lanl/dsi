@@ -5,7 +5,7 @@ schema_dsi = DSI()
 
 # loads a complex schema into DSI to apply to a database
 #dsi.read(filename, reader)
-schema_dsi.read("../data/example_schema.json", "Schema") # view comments in dsi/data/example_schema.json to learn how to structure it
+schema_dsi.schema("../data/example_schema.json") # view comments in dsi/data/example_schema.json on how to structure it
 schema_dsi.read("../data/student_test1.yml", 'YAML1')
 
 #dsi.write(filename, writer)

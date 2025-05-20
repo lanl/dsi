@@ -5,7 +5,7 @@ DSI Examples
 PENNANT mini-app
 ----------------
 
-`PENNANT`_ is an unstructured mesh physics mini-application developed at Los Alamos National Laboratory
+`PENNANT` is an unstructured mesh physics mini-application developed at Los Alamos National Laboratory
 for advanced architecture research.
 It contains mesh data structures and a few
 physics algorithms from radiation hydrodynamics and serves as an example of

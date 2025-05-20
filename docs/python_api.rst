@@ -93,7 +93,7 @@ Example 4: Writing data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.
 
-.. literalinclude:: ../examples/user/4.process.py
+.. literalinclude:: ../examples/user/4.write.py
 
 Example 5: Query data
 ~~~~~~~~~~~~~~~~~~~~~
