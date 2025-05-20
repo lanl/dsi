@@ -32,6 +32,21 @@ The DSI API is broken into three main categories:
 - DSI Core: the *middleware* that contains the basic functionality to use the DSI API. 
   This connects Readers/Writers to Backends through several modules exposed to users.
 
+Expected Data Standards
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before using DSI, users are expected to preprocess their data into a standardized format.
+DSI's actions are strict and will not commit any database actions if the data is unstable.
+
+This can be achieved by organizing the data so it can be represented as a table in DSI. 
+It is also expected that each data point is a discrete value, rather than a complex data structure.
+If metadata is crucial to data representation, users should ensure it is stored with the data to be captured by DSI actions.
+
+Users expecting to load a complex schema into DSI should also consider which columns in tables will be related to each other.
+This requires prior knowledge of primary and foreign keys, and writing a JSON file to represent this schema. 
+For more information on a schema compatible with DSI, please view ________.
+
+
 DSI Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -51,10 +66,10 @@ Currently, DSI has the following Readers:
   - Bueno
   - Ensemble (Reader to ingest ensemble data. Ex: the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . 
     Assumes each data row is a separate sim.)
-  - Oceans11Datacard (Data card of datasets on the `Oceans11 data server <https://oceans11.lanl.gov>`_)
+  - Oceans11Datacard (Data card for datasets on the `Oceans11 LANL data server <https://oceans11.lanl.gov>`_)
   - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
   - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
-  - GoogleDatacard (Data card that adheres to the `Google Data Cards Playbook metadata standard <https://sites.research.google/datacardsplaybook/>`_ )
+  - GoogleDatacard (Data card that adheres to the `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_ )
 
 Currently, DSI has the following Writers:
   - Csv_Writer

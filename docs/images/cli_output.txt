@@ -12,37 +12,37 @@ draw [-f filename]                                Draws an ER Diagram of all tab
 find <var>                                        Search for a variable in the dataset
 help                                              Shows this help
 list                                              Lists the tables in the current DSI databse
-load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional
+read <filename> [-t table name]                   Reads in a filename/url to a DSI database. optional
                                                       table name argument if input file is only one table
 plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument
 query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,
                                                       and exports output to a csv/parquet file
-save <filename>                                   Save the local database as <filename>, which will be the same type.
+write <filename>                                   Writes data in DSI to a database location.
 summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally 
                                                      specify number of data rows to display
 ls                                                Lists all files in current directory or a specified path
 cd <path>                                         Changes the working directory within the CLI environment
 
 
-dsi> load student_test1.yml
+dsi> read student_test1.yml
 YAML1 plugin reader loaded successfully.
 Database now has 4 tables
 student_test1.yml successfully loaded.
 
 
-dsi> load student_test2.yml
+dsi> read student_test2.yml
 YAML1 plugin reader loaded successfully.
 Database now has 4 tables
 student_test2.yml successfully loaded.
 
 
-dsi> load results.toml
+dsi> read results.toml
 TOML1 plugin reader loaded successfully.
 Database now has 5 tables
 results.toml successfully loaded.
 
 
-dsi> load yosemite5.csv
+dsi> read yosemite5.csv
 Csv plugin reader loaded successfully.
 Database now has 6 tables
 yosemite5.csv successfully loaded.
@@ -120,7 +120,7 @@ specification | n    | o       | p   | q       | r  | s
   ... showing 1 of 2 rows
 
 
-dsi> save dsi_output.db
+dsi> write dsi_output.db
 
 dsi> exit
 Exiting...

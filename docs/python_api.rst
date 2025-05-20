@@ -12,26 +12,27 @@ The DSI class is a user-level class that encapsulates the Terminal and Sync clas
 DSI interacts with several functions within Terminal and Sync without requiring the user to differentiate them.
 The functionality has also been simplified to improve user experience and reduce complexity.
 
-Users should call ``read()`` to load data from external data files into DSI. ``list_readers()`` prints all valid readers and a short description of each one
+Users must first call ``backend()`` to activate a backend to read data into and interact with.
 
-Users should call ``write()`` to export data from DSI into external formats. ``list_writers()`` prints all valid writers and a short description of each one.
+Users should use ``read()`` to load data into DSI and ``write()`` to export data from DSI into supported external formats.
+Their respective list functions print all valid readers/writers that can be used.
 
-Users should call ``backend()`` to activate either a Sqlite or DuckDB backend. ``list_writers()`` prints the valid backends and differences between them.
+The primary backend interactions are ``query()`` and ``find()`` where users can print a search result, or retrieve the result as a collection of data.
 
-``ingest()``, ``query()``, ``process()`` are considered backend interactions, and require an active backend to work. 
-Therefore, ``backend()`` must be called before them.
+      - Users can manipulate these collections of data and call ``update()`` to update the data collection(s) in the activated backend.
+        Read ``update()`` to understand its accepted collection inputs.
 
-``findt()``, ``findc()``, ``find()`` also require an active backend as they locate and print where a input search term matches 
-tables/columns/datapoints respectively.
-
-``list()``, ``num_tables()``, ``display()``, ``summary()`` all print various information from an active backend. Differences are explained below.
+Users can also view various data/metadata of an active backend with ``list()``, ``num_tables()``, ``display()``, ``summary()``
 
 Notes for users:
-      - Must call ``reader()`` prior to ``ingest()`` to ensure there is actual data ingested into a backend
-      - If there is no data in DSI memory, ie. read() was never called, process() MUST be called on an active backend 
-        to ensure data can be exported with write()
-      - Refer to the :ref:`datacard_section_label` section to learn which/how datacard files are read into DSI 
-        Inputs to the datacard readers - Oceans11Datacard, DublinCoreDatacard, SchemaOrgDatacard - must all follow the formats found in dsi/examples/data/
+      - When using a complex schema, must call ``schema()`` prior to ``read()`` to store the associated data and relations together.
+      - If collection=True in ``find()``, the output is a list of FindObjects. Read the ``FindObject`` description below to understand its structure
+      - If input to ``update()`` contains edited data for a user-defined primary key column, rows in that table might be reordered.
+      - If input to ``update()`` is a Pandas.DataFrame, the existing table in the backend will be **overwritten**. Ensure data is secure.
+      - Read the :ref:`datacard_section_label` section to learn which data card standards are supported and where to find templates compatible with DSI. 
+
+.. autoclass:: dsi.core.FindObject
+      :members:
 
 .. autoclass:: dsi.dsi.DSI 
       :members:
@@ -49,9 +50,9 @@ DSI is expanding its support of several dataset metadata standards. The current 
       - `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_
       - `Oceans11 DSI Data Server <https://oceans11.lanl.gov/>`_
 
-Template file structures can be copied and found in ``dsi/examples/data/``. 
+Template file structures can be found and copied in ``examples/data/``. 
 The fields in a user's data card must exactly match its respective template to be compatible with DSI.
-However, fields can be empty if a user does not have particular information about that dataset.
+However, fields can be empty if a user does not have that particular information about the dataset.
 
 The supported datacards can be read into DSI by creating an instance of DSI() and calling:
 
@@ -60,7 +61,7 @@ The supported datacards can be read into DSI by creating an instance of DSI() an
       - ``read("file/path/to/datacard.YAML", 'GoogleDatacard')``
       - ``read("file/path/to/datacard.YAML", 'Oceans11Datacard')``
 
-Completed examples of each metadata standard for the Wildfire dataset can also be found in ``dsi/examples/wildfire/`` 
+Completed examples of each metadata standard for the Wildfire dataset can also be found in ``examples/wildfire/`` 
 
 
 .. _user_example_section_label:
@@ -76,11 +77,11 @@ Baseline use of DSI to list all valid Readers, Writers, and Backends, and descri
 
 .. literalinclude:: ../examples/user/1.baseline.py
 
-Example 2: Ingest data
+Example 2: Read data
 ~~~~~~~~~~~~~~~~~~~~~~
-Loading data from a Reader, ingesting it into a backend and displaying some of that data
+Reading data from a YAML file into a DSI backend, and displaying some of that data
 
-.. literalinclude:: ../examples/user/2.ingest.py
+.. literalinclude:: ../examples/user/2.read.py
 
 Example 3: Find data
 ~~~~~~~~~~~~~~~~~~~~
@@ -88,9 +89,9 @@ Finding data from an active backend - tables, columns, datapoints matches
 
 .. literalinclude:: ../examples/user/3.find.py
 
-Example 4: Process data
+Example 4: Writing data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Processing (reading) data from a backend and load DSI writers to generate an Entity Relationship diagram, plot a table's data, and export to a CSV
+Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.
 
 .. literalinclude:: ../examples/user/4.process.py
 
