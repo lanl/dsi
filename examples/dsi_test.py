@@ -25,7 +25,7 @@ test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader
 # test.read(filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
 # test.read(filenames="wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
 # test.read(filenames="wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
-# test.read(filenames="data/template_dc_google.yml", reader_name='GoogleDatacard')
+# test.read(filenames="wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
 
 
 ''' Example uses of loading DSI writers '''
