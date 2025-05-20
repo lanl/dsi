@@ -772,8 +772,22 @@ class DuckDB(Filesystem):
                 print(f"  ... showing {max_rows} of {len(rows)} rows")
                 break
 
-    def drop_table(self, table_name):
+    def overwrite_table(self, table_name, dataframe):
+        temp_data = self.process_artifacts()
+        temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
+
+        result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if table_name in pk_tuple[0]), None)
+
+        if result:
+            rows = self.cur.execute(f"SELECT {result} FROM {table_name}").fetchall()
+            data = [row[0] for row in rows]
+            if data != temp_data[table_name][result]:
+                print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
+
         self.cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+        self.con.commit()
+
+        self.ingest_artifacts(temp_data)
         self.con.commit()
 
     # Closes connection to server

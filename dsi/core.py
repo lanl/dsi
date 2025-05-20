@@ -375,36 +375,6 @@ class Terminal():
         else:
             self.active_modules["writer"] = []
 
-    def close(self):
-        """
-        Immediately closes all active modules: backends, plugin writers, plugin readers
-
-        Clears out the current DSI abstraction
-
-        NOTE - This step cannot be undone.
-        """
-        print("Closing the abstraction layer, and all active plugins/backends")
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.info("Closing and clearing out all objects in this Terminal object")
-            
-            self.logger.info("Cleared out the abstraction layer")
-        self.active_metadata = OrderedDict()
-
-        if self.debug_level != 0:
-            self.logger.info("Closed active backends")
-        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
-        for backend in active_backends:
-            backend.close()
-        for loaded in self.loaded_backends:
-            loaded.close()
-
-        if self.debug_level != 0:
-            self.logger.info("Cleared all loaded plugins and backends")
-        for func in self.active_modules:
-            self.active_modules[func] = []
-            self.loaded_backends = []
-
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
@@ -421,9 +391,9 @@ class Terminal():
         `query` : str, optional
             Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
 
-        **kwargs
-        Additional keyword arguments passed to underlying backend handlers.
-        
+        \**kwargs
+        Additional keyword arguments passed to underlying backend functions.
+
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
         if interaction_type not in self.VALID_ARTIFACT_INTERACTION_TYPES:
@@ -563,28 +533,7 @@ class Terminal():
                 not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
-            raise NotImplementedError(not_run_msg)
-    
-    # Internal function used to check if a backend has data
-    def valid_backend(self, backend, parent_name):
-        valid = False
-        if parent_name == "Filesystem":
-            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
-                valid = True
-            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
-                valid = True
-            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
-                valid = True
-        return valid
-    
-    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
-    def trace_function(self, frame, event, arg):
-        global return_line_number
-        global original_file
-        if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
-            original_file = frame.f_code.co_filename # Get file name
-        return self.trace_function
+            raise NotImplementedError(not_run_msg)    
     
     def find(self, query_object):
         """
@@ -829,20 +778,12 @@ class Terminal():
         if errorStmt is not None and isinstance(errorStmt, pd.DataFrame):
             return errorStmt
 
-    def table_print_helper(self, headers, rows, num_rows=25):
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend before printing table info from it')
-            raise NotImplementedError('Need to load a valid backend before printing table info from it')
-        backend = self.loaded_backends[0]
-        backend.table_print_helper(headers, rows, num_rows)
-
     def overwrite_table(self, table_name, dataframe):
         """
         Overwrites a specified table in the first loaded backend with the provided Pandas DataFrame.
 
         If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
-        **Note:** This operation permanently deletes the existing table and its data, before inserting the new data.
+        **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
 
         `table_name` : str
             Name of the table to overwrite in the backend.
@@ -850,7 +791,6 @@ class Terminal():
         `dataframe` : pandas.DataFrame
             A DataFrame containing the updated data to be written to the table.
         """
-        #MAYBE CHECK IF DEVS CALLING THIS -- DONT ALLOW
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
@@ -859,17 +799,11 @@ class Terminal():
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in display function: First loaded backend needs to have data to be able to display data from it")
-            raise ValueError("Error in display function: First loaded backend needs to have data to be able to display data from it")
+                self.logger.error("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
+            raise ValueError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
         start = datetime.now()
 
-        # ASSUMES ONLY USED BY USERS NOT DEVS -- OVERWRITES ANY EXISTING UNITS/RELATIONS TABLES, AND ANY IN MEMORY TABLE MATCHING THIS TABLE NAME 
-        self.active_metadata = backend.process_artifacts(only_units_relations=True)
-        self.active_metadata[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
-        pk_rows = backend.drop_table(table_name)
-        if pk_rows is not None and pk_rows[1] != self.active_metadata[table_name][pk_rows[0]]:
-            print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
-        self.artifact_handler(interaction_type="ingest")
+        backend.overwrite_table(table_name, dataframe)
 
         end = datetime.now()
         if self.debug_level != 0:
@@ -929,7 +863,66 @@ class Terminal():
             self.active_metadata[table_name] = table_data
         elif isinstance(table_data, pd.DataFrame):
             self.active_metadata[table_name] = OrderedDict(table_data.to_dict(orient='list'))
+    
+    def close(self):
+        """
+        Immediately closes all active modules: backends, plugin writers, plugin readers
+
+        Clears out the current DSI abstraction
+
+        NOTE - This step cannot be undone.
+        """
+        print("Closing the abstraction layer, and all active plugins/backends")
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info("Closing and clearing out all objects in this Terminal object")
             
+            self.logger.info("Cleared out the abstraction layer")
+        self.active_metadata = OrderedDict()
+
+        if self.debug_level != 0:
+            self.logger.info("Closed active backends")
+        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
+        for backend in active_backends:
+            backend.close()
+        for loaded in self.loaded_backends:
+            loaded.close()
+
+        if self.debug_level != 0:
+            self.logger.info("Cleared all loaded plugins and backends")
+        for func in self.active_modules:
+            self.active_modules[func] = []
+            self.loaded_backends = []
+    
+    # Internal function used to print a table cleanly
+    def table_print_helper(self, headers, rows, num_rows=25):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.table_print_helper(headers, rows, num_rows)
+
+    # Internal function used to check if a backend has data
+    def valid_backend(self, backend, parent_name):
+        valid = False
+        if parent_name == "Filesystem":
+            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
+                valid = True
+            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
+                valid = True
+            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
+                valid = True
+        return valid
+    
+    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
+    def trace_function(self, frame, event, arg):
+        global return_line_number
+        global original_file
+        if event == "return":
+            return_line_number = frame.f_lineno  # Get line number
+            original_file = frame.f_code.co_filename # Get file name
+        return self.trace_function
 
 class Sync():
     """

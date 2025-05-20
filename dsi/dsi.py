@@ -151,7 +151,6 @@ class DSI():
             self.t.table_print_helper(headers, rows)
         else:
             df.attrs['table_name'] = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', statement, re.IGNORECASE)[0][0]
-            print(re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', statement, re.IGNORECASE)[0][0])
             return df
         
     def find(self, query, collection = False):

@@ -855,19 +855,40 @@ class Sqlite(Filesystem):
                 print(f"  ... showing {max_rows} of {len(rows)} rows")
                 break
 
-    def drop_table(self, table_name):
-        columns_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
-        primary_keys = [col[1] for col in columns_info if col[5] == 1]
+    def overwrite_table(self, table_name, dataframe):
+        temp_data = OrderedDict()
+        temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
 
+        relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
         data = None
-        if primary_keys:
-            data = self.cur.execute(f"SELECT {primary_keys[0]} FROM {table_name}").fetchall()
-            data = [row[0] for row in data]
+        pk_col = None
+        tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
+        for colInfo in tableInfo:
+            if colInfo[5] == 1:
+                relations["primary_key"].append((table_name, colInfo[1]))
+                relations["foreign_key"].append((None, None))
+
+                pk_col = colInfo[1]
+                rows = self.cur.execute(f"SELECT {colInfo[1]} FROM {table_name}").fetchall()
+                data = [row[0] for row in rows]
+                break
+        
+        fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
+        for row in fkData:
+            relations["primary_key"].append((row[2], row[4]))
+            relations["foreign_key"].append((table_name, row[3]))
+        
+        if len(relations["primary_key"]) > 0:
+            temp_data["dsi_relations"] = relations
+        
+        if pk_col and data != temp_data[table_name][pk_col]:
+            print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
 
         self.cur.execute(f'DROP TABLE IF EXISTS "{table_name}";')
         self.con.commit()
 
-        return (primary_keys[0], data)
+        self.ingest_artifacts(temp_data)
+        self.con.commit()
 
     # Closes connection to server
     def close(self):
