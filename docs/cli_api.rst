@@ -3,18 +3,21 @@
 Command Line Interface API
 ==========================
 
-Users can interact with DSI Readers, Writers and Backends even easier using DSI's own Command Line Interace (CLI).
-While slightly more restrictive, the CLI allows users without any knowledge of Python to utilize DSI for their own needs.
-Users can store several files in one database, query/find/export data to other formats and save it in a database for further analysis.
+Users can interact with DSI Readers, Writers and Backends even easier with DSI's Command Line Interace (CLI).
+While slightly more restrictive than the Python API, the CLI allows users to interact with DSI without any knowledge of Python.
+
+Users can store several files in DSI, and query/find/export loaded data to other formats.
+Users can also write loaded data to a permanent database store for post-analysis.
 
 The CLI actions and example workflows are shown below.
 
 CLI Setup and Actions
 ---------------------
-Once a user is within a dsi virtual environment, they should enter ``dsi`` in their command line to active the CLI environment. 
-By default, this creates a hidden DSI Sqlite database that users can interact with. 
-However, if a user wants to use a hidden DuckDB database, they should enter ``dsi -b duckdb`` into their command line. 
-From here on out, all actions will be with this DuckDB database.
+Once a user has successfully installed DSI, they can active the CLI environment by entering ``dsi`` in their command line.
+This automatically creates a hidden Sqlite database that users can interact with. 
+
+However, if a user wants to use DuckDB instead, they should activate the CLI with ``dsi -b duckdb`` in their command line. 
+From here on out, all actions will be using a hidden DuckDB database.
 
 A comprehensive list of all actions within the CLI environment are:
 
@@ -65,14 +68,14 @@ query <SQL query> [-n num rows] [-e filename]
     - `num_rows` is optional; can specify to limit number of rows in result.
     - `filename` is optional; can export the result as CSV or Parquet file.
 
-write <filename>
-    Writes the hidden DSI database to a persistent location. Must match the current DSI database (e.g., SQLite must be `.sqlite`).
-
 summary [-t table] [-n num_rows]
     Displays statistics of all tables or a specified table.
 
     - `table` is optional and limits output to one table.
     - `num_rows` optionally prints rows from the specified table.
+
+write <filename>
+    Writes the hidden DSI database to a persistent location. Must match the current DSI database (e.g., SQLite must be `.sqlite`).
 
 Users can also expect basic unix commands such as ``cd`` (change directory), ``ls`` (list all files) and ``clear`` (clear command line view).
 

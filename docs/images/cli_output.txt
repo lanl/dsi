@@ -121,6 +121,7 @@ specification | n    | o       | p   | q       | r  | s
 
 
 dsi> write dsi_output.db
+Saved data to dsi_output.db
 
 dsi> exit
 Exiting...

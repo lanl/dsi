@@ -19,8 +19,8 @@ Their respective list functions print all valid readers/writers that can be used
 
 The primary backend interactions are ``query()`` and ``find()`` where users can print a search result, or retrieve the result as a collection of data.
 
-      - Users can manipulate these collections of data and call ``update()`` to update the data collection(s) in the activated backend.
-        Read ``update()`` to understand its accepted collection inputs.
+      - If users manipulate these collections, they can call ``update()`` to update the respective data in the activated backend.
+        Read ``update()`` to understand its accepted inputs.
 
 Users can also view various data/metadata of an active backend with ``list()``, ``num_tables()``, ``display()``, ``summary()``
 
@@ -97,7 +97,7 @@ Writing data from a DSI backend as an Entity Relationship diagram, table plot, a
 
 Example 5: Query data
 ~~~~~~~~~~~~~~~~~~~~~
-Querying data from a backend
+Querying data from an active backend
 
 .. literalinclude:: ../examples/user/5.query.py
 
@@ -107,9 +107,9 @@ Printing different data and metadata from a database - number of tables, dimensi
 
 .. literalinclude:: ../examples/user/6.visualize.py
 
-Example 7: Ingest complex schema with data
+Example 7: Read complex schema with data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Using the Schema Reader to load a complex JSON schema, loading the relevant data, and viewing difference between databases with a schema and no schema
-Read :ref:`schema_section` to understand how to structure this schema JSON file for the Schema Reader
+Loading complex JSON schema with ``schema()``, loading associated data with ``read()``, and an ER Diagram to display the relations
+.. Read ref`user_schema_example_label` to understand how to structure this schema JSON file for ``schema()`
 
 .. literalinclude:: ../examples/user/7.schema.py

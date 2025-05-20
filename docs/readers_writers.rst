@@ -2,14 +2,15 @@ DSI Readers/Writers
 =====================
 Readers/Writers connect data-producing applications to DSI core functionalities.  
 A Reader function deals with existing data files or input streams. 
-A Writer function deals with generating new data.
+A Writer function deals with generating new data formats.
 
 Readers/Writers are modular to support user contribution and contributors are encouraged to offer custom Readers/Writers abstract classes and implementations. 
-A contributed Reader/Writer abstract class may either extend another Reader/Writer to inherit the properties of the parent, or be a completely new structure. 
+A contributed Reader/Writer abstract class may either extend another Reader/Writer to inherit the properties of the parent, or be a completely new structure.
+
 In order to be compatible with DSI, Readers should store data in data structures sourced from the Python ``collections`` library (OrderedDict).
 Similarly, Writers should be compatible by accepting data structures from Python ``collections`` (OrderedDict) to export data/generate an image.
 
-Note that any contributed Readers/Writers or extension should include unit tests in  ``plugins/tests`` to demonstrate the new capability.
+Any contributed Readers/Writers, or extension of one, should include unit tests in  ``plugins/tests`` to demonstrate the new capability.
 
 ..  figure:: images/PluginClassHierarchy.png
     :alt: Figure depicting the current Readers/Writers class hierarchy.
@@ -25,7 +26,7 @@ Note that any contributed Readers/Writers or extension should include unit tests
 Metadata Processing
 -------------------
 
-**Note for users:** ``StructuredMetadata`` class is used to assign data from a file_reader to the DSI abstraction in core. 
+**Note for users:** ``StructuredMetadata`` class is used to assign data from a `file_reader` to the DSI abstraction in core. 
 If data in a user-written reader is structured as an OrderedDict, only need to call ``set_schema_2()`` at the end of the reader's ``add_rows()``
 
 .. automodule:: dsi.plugins.metadata
@@ -36,7 +37,8 @@ File Readers
 ------------
 
 Note for users:
-   - Assume names of data structure from all data sources are consistent/stable. Ex: table/column names MUST be consistent. Number of columns in a table CAN vary.
+   - DSI assumes data structure from all data sources are consistent/stable. Ex: table/column names MUST be consistent. 
+     Number of columns in a table CAN vary.
    - DSI Readers can handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d
    
       - if only reading in one table at a time, users can utilize python pandas to stack mulutiple dataframes vertically (ex: CSV reader)
@@ -51,8 +53,11 @@ File Writers
 ------------
 
 Note for users:
-   - DSI `runTable` is only included in File Writers if data was previously ingested into a backend in a Core.Terminal workflow where `runTable` was set to True.
-     In :ref:`example4_label`, `runTable` is included in a generated ER Diagram since it uses ingested data from :ref:`example2_label` where `runTable` = True
+   - DSI's `runTable` is only included in File Writers if data was previously ingested into a backend in a Core.Terminal workflow 
+     where `runTable` was set to True.
+   
+      - Ex: in :ref:`example4_label`, `runTable` is included in a generated ER Diagram since it uses ingested data from 
+        :ref:`example2_label` where `runTable` = True
      
 .. automodule:: dsi.plugins.file_writer
    :members:
@@ -70,6 +75,7 @@ Optional Plugin Type Enforcement
 
 Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. 
 Plugins may enforce types, but they are not required to enforce types. 
+
 Plugin type enforcement can be static, like the Hostname default plugin. 
 Plugin type enforcement can also be dynamic, like the Bueno default plugin.
 
