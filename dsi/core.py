@@ -370,7 +370,7 @@ class Terminal():
                     raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
             if tester == 1:
                 sys.settrace(None) # ends trace to prevent large overhead
-                
+
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -399,8 +399,8 @@ class Terminal():
         `query` : str, optional
             Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
 
-        \**kwargs
-        Additional keyword arguments passed to underlying backend functions.
+        \**kwargs : 
+            Additional keyword arguments passed to underlying backend functions.
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -882,7 +882,7 @@ class Terminal():
 
         NOTE - This step cannot be undone.
         """
-        print("Closing the abstraction layer, and all active plugins/backends")
+        print("Closing the abstraction layer, and all active readers/writers/backends")
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info("Closing and clearing out all objects in this Terminal object")

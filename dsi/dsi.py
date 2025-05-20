@@ -26,8 +26,8 @@ class DSI():
 
     def backend(self, filename, backend_name = "Sqlite"):
         """
-        Activates a backend for data operations; default is Sqlite unless user specifies.. 
-        Uses can call read(), find(), query(), write() or any backend printing operations
+        Activates a backend for data operations; default is Sqlite unless user specifies. 
+        Can now call read(), find(), query(), write() or any backend printing operations
 
         `filename` : str
             Name of the backend file to create.
@@ -143,6 +143,7 @@ class DSI():
 
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
+            
             If False, (default), prints the result.
         """
         df = self.t.artifact_handler(interaction_type='query', query=statement)

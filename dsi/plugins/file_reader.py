@@ -39,11 +39,15 @@ class Csv(FileReader):
     """
     def __init__(self, filenames, table_name = None, **kwargs):
         """
-        Initializes CSV Reader with user specified filenames and optional table_name.
+        Initializes the CSV Reader with user specified filenames and optional table_name.
 
-        `filenames`: Required input. List of CSV files, or just one CSV files to store in DSI. If a list, data in all files must be for the same table
+        `filenames` : str or list of str
+            Required. One or more CSV file paths to be loaded into DSI.
+            If multiple files are provided, all data must correspond to the same table.
 
-        `table_name`: default None. User can specify table name when loading CSV file. Otherwise DSI uses table_name = "Csv"
+        `table_name` : str, optional
+            Optional name to assign to the loaded table.
+            If not provided, DSI will default to using "Csv" as the table name.
         """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
@@ -81,7 +85,6 @@ class Bueno(FileReader):
 
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
-
     def __init__(self, filenames, **kwargs) -> None:
         """
         `filenames`: one Bueno file or a list of Bueno files to be ingested
@@ -113,19 +116,24 @@ class Bueno(FileReader):
 
 class JSON(FileReader):
     """
-    A DSI Reader that captures generic JSON data. 
-    Assumes all key/value pairs are basic data formats, ie. string, int, float, not a nested dictionary or more
+    A DSI Reader for ingesting generic JSON data with flat key-value pairs.
+    
+    This reader assumes that all values are primitive data types (e.g., str, int, float),
+    and that there are no nested dictionaries, arrays, or complex structures.
 
-    The JSON data's keys are used as columns and values are rows
-   
+    The keys in the JSON object are treated as column names, and their corresponding values are interpreted as rows.
     """
     def __init__(self, filenames, table_name = None, **kwargs) -> None:
         """
-        Initializes generic JSON reader with user-specified filenames
+        Initializes the generic JSON reader with user-specified filenames
         
-        `filenames`: Required input. List of JSON files, or just one JSON files to store in DSI. If a list, data in all files must be for the same table
+        `filenames` : str or list of str
+            Required input. One or more JSON file paths to be loaded into DSI.
+            If multiple files are provided, all data must all correspond to the same table
 
-        `table_name`: default None. User can specify table name when loading JSON file. Otherwise DSI uses table_name = "JSON"
+        `table_name` : str, optional
+            Name to assign to the loaded table. If not provided, DSI defaults to using "JSON" 
+            as the table name.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -156,18 +164,25 @@ class JSON(FileReader):
 
 class Schema(FileReader):
     """
-    DSI Reader that parses the schema of a data source to ingest in same workflow.
+    DSI Reader for parsing and ingesting a relational schema alongside its associated data.
 
-    Schema file input should be a JSON file that stores primary and foreign keys for all tables in the data source. 
-    Stores all relations in global dsi_relations table used for creating backends/writers
+    Schema file input should be a JSON file that defines primary and foreign key relationships between tables in a data source.
+    Parsed relationships are stored in the global `dsi_relations` table, which is used for creating backends and used by writers.
 
-    Users ingesting complex schemas should load this reader. View :ref:`schema_section` to see how a schema file should be structured
+    This reader is essential when working with complex, multi-table data structures. 
+    See :ref:`schema_section` to learn how a schema file should be structured
     """
     def __init__(self, filename, target_table_prefix = None, **kwargs):
         """
-        `filename`: file name of the json file to be ingested
+        Initializes the Schema reader with the specified schema file.
 
-        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        `filename`: str
+            Path to the JSON file containing the schema to be ingested. This file should define
+            primary and foreign key relationships between tables.
+
+        `target_table_prefix` : str, optional
+            A prefix to prepend to every table name in the primary and foreign key lists.
+            Useful for avoiding naming conflicts in shared environments.
         """
         super().__init__(filename, **kwargs)
         self.schema_file = filename
@@ -208,7 +223,7 @@ class Schema(FileReader):
 
     def add_rows(self) -> None:
         """
-        Generates a dsi_relations OrderedDict to be added to the internal DSI abstraction. 
+        Generates a `dsi_relations` OrderedDict to be added to the internal DSI abstraction. 
 
         The Ordered Dict has 2 keys, primary key and foreign key, with their values a list of PK and FK tuples associating tables and columns 
         """
@@ -249,11 +264,18 @@ class YAML1(FileReader):
     """
     def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
         """
-        `filenames`: one yaml file or a list of yaml files to be ingested
+        Initializes the YAML1 reader with the specified YAML file(s)
 
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other yaml sources
+        `filenames` : str or list of str
+            One YAML file or a list of YAML files to be loaded into DSI.
 
-        `yamlSpace`: indent used in ingested yaml files - default 2 spaces but can change to the indentation used in input
+        `target_table_prefix`: str, optional
+            A prefix to be added to each table name created from the YAML data.
+            Useful for distinguishing between tables from other data sources.
+
+        `yamlSpace` : str, default='  '
+            The indentation used in the input YAML files. 
+            Defaults to two spaces, but can be customized to match the formatting in certain files.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -286,7 +308,18 @@ class YAML1(FileReader):
             
     def add_rows(self) -> None:
         """
-        Parses YAML data to create a nested Ordered Dict where each table is a key and its data as another Ordered Dict with keys as cols and vals as col data
+        Parses YAML data and constructs a nested OrderedDict to load into DSI.
+
+        The resulting structure has:
+
+            - Top-level keys as table names.
+            - Each value is an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_counter = 0        
         for filename in self.yaml_files:
@@ -351,9 +384,12 @@ class TOML1(FileReader):
     """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
         """
-        `filenames`: one toml file or a list of toml files to be ingested
+        `filenames` : str or list of str
+            One TOML file or a list of TOML files to be loaded into DSI.
 
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other toml sources
+        `target_table_prefix`: str, optional
+            A prefix to be added to each table name created from the TOML data.
+            Useful for distinguishing between tables from other data sources.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -365,7 +401,18 @@ class TOML1(FileReader):
 
     def add_rows(self) -> None:
         """
-        Parses TOML data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
+        Parses TOML data and constructs a nested OrderedDict to load into DSI.
+
+        The resulting structure has:
+
+            - Top-level keys as table names.
+            - Each value is an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_counter = 0
         for filename in self.toml_files:
@@ -426,22 +473,32 @@ class TOML1(FileReader):
 
 class Ensemble(FileReader):
     """
-    DSI Reader that ingests Ensemble data stored as a CSV
+    DSI Reader that loads ensemble simulation data stored in a CSV file.
 
-    Can be used for other cases if data is post-processed and running only once.
-    Can create a manual simulation table
+    Designed to handle simulation outputs where each row represents an individual simulation run. 
+    Specifically for single-run use cases when data is post-processed.
+
+    Automatically generates a simulation metadata table to accompany the data.
     """
     def __init__(self, filenames, table_name = None, sim_table = True, **kwargs):
         """
         Initializes Ensemble Reader with user specified parameters.
 
-        `filenames`: Required input -- Ensemble data files. All files must only store data for one table
+        `filenames` : str or list of str
+            Required input. One or more Ensemble data files in CSV format.
+            All files must correspond to the same table.
 
-        `table_name`: default None. User can specify table name when loading the Ensemble data.   
+        `table_name` : str, optional
+            Optional name to assign to the table when loading the Ensemble data.
+            If not provided, the default table name, 'Ensemble', will be used.
 
-        `sim_table`: default True. Set to False if DO NOT want to create a simulation table where each row of an input data table is a separate sim
+        `sim_table` : bool, default=True
+            If True, creates a simulation metadata table (`sim_table`) where each row 
+            in the input data table represents a separate simulation run.
 
-            - also creates new column in Ensemble data for each row to associate to a corresponding row/simulation in sim_table
+            - Adds a new column to the input data to associate each row with its corresponding entry in the simulation table.
+
+            If False, skips creation of the simulation table.
         """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
@@ -454,9 +511,13 @@ class Ensemble(FileReader):
 
     def add_rows(self) -> None:
         """ 
-        Creates Ordered Dictionary for the Ensemble data. 
+        Creates an OrderedDict representation of the Ensemble data to load into DSI.
 
-        If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
+        When sim_table = True, a sim_table Ordered Dict is created alongside the Ensemble data table OrderedDict.
+        Both tables are nested within a larger OrderedDict.
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name is None:
             self.table_name = "Ensemble"
@@ -493,10 +554,14 @@ class Ensemble(FileReader):
 
 class Oceans11Datacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
+    Input datacard should follow template in `examples/data/template_dc_oceans11.yml`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of YAML data card files to ingest that adhere to the Oceans 11 LANL Data Server metadata standard
+        `filenames` : str or list of str
+            File name(s) of YAML data card files to ingest. Each file must adhere to the
+            Oceans 11 LANL Data Server metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -507,6 +572,10 @@ class Oceans11Datacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `oceans11_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
@@ -542,10 +611,14 @@ class Oceans11Datacard(FileReader):
 
 class DublinCoreDatacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `dublin_core_datacard` table.
+    Input datacard should follow template in `examples/data/template_dc_dublin_core.xml`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of XML data card files to ingest that adhere to the Dublin Core metadata standard
+        `filenames` : str or list of str
+            File name(s) of XML data card files to ingest. Each file must adhere to the
+            Dublin Core metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -556,6 +629,10 @@ class DublinCoreDatacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `dublin_core_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         import xmltodict
         temp_data = OrderedDict()
@@ -583,10 +660,14 @@ class DublinCoreDatacard(FileReader):
 
 class SchemaOrgDatacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `schema_org_datacard` table.
+    Input datacard should follow template in `examples/data/template_dc_schema_org.json`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of JSON data card files to ingest that adhere to the Schema.org metadata standard
+        `filenames` : str or list of str
+            File name(s) of JSON data card files to ingest. Each file must adhere to the
+            Schema.org metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -597,6 +678,10 @@ class SchemaOrgDatacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `schema_org_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
@@ -628,10 +713,14 @@ class SchemaOrgDatacard(FileReader):
 
 class GoogleDatacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `google_datacard` table.
+    Input datacard should follow template in `examples/data/template_dc_google.yml`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of YAML data card files to ingest that adhere to the Google Data Cards Playbook metadata standard
+        `filenames` : str or list of str
+            File name(s) of YAML data card files to ingest. 
+            Each file must adhere to the Google Data Cards Playbook metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -642,6 +731,10 @@ class GoogleDatacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `google_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
 
