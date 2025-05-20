@@ -120,106 +120,107 @@ To run this example, load dsi and run:
 .. .. _Cinema: https://github.com/cinemascience
 .. .. _PyCinema: https://github.com/cinemascience/pycinema
 
+.. .. _user_schema_example_label:
 
-Complex Schemas in DSI
-----------------------
+.. Complex Schemas in DSI
+.. ----------------------
 
-This example details how to structure a JSON file for the DSI Schema Reader to store all table primary key - foreign key relations.
+.. This example details how to structure a JSON file for the DSI Schema Reader to store all table primary key - foreign key relations.
 
-If we consider a workflow where a user reads in a complex schema for YAML data and generates an ER Diagram:
+.. If we consider a workflow where a user reads in a complex schema for YAML data and generates an ER Diagram:
 
-.. literalinclude:: ../examples/user/7.schema.py
+.. .. literalinclude:: ../examples/user/7.schema.py
 
-where ``examples/data/example_schema.json`` is:
-
-.. code-block:: json
-
-   {
-      "math": {
-         "primary_key": "specification",
-         "foreign_key": {
-               "b": ["address", "i"]
-         }
-      }, 
-      "address": {
-         "primary_key": "i",
-         "foreign_key": {
-               "h": ["physics", "n"]
-         }
-      }, 
-      "physics": {
-         "primary_key": "n"
-      }
-   }
-   
-the ER diagram looks like:
-
-..  figure:: images/schema_erd.png
-    :scale: 35%
-    :align: center
-
-    Entity Relationship Diagram of YAML data. 
-    Shows table relations between the math, address and physics tables.
-
-NOTE: Schema JSON files do not need "comment" keys. They have only been included for clarity.
-
-For futher clarity, each schema file must be structured as a dictionary where:
-
-   - Each table with a relation is a key whose value is a nested dictionary storing primary and foreign key information
-
-      - Ex from above: "math" : { ... }
-   - The nested dictionary has 2 keys: 'primary_key' and 'foreign_key' which must be spelled exactly the same to be processed:
-   - The value of 'primary_key' is this table's column that is a primary key
-
-      - Ex from above: "primary_key" : "specification"
-   - The value of 'foreign_key' is another inner dictionary, since a table can have multiple foreign keys:
-
-      - Each key in this dictionary is a column in this table that serves as a foreign key
-      - Each value is a list with 2 elements - the table storing the associated primary key, and the column in that table which is the primary key
-      - Ex: "foreign_key" : { "name" : ["table1", "table1_id"] , "age" : ["table2", "table2_id"] }
-   - If a table does not have a primary or foreign key, you do not have to include them in the table's nested dictionary
-
-.. For example, if a user has a a table 'Payments' with a primary key 'id' 
-.. and a foreign key 'user_name' that points to another table 'Users' with primary key 'name', the schema is: 
+.. where ``examples/data/example_schema.json`` is:
 
 .. .. code-block:: json
-   
+
 ..    {
-..       "Payments": {
-..          "primary_key" : "id",
-..          "foreign_key" : {
-..             "user_name" : ["Users", "name"]
+..       "math": {
+..          "primary_key": "specification",
+..          "foreign_key": {
+..                "b": ["address", "i"]
 ..          }
+..       }, 
+..       "address": {
+..          "primary_key": "i",
+..          "foreign_key": {
+..                "h": ["physics", "n"]
+..          }
+..       }, 
+..       "physics": {
+..          "primary_key": "n"
+..       }
+..    }
+   
+.. the ER diagram looks like:
+
+.. ..  figure:: images/schema_erd.png
+..     :scale: 35%
+..     :align: center
+
+..     Entity Relationship Diagram of YAML data. 
+..     Shows table relations between the math, address and physics tables.
+
+.. NOTE: Schema JSON files do not need "comment" keys. They have only been included for clarity.
+
+.. For futher clarity, each schema file must be structured as a dictionary where:
+
+..    - Each table with a relation is a key whose value is a nested dictionary storing primary and foreign key information
+
+..       - Ex from above: "math" : { ... }
+..    - The nested dictionary has 2 keys: 'primary_key' and 'foreign_key' which must be spelled exactly the same to be processed:
+..    - The value of 'primary_key' is this table's column that is a primary key
+
+..       - Ex from above: "primary_key" : "specification"
+..    - The value of 'foreign_key' is another inner dictionary, since a table can have multiple foreign keys:
+
+..       - Each key in this dictionary is a column in this table that serves as a foreign key
+..       - Each value is a list with 2 elements - the table storing the associated primary key, and the column in that table which is the primary key
+..       - Ex: "foreign_key" : { "name" : ["table1", "table1_id"] , "age" : ["table2", "table2_id"] }
+..    - If a table does not have a primary or foreign key, you do not have to include them in the table's nested dictionary
+
+.. .. For example, if a user has a a table 'Payments' with a primary key 'id' 
+.. .. and a foreign key 'user_name' that points to another table 'Users' with primary key 'name', the schema is: 
+
+.. .. .. code-block:: json
+   
+.. ..    {
+.. ..       "Payments": {
+.. ..          "primary_key" : "id",
+.. ..          "foreign_key" : {
+.. ..             "user_name" : ["Users", "name"]
+.. ..          }
+.. ..       }
+.. ..    }
+
+.. For example, if we update ``examples/data/example_schema.json``, by adding a foreign key in 'math' pointing to 'n' in 'physics':
+
+.. .. code-block:: json
+
+..    {
+..       "math": {
+..          "primary_key": "specification",
+..          "foreign_key": {
+..                "b": ["address", "i"],
+..                "c": ["physics", "n"]  // <--- new foreign key
+..          }
+..       }, 
+..       "address": {
+..          "primary_key": "i",
+..          "foreign_key": {
+..                "h": ["physics", "n"]
+..          }
+..       }, 
+..       "physics": {
+..          "primary_key": "n"
 ..       }
 ..    }
 
-For example, if we update ``examples/data/example_schema.json``, by adding a foreign key in 'math' pointing to 'n' in 'physics':
+.. our new ER diagram would be:
 
-.. code-block:: json
-
-   {
-      "math": {
-         "primary_key": "specification",
-         "foreign_key": {
-               "b": ["address", "i"],
-               "c": ["physics", "n"]  // <--- new foreign key
-         }
-      }, 
-      "address": {
-         "primary_key": "i",
-         "foreign_key": {
-               "h": ["physics", "n"]
-         }
-      }, 
-      "physics": {
-         "primary_key": "n"
-      }
-   }
-
-our new ER diagram would be:
-
-..  figure:: images/schema_erd_added.png
-    :scale: 35%
-    :align: center
+.. ..  figure:: images/schema_erd_added.png
+..     :scale: 35%
+..     :align: center
    
-    ER Diagram of same data. However, there is now an additional foreign key from 'math' to 'physics'
+..     ER Diagram of same data. However, there is now an additional foreign key from 'math' to 'physics'

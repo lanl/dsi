@@ -45,7 +45,7 @@ If metadata is crucial to data representation, users should ensure it is stored 
 Users expecting to load a complex schema into DSI should also consider which columns in tables will be related to each other.
 This requires prior knowledge of primary and foreign keys, and writing a JSON file to represent this schema. 
 For a template DSI-compatible schema, review ``examples/data/example_schema.json``
-.. For more information on a schema compatible with DSI, please view ________.
+.. For more information on a schema compatible with DSI, please view :ref:`user_schema_example_label`.
 
 DSI Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~
