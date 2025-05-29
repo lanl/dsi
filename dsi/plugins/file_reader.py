@@ -189,38 +189,6 @@ class Schema(FileReader):
         self.target_table_prefix = target_table_prefix
         self.schema_data = OrderedDict()
 
-    def has_circular_dependency(self, relation_dict):
-        """
-        Helper function to check if a user-loaded schema for DSI has circular dependencies. 
-        Only used for internal functions
-        """
-        from collections import defaultdict
-        pk_list = relation_dict['primary_key']
-        fk_list = relation_dict['foreign_key']
-
-        # Build graph: FK table -> PK table
-        graph = defaultdict(list)
-        for (pk_table, _), (fk_table, _) in zip(pk_list, fk_list):
-            if fk_table is not None and pk_table is not None:
-                graph[fk_table].append(pk_table)
-
-        visited = set()
-        stack = set()
-        def visit(node):
-            if node in stack:
-                return True  # cycle detected
-            if node in visited:
-                return False
-            stack.add(node)
-            visited.add(node)
-            for neighbor in graph[node]:
-                if visit(neighbor):
-                    return True
-            stack.remove(node)
-            return False
-
-        return any(visit(node) for node in list(graph.keys()))
-
     def add_rows(self) -> None:
         """
         Generates a `dsi_relations` OrderedDict to be added to the internal DSI abstraction. 
@@ -251,10 +219,7 @@ class Schema(FileReader):
                     self.schema_data["dsi_relations"]["primary_key"].append(pk)
                     self.schema_data["dsi_relations"]["foreign_key"].append((None, None))
             
-            if self.has_circular_dependency(self.schema_data["dsi_relations"]):
-                return (ValueError, f"There is a circular dependency in {self.schema_file}. Please remove it.")
-            else:
-                self.set_schema_2(self.schema_data)
+            self.set_schema_2(self.schema_data)
 
 class YAML1(FileReader):
     """
