@@ -813,7 +813,7 @@ class Terminal():
 
     def overwrite_table(self, table_name, collection):
         """
-        Overwrites a specified table in the first loaded backend with the provided Pandas DataFrame.
+        Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
 
         If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
         **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
@@ -823,8 +823,8 @@ class Terminal():
             - If list, list of all tables to overwrite in the backend
 
         `collection` : pandas.DataFrame  or list of Pandas.DataFrames
-            - If one item, a DataFrame containing the updated data to be written to the table.
-            - If a list, is all DataFrames with updated data to be written to their own table
+            - If one item, a DataFrame containing the updated data will be written to the table.
+            - If a list, all DataFrames with updated data will be written to their own table
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
@@ -847,6 +847,16 @@ class Terminal():
             self.logger.info(f"Runtime: {end-start}")
 
     def get_table(self, table_name, dict_return = False):
+        """
+        Returns all data from a specified table in the first loaded backend.
+
+        `table_name` : str
+            Name of the table to retrieve data from.
+
+        `dict_return`: bool, optional, default=False.
+            If True, returns the data as an OrderedDict.
+            If False (default), returns the data as a pandas DataFrame.
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend to be able to return data from a specified table')
@@ -872,10 +882,16 @@ class Terminal():
             
     
     def get_table_names(self, query):
+        """
+        Extracts and returns all table names referenced in a given query.
+
+        `query` : str
+            A query string written in a database language (typically SQL in DSI).
+        """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend to be able to identify table names in a query')
-            raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query')
+                self.logger.error('Need to load a valid backend to be able to identify table names in a query for that backend')
+            raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query for that backend')
         backend = self.loaded_backends[0]
         start = datetime.now()
 

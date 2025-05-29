@@ -18,16 +18,16 @@ Users should use ``read()`` to load data into DSI and ``write()`` to export data
 Their respective list functions print all valid readers/writers that can be used.
 
 The primary backend interactions are ``query()``, ``get_table()``, and ``find()`` where users can print a search result, or retrieve the result as a collection of data.
-
-      - If users manipulate these collections, they can call ``update()`` to update the respective data in the activated backend.
-        Read ``update()`` to understand its accepted inputs and behavior.
+      
+      - If users modify these collections, they can call ``update()`` to apply those changes to the respective data in the activated backend.
+        Read ``update()`` below to understand its accepted inputs and behavior.
 
 Users can also view various data/metadata of an active backend with ``list()``, ``num_tables()``, ``display()``, ``summary()``
 
 Notes for users:
       - When using a complex schema, must call ``schema()`` prior to ``read()`` to store the associated data and relations together.
       - If input to ``update()`` contains edited data for a user-defined primary key column, rows in that table might be reordered.
-      - If input to ``update()`` is a single Pandas.DataFrame, the existing table in the backend will be **overwritten**. Ensure data is secure.
+      - If input to ``update()`` is a modified output from ``query()``, the existing table in the backend will be **overwritten**. Ensure data is secure.
       - Read the :ref:`datacard_section_label` section to learn which data card standards are supported and where to find templates compatible with DSI. 
 
 .. autoclass:: dsi.dsi.DSI 

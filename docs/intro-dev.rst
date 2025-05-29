@@ -4,6 +4,7 @@ Contributor Introduction
 The main Introduction page gave a brief description of the Readers/Writers, Backends, and DSI Core. 
 This page will provide a more detailed explanation of them, with the following pages delving into how contributors can create their own compatible with DSI.
 
+Similar to the Python User API which uses ``dsi.py``, contributors can view ``core.py`` and its documentation, :ref:`core_page`, to use the most-flexible version of DSI.
 
 DSI Readers/Writers Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

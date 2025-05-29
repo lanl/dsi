@@ -143,7 +143,9 @@ class DSI():
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
             
-            If False, (default), prints the result.
+            If False (default), prints the result.
+
+        `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
         df = self.t.artifact_handler(interaction_type='query', query=statement)
         if not collection:
@@ -158,15 +160,19 @@ class DSI():
     
     def get_table(self, table_name, collection = False):
         """
-        Prints/gets all data from a table without requiring knowledge of a backend's query language.
-        Simpler alternative to the `query()` function for users who only know Python.
+        Retrieves all data from a specified table without requiring knowledge of a particular backend's query language.
+        
+        This method is a simplified alternative to `query()` for users who are only familiar with Python.
 
-        `table_name`: name of table from which all data will be retrieved
+        `table_name` : str
+            Name of the table from which all data will be retrieved.
 
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
             
-            If False, (default), prints the result.
+            If False (default), prints the result.
+        
+        `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
         df = self.t.get_table(table_name)
         if not collection:
@@ -183,16 +189,15 @@ class DSI():
         """
         Finds all individual datapoints matching the `query` input from the first activated backend
 
-        `query`: int, float, or str
-            The value to search for across all tables in the backend. Matching is performed
-            at the individual cell level.
+        `query` : int, float, or str
+            The value to search for at the cell level, across all tables in the backend.
 
         `collection` : bool, optional, default False. 
-            If True, returns a list of Pandas DataFrames where each DataFrame is a subset of a table with all rows where `query` was found
+            If True, returns a list of pandas DataFrames, each representing a subset of rows from a table where `query` was found.
             
-            If False (default), prints the matches in the table
+            If False (default), prints the matching rows directly.
 
-            `return`: If there are no matches found, then nothing is returned or printed
+        `return` : If there are no matches found, then nothing is returned or printed
         """
         find_data = self.t.find_cell(query, row=True)
         if find_data is None:
@@ -225,19 +230,20 @@ class DSI():
     def update(self, collection):
         """
         Updates data in one or more tables in the first activated backend using the provided input. 
-        Expected to be used after manipulating outputs of `find()`, `query()` or `get_table()`
+        Intended to be used after modifying the output of `find()`, `query()`, or `get_table()`
 
-        `collection` : List of/single pandas.DataFrame. 
-        This object is used to update the backend.
-        Must be some form of output from `find()`, `query()` or `get_table()` as they contain important metadata used for updating.
+        `collection` : pandas.DataFrame or list of pandas.DataFrame
+            The data used to update the backend.
+            Must be a direct or modified output of `find()`, `query()` or `get_table()` to ensure required metadata is preserved.
 
-            - find() output is a list/single DataFrame
-            - query() and get_table() output is a single DataFrame
-                - If using this output, the corresponding table in the backend will be completely overwritten.
+            - `find()` returns one or more DataFrames depending on the number of matches.
+            - `query()` and `get_table()` return a single DataFrame corresponding to one table.
+              
+                - If this DataFrame is the input, the corresponding table in the backend will be completely overwritten by the input.
 
-        - NOTE: Some user-Pandas operations could delete hidden metadata which will raise errors when trying to update.
-        - NOTE: Edited table cannot delete columns from the original table, only edit or append new ones.
-        - NOTE: If a DataFrame includes edits to a column that is a user-defined primary key, row order may change upon reinsertion.
+        - NOTE: Some Pandas operations can delete the hidden metadata which will raise errors when trying to update.
+        - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
+        - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
         """
         if isinstance(collection, pd.DataFrame) and 'row_num' in collection.attrs:
             collection = [collection]

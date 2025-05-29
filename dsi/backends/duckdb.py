@@ -32,7 +32,7 @@ class ValueObject:
     # implement this later once filesystem table incoroporated into dsi
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
-# Main storage class, interfaces with SQL
+# Main storage class, interfaces with DuckDB
 class DuckDB(Filesystem):
     """
     DuckDB Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term
@@ -50,13 +50,15 @@ class DuckDB(Filesystem):
 
     def check_type(self, input_list):
         """
-        **Users should not use this function. Only used by internal DuckDB functions**
+        **Internal use only. This function is not intended for direct use by users.**
 
         Evaluates a list and returns the predicted compatible DuckDB Type
 
-        `input_list`: list of values to evaluate
+        `input_list` : list
+            A list of values to analyze for type compatibility.
 
-        `return`: string description of the list's DuckDB data type
+        `return`: str
+            A string representing the inferred DuckDB data type for the input list.
         """
         for item in input_list:
             if isinstance(item, int):
@@ -77,14 +79,17 @@ class DuckDB(Filesystem):
 
         Helper function to create DuckDB table based on a passed in schema.
 
-        `types`: DataType derived class that defines the string name, properties (dictionary of table names and table data), 
-        and units for each column in the schema.
+        `types` : DataType
+            A DataType-derived object that defines:
+                - the table name as a string,
+                - table properties as a dictionary mapping column names to data,
+                - associated units for each column.
 
-        `foreign_query`: defaut is None. It is a DuckDB string detailing the foreign keys in this table
+        `foreign_query` : str, optional, default=None
+            A valid SQL string specifying foreign key constraints to apply to the table.
 
-        `isVerbose`: default is False. Flag to print all create table DuckDB statements
-
-        `return`: none
+        `isVerbose` : bool, optional, default=False
+            If True, prints the CREATE TABLE statements for debugging or inspection.
         """
         #checking if extra column needs to be added to a table
         if self.cur.execute(f"""
@@ -133,16 +138,22 @@ class DuckDB(Filesystem):
         """
         Primary function to ingest a collection of tables into the defined DuckDB database.
         
-        Creates the auto generated `runTable` if flag set to True when setting up a Core.Terminal workflow
-        Creates `dsi_units` table if there are units for ingested data values.
+        Creates the auto generated `runTable` if the corresponding flag was set to True when initializing a Core.Terminal
+        Also creates a `dsi_units` table if any units are associated with the ingested data values.
 
-        Can only be called if a DuckDB database is loaded as a BACK-WRITE backend (check ``core.py`` for distinction)
+        Cannot ingest data if it has a complex schema with circular dependencies, ex: A->B->C->A
 
-        `collection`: A Python Collection of several tables and their data structured as a nested Ordered Dictionary.
+        Can only be called if a DuckDB database is loaded as a BACK-WRITE backend. 
+        (See `core.py` for distinction between BACK-READ and BACK-WRITE.)
 
-        `isVerbose`: default is False. Flag to print all insert table DuckDB statements
+        `collection` : OrderedDict
+            A nested OrderedDict representing multiple tables and their associated data. 
+            Each top-level key is a table name, and its value is an OrderedDict of column names and corresponding data lists.
 
-        `return`: None when stable ingesting. When errors occur, returns a tuple of (ErrorType, error message). 
+        `isVerbose` : bool, optional, default=False
+            If True, prints all SQL insert statements during the ingest process for debugging or inspection purposes.
+
+        `return`: None on successful ingestion. If an error occurs, returns a tuple in the format of: (ErrorType, error message). 
         Ex: (ValueError, "this is an error")
         """
         artifacts = collection
@@ -257,22 +268,23 @@ class DuckDB(Filesystem):
     
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
-        Function that returns data from a DuckDB database based on a specified SQL query.
-        Data returned varies based on the `dict_return` flag explained below.
+        Executes a SQL query on the DuckDB backend and returns the result in the specified format dependent on `dict_return`
 
-        `query`: Must be a SELECT or PRAGMA query. If `dict_return` is True, then this can only be a simple query on one table, NO JOINS.
-        Query CAN create new aggregate columns such as COUNT to include in the result regardless of `dict_return`.
+        `query` : str
+            Must be a SELECT or PRAGMA SQL query. Aggregate functions like COUNT are allowed.
+            If `dict_return` is True, the query must target a single table and cannot include joins. 
 
-        `isVerbose`: default is False. Flag to print all Select table DuckDB statements
+        `isVerbose` : bool, optional, default=False
+            If True, prints the SQL SELECT statements being executed.
 
-        `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from the table specified in `query`.
+        `dict_return : bool, optional, default=False
+            If True, returns the result as an OrderedDict.
+            If False, returns the result as a pandas DataFrame.
         
-        `return`: 
-
-            - When `query` is of correct format and dict_return = False, returns a Pandas dataframe of that table's data
-            - When `query` is of correct format and dict_return = True, 
-              return an Ordered Dictionary of data for the table specified in `query`
-            - When `query` is incorrect, return a tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+        `return` : pandas.DataFrame or OrderedDict or tuple
+            - If query is valid and `dict_return` is False: returns a DataFrame.
+            - If query is valid and `dict_return` is True: returns an OrderedDict.
+            - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
         """
         if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
@@ -295,27 +307,33 @@ class DuckDB(Filesystem):
     
     def get_table(self, table_name, dict_return = False):
         """
-        User-friendly version of query_artifacts() where users do not need to know SQL if retrieving all data from a specified table.
+        Retrieves all data from a specified table without requiring knowledge of SQL.
+        
+        This method is a simplified alternative to `query_artifacts()` for users who are only familiar with Python.
 
-        `table_name` : name of table that must be in this DuckDB backend
+        `table_name` : str
+            Name of the table in the DuckDB backend.
 
-        `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from `table_name`
+        `dict_return : bool, optional, default=False
+            If True, returns the result as an OrderedDict.
+            If False, returns the result as a pandas DataFrame.
 
-        `return`: 
-            - dict_return = False, returns a Pandas dataframe of that table's data
-            - dict_return = True, returns an Ordered Dict of that table's data
-            - if table_name not in backend, returns tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+        `return` : pandas.DataFrame or OrderedDict or tuple
+            - If query is valid and `dict_return` is False: returns a DataFrame.
+            - If query is valid and `dict_return` is True: returns an OrderedDict.
+            - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
         """
         return self.query_artifacts(query=f"SELECT * FROM {table_name}", dict_return=dict_return)
     
     def get_table_names(self, query):
         """
-        Meant for internal use to parse the table names from a SQL query statement. 
-        Unique for each backend file due to different querying languages.
+        Extracts all table names from a SQL query. Helper function for `query_artifacts()` that users do not need to call
 
-        `query` : SQL query statement typically as an input for ``query_artifacts()``
+        `query` : str
+            A SQL query string, typically passed into `query_artifacts()`.
 
-        `return`: list of all table names
+        `return`: list of str
+            List of table names referenced in the query.
         """
         all_names = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
         tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
@@ -329,23 +347,18 @@ class DuckDB(Filesystem):
         pass
 
     # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def read_to_artifact(self, only_units_relations = False, isVerbose = False):
-        return self.process_artifacts(only_units_relations, isVerbose)
+    def read_to_artifact(self):
+        return self.process_artifacts()
     
-    def process_artifacts(self, only_units_relations = False, isVerbose = False):
+    def process_artifacts(self):
         """
-        Reads in data from the DuckDB database into a nested Ordered Dictionary, 
-        where keys are table names and values are Ordered Dictionary of table data.
-        If there are PK/FK relations in a database it is stored in a table called `dsi_relations`.
+        Reads data from the DuckDB database into a nested OrderedDict.
+        Keys are table names, and values are OrderedDicts containing table data.
 
-        Can only be called if a loaded DuckDB database is a BACK-READ backend (check core.py for distinction)
+        If the database contains PK/FK relationships, they are stored in a special `dsi_relations` table.
 
-        `only_units_relations`: default is False. **USERS SHOULD IGNORE THIS FLAG.** Used by an internal sqlite.py function. 
-
-        `isVerbose`: default is False. When set to True, prints all DuckDB queries to select data and store in abstraction
-
-        `return`: Nested Ordered Dictionary of all data from the DuckDB database
-        
+        `return` : OrderedDict
+            A nested OrderedDict containing all data from the DuckDB database.
         """
         artifact = OrderedDict()
         artifact["dsi_relations"] = OrderedDict([("primary_key",[]), ("foreign_key", [])])
@@ -359,15 +372,14 @@ class DuckDB(Filesystem):
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchdf()
             colDict = OrderedDict((col, []) for col in tableInfo['name'])
 
-            if only_units_relations == False:
-                data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
-                for row in data:
-                    for colName, val in zip(colDict.keys(), row):
-                        if val == "NULL":
-                            colDict[colName].append(None)
-                        else:
-                            colDict[colName].append(val)
-                artifact[tableName] = colDict
+            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
+            for row in data:
+                for colName, val in zip(colDict.keys(), row):
+                    if val == "NULL":
+                        colDict[colName].append(None)
+                    else:
+                        colDict[colName].append(val)
+            artifact[tableName] = colDict
 
         pk_list = []
         fkData = self.cur.execute(f"""
@@ -392,16 +404,18 @@ class DuckDB(Filesystem):
 
     def find(self, query_object):
         """
-        Function that finds all instances of a `query_object` in a DuckDB database. 
-        This includes any partial hits if `query_object` is part of a table/col/cell
+        Searches for all instances of `query_object` in the DuckDB database at the table, column, and cell levels. 
+        Includes partial matches as well.
         
-        `query_object`: Object to find in this database. Can be of any type (string, float, int).
+        `query_object` : int, float, or str
+            The value to search for across all tables in the backend.
 
-        `return`: List of ValueObjects if there is a match. Else returns tuple of empty ValueObject() and an error message.
+        `return` : list or tuple
+            A list of ValueObjects representing matches. 
+            If no matches are found, returns a tuple of an empty ValueObject and an error message.
 
-            - Note: Return list can have ValueObjects with different structure 
-              due to table/column/cell matches having different `value` variables
-            - Refer to other find functions (table, column and cell) to clearly understand each one's ValueObject structure
+        - Note: ValueObjects may vary in structure depending on whether the match occurred at the table, column, or cell level.
+        - Refer to `find_table()`, `find_column()`, and `find_cell()` for the specific structure of each ValueObject type.
         """
         table_match = self.find_table(query_object)
         col_match = self.find_column(query_object)
@@ -420,17 +434,18 @@ class DuckDB(Filesystem):
         
     def find_table(self, query_object):
         """
-        Function that finds all tables whose name matches the `query_object`. 
-        This includes any partial hits if the `query_object` is part of a table name
+        Finds all tables whose names match or partially match the given `query_object`.
 
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `query_object` : str
+            The string to search for in table names.
 
-        `return`: List of ValueObjects if there is a match. 
+        `return` : list of ValueObjects
+            One ValueObject per matching table.
 
-        Structure of ValueObjects for this function:
-            - t_name:   string of table name
-            - c_name:   list of all columns in matching table
-            - value:    table's data as a list of lists (each row is a list)
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list of all columns in the table
+            - value:    table data as list of rows (each row is a list)
             - row_num:  None
             - type:     'table'
         """
@@ -461,28 +476,29 @@ class DuckDB(Filesystem):
     
     def find_column(self, query_object, range = False):
         """
-        Function that finds all columns whose name matches the `query_object`. 
-        This includes any partial hits if the `query_object` is part of a column name
+        Finds all columns whose names match or partially match the given `query_object`.
 
-        `query_object`: Object to find in all column names. HAS TO BE A STRING
+        `query_object` : str
+            The string to search for in column names.
 
-        `range`: default is False. If True, min/max of a numerical column that matches `query_object` is included, not column data.
+        `range` : bool, optional, default=False
+            If True, `value` in the returned ValueObject will be the [min, max] of the matching numerical column.
+            If False, `value` in the returned ValueObject will be the full list of column data.
 
-        `return`: List of ValueObjects if there is a match. 
+        `return` : List of ValueObjects if there is a match. 
         
-        **Structure of ValueObjects for this function:**
-
-            - t_name:   string of table name
-            - c_name:   list of one, which is the name of the matching column
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list containing one element - the matching column name
             - value:
 
-                - range = True, [min, max] of the column
-                - range = False, column data as a list
+                - If range=True: [min, max]
+                - If range=False: list of column data
             - row_num:  None
             - type:
             
-                - range = True, 'range'
-                - range = False, 'column'
+                - If range=True: 'range'
+                - If range=False: 'column'
         """
         tableList = self.cur.execute("""
                                      SELECT table_name FROM information_schema.tables
@@ -520,31 +536,32 @@ class DuckDB(Filesystem):
 
     def find_cell(self, query_object, row = False):
         """
-        Function that finds all cells that match the `query_object`. 
-        This includes any partial hits if the `query_object` is part of a cell value
+        Finds all cells in the database that match or partially match the given `query_object`.
 
-        `query_object`: Object to find in all cells. Can be of any type (string, float, int).
+        `query_object` : int, float, or str
+            The value to search for at the cell level, across all tables in the backend.
 
-        `row`: default is False. Set to True, if want to return whole row where there is a match between a cell and `query_object`
+        `row`: bool, optional, default=False
+            If True, `value` in the returned ValueObject will be the entire row where a cell matched.
+            If False, `value` in the returned ValueObject will only be the matching cell value.
 
-        `return`: List of ValueObjects if there is a match.
+        `return` : List of ValueObjects if there is a match.
 
-        **Structure of ValueObjects for this function:**
-
-            - t_name:   string of table name
+        ValueObject Structure:
+            - t_name:   table name (str)
             - c_name:   list of column names. 
 
-                - row = True, list is all columns in this table
-                - row = False, list is one item -- column of cell that matched `query_object`
+                - If row=True: list of all column names in the table
+                - If row=False: list with one element - the matched column name
             - value:
 
-                - row = True, list of whole row where a cell matches `query_object`
-                - row = False, value of the cell that matches `query_object`
-            - row_num:  row number of the cell that matched
+                - If row=True: full row of values
+                - If row=False: value of the matched cell
+            - row_num:  row index of the match
             - type:
 
-                - row = True, 'row'
-                - row = False, 'cell'
+                - If row=True: 'row'
+                - If row=False: 'cell'
         """
         tableList = self.cur.execute("""
                                      SELECT table_name FROM information_schema.tables
@@ -635,13 +652,18 @@ class DuckDB(Filesystem):
     
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
-        Prints data of a specified table from this DuckDB backend.
+        Prints data of a specified table in this DuckDB backend.
         
-        `table_name`: table whose data is printed
+        `table_name` : str
+            Name of the table to display.
          
-        `num_rows`: Optional numerical parameter limiting how many rows are printed. Default is 25.
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
-        `display_cols`: Optional parameter specifying which columns in `table_name` to display. Must be a Python list object
+        `display_cols` : list of str, optional
+            List of specific column names to display from the table. 
+
+            If None (default), all columns are displayed.
         """
         if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
             return (ValueError, f"{table_name} does not exist in this DuckDB database")
@@ -661,15 +683,17 @@ class DuckDB(Filesystem):
     
     def summary(self, table_name = None, num_rows = 0):
         """
-        Prints data and numerical metadata of tables from this DuckDB backend. Output varies depending on parameters
+        Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
 
-        `table_name`: default is None. When specified only that table's numerical metadata is printed. 
-        Otherwise every table's numerical metdata is printed
+        `table_name` : str, optional
+            If specified, only the numerical metadata for that table will be printed.
+            
+            If None (default), metadata for all available tables is printed.
 
-        `num_rows`: default is 0. When specified, data from the first N rows of a table are printed. 
-        Otherwise, only the total number of rows of a table are printed. 
-        The tables whose data is printed depends on the `table_name` parameter.
+        `num_rows` : int, optional, default=0
+            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
 
+            If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if table_name is None:
             tableList = self.cur.execute("""
@@ -708,9 +732,9 @@ class DuckDB(Filesystem):
     
     def summary_helper(self, table_name):
         """
-        **Users should not call this function**
+        **Internal use only.**
 
-        Helper function to generate the summary of tables in this DuckDB database. 
+        Generates and returns summary metadata for a specific table in the DuckDB backend.
         """
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
@@ -740,40 +764,24 @@ class DuckDB(Filesystem):
             rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
-    
-    def table_print_helper(self, headers, rows, max_rows=25):
-        """
-        **Users should not call this function**
-
-        Helper function to print table data/metdata cleanly
-        """
-        # Determine max width for each column
-        col_widths = [
-            max(
-                len(str(h)),
-                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
-            )
-            for i, h in enumerate(headers)
-        ]
-
-        # Print header
-        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-        print("\n" + header_row)
-        print("-" * len(header_row))
-
-        # Print each row
-        count = 0
-        for row in rows:
-            print(" | ".join(
-                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
-            ))
-
-            count += 1
-            if count == max_rows:
-                print(f"  ... showing {max_rows} of {len(rows)} rows")
-                break
 
     def overwrite_table(self, table_name, dataframe):
+        """
+        Overwrites specified table(s) in this DuckDB backend using the provided Pandas DataFrame(s).
+
+        If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
+        Cannot accept any schemas with circular dependencies.
+
+        **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
+
+        `table_name` : str or list
+            - If str, name of the table to overwrite in the backend.
+            - If list, list of all tables to overwrite in the backend
+
+        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+            - If one item, a DataFrame containing the updated data will be written to the table.
+            - If a list, all DataFrames with updated data will be written to their own table
+        """
         temp_data = self.process_artifacts()
         if isinstance(table_name, list) and isinstance(dataframe, list):
             pass
@@ -838,18 +846,22 @@ class DuckDB(Filesystem):
     def check_table_relations(self, tables, relation_dict):
         """
         Internal helper function to check if a user-loaded schema for DSI has circular dependencies. 
-        If not, returns list of tables from least dependent to most dependent.
         
-        **DSI users should not call this**
+        If no circular dependencies are found, returns a list of tables ordered from least
+        dependent to most dependent, suitable for staged ingestion into the DuckDB backend.
+        
+        **Note:** This method is intended for internal use only. DSI users should not call this directly.
 
-        `tables`: list of tables to ingest into the DuckDB backend
+        `tables` : list of str
+            List of table names to ingest into the DuckDB backend.
 
-        `relation_dict`: OrderedDict of table relations. Should be the structure of the "dsi_relations" OrderedDict.
+        `relation_dict` : OrderedDict
+            An OrderedDict describing table relationships. Structured as the `dsi_relations` object with primary and foreign keys.
 
-        `return`: tuple of (circular dependency, list of ordered tables)
-            - list of ordered tables is None if there is a circular dependency
+        `return`: tuple of (has_cycle, ordered_tables)
+            - has_cycle (bool): True if a circular dependency is detected.
+            - ordered_tables (list or None): Ordered list of tables if no cycle is found; None if a circular dependency exists.
         """
-
         from collections import defaultdict, deque
         pk_list = relation_dict['primary_key']
         fk_list = relation_dict['foreign_key']
@@ -899,6 +911,38 @@ class DuckDB(Filesystem):
                     queue.append(parent)
 
         return False, ordered_tables
+
+    def table_print_helper(self, headers, rows, max_rows=25):
+        """
+        **Internal use only.**
+
+        Prints table data and metadata in a clean tabular format.
+        """
+        # Determine max width for each column
+        col_widths = [
+            max(
+                len(str(h)),
+                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
+            )
+            for i, h in enumerate(headers)
+        ]
+
+        # Print header
+        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
+        print("\n" + header_row)
+        print("-" * len(header_row))
+
+        # Print each row
+        count = 0
+        for row in rows:
+            print(" | ".join(
+                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
+            ))
+
+            count += 1
+            if count == max_rows:
+                print(f"  ... showing {max_rows} of {len(rows)} rows")
+                break
 
     # Closes connection to server
     def close(self):

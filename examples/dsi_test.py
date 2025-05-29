@@ -11,8 +11,8 @@ test = DSI()
 
 
 ''' Example of loading a DSI backend '''
-# test.backend("data.db", backend_name="Sqlite")
-test.backend("data.duckdb", backend_name="DuckDB")
+test.backend("data.db", backend_name="Sqlite")
+# test.backend("data.duckdb", backend_name="DuckDB")
 
 
 ''' Example uses of loading DSI readers '''
