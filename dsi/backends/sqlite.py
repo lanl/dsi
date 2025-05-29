@@ -258,7 +258,7 @@ class Sqlite(Filesystem):
         `isVerbose` : bool, optional, default=False
             If True, prints the SQL SELECT statements being executed.
 
-        `dict_return : bool, optional, default=False
+        `dict_return` : bool, optional, default=False
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
         
@@ -295,7 +295,7 @@ class Sqlite(Filesystem):
         `table_name` : str
             Name of the table in the SQLite backend.
 
-        `dict_return : bool, optional, default=False
+        `dict_return` : bool, optional, default=False
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
 
