@@ -234,6 +234,7 @@ class Terminal():
                                 backend_filename = kwargs['filename']
                                 has_data = False
                                 has_runTable = False
+                                # if to-be-loaded backend has data and runTable in its tables, turn global runTable off
                                 if os.path.isfile(backend_filename):
                                     if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
                                         has_data = True
@@ -810,23 +811,25 @@ class Terminal():
         if errorStmt is not None and isinstance(errorStmt, pd.DataFrame):
             return errorStmt
 
-    def overwrite_table(self, table_name, dataframe):
+    def overwrite_table(self, table_name, collection):
         """
         Overwrites a specified table in the first loaded backend with the provided Pandas DataFrame.
 
         If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
         **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
 
-        `table_name` : str
-            Name of the table to overwrite in the backend.
+        `table_name` : str or list
+            - If str, name of the table to overwrite in the backend.
+            - If list, list of all tables to overwrite in the backend
 
-        `dataframe` : pandas.DataFrame
-            A DataFrame containing the updated data to be written to the table.
+        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+            - If one item, a DataFrame containing the updated data to be written to the table.
+            - If a list, is all DataFrames with updated data to be written to their own table
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend before printing table info from it')
-            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+                self.logger.error('Need to load a valid backend to be able to overwrite a table')
+            raise NotImplementedError('Need to load a valid backend to be able to overwrite a table')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
@@ -835,13 +838,57 @@ class Terminal():
             raise ValueError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
         start = datetime.now()
 
-        errorStmt = backend.overwrite_table(table_name, dataframe)
+        errorStmt = backend.overwrite_table(table_name, collection)
         if errorStmt is not None and isinstance(errorStmt, tuple):
             raise errorStmt[0](errorStmt[1])
         
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
+
+    def get_table(self, table_name, dict_return = False):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to return data from a specified table')
+            raise NotImplementedError('Need to load a valid backend to be able to return data from a specified table')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("Error in get_table function: First loaded backend needs to have data to be able to return a table")
+            raise ValueError("Error in get_table function: First loaded backend needs to have data to be able to return a table")
+        start = datetime.now()
+
+        output = backend.get_table(table_name, dict_return)
+        if output is not None and isinstance(output, tuple):
+            raise output[0](output[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
+            return output
+            
+    
+    def get_table_names(self, query):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to identify table names in a query')
+            raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query')
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+
+        output = backend.get_table_names(query)
+        if output is not None and isinstance(output, tuple):
+            raise output[0](output[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        if output is not None and isinstance(output, list):
+            return output
     
     def get_current_abstraction(self, table_name = None):
         """
@@ -1131,19 +1178,3 @@ class Sync():
         DSI database
         '''
         True
-
-class FindObject:
-    """
-    Data Structure used when returning search results from ``dsi.find()``
-
-        - table_name: table name 
-        - column_name: first column in this table where a datapoint matched user-defined query
-        - row_numbers: list of all row numbers where user-defined query was found
-        - collection: Pandas dataframe of all rows in this table where user-defined query is found
-
-    """
-    table_name = "" # table name
-    column_name = "" # first column name 
-    # column_name = [] # list of all column matches 
-    row_numbers = [] # list of row numbers
-    collection = None # collection of data. Default is empty
