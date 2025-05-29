@@ -130,7 +130,7 @@ This example details how to structure a JSON file for the DSI Schema Reader to s
 
 If we consider a workflow where a user reads in a complex schema for YAML data and generates an ER Diagram:
 
-.. literalinclude:: ../examples/dev_core/schema.py
+.. literalinclude:: ../examples/developer/schema.py
 
 where ``examples/data/example_schema.json`` is:
 
@@ -234,7 +234,7 @@ This example displays an example workflow for a user to read data into DSI, inge
 
 ``examples/core/jupyter_example.py``:
 
-.. literalinclude:: ../examples/dev_core/jupyter_example.py
+.. literalinclude:: ../examples/developer/jupyter_example.py
 
 The above workflow generates ``dsi_sqlite_backend_output.ipynb`` which can be seen below.
 Users can make further edits to the Jupyter notebook to interact with the data.

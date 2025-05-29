@@ -17,22 +17,18 @@ Users must first call ``backend()`` to activate a backend to read data into and 
 Users should use ``read()`` to load data into DSI and ``write()`` to export data from DSI into supported external formats.
 Their respective list functions print all valid readers/writers that can be used.
 
-The primary backend interactions are ``query()`` and ``find()`` where users can print a search result, or retrieve the result as a collection of data.
+The primary backend interactions are ``query()``, ``get_table()``, and ``find()`` where users can print a search result, or retrieve the result as a collection of data.
 
       - If users manipulate these collections, they can call ``update()`` to update the respective data in the activated backend.
-        Read ``update()`` to understand its accepted inputs.
+        Read ``update()`` to understand its accepted inputs and behavior.
 
 Users can also view various data/metadata of an active backend with ``list()``, ``num_tables()``, ``display()``, ``summary()``
 
 Notes for users:
       - When using a complex schema, must call ``schema()`` prior to ``read()`` to store the associated data and relations together.
-      - If collection=True in ``find()``, the output is a list of FindObjects. Read the ``FindObject`` description below to understand its structure
       - If input to ``update()`` contains edited data for a user-defined primary key column, rows in that table might be reordered.
-      - If input to ``update()`` is a Pandas.DataFrame, the existing table in the backend will be **overwritten**. Ensure data is secure.
+      - If input to ``update()`` is a single Pandas.DataFrame, the existing table in the backend will be **overwritten**. Ensure data is secure.
       - Read the :ref:`datacard_section_label` section to learn which data card standards are supported and where to find templates compatible with DSI. 
-
-.. autoclass:: dsi.core.FindObject
-      :members:
 
 .. autoclass:: dsi.dsi.DSI 
       :members:
@@ -110,7 +106,6 @@ Printing different data and metadata from a database - number of tables, dimensi
 Example 7: Complex schema with data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Loading complex JSON schema with ``schema()``, loading associated data with ``read()``, and an ER Diagram to display the relations.
-
-.. Read :ref:`user_schema_example_label` to understand how to structure this schema JSON file for ``schema()``
+Read :ref:`user_schema_example_label` to understand how to structure a DSI-compatible input file for ``schema()``
 
 .. literalinclude:: ../examples/user/7.schema.py

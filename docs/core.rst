@@ -59,13 +59,13 @@ Examples
 --------
 Before interacting with the Readers/Writers and backends, they must each be loaded. 
 Examples below display various ways users can incorporate DSI into their data science workflows.
-They can be found and run in ``examples/dev_core/``
+They can be found and run in ``examples/developer/``
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Baseline use of DSI to list Modules
 
-.. literalinclude:: ../examples/dev_core/baseline.py
+.. literalinclude:: ../examples/developer/baseline.py
 
 
 .. _example2_label:
@@ -74,20 +74,20 @@ Example 2: Ingest data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Ingesting data from a Reader to a backend
 
-.. literalinclude:: ../examples/dev_core/ingest.py
+.. literalinclude:: ../examples/developer/ingest.py
 
 Example 2.5: Ingest complex schema and data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Ingesting data from a Reader to a backend with a complex schema stored in a separate JSON file. 
 Read :ref:`schema_section` to understand how to structure this schema JSON file for the Schema Reader
 
-.. literalinclude:: ../examples/dev_core/ingest_schema.py
+.. literalinclude:: ../examples/developer/ingest_schema.py
 
 Example 3: Query data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Querying data from a backend
 
-.. literalinclude:: ../examples/dev_core/query.py
+.. literalinclude:: ../examples/developer/query.py
 
 
 .. _example4_label:
@@ -96,19 +96,19 @@ Example 4: Process data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Processing data from a backend to generate an Entity Relationship diagram using a Writer
 
-.. literalinclude:: ../examples/dev_core/process.py
+.. literalinclude:: ../examples/developer/process.py
 
 Example 5: Generate notebook
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generating a python notebook file (mostly Jupyter notebook) from a backend to view data interactively
 
-.. literalinclude:: ../examples/dev_core/notebook.py
+.. literalinclude:: ../examples/developer/notebook.py
 
 Example 6: Find data
 ~~~~~~~~~~~~~~~~~~~~
 Finding data from a backend - tables, columns, cells, or all matches
 
-.. literalinclude:: ../examples/dev_core/find.py
+.. literalinclude:: ../examples/developer/find.py
 
 .. _external_readers_writers_label:
 
@@ -116,8 +116,8 @@ Example 7: External Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Loading an external python reader from a separate file:
 
-.. literalinclude:: ../examples/dev_core/external_plugin.py
+.. literalinclude:: ../examples/developer/external_plugin.py
 
 ``text_file_reader``:
 
-.. literalinclude:: ../examples/dev_core/text_file_reader.py
+.. literalinclude:: ../examples/developer/text_file_reader.py
