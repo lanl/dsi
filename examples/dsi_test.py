@@ -1,4 +1,5 @@
 from dsi.dsi import DSI
+import os
 
 '''This is an example workflow using core.py'''
 test = DSI()
@@ -9,13 +10,14 @@ test = DSI()
 # test.list_writers()
 
 
-''' Example of loading a Sqlite DSI backend '''
-test.backend("data.db", backend_name="Sqlite")
-# test.backend("data.duckdb", backend_name="DuckDB")
+''' Example of loading a DSI backend '''
+# test.backend("data.db", backend_name="Sqlite")
+test.backend("data.duckdb", backend_name="DuckDB")
 
 
 ''' Example uses of loading DSI readers '''
-test.schema(filename="data/example_schema.json")
+test.schema(filename="data/example_schema.json") # must be loaded first
+
 test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader_name='YAML1')
 # test.read(filenames=["data/results.toml", "data/results1.toml"], reader_name='TOML1')
 # test.read(filenames="data/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
@@ -44,21 +46,17 @@ test.query("SELECT * FROM math")                              # print output
 # test.update(query_df)
 # test.display("math")
 
-test.find(query=2)                                # print output
-# find_list = test.find(query=2, collection=True)   # return output
+test.find(query="a")                                # print output
+# find_list = test.find(query="a", collection=True)   # return output
 # for obj in find_list:
-#     test.display(table_name=obj.table_name)
+#     test.display(table_name=obj["dsi_table_name"][0])
 # for obj in find_list:
-#     address_table = obj
-#     address_df = address_table.collection
-#     address_df['i'] = 200
-#     address_df['j'] = 123.456
-#     address_df["new_col"] = "test"
-#     address_table.collection = address_df
-#     obj = address_table
+#     obj['i'] = list(range(2000, 2000 + len(obj)))
+#     obj['b'] = list(range(2000, 2000 + len(obj)))
+#     obj["new_col"] = "test1"
 # test.update(find_list)
 # for obj in find_list:
-#     test.display(table_name=obj.table_name)
+#     test.display(table_name=obj["dsi_table_name"][0])
 
 
 ''' Printing table information '''
