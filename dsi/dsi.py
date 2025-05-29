@@ -1,8 +1,7 @@
-from dsi.core import Terminal, Sync, FindObject
+from dsi.core import Terminal, Sync
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-import re
 
 class DSI():
     '''
@@ -153,7 +152,31 @@ class DSI():
             self.t.table_print_helper(headers, rows)
             print()
         else:
-            df.attrs['table_name'] = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', statement, re.IGNORECASE)[0][0]
+            df.attrs['table_name'] = self.t.get_table_names(statement)[0]
+            df.insert(0, "dsi_table_name", df.attrs['table_name'])
+            return df
+    
+    def get_table(self, table_name, collection = False):
+        """
+        Prints/gets all data from a table without requiring knowledge of a backend's query language.
+        Simpler alternative to the `query()` function for users who only know Python.
+
+        `table_name`: name of table from which all data will be retrieved
+
+        `collection` : bool, optional, default False.
+            If True, returns the result as a pandas.DataFrame
+            
+            If False, (default), prints the result.
+        """
+        df = self.t.get_table(table_name)
+        if not collection:
+            headers = df.columns.tolist()
+            rows = df.values.tolist()
+            self.t.table_print_helper(headers, rows)
+            print()
+        else:
+            df.attrs['table_name'] = table_name
+            df.insert(0, "dsi_table_name", df.attrs['table_name'])
             return df
         
     def find(self, query, collection = False):
@@ -165,26 +188,15 @@ class DSI():
             at the individual cell level.
 
         `collection` : bool, optional, default False. 
-            If True, returns a list of structured objects (one for each table with data matching `query`) 
-            that include data/metadata for each match. Each object follows the FindObject structure:
-
-                - table_name : str
-                    Name of table where 'query' was found.
-                    **DO NOT modify this if you plan to call DSI.update()**
-
-                - column_name : str
-                    The first column where 'query` was matched in this table
-
-                - row_numbers : list of int
-                    Indices (row numbers) where `query` was found in this table. 
-                    **DO NOT modify this list if you plan to cal DSI.update()**
-
-                - collection : Pandas.DataFrame
-                    Subset of the table containing all rows where `query` was found
+            If True, returns a list of Pandas DataFrames where each DataFrame is a subset of a table with all rows where `query` was found
             
             If False (default), prints the matches in the table
+
+            `return`: If there are no matches found, then nothing is returned or printed
         """
         find_data = self.t.find_cell(query, row=True)
+        if find_data is None:
+            return
         if collection == False:
             for val in find_data:
                 print(f"Table: {val.t_name}")
@@ -195,94 +207,86 @@ class DSI():
         else:
             find_dict = {}
             for val in find_data:
-                # ALL COLS WHERE QUERY IS FOUND
-                # all_cols = [i for i, x in enumerate(val.value) if str(query) in str(x)]
-
                 if val.t_name not in find_dict:
-                    find_dict[val.t_name] = FindObject()
-                    find_dict[val.t_name].table_name = val.t_name
-                    index = next((i for i, x in enumerate(val.value) if str(query) in str(x)), -1)
-                    find_dict[val.t_name].column_name = index
-                    # find_dict[val.t_name].column_name = sorted(all_cols)
-                    find_dict[val.t_name].row_numbers = []
-                    find_dict[val.t_name].row_numbers.append(val.row_num)
-                    find_dict[val.t_name].collection = pd.DataFrame([val.value], columns=val.c_name)
+                    find_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
+                    find_dict[val.t_name].attrs['table_name'] = val.t_name
+                    find_dict[val.t_name].attrs['row_num'] = [val.row_num]
 
-                if val.row_num not in find_dict[val.t_name].row_numbers:
-                    find_dict[val.t_name].row_numbers.append(val.row_num)
-                    find_dict[val.t_name].collection.loc[len(find_dict[val.t_name].collection)] = val.value
-                    
-                    # CHECK IF COLUMNS LIST NEEDS TO BE UPDATED
-                    # curr_cols = find_dict[val.t_name].column_name
-                    # diff = set(all_cols) - set(curr_cols)
-                    # if diff:
-                    #     find_dict[val.t_name].column_name = sorted(set(curr_cols).union(diff))
-            
+                if val.row_num not in find_dict[val.t_name].attrs['row_num']:
+                    find_dict[val.t_name].loc[len(find_dict[val.t_name])] = val.value
+                    find_dict[val.t_name].attrs['row_num'].append(val.row_num)
+
             table_list = list(find_dict.values())
-            for ind, item in enumerate(table_list):
-                table_list[ind].column_name = item.collection.columns[item.column_name]
-
-                # IF COLUMN IS A LIST OF MATCHING COLS
-                # table_list[ind].column_name = [item.column_name[i] for i in item.collection.columns] 
+            for table in table_list:
+                table.insert(0, "dsi_table_name", table.attrs['table_name'])
             
             return table_list
 
     def update(self, collection):
         """
         Updates data in one or more tables in the first activated backend using the provided input. 
-        Expected to be used after manipulating outputs of `find()` or `query()`
+        Expected to be used after manipulating outputs of `find()`, `query()` or `get_table()`
 
-        `collection` : List of FindObject, FindObject, or pandas.DataFrame
-            The object used to update table data. Valid inputs are:
+        `collection` : List of/single pandas.DataFrame. 
+        This object is used to update the backend.
+        Must be some form of output from `find()`, `query()` or `get_table()` as they contain important metadata used for updating.
 
-            - List of `FindObject` (from `find()` output when collection = True)
-            - Single `FindObject`  (one element in `find()` output when collection = True)
-            - `pandas.DataFrame` (from `query()` output when collection = True)
+            - find() output is a list/single DataFrame
+            - query() and get_table() output is a single DataFrame
+                - If using this output, the corresponding table in the backend will be completely overwritten.
 
-                - Corresponding table in the backend will be completely overwritten.
-                  Ensure the data is complete and properly structured
-
+        - NOTE: Some user-Pandas operations could delete hidden metadata which will raise errors when trying to update.
         - NOTE: Edited table cannot delete columns from the original table, only edit or append new ones.
         - NOTE: If a DataFrame includes edits to a column that is a user-defined primary key, row order may change upon reinsertion.
         """
-        if isinstance(collection, (list, FindObject)):
-            if isinstance(collection, FindObject):
-                collection = [collection]
-            if isinstance(collection, list) and len(collection) > 0 and isinstance(collection[0], FindObject):
-                pass
-            else:
-                raise ValueError("If input is a list, must be a list of FindObjects which was the output of find()")
+        if isinstance(collection, pd.DataFrame) and 'row_num' in collection.attrs:
+            collection = [collection]
+        if isinstance(collection, list):
+            if not all(isinstance(item, pd.DataFrame) for item in collection):
+                raise ValueError("If input is a list, must be a list of all Pandas DataFrames")
+            if not all('row_num' in item.attrs for item in collection):
+                raise ValueError("Hidden metadata was deleted from input DataFrame list. Please check Pandas operations again")
 
-            for find_obj in collection:
-                actual_df = self.t.display(find_obj.table_name, num_rows=-101)
-                input_df = find_obj.collection
-                if not set(actual_df.columns).issubset(set(input_df.columns)):
-                    errorStmt = f"The columns in {find_obj.table_name} object's dataframe, must contain all columns from the table in the backend"
-                    raise ValueError(errorStmt)
-                new_cols = list(set(input_df.columns) - set(actual_df.columns))
+            table_name_list = []
+            dataframe_list = []
+            for table_df in collection:
+                table_name = table_df.attrs["table_name"]
+                row_num_list = table_df.attrs["row_num"]
+                actual_df = self.t.display(table_name, num_rows=-101)
+
+                if 'dsi_table_name' in table_df.columns:
+                    table_df = table_df.drop(columns='dsi_table_name')
+
+                if not set(actual_df.columns).issubset(set(table_df.columns)):
+                    raise ValueError(f"{table_name}'s edited dataframe must contain all columns from the original table in the backend")
+                new_cols = list(set(table_df.columns) - set(actual_df.columns))
                 if new_cols:
                     for col in new_cols:
                         actual_df[col] = None
-                    actual_df = actual_df[input_df.columns]
+                    actual_df = actual_df[table_df.columns]
                 
                 for col in actual_df.columns:
-                    common_dtype = np.find_common_type([actual_df[col].dtype, input_df[col].dtype], [])
+                    common_dtype = np.find_common_type([actual_df[col].dtype, table_df[col].dtype], [])
                     actual_df[col] = actual_df[col].astype(common_dtype)
-                    input_df[col] = input_df[col].astype(common_dtype)
+                    table_df[col] = table_df[col].astype(common_dtype)
+                
+                id_list = [x - 1 for x in row_num_list] # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
+                actual_df.loc[id_list] = table_df.values
+                table_name_list.append(table_name)
+                dataframe_list.append(actual_df)
 
-                # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
-                id_list = [x - 1 for x in find_obj.row_numbers]
-                actual_df.loc[id_list] = input_df.values
-
-                # IF ROW NUMBERS ARE 0-INDEXED
-                # actual_df.loc[find_obj.row_numbers] = input_df.values
-
-                self.t.overwrite_table(find_obj.table_name, actual_df)
+            if len(table_name_list) > 1:
+                self.t.overwrite_table(table_name_list, dataframe_list)
+            elif len(table_name_list) == 1:
+                self.t.overwrite_table(table_name_list[0], dataframe_list[0])
     
         elif isinstance(collection, pd.DataFrame):
-            self.t.overwrite_table(collection.attrs['table_name'], collection)
+            table_name = collection.attrs['table_name']
+            if 'dsi_table_name' in collection.columns:
+                collection = collection.drop(columns='dsi_table_name')
+            self.t.overwrite_table(table_name, collection)
         else:
-            raise ValueError("collection can only be a FindObject, list of FindObjects, or Pandas DataFrame to update the backend")
+            raise ValueError("collection must be a list/single Pandas DataFrame that was the output from find(), query() or get_table()")
     
     def nb(self):
         """
