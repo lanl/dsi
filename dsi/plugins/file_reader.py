@@ -366,6 +366,17 @@ class YAML1(FileReader):
         
         if len(self.yaml_data["dsi_units"]) == 0:
             del self.yaml_data["dsi_units"]
+        else:
+            dsi_unit_data = self.yaml_data["dsi_units"]
+            del self.yaml_data["dsi_units"]
+            new_unit_dict = OrderedDict([('table_name', []), ('column_name', []), ('unit', [])])
+            for table_name, unit_tuple in dsi_unit_data.items():
+                for col, unit in unit_tuple.items():
+                    new_unit_dict['table_name'].append(table_name)
+                    new_unit_dict['column_name'].append(col)
+                    new_unit_dict['unit'].append(unit)
+            self.yaml_data["dsi_units"] = new_unit_dict
+
         self.set_schema_2(self.yaml_data)
 
         # SAVE FOR READERS TO USE FOR PADDING MISMATCHED COLUMNS- YAML AND TOML USE THIS NOW
@@ -469,6 +480,17 @@ class TOML1(FileReader):
 
         if len(self.toml_data["dsi_units"]) == 0:
             del self.toml_data["dsi_units"]
+        else:
+            dsi_unit_data = self.toml_data["dsi_units"]
+            del self.toml_data["dsi_units"]
+            new_unit_dict = OrderedDict([('table_name', []), ('column_name', []), ('unit', [])])
+            for table_name, unit_tuple in dsi_unit_data.items():
+                for col, unit in unit_tuple.items():
+                    new_unit_dict['table_name'].append(table_name)
+                    new_unit_dict['column_name'].append(col)
+                    new_unit_dict['unit'].append(unit)
+            self.toml_data["dsi_units"] = new_unit_dict
+
         self.set_schema_2(self.toml_data)
 
 class Ensemble(FileReader):
