@@ -765,7 +765,7 @@ class DuckDB(Filesystem):
 
         return headers, rows
 
-    def overwrite_table(self, table_name, dataframe):
+    def overwrite_table(self, table_name, collection):
         """
         Overwrites specified table(s) in this DuckDB backend using the provided Pandas DataFrame(s).
 
@@ -783,18 +783,18 @@ class DuckDB(Filesystem):
             - If a list, all DataFrames with updated data will be written to their own table
         """
         temp_data = self.process_artifacts()
-        if isinstance(table_name, list) and isinstance(dataframe, list):
+        if isinstance(table_name, list) and isinstance(collection, list):
             pass
-        elif isinstance(table_name, str) and isinstance(dataframe, pd.DataFrame):
+        elif isinstance(table_name, str) and isinstance(collection, pd.DataFrame):
             table_name = [table_name]
-            dataframe = [dataframe]
+            collection = [collection]
         else:
             return (TypeError, "inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
         
-        for name, data in zip(table_name, dataframe):
+        for name, data in zip(table_name, collection):
             temp_data[name] = OrderedDict(data.to_dict(orient='list'))
         
-        for name, data in zip(table_name, dataframe):
+        for name, data in zip(table_name, collection):
             if "dsi_relations" not in temp_data.keys(): # skip PK check if no relations
                 continue
             
