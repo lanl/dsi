@@ -125,7 +125,6 @@ class DuckDB(Filesystem):
                 return (duckdb.Error, e)
             self.types = types
 
-
     # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def put_artifacts(self, collection, isVerbose=False):
         return self.ingest_artifacts(collection, isVerbose)
@@ -148,6 +147,18 @@ class DuckDB(Filesystem):
         """
         artifacts = collection
 
+        table_order = artifacts.keys()
+        if "dsi_relations" in artifacts.keys():
+            circular, ordered_tables = self.check_table_relations(artifacts.keys(), artifacts["dsi_relations"])
+
+            if circular:
+                return (ValueError, f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
+            else:
+                table_order = list(reversed(ordered_tables)) # ingest primary key tables first then children
+
+        if "runTable" in artifacts.keys():
+            self.runTable = False
+
         self.cur.execute("BEGIN TRANSACTION")
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable " \
@@ -160,30 +171,6 @@ class DuckDB(Filesystem):
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             runTable_insert = f"INSERT INTO runTable VALUES (nextval('seq_run_id'), '{timestamp}');"
             self.cur.execute(runTable_insert)
-
-        table_order = []
-        if "dsi_relations" in artifacts.keys(): # only do this extra manipulation if using a complex schema
-            for (tableName, key) in artifacts["dsi_relations"]["foreign_key"]:
-                if tableName == None:
-                    continue
-                foreignIndex = artifacts["dsi_relations"]["foreign_key"].index((tableName, key))
-                primaryTuple = artifacts["dsi_relations"]['primary_key'][foreignIndex]
-                
-                if tableName in table_order and primaryTuple[0] in table_order:
-                    fk_spot = table_order.index(tableName)
-                    pk_spot = table_order.index(primaryTuple[0])
-                    if fk_spot < pk_spot:
-                        table_order[pk_spot] = primaryTuple[0]
-                        table_order[fk_spot] = tableName
-                if tableName not in table_order:
-                    table_order.append(tableName)
-                if primaryTuple[0] not in table_order:
-                    table_order.insert(table_order.index(tableName), primaryTuple[0])
-
-            difference = [item for item in artifacts.keys() if item not in table_order]
-            table_order = difference + table_order
-        else:
-            table_order = artifacts.keys()
 
         for tableName in table_order:
             if tableName == "dsi_relations" or tableName == "dsi_units":
@@ -239,23 +226,21 @@ class DuckDB(Filesystem):
         if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
             self.cur.execute(create_query)
-            for tableName, tableData in artifacts["dsi_units"].items():
-                if len(tableData) > 0:
-                    for col, unit in tableData.items():
-                        str_query = f"INSERT INTO dsi_units VALUES ('{tableName}', '{col}', '{unit}')"
-                        unit_result = self.cur.execute(f"""
-                                                       SELECT unit FROM dsi_units 
-                                                       WHERE table_name = '{tableName}' AND column_name = '{col}';""").fetchone()
-                        if unit_result and unit_result[0] != unit: #checks if unit for same table and col exists in db and if units match
-                            self.con.rollback()
-                            return (TypeError, f"Cannot ingest different units for the column {col} in {tableName}")
-                        elif not unit_result:
-                            try:
-                                self.cur.execute(str_query)
-                            except duckdb.Error as e:
-                                self.cur.execute("ROLLBACK")
-                                self.cur.execute("CHECKPOINT")
-                                return (duckdb.Error, e)
+            units_data = artifacts["dsi_units"]
+            for table_val, col_val, unit_val in zip(units_data["table_name"], units_data["column_name"], units_data["unit"]):
+                str_query = f"INSERT INTO dsi_units VALUES ('{table_val}', '{col_val}', '{unit_val}')"
+                unit_result = self.cur.execute(f"""SELECT unit FROM dsi_units 
+                                                WHERE table_name = '{table_val}' AND column_name = '{col_val}';""").fetchone()
+                if unit_result and unit_result[0] != unit_val: #checks if unit for same table and col exists in db and if units match
+                    self.con.rollback()
+                    return (TypeError, f"Cannot ingest different units for the column {col_val} in {table_val}")
+                elif not unit_result:
+                    try:
+                        self.cur.execute(str_query)
+                    except duckdb.Error as e:
+                        self.cur.execute("ROLLBACK")
+                        self.cur.execute("CHECKPOINT")
+                        return (duckdb.Error, e)
                             
         try:
             self.cur.execute("COMMIT")
@@ -300,13 +285,41 @@ class DuckDB(Filesystem):
             return (ValueError, "Error in query_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
-            tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+            tables = self.get_table_names(query)
             if len(tables) > 1:
                 return (ValueError, "Error in query_artifacts handler: Can only return ordered dictionary if query with one table")
             
             return OrderedDict(data.to_dict(orient='list'))
         else:
             return data
+    
+    def get_table(self, table_name, dict_return = False):
+        """
+        User-friendly version of query_artifacts() where users do not need to know SQL if retrieving all data from a specified table.
+
+        `table_name` : name of table that must be in this DuckDB backend
+
+        `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from `table_name`
+
+        `return`: 
+            - dict_return = False, returns a Pandas dataframe of that table's data
+            - dict_return = True, returns an Ordered Dict of that table's data
+            - if table_name not in backend, returns tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+        """
+        return self.query_artifacts(query=f"SELECT * FROM {table_name}", dict_return=dict_return)
+    
+    def get_table_names(self, query):
+        """
+        Meant for internal use to parse the table names from a SQL query statement. 
+        Unique for each backend file due to different querying languages.
+
+        `query` : SQL query statement typically as an input for ``query_artifacts()``
+
+        `return`: list of all table names
+        """
+        all_names = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+        tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
+        return tables
     
     # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def inspect_artifacts(self, interactive=False):
@@ -343,10 +356,6 @@ class DuckDB(Filesystem):
                                      """).fetchall()
         for item in tableList:
             tableName = item[0]
-            if tableName == "dsi_units":
-                artifact["dsi_units"] = self.process_units_helper()
-                continue
-
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchdf()
             colDict = OrderedDict((col, []) for col in tableInfo['name'])
 
@@ -360,16 +369,19 @@ class DuckDB(Filesystem):
                             colDict[colName].append(val)
                 artifact[tableName] = colDict
 
+        pk_list = []
         fkData = self.cur.execute(f"""
                                   SELECT table_name, constraint_column_names, referenced_table, referenced_column_names
                                   FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'""").fetchall()
         for row in fkData:
             artifact["dsi_relations"]["primary_key"].append((row[2], row[3][0]))
             artifact["dsi_relations"]["foreign_key"].append((row[0], row[1][0]))
+            pk_list.append((row[2], row[3][0])) 
         
-        if not fkData:
-            pkData = self.cur.execute(f"SELECT * FROM duckdb_constraints() WHERE constraint_type = 'PRIMARY KEY'").fetchall()
-            for pk_table, pk_col in pkData:
+        pkData = self.cur.execute(f"""SELECT table_name, constraint_column_names FROM duckdb_constraints() 
+                                  WHERE constraint_type = 'PRIMARY KEY'""").fetchall()
+        for pk_table, pk_col in pkData:
+            if (pk_table, pk_col[0]) not in pk_list:
                 artifact["dsi_relations"]["primary_key"].append((pk_table, pk_col[0]))
                 artifact["dsi_relations"]["foreign_key"].append((None, None))
 
@@ -377,24 +389,6 @@ class DuckDB(Filesystem):
             del artifact["dsi_relations"]
 
         return artifact
-      
-    def process_units_helper(self):
-        """
-        **Users do not interact with this function and should ignore it. Called within process_artifacts()**
-
-        Helper function to create the DuckDB database's units table as an Ordered Dictionary.
-        Only called if `dsi_units` table exists in the database.
-
-        `return`: units table as an Ordered Dictionary
-        """
-        unitsDict = OrderedDict()
-        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
-        for row in unitsTable:
-            tableName = row[0]
-            if tableName not in unitsDict.keys():
-                unitsDict[tableName] = {}
-            unitsDict[tableName][row[1]] = row[2]
-        return unitsDict
 
     def find(self, query_object):
         """
@@ -557,27 +551,27 @@ class DuckDB(Filesystem):
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
         tableList = [table[0] for table in tableList]
-                    
         query_list = []
         for table in tableList:
             colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
             all_cols = [column[1] for column in colList]
-            row_list = []
-            for col in colList:
-                middle= None
-                if row:
-                    result = ', '.join(str(i) for i in all_cols)
-                    middle = f"'{result}', *"
-                else:
-                    middle = f"'{col[1]}', {col[1]}"
-                query = f"""
-                        SELECT '{table}', row_number() OVER () AS row_number, {middle} 
-                        FROM {table} 
-                        WHERE CAST({col[1]} AS TEXT) ILIKE '%{query_object}%'
-                        """
-                row_list.append(query)            
-
-            table_row_query = " UNION ".join(row_list) + ";"
+            result = ', '.join(str(i) for i in all_cols)
+            table_row_query = ""
+            if row:
+                table_row_query = f"""SELECT '{table}', ROW_NUMBER() OVER () AS row_number, '{result}', *
+                                      FROM {table} WHERE """
+                for col in all_cols:
+                    table_row_query += f"CAST({col} AS TEXT) ILIKE '%{query_object}%' OR "
+                table_row_query = table_row_query[:-4] + ";"
+            else:
+                casted_cols = ""
+                for col in all_cols:
+                    casted_cols += f"CAST({col} AS TEXT) AS {col}, "
+                casted_cols = casted_cols[:-2]
+                table_row_query = f"""SELECT '{table}', original_row_num, column_name, column_value
+                FROM ( SELECT * FROM (SELECT ROW_NUMBER() OVER () AS original_row_num, {casted_cols} FROM {table} )
+                UNPIVOT (column_value FOR column_name IN ({result}))) AS unpvt
+                WHERE column_value ILIKE '%{query_object}%';"""
             table_row_return = self.cur.execute(table_row_query).fetchall()
             query_list += table_row_return
 
@@ -587,13 +581,20 @@ class DuckDB(Filesystem):
                 val = ValueObject()
                 val.t_name = value_row[0]
                 val.row_num = value_row[1]
-                val.c_name = [value_row[2]]
-                val.value = value_row[3]
-                val.type = "cell"
                 if row:
                     val.c_name = value_row[2].split(', ')
                     val.value = list(value_row[3:])
                     val.type = "row"
+                else:
+                    val.c_name = [value_row[2]]
+                    try:
+                        val.value = int(value_row[3])
+                    except ValueError:
+                        try:
+                            val.value = float(value_row[3])
+                        except ValueError:
+                            val.value = value_row[3]
+                    val.type = "cell"
                 value_obj_list.append(val)
             return value_obj_list
 
@@ -774,25 +775,130 @@ class DuckDB(Filesystem):
 
     def overwrite_table(self, table_name, dataframe):
         temp_data = self.process_artifacts()
-        temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
-
-        result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if table_name in pk_tuple[0]), None)
-
-        if result:
-            pk_data = temp_data[table_name][result]
-            if any(isinstance(x, str) for x in pk_data) and any(isinstance(x, (int, float)) for x in pk_data):
-                return (ValueError, f"User edited {table_name}'s primary key column, {result}, with mismatched data types. Table not updated.")
+        if isinstance(table_name, list) and isinstance(dataframe, list):
+            pass
+        elif isinstance(table_name, str) and isinstance(dataframe, pd.DataFrame):
+            table_name = [table_name]
+            dataframe = [dataframe]
+        else:
+            return (TypeError, "inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
+        
+        for name, data in zip(table_name, dataframe):
+            temp_data[name] = OrderedDict(data.to_dict(orient='list'))
+        
+        for name, data in zip(table_name, dataframe):
+            if "dsi_relations" not in temp_data.keys(): # skip PK check if no relations
+                continue
             
-            rows = self.cur.execute(f"SELECT {result} FROM {table_name}").fetchall()
-            data = [row[0] for row in rows]
-            if data != pk_data:
-                print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
+            result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if name in pk_tuple[0]), None)
+            if result:
+                new_data = temp_data[name][result]
+                if any(isinstance(x, str) for x in new_data) and any(isinstance(x, (int, float)) for x in new_data):
+                    return (ValueError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
+                if len(new_data) != len(set(new_data)):
+                    return (ValueError, f"{name}'s primary key column, {result}, must have unique data")
 
-        self.cur.execute(f"DROP TABLE IF EXISTS {table_name};")
-        self.con.commit()
+                rows = self.cur.execute(f"SELECT {result} FROM {name}").fetchall()
+                old_data = [row[0] for row in rows]
+                if old_data != new_data:
+                    if any(isinstance(x, float) for x in new_data):
+                        new_data = [round(val, 4) for val in new_data]
+                    for pk, fk in zip(temp_data["dsi_relations"]["primary_key"], temp_data["dsi_relations"]["foreign_key"]):
+                        if pk == (name, result) and fk != (None, None):
+                            fk_data = temp_data[fk[0]][fk[1]]
+                            if any(isinstance(x, float) for x in fk_data):
+                                fk_data = [round(val, 4) for val in fk_data]
+                            if not all(item in new_data for item in fk_data):
+                                errorMsg = f"Data in table {fk[0]}'s foreign key column, {fk[1]}, must match table {name}'s primary key"
+                                return(ValueError, errorMsg + f" column, {result}. Please ensure that all rows in {fk[0]} are updated")
 
-        self.ingest_artifacts(temp_data)
-        self.con.commit()
+                    print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
+
+        ordered_tables = temp_data.keys()
+        if "dsi_relations" in temp_data.keys():
+            circular, ordered_tables = self.check_table_relations(temp_data.keys(), temp_data["dsi_relations"])
+            if circular:
+                return (ValueError, f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
+
+        for table_name in ordered_tables:
+            self.con.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
+
+        temp_runTable_bool = self.runTable
+        if "runTable" in temp_data.keys() and temp_runTable_bool == True:
+            self.runTable = False
+
+        errorStmt = self.ingest_artifacts(temp_data)
+
+        if "runTable" in temp_data.keys() and temp_runTable_bool == True:
+            self.runTable = True
+
+        if errorStmt is not None:
+            raise errorStmt[0](f"Error ingesting data in {self.filename} due to {errorStmt[1]}")
+        
+    def check_table_relations(self, tables, relation_dict):
+        """
+        Internal helper function to check if a user-loaded schema for DSI has circular dependencies. 
+        If not, returns list of tables from least dependent to most dependent.
+        
+        **DSI users should not call this**
+
+        `tables`: list of tables to ingest into the DuckDB backend
+
+        `relation_dict`: OrderedDict of table relations. Should be the structure of the "dsi_relations" OrderedDict.
+
+        `return`: tuple of (circular dependency, list of ordered tables)
+            - list of ordered tables is None if there is a circular dependency
+        """
+
+        from collections import defaultdict, deque
+        pk_list = relation_dict['primary_key']
+        fk_list = relation_dict['foreign_key']
+
+        graph = defaultdict(set)
+        for table in tables:
+            graph[table] = set()
+
+        for (pk_table, _), (fk_table, _) in zip(pk_list, fk_list):
+            if fk_table is not None and pk_table is not None and fk_table != pk_table:
+                graph[fk_table].add(pk_table)
+
+        visited = set()
+        stack = set()
+
+        def visit(node):
+            if node in stack:
+                return True  # cycle detected
+            if node in visited:
+                return False
+            stack.add(node)
+            visited.add(node)
+            for neighbor in graph[node]:
+                if visit(neighbor):
+                    return True
+            stack.remove(node)
+            return False
+
+        if any(visit(node) for node in list(graph.keys())):
+            return True, None  # Circular dependency detected
+
+        # Step 3: Order tables from least dependencies to most (if no circular dependencies)
+        in_degree = {table: 0 for table in tables}
+        for child in graph:
+            for parent in graph[child]:
+                in_degree[parent] += 1
+
+        queue = deque([t for t in tables if in_degree[t] == 0])
+        ordered_tables = []
+
+        while queue:
+            current = queue.popleft()
+            ordered_tables.append(current)
+            for parent in graph[current]:
+                in_degree[parent] -= 1
+                if in_degree[parent] == 0:
+                    queue.append(parent)
+
+        return False, ordered_tables
 
     # Closes connection to server
     def close(self):
