@@ -149,6 +149,9 @@ class Sqlite(Filesystem):
         #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
         #     self.con.commit()
         
+        if "runTable" in artifacts.keys():
+            self.runTable = False
+
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
@@ -208,25 +211,22 @@ class Sqlite(Filesystem):
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
-            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column TEXT, unit TEXT)"
+            create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
             self.cur.execute(create_query)
-            for tableName, tableData in artifacts["dsi_units"].items():
-                if len(tableData) > 0:
-                    for col, unit in tableData.items():
-                        str_query = f'INSERT INTO dsi_units VALUES ("{tableName}", "{col}", "{unit}")'
-                        unit_result = self.cur.execute(f"""
-                                                       SELECT unit 
-                                                       FROM dsi_units 
-                                                       WHERE table_name = '{tableName}' AND column = '{col}';""").fetchone()
-                        if unit_result and unit_result[0] != unit: #checks if unit for same table and col exists in db and if units match
-                            self.con.rollback()
-                            return (TypeError, f"Cannot ingest different units for the column {col} in {tableName}")
-                        elif not unit_result:
-                            try:
-                                self.cur.execute(str_query)
-                            except sqlite3.Error as e:
-                                self.con.rollback()
-                                return (sqlite3.Error, e)
+            units_data = artifacts["dsi_units"]
+            for table_val, col_val, unit_val in zip(units_data["table_name"], units_data["column_name"], units_data["unit"]):
+                str_query = f'INSERT INTO dsi_units VALUES ("{table_val}", "{col_val}", "{unit_val}")'
+                unit_result = self.cur.execute(f"""SELECT unit FROM dsi_units 
+                                                WHERE table_name = '{table_val}' AND column_name = '{col_val}';""").fetchone()
+                if unit_result and unit_result[0] != unit_val: #checks if unit for same table and col exists in db and if units match
+                    self.con.rollback()
+                    return (TypeError, f"Cannot ingest different units for the column {col_val} in {table_val}")
+                elif not unit_result:
+                    try:
+                        self.cur.execute(str_query)
+                    except sqlite3.Error as e:
+                        self.con.rollback()
+                        return (sqlite3.Error, e)
                             
         try:
             self.con.commit()
@@ -268,13 +268,41 @@ class Sqlite(Filesystem):
             return (ValueError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
-            tables = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+            tables = self.get_table_names(query)
             if len(tables) > 1:
                 return (ValueError, "Error in query_artifacts/get_artifacts: Can only return ordered dictionary if query with one table")
             
             return OrderedDict(data.to_dict(orient='list'))
         else:
             return data
+        
+    def get_table(self, table_name, dict_return = False):
+        """
+        User-friendly version of query_artifacts() where users do not need to know SQL if retrieving all data from a specified table.
+
+        `table_name` : name of table that must be in this Sqlite backend
+
+        `dict_return`: default is False. When set to True, return type is an Ordered Dict of data from `table_name`
+
+        `return`: 
+            - dict_return = False, returns a Pandas dataframe of that table's data
+            - dict_return = True, returns an Ordered Dict of that table's data
+            - if table_name not in backend, returns tuple of (ErrorType, error message). Ex: (ValueError, "this is an error")
+        """
+        return self.query_artifacts(query=f"SELECT * FROM {table_name}", dict_return=dict_return)
+    
+    def get_table_names(self, query):
+        """
+        Meant for internal use to parse the table names from a SQL query statement. 
+        Unique for each backend file due to different querying languages.
+
+        `query` : SQL query statement typically as an input for ``query_artifacts()``
+
+        `return`: list of all table names
+        """
+        all_names = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+        tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
+        return tables
 
     # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def inspect_artifacts(self, interactive=False):
@@ -420,9 +448,6 @@ class Sqlite(Filesystem):
         pkList = []
         for item in tableList:
             tableName = item[0]
-            if tableName == "dsi_units":
-                artifact["dsi_units"] = self.process_units_helper()
-                continue
             if tableName == "sqlite_sequence":
                 continue
 
@@ -459,24 +484,6 @@ class Sqlite(Filesystem):
             del artifact["dsi_relations"]
 
         return artifact
-      
-    def process_units_helper(self):
-        """
-        **Users do not interact with this function and should ignore it. Called within process_artifacts()**
-
-        Helper function to create the SQLite database's units table as an Ordered Dictionary.
-        Only called if `dsi_units` table exists in the database.
-
-        `return`: units table as an Ordered Dictionary
-        """
-        unitsDict = OrderedDict()
-        unitsTable = self.cur.execute("SELECT * FROM dsi_units;").fetchall()
-        for row in unitsTable:
-            tableName = row[0]
-            if tableName not in unitsDict.keys():
-                unitsDict[tableName] = {}
-            unitsDict[tableName][row[1]] = row[2]
-        return unitsDict
 
     def find(self, query_object):
         """
@@ -857,42 +864,74 @@ class Sqlite(Filesystem):
 
     def overwrite_table(self, table_name, dataframe):
         temp_data = OrderedDict()
-        temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
+        if isinstance(table_name, list) and isinstance(dataframe, list):
+            temp_data = self.process_artifacts()
 
-        relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
-        old_data = None
-        pk_col = None
-        tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
-        for colInfo in tableInfo:
-            if colInfo[5] == 1:
-                relations["primary_key"].append((table_name, colInfo[1]))
-                relations["foreign_key"].append((None, None))
-
-                pk_col = colInfo[1]
-                rows = self.cur.execute(f"SELECT {colInfo[1]} FROM {table_name}").fetchall()
-                old_data = [row[0] for row in rows]
-                break
+            for name, data in zip(table_name, dataframe):
+                temp_data[name] = OrderedDict(data.to_dict(orient='list'))
         
-        fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
-        for row in fkData:
-            relations["primary_key"].append((row[2], row[4]))
-            relations["foreign_key"].append((table_name, row[3]))
-        
-        if len(relations["primary_key"]) > 0:
-            temp_data["dsi_relations"] = relations
-        
-        if pk_col:
-            pk_data = temp_data[table_name][pk_col]
-            if any(isinstance(x, str) for x in pk_data) and any(isinstance(x, (int, float)) for x in pk_data):
-                return (ValueError, f"User edited {table_name}'s primary key column, {pk_col}, with mismatched data types. Table not updated.")
-            if old_data != pk_data:
-                print(f"WARNING: The data in {table_name}'s primary key column was edited which could reorder rows in the table.")
+        elif isinstance(table_name, str) and isinstance(dataframe, pd.DataFrame):
+            temp_data[table_name] = OrderedDict(dataframe.to_dict(orient='list'))
+            relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
+            tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
+            for colInfo in tableInfo:
+                if colInfo[5] == 1:
+                    relations["primary_key"].append((table_name, colInfo[1]))
+                    relations["foreign_key"].append((None, None))
+            
+            fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
+            for row in fkData:
+                relations["primary_key"].append((row[2], row[4]))
+                relations["foreign_key"].append((table_name, row[3]))
+            
+            if len(relations["primary_key"]) > 0:
+                temp_data["dsi_relations"] = relations
 
-        self.cur.execute(f'DROP TABLE IF EXISTS "{table_name}";')
-        self.con.commit()
+            table_name = [table_name]
+            dataframe = [dataframe]
+        else:
+            return (TypeError, "inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
 
-        self.ingest_artifacts(temp_data)
-        self.con.commit()
+        if "dsi_relations" in temp_data.keys():
+            for name, data in zip(table_name, dataframe):
+                result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if name in pk_tuple[0]), None)
+                if result:
+                    new_data = temp_data[name][result]
+                    if any(isinstance(x, str) for x in new_data) and any(isinstance(x, (int, float)) for x in new_data):
+                        return (ValueError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
+                    if len(new_data) != len(set(new_data)):
+                        return (ValueError, f"{name}'s primary key column, {result}, must have unique data")
+                    
+                    rows = self.cur.execute(f"SELECT {result} FROM {name}").fetchall()
+                    old_data = [row[0] for row in rows]
+                    if old_data != new_data:
+                        if name == "runTable" and result == "run_id" and len(table_name) == 1:
+                            errorMsg = "Cannot only edit runTable's run_id column."
+                            return (ValueError, errorMsg + " Need to update the run_id column in other tables to match runTable")
+                        if name == "runTable" and result == "run_id" and len(table_name) > 1:
+                            for pk, fk in zip(temp_data["dsi_relations"]["primary_key"], temp_data["dsi_relations"]["foreign_key"]):
+                                if pk == (name, result) and fk != (None, None):
+                                    fk_data = temp_data[fk[0]][fk[1]]
+                                    if not all(item in new_data for item in fk_data):
+                                        errorMsg = f"Data in table {fk[0]}'s, run_id column must match runTable's edited run_id column."
+                                        return(ValueError, errorMsg + f" Please ensure that all rows in {fk[0]} are being updated")
+                        print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
+        
+        for name in temp_data.keys():
+            self.cur.execute(f'DROP TABLE IF EXISTS "{name}";')
+            self.con.commit()
+        
+        temp_runTable_bool = self.runTable
+        if "runTable" in temp_data.keys() and temp_runTable_bool == True:
+            self.runTable = False
+
+        errorStmt = self.ingest_artifacts(temp_data)
+
+        if "runTable" in temp_data.keys() and temp_runTable_bool == True:
+            self.runTable = True
+        
+        if errorStmt is not None:
+            raise errorStmt[0](f"Error ingesting data in {self.filename} due to {errorStmt[1]}")
 
     # Closes connection to server
     def close(self):
