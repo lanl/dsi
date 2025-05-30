@@ -542,7 +542,7 @@ class Ensemble(FileReader):
 class Oceans11Datacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
-    Input datacard should follow template in `examples/data/template_dc_oceans11.yml`
+    Input datacard should follow template in `examples/test/template_dc_oceans11.yml`
     """
     def __init__(self, filenames, **kwargs):
         """
@@ -599,7 +599,7 @@ class Oceans11Datacard(FileReader):
 class DublinCoreDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `dublin_core_datacard` table.
-    Input datacard should follow template in `examples/data/template_dc_dublin_core.xml`
+    Input datacard should follow template in `examples/test/template_dc_dublin_core.xml`
     """
     def __init__(self, filenames, **kwargs):
         """
@@ -648,7 +648,7 @@ class DublinCoreDatacard(FileReader):
 class SchemaOrgDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `schema_org_datacard` table.
-    Input datacard should follow template in `examples/data/template_dc_schema_org.json`
+    Input datacard should follow template in `examples/test/template_dc_schema_org.json`
     """
     def __init__(self, filenames, **kwargs):
         """
@@ -701,7 +701,7 @@ class SchemaOrgDatacard(FileReader):
 class GoogleDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `google_datacard` table.
-    Input datacard should follow template in `examples/data/template_dc_google.yml`
+    Input datacard should follow template in `examples/test/template_dc_google.yml`
     """
     def __init__(self, filenames, **kwargs):
         """

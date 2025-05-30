@@ -1,5 +1,0 @@
-wind_speed,wdir,smois,fuels,ignition,safe_unsafe_fire_behavior,FILE,inside_burned_area,outside_burned_area
-2,180,0.05,ST5_FF_DUET,ST5_ignite_contour.dat,safe,https://wifire-data.sdsc.edu/data//burnpro3d/d/07/12/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68/png/run_07127fcc-66c4-4498-a4c6-8e9f6e5fbe68_fuels-dens_2100_000.png,120852,1536
-8,225,0.05,ST5_FFDUET_TLS,ST5_ignite_contour.dat,unsafe,https://wifire-data.sdsc.edu/data//burnpro3d/d/cd/34/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12/png/run_cd34e198-92d8-465d-b7d7-9cdf8b4dbd12_fuels-dens_2100_000.png,121306,47996
-8,195,0.05,ST5_FFDUET_TLS,ST5_ignite_ring.dat,unsafe,https://wifire-data.sdsc.edu/data//burnpro3d/d/16/f7/run_16f771f5-b830-4c22-962a-e5074d90c9c4/png/run_16f771f5-b830-4c22-962a-e5074d90c9c4_fuels-dens_2100_000.png,135427,52115
-5,240,0.05,ST5_FFDUET_TLS,ST5_ignite_strip.dat,unsafe,https://wifire-data.sdsc.edu/data//burnpro3d/d/11/be/run_11bea928-97ce-4188-80b9-06eda10d0a2b/png/run_11bea928-97ce-4188-80b9-06eda10d0a2b_fuels-dens_2100_000.png,135424,46159

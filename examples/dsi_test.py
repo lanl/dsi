@@ -16,13 +16,13 @@ test.backend("data.db", backend_name="Sqlite")
 
 
 ''' Example uses of loading DSI readers '''
-test.schema(filename="data/example_schema.json") # must be loaded first
+test.schema(filename="test/example_schema.json") # must be loaded first
 
-test.read(filenames=["data/student_test1.yml", "data/student_test2.yml"], reader_name='YAML1')
-# test.read(filenames=["data/results.toml", "data/results1.toml"], reader_name='TOML1')
-# test.read(filenames="data/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
-# test.read(filenames="data/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
-# test.read(filenames=['data/bueno1.data', 'data/bueno2.data'], reader_name='Bueno')
+test.read(filenames=["test/student_test1.yml", "test/student_test2.yml"], reader_name='YAML1')
+# test.read(filenames=["test/results.toml", "test/results1.toml"], reader_name='TOML1')
+# test.read(filenames="test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
+# test.read(filenames="test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
+# test.read(filenames=['test/bueno1.data', 'test/bueno2.data'], reader_name='Bueno')
 
 # test.read(filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
 # test.read(filenames="wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')

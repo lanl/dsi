@@ -4,10 +4,10 @@ from dsi.core import Terminal
 terminal = Terminal(debug = 0, backup_db = False, runTable = True)
 
 # using schema to target a collection of tables which all have a prefix 'student'
-terminal.load_module('plugin', 'Schema', 'reader', filename="../data/example_schema.json")
+terminal.load_module('plugin', 'Schema', 'reader', filename="../test/example_schema.json")
 
 #creates tables from this YAML data which all have a prefix of 'student'
-terminal.load_module('plugin', 'YAML1', 'reader', filenames=["../data/student_test1.yml", "../data/student_test2.yml"])
+terminal.load_module('plugin', 'YAML1', 'reader', filenames=["../test/student_test1.yml", "../test/student_test2.yml"])
 
 terminal.load_module('backend','Sqlite','back-write', filename='data.db')
 

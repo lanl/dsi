@@ -46,7 +46,7 @@ DSI is expanding its support of several dataset metadata standards. The current 
       - `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_
       - `Oceans11 DSI Data Server <https://oceans11.lanl.gov/>`_
 
-Template file structures can be found and copied in ``examples/data/``. 
+Template file structures can be found and copied in ``examples/test/``. 
 The fields in a user's data card must exactly match its respective template to be compatible with DSI.
 However, fields can be empty if a user does not have that particular information about the dataset.
 

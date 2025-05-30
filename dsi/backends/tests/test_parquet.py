@@ -12,7 +12,7 @@ def get_git_root(path):
     return (git_root)
 
 def test_query_artifacts():
-    a = Parquet(filename='/'.join([get_git_root('.'), 'examples/data/wildfiredata.pq']))
+    a = Parquet(filename='/'.join([get_git_root('.'), 'examples/test/wildfiredata.pq']))
     b = a.query_artifacts()
     cnt = 0
     for key in b:
@@ -21,7 +21,7 @@ def test_query_artifacts():
     assert 11 == cnt
 
 def test_notebook():
-    a = Parquet(filename='/'.join([get_git_root('.'), 'examples/data/wildfiredata.pq']))
+    a = Parquet(filename='/'.join([get_git_root('.'), 'examples/test/wildfiredata.pq']))
     b = a.query_artifacts()
     a.notebook(b)
     # No error on notebook return implies success

@@ -9,7 +9,7 @@ term.add_external_python_module('plugin', 'TextFile', 'text_file_reader.py')
 
 print(term.list_available_modules('plugin')) # includes TextFile at end of list
 
-term.load_module('plugin', 'TextFile', 'reader', filenames = "../data/test.txt")
+term.load_module('plugin', 'TextFile', 'reader', filenames = "../test/test.txt")
 
 print(term.get_current_abstraction())
 # OrderedDict({'text_file': 

@@ -132,7 +132,7 @@ If we consider a workflow where a user reads in a complex schema for YAML data a
 
 .. literalinclude:: ../examples/developer/schema.py
 
-where ``examples/data/example_schema.json`` is:
+where ``examples/test/example_schema.json`` is:
 
 .. code-block:: json
 
@@ -195,7 +195,7 @@ and a foreign key 'user_name' that points to another table 'Users' with primary 
       }
    }
 
-Based on this understanding, we can update ``examples/data/example_schema.json`` too, by adding a foreign key in 'math' pointing to 'n' in 'physics':
+Based on this understanding, we can update ``examples/test/example_schema.json`` too, by adding a foreign key in 'math' pointing to 'n' in 'physics':
 
 .. code-block:: json
 

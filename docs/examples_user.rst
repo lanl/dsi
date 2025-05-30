@@ -131,7 +131,7 @@ If we consider a workflow where a user reads in a complex schema for YAML data a
 
 .. literalinclude:: ../examples/user/7.schema.py
 
-where ``examples/data/example_schema.json`` is:
+where ``examples/test/example_schema.json`` is:
 
 .. code-block:: json
 
@@ -180,7 +180,7 @@ For futher clarity, each schema file must be structured as a dictionary where:
       - Ex: "foreign_key" : { "name" : ["table1", "table1_id"] , "age" : ["table2", "table2_id"] }
    - If a table does not have a primary or foreign key, you do not have to include them in the table's nested dictionary
 
-For example, if we update ``examples/data/example_schema.json``, by adding a foreign key in 'output' pointing to 'run_id' in 'input':
+For example, if we update ``examples/test/example_schema.json``, by adding a foreign key in 'output' pointing to 'run_id' in 'input':
 
 .. code-block:: json
 

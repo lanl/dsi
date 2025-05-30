@@ -1,5 +1,5 @@
 # Project ignores
-#data/
+#test/
 *.db
 #*.csv
 
