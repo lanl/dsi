@@ -14,7 +14,7 @@ def get_git_root(path):
     return (git_root)
 
 def test_csv_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.sqlite_db'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.sqlite_db'])
     back = Sqlite(filename=path)
     
     #assert type(plug.output_collector) == OrderedDict

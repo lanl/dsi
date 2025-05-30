@@ -12,15 +12,15 @@ def get_git_root(path):
 
 
 def test_bueno_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
     plug = Bueno(filenames=path)
     plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 
 def test_bueno_plugin_adds_rows():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'bueno2.data'])
     plug = Bueno(filenames=[path1, path2])
     plug.add_rows()
 
@@ -31,8 +31,8 @@ def test_bueno_plugin_adds_rows():
     assert len(plug.output_collector["Bueno"].keys()) == 4
 
 def test_json_plugin_adds_rows():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'bueno2.data'])
     plug = JSON(filenames=[path1, path2])
     plug.add_rows()
     for key, val in plug.output_collector["JSON"].items():
@@ -43,13 +43,13 @@ def test_json_plugin_adds_rows():
     assert len(plug.output_collector["JSON"].keys()) == 4
 
 def test_csv_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 def test_csv_plugin_adds_rows():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
 
@@ -60,8 +60,8 @@ def test_csv_plugin_adds_rows():
     assert len(plug.output_collector["Csv"].keys()) == 11
 
 def test_csv_plugin_adds_rows_multiple_files():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'yosemite5.csv'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'yosemite5.csv'])
 
     plug = Csv(filenames=[path1, path2])
     plug.add_rows()
@@ -73,8 +73,8 @@ def test_csv_plugin_adds_rows_multiple_files():
     assert len(plug.output_collector["Csv"].keys()) == 13
 
 def test_csv_plugin_adds_rows_multiple_files_strict_mode():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'yosemite5.csv'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'yosemite5.csv'])
 
     plug = Csv(filenames=[path1, path2], strict_mode=True)
     try:
@@ -84,7 +84,7 @@ def test_csv_plugin_adds_rows_multiple_files_strict_mode():
         assert True
 
 def test_csv_plugin_leaves_active_metadata_wellformed():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
 
     term = Terminal()
     term.load_module('plugin', 'Csv', 'reader', filenames=[path])
