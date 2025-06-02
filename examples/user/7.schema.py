@@ -3,6 +3,9 @@ from dsi.dsi import DSI
 
 schema_dsi = DSI()
 
+#dsi.backend(filename, reader)
+schema_dsi.backend("schema_data.db") 
+
 # dsi.schema(filename)
 schema_dsi.schema("../test/example_schema.json")
 

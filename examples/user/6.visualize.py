@@ -1,11 +1,11 @@
 # examples/user/6.visualize.py
 from dsi.dsi import DSI
 
-# ASSUMING DATABASE HAS DATA FROM 2.ingest.py:
+# ASSUMING DATABASE HAS DATA FROM 2.read.py:
 visual_dsi = DSI()
 
 #dsi.backend(filename, backend)
-visual_dsi.backend("data.db") 
+visual_dsi.backend("data.db")
 
 visual_dsi.num_tables()
 visual_dsi.list()

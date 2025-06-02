@@ -1,7 +1,7 @@
 # examples/user/5.query.py
 from dsi.dsi import DSI
 
-# ASSUMING DATABASE HAS DATA FROM 2.ingest.py:
+# ASSUMING DATABASE HAS DATA FROM 2.read.py:
 query_dsi = DSI()
 
 #dsi.backend(filename, backend)
