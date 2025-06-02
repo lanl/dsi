@@ -21,7 +21,7 @@ def test_csv_plugin_type():
 
 def test_er_diagram():
     a=Terminal()
-    a.load_module('plugin', 'Schema', 'reader', filename="examples/test/testcase_schema.json" , target_table_prefix = "student")
+    a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_circular_schema.json" , target_table_prefix = "student")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
     a.load_module('plugin', 'TOML1', 'reader', filenames=["examples/test/results.toml"], target_table_prefix = "results")
     a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'erd_test_output.png')

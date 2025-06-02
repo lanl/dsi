@@ -7,7 +7,7 @@ a=Terminal(debug=0, backup_db = False, runTable=True)
 # a.load_module('plugin','Bueno','reader', filenames=['test/bueno1.data', 'test/bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
 
-# a.load_module('plugin', 'Schema', 'reader', filename="test/example_schema.json")
+# a.load_module('plugin', 'Schema', 'reader', filename="test/yaml1_schema.json")
 a.load_module('plugin', 'YAML1', 'reader', filenames=["test/student_test1.yml", "test/student_test2.yml"])
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["test/results.toml", "test/results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'Csv', 'reader', filenames="test/yosemite5.csv")

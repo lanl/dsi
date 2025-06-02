@@ -53,7 +53,7 @@ class DSI():
 
         `filename` : str
         Path to a JSON file describing the structure of a relational database.
-        The schema should follow the format defined in `examples/test/example_schema.json`.
+        The schema should follow the format described in :ref:`user_schema_example_label`
 
         **Must be called before reading in any data files associated with the schema**
         """

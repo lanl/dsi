@@ -16,7 +16,7 @@ test.backend("data.db", backend_name="Sqlite")
 
 
 ''' Example uses of loading DSI readers '''
-test.schema(filename="test/example_schema.json") # must be loaded first
+test.schema(filename="test/yaml1_schema.json") # must be loaded first
 
 test.read(filenames=["test/student_test1.yml", "test/student_test2.yml"], reader_name='YAML1')
 # test.read(filenames=["test/results.toml", "test/results1.toml"], reader_name='TOML1')
