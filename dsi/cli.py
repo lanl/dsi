@@ -483,20 +483,20 @@ class DSI_cli:
 cli = DSI_cli()
 
 COMMANDS = {
-    'clear': (None, cli.clear), #
-    'display' : (cli.get_display_parser, cli.display), #
+    'clear': (None, cli.clear),
+    'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
-    'exit': (None, cli.exit_cli), #
+    'exit': (None, cli.exit_cli),
     'find' : (None, cli.find),
-    'help': (None, cli.help_fn), #
-    'list' : (None, cli.list_tables), #
+    'help': (None, cli.help_fn),
+    'list' : (None, cli.list_tables),
     'read' : (cli.get_load_parser, cli.load),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
     'write' : (cli.get_save_parser, cli.save_to_file),
-    'summary' : (cli.get_summary_parser, cli.summary), #
-    'ls' : (None, cli.ls), #
-    'cd' : (None, cli.cd) #
+    'summary' : (cli.get_summary_parser, cli.summary),
+    'ls' : (None, cli.ls),
+    'cd' : (None, cli.cd)
 }
 
 def main():

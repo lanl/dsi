@@ -2,6 +2,7 @@ from dsi.core import Terminal, Sync
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
+import os
 
 class DSI():
     '''
@@ -13,6 +14,7 @@ class DSI():
     def __init__(self):
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
+        self.schema_read = False
 
     def list_backends(self):
         """
@@ -57,7 +59,10 @@ class DSI():
 
         **Must be called before reading in any data files associated with the schema**
         """
+        if not os.path.exists(filename):
+            raise ValueError("Input schema file must have a valid filepath. Please check again.")
         self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+        self.schema_read = True
 
     def list_readers(self):
         """
@@ -105,6 +110,10 @@ class DSI():
         """
         if not self.t.loaded_backends:
             raise ValueError("Must load a backend first. Call backend() before this")
+        if isinstance(filenames, str):
+            filenames = [filenames]
+        if not all(os.path.exists(f) for f in filenames):
+            raise ValueError("All input files must have a valid filepath. Please check again.")
         
         if reader_name.lower() == "oceans11datacard":
             self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
@@ -130,6 +139,13 @@ class DSI():
             print("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
             print("Eligible readers are: CSV, YAML1, TOML1, JSON, Ensemble, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard")
             raise ValueError
+        if self.schema_read == True:
+            pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
+            fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
+            all_tables = pk_tables.union(fk_tables)
+            if not all_tables.issubset(set(self.t.active_metadata.keys())):
+                raise ValueError("Users must load associated data for a schema immediately after loading the complex schema.")
+            self.schema_read = False
         self.t.artifact_handler(interaction_type='ingest')
         self.t.active_metadata = OrderedDict()
 
@@ -147,6 +163,11 @@ class DSI():
 
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to query the data")
+        
         df = self.t.artifact_handler(interaction_type='query', query=statement)
         if not collection:
             headers = df.columns.tolist()
@@ -174,6 +195,11 @@ class DSI():
         
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to get a table of data")
+        
         df = self.t.get_table(table_name)
         if not collection:
             headers = df.columns.tolist()
@@ -199,6 +225,11 @@ class DSI():
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to find some data")
+        
         find_data = self.t.find_cell(query, row=True)
         if find_data is None:
             return
@@ -245,6 +276,11 @@ class DSI():
         - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
         - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to update the data")
+        
         if isinstance(collection, pd.DataFrame) and 'row_num' in collection.attrs:
             collection = [collection]
         if isinstance(collection, list):
@@ -298,6 +334,9 @@ class DSI():
         """
         Generates a Python notebook and stores data from the first activated backend
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        
         self.t.artifact_handler(interaction_type="notebook")
         print("Notebook .ipynb and .html generated.")
 
@@ -331,6 +370,8 @@ class DSI():
         """
         if not self.t.loaded_backends:
             raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to call write()")
         
         self.t.artifact_handler(interaction_type='process')
         if writer_name == "ER_Diagram":
@@ -352,6 +393,10 @@ class DSI():
         """
         Prints the names and dimensions (rows x columns) of all tables in the first active backend
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to list the data tables")
         self.t.list()
 
     def summary(self, table_name = None, num_rows = 0):
@@ -368,12 +413,20 @@ class DSI():
 
             If 0 (default), only the total number of rows is printed (no row-level data).
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to summarize the data")
         self.t.summary(table_name, num_rows)
     
     def num_tables(self):
         """
         Prints the number of tables in the first activated backend
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to get number of data tables")
         self.t.num_tables()
 
     def display(self, table_name, num_rows = 25, display_cols = None):
@@ -391,6 +444,10 @@ class DSI():
 
             If None (default), all columns are displayed.
         """
+        if not self.t.loaded_backends:
+            raise ValueError("Must load a backend first. Call backend() before this")
+        if self.schema_read == True:
+            raise ValueError("Associated data must be loaded immediately after the complex schema to be able to display the data")
         self.t.display(table_name, num_rows, display_cols)
 
     def close(self):

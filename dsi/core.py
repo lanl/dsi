@@ -744,8 +744,6 @@ class Terminal():
             raise ValueError("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
         start = datetime.now()
 
-        if table_name != None:
-            print(f"Table: {table_name}")
         backend.summary(table_name, num_rows)
 
         end = datetime.now()
@@ -878,8 +876,7 @@ class Terminal():
             self.logger.info(f"Runtime: {end-start}")
 
         if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
-            return output
-            
+            return output    
     
     def get_table_names(self, query):
         """
