@@ -798,6 +798,7 @@ class Sqlite(Filesystem):
                     row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
                     print(f"  - num of rows: {row_count}\n")
         else:
+            print(f"\nTable: {table_name}")
             headers, rows = self.summary_helper(table_name) 
             self.table_print_helper(headers, rows, 1000)
 
@@ -929,12 +930,12 @@ class Sqlite(Filesystem):
             self.con.commit()
         
         temp_runTable_bool = self.runTable
-        if "runTable" in temp_data.keys() and temp_runTable_bool == True:
+        if temp_runTable_bool == True:
             self.runTable = False
 
         errorStmt = self.ingest_artifacts(temp_data)
 
-        if "runTable" in temp_data.keys() and temp_runTable_bool == True:
+        if temp_runTable_bool == True:
             self.runTable = True
         
         if errorStmt is not None:
