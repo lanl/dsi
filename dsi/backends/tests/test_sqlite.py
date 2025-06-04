@@ -53,7 +53,7 @@ def test_artifact_query():
     query_data = store.query_artifacts(query = "SELECT * FROM wildfire;")
     store.close()
     correct_output = [[1, 3], [2, 2], [3, 1]]
-    assert get_data.values.tolist() == correct_output == query_data
+    assert get_data.values.tolist() == correct_output == query_data.values.tolist()
 
 def test_artifact_notebook():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
