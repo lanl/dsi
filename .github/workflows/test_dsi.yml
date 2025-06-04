@@ -28,6 +28,7 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements.extras.txt
         pip install .
+        sudo apt-get install graphviz
     - name: Test DSI User API
       run: |
         pip install pytest

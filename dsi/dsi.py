@@ -308,7 +308,7 @@ class DSI():
                     actual_df = actual_df[table_df.columns]
                 
                 for col in actual_df.columns:
-                    common_dtype = np.find_common_type([actual_df[col].dtype, table_df[col].dtype], [])
+                    common_dtype = np.result_type(actual_df[col].dtype, table_df[col].dtype)
                     actual_df[col] = actual_df[col].astype(common_dtype)
                     table_df[col] = table_df[col].astype(common_dtype)
                 
