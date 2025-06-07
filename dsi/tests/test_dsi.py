@@ -14,119 +14,32 @@ def test_list_functions():
     assert True
 
 def test_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
     assert True
 
-def test_error_loading_sqlite_backend():
-    test = DSI()
-
-    dbpath = 'data.db'
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.write(filename="er_diagram.png", writer_name="ER_Diagram")
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-    
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.query("SELECT * FROM math")  
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.get_table(table_name= "math")  
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.display("math")
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-    
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.find(query="a")
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.list()
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-    
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.num_tables()
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
-    try:
-        test.summary()
-        test.backend(filename=dbpath, backend_name= "Sqlite")
-        assert False
-    except ValueError:
-        assert True
-
 def test_error_filename():
-    test = DSI()
-    
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
     try:
         test.read(filenames=["examples/test/WRONG_FILENAME_1.yml", "examples/test/WRONG_FILENAME_2.yml"], reader_name='YAML1')
         assert False
-    except ValueError:
-        assert True
+    except SystemExit as e:
+        expected = "read() ERROR: All input files must have a valid filepath. Please check again."
+        assert str(e) == expected
 
 def test_read_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.read(filenames=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
@@ -143,10 +56,8 @@ def test_read_sqlite_backend():
 def test_write_sqlite_backend():
     test_read_sqlite_backend()
     
-    test = DSI()
-
     dbpath = 'data.db'
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.write(filename="er_diagram.png", writer_name="ER_Diagram")
     test.write(filename="physics_plot.png", writer_name="Table_Plot", table_name="physics")
@@ -156,23 +67,22 @@ def test_write_sqlite_backend():
 def test_query_sqlite_backend():
     test_read_sqlite_backend()
 
-    test = DSI()
-
     dbpath = 'data.db'
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     f = io.StringIO()
     with redirect_stdout(f):
         test.query("SELECT * FROM physics")
     output = f.getvalue()
+    output = "\n".join(output.splitlines()[1:])
 
     excepted_output = textwrap.dedent("""
     specification | n    | o       | p   | q       | r  | s      
     -------------------------------------------------------------
     !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
     !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
-    
     """)
+    
     assert output == excepted_output
 
     query_data = test.query("SELECT * FROM physics", collection=True)
@@ -184,12 +94,11 @@ def test_query_sqlite_backend():
     assert query_data["dsi_table_name"][0] == "physics"
 
 def test_query_update_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     query_df = test.query("SELECT * FROM address", collection=True)  # return output
@@ -204,20 +113,20 @@ def test_query_update_sqlite_backend():
 def test_get_table_sqlite_backend():
     test_read_sqlite_backend()
 
-    test = DSI()
-
     dbpath = 'data.db'
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     f = io.StringIO()
     with redirect_stdout(f):
         test.get_table(table_name="physics")
     output = f.getvalue()
+    output = "\n".join(output.splitlines()[1:])
 
     query_f = io.StringIO()
     with redirect_stdout(query_f):
         test.query("SELECT * FROM physics")
     excepted_output = query_f.getvalue()
+    excepted_output = "\n".join(excepted_output.splitlines()[1:])
 
     assert output == excepted_output
 
@@ -226,12 +135,11 @@ def test_get_table_sqlite_backend():
     assert query_data.equals(get_data)
 
 def test_find_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
@@ -240,7 +148,7 @@ def test_find_sqlite_backend():
         test.find(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all cell matches of 2 in first backend loaded" + textwrap.dedent("""
+    expected_output = "Finding all instances of 2 in the active DSI backend\n" + textwrap.dedent("""
     Table: math
       - Columns: ['specification', 'a', 'b', 'c', 'd', 'e', 'f']
       - Row Number: 1
@@ -278,12 +186,11 @@ def test_find_sqlite_backend():
             assert df.attrs['row_num'] == [1,2]
 
 def test_find_update_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     find_list = test.find(query=2, collection=True)   # return output
@@ -301,47 +208,43 @@ def test_find_update_sqlite_backend():
     assert data['new_col'].tolist() == ["test1", "test1"]
 
 def test_schema_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
 
 def test_error_schema_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
     try:
-        test.backend(filename=dbpath, backend_name= "Sqlite")
         test.schema(filename="examples/test/yaml1_schema.json")
         test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
         assert False
-    except ValueError:
-        assert True
+    except SystemExit as e:
+        expected = "read() ERROR: Users must load associated data for a schema immediately after loading the complex schema."
+        assert str(e) == expected
 
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
     try:
-        test.backend(filename=dbpath, backend_name= "Sqlite")
         test.schema(filename="examples/test/yaml1_schema.json")
         test.query("SELECT * FROM math") # Querying data but need to load in associated data after loading in schema
         assert False
-    except ValueError:
-        assert True
+    except SystemExit as e:
+        expected = "ERROR: Cannot query() until associated data is loaded immediately after the complex schema"
+        assert str(e) == expected
 
 def test_query_update_schema_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     
@@ -353,7 +256,8 @@ def test_query_update_schema_sqlite_backend():
     with redirect_stdout(f):
         test.update(query_df)
     output = f.getvalue()
-    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table.\n"
+    output = "\n".join(output.splitlines()[1:])
+    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
     assert output == expected_output
 
     data = test.get_table("address", collection=True)
@@ -361,12 +265,11 @@ def test_query_update_schema_sqlite_backend():
     assert data['new_col'].tolist() == ["test1", "test1"]
 
 def test_find_update_schema_sqlite_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "Sqlite")
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
@@ -380,7 +283,8 @@ def test_find_update_schema_sqlite_backend():
     with redirect_stdout(f):
         test.update(find_list)
     output = f.getvalue()
-    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table.\n"
+    output = "\n".join(output.splitlines()[1:])
+    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
     assert output == expected_output
     
     data = test.get_table("address", collection=True)
@@ -392,21 +296,19 @@ def test_find_update_schema_sqlite_backend():
     assert data['new_col'].tolist() == ["test1", "test1"]
 
 def test_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
     assert True
 
 def test_read_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.read(filenames=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
@@ -423,10 +325,8 @@ def test_read_duckdb_backend():
 def test_write_duckdb_backend():
     test_read_duckdb_backend()
     
-    test = DSI()
-
     dbpath = 'data.db'
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.write(filename="er_diagram.png", writer_name="ER_Diagram")
     test.write(filename="physics_plot.png", writer_name="Table_Plot", table_name="physics")
@@ -436,22 +336,20 @@ def test_write_duckdb_backend():
 def test_query_duckdb_backend():
     test_read_duckdb_backend()
 
-    test = DSI()
-
     dbpath = 'data.db'
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     f = io.StringIO()
     with redirect_stdout(f):
         test.query("SELECT * FROM physics")
     output = f.getvalue()
+    output = "\n".join(output.splitlines()[1:])
 
     excepted_output = textwrap.dedent("""
     specification | n                 | o       | p   | q       | r  | s                     
     -----------------------------------------------------------------------------------------
     !amy          | 9.800000190734863 | gravity | 23  | home 23 | 1  | -0.0012000000569969416
     !amy1         | 91.80000305175781 | gravity | 233 | home 23 | 12 | -0.012199999764561653 
-    
     """)
     assert output == excepted_output
 
@@ -464,12 +362,11 @@ def test_query_duckdb_backend():
     assert query_data["dsi_table_name"][0] == "physics"
 
 def test_query_update_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     query_df = test.query("SELECT * FROM address", collection=True)  # return output
@@ -484,20 +381,20 @@ def test_query_update_duckdb_backend():
 def test_get_table_duckdb_backend():
     test_read_duckdb_backend()
 
-    test = DSI()
-
     dbpath = 'data.db'
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     f = io.StringIO()
     with redirect_stdout(f):
         test.get_table(table_name="physics")
     output = f.getvalue()
+    output = "\n".join(output.splitlines()[1:])
 
     query_f = io.StringIO()
     with redirect_stdout(query_f):
         test.query("SELECT * FROM physics")
     excepted_output = query_f.getvalue()
+    excepted_output = "\n".join(excepted_output.splitlines()[1:])
 
     assert output == excepted_output
 
@@ -506,12 +403,11 @@ def test_get_table_duckdb_backend():
     assert query_data.equals(get_data)
 
 def test_find_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
@@ -520,7 +416,7 @@ def test_find_duckdb_backend():
         test.find(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all cell matches of 2 in first backend loaded" + textwrap.dedent("""
+    expected_output = "Finding all instances of 2 in the active DSI backend\n" + textwrap.dedent("""
     Table: address
       - Columns: ['specification', 'fileLoc', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
       - Row Number: 1
@@ -558,12 +454,11 @@ def test_find_duckdb_backend():
             assert df.attrs['row_num'] == [1,2]
 
 def test_find_update_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     find_list = test.find(query=2, collection=True)   # return output
@@ -581,23 +476,21 @@ def test_find_update_duckdb_backend():
     assert data['new_col'].tolist() == ["test1", "test1"]
 
 def test_schema_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
 
 def test_query_update_schema_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     
@@ -608,7 +501,8 @@ def test_query_update_schema_duckdb_backend():
     with redirect_stdout(f):
         test.update(query_df)
     output = f.getvalue()
-    expected_output = "WARNING: The data in math's primary key column was edited which could reorder rows in the table.\n"
+    output = "\n".join(output.splitlines()[1:])
+    expected_output = "WARNING: The data in math's primary key column was edited which could reorder rows in the table."
     assert output == expected_output
 
     data = test.get_table("math", collection=True)
@@ -616,12 +510,11 @@ def test_query_update_schema_duckdb_backend():
     assert data['new_col'].tolist() == ["test1", "test1"]
 
 def test_find_update_schema_duckdb_backend():
-    test = DSI()
-
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
-    test.backend(filename=dbpath, backend_name= "DuckDB")
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
@@ -635,7 +528,8 @@ def test_find_update_schema_duckdb_backend():
     with redirect_stdout(f):
         test.update(find_list)
     output = f.getvalue()
-    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table.\n"
+    output = "\n".join(output.splitlines()[1:])
+    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
     assert output == expected_output
     
     data = test.get_table("address", collection=True)
