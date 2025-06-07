@@ -33,11 +33,10 @@ if __name__ == "__main__":
         os.makedirs(image_path)
     downloadImages(input_csv, image_path)
 
-    dsi = DSI()
-
     if os.path.exists(db_name):
         os.remove(db_name)
-    dsi.backend(db_name, backend_name="Sqlite")
+
+    dsi = DSI(db_name)
 
     dsi.read(input_csv, "Ensemble", table_name=table_name)
     dsi.read(datacard, "Oceans11Datacard")

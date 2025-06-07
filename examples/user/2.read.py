@@ -1,16 +1,12 @@
-# examples/user/2.ingest.py
+# examples/user/2.read.py
 from dsi.dsi import DSI
 
-read_dsi = DSI()
-
-#dsi.backend(filename, backend)
-read_dsi.backend("data.db") # Target a backend, defaults to SQLite if not defined
+read_dsi = DSI("data.db") # Target a backend, defaults to SQLite if not defined
 
 #dsi.read(filename, reader)
-read_dsi.read("../test/student_test1.yml", 'YAML1') # Read data into memory
-read_dsi.read("../test/student_test2.yml", 'YAML1')
+read_dsi.read("../clover3d/", 'Cloverleaf') # Read data into memory
 
 #dsi.display(table_name)
-read_dsi.display("math") # Print the specific table name in student_test1.yml
+read_dsi.display("input") # Print the specific table's data from the Cloverleaf data
 
 read_dsi.close() # cleans DSI memory of all DSI modules - readers/writers/backends

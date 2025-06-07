@@ -14,12 +14,10 @@ if __name__ == "__main__":
     datacard = "pennant_oceans11.yml"
     output_csv = "pennant_output.csv"
 
-    dsi = DSI()
-
     if os.path.exists(dbpath):
         os.remove(dbpath)
     
-    dsi.backend(dbpath, 'Sqlite')
+    dsi = DSI(dbpath)
 
     dsi.read(csvpath, "Ensemble", table_name=table_name)
     dsi.read(datacard, "Oceans11Datacard")
