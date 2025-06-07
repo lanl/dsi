@@ -18,13 +18,13 @@ In the first step, a python script is used to parse the slurm output files and c
 
 .. code-block:: unixconfig
 
-   python3 parse_slurm_output.py --testname leblanc
+   python3 parse_slurm_output.python
 
 In the second step, another python script,
 
 .. code-block:: unixconfig
 
-   python3 dsi_pennant_dev.py --testname leblanc
+   python3 dsi_pennant_dev.py
 
 reads in the CSV file and creates a database:
 
@@ -53,13 +53,11 @@ The input columns are: wild_speed, wdir (wind direction), smois (surface moistur
 safe_unsafe_fire_behavior, does_fire_meet_objectives, and rationale_if_unsafe. 
 The output of the simulation (and post-processing steps) include the burned_area and the url to the wildfire images stored on the San Diego Super Computer.
 
-All paths in this example are defined from the main dsi repository folder, assumed to be ``~/<path-to-dsi-directory>/dsi``.
-
-To run this example, load dsi and run:
+After loading dsi, run this example within the ``dsi/examples/wildfire/`` folder as all filepaths are relative to that location:
 
 .. code-block:: unixconfig
 
-   python3 examples/wildfire/wildfire.py
+   python3 wildfire_dev.py
 
 .. literalinclude:: ../examples/wildfire/wildfire_dev.py
 
@@ -123,48 +121,60 @@ To open a pycinema viewer, first install pycinema and then run the example scrip
 
 .. _schema_section:
 
-Complex Schemas in DSI
-----------------------
+Cloverleaf (Complex Schemas)
+----------------------------
 
-This example details how to structure a JSON file for the DSI Schema Reader to store all table primary key - foreign key relations.
+This example shows how to use DSI with ensemble data from 8 Cloverleaf_Serial runs, and how to create a complex schema compatible with DSI.
 
-If we consider a workflow where a user reads in a complex schema for YAML data and generates an ER Diagram:
+The directory with this sample input and output data can be found in ``examples/clover3d/`` where each run has its own subfolder.
+Each run's input file is ``clover.in`` and the output is ``clover.out`` and the associated VTK files.
 
-.. literalinclude:: ../examples/developer/schema.py
+After loading dsi, run this example within the ``dsi/examples/developer/`` folder as all filepaths are relative to that location:
+
+.. code-block:: unixconfig
+
+   python3 3.schema.py
+
+This workflow uses a custom Cloverleaf reader to load the data, along with a complex schema that maps the input data, output data, and VTK files to the respective simulation runs.
+Once executing the workflow, users can see that the state2_density value is the only input parameter changed for each run.
+
+.. literalinclude:: ../examples/developer/3.schema.py
 
 where ``examples/test/example_schema.json`` is:
 
 .. code-block:: json
 
    {
-      "math": {
-         "primary_key": "specification",
+      "simulation": {
+         "primary_key": "sim_id"
+      }, 
+      "input": {
          "foreign_key": {
-               "b": ["address", "i"]
+               "sim_id": ["simulation", "sim_id"]
          }
       }, 
-      "address": {
-         "primary_key": "i",
+      "output": {
          "foreign_key": {
-               "h": ["physics", "n"]
+               "sim_id": ["simulation", "sim_id"]
          }
-      }, 
-      "physics": {
-         "primary_key": "n"
+      },
+      "viz_files": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
       }
    }
    
-the ER diagram looks like:
+and the generated ER diagram is:
 
 ..  figure:: images/schema_erd.png
     :scale: 35%
     :align: center
 
-    Entity Relationship Diagram of YAML data. 
-    Shows table relations between the math, address and physics tables.
+    Entity Relationship Diagram of Cloverleaf data. 
+    Displays relations between the simulation, input, output, and viz_files tables.
 
-NOTE: The schema JSON files do not need "comment" keys. 
-They have only been included to better explain the connection of the tables and columns.
+This section explains how to define primary and foreign key relationships in a JSON file for ``schema()``, such as ``examples/test/example_schema.json``
 
 For futher clarity, each schema file must be structured as a dictionary where:
 
@@ -195,26 +205,30 @@ and a foreign key 'user_name' that points to another table 'Users' with primary 
       }
    }
 
-Based on this understanding, we can update ``examples/test/example_schema.json`` too, by adding a foreign key in 'math' pointing to 'n' in 'physics':
+For example, if we update the Cloverleaf schema by adding a new primary and foreign key relation (assuming the columns exist):
 
 .. code-block:: json
 
    {
-      "math": {
-         "primary_key": "specification",
+      "simulation": {
+         "primary_key": "sim_id"
+      }, 
+      "input": {
+         "primary_key": "input_id",                  // <--- new primary key
          "foreign_key": {
-               "b": ["address", "i"],
-               "c": ["physics", "n"]
+               "sim_id": ["simulation", "sim_id"]
          }
       }, 
-      "address": {
-         "primary_key": "i",
+      "output": {
          "foreign_key": {
-               "h": ["physics", "n"]
+               "sim_id": ["simulation", "sim_id"],
+               "input_id": ["input", "input_id"]   // <--- new foreign key
          }
-      }, 
-      "physics": {
-         "primary_key": "n"
+      },
+      "viz_files": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
       }
    }
 
@@ -224,7 +238,7 @@ our new ER diagram is:
     :scale: 35%
     :align: center
    
-    ER Diagram of same YAML data. However, there is now an additional foreign key from 'math' to 'physics'
+    ER Diagram of same data. However, there is now an additional primary/foreign key relation from "input" to "output"
 
 
 Jupyter Notebook
@@ -232,9 +246,9 @@ Jupyter Notebook
 
 This example displays an example workflow for a user to read data into DSI, ingest it into a backend and then view the data interactively with a Jupyter notebook.
 
-``examples/core/jupyter_example.py``:
+``examples/developer/10.notebook.py``:
 
-.. literalinclude:: ../examples/developer/jupyter_example.py
+.. literalinclude:: ../examples/developer/10.notebook.py
 
 The above workflow generates ``dsi_sqlite_backend_output.ipynb`` which can be seen below.
 Users can make further edits to the Jupyter notebook to interact with the data.

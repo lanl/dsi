@@ -53,81 +53,33 @@ The input columns are: wild_speed, wdir (wind direction), smois (surface moistur
 safe_unsafe_fire_behavior, does_fire_meet_objectives, and rationale_if_unsafe. 
 The output of the simulation (and post-processing steps) include the burned_area and the url to the wildfire images stored on the San Diego Super Computer.
 
-All paths in this example are defined from the main dsi repository folder, assumed to be ``~/<path-to-dsi-directory>/dsi``.
-
-To run this example, load dsi and run:
+After loading dsi, run this example within the ``dsi/examples/wildfire/`` folder as all filepaths are relative to that location:
 
 .. code-block:: unixconfig
 
-   python3 examples/wildfire/wildfire.py
+   python3 wildfire.py
 
 .. literalinclude:: ../examples/wildfire/wildfire.py
 
-.. This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. 
-.. This cdb folder is called a `Cinema`_ database (CDB). 
-.. Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.  
-.. A Cinema database is comprised of a CSV file where each row of the table is a data element (ex: run or ensemble member of a simulation) and each column is a property of the data element. 
-.. Any column name that starts with 'FILE' is a path to a file associated with the data element.  
-.. This could be an image, a plot, a simulation mesh or other data artifact.
-
-.. Cinema databases can be visualized through various tools. We illustrate two options below:
-
-.. To visualize the results using Jupyter Lab and Plotly, run:
-
-.. .. code-block:: unixconfig
-
-..    python3 -m pip install plotly
-..    python3 -m pip install jupyterlab
-
-
-.. Open Jupyter Lab with:
-
-.. .. code-block:: unixconfig
-
-..   jupyter lab --browser Firefox
-
-.. and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the results of the DSI pipeline.
-
-.. ..  figure:: images/example-wildfire-jupyter.png
-..     :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
-..     :class: with-shadow
-..     :scale: 50%
-
-..     Screenshot of the JupyterLab workflow. 
-..     The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.
-
-.. Another option is to use `Pycinema`_, a QT-based GUI that supports visualization and analysis of Cinema databases. 
-.. To open a pycinema viewer, first install pycinema and then run the example script.
-
-.. .. code-block:: unixconfig
-
-..    python3 -m pip install pycinema
-..    cinema examples/wildfire/wildfire_pycinema.py
-
-
-.. ..  figure:: images/example-wildfire-pycinema.png
-..     :class: with-shadow
-..     :scale: 40%
-
-..     Screenshot of the Pycinema user interface showing the minimal set of components. 
-..     Left: the nodeview showing the various pycinema components in the visualization pipeline; 
-..     upper-right: the table-view; 
-..     lower-right: the image view. 
-..     Pycinema components are linked such that making a selection in one view will propagate to the other views.
-
-
-.. .. _PENNANT: https://github.com/lanl/PENNANT
-.. .. _Cinema: https://github.com/cinemascience
-.. .. _PyCinema: https://github.com/cinemascience/pycinema
 
 .. _user_schema_example_label:
 
-Complex Schemas in DSI
-----------------------
+Cloverleaf (Complex Schemas)
+-------------------------------
 
-This example details how to structure a JSON file for the DSI Schema Reader to store all table primary key - foreign key relations.
+This example shows how to use DSI with ensemble data from 8 Cloverleaf_Serial runs, and how to create a complex schema compatible with DSI.
 
-If we consider a workflow where a user reads in a complex schema for YAML data and generates an ER Diagram:
+The directory with this sample input and output data can be found in ``examples/clover3d/`` where each run has its own subfolder.
+Each run's input file is ``clover.in`` and the output is ``clover.out`` and the associated VTK files.
+
+After loading dsi, run this example within the ``dsi/examples/user/`` folder as all filepaths are relative to that location:
+
+.. code-block:: unixconfig
+
+   python3 7.schema.py
+
+This workflow uses a custom Cloverleaf reader to load the data, along with a complex schema that maps the input data, output data, and VTK files to the respective simulation runs.
+Once executing the workflow, users can see that the state2_density value is the only input parameter changed for each run.
 
 .. literalinclude:: ../examples/user/7.schema.py
 
@@ -137,32 +89,35 @@ where ``examples/test/example_schema.json`` is:
 
    {
       "simulation": {
-         "primary_key": "sim_id",
+         "primary_key": "sim_id"
       }, 
       "input": {
-         "primary_key": "run_id",
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"]
          }
       }, 
       "output": {
-         "primary_key": "output_id",
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
+      },
+      "viz_files": {
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"]
          }
       }
    }
    
-the ER diagram looks like:
+and the generated ER diagram is:
 
 ..  figure:: images/schema_erd.png
     :scale: 35%
     :align: center
 
-    Entity Relationship Diagram of example data. 
-    Shows table relations between the simulation, input and output tables.
+    Entity Relationship Diagram of Cloverleaf data. 
+    Displays relations between the simulation, input, output, and viz_files tables.
 
-NOTE: Schema JSON files do not need "comment" keys. They have only been included for clarity.
+This section explains how to define primary and foreign key relationships in a JSON file for ``schema()``, such as ``examples/test/example_schema.json``
 
 For futher clarity, each schema file must be structured as a dictionary where:
 
@@ -180,25 +135,29 @@ For futher clarity, each schema file must be structured as a dictionary where:
       - Ex: "foreign_key" : { "name" : ["table1", "table1_id"] , "age" : ["table2", "table2_id"] }
    - If a table does not have a primary or foreign key, you do not have to include them in the table's nested dictionary
 
-For example, if we update ``examples/test/example_schema.json``, by adding a foreign key in 'output' pointing to 'run_id' in 'input':
+For example, if we update the Cloverleaf schema by adding a new primary and foreign key relation (assuming the columns exist):
 
 .. code-block:: json
 
    {
       "simulation": {
-         "primary_key": "sim_id",
+         "primary_key": "sim_id"
       }, 
       "input": {
-         "primary_key": "run_id",
+         "primary_key": "input_id",                  // <--- new primary key
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"]
          }
       }, 
       "output": {
-         "primary_key": "output_id",
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"],
                "input_id": ["input", "input_id"]   // <--- new foreign key
+         }
+      },
+      "viz_files": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
          }
       }
    }
@@ -209,4 +168,4 @@ our new ER diagram would be:
     :scale: 35%
     :align: center
    
-    ER Diagram of same data. However, there is now an additional foreign key from 'output' to 'input'
+    ER Diagram of same data. However, there is now an additional primary/foreign key relation from "input" to "output"
