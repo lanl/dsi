@@ -7,7 +7,6 @@ import shutil
 from pathlib import Path
 import logging
 from datetime import datetime
-import warnings
 import sys
 import pandas as pd
 
@@ -27,7 +26,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
@@ -77,11 +76,13 @@ class Terminal():
         valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + self.VALID_MODULE_FUNCTIONS['backend']
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
+        
         self.active_metadata = OrderedDict()
         self.loaded_backends = []
 
         self.runTable = runTable
         self.backup_db = backup_db
+        self.user_wrapper = False
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug
@@ -146,8 +147,8 @@ class Terminal():
             raise ValueError("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
         if mod_type == "backend" and not any(mod_name.lower() in item for item in self.module_collection[mod_type].keys()):
             if self.debug_level != 0:
-                self.logger.error("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
-            raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extra.txt")
+                self.logger.error("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extras.txt")
+            raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extras.txt")
         if mod_type == "plugin" and mod_name.lower() == "wildfire":
             mod_name = "Ensemble"
         if mod_type == "plugin" and mod_name.lower() == "csv":
@@ -167,8 +168,8 @@ class Terminal():
                         obj = class_(**kwargs)
                     except:
                         if self.debug_level != 0:
-                            self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise TypeError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                            self.logger.error(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                     
                     run_start = datetime.now()
                     if self.debug_level != 0:
@@ -190,7 +191,10 @@ class Terminal():
                     if ingest_error is not None:
                             if self.debug_level != 0:
                                 self.logger.error(f"   {ingest_error[1]}")
-                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                            if self.user_wrapper:
+                                raise ingest_error[0](ingest_error[1])
+                            else:
+                                raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
                     if tester == 1:
                         sys.settrace(None) # ends trace to prevent large overhead
                     
@@ -198,7 +202,7 @@ class Terminal():
                         if self.runTable == True and table_name == "runTable":
                             if self.debug_level != 0:
                                 self.logger.error(f'   Cannot read in a manual runTable when the runTable flag is on')
-                            raise ValueError('Cannot read in a manual runTable when the runTable flag is on')
+                            raise RuntimeError('Cannot read in a manual runTable when the runTable flag is on')
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
                                 if isinstance(colData[0], list):
@@ -219,7 +223,7 @@ class Terminal():
                                         elif key in self.active_metadata[table_name][colName] and self.active_metadata[table_name][colName][key] != col_unit:
                                             if self.debug_level != 0:
                                                 self.logger.error(f"   Cannot have a different set of units for column {key} in {colName}")
-                                            raise ValueError(f"Cannot have a different set of units for column {key} in {colName}")
+                                            raise TypeError(f"Cannot have a different set of units for column {key} in {colName}")
                                 elif colName not in self.active_metadata[table_name].keys():
                                     self.active_metadata[table_name][colName] = colData
                     run_end = datetime.now()
@@ -256,7 +260,7 @@ class Terminal():
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise TypeError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                 
                 print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()
@@ -311,7 +315,7 @@ class Terminal():
                 self.logger.info(f"{mod_name} {mod_function} {mod_type} unloaded successfully.")
                 self.logger.info(f"Runtime: {end-start}")
         else:            
-            warnings.warn(f"{mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
+            print(f"WARNING: {mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
             if self.debug_level != 0:
                 self.logger.warning(f"{mod_name} {mod_function} {mod_type} could not be found in active_modules. No action taken.")
 
@@ -365,11 +369,14 @@ class Terminal():
             
             if writer_error is not None:
                 if writer_error[0] == "Warning":
-                    warnings.warn(writer_error[1])
+                    print("WARNING:", writer_error[1])
                 else:
                     if self.debug_level != 0:
                         self.logger.error(writer_error[1])
-                    raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+                    if self.user_wrapper:
+                        raise writer_error[0](writer_error[1])
+                    else:
+                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
             if tester == 1:
                 sys.settrace(None) # ends trace to prevent large overhead
 
@@ -380,8 +387,8 @@ class Terminal():
         if len(unused_writers) > 0:
             self.active_modules["writer"] = unused_writers
             if self.debug_level != 0:
-                self.logger.warning(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
-            warnings.warn(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
+                self.logger.warning(f"Not all writers were successfully transloaded. These were not transloaded: {unused_writers}")
+            print(f"WARNING: Not all writers were successfully transloaded. These were not transloaded: {unused_writers}")
         else:
             self.active_modules["writer"] = []
 
@@ -450,7 +457,10 @@ class Terminal():
                 if errorMessage is not None:
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
-                    raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                    if self.user_wrapper:
+                        raise errorMessage[0](f"Error ingesting data due to {errorMessage[1]}")
+                    else:
+                        raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
@@ -489,14 +499,17 @@ class Terminal():
                 if isinstance(query_data, tuple):
                     if self.debug_level != 0:
                         self.logger.error(query_data[1])
-                    raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
+                    if self.user_wrapper:
+                        raise query_data[0](query_data[1])
+                    else:
+                        raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
             else: #backend is empty - cannot query
                 if self.debug_level != 0:
                     self.logger.error("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
-                raise ValueError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
+                raise RuntimeError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
             if self.valid_backend(first_backend, parent_backend):
@@ -506,13 +519,13 @@ class Terminal():
                     elif interaction_type == "notebook":
                         first_backend.notebook(**kwargs)
                 except:
-                    raise ValueError("Error in generating notebook. Please ensure data in the actual backend is stable")
+                    raise RuntimeError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
                     self.logger.error("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
-                raise ValueError("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
+                raise RuntimeError("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
         # only processes data from first backend for now - TODO process data from all active backends later
         elif interaction_type in ["process", "read"]:
@@ -531,7 +544,7 @@ class Terminal():
             else: #backend is empty - cannot process data
                 if self.debug_level != 0:
                     self.logger.error("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
-                raise ValueError("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
+                raise RuntimeError("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
 
         if operation_success:
             end = datetime.now()
@@ -571,7 +584,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
@@ -598,7 +611,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
@@ -630,7 +643,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_column(query_object, range)
         return self.find_helper(query_object, return_object, start, "column ")
@@ -662,7 +675,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_cell(query_object, row)
         return self.find_helper(query_object, return_object, start, "cell ")
@@ -683,7 +696,7 @@ class Terminal():
         if isinstance(return_object, tuple):
             if self.debug_level != 0:
                 self.logger.warning(return_object[1])
-            warnings.warn(return_object[1])
+            print("WARNING:", return_object[1])
             return_object = return_object[0]
         else:
             end = datetime.now()
@@ -704,7 +717,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
-            raise ValueError("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
+            raise RuntimeError("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
         start = datetime.now()
         
         table_list = backend.list()
@@ -741,7 +754,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
-            raise ValueError("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
+            raise RuntimeError("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
         start = datetime.now()
 
         backend.summary(table_name, num_rows)
@@ -763,7 +776,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
-            raise ValueError("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
+            raise RuntimeError("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
         start = datetime.now()
 
         backend.num_tables()
@@ -796,7 +809,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in display function: First loaded backend needs to have data to be able to display data from it")
-            raise ValueError("Error in display function: First loaded backend needs to have data to be able to display data from it")
+            raise RuntimeError("Error in display function: First loaded backend needs to have data to be able to display data from it")
         start = datetime.now()
 
         errorStmt = backend.display(table_name, num_rows, display_cols)
@@ -833,7 +846,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
-            raise ValueError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
+            raise RuntimeError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
         start = datetime.now()
 
         errorStmt = backend.overwrite_table(table_name, collection)
@@ -864,7 +877,7 @@ class Terminal():
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in get_table function: First loaded backend needs to have data to be able to return a table")
-            raise ValueError("Error in get_table function: First loaded backend needs to have data to be able to return a table")
+            raise RuntimeError("Error in get_table function: First loaded backend needs to have data to be able to return a table")
         start = datetime.now()
 
         output = backend.get_table(table_name, dict_return)
@@ -963,7 +976,7 @@ class Terminal():
         if not isinstance(table_data, (OrderedDict, pd.DataFrame)):
             if self.debug_level != 0:
                 self.logger.error("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
-            raise ValueError("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
+            raise TypeError("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
         if isinstance(table_data, OrderedDict):
             self.active_metadata[table_name] = table_data
         elif isinstance(table_data, pd.DataFrame):
