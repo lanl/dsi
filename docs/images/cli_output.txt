@@ -25,19 +25,19 @@ cd <path>                                         Changes the working directory 
 dsi> cd test/
 Changed directory to /Users/viyer/dsi/examples/test
 dsi> read student_test1.yml
-Successfully loaded student_test1.yml into tables: math, address, physics
+Loaded student_test1.yml into tables: math, address, physics
 Database now has 4 tables
 
 dsi> read student_test2.yml
-Successfully loaded student_test2.yml into tables: math, address, physics
+Loaded student_test2.yml into tables: math, address, physics
 Database now has 4 tables
 
 dsi> read results.toml
-Successfully loaded results.toml into the table people
+Loaded results.toml into the table people
 Database now has 5 tables
 
 dsi> read yosemite5.csv
-Successfully loaded yosemite5.csv into the table yosemite5
+Loaded yosemite5.csv into the table yosemite5
 Database now has 6 tables
 
 dsi> list
@@ -75,7 +75,7 @@ specification | n    | o       | p   | q       | r  | s
 !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
 !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
 
-Successfully exported the query result to physics_output.csv
+Exported the query result to physics_output.csv
 
 dsi> display math -e math_output.csv
 
@@ -86,7 +86,7 @@ specification | a | b | c     | d | e    | f
 !jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
 !jack1        | 2 | 3 | 45.98 | 3 | 44.8 | 0.0099
 
-Successfully exported math to math_output.csv
+Exported math to math_output.csv
 
 dsi> draw -f dsi_er_diagram.png
 Successfully drew an ER Diagram in dsi_er_diagram.png

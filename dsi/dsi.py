@@ -200,7 +200,7 @@ class DSI():
 
         table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
         if len(table_keys) > 1:
-            print(f"Loaded {filenames} into tables: {", ".join(table_keys)}")
+            print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
         else:
             print(f"Loaded {filenames} into the table {table_keys[0]}")
 

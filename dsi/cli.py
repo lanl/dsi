@@ -151,7 +151,7 @@ class DSI_cli:
                 filename = args.export
             error = self.export_table(table_name, filename)
             if error != 1:
-                print(f"Successfully exported {table_name} to {filename}")
+                print(f"Exported {table_name} to {filename}")
             print()
     
     def get_draw_parser(self):
@@ -363,9 +363,9 @@ class DSI_cli:
             
             table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
             if len(table_keys) > 1:
-                print(f"Successfully loaded {dbfile} into tables: {", ".join(table_keys)}")
+                print(f"Loaded {dbfile} into tables: {', '.join(table_keys)}")
             else:
-                print(f"Successfully loaded {dbfile} into the table {table_keys[0]}")
+                print(f"Loaded {dbfile} into the table {table_keys[0]}")
 
             self.t.num_tables()
             print()
@@ -457,7 +457,7 @@ class DSI_cli:
             error = self.export_table("temp_query", filename)
             if error != 1:
                 print()
-                print(f"Successfully exported the query result to {filename}")
+                print(f"Exported the query result to {filename}")
         print()
 
     def get_save_parser(self):
