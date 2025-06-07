@@ -292,14 +292,14 @@ class DuckDB(Filesystem):
                 if isVerbose:
                     print(data)
             except:
-                return (ValueError, "Error in query_artifacts handler: Incorrect SELECT query on the data. Please try again")
+                return (RuntimeError, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
-            return (ValueError, "Error in query_artifacts handler: Can only run SELECT or PRAGMA queries on the data")
+            return (RuntimeError, "Error in query_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             tables = self.get_table_names(query)
             if len(tables) > 1:
-                return (ValueError, "Error in query_artifacts handler: Can only return ordered dictionary if query with one table")
+                return (RuntimeError, "Error in query_artifacts: Can only return ordered dictionary if query with one table")
             
             return OrderedDict(data.to_dict(orient='list'))
         else:
@@ -666,7 +666,7 @@ class DuckDB(Filesystem):
             If None (default), all columns are displayed.
         """
         if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
-            return (ValueError, f"{table_name} does not exist in this DuckDB database")
+            return (RuntimeError, f"{table_name} does not exist in this DuckDB database")
         if display_cols == None:
             df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
         else:
@@ -783,12 +783,21 @@ class DuckDB(Filesystem):
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
         """
-        temp_data = self.process_artifacts()
+        not_exists = False
+        temp_data = OrderedDict()
         if isinstance(table_name, list) and isinstance(collection, list):
-            pass
+            temp_data = self.process_artifacts()
         elif isinstance(table_name, str) and isinstance(collection, pd.DataFrame):
-            table_name = [table_name]
-            collection = [collection]
+            # if single table doesn't exist, skip all relations/dependencies checking
+            if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
+                not_exists = True
+                temp_data[table_name] = OrderedDict(collection.to_dict(orient='list'))
+                table_name = []
+                collection = []
+            else:
+                temp_data = self.process_artifacts()
+                table_name = [table_name]
+                collection = [collection]
         else:
             return (TypeError, "inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
         
@@ -796,14 +805,14 @@ class DuckDB(Filesystem):
             temp_data[name] = OrderedDict(data.to_dict(orient='list'))
         
         for name, data in zip(table_name, collection):
-            if "dsi_relations" not in temp_data.keys(): # skip PK check if no relations
+            if not_exists or "dsi_relations" not in temp_data.keys(): # skip PK check if no relations
                 continue
             
             result = next((pk_tuple[1] for pk_tuple in temp_data["dsi_relations"]["primary_key"] if name in pk_tuple[0]), None)
             if result:
                 new_data = temp_data[name][result]
                 if any(isinstance(x, str) for x in new_data) and any(isinstance(x, (int, float)) for x in new_data):
-                    return (ValueError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
+                    return (TypeError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
                 if len(new_data) != len(set(new_data)):
                     return (ValueError, f"{name}'s primary key column, {result}, must have unique data")
 
@@ -819,7 +828,7 @@ class DuckDB(Filesystem):
                                 fk_data = [round(val, 4) for val in fk_data]
                             if not all(item in new_data for item in fk_data):
                                 errorMsg = f"Data in table {fk[0]}'s foreign key column, {fk[1]}, must match table {name}'s primary key"
-                                return(ValueError, errorMsg + f" column, {result}. Please ensure that all rows in {fk[0]} are updated")
+                                return(TypeError, errorMsg + f" column, {result}. Please ensure that all rows in {fk[0]} are updated")
 
                     print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
 
@@ -842,7 +851,7 @@ class DuckDB(Filesystem):
             self.runTable = True
 
         if errorStmt is not None:
-            raise errorStmt[0](f"Error ingesting data in {self.filename} due to {errorStmt[1]}")
+            raise errorStmt[0](f"Error updating data in {self.filename} due to {errorStmt[1]}")
         
     def check_table_relations(self, tables, relation_dict):
         """

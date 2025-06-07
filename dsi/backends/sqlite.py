@@ -219,6 +219,10 @@ class Sqlite(Filesystem):
                 
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
+        dsi_units_data = self.cur.execute(f"PRAGMA table_info(dsi_units)").fetchall()
+        if len(dsi_units_data) == 3 and dsi_units_data[1][1] == "column": # old dsi_units table exists
+            self.cur.execute(f'ALTER TABLE dsi_units RENAME COLUMN column TO column_name;') # only commited in later try/catch clause
+            
         if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
             self.cur.execute(create_query)
@@ -275,12 +279,12 @@ class Sqlite(Filesystem):
             except:
                 return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
-            return (ValueError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
+            return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             tables = self.get_table_names(query)
             if len(tables) > 1:
-                return (ValueError, "Error in query_artifacts/get_artifacts: Can only return ordered dictionary if query with one table")
+                return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only return ordered dictionary if query with one table")
             
             return OrderedDict(data.to_dict(orient='list'))
         else:
@@ -880,23 +884,25 @@ class Sqlite(Filesystem):
         
         elif isinstance(table_name, str) and isinstance(collection, pd.DataFrame):
             temp_data[table_name] = OrderedDict(collection.to_dict(orient='list'))
-            relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
-            tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
-            for colInfo in tableInfo:
-                if colInfo[5] == 1:
-                    relations["primary_key"].append((table_name, colInfo[1]))
-                    relations["foreign_key"].append((None, None))
-            
-            fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
-            for row in fkData:
-                relations["primary_key"].append((row[2], row[4]))
-                relations["foreign_key"].append((table_name, row[3]))
-            
-            if len(relations["primary_key"]) > 0:
-                temp_data["dsi_relations"] = relations
 
-            table_name = [table_name]
-            collection = [collection]
+            if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) > 0:
+                relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
+                tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
+                for colInfo in tableInfo:
+                    if colInfo[5] == 1:
+                        relations["primary_key"].append((table_name, colInfo[1]))
+                        relations["foreign_key"].append((None, None))
+                
+                fkData = self.cur.execute(f"PRAGMA foreign_key_list({table_name});").fetchall()
+                for row in fkData:
+                    relations["primary_key"].append((row[2], row[4]))
+                    relations["foreign_key"].append((table_name, row[3]))
+                
+                if len(relations["primary_key"]) > 0:
+                    temp_data["dsi_relations"] = relations
+
+                table_name = [table_name]
+                collection = [collection]
         else:
             return (TypeError, "inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
 
@@ -906,7 +912,7 @@ class Sqlite(Filesystem):
                 if result:
                     new_data = temp_data[name][result]
                     if any(isinstance(x, str) for x in new_data) and any(isinstance(x, (int, float)) for x in new_data):
-                        return (ValueError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
+                        return (TypeError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
                     if len(new_data) != len(set(new_data)):
                         return (ValueError, f"{name}'s primary key column, {result}, must have unique data")
                     
@@ -915,14 +921,14 @@ class Sqlite(Filesystem):
                     if old_data != new_data:
                         if name == "runTable" and result == "run_id" and len(table_name) == 1:
                             errorMsg = "Cannot only edit runTable's run_id column."
-                            return (ValueError, errorMsg + " Need to update the run_id column in other tables to match runTable")
+                            return (TypeError, errorMsg + " Need to update the run_id column in other tables to match runTable")
                         if name == "runTable" and result == "run_id" and len(table_name) > 1:
                             for pk, fk in zip(temp_data["dsi_relations"]["primary_key"], temp_data["dsi_relations"]["foreign_key"]):
                                 if pk == (name, result) and fk != (None, None):
                                     fk_data = temp_data[fk[0]][fk[1]]
                                     if not all(item in new_data for item in fk_data):
                                         errorMsg = f"Data in table {fk[0]}'s, run_id column must match runTable's edited run_id column."
-                                        return(ValueError, errorMsg + f" Please ensure that all rows in {fk[0]} are being updated")
+                                        return(TypeError, errorMsg + f" Please ensure that all rows in {fk[0]} are being updated")
                         print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
         
         for name in temp_data.keys():
@@ -939,7 +945,7 @@ class Sqlite(Filesystem):
             self.runTable = True
         
         if errorStmt is not None:
-            raise errorStmt[0](f"Error ingesting data in {self.filename} due to {errorStmt[1]}")
+            raise errorStmt[0](f"Error updating data in {self.filename} due to {errorStmt[1]}")
 
     def table_print_helper(self, headers, rows, max_rows=25):
         """
