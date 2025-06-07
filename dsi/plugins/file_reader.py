@@ -8,7 +8,7 @@ import re
 import yaml
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
-from datetime import datetime
+import os
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -66,7 +66,7 @@ class Csv(FileReader):
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
             except:
-                raise ValueError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
+                raise TypeError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
 
         table_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in table_data.items():  # replace NaNs with None
@@ -151,6 +151,8 @@ class JSON(FileReader):
             with open(filename, 'r') as fh:
                 file_content = json.load(fh)
                 for key, val in file_content.items():
+                    if not isinstance(val, (str, float, int)):
+                        return (TypeError, "General JSON reader cannot handle nested data, only flat JSON values.")
                     if key not in temp_dict:
                         temp_dict[key] = []
                     temp_dict[key].append(val)
@@ -539,6 +541,152 @@ class Ensemble(FileReader):
        
         self.set_schema_2(self.csv_data)
 
+class Cloverleaf(FileReader):
+    """
+    DSI Reader that stores input and output Cloverleaf data from a directory for each simulation run
+    """
+    def __init__(self, folder_path, **kwargs):
+        """
+        `folder_path` : str
+            Filepath to the directory where the Cloverleaf data is stored. 
+            The directory should have a subfolder for each simulation run, each containing input and output data
+        """
+        if folder_path[-1] != '/':
+            self.folder_path = folder_path
+        else:
+            self.folder_path = folder_path[:-1]
+        self.cloverleaf_data = OrderedDict()
+
+    def check_type(self, text):
+        """
+        **Internal helper function, not used by DSI Users** 
+        
+        Function tests input text and returns a predicted compatible SQL Type
+
+        `text`: text string
+
+        `return`: string returned as int, float or still a string
+        """
+        try:
+            _ = int(text)
+            return int(text)
+        except ValueError:
+            try:
+                _ = float(text)
+                return float(text)
+            except ValueError:
+                return text
+            
+    def add_rows(self) -> None:
+        """
+        Flattens data from each simulation's input file as a row in the `input` table.
+        Flattens data from each simulation's output file as a row in the `output` table.
+        Creates a simulation table which is stores each simulation's number and execution datetime.
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
+        """
+        input_dict = OrderedDict({'sim_id': []})
+        output_dict = OrderedDict({'sim_id': []})
+        viz_dict = OrderedDict({'sim_id': [], 'image_filepath': []})
+        simulation_dict = OrderedDict({'sim_id': [], 'sim_datetime': []})
+
+        sim_num = 1
+        all_runs = sorted([f.name for f in os.scandir(self.folder_path) if f.is_dir()])
+        for run_name in all_runs:
+            input_file = f"{self.folder_path}/{run_name}/clover.in"
+            
+            input_dict["sim_id"].append(sim_num)
+            with open(input_file, 'r') as f:
+                input_lines = [line.strip() for line in f if line.strip()]
+
+            num_timesteps = 0
+            for line in input_lines:
+                if line.startswith("*"):
+                    continue
+                if "test_problem" in line:
+                    test_line = line.strip().lower().split()
+                    if test_line[0] not in input_dict.keys():
+                        input_dict[test_line[0]] = []
+                    input_dict[test_line[0]].append(self.check_type(test_line[1]))
+                elif '=' not in line:
+                    continue
+
+                if line.startswith("state 1"):
+                    prefix = "state1_"
+                    tokens = line.replace("state 1", "").strip().split()
+                elif line.startswith("state 2"):
+                    prefix = "state2_"
+                    tokens = line.replace("state 2", "").strip().split()
+                else:
+                    prefix = ""
+                    tokens = line.split()
+                
+                for token in tokens:
+                    if '=' in token:
+                        key, value = token.split('=', 1)
+                        full_key = prefix.lower() + key.lower()
+                        if full_key not in input_dict.keys():
+                            input_dict[full_key] = []
+                        input_dict[full_key].append(self.check_type(value))
+                        if full_key == "end_step":
+                            num_timesteps = self.check_type(value)
+            
+            output_file = f"{self.folder_path}/{run_name}/clover.out"
+            with open(output_file, 'r') as f:
+                output_lines = [line.strip() for line in f if line.strip()]
+            
+            for index, line in enumerate(output_lines):
+                if line[:6] != "Step  ":
+                    continue
+                output_dict["sim_id"].append(sim_num)
+
+                next_line = index
+                total_line = line.strip().split()
+                if total_line[1] == str(num_timesteps):
+                    next_line = index + 10
+                elif total_line[1][-1] == "0":
+                    next_line = index + 3
+                
+                wall_line = output_lines[next_line+1].strip().split()
+                wall_line[0] = f"{wall_line[0]}_{wall_line[1]}"
+                if next_line == index + 10:
+                    total_line.extend([wall_line[0], wall_line[2], "Average_time_per_cell", None, "Step_time_per_cell", None])
+                else:
+                    avg_line = output_lines[next_line+2].strip().split()
+                    avg_line[0] = f"{avg_line[0]}_{avg_line[1]}_{avg_line[2]}_{avg_line[3]}"
+                    step_t_line = output_lines[next_line+3].strip().split()
+                    step_t_line[0] = f"{step_t_line[0]}_{step_t_line[1]}_{step_t_line[2]}_{step_t_line[3]}"
+                    total_line.extend([wall_line[0], wall_line[2], avg_line[0], avg_line[4], step_t_line[0], step_t_line[4]])
+                for out_key, out_val in zip(total_line[::2], total_line[1::2]):
+                    if out_key == '1,':
+                        continue
+                    if out_key.lower() not in output_dict.keys():
+                        output_dict[out_key.lower()] = []
+                    if out_val is not None:
+                        output_dict[out_key.lower()].append(self.check_type(out_val))
+                    else:
+                        output_dict[out_key.lower()].append(out_val)
+
+            for filename in os.listdir(f"{self.folder_path}/{run_name}"):
+                if "vtk" in filename:
+                    viz_dict["sim_id"].append(sim_num)
+                    viz_dict["image_filepath"].append(f"{run_name}/{filename}")
+            viz_dict["image_filepath"] = sorted(viz_dict["image_filepath"])
+
+            simulation_dict["sim_id"].append(sim_num)
+            with open(f"{self.folder_path}/{run_name}/timestamp.txt", 'r') as f:
+                sim_line = [line.strip() for line in f if line.strip()]
+            simulation_dict['sim_datetime'].append(sim_line[0])
+
+            sim_num+=1
+
+        self.cloverleaf_data["input"] = input_dict
+        self.cloverleaf_data["output"] = output_dict
+        self.cloverleaf_data["simulation"] = simulation_dict
+        self.cloverleaf_data["viz_files"] = viz_dict
+        self.set_schema_2(self.cloverleaf_data)
+    
 class Oceans11Datacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
@@ -681,7 +829,7 @@ class SchemaOrgDatacard(FileReader):
                     field_names.append(element)
                     continue
                 elif element == "@type" and val.lower() != "dataset":
-                    return (ValueError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
+                    return (KeyError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
                 if element not in temp_data.keys():
                     temp_data[element] = [val]
                 else:
@@ -730,7 +878,7 @@ class GoogleDatacard(FileReader):
                 data = yaml.safe_load(yaml_file)
                 
             if not set(data.keys()).issubset(["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
+                return (KeyError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
             
             field_names = []
             sampling_fields = []
@@ -760,12 +908,11 @@ class GoogleDatacard(FileReader):
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
             
             if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields in 'sampling_methods' match the template")
+                return (KeyError, f"Error in reading {filename} data card. Please ensure all fields in 'sampling_methods' match the template")
             
             if not set(ml_fields).issubset(['ml_applications', 'ml_model_name', 'evaluation_accuracy', 'evaluation_precision', 
                                                   'evaluation_recall', 'evaluation_performance_metric']):
-                return (ValueError, f"Error in reading {filename} data card. \
-                        Please ensure all fields in 'known_applications_and_benchmarks' match the template")
+                return (KeyError, f"Error reading {filename} data card. Please ensure all fields in 'known_applications_and_benchmarks' match the template")
         self.datacard_data["google_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 

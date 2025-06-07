@@ -1,21 +1,20 @@
 {
-    "math": {
-        "primary_key": "specification",
-        "foreign_key": {
-            "b": ["address", "i"]
-        },
-        "comment": "The value of 'primary_key' is this table's column that is a primary key (PK). There can only be ONE PK per table"
+    "simulation": {
+       "primary_key": "sim_id"
     }, 
-    "address": {
-        "primary_key": "i",
-        "foreign_key": {
-            "h": ["physics", "n"]
-        },
-        "comment1": "The value of 'foreign_key' is a dictionary. There can be multiple foreign keys (FK) for a table.",
-        "comment2": "For each entry, the key is this table's column that is a FK and the value is a list of the associated table and column that form the PK",
-        "comment3": "Ex: 'address' table has a FK at the column 'h'. The associated PK is in the table 'physics' at column 'specification' "
+    "input": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
     }, 
-    "physics": {
-        "primary_key": "n"
+    "output": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    },
+    "viz_files": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
     }
 }

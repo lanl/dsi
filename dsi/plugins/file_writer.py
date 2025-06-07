@@ -58,7 +58,7 @@ class ER_Diagram(FileWriter):
             file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
         elif len(self.output_filename) > 4 and self.output_filename[-4:] == ".svg":
-            return (ValueError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
+            return (RuntimeError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             return (ValueError, "Your input for target_table_prefix does not exist in memory. Please enter a valid prefix for table names.")
@@ -176,7 +176,7 @@ class Csv_Writer(FileWriter):
             If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (ValueError, f"{self.table_name} does not exist in memory")
+            return (KeyError, f"{self.table_name} does not exist in memory")
         if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
             return (ValueError, f"Inputted list of column names to plot for {self.table_name} is incorrect")
         
@@ -227,9 +227,9 @@ class Table_Plot(FileWriter):
             If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (ValueError, f"{self.table_name} does not exist in memory")
+            return (KeyError, f"{self.table_name} does not exist in memory")
         if self.table_name in ["dsi_units", "dsi_relations", "sqlite_sequence"]:
-            return (ValueError, f"Cannot plot the units or relations table")
+            return (RuntimeError, f"Cannot plot the units or relations table")
         if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
             return (ValueError, f"Inputted list of columns to plot for {self.table_name} is incorrect")
         
