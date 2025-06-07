@@ -79,8 +79,8 @@ write <filename>
 
 Users can also expect basic unix commands such as ``cd`` (change directory), ``ls`` (list all files) and ``clear`` (clear command line view).
 
-CLI Examples
+CLI Example
 ------------
-The terminal output below displays various ways users can utilize DSI's CLI to simplify data science workflows.
+The terminal output below displays various ways users can utilize DSI's CLI for seamless data science analysis.
 
 .. literalinclude:: images/cli_output.txt

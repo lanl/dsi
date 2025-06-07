@@ -1,3 +1,5 @@
+.. _backend_section_label:
+
 Backends
 ========
 

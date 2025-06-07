@@ -59,67 +59,86 @@ by creating a DSI database in the process, or retrieving an existing DSI databas
 
 Examples
 --------
-Before interacting with the Readers/Writers and backends, they must each be loaded. 
 Examples below display various ways users can incorporate DSI into their data science workflows.
-They can be found and run in ``examples/developer/``
+They are located in ``examples/developer/`` and must be run from that directory.
+
+Most of them either load or refer to data from ``examples/clover3d/``.
+If the directory does not exist, users must first call ``core.Sync().move()`` to ensure the data is stored locally for these examples.
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Baseline use of DSI to list Modules
 
-.. literalinclude:: ../examples/developer/baseline.py
+.. literalinclude:: ../examples/developer/1.baseline.py
 
 
-.. _example2_label:
+.. _ingest_label:
 
 Example 2: Ingest data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ingesting data from a Reader to a backend
+Loading a Cloverleaf reader and ingesting that data into a Sqlite DSI backend
 
-.. literalinclude:: ../examples/developer/ingest.py
+.. literalinclude:: ../examples/developer/2.ingest.py
 
-Example 2.5: Ingest complex schema and data
+Example 3: Complex schema with data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ingesting data from a Reader to a backend with a complex schema stored in a separate JSON file. 
-Read :ref:`schema_section` to understand how to structure this schema JSON file for the Schema Reader
+Ingesting data from a Cloverleaf Reader to a DSI backend along with a complex schema stored in a JSON file. 
+Read :ref:`schema_section` to better understand how to structure this schema JSON file for the Schema Reader
 
-.. literalinclude:: ../examples/developer/ingest_schema.py
-
-Example 3: Query data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Querying data from a backend
-
-.. literalinclude:: ../examples/developer/query.py
+.. literalinclude:: ../examples/developer/3.schema.py
 
 
-.. _example4_label:
+.. _process_label:
 
-Example 4: Process data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Processing data from a backend to generate an Entity Relationship diagram using a Writer
+Example 4: Process and Write data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Processing data from a Sqlite DSI backend and useing a Writer to generate an ER diagram, table plot and CSV file.
 
-.. literalinclude:: ../examples/developer/process.py
+.. literalinclude:: ../examples/developer/4.process.py
 
-Example 5: Generate notebook
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generating a python notebook file (mostly Jupyter notebook) from a backend to view data interactively
-
-.. literalinclude:: ../examples/developer/notebook.py
-
-Example 6: Find data
+Example 5: Find data
 ~~~~~~~~~~~~~~~~~~~~
-Finding data from a backend - tables, columns, cells, or all matches
+Finding data from a Sqlite DSI backend - tables, columns, cells, or all matches.
+If matching data found, it is returned as a list of ValueObject(). 
+Refer to each backend's ValueObject() description in :ref:`backend_section_label`, as its structure varies by backend.
 
-.. literalinclude:: ../examples/developer/find.py
+.. literalinclude:: ../examples/developer/5.find.py
+
+Example 6: Query data
+~~~~~~~~~~~~~~~~~~~~~~
+Querying data from a Sqlite DSI backend.
+Users can either use ``artifact_handler('query', SQL_query)`` to store certain data, or ``get_table()`` to retrieve all data from a specified table.
+
+.. literalinclude:: ../examples/developer/6.query.py
+
+Example 7: Overwrite data
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Overwriting a table using modified data from ``get_table()``
+
+.. literalinclude:: ../examples/developer/7.overwrite.py
+
+Example 8: Visualize data
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
+
+.. literalinclude:: ../examples/developer/8.visualize.py
+
 
 .. _external_readers_writers_label:
 
-Example 7: External Readers/Writers
+Example 9: External Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Loading an external python reader from a separate file:
+Temporarily adding an external data reader to DSI, allowing DSI to interact with the associated data across all actions.
+In this instance, the data is ingested into a backend and viewed using ``display()``
 
-.. literalinclude:: ../examples/developer/external_plugin.py
+.. literalinclude:: ../examples/developer/9.external_plugin.py
 
 ``text_file_reader``:
 
 .. literalinclude:: ../examples/developer/text_file_reader.py
+
+Example 10: Generate notebook
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generating a python notebook (mostly Jupyter notebook) from a Sqlite DSI backend to view data interactively.
+
+.. literalinclude:: ../examples/developer/10.notebook.py

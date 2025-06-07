@@ -10,9 +10,11 @@ Dsi: DSI
 ----------
 The DSI class is a user-level class that encapsulates the Terminal and Sync classes from DSI Core. 
 DSI interacts with several functions within Terminal and Sync without requiring the user to differentiate them.
-The functionality has also been simplified to improve user experience and reduce complexity.
+The functionality has been simplified to improve user experience and reduce complexity.
 
-Users must first call ``backend()`` to activate a backend to read data into and interact with.
+When creating an instance of DSI(), users can optionally specify the type of backend and filename to use
+If neither is provided, a temporary backend is automatically created, allowing users to interact with their data.
+Read the ``__init__`` documentation below for more details on the supported backend types.
 
 Users should use ``read()`` to load data into DSI and ``write()`` to export data from DSI into supported external formats.
 Their respective list functions print all valid readers/writers that can be used.
@@ -32,6 +34,7 @@ Notes for users:
 
 .. autoclass:: dsi.dsi.DSI 
       :members:
+      :special-members: __init__
 
 
 .. _datacard_section_label:
@@ -65,7 +68,10 @@ Completed examples of each metadata standard for the Wildfire dataset can also b
 User Examples
 --------------
 Examples below display various ways users can incorporate DSI into their data science workflows.
-They can be found and run in ``examples/user/``
+They are located in ``examples/user/`` and must be run from that directory.
+
+All of them either load or refer to data in ``examples/clover3d/``. 
+If the directory does not exist, users must first call ``dsi.move()`` to ensure the data is stored locally for these examples.
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,37 +81,46 @@ Baseline use of DSI to list all valid Readers, Writers, and Backends, and descri
 
 Example 2: Read data
 ~~~~~~~~~~~~~~~~~~~~~~
-Reading data from a YAML file into a DSI backend, and displaying some of that data
+Reading Cloverleaf data into a DSI backend, and displaying some of that data
 
 .. literalinclude:: ../examples/user/2.read.py
 
 Example 3: Find data
 ~~~~~~~~~~~~~~~~~~~~
-Finding data from an active backend - tables, columns, datapoints matches
+Finding data from an active DSI backend that matches an input query - a string or a number.
+Prints all matches by default. If ``True`` is passed as an additional argument, returns a list of data from each table that matches the query.
 
 .. literalinclude:: ../examples/user/3.find.py
 
-Example 4: Writing data
+Example 4: Updating data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.
+Updating data from the edited output of ``find()``. Input can either be a list of table data or a single table's data.
 
-.. literalinclude:: ../examples/user/4.write.py
+.. literalinclude:: ../examples/user/4.update.py
 
 Example 5: Query data
 ~~~~~~~~~~~~~~~~~~~~~
-Querying data from an active backend
+Querying data from an active DSI backend. 
+Users can either use ``query()`` to view specific data with a SQL statement, or ``get_table()`` to view all data from a specified table.
 
 .. literalinclude:: ../examples/user/5.query.py
 
 Example 6: Visualizing a database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Printing different data and metadata from a database - number of tables, dimensions of tables, actual data in tables, and statistics from each table 
+Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
 
 .. literalinclude:: ../examples/user/6.visualize.py
 
 Example 7: Complex schema with data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Loading complex JSON schema with ``schema()``, loading associated data with ``read()``, and an ER Diagram to display the relations.
-Read :ref:`user_schema_example_label` to understand how to structure a DSI-compatible input file for ``schema()``
+Loading a complex JSON file with ``schema()``, the associated Cloverleaf data with ``read()``, and an ER Diagram to display the data relations.
+
+Read :ref:`user_schema_example_label` to learn how to structure a DSI-compatible input file for ``schema()``
 
 .. literalinclude:: ../examples/user/7.schema.py
+
+Example 8: Writing data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.
+
+.. literalinclude:: ../examples/user/8.write.py

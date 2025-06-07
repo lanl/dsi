@@ -56,8 +56,8 @@ Note for users:
    - DSI's `runTable` is only included in File Writers if data was previously ingested into a backend in a Core.Terminal workflow 
      where `runTable` was set to True.
    
-      - Ex: in :ref:`example4_label`, `runTable` is included in a generated ER Diagram since it uses ingested data from 
-        :ref:`example2_label` where `runTable` = True
+      - Ex: in :ref:`process_label`, `runTable` is included in a generated ER Diagram since it uses ingested data from 
+        :ref:`ingest_label` where `runTable` = True
      
 .. automodule:: dsi.plugins.file_writer
    :members:
