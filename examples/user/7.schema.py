@@ -1,25 +1,21 @@
 # examples/user/7.schema.py
 from dsi.dsi import DSI
 
-schema_dsi = DSI()
+schema_dsi = DSI("schema_data.db")
 
-# loads a complex schema into DSI to apply to a database
+# dsi.schema(filename)
+schema_dsi.schema("../test/example_schema.json") # must be before reading Cloverleaf data
+
 #dsi.read(filename, reader)
-schema_dsi.read("../data/example_schema.json", "Schema") # view comments in dsi/data/example_schema.json to learn how to structure it
-schema_dsi.read("../data/student_test1.yml", 'YAML1')
+schema_dsi.read("../clover3d/", 'Cloverleaf')
 
 #dsi.write(filename, writer)
-schema_dsi.write("schema_er_diagram.png", "ER_Diagram")
+schema_dsi.write("clover_er_diagram.png", "ER_Diagram")
+
+#dsi.display(table_name, num_rows, display_cols)
+schema_dsi.display("simulation")
+schema_dsi.display("input", ["sim_id", "state1_density", "state2_density", "initial_timestep", "end_step"])
+schema_dsi.display("output", ["sim_id", "step", "wall_clock", "average_time_per_cell"])
+schema_dsi.display("viz_files")
 
 schema_dsi.close()
-
-# DSI without a complex Schema
-basic_dsi = DSI()
-
-#dsi.read(filename, reader)
-basic_dsi.read("../data/student_test1.yml", 'YAML1')
-
-#dsi.write(filename, writer)
-basic_dsi.write("normal_er_diagram.png", "ER_Diagram") # schema_er_diagram.png will be different due to complex schema
-
-basic_dsi.close()

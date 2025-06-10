@@ -14,16 +14,16 @@ if __name__ == "__main__":
     datacard = "pennant_oceans11.yml"
     output_csv = "pennant_output.csv"
 
-    dsi = DSI()
-    dsi.read(csvpath, "Ensemble", table_name=table_name)
-    dsi.read(datacard, "Oceans11Datacard")
-
     if os.path.exists(dbpath):
         os.remove(dbpath)
     
-    dsi.backend(dbpath, 'Sqlite')
-    dsi.ingest()
+    dsi = DSI(dbpath)
 
-    dsi.query(f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;")
+    dsi.read(csvpath, "Ensemble", table_name=table_name)
+    dsi.read(datacard, "Oceans11Datacard")
+
+    # saves query output as a Pandas DataFrame to then update that table in the backend
+    query_output = dsi.query(f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", collection=True)
+    dsi.update(query_output)
 
     dsi.write(output_csv, "Csv_Writer", table_name=table_name)

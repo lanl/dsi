@@ -1,52 +1,38 @@
 import os
 import pandas as pd
 import urllib.request 
-from dsi.backends.sqlite import Sqlite, DataType
-import shutil
 
 from dsi.core import Terminal
-
-isVerbose = True
 
 def downloadImages(path_to_csv, imageFolder):
     """
     Read and download the images from the SDSC server
     """
-    df = pd.read_csv (path_to_csv)
+    if not os.path.exists(imageFolder):
+        os.makedirs(imageFolder)
 
-    for index, row in df.iterrows():
-        url = row['FILE'] 
+    df = pd.read_csv(path_to_csv)
+    for url in df["FILE"]:
         filename = url.rsplit('/', 1)[1]
-        isExist = os.path.exists(imageFolder)
-        if not isExist:
-            os.makedirs(imageFolder)
         
         dst = imageFolder + filename
-        urllib.request.urlretrieve(url, dst)
+        if not os.path.exists(dst):
+            urllib.request.urlretrieve(url, dst)
 
 if __name__ == "__main__":
-    # predefined paths
-    dstFolder = ""
-    imageFolderName = "images/"
-    imgDstFolder = dstFolder + imageFolderName
-    input_csv = dstFolder + "wildfiredataSmall.csv"
-    db_name = dstFolder + 'wildfire.db'
-    cinema_db_name = dstFolder + "wildfire.cdb/"
-    path_to_cinema_images = cinema_db_name + imageFolderName
+    input_csv = "wildfiredata.csv"
+    db_name = 'wildfire.db'
+    cinema_db_name = "wildfire.cdb/"
+    path_to_cinema_images = cinema_db_name + "images/"
     datacard = "wildfire_oceans11.yml"
     output_csv = cinema_db_name + "wildfire_output.csv"
     table_name = "wfdata"
-    columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "FILE"]
+    columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "LOCAL_PATH"]
 
-    #external work from DSI
-    downloadImages(input_csv, imgDstFolder)
-
-    # moves the images to the Cinema Database folder - external to DSI
+    # downloads wildfire images and moves them to the Cinema Database folder - external to DSI
     if not os.path.exists(cinema_db_name):
         os.makedirs(cinema_db_name)
-    if os.path.exists(path_to_cinema_images):
-        shutil.rmtree(path_to_cinema_images)
-    os.rename(imgDstFolder, path_to_cinema_images)
+    downloadImages(input_csv, path_to_cinema_images)
 
     core = Terminal()
 
@@ -58,12 +44,12 @@ if __name__ == "__main__":
 
     # update DSI abstraction directly
     updatedFilePaths = []
-    wildfire_table = core.get_current_abstraction(table_name = table_name)
+    wildfire_table = core.get_current_abstraction(table_name)
     for url_image in wildfire_table['FILE']:
         image_name = url_image.rsplit('/', 1)[1]
-        filePath = imageFolderName + image_name
+        filePath = path_to_cinema_images + image_name
         updatedFilePaths.append(filePath)
-    wildfire_table['FILE'] = updatedFilePaths
+    wildfire_table['LOCAL_PATH'] = updatedFilePaths
     core.update_abstraction(table_name, wildfire_table)
 
     # export data with revised filepaths to CSV

@@ -8,7 +8,7 @@ import re
 import yaml
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
-from datetime import datetime
+import os
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -39,11 +39,15 @@ class Csv(FileReader):
     """
     def __init__(self, filenames, table_name = None, **kwargs):
         """
-        Initializes CSV Reader with user specified filenames and optional table_name.
+        Initializes the CSV Reader with user specified filenames and optional table_name.
 
-        `filenames`: Required input. List of CSV files, or just one CSV files to store in DSI. If a list, data in all files must be for the same table
+        `filenames` : str or list of str
+            Required. One or more CSV file paths to be loaded into DSI.
+            If multiple files are provided, all data must correspond to the same table.
 
-        `table_name`: default None. User can specify table name when loading CSV file. Otherwise DSI uses table_name = "Csv"
+        `table_name` : str, optional
+            Optional name to assign to the loaded table.
+            If not provided, DSI will default to using "Csv" as the table name.
         """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
@@ -62,7 +66,7 @@ class Csv(FileReader):
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
             except:
-                raise ValueError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
+                raise TypeError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
 
         table_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in table_data.items():  # replace NaNs with None
@@ -81,7 +85,6 @@ class Bueno(FileReader):
 
     Bueno outputs performance data in keyvalue pairs in a file. Keys and values are delimited by ``:``. Keyval pairs are delimited by ``\\n``.
     """
-
     def __init__(self, filenames, **kwargs) -> None:
         """
         `filenames`: one Bueno file or a list of Bueno files to be ingested
@@ -113,19 +116,24 @@ class Bueno(FileReader):
 
 class JSON(FileReader):
     """
-    A DSI Reader that captures generic JSON data. 
-    Assumes all key/value pairs are basic data formats, ie. string, int, float, not a nested dictionary or more
+    A DSI Reader for ingesting generic JSON data with flat key-value pairs.
+    
+    This reader assumes that all values are primitive data types (e.g., str, int, float),
+    and that there are no nested dictionaries, arrays, or complex structures.
 
-    The JSON data's keys are used as columns and values are rows
-   
+    The keys in the JSON object are treated as column names, and their corresponding values are interpreted as rows.
     """
     def __init__(self, filenames, table_name = None, **kwargs) -> None:
         """
-        Initializes generic JSON reader with user-specified filenames
+        Initializes the generic JSON reader with user-specified filenames
         
-        `filenames`: Required input. List of JSON files, or just one JSON files to store in DSI. If a list, data in all files must be for the same table
+        `filenames` : str or list of str
+            Required input. One or more JSON file paths to be loaded into DSI.
+            If multiple files are provided, all data must all correspond to the same table
 
-        `table_name`: default None. User can specify table name when loading JSON file. Otherwise DSI uses table_name = "JSON"
+        `table_name` : str, optional
+            Name to assign to the loaded table. If not provided, DSI defaults to using "JSON" 
+            as the table name.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -143,6 +151,8 @@ class JSON(FileReader):
             with open(filename, 'r') as fh:
                 file_content = json.load(fh)
                 for key, val in file_content.items():
+                    if not isinstance(val, (str, float, int)):
+                        return (TypeError, "General JSON reader cannot handle nested data, only flat JSON values.")
                     if key not in temp_dict:
                         temp_dict[key] = []
                     temp_dict[key].append(val)
@@ -156,18 +166,25 @@ class JSON(FileReader):
 
 class Schema(FileReader):
     """
-    DSI Reader that parses the schema of a data source to ingest in same workflow.
+    DSI Reader for parsing and ingesting a relational schema alongside its associated data.
 
-    Schema file input should be a JSON file that stores primary and foreign keys for all tables in the data source. 
-    Stores all relations in global dsi_relations table used for creating backends/writers
+    Schema file input should be a JSON file that defines primary and foreign key relationships between tables in a data source.
+    Parsed relationships are stored in the global `dsi_relations` table, which is used for creating backends and used by writers.
 
-    Users ingesting complex schemas should load this reader. View :ref:`schema_section` to see how a schema file should be structured
+    This reader is essential when working with complex, multi-table data structures. 
+    See :ref:`schema_section` to learn how a schema file should be structured
     """
     def __init__(self, filename, target_table_prefix = None, **kwargs):
         """
-        `filename`: file name of the json file to be ingested
+        Initializes the Schema reader with the specified schema file.
 
-        `target_table_prefix`: prefix to be added to every table name in the primary and foreign key list
+        `filename`: str
+            Path to the JSON file containing the schema to be ingested. This file should define
+            primary and foreign key relationships between tables.
+
+        `target_table_prefix` : str, optional
+            A prefix to prepend to every table name in the primary and foreign key lists.
+            Useful for avoiding naming conflicts in shared environments.
         """
         super().__init__(filename, **kwargs)
         self.schema_file = filename
@@ -176,7 +193,7 @@ class Schema(FileReader):
 
     def add_rows(self) -> None:
         """
-        Generates a dsi_relations OrderedDict to be added to the internal DSI abstraction. 
+        Generates a `dsi_relations` OrderedDict to be added to the internal DSI abstraction. 
 
         The Ordered Dict has 2 keys, primary key and foreign key, with their values a list of PK and FK tuples associating tables and columns 
         """
@@ -203,6 +220,7 @@ class Schema(FileReader):
                 if pk not in self.schema_data["dsi_relations"]["primary_key"]:
                     self.schema_data["dsi_relations"]["primary_key"].append(pk)
                     self.schema_data["dsi_relations"]["foreign_key"].append((None, None))
+            
             self.set_schema_2(self.schema_data)
 
 class YAML1(FileReader):
@@ -213,11 +231,18 @@ class YAML1(FileReader):
     """
     def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
         """
-        `filenames`: one yaml file or a list of yaml files to be ingested
+        Initializes the YAML1 reader with the specified YAML file(s)
 
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other yaml sources
+        `filenames` : str or list of str
+            One YAML file or a list of YAML files to be loaded into DSI.
 
-        `yamlSpace`: indent used in ingested yaml files - default 2 spaces but can change to the indentation used in input
+        `target_table_prefix`: str, optional
+            A prefix to be added to each table name created from the YAML data.
+            Useful for distinguishing between tables from other data sources.
+
+        `yamlSpace` : str, default='  '
+            The indentation used in the input YAML files. 
+            Defaults to two spaces, but can be customized to match the formatting in certain files.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -250,7 +275,18 @@ class YAML1(FileReader):
             
     def add_rows(self) -> None:
         """
-        Parses YAML data to create a nested Ordered Dict where each table is a key and its data as another Ordered Dict with keys as cols and vals as col data
+        Parses YAML data and constructs a nested OrderedDict to load into DSI.
+
+        The resulting structure has:
+
+            - Top-level keys as table names.
+            - Each value is an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_counter = 0        
         for filename in self.yaml_files:
@@ -297,6 +333,17 @@ class YAML1(FileReader):
         
         if len(self.yaml_data["dsi_units"]) == 0:
             del self.yaml_data["dsi_units"]
+        else:
+            dsi_unit_data = self.yaml_data["dsi_units"]
+            del self.yaml_data["dsi_units"]
+            new_unit_dict = OrderedDict([('table_name', []), ('column_name', []), ('unit', [])])
+            for table_name, unit_tuple in dsi_unit_data.items():
+                for col, unit in unit_tuple.items():
+                    new_unit_dict['table_name'].append(table_name)
+                    new_unit_dict['column_name'].append(col)
+                    new_unit_dict['unit'].append(unit)
+            self.yaml_data["dsi_units"] = new_unit_dict
+
         self.set_schema_2(self.yaml_data)
 
         # SAVE FOR READERS TO USE FOR PADDING MISMATCHED COLUMNS- YAML AND TOML USE THIS NOW
@@ -315,9 +362,12 @@ class TOML1(FileReader):
     """
     def __init__(self, filenames, target_table_prefix = None, **kwargs):
         """
-        `filenames`: one toml file or a list of toml files to be ingested
+        `filenames` : str or list of str
+            One TOML file or a list of TOML files to be loaded into DSI.
 
-        `target_table_prefix`: prefix to be added to every table created to differentiate between other toml sources
+        `target_table_prefix`: str, optional
+            A prefix to be added to each table name created from the TOML data.
+            Useful for distinguishing between tables from other data sources.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -329,7 +379,18 @@ class TOML1(FileReader):
 
     def add_rows(self) -> None:
         """
-        Parses TOML data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.
+        Parses TOML data and constructs a nested OrderedDict to load into DSI.
+
+        The resulting structure has:
+
+            - Top-level keys as table names.
+            - Each value is an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_counter = 0
         for filename in self.toml_files:
@@ -386,26 +447,47 @@ class TOML1(FileReader):
 
         if len(self.toml_data["dsi_units"]) == 0:
             del self.toml_data["dsi_units"]
+        else:
+            dsi_unit_data = self.toml_data["dsi_units"]
+            del self.toml_data["dsi_units"]
+            new_unit_dict = OrderedDict([('table_name', []), ('column_name', []), ('unit', [])])
+            for table_name, unit_tuple in dsi_unit_data.items():
+                for col, unit in unit_tuple.items():
+                    new_unit_dict['table_name'].append(table_name)
+                    new_unit_dict['column_name'].append(col)
+                    new_unit_dict['unit'].append(unit)
+            self.toml_data["dsi_units"] = new_unit_dict
+
         self.set_schema_2(self.toml_data)
 
 class Ensemble(FileReader):
     """
-    DSI Reader that ingests Ensemble data stored as a CSV
+    DSI Reader that loads ensemble simulation data stored in a CSV file.
 
-    Can be used for other cases if data is post-processed and running only once.
-    Can create a manual simulation table
+    Designed to handle simulation outputs where each row represents an individual simulation run. 
+    Specifically for single-run use cases when data is post-processed.
+
+    Automatically generates a simulation metadata table to accompany the data.
     """
     def __init__(self, filenames, table_name = None, sim_table = True, **kwargs):
         """
         Initializes Ensemble Reader with user specified parameters.
 
-        `filenames`: Required input -- Ensemble data files. All files must only store data for one table
+        `filenames` : str or list of str
+            Required input. One or more Ensemble data files in CSV format.
+            All files must correspond to the same table.
 
-        `table_name`: default None. User can specify table name when loading the Ensemble data.   
+        `table_name` : str, optional
+            Optional name to assign to the table when loading the Ensemble data.
+            If not provided, the default table name, 'Ensemble', will be used.
 
-        `sim_table`: default True. Set to False if DO NOT want to create a simulation table where each row of an input data table is a separate sim
+        `sim_table` : bool, default=True
+            If True, creates a simulation metadata table (`sim_table`) where each row 
+            in the input data table represents a separate simulation run.
 
-            - also creates new column in Ensemble data for each row to associate to a corresponding row/simulation in sim_table
+            - Adds a new column to the input data to associate each row with its corresponding entry in the simulation table.
+
+            If False, skips creation of the simulation table.
         """
         super().__init__(filenames, **kwargs)
         self.csv_data = OrderedDict()
@@ -418,9 +500,13 @@ class Ensemble(FileReader):
 
     def add_rows(self) -> None:
         """ 
-        Creates Ordered Dictionary for the Ensemble data. 
+        Creates an OrderedDict representation of the Ensemble data to load into DSI.
 
-        If sim_table = True, a sim_table Ordered Dict also created, and both are nested within a larger Ordered Dict.
+        When sim_table = True, a sim_table Ordered Dict is created alongside the Ensemble data table OrderedDict.
+        Both tables are nested within a larger OrderedDict.
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name is None:
             self.table_name = "Ensemble"
@@ -455,12 +541,162 @@ class Ensemble(FileReader):
        
         self.set_schema_2(self.csv_data)
 
+class Cloverleaf(FileReader):
+    """
+    DSI Reader that stores input and output Cloverleaf data from a directory for each simulation run
+    """
+    def __init__(self, folder_path, **kwargs):
+        """
+        `folder_path` : str
+            Filepath to the directory where the Cloverleaf data is stored. 
+            The directory should have a subfolder for each simulation run, each containing input and output data
+        """
+        if folder_path[-1] != '/':
+            self.folder_path = folder_path
+        else:
+            self.folder_path = folder_path[:-1]
+        self.cloverleaf_data = OrderedDict()
+
+    def check_type(self, text):
+        """
+        **Internal helper function, not used by DSI Users** 
+        
+        Function tests input text and returns a predicted compatible SQL Type
+
+        `text`: text string
+
+        `return`: string returned as int, float or still a string
+        """
+        try:
+            _ = int(text)
+            return int(text)
+        except ValueError:
+            try:
+                _ = float(text)
+                return float(text)
+            except ValueError:
+                return text
+            
+    def add_rows(self) -> None:
+        """
+        Flattens data from each simulation's input file as a row in the `input` table.
+        Flattens data from each simulation's output file as a row in the `output` table.
+        Creates a simulation table which is stores each simulation's number and execution datetime.
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
+        """
+        input_dict = OrderedDict({'sim_id': []})
+        output_dict = OrderedDict({'sim_id': []})
+        viz_dict = OrderedDict({'sim_id': [], 'image_filepath': []})
+        simulation_dict = OrderedDict({'sim_id': [], 'sim_datetime': []})
+
+        sim_num = 1
+        all_runs = sorted([f.name for f in os.scandir(self.folder_path) if f.is_dir()])
+        for run_name in all_runs:
+            input_file = f"{self.folder_path}/{run_name}/clover.in"
+            
+            input_dict["sim_id"].append(sim_num)
+            with open(input_file, 'r') as f:
+                input_lines = [line.strip() for line in f if line.strip()]
+
+            num_timesteps = 0
+            for line in input_lines:
+                if line.startswith("*"):
+                    continue
+                if "test_problem" in line:
+                    test_line = line.strip().lower().split()
+                    if test_line[0] not in input_dict.keys():
+                        input_dict[test_line[0]] = []
+                    input_dict[test_line[0]].append(self.check_type(test_line[1]))
+                elif '=' not in line:
+                    continue
+
+                if line.startswith("state 1"):
+                    prefix = "state1_"
+                    tokens = line.replace("state 1", "").strip().split()
+                elif line.startswith("state 2"):
+                    prefix = "state2_"
+                    tokens = line.replace("state 2", "").strip().split()
+                else:
+                    prefix = ""
+                    tokens = line.split()
+                
+                for token in tokens:
+                    if '=' in token:
+                        key, value = token.split('=', 1)
+                        full_key = prefix.lower() + key.lower()
+                        if full_key not in input_dict.keys():
+                            input_dict[full_key] = []
+                        input_dict[full_key].append(self.check_type(value))
+                        if full_key == "end_step":
+                            num_timesteps = self.check_type(value)
+            
+            output_file = f"{self.folder_path}/{run_name}/clover.out"
+            with open(output_file, 'r') as f:
+                output_lines = [line.strip() for line in f if line.strip()]
+            
+            for index, line in enumerate(output_lines):
+                if line[:6] != "Step  ":
+                    continue
+                output_dict["sim_id"].append(sim_num)
+
+                next_line = index
+                total_line = line.strip().split()
+                if total_line[1] == str(num_timesteps):
+                    next_line = index + 10
+                elif total_line[1][-1] == "0":
+                    next_line = index + 3
+                
+                wall_line = output_lines[next_line+1].strip().split()
+                wall_line[0] = f"{wall_line[0]}_{wall_line[1]}"
+                if next_line == index + 10:
+                    total_line.extend([wall_line[0], wall_line[2], "Average_time_per_cell", None, "Step_time_per_cell", None])
+                else:
+                    avg_line = output_lines[next_line+2].strip().split()
+                    avg_line[0] = f"{avg_line[0]}_{avg_line[1]}_{avg_line[2]}_{avg_line[3]}"
+                    step_t_line = output_lines[next_line+3].strip().split()
+                    step_t_line[0] = f"{step_t_line[0]}_{step_t_line[1]}_{step_t_line[2]}_{step_t_line[3]}"
+                    total_line.extend([wall_line[0], wall_line[2], avg_line[0], avg_line[4], step_t_line[0], step_t_line[4]])
+                for out_key, out_val in zip(total_line[::2], total_line[1::2]):
+                    if out_key == '1,':
+                        continue
+                    if out_key.lower() not in output_dict.keys():
+                        output_dict[out_key.lower()] = []
+                    if out_val is not None:
+                        output_dict[out_key.lower()].append(self.check_type(out_val))
+                    else:
+                        output_dict[out_key.lower()].append(out_val)
+
+            for filename in os.listdir(f"{self.folder_path}/{run_name}"):
+                if "vtk" in filename:
+                    viz_dict["sim_id"].append(sim_num)
+                    viz_dict["image_filepath"].append(f"{run_name}/{filename}")
+            viz_dict["image_filepath"] = sorted(viz_dict["image_filepath"])
+
+            simulation_dict["sim_id"].append(sim_num)
+            with open(f"{self.folder_path}/{run_name}/timestamp.txt", 'r') as f:
+                sim_line = [line.strip() for line in f if line.strip()]
+            simulation_dict['sim_datetime'].append(sim_line[0])
+
+            sim_num+=1
+
+        self.cloverleaf_data["input"] = input_dict
+        self.cloverleaf_data["output"] = output_dict
+        self.cloverleaf_data["simulation"] = simulation_dict
+        self.cloverleaf_data["viz_files"] = viz_dict
+        self.set_schema_2(self.cloverleaf_data)
+    
 class Oceans11Datacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
+    Input datacard should follow template in `examples/test/template_dc_oceans11.yml`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of YAML data card files to ingest that adhere to the Oceans 11 LANL Data Server metadata standard
+        `filenames` : str or list of str
+            File name(s) of YAML data card files to ingest. Each file must adhere to the
+            Oceans 11 LANL Data Server metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -471,6 +707,10 @@ class Oceans11Datacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `oceans11_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
@@ -506,10 +746,14 @@ class Oceans11Datacard(FileReader):
 
 class DublinCoreDatacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `dublin_core_datacard` table.
+    Input datacard should follow template in `examples/test/template_dc_dublin_core.xml`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of XML data card files to ingest that adhere to the Dublin Core metadata standard
+        `filenames` : str or list of str
+            File name(s) of XML data card files to ingest. Each file must adhere to the
+            Dublin Core metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -520,6 +764,10 @@ class DublinCoreDatacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `dublin_core_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         import xmltodict
         temp_data = OrderedDict()
@@ -547,10 +795,14 @@ class DublinCoreDatacard(FileReader):
 
 class SchemaOrgDatacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `schema_org_datacard` table.
+    Input datacard should follow template in `examples/test/template_dc_schema_org.json`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of JSON data card files to ingest that adhere to the Schema.org metadata standard
+        `filenames` : str or list of str
+            File name(s) of JSON data card files to ingest. Each file must adhere to the
+            Schema.org metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -561,6 +813,10 @@ class SchemaOrgDatacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `schema_org_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
@@ -573,7 +829,7 @@ class SchemaOrgDatacard(FileReader):
                     field_names.append(element)
                     continue
                 elif element == "@type" and val.lower() != "dataset":
-                    return (ValueError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
+                    return (KeyError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
                 if element not in temp_data.keys():
                     temp_data[element] = [val]
                 else:
@@ -592,10 +848,14 @@ class SchemaOrgDatacard(FileReader):
 
 class GoogleDatacard(FileReader):
     """
+    DSI Reader that stores a dataset's data card as a row in the `google_datacard` table.
+    Input datacard should follow template in `examples/test/template_dc_google.yml`
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames`: file name(s) of YAML data card files to ingest that adhere to the Google Data Cards Playbook metadata standard
+        `filenames` : str or list of str
+            File name(s) of YAML data card files to ingest. 
+            Each file must adhere to the Google Data Cards Playbook metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -606,6 +866,10 @@ class GoogleDatacard(FileReader):
 
     def add_rows(self) -> None:
         """
+        Flattens data in the input data card as a row in the `google_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
 
@@ -614,7 +878,7 @@ class GoogleDatacard(FileReader):
                 data = yaml.safe_load(yaml_file)
                 
             if not set(data.keys()).issubset(["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
+                return (KeyError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
             
             field_names = []
             sampling_fields = []
@@ -639,17 +903,16 @@ class GoogleDatacard(FileReader):
                                               'dataset_owner3', 'dataset_owners_affiliation', 'dataset_owners_contact', 'funding_institution', 
                                               'funding_summary', 'data_subjects', 'data_sensitivity', 'version', 'maintenance_status', 
                                               'last_updated', 'release_date', 'motivation', 'dataset_uses', 'citation_guidelines', 
-                                              'citation_bibtex', 'collection_methods_used', 'collection_type', 'source', 'platform', 
-                                              'dates_of_collection', 'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
+                                              'citation_bibtex', 'collection_methods_used', 'source', 'platform', 'dates_of_collection',
+                                              'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
             
             if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields in 'sampling_methods' match the template")
+                return (KeyError, f"Error in reading {filename} data card. Please ensure all fields in 'sampling_methods' match the template")
             
             if not set(ml_fields).issubset(['ml_applications', 'ml_model_name', 'evaluation_accuracy', 'evaluation_precision', 
                                                   'evaluation_recall', 'evaluation_performance_metric']):
-                return (ValueError, f"Error in reading {filename} data card. \
-                        Please ensure all fields in 'known_applications_and_benchmarks' match the template")
+                return (KeyError, f"Error reading {filename} data card. Please ensure all fields in 'known_applications_and_benchmarks' match the template")
         self.datacard_data["google_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
