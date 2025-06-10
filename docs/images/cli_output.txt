@@ -4,26 +4,34 @@ DSI version 1.1.1
 Enter "help" for usage hints.
 
 dsi> help
-display <table name> [-n num_rows] [-e filename]  Displays the contents of that table, num rows to display is 
-                                                      optional, and it can be exported to a csv/parquet file
-exit                                              Exit the DSI Command Line Interface (CLI)
-draw [-f filename]                                Draws an ER Diagram of all tables in the current DSI database
-find <var>                                        Search for a variable in the dataset
-help                                              Shows this help
-list                                              Lists the tables in the current DSI databse
-read <filename> [-t table_name]                   Reads in a filename/url to a DSI database. optional
-                                                      table name argument if input file is only one table
-plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument
-query <SQL_query> [-n num_rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,
-                                                      and exports output to a csv/parquet file
-write <filename>                                  Writes data in DSI to a permanent database location
-summary [-t table] [-n num_rows]                  Get a summary of the database, or just a table, and optionally 
-                                                      specify number of data rows to display
-ls                                                Lists all files in current directory or a specified path
-cd <path>                                         Changes the working directory within the CLI environment
+display <table_name> [-n num_rows] [-e filename] Displays the contents of a table. Optionally
+                                                  limit displayed rows and export to
+                                                  CSV/Parquet
+draw [-f filename]                               Draws an ER diagram of all tables in the
+                                                  current DSI database
+exit                                             Exits the DSI Command Line Interface (CLI)
+find <variable>                                  Searches for a variable in DSI
+help                                             Shows this help message.
+list                                             Lists all tables in the current DSI database
+plot_table <table_name> [-f filename]            Plots numerical data from a table to an
+                                                  optional file name argument
+query <SQL_query> [-n num_rows] [-e filename]    Prints a SQL query result. Optionally limit
+                                                  printed rows and export to CSV/Parquet.
+read <filename> [-t table_name]                  Reads a file or URL into the DSI database.
+                                                  Optionally set table name.
+summary [-t table_name] [-n num_rows]            Displays a summary of the database or a
+                                                  specific table. Optionally limit rows to
+                                                  display.
+write <filename>                                 Writes data in DSI database to a permanent
+                                                  location.
+ls                                               Lists all files in the current or specified
+                                                  directory.
+cd <path>                                        Changes the working directory within the CLI
+                                                  environment.
 
 dsi> cd test/
 Changed directory to /Users/viyer/dsi/examples/test
+
 dsi> read student_test1.yml
 Loaded student_test1.yml into tables: math, address, physics
 Database now has 4 tables
