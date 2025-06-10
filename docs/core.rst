@@ -63,7 +63,6 @@ Examples below display various ways users can incorporate DSI into their data sc
 They are located in ``examples/developer/`` and must be run from that directory.
 
 Most of them either load or refer to data from ``examples/clover3d/``.
-If the directory does not exist, users must first call ``core.Sync().move()`` to ensure the data is stored locally for these examples.
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
