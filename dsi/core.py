@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 import sys
 import pandas as pd
+import csv
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
@@ -1052,6 +1053,9 @@ class Sync():
     remote_location = []
     local_location = []
 
+    file_list = []
+    rfile_list = []
+
     def __init__(self, project_name="test"):
         # Helper function to get parent module names.
         #self.remote_location = {}
@@ -1063,13 +1067,6 @@ class Sync():
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        True
-
-    def copy(self, local_loc, remote_loc, isVerbose=False):
-        """
-        Helper function to stage location and get filesystem information, and copy
-        data over using a preferred API
-        """
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
         # Data Crawl and gather metadata of local location
@@ -1079,16 +1076,45 @@ class Sync():
         st_list = []
         rfile_list = []
 
-        # Do a quick validation of group permissions
+        # Do a quick validation of group access permissions
+        # While crawling os.stat info
+        # Create ordered dictionary
+        st_dict = OrderedDict()
+        st_dict['file_origin'] = []
+        st_dict['size']= []
+        st_dict['modified_time'] = []
+        st_dict['created_time'] = []
+        st_dict['accessed_time'] = []
+        st_dict['mode'] = []
+        st_dict['inode'] = []
+        st_dict['device'] = []
+        st_dict['n_links'] = []
+        st_dict['uid'] = []
+        st_dict['gid'] = []
+        st_dict['file_remote'] = []
+
         for file in file_list:
-            file = os.path.relpath(file,local_loc) #rel path
+            rel_file = os.path.relpath(file,local_loc) #rel path
             #utils.isgroupreadable(file) # quick test
-            filepath = os.path.join(local_loc, file)
+            filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
-            rfilepath = os.path.join(remote_loc,self.project_name, file)
+            rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
             rfile_list.append(rfilepath)
+            st_dict['file_origin'].append(rel_file)
+            st_dict['size'].append(st.st_size)
+            st_dict['modified_time'].append(st.st_mtime)
+            st_dict['created_time'].append(st.st_ctime)
+            st_dict['accessed_time'].append(st.st_atime)
+            st_dict['mode'].append(st.st_mode)
+            st_dict['inode'].append(st.st_ino)
+            st_dict['device'].append(st.st_dev)
+            st_dict['n_links'].append(st.st_nlink)
+            st_dict['uid'].append(st.st_uid)
+            st_dict['gid'].append(st.st_gid)
+            st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
+
 
         # Test remote location validity, try to check access
         # Future: iterate through remote/server list here, for now:::
@@ -1096,84 +1122,96 @@ class Sync():
         for remote in remote_list:
             try: # Try for file permissions
                 if os.path.exists(remote): # Check if exists
-                    print(f"The directory '{remote}' already exists locally.")
+                    print(f"The directory '{remote}' already exists remotely.")
                 else:
                     os.makedirs(remote) # Create it
-                    print(f"The directory '{remote}' has been created locally.")
+                    print(f"The directory '{remote}' has been created remotely.")
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
                 raise
 
-        # Try to open or create a local database to store fs info before copy
+        
+        # Try to open existing local database to store filesystem info before copy
         # Open and validate local DSI data store
+        t = Terminal()
+
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             f = local_loc+"/"+self.project_name+".db"
             print("db: ", f)
-            store = Sqlite( f )
+            t.load_module('backend','Sqlite','back-write', filename=f)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             raise
 
-        # Create new filesystem table with origin and remote locations
-        data_type = DataType()
-        data_type.name = "filesystem"
-        data_type.properties["file_origin"] = Sqlite.STRING
-        data_type.properties["st_mode"] = Sqlite.DOUBLE
-        data_type.properties["st_ino"] = Sqlite.DOUBLE
-        data_type.properties["st_dev"] = Sqlite.DOUBLE
-        data_type.properties["st_nlink"] = Sqlite.DOUBLE
-        data_type.properties["st_uid"] = Sqlite.DOUBLE
-        data_type.properties["st_gid"] = Sqlite.DOUBLE
-        data_type.properties["st_size"] = Sqlite.DOUBLE
-        data_type.properties["st_atime"] = Sqlite.DOUBLE
-        data_type.properties["st_mtime"] = Sqlite.DOUBLE
-        data_type.properties["st_ctime"] = Sqlite.DOUBLE
-        data_type.properties["file_remote"] = Sqlite.STRING
-        #print(data_type.properties)
-        store.put_artifact_type(data_type, isVerbose)
+        # See if filesystem exists
+        fs_t = t.find_table("filesystem")
+        
+        print (fs_t)
 
-        artifact = Artifact()
-        artifact.name = "filesystem"
-        for file,st,file_remote in zip(file_list,st_list,rfile_list):
-            artifact.properties["file_origin"] = str(file)
-            artifact.properties["st_mode"] = st.st_mode
-            artifact.properties["st_ino"] = st.st_ino
-            artifact.properties["st_dev"] = st.st_dev
-            artifact.properties["st_nlink"] = st.st_nlink
-            artifact.properties["st_uid"] = st.st_uid
-            artifact.properties["st_gid"] = st.st_gid
-            artifact.properties["st_size"] = st.st_size
-            artifact.properties["st_atime"] = st.st_atime
-            artifact.properties["st_mtime"] = st.st_mtime
-            artifact.properties["st_ctime"] = st.st_ctime
-            artifact.properties["file_remote"] = str(file_remote)
-            #print(artifact.properties)
-            store.put_artifacts_lgcy(artifact, isVerbose)
+        if fs_t == None:
+            # Create new filesystem collection with origin and remote locations
+            # Stage data for ingest
+            # Transpose the OrderedDict to a list of row dictionaries
+            num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
+            rows = []
 
-        store.close()
+            for i in range(num_rows):
+                row = {col: values[i] for col, values in st_dict.items()}
+                rows.append(row)
 
-        # Data movement
-        # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
-        for file,file_remote in zip(file_list,rfile_list):
-            abspath = os.path.dirname(os.path.abspath(file_remote))
-            if not os.path.exists(abspath):
-                if isVerbose:
-                    print( " mkdir " + abspath)
-                path = Path(abspath)
-                path.mkdir(parents=True)
-
-            if isVerbose:
-                print( " cp " + file + " " + file_remote)
-            shutil.copyfile(file , file_remote)
+            # Write to CSV
+            output_file = '.fs.csv'
+            with open(output_file, mode='w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
+                writer.writeheader()
+                writer.writerows(rows)
             
+            # Add filesystem table
+            t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
+            t.artifact_handler(interaction_type='ingest')
 
-        # Database movement
-        if isVerbose:
-            print( " cp " + os.path.join(local_loc, str(self.project_name+".db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
-        shutil.copyfile(os.path.join(local_loc, str(self.project_name+".db") ), os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+            self.file_list = file_list
+            self.rfile_list = rfile_list
 
-        print( " Data Copy Complete! ")
+    def copy(self, tool="copy", isVerbose=False):
+        """
+        Helper function to perform the 
+        data copy over using a preferred API
+        """
+        
+        # Unix Copy
+        if tool == "copy":
+            # Data movement
+            # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
+            for file,file_remote in zip(self.file_list,self.rfile_list):
+                abspath = os.path.dirname(os.path.abspath(file_remote))
+                if not os.path.exists(abspath):
+                    if isVerbose:
+                        print( " mkdir " + abspath)
+                    path = Path(abspath)
+                    path.mkdir(parents=True)
+
+                if isVerbose:
+                    print( " cp " + file + " " + file_remote)
+                shutil.copyfile(file , file_remote)
+                
+
+            # Database movement
+            if isVerbose:
+                print( " cp " + os.path.join(local_loc, str(self.project_name+".db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+            shutil.copyfile(os.path.join(local_loc, str(self.project_name+".db") ), os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+
+            print( " Data Copy Complete! ")
+        elif tool == "scp":
+            True
+        elif tool == "ftp":
+            True
+        elif tool == "git":
+            True
+        else:
+            raise TypeError(f"Data movement format not supported:, Type: {tool}")
+
 
 
     def dircrawl(self,filepath):
