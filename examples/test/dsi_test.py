@@ -34,7 +34,7 @@ test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAM
 
 ''' Backend data interactions: query()/get_table() and find(). Manipulating their outputs to update() the backend '''
 # test.query("SELECT * FROM math")                                # print output
-# test.get_table("math")                                          # print output
+test.get_table("math")                                          # print output
 # query_df = test.query("SELECT * FROM math", collection=True)    # return output
 # query_df = test.get_table("math", collection=True)              # return output
 # test.display("math")
@@ -47,7 +47,7 @@ test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAM
 # test.update(query_df)
 # test.display("math")
 
-# test.find(query="a")                                # print output
+test.find(query="a")                                # print output
 # find_list = test.find(query="a", collection=True)   # return output
 # for obj in find_list:
 #     test.display(table_name=obj["dsi_table_name"][0])

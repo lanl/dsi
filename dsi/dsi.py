@@ -34,8 +34,11 @@ class DSI():
         """
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
-        self.schema_read = False
         self.t.user_wrapper = True
+        self.backend_name = None
+        self.schema_read = False
+        self.schema_tables = set()
+        self.loaded_tables = set()
 
         if filename == ".temp.db" and os.path.exists(filename):
             os.remove(filename)
@@ -54,17 +57,19 @@ class DSI():
             if backend_name.lower() == 'sqlite':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','Sqlite','back-write', filename=filename)
+                    self.backend_name = "sqlite"
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','DuckDB','back-write', filename=filename)
+                    self.backend_name = "duckdb"
             else:
-                print("Please check the 'backend_name' argument as that is not supported by DSI now")
+                print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print(f"Eligible backend_names are: Sqlite, DuckDB")
         except Exception as e:
             sys.exit(f"backend ERROR: {e}")
 
         if filename != ".temp.db":
-            print(f"Created an instance of DSI with the {backend_name} backend, {filename}")
+            print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
         else:
             print("Created an instance of DSI")
 
@@ -94,6 +99,9 @@ class DSI():
         with redirect_stdout(fnull):
             self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
         self.schema_read = True
+        pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
+        fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
+        self.schema_tables = pk_tables.union(fk_tables)
         print(f"Successfully loaded the schema file, {filename}")
 
     def list_readers(self):
@@ -183,28 +191,45 @@ class DSI():
             elg = "CSV, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard"
             sys.exit(f"Eligible readers are: {elg}")
 
+        table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
-            pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
-            fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
-            all_tables = pk_tables.union(fk_tables)
-            if not bool(all_tables & set(self.t.active_metadata.keys())): # at least one table from schema in first read()
-                sys.exit("read() ERROR: Users must load associated data for a schema immediately after loading the complex schema.")
-            # if not all_tables.issubset(set(self.t.active_metadata.keys())): # all tables in schema must be in first read()
-            #     sys.exit("read() ERROR: Users must load associated data for a schema immediately after loading the complex schema.")
-            self.schema_read = False
+            overlap_tables = self.schema_tables & set(self.t.active_metadata.keys())
+            if not overlap_tables: # at least one table from schema in the first read()
+                sys.exit("read() ERROR: Users must load all associated data for a schema after loading a complex schema.")
+            self.loaded_tables.update(overlap_tables)
+            
+            if self.backend_name == "sqlite":
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    sys.exit(f"read() ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
 
-        try:
-            self.t.artifact_handler(interaction_type='ingest')
-        except Exception as e:
-            sys.exit(f"read() ERROR: {e}")
+                # if self.loaded_tables == self.schema_tables:
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
 
-        table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
+            elif self.backend_name == "duckdb" and self.loaded_tables == self.schema_tables:
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    sys.exit(f"read() ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
+        else:
+            try:
+                self.t.artifact_handler(interaction_type='ingest')
+            except Exception as e:
+                sys.exit(f"read() ERROR: {e}")
+            self.t.active_metadata = OrderedDict()
+
         if len(table_keys) > 1:
             print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
         else:
             print(f"Loaded {filenames} into the table {table_keys[0]}")
-
-        self.t.active_metadata = OrderedDict()
 
     def query(self, statement, collection = False):
         """
@@ -221,7 +246,7 @@ class DSI():
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot query() until associated data is loaded immediately after the complex schema")
+            sys.exit("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         
         try:
             df = self.t.artifact_handler(interaction_type='query', query=statement)
@@ -256,7 +281,7 @@ class DSI():
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot get a table of data until associated data is loaded immediately after the complex schema")
+            sys.exit("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         
         try:
             df = self.t.get_table(table_name)
@@ -289,7 +314,7 @@ class DSI():
         `return` : If there are no matches found, then nothing is returned or printed
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot find() until associated data is loaded immediately after the complex schema")
+            sys.exit("ERROR: Cannot find() until all associated data is loaded after a complex schema")
         if isinstance(query, str): 
             print(f"Finding all instances of '{query}' in the active DSI backend")
         else:
@@ -352,7 +377,7 @@ class DSI():
         - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot update() until associated data is loaded immediately after the complex schema")
+            sys.exit("ERROR: Cannot update() until all associated data is loaded after a complex schema")
         print("Updating the active DSI backend with the input collection of data")
 
         if isinstance(collection, pd.DataFrame) and 'row_num' in collection.attrs:
@@ -470,7 +495,7 @@ class DSI():
             Required when using "Table_Plot" or "Csv_Writer" to specify which table to export.
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot write() until associated data is loaded immediately after the complex schema")
+            sys.exit("ERROR: Cannot write() until all associated data is loaded after a complex schema")
 
         try:        
             self.t.artifact_handler(interaction_type='process')
@@ -503,15 +528,19 @@ class DSI():
             sys.exit(f"write() ERROR: {e}")
 
         self.t.active_metadata = OrderedDict()
-        print(f"Successfully written to the output file {filename}")
+        print(f"Successfully wrote to the output file {filename}")
     
     def list(self):
         """
         Prints the names and dimensions (rows x columns) of all tables in the first active backend
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot call list() until associated data is loaded immediately after the complex schema")
-        self.t.list()
+            sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+        try:
+            self.t.list()
+        except Exception as e:
+            sys.exit(f"list() ERROR: {e}")
+        
 
     def summary(self, table_name = None, num_rows = 0):
         """
@@ -528,16 +557,22 @@ class DSI():
             If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot call summary() until associated data is loaded immediately after the complex schema")
-        self.t.summary(table_name, num_rows)
+            sys.exit("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
+        try:
+            self.t.summary(table_name, num_rows)
+        except Exception as e:
+            sys.exit(f"display() ERROR: {e}")
     
     def num_tables(self):
         """
         Prints the number of tables in the first activated backend
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot call num_tables() until associated data is loaded immediately after the complex schema")
-        self.t.num_tables()
+            sys.exit("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
+        try:
+            self.t.num_tables()
+        except Exception as e:
+            sys.exit(f"num_tables() ERROR: {e}")
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
@@ -555,11 +590,14 @@ class DSI():
             If None (default), all columns are displayed.
         """
         if self.schema_read == True:
-            sys.exit("ERROR: Cannot display() until associated data is loaded immediately after the complex schema")
+            sys.exit("ERROR: Cannot display() until all associated data is loaded after a complex schema")
         if isinstance(num_rows, list):
             display_cols = num_rows
             num_rows = 25
-        self.t.display(table_name, num_rows, display_cols)
+        try:
+            self.t.display(table_name, num_rows, display_cols)
+        except Exception as e:
+            sys.exit(f"display() ERROR: {e}")
 
     def close(self):
         """

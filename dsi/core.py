@@ -82,7 +82,9 @@ class Terminal():
 
         self.runTable = runTable
         self.backup_db = backup_db
+
         self.user_wrapper = False
+        self.new_tables = None
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug
@@ -198,6 +200,7 @@ class Terminal():
                     if tester == 1:
                         sys.settrace(None) # ends trace to prevent large overhead
                     
+                    self.new_tables = obj.output_collector.keys()
                     for table_name, table_metadata in obj.output_collector.items():
                         if self.runTable == True and table_name == "runTable":
                             if self.debug_level != 0:
@@ -508,8 +511,8 @@ class Terminal():
                 operation_success = True
             else: #backend is empty - cannot query
                 if self.debug_level != 0:
-                    self.logger.error("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
-                raise RuntimeError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
+                    self.logger.error("Need to ingest data into first loaded backend before querying data from it")
+                raise RuntimeError("Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
             if self.valid_backend(first_backend, parent_backend):
@@ -524,8 +527,8 @@ class Terminal():
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
-                    self.logger.error("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
-                raise RuntimeError("Error in notebook artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
+                    self.logger.error("Need to ingest data into first loaded backend before generating a Python notebook")
+                raise RuntimeError("Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
         # only processes data from first backend for now - TODO process data from all active backends later
         elif interaction_type in ["process", "read"]:
@@ -543,8 +546,8 @@ class Terminal():
                 operation_success = True
             else: #backend is empty - cannot process data
                 if self.debug_level != 0:
-                    self.logger.error("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
-                raise RuntimeError("Error in process artifact handler: First loaded backend needs to have data to be able to process data to DSI")
+                    self.logger.error("First loaded backend needs to have data to be able to process data to DSI")
+                raise RuntimeError("First loaded backend needs to have data to be able to process data to DSI")
 
         if operation_success:
             end = datetime.now()
@@ -562,6 +565,40 @@ class Terminal():
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)    
     
+    def get_table(self, table_name, dict_return = False):
+        """
+        Returns all data from a specified table in the first loaded backend.
+
+        `table_name` : str
+            Name of the table to retrieve data from.
+
+        `dict_return`: bool, optional, default=False.
+            If True, returns the data as an OrderedDict.
+            If False (default), returns the data as a pandas DataFrame.
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to get data from a specified table')
+            raise NotImplementedError('Need to load a valid backend to be able to get data from a specified table')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to get a table")
+            raise RuntimeError("First loaded backend needs to have data to be able to get a table")
+        start = datetime.now()
+
+        output = backend.get_table(table_name, dict_return)
+        if output is not None and isinstance(output, tuple):
+            raise output[0](output[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
+            return output
+
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
@@ -674,8 +711,8 @@ class Terminal():
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
-            raise RuntimeError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
+                self.logger.error("First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_cell(query_object, row)
         return self.find_helper(query_object, return_object, start, "cell ")
@@ -704,6 +741,41 @@ class Terminal():
                 self.logger.info(f"Runtime: {end-start}")
         return return_object
     
+    def overwrite_table(self, table_name, collection):
+        """
+        Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
+
+        If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
+        **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
+
+        `table_name` : str or list
+            - If str, name of the table to overwrite in the backend.
+            - If list, list of all tables to overwrite in the backend
+
+        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+            - If one item, a DataFrame containing the updated data will be written to the table.
+            - If a list, all DataFrames with updated data will be written to their own table
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to overwrite a table')
+            raise NotImplementedError('Need to load a valid backend to be able to overwrite a table')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to overwrite its data")
+        start = datetime.now()
+
+        errorStmt = backend.overwrite_table(table_name, collection)
+        if errorStmt is not None and isinstance(errorStmt, tuple):
+            raise errorStmt[0](errorStmt[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+    
     def list(self):
         """
         Prints a list of all tables and their dimensions in the first loaded backend
@@ -716,8 +788,8 @@ class Terminal():
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
-            raise RuntimeError("Error in list tables function: First loaded backend needs to have data to be able to list data from it")
+                self.logger.error("First loaded backend needs to have data to be able to list its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to list its datd")
         start = datetime.now()
         
         table_list = backend.list()
@@ -753,8 +825,8 @@ class Terminal():
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
-            raise RuntimeError("Error in summary function: First loaded backend needs to have data to be able to summarize data from it")
+                self.logger.error("First loaded backend needs to have data to be able to summarize its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
         start = datetime.now()
 
         backend.summary(table_name, num_rows)
@@ -775,8 +847,8 @@ class Terminal():
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
-            raise RuntimeError("Error in num tables function: First loaded backend needs to have data to be able to get num tables from it")
+                self.logger.error("First loaded backend needs to have data to be able to get its number of tables")
+            raise RuntimeError("First loaded backend needs to have data to be able to get its number of tables")
         start = datetime.now()
 
         backend.num_tables()
@@ -808,8 +880,8 @@ class Terminal():
         parent_backend = backend.__class__.__bases__[0].__name__
         if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in display function: First loaded backend needs to have data to be able to display data from it")
-            raise RuntimeError("Error in display function: First loaded backend needs to have data to be able to display data from it")
+                self.logger.error("First loaded backend needs to have data to be able to display its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to display its data")
         start = datetime.now()
 
         errorStmt = backend.display(table_name, num_rows, display_cols)
@@ -821,82 +893,13 @@ class Terminal():
             self.logger.info(f"Runtime: {end-start}")
         if errorStmt is not None and isinstance(errorStmt, pd.DataFrame):
             return errorStmt
-
-    def overwrite_table(self, table_name, collection):
-        """
-        Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
-
-        If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
-        **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
-
-        `table_name` : str or list
-            - If str, name of the table to overwrite in the backend.
-            - If list, list of all tables to overwrite in the backend
-
-        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
-            - If one item, a DataFrame containing the updated data will be written to the table.
-            - If a list, all DataFrames with updated data will be written to their own table
-        """
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend to be able to overwrite a table')
-            raise NotImplementedError('Need to load a valid backend to be able to overwrite a table')
-        backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
-            if self.debug_level != 0:
-                self.logger.error("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
-            raise RuntimeError("Error in overwrite_table function: First loaded backend needs to have data to be able to overwrite its data")
-        start = datetime.now()
-
-        errorStmt = backend.overwrite_table(table_name, collection)
-        if errorStmt is not None and isinstance(errorStmt, tuple):
-            raise errorStmt[0](errorStmt[1])
-        
-        end = datetime.now()
-        if self.debug_level != 0:
-            self.logger.info(f"Runtime: {end-start}")
-
-    def get_table(self, table_name, dict_return = False):
-        """
-        Returns all data from a specified table in the first loaded backend.
-
-        `table_name` : str
-            Name of the table to retrieve data from.
-
-        `dict_return`: bool, optional, default=False.
-            If True, returns the data as an OrderedDict.
-            If False (default), returns the data as a pandas DataFrame.
-        """
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend to be able to return data from a specified table')
-            raise NotImplementedError('Need to load a valid backend to be able to return data from a specified table')
-        backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
-            if self.debug_level != 0:
-                self.logger.error("Error in get_table function: First loaded backend needs to have data to be able to return a table")
-            raise RuntimeError("Error in get_table function: First loaded backend needs to have data to be able to return a table")
-        start = datetime.now()
-
-        output = backend.get_table(table_name, dict_return)
-        if output is not None and isinstance(output, tuple):
-            raise output[0](output[1])
-        
-        end = datetime.now()
-        if self.debug_level != 0:
-            self.logger.info(f"Runtime: {end-start}")
-
-        if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
-            return output    
     
     def get_table_names(self, query):
         """
         Extracts and returns all table names referenced in a given query.
 
         `query` : str
-            A query string written in a database language (typically SQL in DSI).
+            A query string written in a database language (typically SQL).
         """
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:

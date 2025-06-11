@@ -228,7 +228,7 @@ def test_error_schema_sqlite_backend():
         test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
         assert False
     except SystemExit as e:
-        expected = "read() ERROR: Users must load associated data for a schema immediately after loading the complex schema."
+        expected = "read() ERROR: Users must load all associated data for a schema after loading a complex schema."
         assert str(e) == expected
 
     try:
@@ -236,7 +236,7 @@ def test_error_schema_sqlite_backend():
         test.query("SELECT * FROM math") # Querying data but need to load in associated data after loading in schema
         assert False
     except SystemExit as e:
-        expected = "ERROR: Cannot query() until associated data is loaded immediately after the complex schema"
+        expected = "ERROR: Cannot query() until all associated data is loaded after a complex schema"
         assert str(e) == expected
 
 def test_query_update_schema_sqlite_backend():
