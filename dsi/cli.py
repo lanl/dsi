@@ -6,7 +6,7 @@ import os
 import shutil
 import pandas as pd
 from collections import OrderedDict
-import sys
+import textwrap
 from contextlib import redirect_stdout
 
 from dsi.core import Terminal
@@ -85,23 +85,42 @@ class DSI_cli:
     
 
     def help_fn(self, args):
-        print("display <table name> [-n num_rows] [-e filename]  Displays the contents of that table, num rows to display is ")
-        print("                                                      optional, and it can be exported to a csv/parquet file")
-        print("exit                                              Exit the DSI Command Line Interface (CLI)")
-        print("draw [-f filename]                                Draws an ER Diagram of all tables in the current DSI database")
-        print("find <var>                                        Search for a variable in the dataset")
-        print("help                                              Shows this help")
-        print("list                                              Lists the tables in the current DSI databse")
-        print("read <filename> [-t table_name]                   Reads in a filename/url to a DSI database. optional")
-        print("                                                      table name argument if input file is only one table")
-        print("plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument")
-        print("query <SQL_query> [-n num_rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,")
-        print("                                                      and exports output to a csv/parquet file")
-        print("write <filename>                                  Writes data in DSI to a permanent database location")
-        print("summary [-t table] [-n num_rows]                  Get a summary of the database, or just a table, and optionally ")
-        print("                                                      specify number of data rows to display")
-        print("ls                                                Lists all files in current directory or a specified path")
-        print("cd <path>                                         Changes the working directory within the CLI environment")
+        commands = [
+            ("display <table_name> [-n num_rows] [-e filename]",
+            "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
+            ("draw [-f filename]",
+            "Draws an ER diagram of all tables in the current DSI database"),
+            ("exit",
+            "Exits the DSI Command Line Interface (CLI)"),
+            ("find <variable>",
+            "Searches for a variable in DSI"),
+            ("help",
+            "Shows this help message."),
+            ("list",
+            "Lists all tables in the current DSI database"),
+            ("plot_table <table_name> [-f filename]",
+            "Plots numerical data from a table to an optional file name argument"),
+            ("query <SQL_query> [-n num_rows] [-e filename]",
+            "Prints a SQL query result. Optionally limit printed rows and export to CSV/Parquet."),
+            ("read <filename> [-t table_name]",
+            "Reads a file or URL into the DSI database. Optionally set table name."),
+            ("summary [-t table_name] [-n num_rows]",
+            "Summary of the database or a specific table. Optionally view N rows of the table(s)"),
+            ("write <filename>",
+            "Writes data in DSI database to a permanent location."),
+            ("ls",
+            "Lists all files in the current or specified directory."),
+            ("cd <path>",
+            "Changes the working directory within the CLI environment.")
+        ]
+
+        terminal_width = shutil.get_terminal_size().columns
+        for cmd, desc in commands:
+            print(textwrap.fill(
+                f"{cmd:48} {desc}",
+                width=terminal_width,
+                subsequent_indent=' ' * 50  # aligns wrapped lines under the description
+            ))
         print()
 
     def cd(self, args):
@@ -117,6 +136,7 @@ class DSI_cli:
             print(f"Changed directory to {os.getcwd()}")
         else:
             print(f"{path} is not a directory.")
+        print()
 
     def clear(self, args):
         '''
@@ -128,7 +148,7 @@ class DSI_cli:
     def get_display_parser(self):
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('table_name', help='Table to display')
-        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows  for each table')
+        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
         parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
 
@@ -156,7 +176,7 @@ class DSI_cli:
     
     def get_draw_parser(self):
         parser = argparse.ArgumentParser(prog='draw')
-        parser.add_argument('-f', '--filename', type=str, required=False, help='Show only this table')
+        parser.add_argument('-f', '--filename', type=str, required=False, help='ER Diagram filename')
         return parser
     
     def draw_schema(self, args):
@@ -270,21 +290,20 @@ class DSI_cli:
         Lists the tables in the database
         '''
         self.t.list()
-    
 
-    def get_load_parser(self):
+    def get_read_parser(self):
         parser = argparse.ArgumentParser(prog='read')
-        parser.add_argument('filename', help='File to load ito DSI')
-        parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name of csv or parquet file')
+        parser.add_argument('filename', help='File to read into DSI')
+        parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name to store data into')
         return parser
     
-    def load(self, args):
+    def read(self, args):
         '''
-        Loads data to into a DSI database or loads a DSI database
+        Reads data file or a database into DSI
 
         Args:
-            dbfile (obj): name of the file or database to load 
-            table_name (str): name of the table to load the data to for CSV and parquet
+            dbfile (obj): name of the file or database to read 
+            table_name (str): name of the table to read the data into
         '''
         table_name = ""
         if args.table_name != "":
@@ -327,21 +346,18 @@ class DSI_cli:
                     self.t.load_module('backend','Sqlite','back-read', filename=dbfile)
                     self.t.artifact_handler(interaction_type="process")
                     self.t.unload_module('backend','Sqlite','back-read')
-
                 elif self.__is_duckdb_file(dbfile):
                     self.t.load_module('backend','DuckDB','back-read', filename=dbfile)
                     self.t.artifact_handler(interaction_type="process")
                     self.t.unload_module('backend','DuckDB','back-read')
-
                 elif file_extension.lower() == 'csv':
                     self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
-                
                 elif file_extension.lower() == 'toml':
                     self.t.load_module('plugin', "TOML1", "reader", filenames = dbfile)
-
                 elif file_extension.lower() in ['yaml', 'yml']:
                     self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
-
+                elif file_extension.lower() == 'json':
+                    self.t.load_module('plugin', "JSON", "reader", filenames = dbfile)
                 elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
                     self.t.load_module('backend','Parquet','back-write', filename=dbfile)
                     data = OrderedDict(self.t.artifact_handler(interaction_type="query")) #Parquet's query() returns a normal dict
@@ -351,7 +367,7 @@ class DSI_cli:
                         self.t.active_metadata["Parquet"] = data
                     self.t.unload_module('backend','Parquet','back-write')
         except Exception as e:
-            print(f"An error {e} occurred loading {dbfile}\n")
+            print(f"An error {e} occurred reading {dbfile}\n")
             return
 
         if self.t.active_metadata:
@@ -374,6 +390,7 @@ class DSI_cli:
             print("Ensure file has data stored correctly.")
             print("Currently supported formats are: ")
             print("   - csv (extension: .csv)")
+            print("   - json (extension: .json)")
             print("   - toml (extension: .toml)")
             print("   - yaml (extension: .yaml, .yml)")
             print("   - parquet (extension: .pq, .parquet)")
@@ -402,7 +419,7 @@ class DSI_cli:
     def get_plot_table_parser(self):
         parser = argparse.ArgumentParser(prog='plot_table')
         parser.add_argument('table_name', help='Table to plot')
-        parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Export filename')
+        parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Table plot filename')
         return parser
     
     def plot_table(self, args):
@@ -422,7 +439,7 @@ class DSI_cli:
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='query')
         parser.add_argument('sql_query', help='SQL query to execute')
-        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows  for each table')
+        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
         parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
 
@@ -492,7 +509,7 @@ class DSI_cli:
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')
         parser.add_argument('-t', '--table', type=str, required=False, help='Show only this table')
-        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows for each table')
+        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
         return parser
     
     def summary(self, args):
@@ -564,7 +581,7 @@ COMMANDS = {
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
-    'read' : (cli.get_load_parser, cli.load),
+    'read' : (cli.get_read_parser, cli.read),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
     'write' : (cli.get_save_parser, cli.save_to_file),

@@ -7,7 +7,7 @@ Quick Start: Installation
 
    .. code-block:: unixconfig
 
-      python -m venv mydsi
+      python3 -m venv mydsi
       source mydsi/bin/activate           # start from here if virtual environment exists
       pip install --upgrade pip
    
@@ -19,13 +19,21 @@ Quick Start: Installation
       conda create -n mydsi python=3.11 
       conda activate mydsi                # only run this if virtual environment exists
 
-#. Go down into the project space root, clone the dsi repo and use pip to install dsi:
+#. Install DSI:
+
+   Alpha-version: Clone the dsi repo, move into the new dsi directory, and use pip to install all base packages:
 
    .. code-block:: unixconfig
 
       git clone https://github.com/lanl/dsi.git
       cd dsi
       pip install .
+
+   Supported release: Published versions on PyPI at https://pypi.org/project/dsi-workflow/. Install the latest version by:
+
+   .. code-block:: unixconfig
+
+      python3 -m pip install dsi-workflow
 
 #. (Optional) If using all DSI functionalities, it is necessary to install requirements.extras.txt as well:
 

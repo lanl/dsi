@@ -42,16 +42,17 @@ Notes for users:
 DSI Data Cards
 ---------------
 
-DSI is expanding its support of several dataset metadata standards. The current supported standards are for:
+DSI is expanding its support of several dataset metadata standards. Currently supported standards include:
 
       - `Dublin Core <https://www.dublincore.org/resources/metadata-basics/>`_
       - `Schema.org's Dataset object <https://schema.org/Dataset>`_
       - `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_
       - `Oceans11 DSI Data Server <https://oceans11.lanl.gov/>`_
 
-Template file structures can be found and copied in ``examples/test/``. 
-The fields in a user's data card must exactly match its respective template to be compatible with DSI.
-However, fields can be empty if a user does not have that particular information about the dataset.
+Template file structures can be found and copied in ``examples/test/``.
+
+To be compatible with DSI, a user's data card must contain all the fields in its corresponding template.
+However, if certain metadata is not available for a dataset, the values of those fields may be left empty.
 
 The supported datacards can be read into DSI by creating an instance of DSI() and calling:
 
@@ -60,7 +61,7 @@ The supported datacards can be read into DSI by creating an instance of DSI() an
       - ``read("file/path/to/datacard.YAML", 'GoogleDatacard')``
       - ``read("file/path/to/datacard.YAML", 'Oceans11Datacard')``
 
-Completed examples of each metadata standard for the Wildfire dataset can also be found in ``examples/wildfire/`` 
+Examples of each data card standard for the Wildfire dataset can be found in ``examples/wildfire/`` 
 
 
 .. _user_example_section_label:
@@ -71,7 +72,6 @@ Examples below display various ways users can incorporate DSI into their data sc
 They are located in ``examples/user/`` and must be run from that directory.
 
 All of them either load or refer to data in ``examples/clover3d/``. 
-If the directory does not exist, users must first call ``dsi.move()`` to ensure the data is stored locally for these examples.
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -4,14 +4,14 @@ from dsi.core import Terminal
 a=Terminal(debug=0, backup_db = False, runTable=True)
 
 ''' Example uses of loading open DSI readers '''
-# a.load_module('plugin','Bueno','reader', filenames=['test/bueno1.data', 'test/bueno2.data'])
+# a.load_module('plugin','Bueno','reader', filenames=['bueno1.data', 'bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
 
-a.load_module('plugin', 'Schema', 'reader', filename="test/yaml1_schema.json")
-a.load_module('plugin', 'YAML1', 'reader', filenames=["test/student_test1.yml", "test/student_test2.yml"])
-# a.load_module('plugin', 'TOML1', 'reader', filenames=["test/results.toml", "test/results1.toml"], target_table_prefix = "results")
-# a.load_module('plugin', 'Csv', 'reader', filenames="test/yosemite5.csv")
-# a.load_module('plugin', 'Ensemble', 'reader', filenames="test/wildfiredata.csv")
+a.load_module('plugin', 'Schema', 'reader', filename="yaml1_schema.json")
+a.load_module('plugin', 'YAML1', 'reader', filenames=["student_test1.yml", "student_test2.yml"])
+# a.load_module('plugin', 'TOML1', 'reader', filenames=["results.toml", "results1.toml"], target_table_prefix = "results")
+# a.load_module('plugin', 'Csv', 'reader', filenames="yosemite5.csv")
+# a.load_module('plugin', 'Ensemble', 'reader', filenames="wildfiredata.csv")
 # a.load_module('plugin', 'Cloverleaf', 'reader', folder_path="clover3d/")
 
 # a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'])
@@ -27,8 +27,8 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["test/student_test1.yml", 
 
 
 ''' Example of loading a Sqlite DSI backend, and its data interactions: ingest, query, notebook, process '''
-a.load_module('backend','Sqlite','back-write', filename='test/data.db')
-# a.load_module('backend','DuckDB','back-write', filename='test/data.db')
+a.load_module('backend','Sqlite','back-write', filename='data.db')
+# a.load_module('backend','DuckDB','back-write', filename='data.db')
 
 a.artifact_handler(interaction_type='ingest')
 # data = a.artifact_handler(interaction_type='query', query = "SELECT * FROM runTable;")
@@ -100,7 +100,7 @@ a.artifact_handler(interaction_type='ingest')
 # #  'back-write': []}
 
 ''' Example use case: reading data from backend and generating an ER Diagram and table plot from its metadata '''
-# a.load_module('backend','Sqlite','back-read', filename='test/data.db')   
+# a.load_module('backend','Sqlite','back-read', filename='data.db')   
 # a.artifact_handler(interaction_type="process")
 # a.load_module('plugin', "Table_Plot", "writer", table_name = "physics", filename = "physics")
 # a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.pdf')#, target_table_prefix = "physics")

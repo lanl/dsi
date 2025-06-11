@@ -31,29 +31,19 @@ display <table name> [-n num rows] [-e filename]
     - `num_rows` is optional and limits the display to the first N rows.
     - `filename` is optional and exports the display to a CSV or Parquet file.
 
-exit
-    Exits the CLI and closes all active DSI Readers/Writers/Backends.
-
 draw [-f filename]
     Draws an ER diagram of all data loaded into DSI.
 
     - `filename` is optional; default is `er_diagram.png`.
+
+exit
+    Exits the CLI and closes all active DSI Readers/Writers/Backends.
 
 find <var>
     Searches for an input variable from all data loaded into DSI. Can match table names, columns, or data values.
 
 list
     Lists the names of all tables and their dimensions.
-
-read <filename> [-t table name]
-    Reads specified data into DSI
-    
-    - `filename` is a mandatory input of data to ingest. Accepted formats: 
-    
-        - CSV, TOML, YAML, Parquet, SQLite databases, DuckDB databases
-        - URL of data stored online that is in one of the above formats
-
-    - `table_name` is optional. If reading a CSV or Parquet, users can specify table_name
 
 plot_table <table_name> [-f filename]
     Plots numerical data from the specified table.
@@ -67,6 +57,16 @@ query <SQL query> [-n num rows] [-e filename]
     - `SQL query` is mandatory and must match SQLite or DuckDB syntax.
     - `num_rows` is optional; can specify to limit number of rows in result.
     - `filename` is optional; can export the result as CSV or Parquet file.
+
+read <filename> [-t table name]
+    Reads specified data into DSI
+    
+    - `filename` is a mandatory input of data to ingest. Accepted formats: 
+    
+        - CSV, JSON, TOML, YAML, Parquet, SQLite databases, DuckDB databases
+        - URL of data stored online that is in one of the above formats
+
+    - `table_name` is optional. If reading a CSV or Parquet, users can specify table_name
 
 summary [-t table] [-n num_rows]
     Displays statistics of all tables or a specified table.
