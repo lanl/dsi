@@ -35,11 +35,6 @@ Installation
 
 DSI has several versioned releases and cloning from 'main' is the alpha-version. 
 
-.. Prior to installing DSI, users that want to use Miniconda3 for managing virtual environments should::
-
-.. 	. ~/miniconda3/bin/activate
-.. 	conda create -n dsi python=3.11
-.. 	conda activate dsi
 Users that want to install DSI should follow our `installation steps <https://lanl.github.io/dsi/installation.html>`_.
 	
 =====================
