@@ -6,6 +6,9 @@ import os
 import sys
 from contextlib import redirect_stdout
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 class DSI():
     '''
     A user-facing interface for DSI's Core middleware.
