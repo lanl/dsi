@@ -87,7 +87,7 @@ class DSI_cli:
     def help_fn(self, args):
         commands = [
             ("display <table_name> [-n num_rows] [-e filename]",
-            "Displays the contents of a table. Optionally limit displayed rows and export to CSV/Parquet"),
+            "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             ("draw [-f filename]",
             "Draws an ER diagram of all tables in the current DSI database"),
             ("exit",
@@ -105,7 +105,7 @@ class DSI_cli:
             ("read <filename> [-t table_name]",
             "Reads a file or URL into the DSI database. Optionally set table name."),
             ("summary [-t table_name] [-n num_rows]",
-            "Displays a summary of the database or a specific table. Optionally limit rows to display."),
+            "Summary of the database or a specific table. Optionally view N rows of the table(s)"),
             ("write <filename>",
             "Writes data in DSI database to a permanent location."),
             ("ls",
