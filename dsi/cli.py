@@ -367,7 +367,7 @@ class DSI_cli:
                         self.t.active_metadata["Parquet"] = data
                     self.t.unload_module('backend','Parquet','back-write')
         except Exception as e:
-            print(f"An error {e} occurred reading {dbfile}\n")
+            print(f"read ERROR: {e}\n")
             return
 
         if self.t.active_metadata:

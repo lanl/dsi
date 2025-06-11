@@ -485,7 +485,7 @@ class Terminal():
             # TODO fix this passthrough by updating Parquet to use process_artifacts()
             # TODO query all backends
             if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
             if self.valid_backend(first_backend, parent_backend):
@@ -534,7 +534,7 @@ class Terminal():
         # only processes data from first backend for now - TODO process data from all active backends later
         elif interaction_type in ["process", "read"]:
             if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
             if self.valid_backend(first_backend, parent_backend):
