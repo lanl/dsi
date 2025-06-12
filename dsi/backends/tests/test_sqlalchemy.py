@@ -210,7 +210,7 @@ def test_jsondata_artifact_put():
     assert True
 
 def test_yosemite_data_csv_artifact():
-    csvpath = '/'.join([get_git_root('.'), 'examples/data/yosemite5.csv'])
+    csvpath = '/'.join([get_git_root('.'), 'examples/test/yosemite5.csv'])
     engine_path = "sqlite:///yosemite.db"
     store = SqlAlchemy(engine_path, YosemiteBase)
     print(csvpath)

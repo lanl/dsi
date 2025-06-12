@@ -7,12 +7,12 @@ import shutil
 from pathlib import Path
 import logging
 from datetime import datetime
-import warnings
 import sys
+import pandas as pd
+import csv
 
 from dsi.backends.filesystem import Filesystem
 from dsi.backends.sqlite import Sqlite, DataType, Artifact
-
 
 class Terminal():
     """
@@ -23,14 +23,15 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'MetadataReader1', 'Wildfire']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf']
+    VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
-    VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet']
+    VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
@@ -38,30 +39,36 @@ class Terminal():
 
     def __init__(self, debug = 0, backup_db = False, runTable = False):
         """
-        Initialization helper function to pass through optional parameters for DSI core.
+        Initialization function to configure optional DSI core parameters.
 
-        Optional flags can be set and defined:
-
-        `debug`: {0: off, 1: user debug log, 2: user + developer debug log} 
+        Optional flags
+        --------------
+        `debug` : int, default=0 
+            {0: off, 1: user debug log, 2: user + developer debug log} 
             
-            - When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
-        `backup_db`: Undefined False as default. If set to True, this creates a backup database before committing new changes.
+            When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
 
-        `runTable`: Undefined False as default. 
-        When new metadata is ingested, a 'runTable' is created, appended, and timestamped when database in incremented. Recommended for in-situ use-cases.
+        `backup_db` : bool, default=False
+            - If True, creates a backup of the current backend database before committing any new changes.
+
+        `runTable` : bool, default=False
+            - If True, a 'runTable' is created, and timestamped each time new metadata is ingested.
+              Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
 
         self.module_collection = {}
-        backend_modules = static_munge(
-            self.BACKEND_PREFIX, self.BACKEND_IMPLEMENTATIONS)
+        backend_modules = static_munge(self.BACKEND_PREFIX, self.BACKEND_IMPLEMENTATIONS)
         self.module_collection['backend'] = {}
         for module in backend_modules:
-            self.module_collection['backend'][module] = import_module(module)
+            try:
+                imported = import_module(module)
+                self.module_collection['backend'][module] = imported
+            except ImportError as e:
+                continue
 
-        plugin_modules = static_munge(
-            self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
+        plugin_modules = static_munge(self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
         self.module_collection['plugin'] = {}
         for module in plugin_modules:
             self.module_collection['plugin'][module] = import_module(module)
@@ -70,11 +77,15 @@ class Terminal():
         valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + self.VALID_MODULE_FUNCTIONS['backend']
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
+        
         self.active_metadata = OrderedDict()
         self.loaded_backends = []
 
         self.runTable = runTable
         self.backup_db = backup_db
+
+        self.user_wrapper = False
+        self.new_tables = None
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug
@@ -91,11 +102,9 @@ class Terminal():
         List available DSI modules of an arbitrary module type.
 
         This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
-        are supported, but this getter can be extended to support any new DSI module
-        types which are added. 
+        are supported, but this getter can be extended to support any new DSI module types which are added. 
         
-        Note: self.VALID_MODULES refers to _DSI_ Modules
-        however, DSI Modules are classes, hence the naming idiosynchrocies below.
+        Note: self.VALID_MODULES refers to _DSI_ Modules however, DSI Modules are classes, hence the naming idiosynchrocies below.
         """
         # "DSI Modules" are Python Classes
         class_collector = []
@@ -112,6 +121,7 @@ class Terminal():
 
         DSI modules may be loaded which are not explicitly listed by the list_available_modules.
         This flexibility ensures that advanced users can access higher level abstractions.
+        
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
 
@@ -138,6 +148,16 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
             raise ValueError("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
+        if mod_type == "backend" and not any(mod_name.lower() in item for item in self.module_collection[mod_type].keys()):
+            if self.debug_level != 0:
+                self.logger.error("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extras.txt")
+            raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extras.txt")
+        if mod_type == "plugin" and mod_name.lower() == "wildfire":
+            mod_name = "Ensemble"
+        if mod_type == "plugin" and mod_name.lower() == "csv":
+            mod_name = "Csv"
+        if mod_type == "plugin" and mod_name.lower() == "csv_writer":
+            mod_name = "Csv_Writer"
         
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
@@ -151,31 +171,42 @@ class Terminal():
                         obj = class_(**kwargs)
                     except:
                         if self.debug_level != 0:
-                            self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise TypeError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                            self.logger.error(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                     
                     run_start = datetime.now()
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
                     
-                    try:
+                    tester = 0
+                    if sys.gettrace() is None:
+                        tester = 1
                         sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
+
+                    ingest_error = None
+                    try:
                         ingest_error = obj.add_rows()
-                        if ingest_error is not None:
-                            if self.debug_level != 0:
-                                self.logger.error(f"   {ingest_error[1]}")
-                            raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
-                        sys.settrace(None) # ends trace to prevent large overhead
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                         raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                     
+                    if ingest_error is not None:
+                            if self.debug_level != 0:
+                                self.logger.error(f"   {ingest_error[1]}")
+                            if self.user_wrapper:
+                                raise ingest_error[0](ingest_error[1])
+                            else:
+                                raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                    if tester == 1:
+                        sys.settrace(None) # ends trace to prevent large overhead
+                    
+                    self.new_tables = obj.output_collector.keys()
                     for table_name, table_metadata in obj.output_collector.items():
                         if self.runTable == True and table_name == "runTable":
                             if self.debug_level != 0:
                                 self.logger.error(f'   Cannot read in a manual runTable when the runTable flag is on')
-                            raise ValueError('Cannot read in a manual runTable when the runTable flag is on')
+                            raise RuntimeError('Cannot read in a manual runTable when the runTable flag is on')
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
                                 if isinstance(colData[0], list):
@@ -196,7 +227,7 @@ class Terminal():
                                         elif key in self.active_metadata[table_name][colName] and self.active_metadata[table_name][colName][key] != col_unit:
                                             if self.debug_level != 0:
                                                 self.logger.error(f"   Cannot have a different set of units for column {key} in {colName}")
-                                            raise ValueError(f"Cannot have a different set of units for column {key} in {colName}")
+                                            raise TypeError(f"Cannot have a different set of units for column {key} in {colName}")
                                 elif colName not in self.active_metadata[table_name].keys():
                                     self.active_metadata[table_name][colName] = colData
                     run_end = datetime.now()
@@ -206,6 +237,25 @@ class Terminal():
                 else:
                     try:
                         if mod_type == "backend" and hasattr(class_, 'runTable'):
+                            parent_classes = class_.__bases__
+                            if parent_classes and parent_classes[0].__name__ == "Filesystem" and 'filename' in kwargs:
+                                backend_filename = kwargs['filename']
+                                has_data = False
+                                has_runTable = False
+                                # if to-be-loaded backend has data and runTable in its tables, turn global runTable off
+                                if os.path.isfile(backend_filename):
+                                    if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
+                                        has_data = True
+                                    elif class_.__name__ == "DuckDB" and os.path.getsize(backend_filename) > 13000:
+                                        has_data = True
+                                if has_data:
+                                    with open(backend_filename, 'rb') as fb:
+                                        content = fb.read()
+                                    if b'runTable' in content:
+                                        has_runTable = True
+                                if has_runTable:
+                                    self.runTable = True
+
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
@@ -214,7 +264,7 @@ class Terminal():
                     except:
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise TypeError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                 
                 print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()
@@ -234,7 +284,7 @@ class Terminal():
         """
         Unloads a specific DSI module from the active_modules collection.
 
-        Mostly to be used for unloading backends, as plugin readers and writers are auto unloaded elsewhere.
+        Primarily used when unloading backends, as plugin readers and writers are automatically unloaded elsewhere.
         """
         if self.debug_level != 0:
             self.logger.info(f"-------------------------------------")
@@ -269,7 +319,7 @@ class Terminal():
                 self.logger.info(f"{mod_name} {mod_function} {mod_type} unloaded successfully.")
                 self.logger.info(f"Runtime: {end-start}")
         else:            
-            warnings.warn(f"{mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
+            print(f"WARNING: {mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
             if self.debug_level != 0:
                 self.logger.warning(f"{mod_name} {mod_function} {mod_type} could not be found in active_modules. No action taken.")
 
@@ -280,7 +330,7 @@ class Terminal():
 
         Note: mod_type is needed because each Python module only implements plugins or backends.
 
-        Check Example 7 in Core:Examples on GitHub Docs to see how to use this function.
+        View :ref:`external_readers_writers_label` to see how to use this function.
         """
         mod = SourceFileLoader(mod_name, mod_path).load_module()
         self.module_collection[mod_type][mod_name] = mod
@@ -298,7 +348,7 @@ class Terminal():
         """
         Transloading signals to the DSI Core Terminal that Plugin set up is complete.
 
-        Activates all loaded plugin writers by generating all their various output files such as an ER Diagram or an image of a table plot
+        Activates all loaded plugin writers by generating their various output files such as an ER Diagram or an image of a table plot
 
         All loaded plugin writers will be unloaded after activation, so there is no need to separately call unload_module() for them
         """
@@ -307,21 +357,33 @@ class Terminal():
             self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
             start = datetime.now()
-            try:
+
+            tester = 0
+            if sys.gettrace() is None:
+                tester = 1
                 sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
+            
+            writer_error = None
+            try:
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
-                if writer_error is not None:
-                    if writer_error[0] == "Warning":
-                        warnings.warn(writer_error[1])
-                    else:
-                        if self.debug_level != 0:
-                            self.logger.error(writer_error[1])
-                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
-                sys.settrace(None) # ends trace to prevent large overhead
             except:
                 if self.debug_level != 0: 
-                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
-                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Check to ensure data was handled correctly')
+                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
+                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
+            
+            if writer_error is not None:
+                if writer_error[0] == "Warning":
+                    print("WARNING:", writer_error[1])
+                else:
+                    if self.debug_level != 0:
+                        self.logger.error(writer_error[1])
+                    if self.user_wrapper:
+                        raise writer_error[0](writer_error[1])
+                    else:
+                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+            if tester == 1:
+                sys.settrace(None) # ends trace to prevent large overhead
+
             used_writers.append(obj)
             end = datetime.now()
             self.logger.info(f"Runtime: {end-start}")
@@ -329,55 +391,33 @@ class Terminal():
         if len(unused_writers) > 0:
             self.active_modules["writer"] = unused_writers
             if self.debug_level != 0:
-                self.logger.warning(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
-            warnings.warn(f"Not all plugin writers were successfully transloaded. These were not transloaded: {unused_writers}")
+                self.logger.warning(f"Not all writers were successfully transloaded. These were not transloaded: {unused_writers}")
+            print(f"WARNING: Not all writers were successfully transloaded. These were not transloaded: {unused_writers}")
         else:
             self.active_modules["writer"] = []
-
-    def close(self):
-        """
-        Immediately closes all active modules: backends, plugin writers, plugin readers
-
-        Clears out the current DSI abstraction
-
-        NOTE - This step cannot be undone.
-        """
-        print("Closing the abstraction layer, and all active plugins/backends")
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.info("Closing and clearing out all objects in this Terminal object")
-            
-            self.logger.info("Cleared out the abstraction layer")
-        self.active_metadata = OrderedDict()
-
-        if self.debug_level != 0:
-            self.logger.info("Closed active backends")
-        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
-        for backend in active_backends:
-            backend.close()
-        for loaded in self.loaded_backends:
-            loaded.close()
-
-        if self.debug_level != 0:
-            self.logger.info("Cleared all loaded plugins and backends")
-        for func in self.active_modules:
-            self.active_modules[func] = []
-            self.loaded_backends = []
 
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
         
-        `interaction_type`:
+        `interaction_type` : str
+            Specifies the type of action to perform. Accepted values:
 
-            - 'ingest' or 'put': ingests active DSI abstraction into ALL loaded BACK-WRITE backends (BACK-READ backends ignored
+                - 'ingest' or 'put': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
 
-                - if backup_db flag = True in a local Core, a backup is created prior to ingesting data into each loaded backend
-            - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
-            - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
-            - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+                    - if backup_db flag = True in Core instance, a backup is created prior to ingesting data
+                - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
+                - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
+                - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
-        `query`: default None. Specify if *interaction_type* = 'query' and ``query_artifact`` function in a backend file accepts an input
+        `query` : str, optional
+            Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
+
+        \**kwargs : 
+            Additional keyword arguments passed to underlying backend functions.
+        
+        `return`: only when `interaction_type` = 'query'
+            By default stores query result as a Pandas.DataFrame. If specified, returns it as an OrderedDict
 
         A DSI Core Terminal may load zero or more Backends with storage functionality.
         """
@@ -385,6 +425,10 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error('Could not find artifact interaction type in VALID_ARTIFACT_INTERACTION_TYPES')
             raise NotImplementedError('Hint: Did you declare your artifact interaction type in the Terminal Global vars?')
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing an action on it')
+            raise NotImplementedError('Need to load a valid backend before performing an action on it')
         
         operation_success = False
         backread_active = False
@@ -406,7 +450,10 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
                 
-                sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
                 if interaction_type == "ingest":
                     errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 elif interaction_type == "put":
@@ -414,8 +461,12 @@ class Terminal():
                 if errorMessage is not None:
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
-                    raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
-                sys.settrace(None) # ends trace to prevent large overhead
+                    if self.user_wrapper:
+                        raise errorMessage[0](f"Error ingesting data due to {errorMessage[1]}")
+                    else:
+                        raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
@@ -425,16 +476,26 @@ class Terminal():
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
-        if interaction_type not in ['ingest', 'put', "processs", "read"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            # Only used when reading data from Parquet backend in CLI API (Parquet uses query not process) - 
+            # TODO fix this passthrough by updating Parquet to use process_artifacts()
+            # TODO query all backends
+            if len(self.loaded_backends) > 1:
+                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                    first_backend = self.loaded_backends[1]
+                    parent_backend = first_backend.__class__.__bases__[0].__name__
+            if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
-                sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
+                tester = 0
+                if sys.gettrace() is None:
+                    tester = 1
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
                 if interaction_type == "get":
                     query_data = first_backend.get_artifacts(**kwargs)
                 elif interaction_type == "query":
@@ -442,47 +503,52 @@ class Terminal():
                 if isinstance(query_data, tuple):
                     if self.debug_level != 0:
                         self.logger.error(query_data[1])
-                    raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
-                sys.settrace(None) # ends trace to prevent large overhead
+                    if self.user_wrapper:
+                        raise query_data[0](query_data[1])
+                    else:
+                        raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
+                if tester == 1:
+                    sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
             else: #backend is empty - cannot query
                 if self.debug_level != 0:
-                    self.logger.error("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
-                raise ValueError("Error in query/get artifact handler: Need to ingest data into first loaded backend before querying data from it")
+                    self.logger.error("Need to ingest data into first loaded backend before querying data from it")
+                raise RuntimeError("Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook', 'inspect']:
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+            if self.valid_backend(first_backend, parent_backend):
                 try:
                     if interaction_type == "inspect":
                         first_backend.inspect_artifacts(**kwargs)
                     elif interaction_type == "notebook":
                         first_backend.notebook(**kwargs)
                 except:
-                    raise ValueError("Error in generating notebook. Please ensure data in the actual backend is stable")
+                    raise RuntimeError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
             else: #backend is empty - cannot inspect
                 if self.debug_level != 0:
-                    self.logger.error("Error in notebook/inspect artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
-                raise ValueError("Error in notebook/inspect artifact handler: Need to ingest data into first loaded backend before generating a Python notebook")
+                    self.logger.error("Need to ingest data into first loaded backend before generating a Python notebook")
+                raise RuntimeError("Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
-
-        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) > 0:
-            first_backread = self.active_modules['back-read'][0]
-            if parent_backend == "Filesystem" and os.path.getsize(first_backend.filename) > 100:
+        # only processes data from first backend for now - TODO process data from all active backends later
+        elif interaction_type in ["process", "read"]:
+            if len(self.loaded_backends) > 1:
+                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                    first_backend = self.loaded_backends[1]
+                    parent_backend = first_backend.__class__.__bases__[0].__name__
+            if self.valid_backend(first_backend, parent_backend):
                 if self.debug_level != 0:
-                    self.logger.info(f"{first_backread.__class__.__name__} backend - {interaction_type.upper()} the data")
+                    self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
                 if interaction_type == "process":
-                    self.active_metadata = first_backread.process_artifacts()
+                    self.active_metadata = first_backend.process_artifacts()
                 elif interaction_type == "read":
-                    self.active_metadata = first_backread.read_to_artifact()
+                    self.active_metadata = first_backend.read_to_artifact()
                 operation_success = True
-            else: #back-READ backend is empty - cannot process data
+            else: #backend is empty - cannot process data
                 if self.debug_level != 0:
-                    self.logger.error("Error in process/read artifact handler: First loaded back-READ backend needs to have data to be able to process data to DSI")
-                raise ValueError("Error in process/read artifact handler: First loaded back-READ backend needs to have data to be able to process data to DSI")
-        elif interaction_type in ["process", "read"] and len(self.active_modules['back-read']) == 0:
-            backread_active = True
+                    self.logger.error("First loaded backend needs to have data to be able to process data to DSI")
+                raise RuntimeError("First loaded backend needs to have data to be able to process data to DSI")
 
         if operation_success:
             end = datetime.now()
@@ -493,106 +559,161 @@ class Terminal():
         else:
             not_run_msg = None
             if backread_active:
-                not_run_msg = 'Remember that back-WRITE backends cannot process/read data and back-READ backends cannot ingest/put'
+                not_run_msg = 'Remember that back-READ backends cannot ingest/put data'
             else:
                 not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
-            raise NotImplementedError(not_run_msg)
+            raise NotImplementedError(not_run_msg)    
     
-    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
-    def trace_function(self, frame, event, arg):
-        global return_line_number
-        global original_file
-        if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
-            original_file = frame.f_code.co_filename # Get file name
-        return self.trace_function
-    
-    def find(self, query_object):
+    def get_table(self, table_name, dict_return = False):
         """
-        Find all function that searches for all instances of `query_object` in first loaded backend. Searches among all tables/column/cells
-       
-        `query_object`: Object to find in first loaded backend. Can be of any type (string, float, int).
+        Returns all data from a specified table in the first loaded backend.
 
-        `return`: List of backend-specific objects that each contain details of a match for `query_object`
+        `table_name` : str
+            Name of the table to retrieve data from.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+        `dict_return`: bool, optional, default=False.
+            If True, returns the data as an OrderedDict.
+            If False (default), returns the data as a pandas DataFrame.
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to get data from a specified table')
+            raise NotImplementedError('Need to load a valid backend to be able to get data from a specified table')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to get a table")
+            raise RuntimeError("First loaded backend needs to have data to be able to get a table")
+        start = datetime.now()
+
+        output = backend.get_table(table_name, dict_return)
+        if output is not None and isinstance(output, tuple):
+            raise output[0](output[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
+            return output
+
+    def find(self, query_object):
+        """
+        Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. Can be of any type, including str, float, or int.
+
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
+
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
     
     def find_table(self, query_object):
+        """   
+        Find all tables whose name matches `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. HAS TO BE A str.
+
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
+
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
-        Find table function that searches for all tables whose names matches the `query_object` in first loaded backend.
-
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
-
-        `return`: List of backend-specific objects that each contain all data from a table matching `query_object`.
-
-            - check file of the first backend loaded to understand the structure of the objects in this list
-        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
     
     def find_column(self, query_object, range = False):
         """
-        Find column function that searches for all columns whose names matches the `query_object` in first loaded backend.
+        Find all columns whose name matches `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. HAS TO BE A str.
 
-        `query_object`: Object to find in all table names. HAS TO BE A STRING
+        `range`: bool, optional, default False. 
+            If True, then data-range of all numerical columns which match `query_object` is included in return
 
-        `range`: default False. 
+            If False, then data for each column that matches `query_object` is included in return
 
-            - If True, then data-range of all numerical columns which match `query_object` is included in return
-            - If False, then data for each column that matches `query_object` is included in return
-        `return`: List of backend-specific objects that each contain data/numerical range about a column matching `query_object`.
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_column(query_object, range)
         return self.find_helper(query_object, return_object, start, "column ")
 
     def find_cell(self, query_object, row = False):
         """
-        Find cell function that searches for all cells which match the `query_object` in first loaded backend.
+        Find all cells that match the `query_object` in the first loaded backend.
+       
+        `query_object` : any
+            The object to search for in the backend. Can be of any type, including str, float, or int.
 
-        `query_object`: Object to find in all cells. Can be of any type (string, float, int).
+        `row` : bool, default=False
+            If True, includes the entire row of data for each matching cell in return.
 
-        `row`: default False.
+            If False, includes only the value of the matching cell
 
-            - If True, then full row of data where a cell matches `query_object` is included in return
-            - If False, then the value of the cell that matches `query_object` is included in return
-        `return`: List of backend-specific objects that each contain value of a cell/full row where a cell matches `query_object`
+        `return` : list
+            A list of backend-specific result objects, each representing a match for `query_object`.
+            The structure of each object depends on the backend implementation.
 
-            - check file of the first backend loaded to understand the structure of the objects in this list
+            - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before performing a find on it')
+            raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
         parent_backend = backend.__class__.__bases__[0].__name__
-        if parent_backend == "Filesystem" and os.path.getsize(backend.filename) <= 100:
+        if not self.valid_backend(backend, parent_backend):
             if self.debug_level != 0:
-                self.logger.error("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
-            raise ValueError("Error in find cell function: First loaded backend needs to have data to be able to find data from it")
+                self.logger.error("First loaded backend needs to have data to be able to find data from it")
+            raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
         return_object = backend.find_cell(query_object, row)
         return self.find_helper(query_object, return_object, start, "cell ")
@@ -613,7 +734,7 @@ class Terminal():
         if isinstance(return_object, tuple):
             if self.debug_level != 0:
                 self.logger.warning(return_object[1])
-            warnings.warn(return_object[1])
+            print("WARNING:", return_object[1])
             return_object = return_object[0]
         else:
             end = datetime.now()
@@ -621,15 +742,201 @@ class Terminal():
                 self.logger.info(f"Runtime: {end-start}")
         return return_object
     
+    def overwrite_table(self, table_name, collection):
+        """
+        Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
+
+        If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
+        **Note:** This function permanently deletes the existing table and its data, before inserting the new data.
+
+        `table_name` : str or list
+            - If str, name of the table to overwrite in the backend.
+            - If list, list of all tables to overwrite in the backend
+
+        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+            - If one item, a DataFrame containing the updated data will be written to the table.
+            - If a list, all DataFrames with updated data will be written to their own table
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to overwrite a table')
+            raise NotImplementedError('Need to load a valid backend to be able to overwrite a table')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to overwrite its data")
+        start = datetime.now()
+
+        errorStmt = backend.overwrite_table(table_name, collection)
+        if errorStmt is not None and isinstance(errorStmt, tuple):
+            raise errorStmt[0](errorStmt[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+    
+    def list(self):
+        """
+        Prints a list of all tables and their dimensions in the first loaded backend
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before listing all tables in it')
+            raise NotImplementedError('Need to load a valid backend before listing all tables in it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to list its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to list its datd")
+        start = datetime.now()
+        
+        table_list = backend.list()
+        for table in table_list:
+            print(f"\nTable: {table[0]}")
+            print(f"  - num of columns: {table[1]}")
+            print(f"  - num of rows: {table[2]}")
+        print("\n")
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+    def summary(self, table_name = None, num_rows = 0):
+        """
+        Prints numerical metadata and (optionally) sample data from tables in the first loaded backend.
+
+        `table_name` : str, optional
+            If specified, only the numerical metadata for that table will be printed.
+
+            If None (default), metadata for all available tables is printed.
+
+        `num_rows` : int, optional, default=0
+            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
+
+            If 0 (default), only the total number of rows is printed (no row-level data).
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to summarize its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
+        start = datetime.now()
+
+        backend.summary(table_name, num_rows)
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+    def num_tables(self):
+        """
+        Prints number of tables in the first loaded backend
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before listing all tables in it')
+            raise NotImplementedError('Need to load a valid backend before listing all tables in it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to get its number of tables")
+            raise RuntimeError("First loaded backend needs to have data to be able to get its number of tables")
+        start = datetime.now()
+
+        backend.num_tables()
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+    def display(self, table_name, num_rows = 25, display_cols = None):
+        """
+        Prints data from a specified table in the first loaded backend.
+        
+        `table_name` : str
+            Name of the table to display.
+         
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
+
+        `display_cols` : list of str, optional
+            List of specific column names to display from the table. 
+
+            If None (default), all columns are displayed.
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to be able to display its data")
+            raise RuntimeError("First loaded backend needs to have data to be able to display its data")
+        start = datetime.now()
+
+        errorStmt = backend.display(table_name, num_rows, display_cols)
+        if errorStmt is not None and isinstance(errorStmt, tuple):
+            raise errorStmt[0](errorStmt[1])
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+        if errorStmt is not None and isinstance(errorStmt, pd.DataFrame):
+            return errorStmt
+    
+    def get_table_names(self, query):
+        """
+        Extracts and returns all table names referenced in a given query.
+
+        `query` : str
+            A query string written in a database language (typically SQL).
+        """
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to identify table names in a query for that backend')
+            raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query for that backend')
+        backend = self.loaded_backends[0]
+        start = datetime.now()
+
+        output = backend.get_table_names(query)
+        if output is not None and isinstance(output, tuple):
+            raise output[0](output[1])
+        
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        if output is not None and isinstance(output, list):
+            return output
+    
     def get_current_abstraction(self, table_name = None):
         """
-        Returns the current DSI abstraction as a nested Ordered Dict, where keys are table names and values are the table's data as an Ordered Dict
+        Returns the current DSI abstraction as a nested Ordered Dict.
 
-        The inner table Ordered Dict has column names as keys and list of column data as the values.
+        The abstraction is organized such that:
+            - The outer OrderedDict has table names as keys.
+            - Each value is an inner OrderedDict representing a table, where keys are column names and values are lists of column data.
 
-        `table_name`: default None. If specified, the return will only be that table's Ordered Dict, not a nested one.
+        `table_name` : str, optional, default is None.
+            If specified, returns only the OrderedDict corresponding to that table.
 
-        `return`: nested Ordered Dict if table_name is None. single Ordered Dict if table_name is not None
+            If None (default), returns the full nested OrderedDict containing all tables.
+
+        `return` : OrderedDict
+            If `table_name` is None: returns a nested OrderedDict of all tables.
+            
+            If `table_name` is provided: returns a single OrderedDict for that table.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -654,11 +961,14 @@ class Terminal():
         """
         Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
 
-        `table_name`: name of table that must be in the current abstraction
+        `table_name`: str
+            Name of the table to update. This table must already exist in the current abstraction.
 
-        `table_data`: table data that must be stored as an Ordered Dict where column names are keys and column data is a list stored as values.
-        
-        `return`: None
+        `table_data` : OrderedDict
+            The new data to store in the table. Must be an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -667,12 +977,74 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(f"{table_name} not in current abstraction")
             raise ValueError(f"{table_name} not in current abstraction")
-        if not isinstance(table_data, OrderedDict):
+        if not isinstance(table_data, (OrderedDict, pd.DataFrame)):
             if self.debug_level != 0:
-                self.logger.error("table_data needs to be in the form of an Ordered Dictionary")
-            raise ValueError("table_data needs to be in the form of an Ordered Dictionary")
-        self.active_metadata[table_name] = table_data
+                self.logger.error("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
+            raise TypeError("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
+        if isinstance(table_data, OrderedDict):
+            self.active_metadata[table_name] = table_data
+        elif isinstance(table_data, pd.DataFrame):
+            self.active_metadata[table_name] = OrderedDict(table_data.to_dict(orient='list'))
+    
+    def close(self):
+        """
+        Immediately closes all active modules: backends, plugin writers, plugin readers
+
+        Clears out the current DSI abstraction
+
+        NOTE - This step cannot be undone.
+        """
+        print("Closing the abstraction layer, and all active readers/writers/backends")
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.info("Closing and clearing out all objects in this Terminal object")
             
+            self.logger.info("Cleared out the abstraction layer")
+        self.active_metadata = OrderedDict()
+
+        if self.debug_level != 0:
+            self.logger.info("Closed active backends")
+        active_backends = self.active_modules['back-write'] + self.active_modules['back-read']
+        for backend in active_backends:
+            backend.close()
+        for loaded in self.loaded_backends:
+            loaded.close()
+
+        if self.debug_level != 0:
+            self.logger.info("Cleared all loaded plugins and backends")
+        for func in self.active_modules:
+            self.active_modules[func] = []
+            self.loaded_backends = []
+    
+    # Internal function used to print a table cleanly
+    def table_print_helper(self, headers, rows, num_rows=25):
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend before printing table info from it')
+            raise NotImplementedError('Need to load a valid backend before printing table info from it')
+        backend = self.loaded_backends[0]
+        backend.table_print_helper(headers, rows, num_rows)
+
+    # Internal function used to check if a backend has data
+    def valid_backend(self, backend, parent_name):
+        valid = False
+        if parent_name == "Filesystem":
+            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
+                valid = True
+            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
+                valid = True
+            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
+                valid = True
+        return valid
+    
+    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
+    def trace_function(self, frame, event, arg):
+        global return_line_number
+        global original_file
+        if event == "return":
+            return_line_number = frame.f_lineno  # Get line number
+            original_file = frame.f_code.co_filename # Get file name
+        return self.trace_function
 
 class Sync():
     """
@@ -683,6 +1055,9 @@ class Sync():
     """
     remote_location = []
     local_location = []
+
+    file_list = []
+    rfile_list = []
 
     def __init__(self, project_name="test"):
         # Helper function to get parent module names.
@@ -695,13 +1070,6 @@ class Sync():
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        True
-
-    def copy(self, local_loc, remote_loc, isVerbose=False):
-        """
-        Helper function to stage location and get filesystem information, and copy
-        data over using a preferred API
-        """
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
         # Data Crawl and gather metadata of local location
@@ -711,16 +1079,45 @@ class Sync():
         st_list = []
         rfile_list = []
 
-        # Do a quick validation of group permissions
+        # Do a quick validation of group access permissions
+        # While crawling os.stat info
+        # Create ordered dictionary
+        st_dict = OrderedDict()
+        st_dict['file_origin'] = []
+        st_dict['size']= []
+        st_dict['modified_time'] = []
+        st_dict['created_time'] = []
+        st_dict['accessed_time'] = []
+        st_dict['mode'] = []
+        st_dict['inode'] = []
+        st_dict['device'] = []
+        st_dict['n_links'] = []
+        st_dict['uid'] = []
+        st_dict['gid'] = []
+        st_dict['file_remote'] = []
+
         for file in file_list:
-            file = os.path.relpath(file,local_loc) #rel path
+            rel_file = os.path.relpath(file,local_loc) #rel path
             #utils.isgroupreadable(file) # quick test
-            filepath = os.path.join(local_loc, file)
+            filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
-            rfilepath = os.path.join(remote_loc,self.project_name, file)
+            rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
             rfile_list.append(rfilepath)
+            st_dict['file_origin'].append(rel_file)
+            st_dict['size'].append(st.st_size)
+            st_dict['modified_time'].append(st.st_mtime)
+            st_dict['created_time'].append(st.st_ctime)
+            st_dict['accessed_time'].append(st.st_atime)
+            st_dict['mode'].append(st.st_mode)
+            st_dict['inode'].append(st.st_ino)
+            st_dict['device'].append(st.st_dev)
+            st_dict['n_links'].append(st.st_nlink)
+            st_dict['uid'].append(st.st_uid)
+            st_dict['gid'].append(st.st_gid)
+            st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
+
 
         # Test remote location validity, try to check access
         # Future: iterate through remote/server list here, for now:::
@@ -728,84 +1125,96 @@ class Sync():
         for remote in remote_list:
             try: # Try for file permissions
                 if os.path.exists(remote): # Check if exists
-                    print(f"The directory '{remote}' already exists locally.")
+                    print(f"The directory '{remote}' already exists remotely.")
                 else:
                     os.makedirs(remote) # Create it
-                    print(f"The directory '{remote}' has been created locally.")
+                    print(f"The directory '{remote}' has been created remotely.")
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
                 raise
 
-        # Try to open or create a local database to store fs info before copy
+        
+        # Try to open existing local database to store filesystem info before copy
         # Open and validate local DSI data store
+        t = Terminal()
+
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             f = local_loc+"/"+self.project_name+".db"
             print("db: ", f)
-            store = Sqlite( f )
+            t.load_module('backend','Sqlite','back-write', filename=f)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             raise
 
-        # Create new filesystem table with origin and remote locations
-        data_type = DataType()
-        data_type.name = "filesystem"
-        data_type.properties["file_origin"] = Sqlite.STRING
-        data_type.properties["st_mode"] = Sqlite.DOUBLE
-        data_type.properties["st_ino"] = Sqlite.DOUBLE
-        data_type.properties["st_dev"] = Sqlite.DOUBLE
-        data_type.properties["st_nlink"] = Sqlite.DOUBLE
-        data_type.properties["st_uid"] = Sqlite.DOUBLE
-        data_type.properties["st_gid"] = Sqlite.DOUBLE
-        data_type.properties["st_size"] = Sqlite.DOUBLE
-        data_type.properties["st_atime"] = Sqlite.DOUBLE
-        data_type.properties["st_mtime"] = Sqlite.DOUBLE
-        data_type.properties["st_ctime"] = Sqlite.DOUBLE
-        data_type.properties["file_remote"] = Sqlite.STRING
-        #print(data_type.properties)
-        store.put_artifact_type(data_type, isVerbose)
+        # See if filesystem exists
+        fs_t = t.find_table("filesystem")
+        
+        print (fs_t)
 
-        artifact = Artifact()
-        artifact.name = "filesystem"
-        for file,st,file_remote in zip(file_list,st_list,rfile_list):
-            artifact.properties["file_origin"] = str(file)
-            artifact.properties["st_mode"] = st.st_mode
-            artifact.properties["st_ino"] = st.st_ino
-            artifact.properties["st_dev"] = st.st_dev
-            artifact.properties["st_nlink"] = st.st_nlink
-            artifact.properties["st_uid"] = st.st_uid
-            artifact.properties["st_gid"] = st.st_gid
-            artifact.properties["st_size"] = st.st_size
-            artifact.properties["st_atime"] = st.st_atime
-            artifact.properties["st_mtime"] = st.st_mtime
-            artifact.properties["st_ctime"] = st.st_ctime
-            artifact.properties["file_remote"] = str(file_remote)
-            #print(artifact.properties)
-            store.put_artifacts_lgcy(artifact, isVerbose)
+        if fs_t == None:
+            # Create new filesystem collection with origin and remote locations
+            # Stage data for ingest
+            # Transpose the OrderedDict to a list of row dictionaries
+            num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
+            rows = []
 
-        store.close()
+            for i in range(num_rows):
+                row = {col: values[i] for col, values in st_dict.items()}
+                rows.append(row)
 
-        # Data movement
-        # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
-        for file,file_remote in zip(file_list,rfile_list):
-            abspath = os.path.dirname(os.path.abspath(file_remote))
-            if not os.path.exists(abspath):
-                if isVerbose:
-                    print( " mkdir " + abspath)
-                path = Path(abspath)
-                path.mkdir(parents=True)
-
-            if isVerbose:
-                print( " cp " + file + " " + file_remote)
-            shutil.copyfile(file , file_remote)
+            # Write to CSV
+            output_file = '.fs.csv'
+            with open(output_file, mode='w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
+                writer.writeheader()
+                writer.writerows(rows)
             
+            # Add filesystem table
+            t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
+            t.artifact_handler(interaction_type='ingest')
 
-        # Database movement
-        if isVerbose:
-            print( " cp " + os.path.join(local_loc, str(self.project_name+".db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
-        shutil.copyfile(os.path.join(local_loc, str(self.project_name+".db") ), os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+            self.file_list = file_list
+            self.rfile_list = rfile_list
 
-        print( " Data Copy Complete! ")
+    def copy(self, tool="copy", isVerbose=False):
+        """
+        Helper function to perform the 
+        data copy over using a preferred API
+        """
+        
+        # Unix Copy
+        if tool == "copy":
+            # Data movement
+            # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
+            for file,file_remote in zip(self.file_list,self.rfile_list):
+                abspath = os.path.dirname(os.path.abspath(file_remote))
+                if not os.path.exists(abspath):
+                    if isVerbose:
+                        print( " mkdir " + abspath)
+                    path = Path(abspath)
+                    path.mkdir(parents=True)
+
+                if isVerbose:
+                    print( " cp " + file + " " + file_remote)
+                shutil.copyfile(file , file_remote)
+                
+
+            # Database movement
+            if isVerbose:
+                print( " cp " + os.path.join(local_loc, str(self.project_name+".db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+            shutil.copyfile(os.path.join(local_loc, str(self.project_name+".db") ), os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+
+            print( " Data Copy Complete! ")
+        elif tool == "scp":
+            True
+        elif tool == "ftp":
+            True
+        elif tool == "git":
+            True
+        else:
+            raise TypeError(f"Data movement format not supported:, Type: {tool}")
+
 
 
     def dircrawl(self,filepath):
@@ -830,10 +1239,9 @@ class Sync():
     
         return file_list
     
-    def get(project_name = "Project"):
+    def get(self, project_name = "Project"):
         '''
         Helper function that searches remote location based on project name, and retrieves
         DSI database
         '''
         True
-        

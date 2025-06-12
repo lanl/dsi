@@ -16,5 +16,5 @@ class SetupWrapper(install):
 setup(
     packages=['dsi','dsi.plugins','dsi.backends','dsi.tests'],
     cmdclass={'install': SetupWrapper},
-    version=__version__
+    version=__version__,
 )

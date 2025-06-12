@@ -10,14 +10,12 @@ The Data Science Infrastructure Project (DSI)
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
+   intro-users
    installation
-   tiers
-   plugins
-   backends
-   core
-   contributing_readers
-   examples
+   python_api
+   cli_api
+   examples_user
+   contributors
 
 Indices and tables
 ==================

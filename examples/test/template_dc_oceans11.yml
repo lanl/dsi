@@ -1,0 +1,19 @@
+name: "data set name"
+description: ""
+data_uses: ""
+
+authorship:
+  creators: ""
+  creation_date: ""
+  la_ur: ""
+  owner: ""
+  funding: ""
+  publisher: ""
+  published_date: ""
+
+data:
+  origin_location: ""
+  num_simulations: 0
+  version: 0
+  license: ""
+  live_dataset: No

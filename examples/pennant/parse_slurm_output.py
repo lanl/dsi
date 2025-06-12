@@ -10,15 +10,7 @@ import re
 import glob
 
 def main():
-    """ A testname argument is required """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--testname', help='the test name')
-    args = parser.parse_args()
-    testname = args.testname
-    if testname is None:
-        parser.print_help()
-        sys.exit(0)
-
+    testname = "leblanc"
 
     """ The data is parsed from all of the .out files in the current directory """
     for slurmoutput in glob.glob('*.out'):
