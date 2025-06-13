@@ -681,7 +681,7 @@ class DuckDB(Filesystem):
         self.table_print_helper(headers, rows, num_rows)
         print()
     
-    def summary(self, table_name = None, num_rows = 0):
+    def summary(self, table_name = None):
         """
         Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
 
@@ -689,11 +689,6 @@ class DuckDB(Filesystem):
             If specified, only the numerical metadata for that table will be printed.
             
             If None (default), metadata for all available tables is printed.
-
-        `num_rows` : int, optional, default=0
-            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
-
-            If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if table_name is None:
             tableList = self.cur.execute("""
@@ -705,32 +700,11 @@ class DuckDB(Filesystem):
                 print(f"\nTable: {table[0]}")
                 headers, rows = self.summary_helper(table[0]) 
                 self.table_print_helper(headers, rows, 1000)
-
-                if num_rows > 0:
-                    df = self.cur.execute(f"SELECT * FROM {table[0]};").fetchdf()
-                    headers = df.columns.tolist()
-                    rows = df.values.tolist()
-                    self.table_print_helper(headers, rows, num_rows)
-                    print()
-                else:
-                    row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
-                    print(f"  - num of rows: {row_count}\n")
         else:
             print(f"\nTable: {table_name}")
             headers, rows = self.summary_helper(table_name) 
             self.table_print_helper(headers, rows, 1000)
 
-            if num_rows > 0:
-                df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
-                headers = df.columns.tolist()
-                rows = df.values.tolist()
-                self.table_print_helper(headers, rows, num_rows)
-                print()
-            else:
-                row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-                print(f"  - num of rows: {row_count}\n")
-
-    
     def summary_helper(self, table_name):
         """
         **Internal use only.**
@@ -762,6 +736,8 @@ class DuckDB(Filesystem):
             else:
                 min_val = max_val = avg_val = std_dev = None
             
+            if avg_val != None and std_dev == None:
+                std_dev = 0
             rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
