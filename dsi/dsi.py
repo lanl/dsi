@@ -200,14 +200,13 @@ class DSI():
                 if "table" in param.lower():
                     updated[param] = table_name
             
-            print(updated)
-            # fnull = open(os.devnull, 'w')
-            # try:
-            #     with redirect_stdout(fnull):
-            self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
-            self.t.load_module('plugin', class_name, 'reader', **updated)
-            # except Exception as e:
-            #     sys.exit(f"read() ERROR: {e}")
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
+                    self.t.load_module('plugin', class_name, 'reader', **updated)
+            except Exception as e:
+                sys.exit(f"read() ERROR: {e}")
 
         else:
             correct_reader = True
