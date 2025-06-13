@@ -13,12 +13,13 @@ test = DSI("data.db")
 test.schema(filename="yaml1_schema.json") # must be loaded first
 # test.schema(filename="example_schema.json") # must be loaded first
 
-test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAML1')
+test.read(path=["student_test1.yml", "student_test2.yml"], reader_name='YAML1')
 # test.read(filenames=["results.toml", "results1.toml"], reader_name='TOML1')
 # test.read(filenames="yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
 # test.read(filenames="wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
 # test.read(filenames=['bueno1.data', 'bueno2.data'], reader_name='Bueno')
 # test.read(filenames="../clover3d/", reader_name='Cloverleaf')
+# test.read("test.txt", "../developer/text_file_reader.py")
 
 # test.read(filenames=['wildfire/wildfire_oceans11.yml', 'pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
 # test.read(filenames="wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
@@ -47,7 +48,7 @@ test.get_table("math")                                          # print output
 # test.update(query_df)
 # test.display("math")
 
-test.find(query="a")                                # print output
+test.find(query=2)                                  # print output
 # find_list = test.find(query="a", collection=True)   # return output
 # for obj in find_list:
 #     test.display(table_name=obj["dsi_table_name"][0])
@@ -55,7 +56,7 @@ test.find(query="a")                                # print output
 #     obj['i'] = list(range(2000, 2000 + len(obj)))
 #     obj['b'] = list(range(2000, 2000 + len(obj)))
 #     obj["new_col"] = "test1"
-# test.update(find_list)
+# test.update(find_list, backup=True)
 # for obj in find_list:
 #     test.display(table_name=obj["dsi_table_name"][0])
 
