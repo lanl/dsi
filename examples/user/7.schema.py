@@ -6,7 +6,7 @@ schema_dsi = DSI("schema_data.db")
 # dsi.schema(filename)
 schema_dsi.schema("../test/example_schema.json") # must be before reading Cloverleaf data
 
-#dsi.read(filename, reader)
+#dsi.read(path, reader)
 schema_dsi.read("../clover3d/", 'Cloverleaf')
 
 #dsi.write(filename, writer)
