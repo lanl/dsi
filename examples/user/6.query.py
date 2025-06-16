@@ -1,4 +1,4 @@
-# examples/user/5.query.py
+# examples/user/6.query.py
 from dsi.dsi import DSI
 
 query_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:

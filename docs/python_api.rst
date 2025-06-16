@@ -85,31 +85,31 @@ Reading Cloverleaf data into a DSI backend, and displaying some of that data
 
 .. literalinclude:: ../examples/user/2.read.py
 
-Example 3: Find data
+Example 3: Visualize data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
+
+.. literalinclude:: ../examples/user/3.visualize.py
+
+Example 4: Find data
 ~~~~~~~~~~~~~~~~~~~~
 Finding data from an active DSI backend that matches an input query - a string or a number.
 Prints all matches by default. If ``True`` is passed as an additional argument, returns a list of data from each table that matches the query.
 
-.. literalinclude:: ../examples/user/3.find.py
+.. literalinclude:: ../examples/user/4.find.py
 
-Example 4: Updating data
+Example 5: Update data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Updating data from the edited output of ``find()``. Input can either be a list of table data or a single table's data.
 
-.. literalinclude:: ../examples/user/4.update.py
+.. literalinclude:: ../examples/user/5.update.py
 
-Example 5: Query data
+Example 6: Query data
 ~~~~~~~~~~~~~~~~~~~~~
 Querying data from an active DSI backend. 
 Users can either use ``query()`` to view specific data with a SQL statement, or ``get_table()`` to view all data from a specified table.
 
-.. literalinclude:: ../examples/user/5.query.py
-
-Example 6: Visualizing a database
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
-
-.. literalinclude:: ../examples/user/6.visualize.py
+.. literalinclude:: ../examples/user/6.query.py
 
 Example 7: Complex schema with data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -119,7 +119,7 @@ Read :ref:`user_schema_example_label` to learn how to structure a DSI-compatible
 
 .. literalinclude:: ../examples/user/7.schema.py
 
-Example 8: Writing data
+Example 8: Write data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.
 

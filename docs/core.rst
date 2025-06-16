@@ -86,42 +86,40 @@ Read :ref:`schema_section` to better understand how to structure this schema JSO
 
 .. literalinclude:: ../examples/developer/3.schema.py
 
+Example 4: Visualize data
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
+
+.. literalinclude:: ../examples/developer/4.visualize.py
 
 .. _process_label:
 
-Example 4: Process and Write data
+Example 5: Process and Write data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Processing data from a Sqlite DSI backend and useing a Writer to generate an ER diagram, table plot and CSV file.
 
-.. literalinclude:: ../examples/developer/4.process.py
+.. literalinclude:: ../examples/developer/5.process.py
 
-Example 5: Find data
+Example 6: Find data
 ~~~~~~~~~~~~~~~~~~~~
 Finding data from a Sqlite DSI backend - tables, columns, cells, or all matches.
 If matching data found, it is returned as a list of ValueObject(). 
 Refer to each backend's ValueObject() description in :ref:`backend_section_label`, as its structure varies by backend.
 
-.. literalinclude:: ../examples/developer/5.find.py
+.. literalinclude:: ../examples/developer/6.find.py
 
-Example 6: Query data
+Example 7: Query data
 ~~~~~~~~~~~~~~~~~~~~~~
 Querying data from a Sqlite DSI backend.
 Users can either use ``artifact_handler('query', SQL_query)`` to store certain data, or ``get_table()`` to retrieve all data from a specified table.
 
-.. literalinclude:: ../examples/developer/6.query.py
+.. literalinclude:: ../examples/developer/7.query.py
 
-Example 7: Overwrite data
+Example 8: Overwrite data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overwriting a table using modified data from ``get_table()``
 
-.. literalinclude:: ../examples/developer/7.overwrite.py
-
-Example 8: Visualize data
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
-
-.. literalinclude:: ../examples/developer/8.visualize.py
-
+.. literalinclude:: ../examples/developer/8.overwrite.py
 
 .. _external_readers_writers_label:
 

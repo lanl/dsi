@@ -1,4 +1,4 @@
-# examples/user/3.find.py
+# examples/user/4.find.py
 from dsi.dsi import DSI
 
 find_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
