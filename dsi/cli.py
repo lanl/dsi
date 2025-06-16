@@ -13,40 +13,30 @@ import sys
 from dsi.core import Terminal
 from ._version import __version__
 
-def path_completer(text, state):
-    """
-    Completes file and directory paths for the current input
-    """
+def autofill_path(text, state):
+    """ Completes file and directory paths for the current input """
     line = readline.get_line_buffer()
     parts = shlex.split(line[:readline.get_endidx()], posix=True)
     
-    # Handle the case where the user is starting a new argument
     if line and line[-1].isspace():
         parts.append('')
     
-    # Only complete the current argument (the last one)
-    if parts:
-        curr = parts[-1]
-    else:
-        curr = ''
+    curr = parts[-1] if parts else ''
     
-    # Expand ~ and glob for possible matches
-    curr_expanded = os.path.expanduser(curr)
-    matches = glob.glob(curr_expanded + '*')
-
-    # Append a slash to directories to hint completion
+    matches = glob.glob(os.path.expanduser(curr) + '*')
     matches = [m + '/' if os.path.isdir(m) else m for m in matches]
+    matches = [m[m[:-1].rfind('/')+1:] if '/' in m[:-1] else m for m in matches]
 
-    # Return the match corresponding to this state
     try:
         return matches[state]
     except IndexError:
         return None
 
-# Enable autocompletion
-readline.set_completer_delims(' \t\n')  # So paths with `/` are not broken
-readline.set_completer(path_completer)
-readline.parse_and_bind('tab: complete')
+readline.set_completer(autofill_path)
+if "libedit" in readline.__doc__:
+    readline.parse_and_bind("bind ^I rl_complete")
+else:
+    readline.parse_and_bind("tab: complete")
 
 
 class DSI_cli:
@@ -261,7 +251,7 @@ class DSI_cli:
             print(f"find ERROR: {e}")
             return
 
-        if not isinstance(find_list, list):
+        if find_list is None:
             if isinstance(args[0], str):
                 print(f"'{args[0]}' was not found")
             else:
@@ -440,6 +430,7 @@ class DSI_cli:
                     self.t.unload_module('backend','Parquet','back-write')
         except Exception as e:
             print(f"read ERROR: {e}\n")
+            self.t.active_metadata = OrderedDict()
             return
 
         if self.t.active_metadata:
@@ -447,6 +438,7 @@ class DSI_cli:
                 self.t.artifact_handler(interaction_type='ingest')
             except Exception as e:
                 print(f"read ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
                 return
             
             table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
@@ -459,6 +451,7 @@ class DSI_cli:
             print()
             self.t.active_metadata = OrderedDict()
         else:
+            print()
             print("Ensure file has data stored correctly.")
             print("Currently supported formats are: ")
             print("   - csv (extension: .csv)")
