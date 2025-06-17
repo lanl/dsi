@@ -1062,7 +1062,7 @@ class Sync():
         #self.local_location = {}
         self.project_name = project_name
 
-    def populate(self, local_loc, remote_loc, isVerbose=False):
+    def index(self, local_loc, remote_loc, isVerbose=False):
         """
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
@@ -1072,6 +1072,8 @@ class Sync():
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl(local_loc)
 
+        self.remote_location = remote_loc
+        self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
         rfile_list = []
@@ -1138,18 +1140,23 @@ class Sync():
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             f = local_loc+"/"+self.project_name+".db"
-            print("db: ", f)
-            t.load_module('backend','Sqlite','back-write', filename=f)
+            if isVerbose:
+                print("db: ", f)
+            if os.path.exists(f):
+                t.load_module('backend','Sqlite','back-write', filename=f)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             raise
 
         # See if filesystem exists
-        fs_t = t.find_table("filesystem")
-        
-        print (fs_t)
-
-        if fs_t == None:
+        #fs_t = t.find_table("filesystem")
+        try:
+            fs_t = t.get_table("filesystem")
+            if isVerbose:
+                print("fs table exists already, skipping for now")
+        except:
+            if isVerbose:
+                print( "Creating new fs table")
             # Create new filesystem collection with origin and remote locations
             # Stage data for ingest
             # Transpose the OrderedDict to a list of row dictionaries
@@ -1174,16 +1181,15 @@ class Sync():
             self.file_list = file_list
             self.rfile_list = rfile_list
 
-    def copy(self, tool="copy", isVerbose=False):
+    def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
         Helper function to perform the 
         data copy over using a preferred API
         """
         
-        # Unix Copy
+        # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         if tool == "copy":
-            # Data movement
-            # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
+            # Data movement via Unix Copy
             for file,file_remote in zip(self.file_list,self.rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
@@ -1199,12 +1205,15 @@ class Sync():
 
             # Database movement
             if isVerbose:
-                print( " cp " + os.path.join(local_loc, str(self.project_name+".db") ) + " " + os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
-            shutil.copyfile(os.path.join(local_loc, str(self.project_name+".db") ), os.path.join(remote_loc, self.project_name, self.project_name+".db" ) )
+                print( " cp " + os.path.join(self.local_location, str(self.project_name+".db") ) + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+            shutil.copyfile(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
 
             print( " Data Copy Complete! ")
         elif tool == "scp":
-            True
+            #  Data movement via SCP
+            remote_user =
+            remote_host =
+
         elif tool == "ftp":
             True
         elif tool == "git":
