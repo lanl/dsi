@@ -90,8 +90,8 @@ class DSI():
        Loads a relational database schema into DSI from a specified `filename`
 
         `filename` : str
-        Path to a JSON file describing the structure of a relational database.
-        The schema should follow the format described in :ref:`user_schema_example_label`
+            Path to a JSON file describing the structure of a relational database.
+            The schema should follow the format described in :ref:`user_schema_example_label`
 
         **Must be called before reading in any data files associated with the schema**
         """
@@ -105,7 +105,7 @@ class DSI():
         pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
         fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
         self.schema_tables = pk_tables.union(fk_tables)
-        print(f"Successfully loaded the schema file, {filename}")
+        print(f"Successfully loaded the schema file: {filename}")
 
     def list_readers(self):
         """
@@ -138,7 +138,7 @@ class DSI():
                 - "TOML1"                → .toml
                 - "JSON"                 → .json
                 - "Ensemble"             → .csv
-                - "Cloverleaf"           → /path/to/data/dir/
+                - "Cloverleaf"           → /path/to/data/directory/
                 - "Bueno"                → .data
                 - "DublinCoreDatacard"   → .xml
                 - "SchemaOrgDatacard"    → .json
@@ -147,7 +147,11 @@ class DSI():
 
         `reader_name` : str
             Name of the DSI reader to use for loading the data. 
-            Call `list_readers()` to see a list of supported reader names.
+
+            If using a DSI-supported reader, this should be one of the reader_names from `list_readers()`.
+
+            If using a custom reader, provide the relative file path to the Python script with the reader.  
+            For guidance on creating a DSI-compatible reader, view :ref:`custom_reader`.
 
         `table_name` : str, optional
             Name to assign to the loaded table. 
@@ -158,41 +162,89 @@ class DSI():
         if isinstance(filenames, list) and not all(os.path.exists(f) for f in filenames):
             sys.exit("read() ERROR: All input files must have a valid filepath. Please check again.")
         
-        correct_reader = True
-        fnull = open(os.devnull, 'w')
-        try:
-            with redirect_stdout(fnull):
-                if reader_name.lower() == "oceans11datacard":
-                    self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
-                elif reader_name.lower() == "dublincoredatacard":
-                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
-                elif reader_name.lower() == "schemaorgdatacard":
-                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
-                elif reader_name.lower() == "googledatacard":
-                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
-                elif reader_name.lower() == "bueno":
-                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
-                elif reader_name.lower() == "csv":
-                    self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name = table_name)
-                elif reader_name.lower() == "yaml1":
-                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
-                elif reader_name.lower() == "toml1":
-                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
-                elif reader_name.lower() == "ensemble":
-                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name = table_name)
-                elif reader_name.lower() == "json":
-                    self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name = table_name)
-                elif reader_name.lower() == "cloverleaf":
-                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames)
-                else:
-                    correct_reader = False
-        except Exception as e:
-            sys.exit(f"read() ERROR: {e}")
+        if reader_name.endswith(".py"):
+            if not os.path.exists(reader_name):
+                sys.exit("read() ERROR: `reader_name` must be a valid filepath to the custom reader. Please check again.")
 
-        if correct_reader == False:
-            print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-            elg = "CSV, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard, GoogleDatacard, Oceans11Datacard"
-            sys.exit(f"Eligible readers are: {elg}")
+            import ast
+            parsed_data = None
+            try:
+                with open(reader_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=reader_name)
+            except Exception as e:
+                sys.exit(f"read() Error: Could not read the Python file with the custom reader.")
+
+            class_name = None
+            init_params = []
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    if "__init__" in functions and "add_rows" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name == None:
+                sys.exit(f"read() Error: The custom Reader must be structured as a Class in the Python script.")
+            elif init_params == []:
+                print("read() Error: The custom Reader must be DSI-compatible.")
+                sys.exit("Please review https://lanl.github.io/dsi/dev_readers.html to ensure it is compatible.")
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = filenames
+                if "table" in param.lower():
+                    updated[param] = table_name
+            
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
+                    self.t.load_module('plugin', class_name, 'reader', **updated)
+            except Exception as e:
+                sys.exit(f"read() ERROR: {e}")
+
+        else:
+            correct_reader = True
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    if reader_name.lower() == "oceans11datacard":
+                        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "dublincoredatacard":
+                        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "schemaorgdatacard":
+                        self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "googledatacard":
+                        self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "bueno":
+                        self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "csv":
+                        self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name = table_name)
+                    elif reader_name.lower() == "yaml1":
+                        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "toml1":
+                        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "ensemble":
+                        self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name = table_name)
+                    elif reader_name.lower() == "json":
+                        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name = table_name)
+                    elif reader_name.lower() == "cloverleaf":
+                        self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames)
+                    else:
+                        correct_reader = False
+            except Exception as e:
+                sys.exit(f"read() ERROR: {e}")
+
+            if correct_reader == False:
+                print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
+                elg = "CSV, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
+                sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
@@ -361,7 +413,7 @@ class DSI():
             
             return table_list
 
-    def update(self, collection):
+    def update(self, collection, backup = False):
         """
         Updates data in one or more tables in the first activated backend using the provided input. 
         Intended to be used after modifying the output of `find()`, `query()`, or `get_table()`
@@ -374,6 +426,11 @@ class DSI():
             - `query()` and `get_table()` return a single DataFrame corresponding to one table.
               
                 - If this DataFrame is the input, the corresponding table in the backend will be completely overwritten by the input.
+
+        `backup` : bool, optional, default False. 
+            If True, creates a backup file for the DSI backend before updating its data.
+
+            If False, (default), only updates the data.
 
         - NOTE: Some Pandas operations can delete the hidden metadata which will raise errors when trying to update.
         - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
@@ -438,9 +495,9 @@ class DSI():
 
             try:
                 if len(table_name_list) > 1:
-                    self.t.overwrite_table(table_name_list, dataframe_list)
+                    self.t.overwrite_table(table_name_list, dataframe_list, backup)
                 elif len(table_name_list) == 1:
-                    self.t.overwrite_table(table_name_list[0], dataframe_list[0])
+                    self.t.overwrite_table(table_name_list[0], dataframe_list[0], backup)
             except Exception as e:
                 sys.exit(f"update() ERROR: {e}")
     
@@ -453,7 +510,7 @@ class DSI():
             if 'dsi_table_name' in collection.columns:
                 collection = collection.drop(columns='dsi_table_name')
             try:
-                self.t.overwrite_table(table_name, collection)
+                self.t.overwrite_table(table_name, collection, backup)
             except Exception as e:
                 sys.exit(f"update() ERROR: {e}")
         else:
@@ -545,7 +602,7 @@ class DSI():
             sys.exit(f"list() ERROR: {e}")
         
 
-    def summary(self, table_name = None, num_rows = 0):
+    def summary(self, table_name = None):
         """
         Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
 
@@ -553,18 +610,13 @@ class DSI():
             If specified, only the numerical metadata for that table will be printed.
             
             If None (default), metadata for all available tables is printed.
-
-        `num_rows` : int, optional, default=0
-            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
-
-            If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
         try:
-            self.t.summary(table_name, num_rows)
+            self.t.summary(table_name)
         except Exception as e:
-            sys.exit(f"display() ERROR: {e}")
+            sys.exit(f"summary() ERROR: {e}")
     
     def num_tables(self):
         """

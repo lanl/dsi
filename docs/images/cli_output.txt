@@ -1,9 +1,11 @@
 (mydsi) viyer@pn2405703 examples % dsi
-DSI version 1.1.1
+DSI 1.1.1
+
+Created a temporary sqlite DSI backend
 
 Enter "help" for usage hints.
-
 dsi> help
+
 display <table_name> [-n num_rows] [-e filename] Displays a table's data. Optionally limit
                                                   displayed rows and export to CSV/Parquet
 draw [-f filename]                               Draws an ER diagram of all tables in the
@@ -14,12 +16,11 @@ help                                             Shows this help message.
 list                                             Lists all tables in the current DSI database
 plot_table <table_name> [-f filename]            Plots numerical data from a table to an
                                                   optional file name argument
-query <SQL_query> [-n num_rows] [-e filename]    Prints a SQL query result. Optionally limit
-                                                  printed rows and export to CSV/Parquet.
+query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes). Optionally
+                                                  limit printed rows or export to CSV/Parquet
 read <filename> [-t table_name]                  Reads a file or URL into the DSI database.
                                                   Optionally set table name.
-summary [-t table_name] [-n num_rows]            Summary of the database or a specific table.
-                                                  Optionally view N rows of the table(s)
+summary [-t table_name]                          Summary of the database or a specific table.
 write <filename>                                 Writes data in DSI database to a permanent
                                                   location.
 ls                                               Lists all files in the current or specified
@@ -100,7 +101,7 @@ Successfully drew an ER Diagram in dsi_er_diagram.png
 dsi> plot_table physics -f physics_plot.png
 Successfully plotted physics in physics_plot.png
 
-dsi> summary -t physics -n 1
+dsi> summary -t physics
 
 Table: physics
 
@@ -113,12 +114,6 @@ p             | INTEGER | 23      | 233     | 128.0   | 105.0
 q             | VARCHAR | None    | None    | None    | None                 
 r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
 s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
-
-specification | n    | o       | p   | q       | r  | s      
--------------------------------------------------------------
-!amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
-  ... showing 1 of 2 rows
-
 
 dsi> write dsi_output.db
 Sucessfully wrote all data to dsi_output.db

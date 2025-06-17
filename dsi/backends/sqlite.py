@@ -768,7 +768,7 @@ class Sqlite(Filesystem):
         self.table_print_helper(headers, rows, num_rows)
         print()
     
-    def summary(self, table_name = None, num_rows = 0):
+    def summary(self, table_name = None):
         """
         Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
 
@@ -776,11 +776,6 @@ class Sqlite(Filesystem):
             If specified, only the numerical metadata for that table will be printed.
             
             If None (default), metadata for all available tables is printed.
-
-        `num_rows` : int, optional, default=0
-            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
-
-            If 0 (default), only the total number of rows is printed (no row-level data).
         """
         if table_name is None:
             tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table' AND name != 'sqlite_sequence';").fetchall()
@@ -791,30 +786,10 @@ class Sqlite(Filesystem):
                 print(f"\nTable: {table[0]}")
                 headers, rows = self.summary_helper(table[0]) 
                 self.table_print_helper(headers, rows, 1000)
-
-                if num_rows > 0:
-                    df = pd.read_sql_query(f"SELECT * FROM {table[0]};", self.con) 
-                    headers = df.columns.tolist()
-                    rows = df.values.tolist()
-                    self.table_print_helper(headers, rows, num_rows)
-                    print()
-                else:
-                    row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
-                    print(f"  - num of rows: {row_count}\n")
         else:
             print(f"\nTable: {table_name}")
             headers, rows = self.summary_helper(table_name) 
             self.table_print_helper(headers, rows, 1000)
-
-            if num_rows > 0:
-                df = pd.read_sql_query(f"SELECT * FROM {table_name};", self.con) 
-                headers = df.columns.tolist()
-                rows = df.values.tolist()
-                self.table_print_helper(headers, rows, num_rows)
-                print()
-            else:
-                row_count = self.cur.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-                print(f"  - num of rows: {row_count}\n")
 
     def summary_helper(self, table_name):
         """
@@ -833,6 +808,12 @@ class Sqlite(Filesystem):
             col_type = col[2].upper()
             is_primary = col[5] > 0
             display_name = f"{col_name}*" if is_primary else col_name
+
+            try:
+                self.cur.execute("SELECT sqrt(4);")
+            except Exception as e:
+                import math
+                self.con.create_function('sqrt', 1, math.sqrt)
 
             if any(nt in col_type for nt in numeric_types):
                 min_val, max_val, avg_val, std_dev = self.cur.execute(f"""
@@ -856,6 +837,8 @@ class Sqlite(Filesystem):
             else:
                 min_val = max_val = avg_val = std_dev = None
             
+            if avg_val != None and std_dev == None:
+                std_dev = 0
             rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
 
         return headers, rows

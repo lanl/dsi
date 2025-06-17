@@ -413,8 +413,9 @@ class Terminal():
         `query` : str, optional
             Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
 
-        \**kwargs : 
-            Additional keyword arguments passed to underlying backend functions.
+        kwargs : 
+            Additional keyword arguments passed to underlying backend functions. 
+            View relevant functions in the DSI backend file to understand other arguments to pass in.
         
         `return`: only when `interaction_type` = 'query'
             By default stores query result as a Pandas.DataFrame. If specified, returns it as an OrderedDict
@@ -441,7 +442,7 @@ class Terminal():
                 parent_class = obj.__class__.__bases__[0].__name__
                 if self.backup_db == True and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
                     if self.debug_level != 0:
-                        self.logger.info(f"   Creating backup file before ingesting data into {obj.__class__.__name__} backend")
+                        self.logger.info(f"   Creating backup file before ingesting data into the {obj.__class__.__name__} backend")
                     backup_start = datetime.now()
                     formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
                     backup_file = obj.filename[:obj.filename.rfind('.')] + "_backup_" + formatted_datetime + obj.filename[obj.filename.rfind('.'):]
@@ -485,7 +486,7 @@ class Terminal():
             # TODO fix this passthrough by updating Parquet to use process_artifacts()
             # TODO query all backends
             if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
             if self.valid_backend(first_backend, parent_backend):
@@ -534,7 +535,7 @@ class Terminal():
         # only processes data from first backend for now - TODO process data from all active backends later
         elif interaction_type in ["process", "read"]:
             if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and first_backend.filename in [".temp.sqlite", ".temp.duckdb"]:
+                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
             if self.valid_backend(first_backend, parent_backend):
@@ -577,6 +578,9 @@ class Terminal():
             If True, returns the data as an OrderedDict.
             If False (default), returns the data as a pandas DataFrame.
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Getting data from the table: {table_name} in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend to be able to get data from a specified table')
@@ -613,6 +617,9 @@ class Terminal():
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Finding `{query_object}` across all tables, columns, and cells in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before performing a find on it')
@@ -640,6 +647,9 @@ class Terminal():
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Finding all tables whose name matches `{query_object}` in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before performing a find on it')
@@ -672,6 +682,9 @@ class Terminal():
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Finding all columns whose name matches `{query_object}` in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before performing a find on it')
@@ -704,6 +717,9 @@ class Terminal():
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Finding all cells which match `{query_object}` in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before performing a find on it')
@@ -728,9 +744,6 @@ class Terminal():
             print(f"Finding all {find_type}matches of '{query_object}' in first backend loaded")
         else:
             print(f"Finding all {find_type}matches of {query_object} in first backend loaded")
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.info(f"Finding all instances of '{query_object}' in first backend loaded in")
         if isinstance(return_object, tuple):
             if self.debug_level != 0:
                 self.logger.warning(return_object[1])
@@ -742,7 +755,7 @@ class Terminal():
                 self.logger.info(f"Runtime: {end-start}")
         return return_object
     
-    def overwrite_table(self, table_name, collection):
+    def overwrite_table(self, table_name, collection, backup = False):
         """
         Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
 
@@ -756,7 +769,14 @@ class Terminal():
         `collection` : pandas.DataFrame  or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
+        
+        `backup` : bool, optional, default False. 
+            - If True, creates a backup file for the DSI backend before updating its data.
+            - If False, (default), only updates the data.
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Overwriting data in the table(s): {table_name} in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend to be able to overwrite a table')
@@ -768,6 +788,18 @@ class Terminal():
                 self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
             raise RuntimeError("First loaded backend needs to have data to be able to overwrite its data")
         start = datetime.now()
+
+        if backup == True:
+            if self.debug_level != 0:
+                self.logger.info(f"   Creating backup file before overwriting data in the {backend.__class__.__name__} backend")
+            backup_start = datetime.now()
+            formatted_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            extension = backend.filename.rfind('.')
+            backup_file = backend.filename[:extension] + "_backup_" + formatted_datetime + backend.filename[extension:]
+            shutil.copyfile(backend.filename, backup_file)
+            backup_end = datetime.now()
+            if self.debug_level != 0:
+                self.logger.info(f"   Backup file creation runtime: {backup_end-backup_start}")
 
         errorStmt = backend.overwrite_table(table_name, collection)
         if errorStmt is not None and isinstance(errorStmt, tuple):
@@ -781,6 +813,9 @@ class Terminal():
         """
         Prints a list of all tables and their dimensions in the first loaded backend
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Listing data of all tables and their dimensions in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before listing all tables in it')
@@ -804,7 +839,7 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
-    def summary(self, table_name = None, num_rows = 0):
+    def summary(self, table_name = None):
         """
         Prints numerical metadata and (optionally) sample data from tables in the first loaded backend.
 
@@ -812,12 +847,13 @@ class Terminal():
             If specified, only the numerical metadata for that table will be printed.
 
             If None (default), metadata for all available tables is printed.
-
-        `num_rows` : int, optional, default=0
-            If greater than 0, prints the first `num_rows` of data for each selected table (depends if `table_name` is specified).
-
-            If 0 (default), only the total number of rows is printed (no row-level data).
         """
+        if self.debug_level != 0 and table_name == None:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Summarizing numerical data of all tables in the first loaded backend')
+        elif self.debug_level != 0 and table_name != None:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Summarizing numerical data of the table: {table_name} in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
@@ -830,7 +866,7 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
         start = datetime.now()
 
-        backend.summary(table_name, num_rows)
+        backend.summary(table_name)
 
         end = datetime.now()
         if self.debug_level != 0:
@@ -840,6 +876,9 @@ class Terminal():
         """
         Prints number of tables in the first loaded backend
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Printing number of tables in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before listing all tables in it')
@@ -873,6 +912,9 @@ class Terminal():
 
             If None (default), all columns are displayed.
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Displaying data from the table {table_name} in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
@@ -902,6 +944,9 @@ class Terminal():
         `query` : str
             A query string written in a database language (typically SQL).
         """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Getting all table names from the query: {query}')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend to be able to identify table names in a query for that backend')

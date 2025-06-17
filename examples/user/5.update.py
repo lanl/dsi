@@ -1,4 +1,4 @@
-# examples/user/4.update.py
+# examples/user/5.update.py
 from dsi.dsi import DSI
 
 update_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:

@@ -1,4 +1,4 @@
-# examples/developer/8.visualize.py
+# examples/developer/4.visualize.py
 from dsi.core import Terminal
 
 terminal_visualize = Terminal()

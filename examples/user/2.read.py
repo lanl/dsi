@@ -3,7 +3,7 @@ from dsi.dsi import DSI
 
 read_dsi = DSI("data.db") # Target a backend, defaults to SQLite if not defined
 
-#dsi.read(filename, reader)
+#dsi.read(path, reader)
 read_dsi.read("../clover3d/", 'Cloverleaf') # Read data into memory
 
 #dsi.display(table_name)

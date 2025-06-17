@@ -1,4 +1,4 @@
-# examples/developer/5.query.py
+# examples/developer/7.query.py
 from dsi.core import Terminal
 
 terminal_query = Terminal()
