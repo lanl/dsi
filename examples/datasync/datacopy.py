@@ -7,5 +7,5 @@ remote_path = "/Users/Shared/staging/"
 
 # Create Sync type with project name
 s = Sync("clover3d")
-s.populate(local_files,remote_path,True)
-#s.copy("copy",True)
+s.index(local_files,remote_path,True)
+s.copy("copy",True)
