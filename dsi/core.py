@@ -1211,8 +1211,8 @@ class Sync():
             print( " Data Copy Complete! ")
         elif tool == "scp":
             #  Data movement via SCP
-            remote_user =
-            remote_host =
+            remote_user = os.getlogin()
+            remote_host = "myremote"
 
         elif tool == "ftp":
             True
