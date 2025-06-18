@@ -673,7 +673,7 @@ class DuckDB(Filesystem):
             values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
             relation = f"BETWEEN {values[0]} AND {values[1]}"
         
-        query = f"SELECT ROW_NUMBER() OVER () AS row_number, * FROM {all_tables[0]} WHERE {column_name} {relation}"
+        query = f"SELECT * FROM (SELECT ROW_NUMBER() OVER () AS row_num, * FROM {all_tables[0]}) WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()
         
         if not output_data:

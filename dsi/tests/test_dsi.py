@@ -243,7 +243,7 @@ def test_error_schema_sqlite_backend():
         test.query("SELECT * FROM math") # Querying data but need to load in associated data after loading in schema
         assert False
     except SystemExit as e:
-        expected = "ERROR: Cannot query() until all associated data is loaded after a complex schema"
+        expected = "ERROR: Cannot query() on an empty backend. Please ensure there is data in it."
         assert str(e) == expected
 
 def test_query_update_schema_sqlite_backend():
