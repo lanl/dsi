@@ -14,14 +14,13 @@ class DataType:
 
 class ValueObject:
     """
-    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, or ``find_cell``
+    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, ``find_cell``, or ``find_relation``
 
         - t_name: table name 
         - c_name: column name as a list. The length of the list varies based on the find function. 
           Read the description of each one to understand the differences
-        - row_num: row number. Is useful when finding a value in ``find_cell`` or ``find`` (which includes results from ``find_cell``)
-        - type: type of match for this specific ValueObject. {table, column, range, cell, row}
-
+        - row_num: row number. Useful when finding a value in find_cell, find_relation, or find (includes results from find_cell)
+        - type: type of match for this specific ValueObject. {table, column, range, cell, row, relation}
     """
     t_name = "" # table name
     c_name = [] # column name(s) 
@@ -48,7 +47,7 @@ class DuckDB(Filesystem):
         self.cur = self.con.cursor()
         self.runTable = DuckDB.runTable
 
-    def check_type(self, input_list):
+    def sql_type(self, input_list):
         """
         **Internal use only. This function is not intended for direct use by users.**
 
@@ -102,7 +101,7 @@ class DuckDB(Filesystem):
             diff_cols = list(set(col_names) - set(query_cols))
             if len(diff_cols) > 0:
                 for col in diff_cols:
-                    temp_name = col + self.check_type(types.properties[col])
+                    temp_name = col + self.sql_type(types.properties[col])
                     try:
                         self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
                     except duckdb.Error as e:
@@ -206,9 +205,9 @@ class DuckDB(Filesystem):
                 types.properties[key.replace('-','_minus_')] = tableData[key]
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(key + self.check_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(key + self.sql_type(tableData[key]) + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(key + self.check_type(tableData[key]))
+                    types.unit_keys.append(key + self.sql_type(tableData[key]))
             
             self.ingest_table_helper(types, foreign_query)
             
@@ -291,7 +290,19 @@ class DuckDB(Filesystem):
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
                     print(data)
-            except:
+            except Exception as e:
+                message = str(e)
+                if "Table" in message and "does not exist" in message:
+                    table_name = message[message.find("Table"):message.find("Did you mean")-2]
+                    print(f"WARNING: {table_name} in this database")
+                    if dict_return:
+                        return OrderedDict()
+                    return pd.DataFrame()
+                
+                if "Table" in str(e) and "does not exist" in str(e) and dict_return:
+                    return OrderedDict()
+                elif "Table" in str(e) and "does not exist" in str(e) and not dict_return:
+                    return pd.DataFrame()
                 return (RuntimeError, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts: Can only run SELECT or PRAGMA queries on the data")
@@ -430,7 +441,7 @@ class DuckDB(Filesystem):
         if len(all_return) > 0:
             return all_return
         else:
-            return (ValueObject(),  f"{query_object} was not found in this database")
+            return f"{query_object} was not found in this database"
         
     def find_table(self, query_object):
         """
@@ -471,8 +482,8 @@ class DuckDB(Filesystem):
             
             if len(table_return_list) > 0:
                 return table_return_list
-            return (ValueObject(), f"{query_object} is not a table name in this database")
-        return (ValueObject(), f"{query_object} needs to be a string if finding among table names")
+            return f"{query_object} is not a table name in this database"
+        return f"{query_object} needs to be a string if finding among table names"
     
     def find_column(self, query_object, range = False):
         """
@@ -531,8 +542,8 @@ class DuckDB(Filesystem):
             
             if len(col_return_list) > 0:
                 return col_return_list
-            return (ValueObject(), f"{query_object} is not a column name in this database")
-        return (ValueObject(), f"{query_object} needs to be a string if finding among column names")
+            return f"{query_object} is not a column name in this database"
+        return f"{query_object} needs to be a string if finding among column names"
 
     def find_cell(self, query_object, row = False):
         """
@@ -615,8 +626,71 @@ class DuckDB(Filesystem):
                 value_obj_list.append(val)
             return value_obj_list
 
-        return (ValueObject(), f"{query_object} is not a cell in this database")
+        return f"{query_object} is not a cell in this database"
 
+    def find_relation(self, column_name, relation):
+        """
+        Finds all rows in the first table of the database that satisfy the relation applied to the given column.
+
+        `column_name` : str
+            The name of the column to apply the relation to.
+        
+        `relation` : str
+            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5)
+
+        `return` : list of ValueObjects
+            One ValueObject per matching row in that first table.
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list of all columns in the table
+            - value:    full row of values
+            - row_num:  row index of the match
+            - type:     'relation'
+        """      
+        tableList = self.cur.execute("""SELECT table_name FROM information_schema.tables
+                                        WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                        """).fetchall()
+        tableList = [table[0] for table in tableList]
+
+        all_tables = []
+        col_list = []
+        for table in tableList:
+            colData = self.cur.execute(f"PRAGMA table_info({table})").fetchall()
+            columns = [row[1] for row in colData]
+            if column_name in columns:
+                all_tables.append(table)
+                col_list = columns        
+        
+        if len(all_tables) == 0:
+            return f"'{column_name}' is not a column in this database. Ensure the column is written first."
+        if relation[0] == '(' and relation[-1] == ')':
+            values = relation[1:-1].strip()
+            values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
+            values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
+            relation = f"BETWEEN {values[0]} AND {values[1]}"
+        
+        query = f"SELECT ROW_NUMBER() OVER () AS row_number, * FROM {all_tables[0]} WHERE {column_name} {relation}"
+        output_data = self.cur.execute(query).fetchall()
+        
+        if not output_data:
+            return f"Could not find any rows where '{column_name} {relation}' in this database."
+        if len(all_tables) > 1:
+            query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
+            return query_list
+        
+        return_list = []
+        for row in output_data:
+            temp = ValueObject()
+            temp.t_name = all_tables[0]
+            temp.c_name = col_list
+            temp.row_num = int(row[0])
+            temp.type = "relation"
+            temp.value = list(row[1:])
+            return_list.append(temp)
+        
+        return return_list
+    
     def list(self):
         """
         Return a list of all tables and their dimensions from this DuckDB backend
@@ -665,8 +739,9 @@ class DuckDB(Filesystem):
 
             If None (default), all columns are displayed.
         """
-        if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
-            return (RuntimeError, f"{table_name} does not exist in this DuckDB database")
+        if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
+                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
+            return (ValueError, f"{table_name} does not exist in this DuckDB database")
         if display_cols == None:
             df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
         else:
@@ -701,6 +776,9 @@ class DuckDB(Filesystem):
                 headers, rows = self.summary_helper(table[0]) 
                 self.table_print_helper(headers, rows, 1000)
         else:
+            if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
+                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
+                return (ValueError, f"{table_name} does not exist in this DuckDB database")
             print(f"\nTable: {table_name}")
             headers, rows = self.summary_helper(table_name) 
             self.table_print_helper(headers, rows, 1000)
@@ -765,7 +843,8 @@ class DuckDB(Filesystem):
             temp_data = self.process_artifacts()
         elif isinstance(table_name, str) and isinstance(collection, pd.DataFrame):
             # if single table doesn't exist, skip all relations/dependencies checking
-            if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
+            if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
+                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
                 not_exists = True
                 temp_data[table_name] = OrderedDict(collection.to_dict(orient='list'))
                 table_name = []
@@ -803,8 +882,8 @@ class DuckDB(Filesystem):
                             if any(isinstance(x, float) for x in fk_data):
                                 fk_data = [round(val, 4) for val in fk_data]
                             if not all(item in new_data for item in fk_data):
-                                errorMsg = f"Data in table {fk[0]}'s foreign key column, {fk[1]}, must match table {name}'s primary key"
-                                return(TypeError, errorMsg + f" column, {result}. Please ensure that all rows in {fk[0]} are updated")
+                                errorMsg = f"Data in '{fk[1]}', the foreign key of '{fk[0]}', must match '{result}', the primary"
+                                return(TypeError, errorMsg + f" key of '{name}'. Please ensure that all rows in '{fk[0]}' are updated")
 
                     print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
 
