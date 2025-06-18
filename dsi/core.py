@@ -792,11 +792,13 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
 
-        print(f"Finding all rows in the first table of the first loaded backend where {query_object}")
-
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
         if not isinstance(query_object, str):
             raise TypeError("`query_object` must be a string")
+        print(f"Finding all rows in the first table of the first loaded backend where {query_object}")
+        if "\\'" in query_object:
+            query_object = query_object.replace("\\'", "'")
+
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
         if not any(op in query_object for op in operators):
             raise ValueError("`query_object` is missing an operator to compare the column to a value.")
         
@@ -808,36 +810,44 @@ class Terminal():
                 result.append(part)
             else:
                 result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
-        column_name = result[0]
-        relation = result[1] + result[2]
-
+        if len(result) == 1:
+            raise ValueError("Could not identify the operator in `query_object`. The operator cannot be nested in double quotes")
+        elif len(result) == 2:
+            raise ValueError("Input must include both a column and a value for comparison.")
+        elif any('"' in val for val in result[1:]):
+            raise ValueError(f"The value in the relational find() cannot be enclosed in double quotes")
+        elif len(result) > 3:
+            raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
+        
         def is_literal(s):
             return s.startswith("'") and s.endswith("'")
         def wrap_in_quotes(value):
             return f"'{value}'" if isinstance(self.check_type(value), str) and not is_literal(value) else value
         
+        column_name = result[0]
+        relation = result[1] + result[2]
+        if "'" in column_name:
+            raise ValueError("Cannot have a single quote as part of a column name")
         if '"' in relation:
             raise ValueError(f"The value in '{relation}' cannot be enclosed in double quotes")
-        if len(result) == 1:
-            raise ValueError("Could not identify the operator in `query_object`. The operator cannot be nested in double quotes")
-        if len(result) == 2:
-            raise ValueError("Input must include both a column and a value for comparison.")
-        elif len(result) > 3:
-            raise ValueError("Can only compare one column to one value. Only range-based find allows two values in the ()")
+        if "'" in result[2] and result[2].count("'") % 2 != 0:
+            raise TypeError("Detected an unmatched single quote. For an apostrophe use 2 single quotes. Ex: he's -> he''s NOT he\"s")
         elif len(result) == 3 and result[1] == '(':
             start_msg = f"When finding rows in '{column_name}' between two values using (),"
             if ',' not in result[2]:
                 raise ValueError(f"{start_msg} values must be separated with a comma.")
             elif ')' != result[2][-1]:
                 raise ValueError(f"{start_msg} the input string must end with closing parenthesis.")
+            elif (result[2][result[2].rfind("'"):] if "'" in result[2] else result[2]).count(')') > 1:
+                raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
         
             values = result[2][:-1].strip()
-            if "'" in values and values.count("'") != 4:
-                raise TypeError("Both values in a range find must be either unquoted or enclosed in single quotes.")
-            elif values.count("'") == 0 and (values.count(",") > 1 or values.count(" ") > 1):
+            if ("'" not in values or ("'" in values and not is_literal(values))) and ("," in values or " " in values):
                 raise ValueError("Range-based finds require multi-word values to be enclosed in single quotes")
             values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
             values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
+            if '' in values:
+                raise ValueError("There needs to be two values for the range find. Ex: (1,2)")
             relation = f"({wrap_in_quotes(values[0])},{wrap_in_quotes(values[1])})"
             if values[0] > values[1]:
                raise ValueError(f"Invalid input range: '{relation}'. The lower value must come first.")
@@ -860,7 +870,7 @@ class Terminal():
                 self.logger.warning(err_msg)
             print(f"WARNING: {err_msg}")
             print("Try using `artifact_handler('query', query = )` to retrieve the matching rows for a specific table")
-            print("Example input for artifact_handler():")
+            print("Valid inputs for artifact_handler():")
             for cond_query in return_object:
                 print(f" - {cond_query}")
             return_object = None

@@ -200,6 +200,20 @@ def test_find_update_sqlite_backend():
     assert data['b'].tolist() == [2000,2001]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
+def test_find_relation_sqlite_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find(query=2)
+    output = f.getvalue()
+
 def test_schema_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
@@ -283,6 +297,10 @@ def test_find_update_schema_sqlite_backend():
     data = test.get_table("math", collection=True)
     assert data['specification'].tolist() == [2000,2001]
     assert data['new_col'].tolist() == ["test1", "test1"]
+
+# DUCKDB
+# DUCKDB
+# DUCKDB
 
 def test_duckdb_backend():
     dbpath = 'data.db'

@@ -74,6 +74,7 @@ class DSI():
         except Exception as e:
             sys.exit(f"backend ERROR: {e}")
 
+        self.main_backend_obj = self.t.loaded_backends[0]
         if filename != ".temp.db":
             print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
         else:
@@ -303,14 +304,24 @@ class DSI():
 
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         
+        output = None
         try:
-            df = self.t.artifact_handler(interaction_type='query', query=statement)
+            f = io.StringIO()
+            with redirect_stdout(f):
+                df = self.t.artifact_handler(interaction_type='query', query=statement)
+            output = f.getvalue()
         except Exception as e:
             sys.exit(f"query() ERROR: {e}")
         if df.empty:
+            if output:
+                print(output)
+            else:
+                print("WARNING: input query returned no data. Please check again.")
             return
         if not collection:
             print(f"Printing the result of the SQL query: {statement}")
@@ -340,6 +351,8 @@ class DSI():
         
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         
@@ -381,10 +394,14 @@ class DSI():
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot find() until all associated data is loaded after a complex schema")
-        if isinstance(query, str) and query.count('"') % 2 != 0:
+        if isinstance(query, str) and query.count('"') > 2:
             sys.exit("find() ERROR: find() does not support nested or escaped double quotes as an input")
+        if isinstance(query, str) and "\\'" in query:
+            query = query.replace("\\'", "'")
         
         new_find = False
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
@@ -484,6 +501,8 @@ class DSI():
         - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
         - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot update() until all associated data is loaded after a complex schema")
         print("Updating the active backend with the input collection of data")
@@ -590,6 +609,8 @@ class DSI():
         `table_name`: str, optional
             Required when using "Table_Plot" or "Csv_Writer" to specify which table to export.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot write() until all associated data is loaded after a complex schema")
 
@@ -630,6 +651,8 @@ class DSI():
         """
         Prints the names and dimensions (rows x columns) of all tables in the active backend.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
         try:
@@ -647,6 +670,8 @@ class DSI():
             
             If None (default), metadata for all available tables is printed.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
         try:
@@ -658,6 +683,8 @@ class DSI():
         """
         Prints the number of tables in the active backend.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
         try:
@@ -680,6 +707,8 @@ class DSI():
 
             If None (default), all columns are displayed.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot display() until all associated data is loaded after a complex schema")
         if isinstance(num_rows, list):
