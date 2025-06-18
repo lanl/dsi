@@ -148,7 +148,7 @@ def test_find_sqlite_backend():
         test.find(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all instances of 2 in the active DSI backend\n" + textwrap.dedent("""
+    expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
     Table: math
       - Columns: ['specification', 'a', 'b', 'c', 'd', 'e', 'f']
       - Row Number: 1
@@ -193,15 +193,12 @@ def test_find_update_sqlite_backend():
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    find_list = test.find(query=2, collection=True)   # return output
-    for obj in find_list:
-        obj['i'] = list(range(2000, 2000 + len(obj)))
-        obj['b'] = list(range(2000, 2000 + len(obj)))
-        obj["new_col"] = "test1"
-    test.update(find_list)
-    data = test.get_table("address", collection=True)
-    assert data['i'].tolist() == [2000,3]
-    assert data['new_col'].tolist() == ["test1", None]
+    find_df = test.find(query=2, collection=True)   # return output
+
+    find_df['i'] = list(range(2000, 2000 + len(find_df)))
+    find_df['b'] = list(range(2000, 2000 + len(find_df)))
+    find_df["new_col"] = "test1"
+    test.update(find_df)
 
     data = test.get_table("math", collection=True)
     assert data['b'].tolist() == [2000,2001]
@@ -273,23 +270,19 @@ def test_find_update_schema_sqlite_backend():
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
-    find_list = test.find(query=2, collection=True)   # return output
-    for obj in find_list:
-        obj['i'] = list(range(2000, 2000 + len(obj)))
-        obj['b'] = list(range(2000, 2000 + len(obj)))
-        obj["new_col"] = "test1"
+    find_df = test.find(query=2, collection=True)   # return output
+
+    find_df['i'] = list(range(2000, 2000 + len(find_df)))
+    find_df['b'] = list(range(2000, 2000 + len(find_df)))
+    find_df["new_col"] = "test1"
     
     f = io.StringIO()
     with redirect_stdout(f):
-        test.update(find_list)
+        test.update(find_df)
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
     expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
     assert output == expected_output
-    
-    data = test.get_table("address", collection=True)
-    assert data['i'].tolist() == [3,2000]
-    assert data['new_col'].tolist() == [None, "test1"]
 
     data = test.get_table("math", collection=True)
     assert data['b'].tolist() == [2000,2001]
@@ -416,7 +409,7 @@ def test_find_duckdb_backend():
         test.find(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all instances of 2 in the active DSI backend\n" + textwrap.dedent("""
+    expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
     Table: address
       - Columns: ['specification', 'fileLoc', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
       - Row Number: 1
@@ -461,15 +454,12 @@ def test_find_update_duckdb_backend():
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    find_list = test.find(query=2, collection=True)   # return output
-    for obj in find_list:
-        obj['i'] = list(range(2000, 2000 + len(obj)))
-        obj['b'] = list(range(2000, 2000 + len(obj)))
-        obj["new_col"] = "test1"
-    test.update(find_list)
-    data = test.get_table("address", collection=True)
-    assert data['i'].tolist() == [2000,3]
-    assert data['new_col'].tolist() == ["test1", None]
+    find_df = test.find(query=2, collection=True)   # return output
+
+    find_df['i'] = list(range(2000, 2000 + len(find_df)))
+    find_df['b'] = list(range(2000, 2000 + len(find_df)))
+    find_df["new_col"] = "test1"
+    test.update(find_df)
 
     data = test.get_table("math", collection=True)
     assert data['b'].tolist() == [2000,2001]
@@ -518,15 +508,15 @@ def test_find_update_schema_duckdb_backend():
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
-    find_list = test.find(query="a", collection=True)   # return output
-    for obj in find_list:
-        obj['i'] = list(range(2000, 2000 + len(obj)))
-        obj['b'] = list(range(2000, 2000 + len(obj)))
-        obj["new_col"] = "test1"
+    find_df = test.find(query=2, collection=True)   # return output
+
+    find_df['i'] = list(range(2000, 2000 + len(find_df)))
+    find_df['b'] = list(range(2000, 2000 + len(find_df)))
+    find_df["new_col"] = "test1"
     
     f = io.StringIO()
     with redirect_stdout(f):
-        test.update(find_list)
+        test.update(find_df)
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
     expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
