@@ -48,17 +48,17 @@ test.get_table("math")                                          # print output
 # test.update(query_df)
 # test.display("math")
 
-test.find(query=2)                                  # print output
-# find_list = test.find(query="a", collection=True)   # return output
-# for obj in find_list:
-#     test.display(table_name=obj["dsi_table_name"][0])
-# for obj in find_list:
-#     obj['i'] = list(range(2000, 2000 + len(obj)))
-#     obj['b'] = list(range(2000, 2000 + len(obj)))
-#     obj["new_col"] = "test1"
-# test.update(find_list, backup=True)
-# for obj in find_list:
-#     test.display(table_name=obj["dsi_table_name"][0])
+# test.find(query="a<2")                                         # print output
+find_df = test.find(query="a = 2", collection=True)   # return output
+# test.display(table_name=find_df["dsi_table_name"][0])
+
+# find_df['i'] = list(range(3000, 3000 + len(find_df)))
+# find_df['b'] = list(range(3000, 3000 + len(find_df)))
+# find_df["new_col"] = "test1"
+print(find_df)
+# find_df.attrs["table_name"] = "Vedant"
+# test.update([find_df], backup=True)
+# test.display(table_name=find_df["dsi_table_name"][0])
 
 
 ''' Printing table information '''
