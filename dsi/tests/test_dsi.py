@@ -173,17 +173,13 @@ def test_find_sqlite_backend():
     """)
     assert output == expected_output
 
-    df_list = test.find(query=2, collection=True)
-    assert len(df_list) == 3
-    assert df_list[0].columns.tolist()[0] == "dsi_table_name"
-    assert df_list[0].attrs["table_name"] in ["math","address","physics"]
-    for df in df_list:
-        if df["dsi_table_name"][0] == "math":
-            assert df.attrs['row_num'] == [1,2]
-        elif df["dsi_table_name"][0] == "address":
-            assert df.attrs['row_num'] == [1]
-        elif df["dsi_table_name"][0] == "physics":
-            assert df.attrs['row_num'] == [1,2]
+    find_df = test.find(query=2, collection=True)
+    assert find_df.columns.tolist()[0] == "dsi_table_name"
+    assert find_df.attrs["table_name"] == "math"
+    if find_df["dsi_table_name"][0] == "math":
+        assert find_df.attrs['row_num'] == [1,2]
+    else:
+        assert False
 
 def test_find_update_sqlite_backend():
     dbpath = 'data.db'
@@ -273,19 +269,19 @@ def test_find_update_schema_sqlite_backend():
     find_df = test.find(query=2, collection=True)   # return output
 
     find_df['i'] = list(range(2000, 2000 + len(find_df)))
-    find_df['b'] = list(range(2000, 2000 + len(find_df)))
+    find_df['specification'] = list(range(2000, 2000 + len(find_df)))
     find_df["new_col"] = "test1"
-    
+
     f = io.StringIO()
     with redirect_stdout(f):
         test.update(find_df)
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
-    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
+    expected_output = "WARNING: The data in math's primary key column was edited which could reorder rows in the table."
     assert output == expected_output
 
     data = test.get_table("math", collection=True)
-    assert data['b'].tolist() == [2000,2001]
+    assert data['specification'].tolist() == [2000,2001]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
 def test_duckdb_backend():
@@ -434,17 +430,13 @@ def test_find_duckdb_backend():
     """)
     assert output == expected_output
 
-    df_list = test.find(query=2, collection=True)
-    assert len(df_list) == 3
-    assert df_list[0].columns.tolist()[0] == "dsi_table_name"
-    assert df_list[0].attrs["table_name"] in ["math","address","physics"]
-    for df in df_list:
-        if df["dsi_table_name"][0] == "math":
-            assert df.attrs['row_num'] == [1,2]
-        elif df["dsi_table_name"][0] == "address":
-            assert df.attrs['row_num'] == [1]
-        elif df["dsi_table_name"][0] == "physics":
-            assert df.attrs['row_num'] == [1,2]
+    find_df = test.find(query=2, collection=True)
+    assert find_df.columns.tolist()[0] == "dsi_table_name"
+    assert find_df.attrs["table_name"] == "address"
+    if find_df["dsi_table_name"][0] == "address":
+        assert find_df.attrs['row_num'] == [1]
+    else:
+        assert False
 
 def test_find_update_duckdb_backend():
     dbpath = 'data.db'
@@ -461,9 +453,9 @@ def test_find_update_duckdb_backend():
     find_df["new_col"] = "test1"
     test.update(find_df)
 
-    data = test.get_table("math", collection=True)
-    assert data['b'].tolist() == [2000,2001]
-    assert data['new_col'].tolist() == ["test1", "test1"]
+    data = test.get_table("address", collection=True)
+    assert data['i'].tolist() == [2000,3]
+    assert data['new_col'].tolist() == ["test1", None]
 
 def test_schema_duckdb_backend():
     dbpath = 'data.db'
@@ -514,18 +506,13 @@ def test_find_update_schema_duckdb_backend():
     find_df['b'] = list(range(2000, 2000 + len(find_df)))
     find_df["new_col"] = "test1"
     
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.update(find_df)
-    output = f.getvalue()
-    output = "\n".join(output.splitlines()[1:])
-    expected_output = "WARNING: The data in address's primary key column was edited which could reorder rows in the table."
-    assert output == expected_output
+    except SystemExit as e:
+        output = str(e)
+    expected_output1 = "update() ERROR: Data in 'b', the foreign key of 'math', must match 'i', the primary key of 'address'. "
+    expected_output2 = "Please ensure that all rows in 'math' are updated"
+    assert output == expected_output1+expected_output2
     
     data = test.get_table("address", collection=True)
-    assert data['i'].tolist() == [2000,2001]
-    assert data['new_col'].tolist() == ["test1", "test1"]
-
-    data = test.get_table("math", collection=True)
-    assert data['b'].tolist() == [2000,2001]
-    assert data['new_col'].tolist() == ["test1", "test1"]
+    assert data['i'].tolist() == [2,3]

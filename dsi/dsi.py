@@ -453,6 +453,7 @@ class DSI():
                 if table_name is None:
                     table_name = val.t_name
                     output_df = pd.DataFrame([val.value], columns=val.c_name)
+                    row_list.append(val.row_num)
                 elif table_name == val.t_name and val.row_num not in row_list:
                     output_df.loc[len(output_df)] = val.value
                     row_list.append(val.row_num)
