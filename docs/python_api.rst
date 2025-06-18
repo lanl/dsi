@@ -94,13 +94,13 @@ Printing various data and metadata from a DSI backend - number of tables, list o
 Example 4: Find data
 ~~~~~~~~~~~~~~~~~~~~
 Finding data from an active DSI backend that matches an input query - a string or a number.
-Prints all matches by default. If ``True`` is passed as an additional argument, returns a list of data from each table that matches the query.
+Prints all matches by default. If ``True`` is passed as an additional argument, returns rows of the first table that satisfies the query.
 
 .. literalinclude:: ../examples/user/4.find.py
 
 Example 5: Update data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Updating data from the edited output of ``find()``. Input can either be a list of table data or a single table's data.
+Updating data from the edited output of ``find()``. Input cam be output of either ``find()``, ``query()``, or ``get_table()``.
 
 .. literalinclude:: ../examples/user/5.update.py
 
