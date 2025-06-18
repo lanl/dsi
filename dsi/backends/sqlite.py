@@ -750,7 +750,10 @@ class Sqlite(Filesystem):
                 col_list = columns        
         
         if len(all_tables) == 0:
+            if (column_name[0] == "'" and column_name[-1] == "'") or (column_name[0] == '"' and column_name[-1] == '"'):
+                return f"{column_name} is not a column in this database. Ensure the column is written first."
             return f"'{column_name}' is not a column in this database. Ensure the column is written first."
+        old_relation = relation
         if relation[0] == '(' and relation[-1] == ')':
             values = relation[1:-1].strip()
             values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
@@ -762,7 +765,8 @@ class Sqlite(Filesystem):
         output_data = self.cur.execute(query).fetchall()
         
         if not output_data:
-            return f"Could not find any rows where '{column_name} {relation}' in this database."
+            val = f'"{column_name} {old_relation}"' if "'" in old_relation else f"'{column_name} {old_relation}'"
+            return f"Could not find any rows where {val} in this database."
         if len(all_tables) > 1:
             query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
             return query_list

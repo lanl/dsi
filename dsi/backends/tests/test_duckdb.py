@@ -158,3 +158,81 @@ def test_find_row():
     assert row_data[0].row_num == 1
     assert row_data[0].type == 'row'
     store.close()
+
+def test_find_relation():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = DuckDB(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    row_data = store.find_relation("foo", ">1")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [2,'2']
+    assert row_data[0].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "<2")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", ">=2")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [2,'2']
+    assert row_data[0].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "<=1")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "=3")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [3,'1']
+    assert row_data[0].row_num == 3
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "==3")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [3,'1']
+    assert row_data[0].row_num == 3
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "!=2")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[1].value == [3,'1']
+    assert row_data[1].row_num == 3
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "(1,2)")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[1].value == [2,'2']
+    assert row_data[1].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    store.close()
