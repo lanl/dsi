@@ -34,8 +34,8 @@ test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAM
 
 
 ''' Backend data interactions: query()/get_table() and find(). Manipulating their outputs to update() the backend '''
-# test.query("SELECT * FROM math")                                # print output
-test.get_table("math")                                          # print output
+# test.query("SELECT name FROM sqlite_master WHERE type='table';")                                # print output
+# test.get_table("math")                                          # print output
 # query_df = test.query("SELECT * FROM math", collection=True)    # return output
 # query_df = test.get_table("math", collection=True)              # return output
 # test.display("math")
@@ -49,20 +49,21 @@ test.get_table("math")                                          # print output
 # test.display("math")
 
 # test.find(query="a<2")                                         # print output
-find_df = test.find(query="a = 2", collection=True)   # return output
+# find_df = test.find(query="a = 2", collection=True)   # return output
 # test.display(table_name=find_df["dsi_table_name"][0])
 
 # find_df['i'] = list(range(3000, 3000 + len(find_df)))
 # find_df['b'] = list(range(3000, 3000 + len(find_df)))
 # find_df["new_col"] = "test1"
-print(find_df)
+# print(find_df)
 # find_df.attrs["table_name"] = "Vedant"
 # test.update([find_df], backup=True)
 # test.display(table_name=find_df["dsi_table_name"][0])
 
 
 ''' Printing table information '''
-# test.list()
+# table_list = test.list(True)
+# print(table_list)
 # test.num_tables()
 
 # test.summary()

@@ -958,7 +958,7 @@ class Terminal():
             print(f"\nTable: {table[0]}")
             print(f"  - num of columns: {table[1]}")
             print(f"  - num of rows: {table[2]}")
-        print("\n")
+        print()
 
         end = datetime.now()
         if self.debug_level != 0:

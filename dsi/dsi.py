@@ -647,18 +647,35 @@ class DSI():
         self.t.active_metadata = OrderedDict()
         print(f"Successfully wrote to the output file {filename}")
     
-    def list(self):
+    def list(self, collection = False):
         """
-        Prints the names and dimensions (rows x columns) of all tables in the active backend.
+        Gets the names and dimensions (rows x columns) of all tables in the active backend.
+
+        `collection` : bool, optional, default False. 
+            If True, returns a Python list of all the table names
+            
+            If False (default), prints each table's name and dimensions to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+
+        output = None
         try:
-            self.t.list()
+            f = io.StringIO()
+            with redirect_stdout(f):
+                self.t.list()
+            output = f.getvalue()
         except Exception as e:
             sys.exit(f"list() ERROR: {e}")
+        
+        if collection:
+            output_list = output.split('\n')
+            table_list = [line[7:] for line in output_list if line.startswith('Table: ')]
+            return table_list
+        else:
+            print(output)
         
 
     def summary(self, table_name = None):
