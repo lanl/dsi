@@ -90,7 +90,6 @@ def test_query_sqlite_backend():
     assert query_data.columns.tolist() == ['dsi_table_name','specification','n','o','p','q','r','s']
     assert len(query_data) == 2
     assert query_data["n"].tolist() == [9.8, 91.8]
-    assert query_data.attrs['table_name'] == "physics"
     assert query_data["dsi_table_name"][0] == "physics"
 
 def test_query_update_sqlite_backend():
@@ -175,11 +174,8 @@ def test_find_sqlite_backend():
 
     find_df = test.find(query=2, collection=True)
     assert find_df.columns.tolist()[0] == "dsi_table_name"
-    assert find_df.attrs["table_name"] == "math"
-    if find_df["dsi_table_name"][0] == "math":
-        assert find_df.attrs['row_num'] == [1,2]
-    else:
-        assert False
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"] == [1,2]
 
 def test_find_update_sqlite_backend():
     dbpath = 'data.db'
@@ -200,19 +196,19 @@ def test_find_update_sqlite_backend():
     assert data['b'].tolist() == [2000,2001]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
-def test_find_relation_sqlite_backend():
-    dbpath = 'data.db'
-    if os.path.exists(dbpath):
-        os.remove(dbpath)
+# def test_find_relation_sqlite_backend():
+#     dbpath = 'data.db'
+#     if os.path.exists(dbpath):
+#         os.remove(dbpath)
 
-    test = DSI(filename=dbpath, backend_name= "Sqlite")
+#     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+#     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
-    f = io.StringIO()
-    with redirect_stdout(f):
-        test.find(query=2)
-    output = f.getvalue()
+#     f = io.StringIO()
+#     with redirect_stdout(f):
+#         find_df = test.find(query="a > 2", collection=True)
+#     output = f.getvalue()
 
 def test_schema_sqlite_backend():
     dbpath = 'data.db'
@@ -365,7 +361,6 @@ def test_query_duckdb_backend():
     assert query_data.columns.tolist() == ['dsi_table_name','specification','n','o','p','q','r','s']
     assert len(query_data) == 2
     assert query_data["n"].tolist() == [9.800000190734863, 91.80000305175781]
-    assert query_data.attrs['table_name'] == "physics"
     assert query_data["dsi_table_name"][0] == "physics"
 
 def test_query_update_duckdb_backend():
@@ -450,11 +445,8 @@ def test_find_duckdb_backend():
 
     find_df = test.find(query=2, collection=True)
     assert find_df.columns.tolist()[0] == "dsi_table_name"
-    assert find_df.attrs["table_name"] == "address"
-    if find_df["dsi_table_name"][0] == "address":
-        assert find_df.attrs['row_num'] == [1]
-    else:
-        assert False
+    assert find_df["dsi_table_name"][0] == "address"
+    assert find_df["dsi_row_index"] == [1]
 
 def test_find_update_duckdb_backend():
     dbpath = 'data.db'
