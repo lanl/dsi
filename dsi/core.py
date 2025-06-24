@@ -205,10 +205,10 @@ class Terminal():
                     
                     self.new_tables = obj.output_collector.keys()
                     for table_name, table_metadata in obj.output_collector.items():
-                        if table_name.lower() in self.dsi_tables:
+                        if table_name.lower() == "runtable":
                             if self.debug_level != 0:
-                                self.logger.error(f"   Cannot read in '{table_name}' — it is reserved as a DSI table name.")
-                            raise RuntimeError(f"Cannot read in '{table_name}' — it is reserved as a DSI table name.")
+                                self.logger.error(f"   Cannot read in '{table_name}' — runTable is a reserved DSI table name.")
+                            raise RuntimeError(f"Cannot read in '{table_name}' — runTable is a reserved DSI table name.")
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
                                 if isinstance(colData[0], list):
