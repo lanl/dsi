@@ -49,7 +49,7 @@ class DuckDB(Filesystem):
 
     def sql_type(self, input_list):
         """
-        **Internal use only. This function is not intended for direct use by users.**
+        **Internal use only. Do not call**
 
         Evaluates a list and returns the predicted compatible DuckDB Type
 
@@ -74,7 +74,7 @@ class DuckDB(Filesystem):
         
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
-        **Users do not interact with this function and should ignore it. Called within ingest_artifacts()**
+        **Internal use only. Do not call**
 
         Helper function to create DuckDB table based on a passed in schema.
 
@@ -165,9 +165,6 @@ class DuckDB(Filesystem):
                 return (ValueError, f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
             else:
                 table_order = list(reversed(ordered_tables)) # ingest primary key tables first then children
-
-        if "runTable" in artifacts.keys():
-            self.runTable = False
 
         self.cur.execute("BEGIN TRANSACTION")
         if self.runTable:
@@ -789,7 +786,7 @@ class DuckDB(Filesystem):
 
     def summary_helper(self, table_name):
         """
-        **Internal use only.**
+        **Internal use only. Do not call**
 
         Generates and returns summary metadata for a specific table in the DuckDB backend.
         """
@@ -901,8 +898,7 @@ class DuckDB(Filesystem):
             self.con.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
 
         temp_runTable_bool = self.runTable
-        if temp_runTable_bool == True:
-            self.runTable = False
+        self.runTable = False
 
         errorStmt = self.ingest_artifacts(temp_data)
 
@@ -914,7 +910,9 @@ class DuckDB(Filesystem):
         
     def check_table_relations(self, tables, relation_dict):
         """
-        Internal helper function to check if a user-loaded schema for DSI has circular dependencies. 
+        **Internal use only. Do not call.**
+
+        Checks if a user-loaded schema has circular dependencies. 
         
         If no circular dependencies are found, returns a list of tables ordered from least
         dependent to most dependent, suitable for staged ingestion into the DuckDB backend.
@@ -983,7 +981,7 @@ class DuckDB(Filesystem):
 
     def table_print_helper(self, headers, rows, max_rows=25):
         """
-        **Internal use only.**
+        **Internal use only. Do not call**
 
         Prints table data and metadata in a clean tabular format.
         """

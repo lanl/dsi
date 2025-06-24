@@ -60,7 +60,7 @@ class Sqlite(Filesystem):
 
     def sql_type(self, input_list):
         """
-        **Internal use only. This function is not intended for direct use by users.**
+        **Internal use only. Do not call**
 
         Evaluates a list and returns the predicted compatible SQLite Type
 
@@ -85,7 +85,7 @@ class Sqlite(Filesystem):
         
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
-        **Users do not interact with this function and should ignore it. Called within ingest_artifacts()**
+        **Internal use only. Do not call**
 
         Helper function to create SQLite table based on a passed in schema.
 
@@ -156,9 +156,6 @@ class Sqlite(Filesystem):
         # if "dsi_relations" in artifacts.keys():
         #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
         #     self.con.commit()
-        
-        if "runTable" in artifacts.keys():
-            self.runTable = False
 
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
@@ -869,7 +866,7 @@ class Sqlite(Filesystem):
 
     def summary_helper(self, table_name):
         """
-        **Internal use only.**
+        **Internal use only. Do not call**
 
         Generates and returns summary metadata for a specific table in the SQLite backend.
         """
@@ -978,16 +975,6 @@ class Sqlite(Filesystem):
                     rows = self.cur.execute(f"SELECT {result} FROM {name}").fetchall()
                     old_data = [row[0] for row in rows]
                     if old_data != new_data:
-                        if name == "runTable" and result == "run_id" and len(table_name) == 1:
-                            errorMsg = "Cannot only edit runTable's run_id column."
-                            return (TypeError, errorMsg + " Need to update the run_id column in other tables to match runTable")
-                        if name == "runTable" and result == "run_id" and len(table_name) > 1:
-                            for pk, fk in zip(temp_data["dsi_relations"]["primary_key"], temp_data["dsi_relations"]["foreign_key"]):
-                                if pk == (name, result) and fk != (None, None):
-                                    fk_data = temp_data[fk[0]][fk[1]]
-                                    if not all(item in new_data for item in fk_data):
-                                        errorMsg = f"Data in table {fk[0]}'s, run_id column must match runTable's edited run_id column."
-                                        return(TypeError, errorMsg + f" Please ensure that all rows in {fk[0]} are being updated")
                         print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
         
         for name in temp_data.keys():
@@ -995,8 +982,7 @@ class Sqlite(Filesystem):
             self.con.commit()
         
         temp_runTable_bool = self.runTable
-        if temp_runTable_bool == True:
-            self.runTable = False
+        self.runTable = False
 
         errorStmt = self.ingest_artifacts(temp_data)
 
@@ -1008,7 +994,7 @@ class Sqlite(Filesystem):
 
     def table_print_helper(self, headers, rows, max_rows=25):
         """
-        **Internal use only.**
+        **Internal use only. Do not call**
 
         Prints table data and metadata in a clean tabular format.
         """

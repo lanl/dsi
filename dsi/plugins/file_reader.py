@@ -32,6 +32,25 @@ class FileReader(StructuredMetadata):
             sha = sha1(open(filename, 'rb').read())
             self.file_info[abspath(filename)] = sha.hexdigest()
 
+    def check_type(self, text):
+        """
+        **Internal helper function** 
+        
+        Function tests input text and returns a predicted compatible SQL Type
+
+        `text`: text string
+
+        `return`: string returned as int, float or still a string
+        """
+        try:
+            _ = int(text)
+            return int(text)
+        except ValueError:
+            try:
+                _ = float(text)
+                return float(text)
+            except ValueError:
+                return text
 
 class Csv(FileReader):
     """
@@ -252,26 +271,6 @@ class YAML1(FileReader):
         self.yamlSpace = yamlSpace
         self.yaml_data = OrderedDict()
         self.target_table_prefix = target_table_prefix
-
-    def check_type(self, text):
-        """
-        **Internal helper function, not used by DSI Users** 
-        
-        Function tests input text and returns a predicted compatible SQL Type
-
-        `text`: text string
-
-        `return`: string returned as int, float or still a string
-        """
-        try:
-            _ = int(text)
-            return int(text)
-        except ValueError:
-            try:
-                _ = float(text)
-                return float(text)
-            except ValueError:
-                return text
             
     def add_rows(self) -> None:
         """
@@ -556,26 +555,6 @@ class Cloverleaf(FileReader):
         else:
             self.folder_path = folder_path[:-1]
         self.cloverleaf_data = OrderedDict()
-
-    def check_type(self, text):
-        """
-        **Internal helper function, not used by DSI Users** 
-        
-        Function tests input text and returns a predicted compatible SQL Type
-
-        `text`: text string
-
-        `return`: string returned as int, float or still a string
-        """
-        try:
-            _ = int(text)
-            return int(text)
-        except ValueError:
-            try:
-                _ = float(text)
-                return float(text)
-            except ValueError:
-                return text
             
     def add_rows(self) -> None:
         """

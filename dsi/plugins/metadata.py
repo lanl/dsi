@@ -27,12 +27,12 @@ class StructuredMetadata(Plugin):
 
     def set_schema(self, table_data: list, validation_model=None) -> None:
         """
+        **Old function to be deprecated soon. Do not use.**
+
         Initializes column structure in the output_collector and table_cnt.
 
         This method is typically used within a plugin `pack_header()` method to define
         the expected schema before rows are added.
-
-        **Do not use this if data in ``add_rows()`` is structured as an OrderedDict()**
 
         `table_data` : list
             Defines the table structure to be used.
@@ -73,12 +73,12 @@ class StructuredMetadata(Plugin):
 
     def set_schema_2(self, collection, validation_model=None) -> None:
         """
-        Faster method for updating the DSI abstraction when input data is structured as an OrderedDict.
+        **Use this if data in a Reader's ``add_rows()`` is structured as an OrderedDict()**
+
+        Faster update of the DSI abstraction when input data is structured as an OrderedDict.
 
         This method is optimized for plugins where `add_rows()` passes data as an OrderedDict, and avoids
         the incremental row ingest via `set_schema()` and ``add_to_output()``.
-
-        **Use this if data in ``add_rows()`` is structured as an OrderedDict()**
 
         `collection` : OrderedDict
             The plugin's data structure (with data) passed from a plugin.
@@ -98,12 +98,12 @@ class StructuredMetadata(Plugin):
 
     def add_to_output(self, row: list, tableName = None) -> None:
         """
+        **Old function to be deprecated soon. Do not use.**
+
         Adds a row of data to the output_collector with enforced structure.
         
         This method is typically used within a plugin's `add_rows()` method to incrementally
         build table output in a consistent format.
-
-        **Do not use this if data in ``add_rows()`` is structured as an OrderedDict()**
 
         `row` : list
             A single row of data to be added. Must match the expected structure for the target table.
@@ -133,9 +133,9 @@ class StructuredMetadata(Plugin):
                 self.output_collector[tableName][key] = row_elem
 
     def schema_is_set(self) -> bool:
-        """ 
-        Helper method to see if the schema has been set 
+        """
+        **Old function to be deprecated soon. Do not use.**
 
-        **Do not use this if data in ``add_rows()`` is structured as an OrderedDict()**
+        Helper method to see if the schema has been set 
         """
         return self.table_cnt is not None
