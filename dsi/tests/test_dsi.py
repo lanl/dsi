@@ -175,7 +175,7 @@ def test_find_sqlite_backend():
     find_df = test.find(query=2, collection=True)
     assert find_df.columns.tolist()[0] == "dsi_table_name"
     assert find_df["dsi_table_name"][0] == "math"
-    assert find_df["dsi_row_index"] == [1,2]
+    assert find_df["dsi_row_index"].tolist() == [1,2]
 
 def test_find_update_sqlite_backend():
     dbpath = 'data.db'
@@ -209,6 +209,8 @@ def test_find_update_sqlite_backend():
 #     with redirect_stdout(f):
 #         find_df = test.find(query="a > 2", collection=True)
 #     output = f.getvalue()
+
+# test_find_relation_sqlite_backend()
 
 def test_schema_sqlite_backend():
     dbpath = 'data.db'
@@ -446,7 +448,7 @@ def test_find_duckdb_backend():
     find_df = test.find(query=2, collection=True)
     assert find_df.columns.tolist()[0] == "dsi_table_name"
     assert find_df["dsi_table_name"][0] == "address"
-    assert find_df["dsi_row_index"] == [1]
+    assert find_df["dsi_row_index"].tolist() == [1]
 
 def test_find_update_duckdb_backend():
     dbpath = 'data.db'
