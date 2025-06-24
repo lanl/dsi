@@ -53,7 +53,7 @@ class Terminal():
             - If True, creates a backup of the current backend database before committing any new changes.
 
         `runTable` : bool, default=False
-            - If True, a 'runTable' is created, and timestamped each time new metadata is ingested.
+            - If True, a 'runTable' is created, and timestamped each time new data/metadata is ingested.
               Recommended for in-situ use-cases.
         """
         def static_munge(prefix, implementations):
@@ -87,6 +87,7 @@ class Terminal():
 
         self.user_wrapper = False
         self.new_tables = None
+        self.dsi_tables = ["runtable", "filesystem", "oceans11_datacard", "dublin_core_datacard", "schema_org_datacard", "google_datacard"]
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug
@@ -204,10 +205,10 @@ class Terminal():
                     
                     self.new_tables = obj.output_collector.keys()
                     for table_name, table_metadata in obj.output_collector.items():
-                        if self.runTable == True and table_name == "runTable":
+                        if table_name.lower() in self.dsi_tables:
                             if self.debug_level != 0:
-                                self.logger.error(f'   Cannot read in a manual runTable when the runTable flag is on')
-                            raise RuntimeError('Cannot read in a manual runTable when the runTable flag is on')
+                                self.logger.error(f"   Cannot read in '{table_name}' — it is reserved as a DSI table name.")
+                            raise RuntimeError(f"Cannot read in '{table_name}' — it is reserved as a DSI table name.")
                         if "hostname" in table_name.lower():
                             for colName, colData in table_metadata.items():
                                 if isinstance(colData[0], list):
@@ -215,22 +216,32 @@ class Terminal():
                                     for val in colData:
                                         str_list.append(f'{val}')
                                     table_metadata[colName] = str_list
+                        if table_name == "dsi_units":
+                            incorrect_cols = set(["table_name", "column_name", "unit"]).issubset(table_metadata.keys())
+                            if len(table_metadata.keys()) != 3 or incorrect_cols == False:
+                                if self.debug_level != 0:
+                                    self.logger.error(f"   'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")
+                                raise TypeError(f"'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")
                         if table_name not in self.active_metadata.keys():
                             self.active_metadata[table_name] = table_metadata
                         else:
                             for colName, colData in table_metadata.items():
-                                if colName in self.active_metadata[table_name].keys() and table_name != "dsi_units":
+                                if colName in self.active_metadata[table_name].keys():
                                     self.active_metadata[table_name][colName] += colData
-                                elif colName in self.active_metadata[table_name].keys() and table_name == "dsi_units":
-                                    for key, col_unit in colData.items():
-                                        if key not in self.active_metadata[table_name][colName]:
-                                            self.active_metadata[table_name][colName][key] = col_unit
-                                        elif key in self.active_metadata[table_name][colName] and self.active_metadata[table_name][colName][key] != col_unit:
-                                            if self.debug_level != 0:
-                                                self.logger.error(f"   Cannot have a different set of units for column {key} in {colName}")
-                                            raise TypeError(f"Cannot have a different set of units for column {key} in {colName}")
-                                elif colName not in self.active_metadata[table_name].keys():
+                                else:
                                     self.active_metadata[table_name][colName] = colData
+                            if table_name == "dsi_units":
+                                t_list = self.active_metadata[table_name]['table_name']
+                                c_list = self.active_metadata[table_name]['column_name']
+                                u_list = self.active_metadata[table_name]['unit']
+                                visited = {}
+                                for t_name, c_name, unit in zip(t_list, c_list, u_list):
+                                    key = (t_name, c_name)
+                                    if key in visited and visited[key] != unit:
+                                        if self.debug_level != 0:
+                                            self.logger.error(f"   Cannot have a different set of units for column {c_name} in {t_name}")
+                                        raise TypeError(f"Cannot have a different set of units for column {c_name} in {t_name}")
+                                    visited[key] = unit
                     run_end = datetime.now()
                     if self.debug_level != 0:
                         self.logger.info(f"   Activated this reader with runtime: {run_end-run_start}")
@@ -242,7 +253,6 @@ class Terminal():
                             if parent_classes and parent_classes[0].__name__ == "Filesystem" and 'filename' in kwargs:
                                 backend_filename = kwargs['filename']
                                 has_data = False
-                                has_runTable = False
                                 # if to-be-loaded backend has data and runTable in its tables, turn global runTable off
                                 if os.path.isfile(backend_filename):
                                     if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
@@ -253,9 +263,7 @@ class Terminal():
                                     with open(backend_filename, 'rb') as fb:
                                         content = fb.read()
                                     if b'runTable' in content:
-                                        has_runTable = True
-                                if has_runTable:
-                                    self.runTable = True
+                                        self.runTable = False
 
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
@@ -742,7 +750,7 @@ class Terminal():
     # Internal function to return found objects or print errors.
     def find_helper(self, query_object, return_object, start, find_type):
         """
-        **Users should not call this. Used by internal core functions.**
+        **Users should not call this. Used internally.**
         
         Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
         """
@@ -842,8 +850,9 @@ class Terminal():
                 raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
         
             values = result[2][:-1].strip()
-            if ("'" not in values or ("'" in values and not is_literal(values))) and ("," in values or " " in values):
-                raise ValueError("Range-based finds require multi-word values to be enclosed in single quotes")
+            if "'" not in values or ("'" in values and not is_literal(values)):
+                if values.count(',') > 1 or ' ' in values.replace(', ', ','):
+                    raise ValueError("Range-based finds require multi-word values to be enclosed in single quotes")
             values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
             values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
             if '' in values:
@@ -870,7 +879,7 @@ class Terminal():
                 self.logger.warning(err_msg)
             print(f"WARNING: {err_msg}")
             print("Try using `artifact_handler('query', query = )` to retrieve the matching rows for a specific table")
-            print("Valid inputs for artifact_handler():")
+            print("These are recommended inputs for artifact_handler():")
             for cond_query in return_object:
                 print(f" - {cond_query}")
             return_object = None
@@ -912,6 +921,27 @@ class Terminal():
                 self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
             raise RuntimeError("First loaded backend needs to have data to be able to overwrite its data")
         start = datetime.now()
+
+        list_names = isinstance(table_name, list) and all(isinstance(name, str) for name in table_name)
+        if not isinstance(table_name, str) and list_names == False:
+            if self.debug_level != 0:
+                self.logger.error("Input 'table_name' must be either a single table name or a list of table names")
+            raise RuntimeError("Input 'table_name' must be either a single table name or a list of table names")
+        if isinstance(table_name, str) and table_name.lower() in self.dsi_tables:
+            if self.debug_level != 0:
+                self.logger.error("Input 'table_name' cannot be a DSI-reserved table name. Try again.")
+            raise RuntimeError("Input 'table_name' cannot be a DSI-reserved table name. Try again.")
+        lower_names = [tn.lower() for tn in table_name]
+        if bool(set(lower_names) & set(self.dsi_tables)):
+            if self.debug_level != 0:
+                self.logger.error("Input list of 'table_name' cannot include a DSI-reserved table name. Try again.")
+            raise RuntimeError("Input list of 'table_name' cannot include a DSI-reserved table name. Try again.")
+
+        list_dfs = isinstance(collection, list) and all(isinstance(df, pd.DataFrame) for df in collection)
+        if not isinstance(collection, pd.DataFrame) and list_dfs == False:
+            if self.debug_level != 0:
+                self.logger.error("Input 'collection' must be either a single DataFrame or a list of DataFrames")
+            raise RuntimeError("Input 'collection' must be either a single DataFrame or a list of DataFrames")
 
         if backup == True:
             if self.debug_level != 0:
@@ -1135,13 +1165,13 @@ class Terminal():
         
     def update_abstraction(self, table_name, table_data):
         """
-        Updates the DSI abstraction, by overwriting the specified table_name with the input table_data
+        Updates the DSI abstraction, by creating/overwriting the specified table_name with the input table_data
 
         `table_name`: str
-            Name of the table to update. This table must already exist in the current abstraction.
+            Name of the table to update/create.
 
-        `table_data` : OrderedDict
-            The new data to store in the table. Must be an OrderedDict where:
+        `table_data` : OrderedDict or Pandas DataFrame
+            The new data to store in the table. If it is an Ordered Dict:
 
                 - Keys are column names.
                 - Values are lists representing column data.
@@ -1149,15 +1179,15 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"Updating abstraction table {table_name} with new data")
-        if table_name not in self.active_metadata.keys():
-            if self.debug_level != 0:
-                self.logger.error(f"{table_name} not in current abstraction")
-            raise ValueError(f"{table_name} not in current abstraction")
         if not isinstance(table_data, (OrderedDict, pd.DataFrame)):
             if self.debug_level != 0:
                 self.logger.error("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
             raise TypeError("table_data needs to be in the form of an Ordered Dictionary or Pandas DataFrame")
         if isinstance(table_data, OrderedDict):
+            if not all(isinstance(val, list) for val in table_data.values()):
+                if self.debug_level != 0:
+                    self.logger.error("Each key of the Ordered Dict must be a column name and its value a list of row data")
+                raise TypeError("Each key of the Ordered Dict must be a column name and its value a list of row data")
             self.active_metadata[table_name] = table_data
         elif isinstance(table_data, pd.DataFrame):
             self.active_metadata[table_name] = OrderedDict(table_data.to_dict(orient='list'))
