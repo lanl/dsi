@@ -19,17 +19,17 @@ Read the ``__init__`` documentation below for more details on the supported back
 Users should use ``read()`` to load data into DSI and ``write()`` to export data from DSI into supported external formats.
 Their respective list functions print all valid readers/writers that can be used.
 
-The primary backend interactions are ``query()``, ``get_table()``, and ``find()`` where users can print a search result, or retrieve the result as a collection of data.
+The primary backend interactions are ``find()`` , ``query()``, and ``get_table()`` where users can print a search result, or retrieve the result as a collection of data.
       
-      - If users modify these collections, they can call ``update()`` to apply those changes to the respective data in the activated backend.
-        Read ``update()`` below to understand its accepted inputs and behavior.
+      - If users modify these collections, they can call ``update()`` to apply the changes to the active backend.
+        Users must NOT edit any columns beginning with `dsi_`. Read ``update()`` below to better understand its behavior.
 
 Users can also view various data/metadata of an active backend with ``list()``, ``num_tables()``, ``display()``, ``summary()``
 
 Notes for users:
-      - When using a complex schema, must call ``schema()`` prior to ``read()`` to store the associated data and relations together.
-      - If input to ``update()`` contains edited data for a user-defined primary key column, rows in that table might be reordered.
-      - If input to ``update()`` is a modified output from ``query()``, the existing table in the backend will be **overwritten**. Ensure data is secure.
+      - When using a complex schema, must call ``schema()`` prior to ``read()`` to store the relations with the associated data.
+      - If input to ``update()`` is a modified output from ``query()``, the existing table will be **overwritten**. 
+        Ensure data is secure or add `backup` flag in ``update()`` to create a backup database.
       - Read the :ref:`datacard_section_label` section to learn which data card standards are supported and where to find templates compatible with DSI. 
 
 .. autoclass:: dsi.dsi.DSI 
@@ -100,7 +100,8 @@ Prints all matches by default. If ``True`` is passed as an additional argument, 
 
 Example 5: Update data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Updating data from the edited output of ``find()``. Input cam be output of either ``find()``, ``query()``, or ``get_table()``.
+Updating data from the edited output of ``find()``. Input can be output of either ``find()``, ``query()``, or ``get_table()``.
+Users must NOT change metadata columns starting with `dsi_` even if adding new rows.
 
 .. literalinclude:: ../examples/user/5.update.py
 

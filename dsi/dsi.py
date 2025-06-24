@@ -299,6 +299,9 @@ class DSI():
 
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
+
+            - DataFrame includes 'dsi_table_name' column required for ``dsi.update()``.
+              Drop if not using ``update()``.
             
             If False (default), prints the result.
 
@@ -331,8 +334,8 @@ class DSI():
             print()
         else:
             print(f"Storing the result of the SQL query: {statement} as a collection")
-            df.attrs['table_name'] = self.t.get_table_names(statement)[0]
-            df.insert(0, "dsi_table_name", df.attrs['table_name'])
+            df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+            print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
             return df
     
     def get_table(self, table_name, collection = False):
@@ -346,6 +349,9 @@ class DSI():
 
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
+
+            - DataFrame includes 'dsi_table_name' column required for ``dsi.update()``.
+              Drop if not using ``update()``.
             
             If False (default), prints the result.
         
@@ -370,8 +376,8 @@ class DSI():
             print()
         else:
             print(f"Storing all data for the table: {table_name} as a collection")
-            df.attrs['table_name'] = table_name
-            df.insert(0, "dsi_table_name", df.attrs['table_name'])
+            df.insert(0, "dsi_table_name", table_name)
+            print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
             return df
         
     def find(self, query, collection = False):
@@ -388,8 +394,11 @@ class DSI():
             Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)".
 
         `collection` : bool, optional, default False. 
-            If True, returns a pandas DataFrames representing a subset of table rows that match or satisfy `query`.
-            
+            If True, returns a pandas DataFrame representing a subset of table rows that match or satisfy `query`.
+
+            - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
+              Drop them if not using ``update()``.
+
             If False (default), prints the matching rows to the console.
 
         `return` : If there are no matches found, then nothing is returned or printed
@@ -475,10 +484,10 @@ class DSI():
                     output_df.loc[len(output_df)] = val.value
                     row_list.append(val.row_num)
 
+            output_df.insert(0, "dsi_row_index", row_list)
             output_df.insert(0, "dsi_table_name", table_name)
-            output_df.attrs['table_name'] = table_name
-            output_df.attrs['row_num'] = row_list
-
+            first_msg = "Note: Output includes 'dsi_table_name' and 'dsi_row_index' columns for dsi.update();"
+            print(first_msg, "DO NOT edit them even if adding rows. Drop if not updating.")
             return output_df
 
     def update(self, collection, backup = False):
@@ -487,17 +496,16 @@ class DSI():
         Intended to be used after modifying the output of `find()`, `query()`, or `get_table()`
 
         `collection` : pandas.DataFrame
-            The data used to update the backend.
-            Must be a direct or modified DataFrame from `find()`, `query()` or `get_table()` to ensure certain metadata is included.
+            The data used to update a table. 
+            DataFrame must include unchanged `dsi_` columns from `find()`, `query()` or `get_table()` to successfully update.
 
             - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
         `backup` : bool, optional, default False. 
             If True, creates a backup file for the DSI backend before updating its data.
 
-            If False, (default), only updates the data.
+            If False (default), only updates the data.
 
-        - NOTE: Some Pandas operations can delete the hidden metadata which will raise errors when trying to update.
         - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
         - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
         """
@@ -509,21 +517,46 @@ class DSI():
 
         if not isinstance(collection, pd.DataFrame):
             sys.exit("ERROR: update() expects a single DataFrame from find(), query(), or get_table()")
-        elif isinstance(collection, pd.DataFrame) and not collection.attrs:
-            sys.exit("update() ERROR: Hidden metadata was deleted from the input DataFrame. Please check any operations again")
-        if isinstance(collection, pd.DataFrame) and 'row_num' in collection.attrs:
-            table_df = collection
-            table_name = table_df.attrs["table_name"]
-            row_num_list = table_df.attrs["row_num"]
+        elif 'dsi_table_name' not in collection.columns:
+            sys.exit("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
+        elif 'dsi_table_name' not in collection.columns:
+            t_col = collection['dsi_table_name']
+            if not isinstance(t_col[0], str):
+                sys.exit("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
+            if any(not (t_val in [t_col[0], '']) for t_val in t_col):
+                sys.exit("update() ERROR: 'dsi_table_name' column must be unchanged table name. Extra rows must be empty strings.")
+            if t_col.replace('', pd.NA).dropna().nunique() > 1:
+                sys.exit("update() ERROR: The 'dsi_table_name' column should not be modified.")
+        
+        table_name = collection['dsi_table_name'][0]
+        actual_df = None
+        if table_name.lower() in self.t.dsi_tables:
+            sys.exit(f"update() ERROR: '{table_name}' is a DSI-read-only table. Cannot update it.")
+        if 'dsi_row_index' in collection.columns:
+            table_df = collection.copy()
+
+            if any(not (isinstance(row_ind, int) or row_ind == '') for row_ind in table_df['dsi_row_index']):
+                sys.exit("update() ERROR: 'dsi_row_index' column must be unchanged row indexes. Extra rows must be empty strings.")
+            match = table_df['dsi_row_index'].apply(lambda x: isinstance(x, int)) & (table_df['dsi_table_name'] != table_name)
+            empty_match = (table_df['dsi_row_index'] == '') & (table_df['dsi_table_name'] != '')
+            if match.any() or empty_match.any():
+                sys.exit(f"update() ERROR: Rows in 'dsi_table_name' and 'dsi_row_index' must be '{table_name}' and row index or both be empty.")
+            numeric_rows = [int(val) for val in table_df['dsi_row_index'] if val != '']
+            if numeric_rows != sorted(numeric_rows) or len(numeric_rows) != len(set(numeric_rows)):
+                sys.exit("update() ERROR: 'dsi_row_index' must be unchanged and in increasing order.")
+
+            row_num_list = numeric_rows
+            table_df = table_df.drop(columns='dsi_table_name')
+            table_df = table_df.drop(columns='dsi_row_index')
 
             try:
                 actual_df = self.t.display(table_name, num_rows=-101)
             except Exception as e: # dont update if this table doesn't exist
                 print(f"WARNING: Cannot update the table '{table_name}' as it does not exist in the active backend.\n")
                 return
-
-            if 'dsi_table_name' in table_df.columns:
-                table_df = table_df.drop(columns='dsi_table_name')
+            
+            if len(row_num_list) > len(actual_df) or any(ind > len(actual_df) for ind in row_num_list):
+                sys.exit("update() ERROR: 'dsi_row_index' was modified. When adding new rows, values for 'dsi_row_index' must be empty.")
 
             if not set(actual_df.columns).issubset(set(table_df.columns)):
                 sys.exit(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
@@ -544,32 +577,18 @@ class DSI():
             if len(table_df) > len(id_list):
                 extra_rows = table_df.iloc[len(id_list):]
                 actual_df = pd.concat([actual_df, extra_rows], ignore_index=True)
-
-            try:
-                if backup == True:
-                    extension = self.database_name.rfind('.')
-                    backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
-                    print(f"Stored data in {backup_file} before updating the data.")
-                self.t.overwrite_table(table_name, actual_df, backup)
-            except Exception as e:
-                sys.exit(f"update() ERROR: {e}")
-    
         else:
-            try:
-                table_name = collection.attrs['table_name']
-            except Exception as e:
-                if 'dsi_table_name' in collection.columns:
-                    table_name = collection['dsi_table_name'][0]
-            if 'dsi_table_name' in collection.columns:
-                collection = collection.drop(columns='dsi_table_name')
-            try:
-                if backup == True:
-                    extension = self.database_name.rfind('.')
-                    backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
-                    print(f"Stored data in {backup_file} before updating the data.")
-                self.t.overwrite_table(table_name, collection, backup)
-            except Exception as e:
-                sys.exit(f"update() ERROR: {e}")
+            collection = collection.drop(columns='dsi_table_name')
+            actual_df = collection.copy()
+        
+        try:
+            if backup == True:
+                extension = self.database_name.rfind('.')
+                backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
+                print(f"Created backup '{backup_file}' before updating the data.")
+            self.t.overwrite_table(table_name, actual_df, backup)
+        except Exception as e:
+            sys.exit(f"update() ERROR: {e}")
     
     # def nb(self):
     #     """
@@ -676,7 +695,6 @@ class DSI():
             return table_list
         else:
             print(output)
-        
 
     def summary(self, table_name = None):
         """
