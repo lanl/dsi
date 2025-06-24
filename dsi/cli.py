@@ -329,13 +329,28 @@ class DSI_cli:
         '''
         path = args[0] if args else '.'
         try:
-            entries = [entry for entry in os.listdir(path) if not entry.startswith('.')]
-            for entry in entries:
-                full_path = os.path.join(path, entry)
-                suffix = '/' if os.path.isdir(full_path) else ''
-                print(entry + suffix)
+            files = [file for file in os.listdir(path) if not file.startswith('.')]
+            files = [file + '/' if os.path.isdir(os.path.join(path, file)) else file for file in files]
+            files.sort()
+
+            try:
+                term_width = os.get_terminal_size().columns
+            except OSError:
+                term_width = 80
+            col_width = max((len(file) for file in files), default=0) + 3
+            num_cols = max(1, term_width // col_width)
+            num_rows = (len(files) + num_cols - 1)// num_cols
+
+            for row in range(num_rows):
+                line = ''
+                for col in range(num_cols):
+                    idx = col * num_rows + row
+                    if idx < len(files):
+                        line += files[idx].ljust(col_width)
+                print(line.rstrip())
+            print()
         except FileNotFoundError:
-            print(f"No such file or directory: {path}")
+            print(f"No such filepath: {path}")
             return
         except Exception as e:
             print(f"Error: {e}")
@@ -543,7 +558,7 @@ class DSI_cli:
         '''
         Output the version of DSI being used
         '''
-        print("DSI " + str(__version__)+"\n")
+        return str(__version__)
 
 
     def get_write_parser(self):
@@ -633,7 +648,6 @@ COMMANDS = {
 
 def main():
     if sys.argv[1:] and sys.argv[1].lower() == "help":
-        cli.version()
         cli.help_fn([])
         exit(0)
 
@@ -644,7 +658,19 @@ def main():
     if args.backend.lower() not in ["sqlite", "duckdb"]:
         print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb")
         exit(1)
-    cli.version()
+    print("   ", textwrap.dedent(fr"""
+         _____           ___                          
+        /  /  \         /  /\         ___     
+       /  / /\ \       /  / /_       /  /\    
+      /  / /  \ \     /  / / /\     /  / /    
+     /__/ / \__\ |   /  / / /  \   /__/  \    
+     \  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+      \  \ \  / /   \  \ \/ / / /     \  \ \/\
+       \  \ \/ /     \  \  / / /       \__\  /
+        \  \  /       \__\/ / /        /__/ / 
+         \__\/          /__/ /         \__\/  
+                        \__\/                   v{cli.version()}
+    """).strip())
     cli.startup(args.backend)
     print("\nEnter \"help\" for usage hints.")
 
