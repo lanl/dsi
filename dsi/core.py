@@ -903,7 +903,7 @@ class Terminal():
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
         
-        `backup` : bool, optional, default False. 
+        `backup` : bool, optional, default False.
             - If True, creates a backup file for the DSI backend before updating its data.
             - If False, (default), only updates the data.
         """
@@ -931,8 +931,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("Input 'table_name' cannot be a DSI-reserved table name. Try again.")
             raise RuntimeError("Input 'table_name' cannot be a DSI-reserved table name. Try again.")
-        lower_names = [tn.lower() for tn in table_name]
-        if bool(set(lower_names) & set(self.dsi_tables)):
+        elif isinstance(table_name, list) and bool(set(tn.lower() for tn in table_name) & set(self.dsi_tables)):
             if self.debug_level != 0:
                 self.logger.error("Input list of 'table_name' cannot include a DSI-reserved table name. Try again.")
             raise RuntimeError("Input list of 'table_name' cannot include a DSI-reserved table name. Try again.")
@@ -994,14 +993,18 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
-    def summary(self, table_name = None):
+    def summary(self, table_name = None, collection = False):
         """
-        Prints numerical metadata and (optionally) sample data from tables in the first loaded backend.
+        Returns/Prints numerical metadata from tables in the first loaded backend.
 
         `table_name` : str, optional
-            If specified, only the numerical metadata for that table will be printed.
+            If specified, only the numerical metadata for that table will be returned/printed.
 
-            If None (default), metadata for all available tables is printed.
+            If None (default), metadata for all available tables is returned/printed.
+        
+        `collection` : bool, optional, default False.
+            - If True, returns either a list of DataFrames (table_name = None), or a single DataFrame of metadata
+            - If False (default), prints metadata from all tables (table_name = None), or just a single table
         """
         if self.debug_level != 0 and table_name == None:
             self.logger.info("-------------------------------------")
@@ -1021,15 +1024,33 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
         start = datetime.now()
 
-        errorStmt = backend.summary(table_name)
-        if errorStmt is not None and isinstance(errorStmt, tuple):
+        output = backend.summary(table_name)
+        if output is not None and isinstance(output, tuple):
             if self.debug_level != 0:
-                self.logger.error(f"Summary error: {errorStmt[1]}")
-            raise errorStmt[0](errorStmt[1])
+                self.logger.error(f"Summary error: {output[1]}")
+            raise output[0](output[1])
 
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
+        
+        if collection == True and table_name is None:
+            return output[1:]
+        elif collection == True and table_name is not None:
+            return output
+        elif table_name is not None and isinstance(output, pd.DataFrame):
+            print(f"\nTable: {table_name}")
+            headers = output.columns.tolist()
+            rows = output.values.tolist()
+            self.table_print_helper(headers, rows, 100)
+        elif isinstance(output, list) and isinstance(output[0], list) and all(isinstance(df, pd.DataFrame) for df in output[1:]):
+            for t_name, data in zip(output[0], output[1:]):
+                print(f"\nTable: {t_name}")
+                headers = data.columns.tolist()
+                rows = data.values.tolist() 
+                self.table_print_helper(headers, rows, 100)
+        else:
+            raise ValueError("Returned object from the first loaded backend's summary() is incorrectly structured")
 
     def num_tables(self):
         """
@@ -1086,17 +1107,22 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to display its data")
         start = datetime.now()
 
-        errorStmt = backend.display(table_name, num_rows, display_cols)
-        if errorStmt is not None and isinstance(errorStmt, tuple):
+        output = backend.display(table_name, display_cols)
+        if output is not None and isinstance(output, tuple):
             if self.debug_level != 0:
-                self.logger.error(f"Display error: {errorStmt[1]}")
-            raise errorStmt[0](errorStmt[1])
+                self.logger.error(f"Display error: {output[1]}")
+            raise output[0](output[1])
 
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
-        if errorStmt is not None and isinstance(errorStmt, pd.DataFrame):
-            return errorStmt
+        
+        if table_name is not None and isinstance(output, pd.DataFrame):
+            print(f"\nTable: {table_name}")
+            headers = output.columns.tolist()
+            rows = output.values.tolist()
+            self.table_print_helper(headers, rows, num_rows)
+            print()
     
     def get_table_names(self, query):
         """
@@ -1117,6 +1143,8 @@ class Terminal():
 
         output = backend.get_table_names(query)
         if output is not None and isinstance(output, tuple):
+            if self.debug_level != 0:
+                self.logger.info(f"Error getting table names {output[1]}")
             raise output[0](output[1])
         
         end = datetime.now()
@@ -1235,14 +1263,33 @@ class Terminal():
             except ValueError:
                 return text
 
-    # Internal function used to print a table cleanly
-    def table_print_helper(self, headers, rows, num_rows=25):
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend before printing table info from it')
-            raise NotImplementedError('Need to load a valid backend before printing table info from it')
-        backend = self.loaded_backends[0]
-        backend.table_print_helper(headers, rows, num_rows)
+    # Internal function used to manually print a table cleanly
+    def table_print_helper(self, headers, rows, max_rows=25):
+        # Determine max width for each column
+        col_widths = [
+            max(
+                len(str(h)),
+                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
+            )
+            for i, h in enumerate(headers)
+        ]
+
+        # Print header
+        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
+        print("\n" + header_row)
+        print("-" * len(header_row))
+
+        # Print each row
+        count = 0
+        for row in rows:
+            print(" | ".join(
+                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
+            ))
+
+            count += 1
+            if count == max_rows:
+                print(f"  ... showing {max_rows} of {len(rows)} rows")
+                break
 
     # Internal function used to check if a backend has data
     def valid_backend(self, backend, parent_name):

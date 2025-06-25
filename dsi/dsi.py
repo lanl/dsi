@@ -486,8 +486,8 @@ class DSI():
 
             output_df.insert(0, "dsi_row_index", row_list)
             output_df.insert(0, "dsi_table_name", table_name)
-            first_msg = "Note: Output includes 'dsi_table_name' and 'dsi_row_index' columns for dsi.update();"
-            print(first_msg, "DO NOT edit them even if adding rows. Drop if not updating.")
+            first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+            print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
             return output_df
 
     def update(self, collection, backup = False):
@@ -549,9 +549,10 @@ class DSI():
             table_df = table_df.drop(columns='dsi_table_name')
             table_df = table_df.drop(columns='dsi_row_index')
 
-            try:
-                actual_df = self.t.display(table_name, num_rows=-101)
-            except Exception as e: # dont update if this table doesn't exist
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                actual_df = self.t.get_table(table_name)
+            if actual_df.empty: # dont update if this table doesn't exist
                 print(f"WARNING: Cannot update the table '{table_name}' as it does not exist in the active backend.\n")
                 return
             
@@ -696,7 +697,7 @@ class DSI():
         else:
             print(output)
 
-    def summary(self, table_name = None):
+    def summary(self, table_name = None, collection = False):
         """
         Prints numerical metadata and (optionally) sample data from tables in the active backend.
 
@@ -709,10 +710,20 @@ class DSI():
             sys.exit("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
+        
+        output = None
         try:
-            self.t.summary(table_name)
+            f = io.StringIO()
+            with redirect_stdout(f):
+                summary_df = self.t.summary(table_name, collection)
+            output = f.getvalue()
         except Exception as e:
             sys.exit(f"summary() ERROR: {e}")
+
+        if collection:
+            return summary_df
+        else:
+            print(output)
     
     def num_tables(self):
         """

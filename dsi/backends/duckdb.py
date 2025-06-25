@@ -295,12 +295,7 @@ class DuckDB(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                
-                if "Table" in str(e) and "does not exist" in str(e) and dict_return:
-                    return OrderedDict()
-                elif "Table" in str(e) and "does not exist" in str(e) and not dict_return:
-                    return pd.DataFrame()
-                return (RuntimeError, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
+                return (duckdb.Error, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
@@ -725,15 +720,12 @@ class DuckDB(Filesystem):
         else:
             print(f"Database now has {table_count} table")
     
-    def display(self, table_name, num_rows = 25, display_cols = None):
+    def display(self, table_name, display_cols = None):
         """
-        Prints data of a specified table in this DuckDB backend.
+        Returns all data from a specified table in this DuckDB backend.
         
         `table_name` : str
             Name of the table to display.
-         
-        `num_rows` : int, optional, default=25
-            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
         `display_cols` : list of str, optional
             List of specific column names to display from the table. 
@@ -747,42 +739,40 @@ class DuckDB(Filesystem):
             df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
         else:
             sql_list = ", ".join(display_cols)
-            df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
-        if num_rows == -101:
-            return df
-        headers = df.columns.tolist()
-        rows = df.values.tolist()
-        
-        print("\nTable: " + table_name)
-        self.table_print_helper(headers, rows, num_rows)
-        print()
+            try:
+                df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
+            except Exception as e:
+                return (duckdb.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
+        return df
     
     def summary(self, table_name = None):
         """
-        Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
+        Returns numerical metadata from tables in the first activated backend.
 
         `table_name` : str, optional
-            If specified, only the numerical metadata for that table will be printed.
+            If specified, only the numerical metadata for that table will be returned as a Pandas DataFrame.
             
-            If None (default), metadata for all available tables is printed.
+            If None (default), metadata for all available tables is returned as a list of Pandas DataFrames.
         """
         if table_name is None:
             tableList = self.cur.execute("""
                                         SELECT table_name FROM information_schema.tables
                                         WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                         """).fetchall()
+            tableList = [table[0] for table in tableList]
 
+            summary_list = []
             for table in tableList:
-                print(f"\nTable: {table[0]}")
-                headers, rows = self.summary_helper(table[0]) 
-                self.table_print_helper(headers, rows, 1000)
+                headers, rows = self.summary_helper(table)
+                summary_list.append(pd.DataFrame(rows, columns=headers, dtype=object))
+            summary_list.insert(0, tableList)
+            return summary_list
         else:
             if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
                                 WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
                 return (ValueError, f"{table_name} does not exist in this DuckDB database")
-            print(f"\nTable: {table_name}")
-            headers, rows = self.summary_helper(table_name) 
-            self.table_print_helper(headers, rows, 1000)
+            headers, rows = self.summary_helper(table_name)
+            return pd.DataFrame(rows, columns=headers, dtype=object)
 
     def summary_helper(self, table_name):
         """
@@ -978,38 +968,6 @@ class DuckDB(Filesystem):
                     queue.append(parent)
 
         return False, ordered_tables
-
-    def table_print_helper(self, headers, rows, max_rows=25):
-        """
-        **Internal use only. Do not call**
-
-        Prints table data and metadata in a clean tabular format.
-        """
-        # Determine max width for each column
-        col_widths = [
-            max(
-                len(str(h)),
-                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
-            )
-            for i, h in enumerate(headers)
-        ]
-
-        # Print header
-        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-        print("\n" + header_row)
-        print("-" * len(header_row))
-
-        # Print each row
-        count = 0
-        for row in rows:
-            print(" | ".join(
-                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
-            ))
-
-            count += 1
-            if count == max_rows:
-                print(f"  ... showing {max_rows} of {len(rows)} rows")
-                break
 
     # Closes connection to server
     def close(self):
