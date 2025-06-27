@@ -803,59 +803,53 @@ class Terminal():
         if not isinstance(query_object, str):
             raise TypeError("`query_object` must be a string")
         print(f"Finding all rows in the first table of the first loaded backend where {query_object}")
-        if "\\'" in query_object:
-            query_object = query_object.replace("\\'", "'")
+        query_object = query_object.replace("\\'", "'") if "\\'" in query_object else query_object
+        query_object = query_object.replace('\\"', '"') if '\\"' in query_object else query_object
+
+        def is_literal(s):
+            return s.startswith("'") and s.endswith("'")
+        def wrap_in_quotes(value):
+            value = value[1:-1] if is_literal(value) else value
+            return "'" + re.sub(r"(?<!')'(?!')", "''", value) + "'"
 
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
         if not any(op in query_object for op in operators):
             raise ValueError("`query_object` is missing an operator to compare the column to a value.")
-        
-        pattern = r'(==|!=|>=|<=|=|<|>|\()'
-        parts = re.split(r'(".*?")', query_object)
-        result = []
-        for part in parts:
-            if part.startswith('"') and part.endswith('"'):
-                result.append(part)
-            else:
-                result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
+        result = self.manual_string_parsing(query_object)
         if len(result) == 1:
             raise ValueError("Could not identify the operator in `query_object`. The operator cannot be nested in double quotes")
         elif len(result) == 2:
-            raise ValueError("Input must include both a column and a value for comparison.")
-        elif any('"' in val for val in result[1:]):
+            raise ValueError("Input must include a column, operator, and value. Operator cannot be enclosed in quotes.")
+        elif len(result) == 3 and not is_literal(result[2]) and any(op in result[2] for op in operators):
+            extra = "If matching value has an operator in it, make sure to wrap in single quotes."
+            raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]. {extra}")
+        elif len(result) == 3 and result[2].startswith('"') and result[2].endswith('"'):
             raise ValueError(f"The value in the relational find() cannot be enclosed in double quotes")
-        elif len(result) > 3:
-            raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
-        
-        def is_literal(s):
-            return s.startswith("'") and s.endswith("'")
-        def wrap_in_quotes(value):
-            return f"'{value}'" if isinstance(self.check_type(value), str) and not is_literal(value) else value
         
         column_name = result[0]
         relation = result[1] + result[2]
         if "'" in column_name:
             raise ValueError("Cannot have a single quote as part of a column name")
-        if '"' in relation:
-            raise ValueError(f"The value in '{relation}' cannot be enclosed in double quotes")
         if "'" in result[2] and result[2].count("'") % 2 != 0:
-            raise TypeError("Detected an unmatched single quote. For an apostrophe use 2 single quotes. Ex: he's -> he''s NOT he\"s")
+            raise TypeError("Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s")
         elif len(result) == 3 and result[1] == '(':
-            start_msg = f"When finding rows in '{column_name}' between two values using (),"
+            start_msg = f"When applying a range-based find on '{column_name}' using (),"
             if ',' not in result[2]:
-                raise ValueError(f"{start_msg} values must be separated with a comma.")
+                raise ValueError(f"{start_msg} values must be separated by a comma.")
             elif ')' != result[2][-1]:
-                raise ValueError(f"{start_msg} the input string must end with closing parenthesis.")
+                raise ValueError(f"{start_msg} it must end with closing parenthesis.")
             elif (result[2][result[2].rfind("'"):] if "'" in result[2] else result[2]).count(')') > 1:
                 raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
         
             values = result[2][:-1].strip()
+            if values[0] == '"' or values[-1] == '"':
+                raise ValueError("Neither value in the range-based find can be enclosed in double quotes. Only single quotes")
             if "'" not in values or ("'" in values and not is_literal(values)):
                 if values.count(',') > 1 or ' ' in values.replace(', ', ','):
                     raise ValueError("Range-based finds require multi-word values to be enclosed in single quotes")
             values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
             values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
-            if '' in values:
+            if '' in values or len(values) != 2:
                 raise ValueError("There needs to be two values for the range find. Ex: (1,2)")
             relation = f"({wrap_in_quotes(values[0])},{wrap_in_quotes(values[1])})"
             if values[0] > values[1]:
@@ -887,6 +881,53 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
+    
+    # helper function to manually parse relation input to see if its valid
+    def manual_string_parsing(self, query):
+        # splits on double quotes not within any single quotes
+        # splits on operators outside of any quotes
+        op_pattern = re.compile(r'==|!=|>=|<=|=|<|>|\(')
+        parts = []
+        buffer = ''
+        in_single = False
+        in_double = False
+        operator_found = False
+        i = 0
+
+        while i < len(query):
+            char = query[i]
+
+            # Toggle quote states
+            if char == "'" and not in_double:
+                in_single = not in_single
+                buffer += char
+                i += 1
+            elif char == '"' and not in_single:
+                in_double = not in_double
+                buffer += char
+                i += 1
+
+            # Only split on first operator outside of any quotes
+            elif not in_single and not in_double:
+                op_match = op_pattern.match(query, i)
+                if op_match and not operator_found:
+                    if buffer.strip():
+                        parts.append(buffer.strip())
+                    parts.append(op_match.group())
+                    buffer = ''
+                    operator_found = True
+                    i += len(op_match.group())
+                else:
+                    buffer += char
+                    i += 1
+            else:
+                buffer += char
+                i += 1
+
+        if buffer.strip():
+            parts.append(buffer.strip())
+
+        return parts
     
     def overwrite_table(self, table_name, collection, backup = False):
         """

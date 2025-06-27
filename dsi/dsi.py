@@ -390,8 +390,17 @@ class DSI():
         `query` : int, float, or str
             The value to search for in all rows across all tables.
 
-            If `query` is a string with a condition, it must contain a column name, operator, and value.
-            Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)".
+            If `query` is a string with a condition, it must be in the format of a column name, operator, then value.
+            Valid operators on numbers or strings:
+            
+            - age > 4 
+            - age < 4 
+            - age >= 4 
+            - age <= 4 
+            - age = 4 
+            - age == 4 
+            - age != 4 
+            - age (4, 8) --> inclusive range between 4 and 8
 
         `collection` : bool, optional, default False. 
             If True, returns a pandas DataFrame representing a subset of table rows that match or satisfy `query`.
@@ -407,23 +416,13 @@ class DSI():
             sys.exit("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot find() until all associated data is loaded after a complex schema")
-        if isinstance(query, str) and query.count('"') > 2:
-            sys.exit("find() ERROR: find() does not support nested or escaped double quotes as an input")
-        if isinstance(query, str) and "\\'" in query:
-            query = query.replace("\\'", "'")
+        query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
+        query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
         
         new_find = False
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
         if isinstance(query, str) and any(op in query for op in operators):
-            pattern = r'(==|!=|>=|<=|=|<|>|\()'
-            parts = re.split(r'(".*?")', query)
-
-            result = []
-            for part in parts:
-                if part.startswith('"') and part.endswith('"'):
-                    result.append(part)
-                else:
-                    result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
+            result = self.t.manual_string_parsing(query)
             if len(result) > 1: # can split into column and operator
                 new_find = True
                 print(f"Finding all rows where '{query}' in the active backend")
@@ -446,6 +445,9 @@ class DSI():
                         lines[1] = lines[1].replace(between, "dsi.query()")
                         lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
                         warn_msg = '\n'.join(lines)
+                    elif "Could not find" in warn_msg:
+                        ending_ind = warn_msg.find("in this database")
+                        warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
                     print("\n"+warn_msg.replace("database", "backend"))
                     return
         

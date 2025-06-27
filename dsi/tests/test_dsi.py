@@ -196,21 +196,465 @@ def test_find_update_sqlite_backend():
     assert data['b'].tolist() == [2000,2001]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
-# def test_find_relation_sqlite_backend():
-#     dbpath = 'data.db'
-#     if os.path.exists(dbpath):
-#         os.remove(dbpath)
+def test_find_inequality_sqlite_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
 
-#     test = DSI(filename=dbpath, backend_name= "Sqlite")
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-#     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
-#     f = io.StringIO()
-#     with redirect_stdout(f):
-#         find_df = test.find(query="a > 2", collection=True)
-#     output = f.getvalue()
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a > 2", collection=True)
+    output = f.getvalue()
 
-# test_find_relation_sqlite_backend()
+    expected_output1 = "Finding all rows where 'a > 2' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a > 2\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a > 1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a > 1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [2, 4, 6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a<3", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a<3' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a <=  1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a <=  1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a>=3", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a>=3' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a>=3\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+def test_find_equality_sqlite_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a !=  1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a !=  1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [2, 4, 6]
+    assert find_df['specification'].tolist() == ['!jack1','!jack1','!jack1']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a=3", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a=3' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a=3\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a =  1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a =  1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+    assert find_df['specification'].tolist() == ['!jack','!jack','!jack']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a ==  2", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a ==  2' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [2, 4, 6]
+    assert find_df['specification'].tolist() == ['!jack1','!jack1','!jack1']
+
+def test_find_range_sqlite_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1, 2)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1, 2)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1,2)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1,2)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1, 1)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1, 1)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+    assert find_df['specification'].tolist() == ['!jack','!jack','!jack']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a(1,1)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a(1,1)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+    assert find_df['specification'].tolist() == ['!jack','!jack','!jack']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1,3)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1,3)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a(3,4)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a(3,4)' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a(3,4)\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+
+def test_find_relation_error_sqlite_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    try:
+        test.find(query='"a" > "14"', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: The value in the relational find() cannot be enclosed in double quotes"
+
+    try:
+        test.find(query="'a' > 1", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Cannot have a single quote as part of a column name"
+
+    try:
+        test.find(query="'a' 1", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == 'find() ERROR: near "a": syntax error'
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find(query="a 1", collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all instances of 'a 1' in the active backend\n"
+    expected_output2 = "WARNING: 'a 1' was not found in this backend\n\n"
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find(query='a ">1"', collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all instances of 'a \">1\"' in the active backend\n"
+    expected_output2 = "WARNING: 'a \">1\"' was not found in this backend\n\n"
+    assert output == expected_output1 + expected_output2
+
+    try:
+        test.find(query='a>"2"', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == 'find() ERROR: The value in the relational find() cannot be enclosed in double quotes'
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a > '<4'", collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all rows where 'a > '<4'' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a > '<4'\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="g !='>good memories'", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'g !='>good memories'' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "address"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    try:
+        test.find(query="a > '<4')", collection=True)
+        assert False
+    except SystemExit as output:
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+
+    try:
+        test.find(query="a > <4)", collection=True)
+        assert False
+    except SystemExit as output:
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+
+    try:
+        test.find(query="a (1,2))", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+
+    try:
+        test.find(query="a (')')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), values must be separated by a comma."
+
+    try:
+        test.find(query="a (,", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), it must end with closing parenthesis."
+
+    try:
+        test.find(query="a (,')')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == 'find() ERROR: There needs to be two values for the range find. Ex: (1,2)'
+
+    try:
+        test.find(query="g !=there's", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s"
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="g == 'there '> \"temperature\" '?'", collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all rows where 'g == 'there '> \"temperature\" '?'' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"g == 'there '> \"temperature\" '?'\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    try:
+        test.find(query="g (there is, a place)", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
+    
+    try:
+        test.find(query="g ('there is', a place)", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
+
+    try:
+        test.find(query="g ('there is', 'a place')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Invalid input range: '('there is','a place')'. The lower value must come first."
+    
+    try:
+        test.find(query="g ('there is' 'a place')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), values must be separated by a comma."
+    
+    try:
+        test.find(query="g ('there is', 'a place'", collection=True)
+        assert False
+    except SystemExit as output:
+        print(output)
+        assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
+    
+    try:
+        test.find(query="g ('there is', 'a place)'", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
+    
+    try:
+        test.find(query="g ('there is', 'a place'))", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+
+    try:
+        test.find(query="g (3,4))", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+
+    try:
+        test.find(query="g (,4)", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: There needs to be two values for the range find. Ex: (1,2)"
+    
+    try:
+        test.find(query='a ("hello",6)', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
+
+    try:
+        test.find(query='a (6, "hello")', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
+
+    try:
+        test.find(query='a (6, "hello", 6)', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find("specification = '!jack'")
+    output = f.getvalue()
+    assert find_df is None    
+    expected_output = textwrap.dedent("""\
+        Finding all rows where 'specification = '!jack'' in the active backend\n
+        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        Try using `dsi.query()` to retrieve the matching rows for a specific table
+        These are recommended inputs for query():
+         - SELECT * FROM math WHERE specification = '!jack'
+         - SELECT * FROM address WHERE specification = '!jack'
+         - SELECT * FROM physics WHERE specification = '!jack'\n""")
+    assert output == expected_output
 
 def test_schema_sqlite_backend():
     dbpath = 'data.db'
@@ -449,6 +893,466 @@ def test_find_duckdb_backend():
     assert find_df.columns.tolist()[0] == "dsi_table_name"
     assert find_df["dsi_table_name"][0] == "address"
     assert find_df["dsi_row_index"].tolist() == [1]
+
+def test_find_inequality_duckdb_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a > 2", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a > 2' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a > 2\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a > 1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a > 1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [2, 4, 6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a<3", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a<3' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a <=  1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a <=  1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a>=3", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a>=3' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a>=3\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+def test_find_equality_duckdb_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a !=  1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a !=  1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [2, 4, 6]
+    assert find_df['specification'].tolist() == ['!jack1','!jack1','!jack1']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a=3", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a=3' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a=3\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a =  1", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a =  1' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+    assert find_df['specification'].tolist() == ['!jack','!jack','!jack']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a ==  2", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a ==  2' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [2, 4, 6]
+    assert find_df['specification'].tolist() == ['!jack1','!jack1','!jack1']
+
+def test_find_range_duckdb_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1, 2)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1, 2)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1,2)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1,2)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1, 1)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1, 1)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+    assert find_df['specification'].tolist() == ['!jack','!jack','!jack']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a(1,1)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a(1,1)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 3
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,3,5]
+    assert find_df['specification'].tolist() == ['!jack','!jack','!jack']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a (1,3)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a (1,3)' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "math"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="a(3,4)", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'a(3,4)' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"a(3,4)\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+
+def test_find_relation_error_duckdb_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+
+    try:
+        test.find(query='"a" > "14"', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: The value in the relational find() cannot be enclosed in double quotes"
+
+    try:
+        test.find(query="'a' > 1", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Cannot have a single quote as part of a column name"
+
+    try:
+        test.find(query="'a' 1", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == 'find() ERROR: Parser Error: syntax error at or near "a"'
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find(query="a 1", collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all instances of 'a 1' in the active backend\n"
+    expected_output2 = "WARNING: 'a 1' was not found in this backend\n\n"
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find(query='a ">1"', collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all instances of 'a \">1\"' in the active backend\n"
+    expected_output2 = "WARNING: 'a \">1\"' was not found in this backend\n\n"
+    assert output == expected_output1 + expected_output2
+
+    try:
+        test.find(query='a>"2"', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == 'find() ERROR: The value in the relational find() cannot be enclosed in double quotes'
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="g < '<4'", collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all rows where 'g < '<4'' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"g < '<4'\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="g !='>good memories'", collection=True)
+    output = f.getvalue()
+
+    expected_output1 = "Finding all rows where 'g !='>good memories'' in the active backend\n"
+    expected_output2 = "Note: Output includes 2 'dsi_' columns required for dsi.update(). " \
+    "DO NOT modify if updating; keep any extra rows blank. Drop if not updating.\n\n"
+    assert output == expected_output1 + expected_output2
+    assert find_df is not None
+    assert "dsi_table_name" in find_df.columns and "dsi_row_index" in find_df.columns
+    assert len(find_df) == 6
+    assert find_df["dsi_table_name"][0] == "address"
+    assert find_df["dsi_row_index"].tolist() == [1,2,3,4,5,6]
+
+    try:
+        test.find(query="a > '<4')", collection=True)
+        assert False
+    except SystemExit as output:
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+
+    try:
+        test.find(query="a > <4)", collection=True)
+        assert False
+    except SystemExit as output:
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+
+    try:
+        test.find(query="a (1,2))", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+
+    try:
+        test.find(query="a (')')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), values must be separated by a comma."
+
+    try:
+        test.find(query="a (,", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), it must end with closing parenthesis."
+
+    try:
+        test.find(query="a (,')')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == 'find() ERROR: There needs to be two values for the range find. Ex: (1,2)'
+
+    try:
+        test.find(query="g !=there's", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s"
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find(query="g == 'there '> \"temperature\" '?'", collection=True)
+    output = f.getvalue()
+    expected_output1 = "Finding all rows where 'g == 'there '> \"temperature\" '?'' in the active backend\n\n"
+    expected_output2 = "WARNING: Could not find any rows where \"g == 'there '> \"temperature\" '?'\" in this backend.\n\n"
+    assert find_df is None
+    assert output == expected_output1 + expected_output2
+
+    try:
+        test.find(query="g (there is, a place)", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
+    
+    try:
+        test.find(query="g ('there is', a place)", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
+
+    try:
+        test.find(query="g ('there is', 'a place')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Invalid input range: '('there is','a place')'. The lower value must come first."
+    
+    try:
+        test.find(query="g ('there is' 'a place')", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), values must be separated by a comma."
+    
+    try:
+        test.find(query="g ('there is', 'a place'", collection=True)
+        assert False
+    except SystemExit as output:
+        print(output)
+        assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
+    
+    try:
+        test.find(query="g ('there is', 'a place)'", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
+    
+    try:
+        test.find(query="g ('there is', 'a place'))", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+
+    try:
+        test.find(query="g (3,4))", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+
+    try:
+        test.find(query="g (,4)", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: There needs to be two values for the range find. Ex: (1,2)"
+    
+    try:
+        test.find(query='a ("hello",6)', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
+
+    try:
+        test.find(query='a (6, "hello")', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
+
+    try:
+        test.find(query='a (6, "hello", 6)', collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find("specification = '!jack'")
+    output = f.getvalue()
+    assert find_df is None
+    expected_output = textwrap.dedent("""\
+        Finding all rows where 'specification = '!jack'' in the active backend\n
+        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        Try using `dsi.query()` to retrieve the matching rows for a specific table
+        These are recommended inputs for query():
+         - SELECT * FROM address WHERE specification = '!jack'
+         - SELECT * FROM math WHERE specification = '!jack'
+         - SELECT * FROM physics WHERE specification = '!jack'\n""")
+    assert output == expected_output
 
 def test_find_update_duckdb_backend():
     dbpath = 'data.db'
