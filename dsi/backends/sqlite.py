@@ -761,7 +761,7 @@ class Sqlite(Filesystem):
         query = f"SELECT {row_id_select}, * FROM {all_tables[0]} as t1 WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()
         
-        if not output_data:
+        if not output_data and len(all_tables) == 1:
             val = f'"{column_name} {old_relation}"' if "'" in old_relation else f"'{column_name} {old_relation}'"
             return f"Could not find any rows where {val} in this database."
         if len(all_tables) > 1:
