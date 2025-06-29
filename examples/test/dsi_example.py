@@ -34,8 +34,8 @@ test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAM
 
 
 ''' Backend data interactions: query()/get_table() and find(). Manipulating their outputs to update() the backend '''
-# test.query("SELECT * FROM math")                                # print output
-test.get_table("math")                                          # print output
+test.query("SELECT * from math;")                               # print output
+# test.get_table("math")                                          # print output
 # query_df = test.query("SELECT * FROM math", collection=True)    # return output
 # query_df = test.get_table("math", collection=True)              # return output
 # test.display("math")
@@ -48,26 +48,30 @@ test.get_table("math")                                          # print output
 # test.update(query_df)
 # test.display("math")
 
-test.find(query=2)                                  # print output
-# find_list = test.find(query="a", collection=True)   # return output
-# for obj in find_list:
-#     test.display(table_name=obj["dsi_table_name"][0])
-# for obj in find_list:
-#     obj['i'] = list(range(2000, 2000 + len(obj)))
-#     obj['b'] = list(range(2000, 2000 + len(obj)))
-#     obj["new_col"] = "test1"
-# test.update(find_list, backup=True)
-# for obj in find_list:
-#     test.display(table_name=obj["dsi_table_name"][0])
+test.find(query="a<2")                                         # print output
+# find_df = test.find(query="a < 2", collection=True)   # return output
+# test.display(table_name=find_df["dsi_table_name"][0])
+
+# find_df['i'] = list(range(3000, 3000 + len(find_df)))
+# find_df['b'] = list(range(3000, 3000 + len(find_df)))
+# find_df["new_col"] = "test1"
+# print(find_df)
+
+# test.update(find_df, backup=False)
+# test.display(table_name=find_df["dsi_table_name"][0])
 
 
 ''' Printing table information '''
-# test.list()
+# table_list = test.list(True)
+# print(table_list)
 # test.num_tables()
 
 # test.summary()
+# all_dfs = test.summary(collection= True)
+# print(all_dfs)
 # test.summary(table_name='physics')
-# test.summary(table_name='physics', num_rows = 3)
+# summary_df = test.summary(table_name='physics', collection= True)
+# print(summary_df)
 
 # test.display(table_name='physics')
 # test.display(table_name='physics', num_rows = 3)

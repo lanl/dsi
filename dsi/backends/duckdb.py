@@ -14,14 +14,13 @@ class DataType:
 
 class ValueObject:
     """
-    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, or ``find_cell``
+    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, ``find_cell``, or ``find_relation``
 
         - t_name: table name 
         - c_name: column name as a list. The length of the list varies based on the find function. 
           Read the description of each one to understand the differences
-        - row_num: row number. Is useful when finding a value in ``find_cell`` or ``find`` (which includes results from ``find_cell``)
-        - type: type of match for this specific ValueObject. {table, column, range, cell, row}
-
+        - row_num: row number. Useful when finding a value in find_cell, find_relation, or find (includes results from find_cell)
+        - type: type of match for this specific ValueObject. {table, column, range, cell, row, relation}
     """
     t_name = "" # table name
     c_name = [] # column name(s) 
@@ -48,9 +47,9 @@ class DuckDB(Filesystem):
         self.cur = self.con.cursor()
         self.runTable = DuckDB.runTable
 
-    def check_type(self, input_list):
+    def sql_type(self, input_list):
         """
-        **Internal use only. This function is not intended for direct use by users.**
+        **Internal use only. Do not call**
 
         Evaluates a list and returns the predicted compatible DuckDB Type
 
@@ -75,7 +74,7 @@ class DuckDB(Filesystem):
         
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
-        **Users do not interact with this function and should ignore it. Called within ingest_artifacts()**
+        **Internal use only. Do not call**
 
         Helper function to create DuckDB table based on a passed in schema.
 
@@ -102,7 +101,7 @@ class DuckDB(Filesystem):
             diff_cols = list(set(col_names) - set(query_cols))
             if len(diff_cols) > 0:
                 for col in diff_cols:
-                    temp_name = col + self.check_type(types.properties[col])
+                    temp_name = col + self.sql_type(types.properties[col])
                     try:
                         self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
                     except duckdb.Error as e:
@@ -167,9 +166,6 @@ class DuckDB(Filesystem):
             else:
                 table_order = list(reversed(ordered_tables)) # ingest primary key tables first then children
 
-        if "runTable" in artifacts.keys():
-            self.runTable = False
-
         self.cur.execute("BEGIN TRANSACTION")
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable " \
@@ -206,9 +202,9 @@ class DuckDB(Filesystem):
                 types.properties[key.replace('-','_minus_')] = tableData[key]
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(key + self.check_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(key + self.sql_type(tableData[key]) + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(key + self.check_type(tableData[key]))
+                    types.unit_keys.append(key + self.sql_type(tableData[key]))
             
             self.ingest_table_helper(types, foreign_query)
             
@@ -291,8 +287,15 @@ class DuckDB(Filesystem):
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
                     print(data)
-            except:
-                return (RuntimeError, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
+            except Exception as e:
+                message = str(e)
+                if "Table" in message and "does not exist" in message:
+                    table_name = message[message.find("Table"):message.find("Did you mean")-2]
+                    print(f"WARNING: {table_name} in this database")
+                    if dict_return:
+                        return OrderedDict()
+                    return pd.DataFrame()
+                return (duckdb.Error, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
@@ -430,7 +433,7 @@ class DuckDB(Filesystem):
         if len(all_return) > 0:
             return all_return
         else:
-            return (ValueObject(),  f"{query_object} was not found in this database")
+            return f"{query_object} was not found in this database"
         
     def find_table(self, query_object):
         """
@@ -471,8 +474,8 @@ class DuckDB(Filesystem):
             
             if len(table_return_list) > 0:
                 return table_return_list
-            return (ValueObject(), f"{query_object} is not a table name in this database")
-        return (ValueObject(), f"{query_object} needs to be a string if finding among table names")
+            return f"{query_object} is not a table name in this database"
+        return f"{query_object} needs to be a string if finding among table names"
     
     def find_column(self, query_object, range = False):
         """
@@ -531,8 +534,8 @@ class DuckDB(Filesystem):
             
             if len(col_return_list) > 0:
                 return col_return_list
-            return (ValueObject(), f"{query_object} is not a column name in this database")
-        return (ValueObject(), f"{query_object} needs to be a string if finding among column names")
+            return f"{query_object} is not a column name in this database"
+        return f"{query_object} needs to be a string if finding among column names"
 
     def find_cell(self, query_object, row = False):
         """
@@ -615,8 +618,75 @@ class DuckDB(Filesystem):
                 value_obj_list.append(val)
             return value_obj_list
 
-        return (ValueObject(), f"{query_object} is not a cell in this database")
+        return f"{query_object} is not a cell in this database"
 
+    def find_relation(self, column_name, relation):
+        """
+        Finds all rows in the first table of the database that satisfy the relation applied to the given column.
+
+        `column_name` : str
+            The name of the column to apply the relation to.
+        
+        `relation` : str
+            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5)
+
+        `return` : list of ValueObjects
+            One ValueObject per matching row in that first table.
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list of all columns in the table
+            - value:    full row of values
+            - row_num:  row index of the match
+            - type:     'relation'
+        """      
+        tableList = self.cur.execute("""SELECT table_name FROM information_schema.tables
+                                        WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
+                                        """).fetchall()
+        tableList = [table[0] for table in tableList]
+
+        all_tables = []
+        col_list = []
+        for table in tableList:
+            colData = self.cur.execute(f"PRAGMA table_info({table})").fetchall()
+            columns = [row[1] for row in colData]
+            if column_name in columns:
+                all_tables.append(table)
+                col_list = columns        
+        
+        if len(all_tables) == 0:
+            if (column_name[0] == "'" and column_name[-1] == "'") or (column_name[0] == '"' and column_name[-1] == '"'):
+                return f"{column_name} is not a column in this database. Ensure the column is written first."
+            return f"'{column_name}' is not a column in this database. Ensure the column is written first."
+        old_relation = relation
+        if relation[0] == '(' and relation[-1] == ')':
+            values = relation[1:-1].strip()
+            values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
+            values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
+            relation = f"BETWEEN {values[0]} AND {values[1]}"
+        
+        query = f"SELECT * FROM (SELECT ROW_NUMBER() OVER () AS row_num, * FROM {all_tables[0]}) WHERE {column_name} {relation}"
+        output_data = self.cur.execute(query).fetchall()
+        
+        if not output_data and len(all_tables) == 1:
+            val = f'"{column_name} {old_relation}"' if "'" in old_relation else f"'{column_name} {old_relation}'"
+            return f"Could not find any rows where {val} in this database."
+        if len(all_tables) > 1:
+            query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
+            return query_list
+        
+        return_list = []
+        for row in output_data:
+            temp = ValueObject()
+            temp.t_name = all_tables[0]
+            temp.c_name = col_list
+            temp.row_num = int(row[0])
+            temp.type = "relation"
+            temp.value = list(row[1:])
+            return_list.append(temp)
+        
+        return return_list
+    
     def list(self):
         """
         Return a list of all tables and their dimensions from this DuckDB backend
@@ -650,64 +720,63 @@ class DuckDB(Filesystem):
         else:
             print(f"Database now has {table_count} table")
     
-    def display(self, table_name, num_rows = 25, display_cols = None):
+    def display(self, table_name, display_cols = None):
         """
-        Prints data of a specified table in this DuckDB backend.
+        Returns all data from a specified table in this DuckDB backend.
         
         `table_name` : str
             Name of the table to display.
-         
-        `num_rows` : int, optional, default=25
-            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
         `display_cols` : list of str, optional
             List of specific column names to display from the table. 
 
             If None (default), all columns are displayed.
         """
-        if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
-            return (RuntimeError, f"{table_name} does not exist in this DuckDB database")
+        if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
+                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
+            return (ValueError, f"{table_name} does not exist in this DuckDB database")
         if display_cols == None:
             df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
         else:
             sql_list = ", ".join(display_cols)
-            df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
-        if num_rows == -101:
-            return df
-        headers = df.columns.tolist()
-        rows = df.values.tolist()
-        
-        print("\nTable: " + table_name)
-        self.table_print_helper(headers, rows, num_rows)
-        print()
+            try:
+                df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
+            except Exception as e:
+                return (duckdb.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
+        return df
     
     def summary(self, table_name = None):
         """
-        Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
+        Returns numerical metadata from tables in the first activated backend.
 
         `table_name` : str, optional
-            If specified, only the numerical metadata for that table will be printed.
+            If specified, only the numerical metadata for that table will be returned as a Pandas DataFrame.
             
-            If None (default), metadata for all available tables is printed.
+            If None (default), metadata for all available tables is returned as a list of Pandas DataFrames.
         """
         if table_name is None:
             tableList = self.cur.execute("""
                                         SELECT table_name FROM information_schema.tables
                                         WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                         """).fetchall()
+            tableList = [table[0] for table in tableList]
 
+            summary_list = []
             for table in tableList:
-                print(f"\nTable: {table[0]}")
-                headers, rows = self.summary_helper(table[0]) 
-                self.table_print_helper(headers, rows, 1000)
+                headers, rows = self.summary_helper(table)
+                summary_list.append(pd.DataFrame(rows, columns=headers, dtype=object))
+            summary_list.insert(0, tableList)
+            return summary_list
         else:
-            print(f"\nTable: {table_name}")
-            headers, rows = self.summary_helper(table_name) 
-            self.table_print_helper(headers, rows, 1000)
+            if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
+                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
+                return (ValueError, f"{table_name} does not exist in this DuckDB database")
+            headers, rows = self.summary_helper(table_name)
+            return pd.DataFrame(rows, columns=headers, dtype=object)
 
     def summary_helper(self, table_name):
         """
-        **Internal use only.**
+        **Internal use only. Do not call**
 
         Generates and returns summary metadata for a specific table in the DuckDB backend.
         """
@@ -765,7 +834,8 @@ class DuckDB(Filesystem):
             temp_data = self.process_artifacts()
         elif isinstance(table_name, str) and isinstance(collection, pd.DataFrame):
             # if single table doesn't exist, skip all relations/dependencies checking
-            if self.cur.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()[0] == 0:
+            if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
+                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
                 not_exists = True
                 temp_data[table_name] = OrderedDict(collection.to_dict(orient='list'))
                 table_name = []
@@ -803,8 +873,8 @@ class DuckDB(Filesystem):
                             if any(isinstance(x, float) for x in fk_data):
                                 fk_data = [round(val, 4) for val in fk_data]
                             if not all(item in new_data for item in fk_data):
-                                errorMsg = f"Data in table {fk[0]}'s foreign key column, {fk[1]}, must match table {name}'s primary key"
-                                return(TypeError, errorMsg + f" column, {result}. Please ensure that all rows in {fk[0]} are updated")
+                                errorMsg = f"Data in '{fk[1]}', the foreign key of '{fk[0]}', must match '{result}', the primary"
+                                return(TypeError, errorMsg + f" key of '{name}'. Please ensure that all rows in '{fk[0]}' are updated")
 
                     print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
 
@@ -818,8 +888,7 @@ class DuckDB(Filesystem):
             self.con.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
 
         temp_runTable_bool = self.runTable
-        if temp_runTable_bool == True:
-            self.runTable = False
+        self.runTable = False
 
         errorStmt = self.ingest_artifacts(temp_data)
 
@@ -831,7 +900,9 @@ class DuckDB(Filesystem):
         
     def check_table_relations(self, tables, relation_dict):
         """
-        Internal helper function to check if a user-loaded schema for DSI has circular dependencies. 
+        **Internal use only. Do not call.**
+
+        Checks if a user-loaded schema has circular dependencies. 
         
         If no circular dependencies are found, returns a list of tables ordered from least
         dependent to most dependent, suitable for staged ingestion into the DuckDB backend.
@@ -897,38 +968,6 @@ class DuckDB(Filesystem):
                     queue.append(parent)
 
         return False, ordered_tables
-
-    def table_print_helper(self, headers, rows, max_rows=25):
-        """
-        **Internal use only.**
-
-        Prints table data and metadata in a clean tabular format.
-        """
-        # Determine max width for each column
-        col_widths = [
-            max(
-                len(str(h)),
-                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
-            )
-            for i, h in enumerate(headers)
-        ]
-
-        # Print header
-        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-        print("\n" + header_row)
-        print("-" * len(header_row))
-
-        # Print each row
-        count = 0
-        for row in rows:
-            print(" | ".join(
-                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
-            ))
-
-            count += 1
-            if count == max_rows:
-                print(f"  ... showing {max_rows} of {len(rows)} rows")
-                break
 
     # Closes connection to server
     def close(self):

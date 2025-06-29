@@ -25,14 +25,13 @@ class Artifact:
 
 class ValueObject:
     """
-    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, or ``find_cell``
+    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, ``find_cell``, or ``find_relation``
 
         - t_name: table name 
         - c_name: column name as a list. The length of the list varies based on the find function. 
           Read the description of each one to understand the differences
-        - row_num: row number. Is useful when finding a value in ``find_cell`` or ``find`` (which includes results from ``find_cell``)
-        - type: type of match for this specific ValueObject. {table, column, range, cell, row}
-
+        - row_num: row number. Useful when finding a value in find_cell, find_relation, or find (includes results from find_cell)
+        - type: type of match for this specific ValueObject. {table, column, range, cell, row, relation}
     """
     t_name = "" # table name
     c_name = [] # column name(s) 
@@ -59,9 +58,9 @@ class Sqlite(Filesystem):
         self.cur = self.con.cursor()
         self.runTable = Sqlite.runTable
 
-    def check_type(self, input_list):
+    def sql_type(self, input_list):
         """
-        **Internal use only. This function is not intended for direct use by users.**
+        **Internal use only. Do not call**
 
         Evaluates a list and returns the predicted compatible SQLite Type
 
@@ -86,7 +85,7 @@ class Sqlite(Filesystem):
         
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
-        **Users do not interact with this function and should ignore it. Called within ingest_artifacts()**
+        **Internal use only. Do not call**
 
         Helper function to create SQLite table based on a passed in schema.
 
@@ -110,7 +109,7 @@ class Sqlite(Filesystem):
             diff_cols = list(set(col_names) - set(query_cols))
             if len(diff_cols) > 0:
                 for col in diff_cols:
-                    temp_name = col + self.check_type(types.properties[col])
+                    temp_name = col + self.sql_type(types.properties[col])
                     self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
         else:
             sql_cols = ', '.join(types.unit_keys)
@@ -157,9 +156,6 @@ class Sqlite(Filesystem):
         # if "dsi_relations" in artifacts.keys():
         #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
         #     self.con.commit()
-        
-        if "runTable" in artifacts.keys():
-            self.runTable = False
 
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
@@ -190,9 +186,9 @@ class Sqlite(Filesystem):
                 types.properties[key.replace('-','_minus_')] = tableData[key]
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(key + self.check_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(key + self.sql_type(tableData[key]) + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(key + self.check_type(tableData[key]))
+                    types.unit_keys.append(key + self.sql_type(tableData[key]))
             
             # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
             # self.put_artifact_type(types, foreign_query)
@@ -276,7 +272,14 @@ class Sqlite(Filesystem):
                 data = pd.read_sql_query(query, self.con) 
                 if isVerbose:
                     print(data)
-            except:
+            except Exception as e:
+                message = str(e)
+                if "no such table" in message:
+                    table_name = message[message.rfind(":")+2:]
+                    print(f"WARNING: '{table_name}' does not exist in this database")
+                    if dict_return:
+                        return OrderedDict()
+                    return pd.DataFrame()
                 return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect SELECT query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
@@ -531,7 +534,7 @@ class Sqlite(Filesystem):
         if len(all_return) > 0:
             return all_return
         else:
-            return (ValueObject(),  f"{query_object} was not found in this database")
+            return f"{query_object} was not found in this database"
         
     def find_table(self, query_object):
         """
@@ -571,8 +574,8 @@ class Sqlite(Filesystem):
             
             if len(table_return_list) > 0:
                 return table_return_list
-            return (ValueObject(), f"{query_object} is not a table name in this database")
-        return (ValueObject(), f"{query_object} needs to be a string if finding among table names")
+            return f"{query_object} is not a table name in this database"
+        return f"{query_object} needs to be a string if finding among table names"
     
     def find_column(self, query_object, range = False):
         """
@@ -630,8 +633,8 @@ class Sqlite(Filesystem):
             
             if len(col_return_list) > 0:
                 return col_return_list
-            return (ValueObject(), f"{query_object} is not a column name in this database")
-        return (ValueObject(), f"{query_object} needs to be a string if finding among column names")
+            return f"{query_object} is not a column name in this database"
+        return f"{query_object} needs to be a string if finding among column names"
 
     def find_cell(self, query_object, row = False):
         """
@@ -707,7 +710,75 @@ class Sqlite(Filesystem):
 
             return value_obj_list
 
-        return (ValueObject(), f"{query_object} is not a cell in this database")
+        return f"{query_object} is not a cell in this database"
+    
+    def find_relation(self, column_name, relation):
+        """
+        Finds all rows in the first table of the database that satisfy the relation applied to the given column.
+
+        `column_name` : str
+            The name of the column to apply the relation to.
+        
+        `relation` : str
+            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5)
+
+        `return` : list of ValueObjects
+            One ValueObject per matching row in that first table.
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list of all columns in the table
+            - value:    full row of values
+            - row_num:  row index of the match
+            - type:     'relation'
+        """
+        tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        tableList = [table[0] for table in tableList]
+        if "sqlite_sequence" in tableList:
+            tableList.remove("sqlite_sequence")
+
+        all_tables = []
+        col_list = []
+        for table in tableList:
+            colData = self.cur.execute(f"PRAGMA table_info({table})").fetchall()
+            columns = [row[1] for row in colData]
+            if column_name in columns:
+                all_tables.append(table)
+                col_list = columns        
+        
+        if len(all_tables) == 0:
+            if (column_name[0] == "'" and column_name[-1] == "'") or (column_name[0] == '"' and column_name[-1] == '"'):
+                return f"{column_name} is not a column in this database. Ensure the column is written first."
+            return f"'{column_name}' is not a column in this database. Ensure the column is written first."
+        old_relation = relation
+        if relation[0] == '(' and relation[-1] == ')':
+            values = relation[1:-1].strip()
+            values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
+            values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
+            relation = f"BETWEEN {values[0]} AND {values[1]}"
+
+        row_id_select = f"(SELECT COUNT(*) FROM {all_tables[0]} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num"
+        query = f"SELECT {row_id_select}, * FROM {all_tables[0]} as t1 WHERE {column_name} {relation}"
+        output_data = self.cur.execute(query).fetchall()
+        
+        if not output_data and len(all_tables) == 1:
+            val = f'"{column_name} {old_relation}"' if "'" in old_relation else f"'{column_name} {old_relation}'"
+            return f"Could not find any rows where {val} in this database."
+        if len(all_tables) > 1:
+            query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
+            return query_list
+        
+        return_list = []
+        for row in output_data:
+            temp = ValueObject()
+            temp.t_name = all_tables[0]
+            temp.c_name = col_list
+            temp.row_num = int(row[0])
+            temp.type = "relation"
+            temp.value = list(row[1:])
+            return_list.append(temp)
+        
+        return return_list
 
     def list(self):
         """
@@ -737,15 +808,12 @@ class Sqlite(Filesystem):
         else:
             print(f"Database now has {table_count[0]} table")
     
-    def display(self, table_name, num_rows = 25, display_cols = None):
+    def display(self, table_name, display_cols = None):
         """
-        Prints data of a specified table in this SQLite backend.
+        Returns all data from a specified table in this SQLite backend.
         
         `table_name` : str
             Name of the table to display.
-         
-        `num_rows` : int, optional, default=25
-            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
         `display_cols` : list of str, optional
             List of specific column names to display from the table. 
@@ -758,42 +826,40 @@ class Sqlite(Filesystem):
             df = pd.read_sql_query(f"SELECT * FROM {table_name};", self.con) 
         else:
             sql_list = ", ".join(display_cols)
-            df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con) 
-        if num_rows == -101:
-            return df
-        headers = df.columns.tolist()
-        rows = df.values.tolist()
-
-        print("\nTable: " + table_name)
-        self.table_print_helper(headers, rows, num_rows)
-        print()
+            try:
+                df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name};", self.con)
+            except Exception as e:
+                return (sqlite3.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
+        return df
     
     def summary(self, table_name = None):
         """
-        Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
+        Returns numerical metadata from tables in the first activated backend.
 
         `table_name` : str, optional
-            If specified, only the numerical metadata for that table will be printed.
+            If specified, only the numerical metadata for that table will be returned as a Pandas DataFrame.
             
-            If None (default), metadata for all available tables is printed.
+            If None (default), metadata for all available tables is returned as a list of Pandas DataFrames.
         """
         if table_name is None:
             tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table' AND name != 'sqlite_sequence';").fetchall()
-            if "sqlite_sequence" in tableList:
-                tableList.remove("sqlite_sequence")
+            tableList = [table[0] for table in tableList]
 
+            summary_list = []
             for table in tableList:
-                print(f"\nTable: {table[0]}")
-                headers, rows = self.summary_helper(table[0]) 
-                self.table_print_helper(headers, rows, 1000)
+                headers, rows = self.summary_helper(table)
+                summary_list.append(pd.DataFrame(rows, columns=headers, dtype=object))
+            summary_list.insert(0, tableList)
+            return summary_list
         else:
-            print(f"\nTable: {table_name}")
-            headers, rows = self.summary_helper(table_name) 
-            self.table_print_helper(headers, rows, 1000)
+            if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
+                return (ValueError, f"{table_name} does not exist in this SQLite database")
+            headers, rows = self.summary_helper(table_name)
+            return pd.DataFrame(rows, columns=headers, dtype=object)
 
     def summary_helper(self, table_name):
         """
-        **Internal use only.**
+        **Internal use only. Do not call**
 
         Generates and returns summary metadata for a specific table in the SQLite backend.
         """
@@ -902,16 +968,6 @@ class Sqlite(Filesystem):
                     rows = self.cur.execute(f"SELECT {result} FROM {name}").fetchall()
                     old_data = [row[0] for row in rows]
                     if old_data != new_data:
-                        if name == "runTable" and result == "run_id" and len(table_name) == 1:
-                            errorMsg = "Cannot only edit runTable's run_id column."
-                            return (TypeError, errorMsg + " Need to update the run_id column in other tables to match runTable")
-                        if name == "runTable" and result == "run_id" and len(table_name) > 1:
-                            for pk, fk in zip(temp_data["dsi_relations"]["primary_key"], temp_data["dsi_relations"]["foreign_key"]):
-                                if pk == (name, result) and fk != (None, None):
-                                    fk_data = temp_data[fk[0]][fk[1]]
-                                    if not all(item in new_data for item in fk_data):
-                                        errorMsg = f"Data in table {fk[0]}'s, run_id column must match runTable's edited run_id column."
-                                        return(TypeError, errorMsg + f" Please ensure that all rows in {fk[0]} are being updated")
                         print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
         
         for name in temp_data.keys():
@@ -919,8 +975,7 @@ class Sqlite(Filesystem):
             self.con.commit()
         
         temp_runTable_bool = self.runTable
-        if temp_runTable_bool == True:
-            self.runTable = False
+        self.runTable = False
 
         errorStmt = self.ingest_artifacts(temp_data)
 
@@ -929,38 +984,6 @@ class Sqlite(Filesystem):
         
         if errorStmt is not None:
             raise errorStmt[0](f"Error updating data in {self.filename} due to {errorStmt[1]}")
-
-    def table_print_helper(self, headers, rows, max_rows=25):
-        """
-        **Internal use only.**
-
-        Prints table data and metadata in a clean tabular format.
-        """
-        # Determine max width for each column
-        col_widths = [
-            max(
-                len(str(h)),
-                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
-            )
-            for i, h in enumerate(headers)
-        ]
-
-        # Print header
-        header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-        print("\n" + header_row)
-        print("-" * len(header_row))
-
-        # Print each row
-        count = 0
-        for row in rows:
-            print(" | ".join(
-                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
-            ))
-
-            count += 1
-            if count == max_rows:
-                print(f"  ... showing {max_rows} of {len(rows)} rows")
-                break
             
     # Closes connection to server
     def close(self):

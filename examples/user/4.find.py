@@ -7,6 +7,9 @@ find_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
 find_dsi.find("Jun 2025") # finds the value 2 in all tables
 
 #dsi.find(value, True)
-df_list = find_dsi.find("Jun 2025", True) # returns list of DataFrames for tables where 2 is found
+find_df = find_dsi.find("Jun 2025", True) # Returns the first matching table as a DataFrame
+
+#dsi.find(condition, True)
+find_df = find_dsi.find("state2_density > 5.0", True) # Returns matching rows as a DataFrame
 
 find_dsi.close()

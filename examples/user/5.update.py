@@ -3,19 +3,17 @@ from dsi.dsi import DSI
 
 update_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
 
-#dsi.find(value, collection)
-find_list = update_dsi.find(2, True) # list of DataFrames for tables where 2 is found
-for table in find_list:
-    update_dsi.display(table["dsi_table_name"][0], 5) # display table before update
+#dsi.find(condition, collection)
+find_df = update_dsi.find("state2_density > 5.0", True) # Returns matching rows as a DataFrame
 
-    table["new_col"] = 50   # add new column to this DataFrame
-    table["timestep"] = 100 # update existing column for some DataFrames
+update_dsi.display(find_df["dsi_table_name"][0], 5) # display table before update
 
-#dsi.update(collection)
-update_dsi.update(find_list) # update all tables in the list
-update_dsi.update(find_list[0]) # update only first table in the list
+find_df["new_col"] = 50   # add new column to this DataFrame
+find_df["max_timestep"] = 100 # update existing column
 
-for table in find_list:
-    update_dsi.display(table["dsi_table_name"][0], 5) # display table after update
+#dsi.update(collection, backup)
+update_dsi.update(find_df, True) # update the table in the backend
+
+update_dsi.display(find_df["dsi_table_name"][0], 5) # display table after update
 
 update_dsi.close()

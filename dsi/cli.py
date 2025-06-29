@@ -9,6 +9,8 @@ from collections import OrderedDict
 import textwrap
 from contextlib import redirect_stdout
 import sys
+import re
+import io
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -75,6 +77,7 @@ class DSI_cli:
                 self.exit_cli()
         print(f"Created a temporary {backend} DSI backend")
 
+
     def help_fn(self, args):
         commands = [
             ("display <table_name> [-n num_rows] [-e filename]", 
@@ -100,6 +103,7 @@ class DSI_cli:
             print(textwrap.fill(f"{cmd:48} {desc}", width=terminal_width, subsequent_indent=' ' * 50))
         print()
 
+
     def cd(self, args):
         '''
         Changes the current working directory only within the CLI environment
@@ -114,6 +118,7 @@ class DSI_cli:
         else:
             print(f"{path} is not a directory.")
         print()
+
 
     def clear(self, args):
         '''
@@ -154,6 +159,7 @@ class DSI_cli:
                 print(f"Exported {table_name} to {filename}")
             print()
     
+    
     def get_draw_parser(self):
         parser = argparse.ArgumentParser(prog='draw')
         parser.add_argument('-f', '--filename', type=str, required=False, help='ER Diagram filename')
@@ -172,6 +178,7 @@ class DSI_cli:
             print(f"Successfully drew an ER Diagram in {erd_name}")
         print()
 
+
     def exit_cli(self, args):
         '''
         Exits the CLI
@@ -181,6 +188,7 @@ class DSI_cli:
         with redirect_stdout(fnull):
             self.t.close()
         exit(0)
+
 
     def export_table(self, table_name, filename):
         '''
@@ -230,7 +238,8 @@ class DSI_cli:
                 return 1
         
         self.t.active_metadata = OrderedDict()
-        
+    
+    
     def find(self, args):
         '''
         Global find to see where that string exists
@@ -238,24 +247,62 @@ class DSI_cli:
         if not args:
             print("find ERROR: need to specify an object to find")
             return
-        if isinstance(args[0], str):
-            print(f"Finding all instances of '{args[0]}' in DSI")
-        else:
-            print(f"Finding all instances of {args[0]} in DSI")
-        
-        fnull = open(os.devnull, 'w')
-        try:
-            with redirect_stdout(fnull):
-                find_list = self.t.find_cell(args[0], row=True)
-        except Exception as e:
-            print(f"find ERROR: {e}")
+        if len(args) > 1:
+            print("find ERROR: need to wrap a multi-word search in quotes. Ex: find 'this is'")
             return
+        query = args[0]
 
+        new_find = False
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        if isinstance(query, str) and any(op in query for op in operators):
+            pattern = r'(==|!=|>=|<=|=|<|>|\()'
+            parts = re.split(r'(".*?")', query)
+
+            result = []
+            for part in parts:
+                if part.startswith('"') and part.endswith('"'):
+                    result.append(part)
+                else:
+                    result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
+            if len(result) > 1: # can split into column and operator
+                new_find = True
+                print(f"Finding all rows where '{query}' in the active backend")
+
+                output = None
+                try:
+                    f = io.StringIO()
+                    with redirect_stdout(f):
+                        find_list = self.t.find_relation(query)
+                    output = f.getvalue()
+                except Exception as e:
+                    sys.exit(f"find() ERROR: {e}")
+                
+                if output and "WARNING" in output:
+                    warn_msg = output[output.find("WARNING"):]
+                    if "artifact_handler" in warn_msg:
+                        lines = warn_msg.splitlines()
+                        start = lines[1].find('`')
+                        between = lines[1][start + 1 : lines[1].find('`', start + 1)]
+                        lines[1] = lines[1].replace(between, "query")
+                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query")
+                        warn_msg = '\n'.join(lines)
+                    print("\n"+warn_msg.replace("database", "backend"))
+                    return
+
+        if new_find == False:
+            val = f"'{query}'" if isinstance(query, str) else query
+            print(f"Finding all instances of {val} in DSI")
+            
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    find_list = self.t.find_cell(query, row=True)
+            except Exception as e:
+                print(f"find ERROR: {e}")
+                return
         if find_list is None:
-            if isinstance(args[0], str):
-                print(f"'{args[0]}' was not found")
-            else:
-                print(f"{args[0]} was not found")
+            val = f"'{query}'" if isinstance(query, str) else query
+            print(f"WARNING: {val} was not found")
             return
         print()
         for val in find_list:
@@ -264,7 +311,8 @@ class DSI_cli:
             print(f"  - Row Number: {val.row_num}")
             print(f"  - Data: {val.value}")
         print()
-              
+    
+
     def list_tables(self, args):
         '''
         Lists the tables in the database
@@ -274,23 +322,40 @@ class DSI_cli:
         except Exception as e:
             print(f"list ERROR: {e}")
 
+
     def ls(self, args):
         '''
         Lists contents of the current directory or specified path
         '''
         path = args[0] if args else '.'
         try:
-            entries = [entry for entry in os.listdir(path) if not entry.startswith('.')]
-            for entry in entries:
-                full_path = os.path.join(path, entry)
-                suffix = '/' if os.path.isdir(full_path) else ''
-                print(entry + suffix)
+            files = [file for file in os.listdir(path) if not file.startswith('.')]
+            files = [file + '/' if os.path.isdir(os.path.join(path, file)) else file for file in files]
+            files.sort()
+
+            try:
+                term_width = os.get_terminal_size().columns
+            except OSError:
+                term_width = 80
+            col_width = max((len(file) for file in files), default=0) + 3
+            num_cols = max(1, term_width // col_width)
+            num_rows = (len(files) + num_cols - 1)// num_cols
+
+            for row in range(num_rows):
+                line = ''
+                for col in range(num_cols):
+                    idx = col * num_rows + row
+                    if idx < len(files):
+                        line += files[idx].ljust(col_width)
+                print(line.rstrip())
+            print()
         except FileNotFoundError:
-            print(f"No such file or directory: {path}")
+            print(f"No such filepath: {path}")
             return
         except Exception as e:
             print(f"Error: {e}")
             return
+
 
     def get_plot_table_parser(self):
         parser = argparse.ArgumentParser(prog='plot_table')
@@ -312,9 +377,10 @@ class DSI_cli:
             print(f"Successfully plotted {table_name} in {filename}")
         print()
 
+
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='query')
-        parser.add_argument('sql_query', help='SQL query to execute')
+        parser.add_argument('sql_query', help='SQL query (in quotes) to execute')
         parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
         parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
@@ -335,6 +401,9 @@ class DSI_cli:
         except Exception as e:
             print(f"query ERROR: {e}")
             return
+        if data.empty:
+            print()
+            return
         
         headers = data.columns.tolist()
         rows = data.values.tolist()
@@ -352,6 +421,7 @@ class DSI_cli:
                 print()
                 print(f"Exported the query result to {filename}")
         print()
+
 
     def get_read_parser(self):
         parser = argparse.ArgumentParser(prog='read')
@@ -463,6 +533,7 @@ class DSI_cli:
             print("   - duckdb (extension: .duckdb, .db)\n")
             return
 
+
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')
         parser.add_argument('-t', '--table', type=str, required=False, help='Show only this table')
@@ -482,11 +553,13 @@ class DSI_cli:
             print(f"summary ERROR: {e}")
         print()
 
+
     def version(self):
         '''
         Output the version of DSI being used
         '''
-        print("DSI " + str(__version__)+"\n")
+        return str(__version__)
+
 
     def get_write_parser(self):
         parser = argparse.ArgumentParser(prog='write')
@@ -575,7 +648,6 @@ COMMANDS = {
 
 def main():
     if sys.argv[1:] and sys.argv[1].lower() == "help":
-        cli.version()
         cli.help_fn([])
         exit(0)
 
@@ -586,7 +658,19 @@ def main():
     if args.backend.lower() not in ["sqlite", "duckdb"]:
         print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb")
         exit(1)
-    cli.version()
+    print("   ", textwrap.dedent(fr"""
+         _____           ___                          
+        /  /  \         /  /\         ___     
+       /  / /\ \       /  / /_       /  /\    
+      /  / /  \ \     /  / / /\     /  / /    
+     /__/ / \__\ |   /  / / /  \   /__/  \    
+     \  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+      \  \ \  / /   \  \ \/ / / /     \  \ \/\
+       \  \ \/ /     \  \  / / /       \__\  /
+        \  \  /       \__\/ / /        /__/ / 
+         \__\/          /__/ /         \__\/  
+                        \__\/                   v{cli.version()}
+    """).strip())
     cli.startup(args.backend)
     print("\nEnter \"help\" for usage hints.")
 

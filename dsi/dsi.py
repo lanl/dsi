@@ -5,6 +5,8 @@ import pandas as pd
 import os
 import sys
 from contextlib import redirect_stdout
+import re
+import io
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -54,6 +56,7 @@ class DSI():
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "duckdb"]:
                 filename += ".db"
+        self.database_name = filename
 
         fnull = open(os.devnull, 'w')
         try:
@@ -71,6 +74,7 @@ class DSI():
         except Exception as e:
             sys.exit(f"backend ERROR: {e}")
 
+        self.main_backend_obj = self.t.loaded_backends[0]
         if filename != ".temp.db":
             print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
         else:
@@ -288,25 +292,40 @@ class DSI():
 
     def query(self, statement, collection = False):
         """
-        Executes a SQL query on the first activated backend.
+        Executes a SQL query on the active backend.
 
         `statement` : str
             A SQL query to execute. Only `SELECT` and `PRAGMA` statements are allowed.
 
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
+
+            - DataFrame includes 'dsi_table_name' column required for ``dsi.update()``.
+              Drop if not using ``update()``.
             
             If False (default), prints the result.
 
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         
+        output = None
         try:
-            df = self.t.artifact_handler(interaction_type='query', query=statement)
+            f = io.StringIO()
+            with redirect_stdout(f):
+                df = self.t.artifact_handler(interaction_type='query', query=statement)
+            output = f.getvalue()
         except Exception as e:
             sys.exit(f"query() ERROR: {e}")
+        if df.empty:
+            if output:
+                print(output)
+            else:
+                print("WARNING: input query returned no data. Please check again.")
+            return
         if not collection:
             print(f"Printing the result of the SQL query: {statement}")
             headers = df.columns.tolist()
@@ -315,13 +334,13 @@ class DSI():
             print()
         else:
             print(f"Storing the result of the SQL query: {statement} as a collection")
-            df.attrs['table_name'] = self.t.get_table_names(statement)[0]
-            df.insert(0, "dsi_table_name", df.attrs['table_name'])
+            df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+            print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
             return df
     
     def get_table(self, table_name, collection = False):
         """
-        Retrieves all data from a specified table without requiring knowledge of a particular backend's query language.
+        Retrieves all data from a specified table without requiring knowledge of the active backend's query language.
         
         This method offers a simplified alternative to `query()` for retrieving a full table data without using SQL.
 
@@ -330,11 +349,16 @@ class DSI():
 
         `collection` : bool, optional, default False.
             If True, returns the result as a pandas.DataFrame
+
+            - DataFrame includes 'dsi_table_name' column required for ``dsi.update()``.
+              Drop if not using ``update()``.
             
             If False (default), prints the result.
         
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         
@@ -342,6 +366,8 @@ class DSI():
             df = self.t.get_table(table_name)
         except Exception as e:
             sys.exit(f"get_table() ERROR: {e}")
+        if df.empty:
+            return
         if not collection:
             print(f"Printing all data from the table: {table_name}")
             headers = df.columns.tolist()
@@ -350,42 +376,94 @@ class DSI():
             print()
         else:
             print(f"Storing all data for the table: {table_name} as a collection")
-            df.attrs['table_name'] = table_name
-            df.insert(0, "dsi_table_name", df.attrs['table_name'])
+            df.insert(0, "dsi_table_name", table_name)
+            print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
             return df
         
     def find(self, query, collection = False):
         """
-        Finds all individual datapoints matching the `query` input from the first activated backend
+        Finds all rows across all tables in the active backend where `query` can be found.
+
+        If `query` is a string containing a column-level condition (e.g., "age > 4"), this method instead finds all rows 
+        in the first table where the condition is satisfied.
 
         `query` : int, float, or str
-            The value to search for at the cell level, across all tables in the backend.
+            The value to search for in all rows across all tables.
+
+            If `query` is a string with a condition, it must be in the format of a column name, operator, then value.
+            Valid operators on numbers or strings:
+            
+            - age > 4 
+            - age < 4 
+            - age >= 4 
+            - age <= 4 
+            - age = 4 
+            - age == 4 
+            - age != 4 
+            - age (4, 8) --> inclusive range between 4 and 8
 
         `collection` : bool, optional, default False. 
-            If True, returns a list of pandas DataFrames, each representing a subset of rows from a table where `query` was found.
-            
-            If False (default), prints the matching rows directly.
+            If True, returns a pandas DataFrame representing a subset of table rows that match or satisfy `query`.
+
+            - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
+              Drop them if not using ``update()``.
+
+            If False (default), prints the matching rows to the console.
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot find() until all associated data is loaded after a complex schema")
-        if isinstance(query, str): 
-            print(f"Finding all instances of '{query}' in the active DSI backend")
-        else:
-            print(f"Finding all instances of {query} in the active DSI backend")
+        query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
+        query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
+        
+        new_find = False
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        if isinstance(query, str) and any(op in query for op in operators):
+            result = self.t.manual_string_parsing(query)
+            if len(result) > 1: # can split into column and operator
+                new_find = True
+                print(f"Finding all rows where '{query}' in the active backend")
 
-        fnull = open(os.devnull, 'w')
-        try:
-            with redirect_stdout(fnull):
-                find_data = self.t.find_cell(query, row=True)
-        except Exception as e:
-            sys.exit(f"find() ERROR: {e}")
-        if not isinstance(find_data, list):
-            if isinstance(query, str):
-                print(f"'{query}' was not found in this backend")
-            else:
-                print(f"{query} was not found in this backend")
+                output = None
+                try:
+                    f = io.StringIO()
+                    with redirect_stdout(f):
+                        find_data = self.t.find_relation(query)
+                    output = f.getvalue()
+                except Exception as e:
+                    sys.exit(f"find() ERROR: {e}")
+                
+                if output and "WARNING" in output:
+                    warn_msg = output[output.find("WARNING"):]
+                    if "artifact_handler" in warn_msg:
+                        lines = warn_msg.splitlines()
+                        start = lines[1].find('`')
+                        between = lines[1][start + 1 : lines[1].find('`', start + 1)]
+                        lines[1] = lines[1].replace(between, "dsi.query()")
+                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
+                        warn_msg = '\n'.join(lines)
+                    elif "Could not find" in warn_msg:
+                        ending_ind = warn_msg.find("in this database")
+                        warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
+                    print("\n"+warn_msg.replace("database", "backend"))
+                    return
+        
+        if new_find == False:
+            val = f"'{query}'" if isinstance(query, str) else query
+            print(f"Finding all instances of {val} in the active backend")
+
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    find_data = self.t.find_cell(query, row=True)
+            except Exception as e:
+                sys.exit(f"find() ERROR: {e}")
+        if find_data is None:
+            val = f"'{query}'" if isinstance(query, str) else query
+            print(f"WARNING: {val} was not found in this backend\n")
             return
         if collection == False:
             print()
@@ -396,125 +474,124 @@ class DSI():
                 print(f"  - Data: {val.value}")
             print()
         else:
-            find_dict = {}
+            table_name = None
+            output_df = None
+            row_list = []
             for val in find_data:
-                if val.t_name not in find_dict:
-                    find_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
-                    find_dict[val.t_name].attrs['table_name'] = val.t_name
-                    find_dict[val.t_name].attrs['row_num'] = [val.row_num]
+                if table_name is None:
+                    table_name = val.t_name
+                    output_df = pd.DataFrame([val.value], columns=val.c_name)
+                    row_list.append(val.row_num)
+                elif table_name == val.t_name and val.row_num not in row_list:
+                    output_df.loc[len(output_df)] = val.value
+                    row_list.append(val.row_num)
 
-                if val.row_num not in find_dict[val.t_name].attrs['row_num']:
-                    find_dict[val.t_name].loc[len(find_dict[val.t_name])] = val.value
-                    find_dict[val.t_name].attrs['row_num'].append(val.row_num)
-
-            table_list = list(find_dict.values())
-            for table in table_list:
-                table.insert(0, "dsi_table_name", table.attrs['table_name'])
-            
-            return table_list
+            output_df.insert(0, "dsi_row_index", row_list)
+            output_df.insert(0, "dsi_table_name", table_name)
+            first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+            print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
+            return output_df
 
     def update(self, collection, backup = False):
         """
-        Updates data in one or more tables in the first activated backend using the provided input. 
+        Updates data in one or more tables in the active backend using the provided input. 
         Intended to be used after modifying the output of `find()`, `query()`, or `get_table()`
 
-        `collection` : pandas.DataFrame or list of pandas.DataFrame
-            The data used to update the backend.
-            Must be a direct or modified output of `find()`, `query()` or `get_table()` to ensure required metadata is preserved.
+        `collection` : pandas.DataFrame
+            The data used to update a table. 
+            DataFrame must include unchanged `dsi_` columns from `find()`, `query()` or `get_table()` to successfully update.
 
-            - `find()` returns one or more DataFrames depending on the number of matches.
-            - `query()` and `get_table()` return a single DataFrame corresponding to one table.
-              
-                - If this DataFrame is the input, the corresponding table in the backend will be completely overwritten by the input.
+            - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
         `backup` : bool, optional, default False. 
             If True, creates a backup file for the DSI backend before updating its data.
 
-            If False, (default), only updates the data.
+            If False (default), only updates the data.
 
-        - NOTE: Some Pandas operations can delete the hidden metadata which will raise errors when trying to update.
         - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
         - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot update() until all associated data is loaded after a complex schema")
-        print("Updating the active DSI backend with the input collection of data")
+        print("Updating the active backend with the input collection of data")
 
-        if isinstance(collection, pd.DataFrame) and 'row_num' in collection.attrs:
-            collection = [collection]
-        if isinstance(collection, list):
-            if not all(isinstance(item, pd.DataFrame) for item in collection):
-                sys.exit("update() ERROR: If input is a list, must be a list of Pandas DataFrames")
-            if not all('row_num' in item.attrs for item in collection):
-                sys.exit("update() ERROR: Hidden metadata was deleted from input DataFrame list. Please check user operations again")
+        if not isinstance(collection, pd.DataFrame):
+            sys.exit("ERROR: update() expects a single DataFrame from find(), query(), or get_table()")
+        elif 'dsi_table_name' not in collection.columns:
+            sys.exit("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
+        elif 'dsi_table_name' not in collection.columns:
+            t_col = collection['dsi_table_name']
+            if not isinstance(t_col[0], str):
+                sys.exit("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
+            if any(not (t_val in [t_col[0], '']) for t_val in t_col):
+                sys.exit("update() ERROR: 'dsi_table_name' column must be unchanged table name. Extra rows must be empty strings.")
+            if t_col.replace('', pd.NA).dropna().nunique() > 1:
+                sys.exit("update() ERROR: The 'dsi_table_name' column should not be modified.")
+        
+        table_name = collection['dsi_table_name'][0]
+        actual_df = None
+        if table_name.lower() in self.t.dsi_tables:
+            sys.exit(f"update() ERROR: '{table_name}' is a DSI-read-only table. Cannot update it.")
+        if 'dsi_row_index' in collection.columns:
+            table_df = collection.copy()
 
-            table_name_list = []
-            dataframe_list = []
-            for table_df in collection:
-                table_name = table_df.attrs["table_name"]
-                row_num_list = table_df.attrs["row_num"]
+            if any(not (isinstance(row_ind, int) or row_ind == '') for row_ind in table_df['dsi_row_index']):
+                sys.exit("update() ERROR: 'dsi_row_index' column must be unchanged row indexes. Extra rows must be empty strings.")
+            match = table_df['dsi_row_index'].apply(lambda x: isinstance(x, int)) & (table_df['dsi_table_name'] != table_name)
+            empty_match = (table_df['dsi_row_index'] == '') & (table_df['dsi_table_name'] != '')
+            if match.any() or empty_match.any():
+                sys.exit(f"update() ERROR: Rows in 'dsi_table_name' and 'dsi_row_index' must be '{table_name}' and row index or both be empty.")
+            numeric_rows = [int(val) for val in table_df['dsi_row_index'] if val != '']
+            if numeric_rows != sorted(numeric_rows) or len(numeric_rows) != len(set(numeric_rows)):
+                sys.exit("update() ERROR: 'dsi_row_index' must be unchanged and in increasing order.")
 
-                try:
-                    actual_df = self.t.display(table_name, num_rows=-101)
-                except Exception as e: # skip update if this table doesn't exist and is a find table
-                    if 'dsi_table_name' in table_df.columns:
-                        print_msg = table_df['dsi_table_name'][0]
-                    else:
-                        print_msg = f"the table with columns {table_df.columns.tolist()}"
-                    print()
-                    print(f"WARNING: Cannot update {print_msg} as it does not exist in the active backend.")
-                    print()
-                    continue
-                    
+            row_num_list = numeric_rows
+            table_df = table_df.drop(columns='dsi_table_name')
+            table_df = table_df.drop(columns='dsi_row_index')
 
-                if 'dsi_table_name' in table_df.columns:
-                    table_df = table_df.drop(columns='dsi_table_name')
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                actual_df = self.t.get_table(table_name)
+            if actual_df.empty: # dont update if this table doesn't exist
+                print(f"WARNING: Cannot update the table '{table_name}' as it does not exist in the active backend.\n")
+                return
+            
+            if len(row_num_list) > len(actual_df) or any(ind > len(actual_df) for ind in row_num_list):
+                sys.exit("update() ERROR: 'dsi_row_index' was modified. When adding new rows, values for 'dsi_row_index' must be empty.")
 
-                if not set(actual_df.columns).issubset(set(table_df.columns)):
-                    sys.exit(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
-                new_cols = list(set(table_df.columns) - set(actual_df.columns))
-                if new_cols:
-                    for col in new_cols:
-                        actual_df[col] = None
-                    actual_df = actual_df[table_df.columns]
-                
-                for col in actual_df.columns:
-                    common_dtype = np.result_type(actual_df[col].dtype, table_df[col].dtype)
-                    actual_df[col] = actual_df[col].astype(common_dtype)
-                    table_df[col] = table_df[col].astype(common_dtype)
-                
-                id_list = [x - 1 for x in row_num_list] # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
-                table_df_max_len = table_df.iloc[:len(id_list)]
-                actual_df.loc[id_list] = table_df_max_len.values
-                if len(table_df) > len(id_list):
-                    extra_rows = table_df.iloc[len(id_list):]
-                    actual_df = pd.concat([actual_df, extra_rows], ignore_index=True)
-
-                table_name_list.append(table_name)
-                dataframe_list.append(actual_df)
-
-            try:
-                if len(table_name_list) > 1:
-                    self.t.overwrite_table(table_name_list, dataframe_list, backup)
-                elif len(table_name_list) == 1:
-                    self.t.overwrite_table(table_name_list[0], dataframe_list[0], backup)
-            except Exception as e:
-                sys.exit(f"update() ERROR: {e}")
-    
-        elif isinstance(collection, pd.DataFrame):
-            try:
-                table_name = collection.attrs['table_name']
-            except Exception as e:
-                if 'dsi_table_name' in collection.columns:
-                    table_name = collection['dsi_table_name'][0]
-            if 'dsi_table_name' in collection.columns:
-                collection = collection.drop(columns='dsi_table_name')
-            try:
-                self.t.overwrite_table(table_name, collection, backup)
-            except Exception as e:
-                sys.exit(f"update() ERROR: {e}")
+            if not set(actual_df.columns).issubset(set(table_df.columns)):
+                sys.exit(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
+            new_cols = list(set(table_df.columns) - set(actual_df.columns))
+            if new_cols:
+                for col in new_cols:
+                    actual_df[col] = None
+                actual_df = actual_df[table_df.columns]
+            
+            for col in actual_df.columns:
+                common_dtype = np.result_type(actual_df[col].dtype, table_df[col].dtype)
+                actual_df[col] = actual_df[col].astype(common_dtype)
+                table_df[col] = table_df[col].astype(common_dtype)
+            
+            id_list = [x - 1 for x in row_num_list] # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
+            table_df_max_len = table_df.iloc[:len(id_list)]
+            actual_df.loc[id_list] = table_df_max_len.values
+            if len(table_df) > len(id_list):
+                extra_rows = table_df.iloc[len(id_list):]
+                actual_df = pd.concat([actual_df, extra_rows], ignore_index=True)
         else:
-            sys.exit("ERROR: update() expects a DataFrame or list of DataFrames from find(), query(), or get_table()")
+            collection = collection.drop(columns='dsi_table_name')
+            actual_df = collection.copy()
+        
+        try:
+            if backup == True:
+                extension = self.database_name.rfind('.')
+                backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
+                print(f"Created backup '{backup_file}' before updating the data.")
+            self.t.overwrite_table(table_name, actual_df, backup)
+        except Exception as e:
+            sys.exit(f"update() ERROR: {e}")
     
     # def nb(self):
     #     """
@@ -538,7 +615,7 @@ class DSI():
 
     def write(self, filename, writer_name, table_name = None):
         """
-        Exports data from a DSI backend using the specified `writer_name`.
+        Exports data from the active backend using the specified `writer_name`.
 
         `filename` : str
             Name of the output file to write.
@@ -554,6 +631,8 @@ class DSI():
         `table_name`: str, optional
             Required when using "Table_Plot" or "Csv_Writer" to specify which table to export.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot write() until all associated data is loaded after a complex schema")
 
@@ -590,38 +669,70 @@ class DSI():
         self.t.active_metadata = OrderedDict()
         print(f"Successfully wrote to the output file {filename}")
     
-    def list(self):
+    def list(self, collection = False):
         """
-        Prints the names and dimensions (rows x columns) of all tables in the first active backend
+        Gets the names and dimensions (rows x columns) of all tables in the active backend.
+
+        `collection` : bool, optional, default False. 
+            If True, returns a Python list of all the table names
+            
+            If False (default), prints each table's name and dimensions to the console.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+
+        output = None
         try:
-            self.t.list()
+            f = io.StringIO()
+            with redirect_stdout(f):
+                self.t.list()
+            output = f.getvalue()
         except Exception as e:
             sys.exit(f"list() ERROR: {e}")
         
+        if collection:
+            output_list = output.split('\n')
+            table_list = [line[7:] for line in output_list if line.startswith('Table: ')]
+            return table_list
+        else:
+            print(output)
 
-    def summary(self, table_name = None):
+    def summary(self, table_name = None, collection = False):
         """
-        Prints numerical metadata and (optionally) sample data from tables in the first activated backend.
+        Prints numerical metadata and (optionally) sample data from tables in the active backend.
 
         `table_name` : str, optional
             If specified, only the numerical metadata for that table will be printed.
             
             If None (default), metadata for all available tables is printed.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
+        
+        output = None
         try:
-            self.t.summary(table_name)
+            f = io.StringIO()
+            with redirect_stdout(f):
+                summary_df = self.t.summary(table_name, collection)
+            output = f.getvalue()
         except Exception as e:
             sys.exit(f"summary() ERROR: {e}")
+
+        if collection:
+            return summary_df
+        else:
+            print(output)
     
     def num_tables(self):
         """
-        Prints the number of tables in the first activated backend
+        Prints the number of tables in the active backend.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
         try:
@@ -631,7 +742,7 @@ class DSI():
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
-        Prints data from a specified table in the first activated backend.
+        Prints data from a specified table in the active backend.
         
         `table_name` : str
             Name of the table to display.
@@ -644,6 +755,8 @@ class DSI():
 
             If None (default), all columns are displayed.
         """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
             sys.exit("ERROR: Cannot display() until all associated data is loaded after a complex schema")
         if isinstance(num_rows, list):
@@ -656,7 +769,7 @@ class DSI():
 
     def close(self):
         """
-        Closes the connection and finalizes the changes to the backend
+        Closes the connection to the active backend and clears all loaded DSI modules.
         """
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
