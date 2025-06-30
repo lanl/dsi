@@ -671,6 +671,7 @@ def main():
          \__\/          /__/ /         \__\/  
                         \__\/                   v{cli.version()}
     """).strip())
+    print()
     cli.startup(args.backend)
     print("\nEnter \"help\" for usage hints.")
 

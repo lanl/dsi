@@ -330,7 +330,7 @@ class DSI():
             print(f"Printing the result of the SQL query: {statement}")
             headers = df.columns.tolist()
             rows = df.values.tolist()
-            self.t.table_print_helper(headers, rows)
+            self.t.table_print_helper(headers, rows, len(rows))
             print()
         else:
             print(f"Storing the result of the SQL query: {statement} as a collection")
@@ -372,7 +372,7 @@ class DSI():
             print(f"Printing all data from the table: {table_name}")
             headers = df.columns.tolist()
             rows = df.values.tolist()
-            self.t.table_print_helper(headers, rows)
+            self.t.table_print_helper(headers, rows, len(rows))
             print()
         else:
             print(f"Storing all data for the table: {table_name} as a collection")
@@ -499,7 +499,7 @@ class DSI():
 
         `collection` : pandas.DataFrame
             The data used to update a table. 
-            DataFrame must include unchanged `dsi_` columns from `find()`, `query()` or `get_table()` to successfully update.
+            DataFrame must include unchanged **`dsi_`** columns from `find()`, `query()` or `get_table()` to successfully update.
 
             - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
