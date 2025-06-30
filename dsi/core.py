@@ -263,7 +263,7 @@ class Terminal():
                                     with open(backend_filename, 'rb') as fb:
                                         content = fb.read()
                                     if b'runTable' in content:
-                                        self.runTable = False
+                                        self.runTable = True
 
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
@@ -881,54 +881,7 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
-    
-    # helper function to manually parse relation input to see if its valid
-    def manual_string_parsing(self, query):
-        # splits on double quotes not within any single quotes
-        # splits on operators outside of any quotes
-        op_pattern = re.compile(r'==|!=|>=|<=|=|<|>|\(')
-        parts = []
-        buffer = ''
-        in_single = False
-        in_double = False
-        operator_found = False
-        i = 0
 
-        while i < len(query):
-            char = query[i]
-
-            # Toggle quote states
-            if char == "'" and not in_double:
-                in_single = not in_single
-                buffer += char
-                i += 1
-            elif char == '"' and not in_single:
-                in_double = not in_double
-                buffer += char
-                i += 1
-
-            # Only split on first operator outside of any quotes
-            elif not in_single and not in_double:
-                op_match = op_pattern.match(query, i)
-                if op_match and not operator_found:
-                    if buffer.strip():
-                        parts.append(buffer.strip())
-                    parts.append(op_match.group())
-                    buffer = ''
-                    operator_found = True
-                    i += len(op_match.group())
-                else:
-                    buffer += char
-                    i += 1
-            else:
-                buffer += char
-                i += 1
-
-        if buffer.strip():
-            parts.append(buffer.strip())
-
-        return parts
-    
     def overwrite_table(self, table_name, collection, backup = False):
         """
         Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
@@ -1083,13 +1036,13 @@ class Terminal():
             print(f"\nTable: {table_name}")
             headers = output.columns.tolist()
             rows = output.values.tolist()
-            self.table_print_helper(headers, rows, 100)
+            self.table_print_helper(headers, rows, len(rows), 100)
         elif isinstance(output, list) and isinstance(output[0], list) and all(isinstance(df, pd.DataFrame) for df in output[1:]):
             for t_name, data in zip(output[0], output[1:]):
                 print(f"\nTable: {t_name}")
                 headers = data.columns.tolist()
                 rows = data.values.tolist() 
-                self.table_print_helper(headers, rows, 100)
+                self.table_print_helper(headers, rows, len(rows), 100)
         else:
             raise ValueError("Returned object from the first loaded backend's summary() is incorrectly structured")
 
@@ -1126,7 +1079,7 @@ class Terminal():
             Name of the table to display.
          
         `num_rows` : int, optional, default=25
-            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
+            Number of rows to print. If the table contains fewer rows, only those are shown.
 
         `display_cols` : list of str, optional
             List of specific column names to display from the table. 
@@ -1148,7 +1101,14 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to display its data")
         start = datetime.now()
 
-        output = backend.display(table_name, display_cols)
+        if not isinstance(table_name, str):
+            raise TypeError("Input 'table_name' must be a string")
+        if not isinstance(num_rows, int):
+            raise TypeError("Input 'num_rows' must be a integer")
+        if display_cols is not None and not isinstance(display_cols, int):
+            raise TypeError("Input 'display_cols' must be a list of string column names")
+
+        output = backend.display(table_name, num_rows, display_cols)
         if output is not None and isinstance(output, tuple):
             if self.debug_level != 0:
                 self.logger.error(f"Display error: {output[1]}")
@@ -1159,10 +1119,11 @@ class Terminal():
             self.logger.info(f"Runtime: {end-start}")
         
         if table_name is not None and isinstance(output, pd.DataFrame):
+            max_rows = output.attrs["max_rows"]
             print(f"\nTable: {table_name}")
             headers = output.columns.tolist()
             rows = output.values.tolist()
-            self.table_print_helper(headers, rows, num_rows)
+            self.table_print_helper(headers, rows, max_rows, num_rows)
             print()
     
     def get_table_names(self, query):
@@ -1291,7 +1252,6 @@ class Terminal():
             self.active_modules[func] = []
             self.loaded_backends = []
     
-    
     # Internal function to return input string as either int, float or still a string
     def check_type(self, text):
         try:
@@ -1304,8 +1264,51 @@ class Terminal():
             except ValueError:
                 return text
 
+    # helper function to manually parse relation input to see if its valid
+    def manual_string_parsing(self, query):
+        # splits on double quotes not within any single quotes
+        # splits on operators outside of any quotes
+        op_pattern = re.compile(r'==|!=|>=|<=|=|<|>|\(')
+        parts = []
+        buffer = ''
+        in_single = False
+        in_double = False
+        operator_found = False
+        i = 0
+
+        while i < len(query):
+            char = query[i]
+            if char == "'" and not in_double:
+                in_single = not in_single
+                buffer += char
+                i += 1
+            elif char == '"' and not in_single:
+                in_double = not in_double
+                buffer += char
+                i += 1
+            elif not in_single and not in_double:
+                op_match = op_pattern.match(query, i)
+                if op_match and not operator_found:
+                    if buffer.strip():
+                        parts.append(buffer.strip())
+                    parts.append(op_match.group())
+                    buffer = ''
+                    operator_found = True
+                    i += len(op_match.group())
+                else:
+                    buffer += char
+                    i += 1
+            else:
+                buffer += char
+                i += 1
+
+        if buffer.strip():
+            parts.append(buffer.strip())
+
+        return parts
+
     # Internal function used to manually print a table cleanly
-    def table_print_helper(self, headers, rows, max_rows=25):
+    def table_print_helper(self, headers, rows, max_rows, num_rows=25):
         # Determine max width for each column
         col_widths = [
             max(
@@ -1328,9 +1331,18 @@ class Terminal():
             ))
 
             count += 1
-            if count == max_rows:
-                print(f"  ... showing {max_rows} of {len(rows)} rows")
+            if count == num_rows:
+                print(f"  ... showing {num_rows} of {max_rows} rows")
                 break
+
+    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
+    def trace_function(self, frame, event, arg):
+        global return_line_number
+        global original_file
+        if event == "return":
+            return_line_number = frame.f_lineno  # Get line number
+            original_file = frame.f_code.co_filename # Get file name
+        return self.trace_function
 
     # Internal function used to check if a backend has data
     def valid_backend(self, backend, parent_name):
@@ -1343,15 +1355,7 @@ class Terminal():
             if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
                 valid = True
         return valid
-    
-    # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
-    def trace_function(self, frame, event, arg):
-        global return_line_number
-        global original_file
-        if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
-            original_file = frame.f_code.co_filename # Get file name
-        return self.trace_function
+
 
 class Sync():
     """
