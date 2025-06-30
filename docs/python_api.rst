@@ -22,7 +22,7 @@ Their respective list functions print all valid readers/writers that can be used
 The primary backend interactions are ``find()`` , ``query()``, and ``get_table()`` where users can print a search result, or retrieve the result as a collection of data.
       
       - If users modify these collections, they can call ``update()`` to apply the changes to the active backend.
-        Users must NOT edit any columns beginning with `dsi_`. Read ``update()`` below to better understand its behavior.
+        Users must NOT edit any columns beginning with **`dsi_`**. Read ``update()`` below to better understand its behavior.
 
 Users can also view various data/metadata of an active backend with ``list()``, ``num_tables()``, ``display()``, ``summary()``
 
@@ -101,7 +101,7 @@ Prints all matches by default. If ``True`` is passed as an additional argument, 
 Example 5: Update data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Updating data from the edited output of ``find()``. Input can be output of either ``find()``, ``query()``, or ``get_table()``.
-Users must NOT change metadata columns starting with `dsi_` even if adding new rows.
+Users must NOT change metadata columns starting with **`dsi_`** even if adding new rows.
 
 .. literalinclude:: ../examples/user/5.update.py
 

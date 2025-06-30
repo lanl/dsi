@@ -499,7 +499,7 @@ class DSI():
 
         `collection` : pandas.DataFrame
             The data used to update a table. 
-            DataFrame must include unchanged `dsi_` columns from `find()`, `query()` or `get_table()` to successfully update.
+            DataFrame must include unchanged **`dsi_`** columns from `find()`, `query()` or `get_table()` to successfully update.
 
             - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
