@@ -253,6 +253,7 @@ class Terminal():
                             if parent_classes and parent_classes[0].__name__ == "Filesystem" and 'filename' in kwargs:
                                 backend_filename = kwargs['filename']
                                 has_data = False
+                                has_runTable = False
                                 # if to-be-loaded backend has data and runTable in its tables, turn global runTable off
                                 if os.path.isfile(backend_filename):
                                     if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
@@ -263,17 +264,25 @@ class Terminal():
                                     with open(backend_filename, 'rb') as fb:
                                         content = fb.read()
                                     if b'runTable' in content:
-                                        self.runTable = True
-
+                                        has_runTable = True
+                                if has_runTable:
+                                    self.runTable = True
+                                elif has_data and has_runTable == False and self.runTable == True:
+                                    raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends wihout a runTable.")
+                                
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
                         if mod_type == "backend":
                             self.loaded_backends.append(class_object)
-                    except:
+                    except Exception as e:
+                        if "runTable flag is only valid for in-situ workflows" in str(e):
+                            if self.debug_level != 0:
+                                self.logger.error("runTable flag is only valid for in-situ workflows, not for populated backends wihout a runTable.")
+                            raise
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again') from None
                 
                 if mod_type == "backend":
                     print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
