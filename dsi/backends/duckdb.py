@@ -720,12 +720,15 @@ class DuckDB(Filesystem):
         else:
             print(f"Database now has {table_count} table")
     
-    def display(self, table_name, display_cols = None):
+    def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Returns all data from a specified table in this DuckDB backend.
         
         `table_name` : str
             Name of the table to display.
+        
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
 
         `display_cols` : list of str, optional
             List of specific column names to display from the table. 
@@ -736,13 +739,14 @@ class DuckDB(Filesystem):
                                 WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
             return (ValueError, f"{table_name} does not exist in this DuckDB database")
         if display_cols == None:
-            df = self.cur.execute(f"SELECT * FROM {table_name};").fetchdf()
+            df = self.cur.execute(f"SELECT * FROM {table_name} LIMIT {num_rows};").fetchdf()
         else:
             sql_list = ", ".join(display_cols)
             try:
-                df = self.cur.execute(f"SELECT {sql_list} FROM {table_name};").fetchdf()
+                df = self.cur.execute(f"SELECT {sql_list} FROM {table_name} LIMIT {num_rows};").fetchdf()
             except Exception as e:
                 return (duckdb.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
+        df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
         return df
     
     def summary(self, table_name = None):
