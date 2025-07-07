@@ -282,7 +282,7 @@ class Terminal():
                             raise
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again') from None
+                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                 
                 if mod_type == "backend":
                     print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
