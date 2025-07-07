@@ -1114,7 +1114,7 @@ class Terminal():
             raise TypeError("Input 'table_name' must be a string")
         if not isinstance(num_rows, int):
             raise TypeError("Input 'num_rows' must be a integer")
-        if display_cols is not None and not isinstance(display_cols, int):
+        if display_cols is not None and not isinstance(display_cols, list):
             raise TypeError("Input 'display_cols' must be a list of string column names")
 
         output = backend.display(table_name, num_rows, display_cols)
