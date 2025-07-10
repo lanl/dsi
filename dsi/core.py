@@ -1225,13 +1225,13 @@ class Sync():
 
                 if isVerbose:
                     print( " cp " + file + " " + file_remote)
-                shutil.copyfile(file , file_remote)
+                shutil.copy2(file , file_remote)
                 
 
             # Database movement
             if isVerbose:
                 print( " cp " + os.path.join(self.local_location, str(self.project_name+".db") ) + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
-            shutil.copyfile(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+            shutil.copy2(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
 
             print( " Data Copy Complete! ")
         elif tool == "scp":
