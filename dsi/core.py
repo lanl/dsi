@@ -1149,7 +1149,6 @@ class Sync():
             raise
 
         # See if filesystem exists
-        #fs_t = t.find_table("filesystem")
         try:
             fs_t = t.get_table("filesystem")
             if isVerbose:
@@ -1167,7 +1166,7 @@ class Sync():
                 row = {col: values[i] for col, values in st_dict.items()}
                 rows.append(row)
 
-            # Write to CSV
+            # Temporary csv to ingest
             output_file = '.fs.csv'
             with open(output_file, mode='w', newline='') as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
@@ -1178,17 +1177,43 @@ class Sync():
             t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
             t.artifact_handler(interaction_type='ingest')
 
-            self.file_list = file_list
-            self.rfile_list = rfile_list
+        self.file_list = file_list
+        self.rfile_list = rfile_list
+
+    def move(self, tool="copy", isVerbose=False, **kwargs):
+        self.copy(tool,isVerbose,kwargs)
 
     def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
         Helper function to perform the 
         data copy over using a preferred API
         """
+        # See if FS table has been created
+        t = Terminal()
+
+        try:
+            #f = os.path.join((local_loc, str(self.project_name+".db") ))
+            f = self.local_location+"/"+self.project_name+".db"
+            if isVerbose:
+                print("db: ", f)
+            if os.path.exists(f):
+                t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            raise
+
+        # See if filesystem exists
+        try:
+            fs_t = t.get_table("filesystem")
+        except:
+            print( " Filesystem table not found. Try running Index first.")
+            print( " Data copy failed. ")
+            return
         
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         if tool == "copy":
+            print(self.file_list)
+            print(self.rfile_list)
             # Data movement via Unix Copy
             for file,file_remote in zip(self.file_list,self.rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
