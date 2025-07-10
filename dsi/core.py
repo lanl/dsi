@@ -1151,11 +1151,8 @@ class Sync():
             raise
 
         # See if filesystem exists
-        try:
-            fs_t = t.get_table("filesystem")
-            if isVerbose:
-                print("fs table exists already, skipping for now")
-        except:
+        fs_t = t.get_table("filesystem")
+        if fs_t.empty:
             if isVerbose:
                 print( "Creating new fs table")
             # Create new filesystem collection with origin and remote locations
@@ -1195,7 +1192,8 @@ class Sync():
 
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
-            f = self.local_location+"/"+self.project_name+".db"
+            #f = self.local_location+"/"+self.project_name+".db"
+            f = self.project_name+".db"
             if isVerbose:
                 print("db: ", f)
             if os.path.exists(f):
@@ -1205,9 +1203,8 @@ class Sync():
             raise
 
         # See if filesystem exists
-        try:
-            fs_t = t.get_table("filesystem")
-        except:
+        fs_t = t.get_table("filesystem")
+        if fs_t.empty:
             print( " Filesystem table not found. Try running Index first.")
             print( " Data copy failed. ")
             return
@@ -1232,8 +1229,9 @@ class Sync():
 
             # Database movement
             if isVerbose:
-                print( " cp " + os.path.join(self.local_location, str(self.project_name+".db") ) + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
-            shutil.copy2(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+                print( " cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+            #shutil.copy2(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+            shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
 
             print( " Data Copy Complete! ")
         elif tool == "scp":
