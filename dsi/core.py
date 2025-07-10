@@ -1462,11 +1462,13 @@ class Sync():
 
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
-            f = local_loc+"/"+self.project_name+".db"
+            #f = local_loc+"/"+self.project_name+".db"
+            f = self.project_name+".db"
             if isVerbose:
-                print("db: ", f)
+                print("trying db: ", f)
             if os.path.exists(f):
                 t.load_module('backend','Sqlite','back-write', filename=f)
+            
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             raise
