@@ -14,16 +14,16 @@ def get_git_root(path):
     return (git_root)
 
 def test_csv_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.sqlite_db'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.sqlite_db'])
     back = Sqlite(filename=path)
     
     #assert type(plug.output_collector) == OrderedDict
 
 def test_er_diagram():
     a=Terminal()
-    a.load_module('plugin', 'Schema', 'reader', filename="examples/data/testcase_schema.json" , target_table_prefix = "student")
-    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
-    a.load_module('plugin', 'TOML1', 'reader', filenames=["examples/data/results.toml"], target_table_prefix = "results")
+    a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_circular_schema.json" , target_table_prefix = "student")
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', 'TOML1', 'reader', filenames=["examples/test/results.toml"], target_table_prefix = "results")
     a.load_module('plugin', 'ER_Diagram', 'writer', filename = 'erd_test_output.png')
     a.transload()
     
@@ -36,7 +36,7 @@ def test_er_diagram():
 
 def test_table_plot():
     a=Terminal()
-    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
     a.load_module('plugin', "Table_Plot", "writer", table_name = "student__physics", filename = "student_physics_plot")
     a.transload()
 

@@ -12,15 +12,15 @@ def get_git_root(path):
 
 
 def test_bueno_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
     plug = Bueno(filenames=path)
     plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 
 def test_bueno_plugin_adds_rows():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'bueno2.data'])
     plug = Bueno(filenames=[path1, path2])
     plug.add_rows()
 
@@ -31,8 +31,8 @@ def test_bueno_plugin_adds_rows():
     assert len(plug.output_collector["Bueno"].keys()) == 4
 
 def test_json_plugin_adds_rows():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'bueno1.data'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'bueno2.data'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'bueno2.data'])
     plug = JSON(filenames=[path1, path2])
     plug.add_rows()
     for key, val in plug.output_collector["JSON"].items():
@@ -43,13 +43,13 @@ def test_json_plugin_adds_rows():
     assert len(plug.output_collector["JSON"].keys()) == 4
 
 def test_csv_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
     assert type(plug.output_collector) == OrderedDict
 
 def test_csv_plugin_adds_rows():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
 
@@ -60,8 +60,8 @@ def test_csv_plugin_adds_rows():
     assert len(plug.output_collector["Csv"].keys()) == 11
 
 def test_csv_plugin_adds_rows_multiple_files():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'yosemite5.csv'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'yosemite5.csv'])
 
     plug = Csv(filenames=[path1, path2])
     plug.add_rows()
@@ -73,8 +73,8 @@ def test_csv_plugin_adds_rows_multiple_files():
     assert len(plug.output_collector["Csv"].keys()) == 13
 
 def test_csv_plugin_adds_rows_multiple_files_strict_mode():
-    path1 = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
-    path2 = '/'.join([get_git_root('.'), 'examples/data', 'yosemite5.csv'])
+    path1 = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
+    path2 = '/'.join([get_git_root('.'), 'examples/test', 'yosemite5.csv'])
 
     plug = Csv(filenames=[path1, path2], strict_mode=True)
     try:
@@ -84,7 +84,7 @@ def test_csv_plugin_adds_rows_multiple_files_strict_mode():
         assert True
 
 def test_csv_plugin_leaves_active_metadata_wellformed():
-    path = '/'.join([get_git_root('.'), 'examples/data', 'wildfiredata.csv'])
+    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
 
     term = Terminal()
     term.load_module('plugin', 'Csv', 'reader', filenames=[path])
@@ -97,7 +97,7 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
     
 def test_yaml_reader():
     a=Terminal()
-    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/data/student_test1.yml", "examples/data/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
 
     assert len(a.active_metadata.keys()) == 4 # 4 tables - math, address, physics, dsi_units
     for name, tableData in a.active_metadata.items():
@@ -109,7 +109,7 @@ def test_yaml_reader():
 
 def test_toml_reader():
     a=Terminal()
-    a.load_module('plugin', 'TOML1', 'reader', filenames="examples/data/results.toml", target_table_prefix = "results")
+    a.load_module('plugin', 'TOML1', 'reader', filenames="examples/test/results.toml", target_table_prefix = "results")
 
     assert len(a.active_metadata.keys()) == 2 # 2 tables - people and dsi_units
     for name, tableData in a.active_metadata.items():
@@ -121,7 +121,7 @@ def test_toml_reader():
 
 def test_schema_reader():
     a=Terminal()
-    a.load_module('plugin', 'Schema', 'reader', filename="examples/data/testcase_schema.json" , target_table_prefix = "student")
+    a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_circular_schema.json" , target_table_prefix = "student")
 
     assert len(a.active_metadata.keys()) == 1
     assert "dsi_relations" in a.active_metadata.keys()

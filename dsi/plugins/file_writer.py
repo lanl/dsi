@@ -22,12 +22,15 @@ class ER_Diagram(FileWriter):
     """
     DSI Writer that generates an ER Diagram from the current data in the DSI abstraction
     """
-
     def __init__(self, filename, target_table_prefix = None, **kwargs):
         """
-        `filename`: file name of the ER Diagram to be generated
+        Initializes the ER Diagram writer
 
-        `target_table_prefix`: if generating diagram for only a select set of tables, can specify prefix to search for all alike tables
+        `filename` : str
+            File name for the generated ER diagram. Supported formats are .png, .pdf, .jpg, or .jpeg.
+
+        `target_table_prefix` : str, optional
+            If provided, filters the ER Diagram to only include tables whose names begin with this prefix.
 
             - Ex: If prefix = "student", only "student__address", "student__math", "student__physics" tables are included
         """
@@ -37,11 +40,15 @@ class ER_Diagram(FileWriter):
 
     def get_rows(self, collection) -> None:
         """
-        Function that generates the ER Diagram.
+        Generates the ER Diagram from the given DSI data collection.
 
-        `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
         
-        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_type = ".png"
         if len(self.output_filename) > 4 and self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
@@ -51,7 +58,7 @@ class ER_Diagram(FileWriter):
             file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
         elif len(self.output_filename) > 4 and self.output_filename[-4:] == ".svg":
-            return (ValueError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
+            return (RuntimeError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
             return (ValueError, "Your input for target_table_prefix does not exist in memory. Please enter a valid prefix for table names.")
@@ -136,13 +143,20 @@ class Csv_Writer(FileWriter):
     """
     def __init__(self, table_name, filename, export_cols = None, **kwargs):
         """
-        `table_name`: name of table to be exported to a csv
+        Initializes the CSV Writer with the specified inputs
 
-        `filename`: name of the CSV file that will be generated
+        `table_name` : str
+            Name of the table to export from the DSI backend.
 
-        `export_cols`: default None. When specified, this must be a list of column names to keep in output csv file
+        `filename` : str
+            Name of the CSV file to be generated.
 
-            - Ex: all columns are [a, b, c, d, e]. export_cols = [a, c, e]
+        `export_cols` : list of str, optional, default is None.
+            A list of column names to include in the exported CSV file.
+            
+            If None , all columns from the table will be included.
+
+            - Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to the CSV
         """
         super().__init__(filename, **kwargs)
         self.csv_file_name = filename
@@ -151,14 +165,18 @@ class Csv_Writer(FileWriter):
 
     def get_rows(self, collection) -> None:
         """
-        Function that generates the output CSV file.
+        Exports data from the given DSI data collection to a CSV file.
 
-        `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
-
-        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (ValueError, f"{self.table_name} does not exist in memory")
+            return (KeyError, f"{self.table_name} does not exist in memory")
         if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
             return (ValueError, f"Inputted list of column names to plot for {self.table_name} is incorrect")
         
@@ -177,11 +195,19 @@ class Table_Plot(FileWriter):
     """
     def __init__(self, table_name, filename, display_cols = None, **kwargs):
         """
-        `table_name`: name of table to be plotted
+        Initializes the Table Plot writer with specified inputs
 
-        `filename`: name of output file the plot will be stored in
+        `table_name` : str
+            Name of the table to plot
+
+        `filename` : str
+            Name of the output file where the generated plot will be saved.
         
-        `display_cols`: default None. When specified, must be a list of column names, whose data is NUMERICAL
+        `display_cols`: list of str, optional, default is None.
+            A list of column names to include in the plot. All included columns must contain
+            numerical data. 
+            
+            If None (default), all numerical columns in the specified table will be plotted.
         """
         super().__init__(filename, **kwargs)
         self.output_name = filename
@@ -190,16 +216,20 @@ class Table_Plot(FileWriter):
 
     def get_rows(self, collection) -> None:
         """
-        Function that generates the table plot image file.
+        Generates a plot of a specified table from the given DSI data collection.
 
-        `collection`: representation of internal DSI abstraction. It is a nested Ordered Dict, with table names as keys, and table data as Ordered Dicts
-
-        `return`: None. Only returns if error. Message is sent back to core to print along with error type. Ex: (ValueError, "error message")
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (ValueError, f"{self.table_name} does not exist in memory")
+            return (KeyError, f"{self.table_name} does not exist in memory")
         if self.table_name in ["dsi_units", "dsi_relations", "sqlite_sequence"]:
-            return (ValueError, f"Cannot plot the units or relations table")
+            return (RuntimeError, f"Cannot plot the units or relations table")
         if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
             return (ValueError, f"Inputted list of columns to plot for {self.table_name} is incorrect")
         
@@ -227,9 +257,10 @@ class Table_Plot(FileWriter):
             if not any(isinstance(item, str) for item in colData):
                 all_num_col = [0 if item is None else item for item in colData]
                 unit = ""
-                if "dsi_units" in collection.keys() and self.table_name in collection["dsi_units"].keys() and colName in collection["dsi_units"][self.table_name].keys():
-                    unit = collection["dsi_units"][self.table_name][colName]
-                    unit = f" ({unit})"
+                if "dsi_units" in collection.keys(): 
+                    if self.table_name in collection["dsi_units"].keys() and colName in collection["dsi_units"][self.table_name].keys():
+                        unit = collection["dsi_units"][self.table_name][colName]
+                        unit = f" ({unit})"
                 numeric_cols.append((colName + unit, all_num_col))
             elif self.display_cols is not None and colName in self.display_cols:
                 not_plot_cols.append(colName)

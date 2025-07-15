@@ -5,7 +5,7 @@ DSI Examples
 PENNANT mini-app
 ----------------
 
-`PENNANT`_ is an unstructured mesh physics mini-application developed at Los Alamos National Laboratory
+`PENNANT` is an unstructured mesh physics mini-application developed at Los Alamos National Laboratory
 for advanced architecture research.
 It contains mesh data structures and a few
 physics algorithms from radiation hydrodynamics and serves as an example of
@@ -53,69 +53,119 @@ The input columns are: wild_speed, wdir (wind direction), smois (surface moistur
 safe_unsafe_fire_behavior, does_fire_meet_objectives, and rationale_if_unsafe. 
 The output of the simulation (and post-processing steps) include the burned_area and the url to the wildfire images stored on the San Diego Super Computer.
 
-All paths in this example are defined from the main dsi repository folder, assumed to be ``~/<path-to-dsi-directory>/dsi``.
-
-To run this example, load dsi and run:
+After loading dsi, run this example within the ``dsi/examples/wildfire/`` folder as all filepaths are relative to that location:
 
 .. code-block:: unixconfig
 
-   python3 examples/wildfire/wildfire.py
+   python3 wildfire.py
 
 .. literalinclude:: ../examples/wildfire/wildfire.py
 
-.. This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest. 
-.. This cdb folder is called a `Cinema`_ database (CDB). 
-.. Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.  
-.. A Cinema database is comprised of a CSV file where each row of the table is a data element (ex: run or ensemble member of a simulation) and each column is a property of the data element. 
-.. Any column name that starts with 'FILE' is a path to a file associated with the data element.  
-.. This could be an image, a plot, a simulation mesh or other data artifact.
 
-.. Cinema databases can be visualized through various tools. We illustrate two options below:
+.. _user_schema_example_label:
 
-.. To visualize the results using Jupyter Lab and Plotly, run:
+Cloverleaf (Complex Schemas)
+-------------------------------
 
-.. .. code-block:: unixconfig
+This example shows how to use DSI with ensemble data from 8 Cloverleaf_Serial runs, and how to create a complex schema compatible with DSI.
 
-..    python3 -m pip install plotly
-..    python3 -m pip install jupyterlab
+The directory with this sample input and output data can be found in ``examples/clover3d/`` where each run has its own subfolder.
+Each run's input file is ``clover.in`` and the output is ``clover.out`` and the associated VTK files.
 
+After loading dsi, run this example within the ``dsi/examples/user/`` folder as all filepaths are relative to that location:
 
-.. Open Jupyter Lab with:
+.. code-block:: unixconfig
 
-.. .. code-block:: unixconfig
+   python3 7.schema.py
 
-..   jupyter lab --browser Firefox
+This workflow uses a custom Cloverleaf reader to load the data, along with a complex schema that maps the input data, output data, and VTK files to the respective simulation runs.
+Once executing the workflow, users can see that the state2_density value is the only input parameter changed for each run.
 
-.. and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the results of the DSI pipeline.
+.. literalinclude:: ../examples/user/7.schema.py
 
-.. ..  figure:: images/example-wildfire-jupyter.png
-..     :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
-..     :class: with-shadow
-..     :scale: 50%
+where ``examples/test/example_schema.json`` is:
 
-..     Screenshot of the JupyterLab workflow. 
-..     The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.
+.. code-block:: json
 
-.. Another option is to use `Pycinema`_, a QT-based GUI that supports visualization and analysis of Cinema databases. 
-.. To open a pycinema viewer, first install pycinema and then run the example script.
+   {
+      "simulation": {
+         "primary_key": "sim_id"
+      }, 
+      "input": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
+      }, 
+      "output": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
+      },
+      "viz_files": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
+      }
+   }
+   
+and the generated ER diagram is:
 
-.. .. code-block:: unixconfig
+..  figure:: images/schema_erd.png
+    :scale: 35%
+    :align: center
 
-..    python3 -m pip install pycinema
-..    cinema examples/wildfire/wildfire_pycinema.py
+    Entity Relationship Diagram of Cloverleaf data. 
+    Displays relations between the simulation, input, output, and viz_files tables.
 
+This section explains how to define primary and foreign key relationships in a JSON file for ``schema()``, such as ``examples/test/example_schema.json``
 
-.. ..  figure:: images/example-wildfire-pycinema.png
-..     :class: with-shadow
-..     :scale: 40%
+For futher clarity, each schema file must be structured as a dictionary where:
 
-..     Screenshot of the Pycinema user interface showing the minimal set of components. 
-..     Left: the nodeview showing the various pycinema components in the visualization pipeline; 
-..     upper-right: the table-view; 
-..     lower-right: the image view. 
-..     Pycinema components are linked such that making a selection in one view will propagate to the other views.
+   - Each table with a relation is a key whose value is a nested dictionary storing primary and foreign key information
 
+      - Ex from above: "input" : { ... }
+   - The nested dictionary has 2 keys: 'primary_key' and 'foreign_key' which must be spelled exactly the same to be processed:
+   - The value of 'primary_key' is this table's column that is a primary key
 
-.. .. _PENNANT: https://github.com/lanl/PENNANT
-.. .. _Cinema: https://github.com/cinemascience
-.. .. _PyCinema: https://github.com/cinemascience/pycinema
+      - Ex from above: "primary_key" : "sim_id"
+   - The value of 'foreign_key' is another inner dictionary, since a table can have multiple foreign keys:
+
+      - Each key in this dictionary is a column in this table that serves as a foreign key
+      - Each value is a list with 2 elements - the table storing the associated primary key, and the column in that table which is the primary key
+      - Ex: "foreign_key" : { "name" : ["table1", "table1_id"] , "age" : ["table2", "table2_id"] }
+   - If a table does not have a primary or foreign key, you do not have to include them in the table's nested dictionary
+
+For example, if we update the Cloverleaf schema by adding a new primary and foreign key relation (assuming the columns exist):
+
+.. code-block:: json
+
+   {
+      "simulation": {
+         "primary_key": "sim_id"
+      }, 
+      "input": {
+         "primary_key": "input_id",                  // <--- new primary key
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
+      }, 
+      "output": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"],
+               "input_id": ["input", "input_id"]   // <--- new foreign key
+         }
+      },
+      "viz_files": {
+         "foreign_key": {
+               "sim_id": ["simulation", "sim_id"]
+         }
+      }
+   }
+
+our new ER diagram would be:
+
+..  figure:: images/schema_erd_added.png
+    :scale: 35%
+    :align: center
+   
+    ER Diagram of same data. However, there is now an additional primary/foreign key relation from "input" to "output"

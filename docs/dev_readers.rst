@@ -1,3 +1,5 @@
+.. _custom_reader:
+
 ====================================
 Custom DSI Reader
 ====================================
@@ -11,13 +13,13 @@ Before explaining the structure of Readers, it is important to note there are tw
  - If your Reader is intended for use within your own code base and not added to DSI's modules or for public use, you can load it externally. 
    Doing so allows you to store your Reader separately from DSI yet compatible with all versions of DSI.
 
-    - With the ``Core.Terminal.add_external_python_module`` method, you can make your Reader temporarily accessible to DSI in a workflow and load normally.
+    - With the ``Core.Terminal.add_external_python_module()`` method, you can make your Reader temporarily accessible to DSI in a workflow and load normally.
     - This example can be better seen at :ref:`external_readers_writers_label` where you can try loading an external TextFile reader class.
 
  - If you want your Reader loadable internally with the rest of the provided implementations (in 
    `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_), it must be registered in the ``VALID_READERS`` class variable of ``Terminal`` in 
    `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_. 
-   If this is done correctly, your Reader will be loadable by the ``load_module`` method of ``Terminal``.
+   If this is done correctly, your Reader will be loadable by the ``load_module()`` method of ``Terminal``.
 
 Initializer: ``__init__(self) -> None:``
 -------------------------------------------

@@ -1,3 +1,5 @@
+.. _backend_section_label:
+
 Backends
 ========
 
@@ -5,6 +7,7 @@ Backends connect users to DSI Core middleware and allow DSI middleware data stru
 
 Backends are modular to support user contribution, and users are encouraged to offer custom backend abstract classes and backend implementations.  
 A contributed backend abstract class may extend another backend to inherit the properties of the parent. 
+
 In order to be compatible with DSI core middleware, backends need to interface with Python built-in data structures and with the Python ``collections`` library. 
 
 Note that any contributed backends or extensions must include unit tests in ``backends/tests`` to demonstrate new Backend capability. 

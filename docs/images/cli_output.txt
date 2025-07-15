@@ -1,52 +1,61 @@
-(mydsi) viyer@pn2405703 data % dsi
-DSI version 1.1.1
+(mydsi) viyer@pn2405703 examples % dsi
+    _____           ___                          
+   /  /  \         /  /\         ___     
+  /  / /\ \       /  / /_       /  /\    
+ /  / /  \ \     /  / / /\     /  / /    
+/__/ / \__\ |   /  / / /  \   /__/  \    
+\  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+ \  \ \  / /   \  \ \/ / / /     \  \ \/\
+  \  \ \/ /     \  \  / / /       \__\  /
+   \  \  /       \__\/ / /        /__/ / 
+    \__\/          /__/ /         \__\/  
+                   \__\/                   v1.1.1
+
+Created a temporary sqlite DSI backend
 
 Enter "help" for usage hints.
-
-Sqlite backend back-write loaded successfully.
 dsi> help
-display <table name> [-n num rows] [-e filename]  Displays the contents of that table, num rows to display is 
-                                                      optional, and it can be exported to a csv/parquet file
-exit                                              Exit the DSI Command Line Interface (CLI)
-draw [-f filename]                                Draws an ER Diagram of all tables in the current DSI database
-find <var>                                        Search for a variable in the dataset
-help                                              Shows this help
-list                                              Lists the tables in the current DSI databse
-load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional
-                                                      table name argument if input file is only one table
-plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument
-query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,
-                                                      and exports output to a csv/parquet file
-save <filename>                                   Save the local database as <filename>, which will be the same type.
-summary [-t table] [-n num_rows]                  Get a summary of the database or just a table and optionally 
-                                                     specify number of data rows to display
-ls                                                Lists all files in current directory or a specified path
-cd <path>                                         Changes the working directory within the CLI environment
 
+display <table_name> [-n num_rows] [-e filename] Displays a table's data. Optionally limit
+                                                  displayed rows and export to CSV/Parquet
+draw [-f filename]                               Draws an ER diagram of all tables in the
+                                                  current DSI database
+exit                                             Exits the DSI Command Line Interface (CLI)
+find <variable>                                  Searches for a variable in DSI
+help                                             Shows this help message.
+list                                             Lists all tables in the current DSI database
+plot_table <table_name> [-f filename]            Plots numerical data from a table to an
+                                                  optional file name argument
+query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes). Optionally
+                                                  limit printed rows or export to CSV/Parquet
+read <filename> [-t table_name]                  Reads a file or URL into the DSI database.
+                                                  Optionally set table name.
+summary [-t table_name]                          Summary of the database or a specific table.
+write <filename>                                 Writes data in DSI database to a permanent
+                                                  location.
+ls                                               Lists all files in the current or specified
+                                                  directory.
+cd <path>                                        Changes the working directory within the CLI
+                                                  environment.
 
-dsi> load student_test1.yml
-YAML1 plugin reader loaded successfully.
+dsi> cd test/
+Changed directory to /Users/viyer/dsi/examples/test
+
+dsi> read student_test1.yml
+Loaded student_test1.yml into tables: math, address, physics
 Database now has 4 tables
-student_test1.yml successfully loaded.
 
-
-dsi> load student_test2.yml
-YAML1 plugin reader loaded successfully.
+dsi> read student_test2.yml
+Loaded student_test2.yml into tables: math, address, physics
 Database now has 4 tables
-student_test2.yml successfully loaded.
 
-
-dsi> load results.toml
-TOML1 plugin reader loaded successfully.
+dsi> read results.toml
+Loaded results.toml into the table people
 Database now has 5 tables
-results.toml successfully loaded.
 
-
-dsi> load yosemite5.csv
-Csv plugin reader loaded successfully.
+dsi> read yosemite5.csv
+Loaded yosemite5.csv into the table yosemite5
 Database now has 6 tables
-yosemite5.csv successfully loaded.
-
 
 dsi> list
 
@@ -76,32 +85,34 @@ Table: yosemite5
 
 
 dsi> query "SELECT * FROM physics" -e physics_output.csv
-  specification     n        o    p        q   r       s
-0          !amy   9.8  gravity   23  home 23   1 -0.0012
-1         !amy1  91.8  gravity  233  home 23  12 -0.0122
-Csv_Writer plugin writer loaded successfully.
+Printing the result from input SQL query: SELECT * FROM physics
 
+specification | n    | o       | p   | q       | r  | s      
+-------------------------------------------------------------
+!amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+!amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
+
+Exported the query result to physics_output.csv
 
 dsi> display math -e math_output.csv
-table_name: math
+
+Table: math
 
 specification | a | b | c     | d | e    | f     
 -------------------------------------------------
 !jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
 !jack1        | 2 | 3 | 45.98 | 3 | 44.8 | 0.0099
 
-Csv_Writer plugin writer loaded successfully.
-
+Exported math to math_output.csv
 
 dsi> draw -f dsi_er_diagram.png
-ER_Diagram plugin writer loaded successfully.
-
+Successfully drew an ER Diagram in dsi_er_diagram.png
 
 dsi> plot_table physics -f physics_plot.png
-Table_Plot plugin writer loaded successfully.
+Successfully plotted physics in physics_plot.png
 
+dsi> summary -t physics
 
-dsi> summary -t physics -n 1
 Table: physics
 
 column        | type    | min     | max     | avg     | std_dev              
@@ -114,15 +125,9 @@ q             | VARCHAR | None    | None    | None    | None
 r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
 s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
 
-specification | n    | o       | p   | q       | r  | s      
--------------------------------------------------------------
-!amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
-  ... showing 1 of 2 rows
-
-
-dsi> save dsi_output.db
+dsi> write dsi_output.db
+Sucessfully wrote all data to dsi_output.db
 
 dsi> exit
 Exiting...
-Closing the abstraction layer, and all active plugins/backends
-(mydsi) viyer@pn2405703 data % 
+(mydsi) viyer@pn2405703 examples % 

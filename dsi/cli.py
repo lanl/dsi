@@ -6,44 +6,39 @@ import os
 import shutil
 import pandas as pd
 from collections import OrderedDict
+import textwrap
+from contextlib import redirect_stdout
+import sys
+import re
+import io
 
 from dsi.core import Terminal
 from ._version import __version__
 
-def path_completer(text, state):
-    """
-    Completes file and directory paths for the current input
-    """
+def autofill_path(text, state):
+    """ Completes file and directory paths for the current input """
     line = readline.get_line_buffer()
     parts = shlex.split(line[:readline.get_endidx()], posix=True)
     
-    # Handle the case where the user is starting a new argument
     if line and line[-1].isspace():
         parts.append('')
     
-    # Only complete the current argument (the last one)
-    if parts:
-        curr = parts[-1]
-    else:
-        curr = ''
+    curr = parts[-1] if parts else ''
     
-    # Expand ~ and glob for possible matches
-    curr_expanded = os.path.expanduser(curr)
-    matches = glob.glob(curr_expanded + '*')
-
-    # Append a slash to directories to hint completion
+    matches = glob.glob(os.path.expanduser(curr) + '*')
     matches = [m + '/' if os.path.isdir(m) else m for m in matches]
+    matches = [m[m[:-1].rfind('/')+1:] if '/' in m[:-1] else m for m in matches]
 
-    # Return the match corresponding to this state
     try:
         return matches[state]
     except IndexError:
         return None
 
-# Enable autocompletion
-readline.set_completer_delims(' \t\n')  # So paths with `/` are not broken
-readline.set_completer(path_completer)
-readline.parse_and_bind('tab: complete')
+readline.set_completer(autofill_path)
+if "libedit" in readline.__doc__:
+    readline.parse_and_bind("bind ^I rl_complete")
+else:
+    readline.parse_and_bind("tab: complete")
 
 
 class DSI_cli:
@@ -53,43 +48,61 @@ class DSI_cli:
     t = []
 
     def __init__(self):
+        self.name = None
+        self.start_dir = os.getcwd() + "/"
         return
     
     def startup(self, backend="sqlite"):
         self.t = Terminal(debug = 0, runTable=False)
-        self.name = None
-        if backend=="duckdb":
-            if os.path.exists(".temp.duckdb"):
-                os.remove(".temp.duckdb")
-            self.t.load_module('backend','DuckDB','back-write', filename=".temp.duckdb")
-            self.name = ".temp.duckdb"
-        else:
-            if os.path.exists(".temp.sqlite"):
-                os.remove(".temp.sqlite")
-            self.t.load_module('backend','Sqlite','back-write', filename=".temp.sqlite")
-            self.name = ".temp.sqlite"
-        return
-    
+        self.t.user_wrapper = True
+
+        self.start_dir = os.getcwd()
+        db_path = os.path.join(self.start_dir, ".temp.db")
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                if backend=="duckdb":
+                    self.t.load_module('backend','DuckDB','back-write', filename = db_path)
+                    self.name = "duckdb"
+                else:
+                    backend = "sqlite"
+                    self.t.load_module('backend','Sqlite','back-write', filename = db_path)
+                    self.name = "sqlite"
+        except Exception as e:
+            print(f"backend ERROR: {e}")
+            with redirect_stdout(fnull):
+                self.exit_cli()
+        print(f"Created a temporary {backend} DSI backend")
+
 
     def help_fn(self, args):
-        print("display <table name> [-n num rows] [-e filename]  Displays the contents of that table, num rows to display is ")
-        print("                                                      optional, and it can be exported to a csv/parquet file")
-        print("exit                                              Exit the DSI Command Line Interface (CLI)")
-        print("draw [-f filename]                                Draws an ER Diagram of all tables in the current DSI database")
-        print("find <var>                                        Search for a variable in the dataset")
-        print("help                                              Shows this help")
-        print("list                                              Lists the tables in the current DSI databse")
-        print("load <filename> [-t table name]                   Loads this filename/url to a DSI database. optional")
-        print("                                                      table name argument if input file is only one table")
-        print("plot_table <table_name> [-f filename]             Plots a table's numerical data to an optional file name argument")
-        print("query <SQL query> [-n num rows] [-e filename]     Runs a query (in quotes), displays an optionl num rows,")
-        print("                                                      and exports output to a csv/parquet file")
-        print("save <filename>                                   Save the local database as <filename>, which will be the same type.")
-        print("summary [-t table] [-n num_rows]                  Get a summary of the database, or just a table, and optionally ")
-        print("                                                      specify number of data rows to display")
-        print("ls                                                Lists all files in current directory or a specified path")
-        print("cd <path>                                         Changes the working directory within the CLI environment")
+        commands = [
+            ("display <table_name> [-n num_rows] [-e filename]", 
+            "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
+            ("draw [-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
+            ("exit", "Exits the DSI Command Line Interface (CLI)"),
+            ("find <variable>", "Searches for a variable in DSI"),
+            ("help", "Shows this help message."),
+            ("list", "Lists all tables in the current DSI database"),
+            ("plot_table <table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            ("query <SQL_query> [-n num_rows] [-e filename]",
+            "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
+            ("read <filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            ("summary [-t table_name]", "Summary of the database or a specific table."),
+            ("write <filename>", "Writes data in DSI database to a permanent location."),
+            ("ls", "Lists all files in the current or specified directory."),
+            ("cd <path>", "Changes the working directory within the CLI environment.")
+        ]
+
         print()
+        terminal_width = shutil.get_terminal_size().columns
+        for cmd, desc in commands:
+            print(textwrap.fill(f"{cmd:48} {desc}", width=terminal_width, subsequent_indent=' ' * 50))
+        print()
+
 
     def cd(self, args):
         '''
@@ -99,15 +112,13 @@ class DSI_cli:
             print("Usage: cd <directory>")
             return
         path = os.path.expanduser(args[0])
-        try:
+        if os.path.isdir(path):
             os.chdir(path)
             print(f"Changed directory to {os.getcwd()}")
-        except FileNotFoundError:
-            print(f"No such directory: {path}")
-        except NotADirectoryError:
+        else:
             print(f"{path} is not a directory.")
-        except Exception as e:
-            print(f"Error: {e}")
+        print()
+
 
     def clear(self, args):
         '''
@@ -119,22 +130,23 @@ class DSI_cli:
     def get_display_parser(self):
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('table_name', help='Table to display')
-        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows  for each table')
+        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
         parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
 
     def display(self, args):
         '''
         Displays the contents of a table
-        '''
-        print(f"table_name: {args.table_name}")
-        
+        '''     
         table_name = args.table_name
         num_rows = 25
         if args.num_rows != None:
             num_rows = args.num_rows
 
-        self.t.display(table_name, num_rows)
+        try:
+            self.t.display(table_name, num_rows)
+        except Exception as e:
+            print(f"display ERROR: {e}")
         
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
@@ -142,11 +154,15 @@ class DSI_cli:
                 filename = args.export + ".csv"
             else:
                 filename = args.export
-            self.export_table(table_name, filename)
+            error = self.export_table(table_name, filename)
+            if error != 1:
+                print(f"Exported {table_name} to {filename}")
+            print()
+    
     
     def get_draw_parser(self):
         parser = argparse.ArgumentParser(prog='draw')
-        parser.add_argument('-f', '--filename', type=str, required=False, help='Show only this table')
+        parser.add_argument('-f', '--filename', type=str, required=False, help='ER Diagram filename')
         return parser
     
     def draw_schema(self, args):
@@ -157,75 +173,269 @@ class DSI_cli:
         if args.filename != None:
             erd_name = args.filename
         
-        self.export_table("dsi_erd_gen", erd_name)
+        error = self.export_table("dsi_erd_gen", erd_name)
+        if error != 1:
+            print(f"Successfully drew an ER Diagram in {erd_name}")
         print()
+
 
     def exit_cli(self, args):
         '''
         Exits the CLI
         '''
         print("Exiting...")
-        self.t.close()
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            self.t.close()
         exit(0)
+
 
     def export_table(self, table_name, filename):
         '''
         Exports to a csv/parquet file
         '''
         if table_name != "temp_query":
-            self.t.artifact_handler(interaction_type="process")
+            try:        
+                self.t.artifact_handler(interaction_type='process')
+            except Exception as e:
+                self.t.active_metadata = OrderedDict()
+                print(f"export ERROR: {e}")
+                return 1
 
         file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-        if table_name == "dsi_erd_gen":
-            self.t.load_module('plugin', "ER_Diagram", "writer", filename = filename)
-            self.t.transload()
-        elif "dsi_tb_" in table_name:
-            self.t.load_module('plugin', "Table_Plot", "writer", table_name = table_name[7:], filename = filename)
-            self.t.transload()
-        elif file_extension.lower() == "csv":
-            self.t.load_module('plugin', "Csv_Writer", "writer", filename = filename, table_name = table_name)
-            self.t.transload()
-        elif file_extension.lower() in ['pq', 'parquet']:
-            table_data = self.t.active_metadata[table_name]
-            df = pd.DataFrame(table_data)
-            df.to_parquet(filename, engine='pyarrow', index=False)
+        success_load = True
+
+        if "/" not in filename:
+            filename = os.path.join(self.start_dir, filename)
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                if table_name == "dsi_erd_gen":
+                    self.t.load_module('plugin', "ER_Diagram", "writer", filename = filename)
+                elif "dsi_tb_" in table_name:
+                    self.t.load_module('plugin', "Table_Plot", "writer", table_name = table_name[7:], filename = filename)
+                elif file_extension.lower() == "csv":
+                    self.t.load_module('plugin', "Csv_Writer", "writer", filename = filename, table_name = table_name)
+                elif file_extension.lower() in ['pq', 'parquet']:
+                    table_data = self.t.active_metadata[table_name]
+                    df = pd.DataFrame(table_data)
+                    df.to_parquet(filename, engine='pyarrow', index=False)
+                else:
+                    success_load = False
+        except Exception as e:
+            self.t.active_metadata = OrderedDict()
+            print(f"export ERROR: {e}")
+            return 1
+        
+        if success_load == True:
+            try:
+                self.t.transload()
+            except Exception as e:
+                self.t.active_modules['writer'].pop(0)
+                self.t.active_metadata = OrderedDict()
+                print(f"export ERROR: {e}")
+                return 1
         
         self.t.active_metadata = OrderedDict()
-        
+    
+    
     def find(self, args):
         '''
         Global find to see where that string exists
         '''
-        find_list = self.t.find(args[0])
+        if not args:
+            print("find ERROR: need to specify an object to find")
+            return
+        if len(args) > 1:
+            print("find ERROR: need to wrap a multi-word search in quotes. Ex: find 'this is'")
+            return
+        query = args[0]
+
+        new_find = False
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        if isinstance(query, str) and any(op in query for op in operators):
+            pattern = r'(==|!=|>=|<=|=|<|>|\()'
+            parts = re.split(r'(".*?")', query)
+
+            result = []
+            for part in parts:
+                if part.startswith('"') and part.endswith('"'):
+                    result.append(part)
+                else:
+                    result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
+            if len(result) > 1: # can split into column and operator
+                new_find = True
+                print(f"Finding all rows where '{query}' in the active backend")
+
+                output = None
+                try:
+                    f = io.StringIO()
+                    with redirect_stdout(f):
+                        find_list = self.t.find_relation(query)
+                    output = f.getvalue()
+                except Exception as e:
+                    sys.exit(f"find() ERROR: {e}")
+                
+                if output and "WARNING" in output:
+                    warn_msg = output[output.find("WARNING"):]
+                    if "artifact_handler" in warn_msg:
+                        lines = warn_msg.splitlines()
+                        start = lines[1].find('`')
+                        between = lines[1][start + 1 : lines[1].find('`', start + 1)]
+                        lines[1] = lines[1].replace(between, "query")
+                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query")
+                        warn_msg = '\n'.join(lines)
+                    print("\n"+warn_msg.replace("database", "backend"))
+                    return
+
+        if new_find == False:
+            val = f"'{query}'" if isinstance(query, str) else query
+            print(f"Finding all instances of {val} in DSI")
+            
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    find_list = self.t.find_cell(query, row=True)
+            except Exception as e:
+                print(f"find ERROR: {e}")
+                return
+        if find_list is None:
+            val = f"'{query}'" if isinstance(query, str) else query
+            print(f"WARNING: {val} was not found")
+            return
         print()
         for val in find_list:
             print(f"Table: {val.t_name}")
-            print(f"  - Column(s): {val.c_name}")
-            print(f"  - Search Type: {val.type}")
+            print(f"  - Columns: {val.c_name}")
             print(f"  - Row Number: {val.row_num}")
-            print(f"  - Value: {val.value}")
+            print(f"  - Data: {val.value}")
         print()
-              
+    
+
     def list_tables(self, args):
         '''
         Lists the tables in the database
         '''
-        self.t.list()
-    
+        try:
+            self.t.list()
+        except Exception as e:
+            print(f"list ERROR: {e}")
 
-    def get_load_parser(self):
-        parser = argparse.ArgumentParser(prog='load')
-        parser.add_argument('filename', help='File to load ito DSI')
-        parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name of csv or parquet file')
+
+    def ls(self, args):
+        '''
+        Lists contents of the current directory or specified path
+        '''
+        path = args[0] if args else '.'
+        try:
+            files = [file for file in os.listdir(path) if not file.startswith('.')]
+            files = [file + '/' if os.path.isdir(os.path.join(path, file)) else file for file in files]
+            files.sort()
+
+            try:
+                term_width = os.get_terminal_size().columns
+            except OSError:
+                term_width = 80
+            col_width = max((len(file) for file in files), default=0) + 3
+            num_cols = max(1, term_width // col_width)
+            num_rows = (len(files) + num_cols - 1)// num_cols
+
+            for row in range(num_rows):
+                line = ''
+                for col in range(num_cols):
+                    idx = col * num_rows + row
+                    if idx < len(files):
+                        line += files[idx].ljust(col_width)
+                print(line.rstrip())
+            print()
+        except FileNotFoundError:
+            print(f"No such filepath: {path}")
+            return
+        except Exception as e:
+            print(f"Error: {e}")
+            return
+
+
+    def get_plot_table_parser(self):
+        parser = argparse.ArgumentParser(prog='plot_table')
+        parser.add_argument('table_name', help='Table to plot')
+        parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Table plot filename')
         return parser
     
-    def load(self, args):
+    def plot_table(self, args):
         '''
-        Loads data to into a DSI database or loads a DSI database
+        Plot a table's numerical data and store in an image
+        '''
+        table_name = args.table_name
+        filename = f"{table_name}_plot.png"
+        if args.filename != "":
+            filename = args.filename
+        
+        error = self.export_table("dsi_tb_" + table_name, filename)
+        if error != 1:
+            print(f"Successfully plotted {table_name} in {filename}")
+        print()
+
+
+    def get_query_parser(self):
+        parser = argparse.ArgumentParser(prog='query')
+        parser.add_argument('sql_query', help='SQL query (in quotes) to execute')
+        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
+        parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
+        return parser
+
+    def query(self, args):
+        '''
+        Runs the query sent to it
+        '''
+        sql_query = args.sql_query
+        num_rows = 25
+        if args.num_rows != None:
+            num_rows = args.num_rows
+
+        print(f"Printing the result from input SQL query: {sql_query}")
+
+        try:
+            data = self.t.artifact_handler(interaction_type='query', query = sql_query)
+        except Exception as e:
+            print(f"query ERROR: {e}")
+            return
+        if data.empty:
+            print()
+            return
+        
+        headers = data.columns.tolist()
+        rows = data.values.tolist()
+        self.t.table_print_helper(headers, rows, num_rows)
+        
+        if args.export != None:
+            file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
+            if file_extension.lower() not in ["csv", "pq", "parquet"]:
+                filename = args.export + ".csv"
+            else:
+                filename = args.export
+            self.t.active_metadata["temp_query"] = OrderedDict(data.to_dict(orient='list'))
+            error = self.export_table("temp_query", filename)
+            if error != 1:
+                print()
+                print(f"Exported the query result to {filename}")
+        print()
+
+
+    def get_read_parser(self):
+        parser = argparse.ArgumentParser(prog='read')
+        parser.add_argument('filename', help='File to read into DSI')
+        parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name to store data into')
+        return parser
+    
+    def read(self, args):
+        '''
+        Reads data file or a database into DSI
 
         Args:
-            dbfile (obj): name of the file or database to load 
-            table_name (str): name of the table to load the data to for CSV and parquet
+            dbfile (obj): name of the file or database to read 
+            table_name (str): name of the table to read the data into
         '''
         table_name = ""
         if args.table_name != "":
@@ -233,9 +443,7 @@ class DSI_cli:
         else:
             table_name = os.path.splitext(os.path.basename(args.filename))[0]
 
-            
         dbfile = args.filename
-
         if self.__is_url(dbfile): # if it's a url, do fetch
             url = dbfile
             output_path = url.split('/')[-1]    
@@ -258,159 +466,77 @@ class DSI_cli:
                 print(f"Download failed: {e}")
                 return
 
+        if not os.path.exists(dbfile):
+            print("read ERROR: The input file must be a valid filepath. Please check again.")
+            return
+
         file_extension = dbfile.rsplit(".", 1)[-1] if '.' in dbfile else ''
-        if self.__is_sqlite3_file(dbfile):
-            try:
-                self.t.load_module('backend','Sqlite','back-read', filename=dbfile)
-                self.t.artifact_handler(interaction_type="process")
-                self.t.unload_module('backend','Sqlite','back-read')
-            except Exception as e:
-                print(f"An error {e} occurred loading {dbfile}\n")    
-
-        elif self.__is_duckdb_file(dbfile):
-            try:
-                self.t.load_module('backend','DuckDB','back-read', filename=dbfile)
-                self.t.artifact_handler(interaction_type="process")
-                self.t.unload_module('backend','DuckDB','back-read')
-            except Exception as e:
-                print(f"An error {e} occurred loading {dbfile}\n")  
-
-        elif file_extension.lower() == 'csv':
-            try:
-                self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
-            except Exception as e:
-                print(f"An error {e} occurred loading {dbfile}\n")
-        
-        elif file_extension.lower() == 'toml':
-            try:
-                self.t.load_module('plugin', "TOML1", "reader", filenames = dbfile)
-            except Exception as e:
-                print(f"An error {e} occurred loading {dbfile}\n")
-
-        elif file_extension.lower() in ['yaml', 'yml']:
-            try:
-                self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
-            except Exception as e:
-                print(f"An error {e} occurred loading {dbfile}\n")
-
-        elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
-            try:
-                self.t.load_module('backend','Parquet','back-write', filename=dbfile)
-                data = OrderedDict(self.t.artifact_handler(interaction_type="query")) #Parquet's query() returns a normal dict
-                if table_name is not None:
-                    self.t.active_metadata[table_name] = data
-                else:
-                    self.t.active_metadata["Parquet"] = data
-                self.t.unload_module('backend','Parquet','back-write')
-            except Exception as e:
-                print(f"An error {e} occurred loading {dbfile}\n")   
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                if self.__is_sqlite3_file(dbfile):
+                    self.t.load_module('backend','Sqlite','back-read', filename=dbfile)
+                    self.t.artifact_handler(interaction_type="process")
+                    self.t.unload_module('backend','Sqlite','back-read')
+                elif self.__is_duckdb_file(dbfile):
+                    self.t.load_module('backend','DuckDB','back-read', filename=dbfile)
+                    self.t.artifact_handler(interaction_type="process")
+                    self.t.unload_module('backend','DuckDB','back-read')
+                elif file_extension.lower() == 'csv':
+                    self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
+                elif file_extension.lower() == 'toml':
+                    self.t.load_module('plugin', "TOML1", "reader", filenames = dbfile)
+                elif file_extension.lower() in ['yaml', 'yml']:
+                    self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
+                elif file_extension.lower() == 'json':
+                    self.t.load_module('plugin', "JSON", "reader", filenames = dbfile)
+                elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
+                    self.t.load_module('backend','Parquet','back-write', filename=dbfile)
+                    data = OrderedDict(self.t.artifact_handler(interaction_type="query")) #Parquet's query() returns a normal dict
+                    if table_name is not None:
+                        self.t.active_metadata[table_name] = data
+                    else:
+                        self.t.active_metadata["Parquet"] = data
+                    self.t.unload_module('backend','Parquet','back-write')
+        except Exception as e:
+            print(f"read ERROR: {e}\n")
+            self.t.active_metadata = OrderedDict()
+            return
 
         if self.t.active_metadata:
-            self.t.artifact_handler(interaction_type='ingest')
+            try:
+                self.t.artifact_handler(interaction_type='ingest')
+            except Exception as e:
+                print(f"read ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
+                return
+            
+            table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
+            if len(table_keys) > 1:
+                print(f"Loaded {dbfile} into tables: {', '.join(table_keys)}")
+            else:
+                print(f"Loaded {dbfile} into the table {table_keys[0]}")
+
             self.t.num_tables()
+            print()
             self.t.active_metadata = OrderedDict()
-            print(f"{dbfile} successfully loaded.\n")
         else:
+            print()
             print("Ensure file has data stored correctly.")
             print("Currently supported formats are: ")
             print("   - csv (extension: .csv)")
+            print("   - json (extension: .json)")
             print("   - toml (extension: .toml)")
             print("   - yaml (extension: .yaml, .yml)")
             print("   - parquet (extension: .pq, .parquet)")
             print("   - sqlite (extension: .db, .sqlite, .sqlite3)")
             print("   - duckdb (extension: .duckdb, .db)\n")
-    
-    def ls(self, args):
-        '''
-        Lists contents of the current directory or specified path
-        '''
-        path = args[0] if args else '.'
-        try:
-            entries = [entry for entry in os.listdir(path) if not entry.startswith('.')]
-            for entry in entries:
-                full_path = os.path.join(path, entry)
-                suffix = '/' if os.path.isdir(full_path) else ''
-                print(entry + suffix)
-        except FileNotFoundError:
-            print(f"No such file or directory: {path}")
-        except Exception as e:
-            print(f"Error: {e}")
+            return
 
-    def get_plot_table_parser(self):
-        parser = argparse.ArgumentParser(prog='plot_table')
-        parser.add_argument('table_name', help='Table to plot')
-        parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Export filename')
-        return parser
-    
-    def plot_table(self, args):
-        '''
-        Plot a table's numerical data and store in an image
-        '''
-        table_name = args.table_name
-        filename = f"{table_name}_plot.png"
-        if args.filename != "":
-            filename = args.filename
-        
-        self.export_table("dsi_tb_" + table_name, filename)
-        print()
-
-    def get_query_parser(self):
-        parser = argparse.ArgumentParser(prog='display')
-        parser.add_argument('sql_query', help='SQL query to execute')
-        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows  for each table')
-        parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
-        return parser
-
-    def query(self, args):
-        '''
-        Runs the query sent to it
-        '''
-        sql_query = args.sql_query
-        num_rows = 25
-        if args.num_rows != None:
-            num_rows = args.num_rows
-
-        data = self.t.artifact_handler(interaction_type='query', query = sql_query)
-        headers = data.columns.tolist()
-        rows = data.values.tolist()
-        self.t.table_print_helper(headers, rows, num_rows)
-        
-        if args.export != None:
-            file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
-            if file_extension.lower() not in ["csv", "pq", "parquet"]:
-                filename = args.export + ".csv"
-            else:
-                filename = args.export
-            self.t.active_metadata["temp_query"] = OrderedDict(data.to_dict(orient='list'))
-            self.export_table("temp_query", filename)
-        print()
-
-    def get_save_parser(self):
-        parser = argparse.ArgumentParser(prog='save')
-        parser.add_argument('filename', help='file DSI data will be saved to')
-        return parser
-    
-    def save_to_file(self, args):
-        '''
-        Save the database to file
-        '''
-        new_name = args.filename
-        file_extension = new_name.rsplit(".", 1)[-1] if '.' in new_name else ''
-        if "sqlite" in self.name:
-            if file_extension.lower() in ["db", "sqlite", "sqlite3"]:
-                shutil.copyfile(self.name, new_name)
-            else:
-                shutil.copyfile(self.name, new_name + ".sqlite")
-        elif "duckdb" in self.name:
-            if file_extension.lower() in ["db", "duckdb"]:
-                shutil.copyfile(self.name, new_name)
-            else:
-                shutil.copyfile(self.name, new_name + ".duckdb")
 
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')
         parser.add_argument('-t', '--table', type=str, required=False, help='Show only this table')
-        parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show n rows for each table')
         return parser
     
     def summary(self, args):
@@ -420,13 +546,11 @@ class DSI_cli:
         table_name = None
         if args.table != None:
             table_name = args.table
-           
-        num_rows = 0
-        if args.num_rows != None:
-            num_rows = args.num_rows
         
-        #self.a.summarize(table_name, num_rows)
-        self.t.summary(table_name, num_rows)
+        try:
+            self.t.summary(table_name)
+        except Exception as e:
+            print(f"summary ERROR: {e}")
         print()
 
 
@@ -434,8 +558,37 @@ class DSI_cli:
         '''
         Output the version of DSI being used
         '''
-        print("DSI version " + str(__version__)+"\n")
-        print("Enter \"help\" for usage hints.\n")
+        return str(__version__)
+
+
+    def get_write_parser(self):
+        parser = argparse.ArgumentParser(prog='write')
+        parser.add_argument('filename', help='file DSI data will be written to')
+        return parser
+    
+    def write_to_file(self, args):
+        '''
+        Writes the database to file
+        '''
+        new_name = args.filename
+        file_extension = new_name.rsplit(".", 1)[-1] if '.' in new_name else ''
+        dsi_db_path = os.path.join(self.start_dir, ".temp.db")
+        final_name = None
+        if "sqlite" == self.name:
+            if file_extension.lower() in ["db", "sqlite", "sqlite3"]:
+                shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name))
+                final_name = new_name
+            else:
+                shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name) + ".sqlite")
+                final_name = new_name + ".sqlite"
+        elif "duckdb" == self.name:
+            if file_extension.lower() in ["db", "duckdb"]:
+                shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name))
+                final_name = new_name
+            else:
+                shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name) + ".duckdb")
+                final_name = new_name + ".duckdb"
+        print(f"Sucessfully wrote all data to {final_name}\n")
 
 
     # TODO: Abstract later to __is_valid_file and have independent checks in the dsi.backends
@@ -477,29 +630,50 @@ class DSI_cli:
 cli = DSI_cli()
 
 COMMANDS = {
-    'clear': (None, cli.clear), #
-    'display' : (cli.get_display_parser, cli.display), #
+    'clear': (None, cli.clear),
+    'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
-    'exit': (None, cli.exit_cli), #
+    'exit': (None, cli.exit_cli),
     'find' : (None, cli.find),
-    'help': (None, cli.help_fn), #
-    'list' : (None, cli.list_tables), #
-    'load' : (cli.get_load_parser, cli.load),
+    'help': (None, cli.help_fn),
+    'list' : (None, cli.list_tables),
+    'read' : (cli.get_read_parser, cli.read),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
-    'save' : (cli.get_save_parser, cli.save_to_file),
-    'summary' : (cli.get_summary_parser, cli.summary), #
-    'ls' : (None, cli.ls), #
-    'cd' : (None, cli.cd) #
+    'write' : (cli.get_write_parser, cli.write_to_file),
+    'summary' : (cli.get_summary_parser, cli.summary),
+    'ls' : (None, cli.ls),
+    'cd' : (None, cli.cd)
 }
 
 def main():
+    if sys.argv[1:] and sys.argv[1].lower() == "help":
+        cli.help_fn([])
+        exit(0)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite and duckdb")
 
     args = parser.parse_args()
-    cli.version()
+    if args.backend.lower() not in ["sqlite", "duckdb"]:
+        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb")
+        exit(1)
+    print("   ", textwrap.dedent(fr"""
+         _____           ___                          
+        /  /  \         /  /\         ___     
+       /  / /\ \       /  / /_       /  /\    
+      /  / /  \ \     /  / / /\     /  / /    
+     /__/ / \__\ |   /  / / /  \   /__/  \    
+     \  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+      \  \ \  / /   \  \ \/ / / /     \  \ \/\
+       \  \ \/ /     \  \  / / /       \__\  /
+        \  \  /       \__\/ / /        /__/ / 
+         \__\/          /__/ /         \__\/  
+                        \__\/                   v{cli.version()}
+    """).strip())
+    print()
     cli.startup(args.backend)
+    print("\nEnter \"help\" for usage hints.")
 
     while True:
         try:
@@ -522,14 +696,15 @@ def main():
                     parsed_args = parser.parse_args(args)
                     handler(parsed_args)
                 except SystemExit:
-                    # argparse tries to exit on error — suppress that in shell
-                    pass
+                    pass # argparse tries to exit on error — suppress that in shell
             else:
                 handler(args)
             
         except KeyboardInterrupt:
-            print("\nUse 'exit' to leave.\n")
-
+            cli.exit_cli([])
+        except EOFError:
+            print()
+            cli.exit_cli([])
         except Exception as e:
             print(f"Error: {e}\n")
 
