@@ -1513,16 +1513,17 @@ class Sync():
         # See if FS table has been created
         t = Terminal()
 
+        f = self.project_name+".db"
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = self.local_location+"/"+self.project_name+".db"
-            f = self.project_name+".db"
+            assert os.path.exists(f)
+
             if isVerbose:
                 print("db: ", f)
-            if os.path.exists(f):
-                t.load_module('backend','Sqlite','back-read', filename=f)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+            t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception:
+            print(f"Databaase {f} not found")
             raise
 
         # See if filesystem exists
