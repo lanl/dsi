@@ -1,24 +1,27 @@
+.. _custom_writer:
+
 ====================================
 Custom DSI Writer
 ====================================
 
-DSI Writers are the primary way to convert data from DSI to an external format, and they must each include 2 methods, ``__init__``, and ``get_rows``.
+DSI Writers are the primary way to translate data from DSI to an external format.
+All Writers must be structured as a Class with 2 mandatory methods: ``__init__``, and ``get_rows``.
 
 Loading Custom Writer into DSI
 ------------------------------
-Before explaining the structure of Writers, it is important to note there are two ways to load your Writer, externally and internally.
+Before understanding the structure of Writers, it is important to know how they can be loaded via the User API and the Contributor API:
 
- - If your Writer is intended for use within your own code base and not added to DSI's modules or for public use, you must load it externally.
-   Doing so allows you to store your Writer separately from DSI yet compatible with all versions of DSI.
+- **User API**: Users loading a custom external Writer can use the ``write()`` method from the DSI class.
+  Unlike a normal ``write()``, the second argument should be the path to the Python script containing the user's custom Writer.
+  
+  While there currently isn't an example of loading an external Writer, :ref:`user_external_reader` has a similar process to load an external Reader.
 
-    - With the ``Core.Terminal.add_external_python_module()`` method, you can make your Writer temporarily accessible to DSI in a workflow and load normally.
-    - A similar example can be better seen at :ref:`external_readers_writers_label` where you can try loading an external TextFile reader class.
-      While that example is meant for DSI Readers, the process to load them is the same
+- **Contributor API**: Users loading a custom external Writer must first call ``Terminal.add_external_python_module()`` to temporarily register the Writer
+  with DSI before loading the Writer and its data normally. For detailed instructions, follow :ref:`external_readers_writers_label`.
 
- - If you want your Writer loadable internally with the rest of the provided implementations (in 
-   `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_), it must be registered in the ``VALID_WRITERS`` class variable of ``Terminal`` in 
-   `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_. 
-   If this is done correctly, your Writers will be loadable by the ``load_module()`` method of ``Terminal``.
+  Users intending to add the custom Writer to DSI's codebase must include the file in the `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_ 
+  directory and include the Writer name in the ``Terminal.VALID_WRITERS`` class variable of `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_.
+  If done correctly, the Writer will be accessible by ``Terminal.load_module()``.
 
 Initializer: ``__init__(self) -> None:``
 -----------------------------------------
@@ -44,7 +47,7 @@ Essentially, each entry in the larger OrderedDict has a table's name as a key an
 That table's data will be an inner OrderedDict.
 
 Unlike DSI Readers, there is no standard structure for ``get_rows`` as each Writer can have a vastly different output. 
-If a Writer requires units of data, or primary key/foreign key relations, they are stored in tables named 'dsi_units' amd 'dsi_relations' respectively.
+If a Writer requires units of data, or primary key/foreign key relations, they are stored in tables named 'dsi_units' and 'dsi_relations' respectively.
 
 Various examples of ``get_rows`` can be found in `dsi/plugins/file_writer.py <https://github.com/lanl/dsi/blob/main/dsi/plugins/file_writer.py>`_.
 

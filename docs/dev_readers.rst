@@ -4,22 +4,24 @@
 Custom DSI Reader
 ====================================
 
-DSI Readers are the primary way to convert outside data to metadata that DSI can ingest, and they must must include 2 methods, ``__init__``, and ``add_rows``.
+DSI Readers are the primary way to translate external data to metadata consistent with DSI. 
+All Readers must be structured as a Class with 2 mandatory methods: ``__init__``, and ``add_rows``.
 
 Loading Custom Reader into DSI
 ------------------------------
-Before explaining the structure of Readers, it is important to note there are two ways to load your Reader, externally and internally.
+Before understanding the structure of Readers, it is important to know how they can be loaded via the User API and the Contributor API:
 
- - If your Reader is intended for use within your own code base and not added to DSI's modules or for public use, you can load it externally. 
-   Doing so allows you to store your Reader separately from DSI yet compatible with all versions of DSI.
+- **User API**: Users loading a custom external Reader can use the ``read()`` method from the DSI class.
+  Unlike a normal ``read()``, the second argument should be the path to the Python script containing the user's custom Reader.
+  
+  This can be better seen in :ref:`user_external_reader` where a custom TextFile Reader is loaded into DSI with its data.
+  
+- **Contributor API**: Users loading a custom external Reader must first call ``Terminal.add_external_python_module()`` to temporarily register the Reader
+  with DSI before loading the Reader and its data normally. For detailed instructions, follow :ref:`external_readers_writers_label`.
 
-    - With the ``Core.Terminal.add_external_python_module()`` method, you can make your Reader temporarily accessible to DSI in a workflow and load normally.
-    - This example can be better seen at :ref:`external_readers_writers_label` where you can try loading an external TextFile reader class.
-
- - If you want your Reader loadable internally with the rest of the provided implementations (in 
-   `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_), it must be registered in the ``VALID_READERS`` class variable of ``Terminal`` in 
-   `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_. 
-   If this is done correctly, your Reader will be loadable by the ``load_module()`` method of ``Terminal``.
+  Users intending to add the custom Reader to DSI's codebase must include the file in the `dsi/plugins <https://github.com/lanl/dsi/tree/main/dsi/plugins>`_ 
+  directory and include the Reader name in the ``Terminal.VALID_READERS`` class variable of `dsi/core.py <https://github.com/lanl/dsi/blob/main/dsi/core.py>`_.
+  If done correctly, the Reader will be accessible by ``Terminal.load_module()``.
 
 Initializer: ``__init__(self) -> None:``
 -------------------------------------------
@@ -39,41 +41,6 @@ Example ``__init__``: ::
 
     # data structure to load data into that is compatible with DSI
     self.data_dict = OrderedDict() 
-
-.. Pack Header: ``pack_header(self) -> None``
-.. ---------------------------------------------
-
-.. ``pack_header`` is responsible for setting a schema, registering which columns 
-.. will be populated by the reader. The ``set_schema(self, table_data: list, validation_model=None) -> None`` method 
-.. is available to subclasses of ``StructuredMetadata``, which allows one to simply give a list of column names to register. 
-.. ``validation_model`` is an pydantic model that can help you enforce types, but is completely optional.
-
-.. Example ``pack_header``: ::
-
-..   def pack_header(self) -> None:
-..     column_names = ["foo", "bar", "baz"]
-..     self.set_schema(column_names)
-
-.. Add Rows: ``add_rows(self) -> None``
-.. -------------------------------------
-
-.. ``add_rows`` is responsible for appending to the internal metadata buffer. 
-.. Whatever data is being ingested, it's done here. The ``add_to_output(self, row: list) -> None`` method is available to subclasses 
-.. of ``StructuredMetadata``, which takes a list of data that matches the schema and appends it to the internal metadata buffer.
-
-.. Note: ``pack_header`` must be called before metadata is appended in ``add_rows``. Another helper method of 
-.. ``StructuredMetadata`` is ``schema_is_set``, which provides a way to tell if this restriction is met.
-
-.. Example ``add_rows``: ::
-
-..   def add_rows(self) -> None:
-..     if not self.schema_is_set():
-..       self.pack_header()
-
-..     # data parsing can go here (or abstracted to other functions)
-..     my_data = [1, 2, 3]
-
-..     self.add_to_output(my_data)
 
 Add Rows: ``add_rows(self) -> None``
 --------------------------------------------
@@ -109,6 +76,6 @@ Please note that any accepted PRs into DSI should satisfy the following:
 
 Examples
 ----------
-Full Reader examples in-code, can be found in `dsi/plugins/file_reader.py <https://github.com/lanl/dsi/blob/main/dsi/plugins/file_reader.py>`_.
+Examples of DSI Readers can be found in `dsi/plugins/file_reader.py <https://github.com/lanl/dsi/blob/main/dsi/plugins/file_reader.py>`_.
 ``Csv`` is an especially simple example to view for loading one table. 
 ``YAML1`` and ``TOML1`` are more complex examples with loading multiple tables of data with units
