@@ -150,12 +150,12 @@ class DSI():
                 - "Oceans11Datacard"     → .yaml or .yml
 
         `reader_name` : str
-            Name of the DSI reader to use for loading the data. 
+            Name of the DSI Reader to use for loading the data. 
 
-            If using a DSI-supported reader, this should be one of the reader_names from `list_readers()`.
+            If using a DSI-supported Reader, this should be one of the reader_names from `list_readers()`.
 
-            If using a custom reader, provide the relative file path to the Python script with the reader.  
-            For guidance on creating a DSI-compatible reader, view :ref:`custom_reader`.
+            If using a custom Reader, provide the relative file path to the Python script with the Reader.  
+            For guidance on creating a DSI-compatible Reader, view :ref:`custom_reader`.
 
         `table_name` : str, optional
             Name to assign to the loaded table. 
@@ -168,7 +168,7 @@ class DSI():
         
         if reader_name.endswith(".py"):
             if not os.path.exists(reader_name):
-                sys.exit("read() ERROR: `reader_name` must be a valid filepath to the custom reader. Please check again.")
+                sys.exit("read() ERROR: `reader_name` must be a valid filepath to the custom Reader. Please check again.")
 
             import ast
             parsed_data = None
@@ -176,7 +176,7 @@ class DSI():
                 with open(reader_name, "r", encoding="utf-8") as external_reader:
                     parsed_data = ast.parse(external_reader.read(), filename=reader_name)
             except Exception as e:
-                sys.exit(f"read() Error: Could not read the Python file with the custom reader.")
+                sys.exit(f"read() Error: Could not read the Python file with the custom Reader.")
 
             class_name = None
             init_params = []
@@ -194,7 +194,7 @@ class DSI():
 
             if class_name == None:
                 sys.exit(f"read() Error: The custom Reader must be structured as a Class in the Python script.")
-            elif init_params == []:
+            if init_params == []:
                 print("read() Error: The custom Reader must be DSI-compatible.")
                 sys.exit("Please review https://lanl.github.io/dsi/dev_readers.html to ensure it is compatible.")
             
@@ -610,7 +610,7 @@ class DSI():
         print("\nValid Writers for `writer_name` in write():", self.t.VALID_WRITERS, "\n")
         print("ER_Diagram  : Creates a visual ER diagram image based on all tables in DSI.")
         print("Table_Plot  : Generates a plot of numerical data from a specified table.")
-        print("Csv_Writer  : Exports the data of a specified table to a CSV file.")
+        print("Csv         : Exports the data of a specified table to a CSV file.")
         print()
 
     def write(self, filename, writer_name, table_name = None):
@@ -623,13 +623,18 @@ class DSI():
             Expected file extensions based on `writer_name`:
                 - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
                 - "Table_Plot"   → .png, .jpg, .jpeg
-                - "Csv_Writer"   → .csv
+                - "Csv"          → .csv
 
-        `writer_name` : str
-            Name of the DSI writer to use. Call `list_writers()` to view all available writers.
+        `writer_name` : str        
+            Name of the DSI Writer to export data. 
+            
+            If using a DSI-supported Writer, this should be one of the writer_names from `list_writers()`.
+
+            If using a custom Writer, provide the relative file path to the Python script with the Writer.  
+            For guidance on creating a DSI-compatible Writer, view :ref:`custom_writer`.
 
         `table_name`: str, optional
-            Required when using "Table_Plot" or "Csv_Writer" to specify which table to export.
+            Required when using "Table_Plot" or "Csv" to specify which table to export.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
@@ -640,27 +645,74 @@ class DSI():
             self.t.artifact_handler(interaction_type='process')
         except Exception as e:
             sys.exit(f"write() ERROR: {e}")
+
+        if writer_name.endswith(".py"):
+            if not os.path.exists(writer_name):
+                sys.exit("write() ERROR: `writer_name` must be a valid filepath to the custom Writer. Please check again.")
+
+            import ast
+            parsed_data = None
+            try:
+                with open(writer_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=writer_name)
+            except Exception as e:
+                sys.exit(f"write() Error: Could not read the Python file with the custom Writer.")
+
+            class_name = None
+            init_params = []
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    if "__init__" in functions and "get_rows" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name == None:
+                sys.exit(f"write() Error: The custom Writer must be structured as a Class in the Python script.")
+            if init_params == []:
+                print("write() Error: The custom Writer must be DSI-compatible.")
+                sys.exit("Please review https://lanl.github.io/dsi/dev_writers.html to ensure it is compatible.")
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = filename
+                if "table" in param.lower():
+                    updated[param] = table_name
+            
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
+                    self.t.load_module('plugin', class_name, 'writer', **updated)
+            except Exception as e:
+                sys.exit(f"write() ERROR: {e}")
+        else:
+            correct_writer = True
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    if writer_name.lower() in ["er_diagram", "er diagram"]:
+                        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
+                    elif writer_name.lower() in ["table_plot", "table plot"]:
+                        self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name)
+                    elif writer_name.lower() in ["csv", "csv writer", "csv_writer"]:
+                        self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name)
+                    else:
+                        correct_writer = False
+            except Exception as e:
+                sys.exit(f"write() ERROR: {e}")
+            
+            if correct_writer == False:
+                print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
+                print(f"Eligible writers are: {self.list_writers()}")
+                return
         
-        correct_writer = True
-        fnull = open(os.devnull, 'w')
-        try:
-            with redirect_stdout(fnull):
-                if writer_name == "ER_Diagram":
-                    self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
-                elif writer_name == "Table_Plot":
-                    self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name)
-                elif writer_name == "Csv_Writer":
-                    self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name)
-                    writer_name = "Csv"
-                else:
-                    correct_writer = False
-        except Exception as e:
-            sys.exit(f"write() ERROR: {e}")
-        
-        if correct_writer == False:
-            print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
-            print(f"Eligible writers are: {self.list_writers()}")
-            return
         try:
             self.t.transload()
         except Exception as e:
