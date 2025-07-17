@@ -786,7 +786,7 @@ class Terminal():
        
         `query_object` : str
             A relational expression combining column, operator, and value.
-            Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)".
+            Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)", "age ~ 4", "age ~~ 4".
 
         `return` : list
             A list of backend-specific result objects, each representing a row that satisfies the relation.
@@ -821,7 +821,7 @@ class Terminal():
             value = value[1:-1] if is_literal(value) else value
             return "'" + re.sub(r"(?<!')'(?!')", "''", value) + "'"
 
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', '~', '~~']
         if not any(op in query_object for op in operators):
             raise ValueError("`query_object` is missing an operator to compare the column to a value.")
         result = self.manual_string_parsing(query_object)
@@ -830,8 +830,8 @@ class Terminal():
         elif len(result) == 2:
             raise ValueError("Input must include a column, operator, and value. Operator cannot be enclosed in quotes.")
         elif len(result) == 3 and not is_literal(result[2]) and any(op in result[2] for op in operators):
-            extra = "If matching value has an operator in it, make sure to wrap in single quotes."
-            raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]. {extra}")
+            extra = "or partial match [~,~~]. If matching value has an operator in it, make sure to wrap all in single quotes."
+            raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], {extra}")
         elif len(result) == 3 and result[2].startswith('"') and result[2].endswith('"'):
             raise ValueError(f"The value in the relational find() cannot be enclosed in double quotes")
         
@@ -848,7 +848,7 @@ class Terminal():
             elif ')' != result[2][-1]:
                 raise ValueError(f"{start_msg} it must end with closing parenthesis.")
             elif (result[2][result[2].rfind("'"):] if "'" in result[2] else result[2]).count(')') > 1:
-                raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
+                raise ValueError("Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~].")
         
             values = result[2][:-1].strip()
             if values[0] == '"' or values[-1] == '"':
@@ -1277,7 +1277,7 @@ class Terminal():
     def manual_string_parsing(self, query):
         # splits on double quotes not within any single quotes
         # splits on operators outside of any quotes
-        op_pattern = re.compile(r'==|!=|>=|<=|=|<|>|\(')
+        op_pattern = re.compile(r'==|!=|~~|>=|<=|~|=|<|>|\(')
         parts = []
         buffer = ''
         in_single = False

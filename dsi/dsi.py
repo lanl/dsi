@@ -382,16 +382,11 @@ class DSI():
         
     def find(self, query, collection = False):
         """
-        Finds all rows across all tables in the active backend where `query` can be found.
+        Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
 
-        If `query` is a string containing a column-level condition (e.g., "age > 4"), this method instead finds all rows 
-        in the first table where the condition is satisfied.
-
-        `query` : int, float, or str
-            The value to search for in all rows across all tables.
-
-            If `query` is a string with a condition, it must be in the format of a column name, operator, then value.
-            Valid operators on numbers or strings:
+        `query` : str
+            A column-level condition that must be in the format of a [column name] [operator] [value]. 
+            The value can be a string or number. Valid operators:
             
             - age > 4 
             - age < 4 
@@ -401,9 +396,11 @@ class DSI():
             - age == 4 
             - age != 4 
             - age (4, 8) --> inclusive range between 4 and 8
+            - age ~ 4    --> column age contains the number 4
+            - age ~~ 4   --> column age contains the number 4
 
         `collection` : bool, optional, default False. 
-            If True, returns a pandas DataFrame representing a subset of table rows that match or satisfy `query`.
+            If True, returns a pandas DataFrame representing a subset of table rows that satisfy the `query`.
 
             - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
               Drop them if not using ``update()``.
@@ -420,7 +417,7 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
         
         new_find = False
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if isinstance(query, str) and any(op in query for op in operators):
             result = self.t.manual_string_parsing(query)
             if len(result) > 1: # can split into column and operator
@@ -451,7 +448,7 @@ class DSI():
                     print("\n"+warn_msg.replace("database", "backend"))
                     return
         
-        if new_find == False:
+        if new_find == False: ## TO BE DEPRECEATED SOON. USE dsi.search() TO FIND ALL VALUES THAT MATCH INPUT
             val = f"'{query}'" if isinstance(query, str) else query
             print(f"Finding all instances of {val} in the active backend")
 
@@ -491,15 +488,79 @@ class DSI():
             first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
             print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
             return output_df
+    
+    def search(self, query, collection = False):
+        """
+        Finds all rows across all tables in the active backend where `query` can be found.
+
+        `query` : int, float, or str
+            The value to search for in all rows across all tables.
+
+        `collection` : bool, optional, default False. 
+            If True, returns a pandas DataFrame representing a subset of the first table where `query` is found.
+
+            - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
+              Drop them if not using ``update()``.
+
+            If False (default), prints the matching rows to the console.
+
+        `return` : If there are no matches found, then nothing is returned or printed
+        """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
+        if self.schema_read == True:
+            sys.exit("ERROR: Cannot search() until all associated data is loaded after a complex schema")
+        query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
+        query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
+
+        val = f"'{query}'" if isinstance(query, str) else query
+        print(f"Finding all instances of {val} in the active backend")
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                find_data = self.t.find_cell(query, row=True)
+        except Exception as e:
+            sys.exit(f"find() ERROR: {e}")
+        
+        if find_data is None:
+            print(f"WARNING: {val} was not found in this backend\n")
+            return
+        if collection == False:
+            print()
+            for val in find_data:
+                print(f"Table: {val.t_name}")
+                print(f"  - Columns: {val.c_name}")
+                print(f"  - Row Number: {val.row_num}")
+                print(f"  - Data: {val.value}")
+            print()
+        else:
+            table_name = None
+            output_df = None
+            row_list = []
+            for val in find_data:
+                if table_name is None:
+                    table_name = val.t_name
+                    output_df = pd.DataFrame([val.value], columns=val.c_name)
+                    row_list.append(val.row_num)
+                elif table_name == val.t_name and val.row_num not in row_list:
+                    output_df.loc[len(output_df)] = val.value
+                    row_list.append(val.row_num)
+
+            output_df.insert(0, "dsi_row_index", row_list)
+            output_df.insert(0, "dsi_table_name", table_name)
+            first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+            print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
+            return output_df
 
     def update(self, collection, backup = False):
         """
         Updates data in one or more tables in the active backend using the provided input. 
-        Intended to be used after modifying the output of `find()`, `query()`, or `get_table()`
+        Intended to be used after modifying the output of `find()`, `search()`, `query()`, or `get_table()`
 
         `collection` : pandas.DataFrame
             The data used to update a table. 
-            DataFrame must include unchanged **`dsi_`** columns from `find()`, `query()` or `get_table()` to successfully update.
+            DataFrame must include unchanged **`dsi_`** columns from `find()`, `search()`, `query()` or `get_table()` to successfully update.
 
             - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
@@ -518,7 +579,7 @@ class DSI():
         print("Updating the active backend with the input collection of data")
 
         if not isinstance(collection, pd.DataFrame):
-            sys.exit("ERROR: update() expects a single DataFrame from find(), query(), or get_table()")
+            sys.exit("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
             sys.exit("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
         elif 'dsi_table_name' not in collection.columns:

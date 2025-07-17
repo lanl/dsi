@@ -720,7 +720,7 @@ class Sqlite(Filesystem):
             The name of the column to apply the relation to.
         
         `relation` : str
-            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5)
+            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5), ~4, ~~4
 
         `return` : list of ValueObjects
             One ValueObject per matching row in that first table.
@@ -751,18 +751,25 @@ class Sqlite(Filesystem):
                 return f"{column_name} is not a column in this database. Ensure the column is written first."
             return f"'{column_name}' is not a column in this database. Ensure the column is written first."
         old_relation = relation
+        old_col_name = column_name
         if relation[0] == '(' and relation[-1] == ')':
             values = relation[1:-1].strip()
             values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
             values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
             relation = f"BETWEEN {values[0]} AND {values[1]}"
+        elif relation[0] == "~":
+            column_name = f"CAST({column_name} AS TEXT)"
+            if relation[:2] == '~~':
+                relation = f"LIKE '%' || {relation[3:]} || '%'"
+            else:
+                relation = f"LIKE '%' || {relation[2:]} || '%'"
 
         row_id_select = f"(SELECT COUNT(*) FROM {all_tables[0]} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num"
         query = f"SELECT {row_id_select}, * FROM {all_tables[0]} as t1 WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()
         
         if not output_data and len(all_tables) == 1:
-            val = f'"{column_name} {old_relation}"' if "'" in old_relation else f"'{column_name} {old_relation}'"
+            val = f'"{old_col_name} {old_relation}"' if "'" in old_relation else f"'{old_col_name} {old_relation}'"
             return f"Could not find any rows where {val} in this database."
         if len(all_tables) > 1:
             query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]

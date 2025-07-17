@@ -144,7 +144,7 @@ def test_find_sqlite_backend():
 
     f = io.StringIO()
     with redirect_stdout(f):
-        test.find(query=2)
+        test.search(query=2)
     output = f.getvalue()
 
     expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
@@ -172,7 +172,7 @@ def test_find_sqlite_backend():
     """)
     assert output == expected_output
 
-    find_df = test.find(query=2, collection=True)
+    find_df = test.search(query=2, collection=True)
     assert find_df.columns.tolist()[0] == "dsi_table_name"
     assert find_df["dsi_table_name"][0] == "math"
     assert find_df["dsi_row_index"].tolist() == [1,2]
@@ -185,7 +185,7 @@ def test_find_update_sqlite_backend():
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    find_df = test.find(query=2, collection=True)   # return output
+    find_df = test.search(query=2, collection=True)   # return output
 
     find_df['i'] = list(range(2000, 2000 + len(find_df)))
     find_df['b'] = list(range(2000, 2000 + len(find_df)))
@@ -722,7 +722,7 @@ def test_find_update_schema_sqlite_backend():
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
-    find_df = test.find(query=2, collection=True)   # return output
+    find_df = test.search(query=2, collection=True)   # return output
 
     find_df['i'] = list(range(2000, 2000 + len(find_df)))
     find_df['specification'] = list(range(2000, 2000 + len(find_df)))
@@ -861,7 +861,7 @@ def test_find_duckdb_backend():
 
     f = io.StringIO()
     with redirect_stdout(f):
-        test.find(query=2)
+        test.search(query=2)
     output = f.getvalue()
 
     expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
@@ -889,7 +889,7 @@ def test_find_duckdb_backend():
     """)
     assert output == expected_output
 
-    find_df = test.find(query=2, collection=True)
+    find_df = test.search(query=2, collection=True)
     assert find_df.columns.tolist()[0] == "dsi_table_name"
     assert find_df["dsi_table_name"][0] == "address"
     assert find_df["dsi_row_index"].tolist() == [1]
@@ -1362,7 +1362,7 @@ def test_find_update_duckdb_backend():
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    find_df = test.find(query=2, collection=True)   # return output
+    find_df = test.search(query=2, collection=True)   # return output
 
     find_df['i'] = list(range(2000, 2000 + len(find_df)))
     find_df['b'] = list(range(2000, 2000 + len(find_df)))
@@ -1416,7 +1416,7 @@ def test_find_update_schema_duckdb_backend():
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
-    find_df = test.find(query=2, collection=True)   # return output
+    find_df = test.search(query=2, collection=True)   # return output
 
     find_df['i'] = list(range(2000, 2000 + len(find_df)))
     find_df['b'] = list(range(2000, 2000 + len(find_df)))
