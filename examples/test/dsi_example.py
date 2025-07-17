@@ -48,6 +48,7 @@ test.query("SELECT * from math;")                               # print output
 # test.update(query_df)
 # test.display("math")
 
+# test.search(2)
 test.find(query="a<2")                                         # print output
 # find_df = test.find(query="a < 2", collection=True)   # return output
 # test.display(table_name=find_df["dsi_table_name"][0])
