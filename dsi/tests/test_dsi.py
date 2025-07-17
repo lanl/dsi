@@ -519,21 +519,21 @@ def test_find_relation_error_sqlite_backend():
         test.find(query="a > '<4')", collection=True)
         assert False
     except SystemExit as output:
-        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
-        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a > <4)", collection=True)
         assert False
     except SystemExit as output:
-        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
-        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a (1,2))", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+        assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="a (')')", collection=True)
@@ -609,13 +609,13 @@ def test_find_relation_error_sqlite_backend():
         test.find(query="g ('there is', 'a place'))", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+        assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (3,4))", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+        assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (,4)", collection=True)
@@ -1217,21 +1217,21 @@ def test_find_relation_error_duckdb_backend():
         test.find(query="a > '<4')", collection=True)
         assert False
     except SystemExit as output:
-        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
-        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a > <4)", collection=True)
         assert False
     except SystemExit as output:
-        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]."
-        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap in single quotes."
+        first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
+        assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a (1,2))", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+        assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="a (')')", collection=True)
@@ -1307,13 +1307,13 @@ def test_find_relation_error_duckdb_backend():
         test.find(query="g ('there is', 'a place'))", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+        assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (3,4))", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]"
+        assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (,4)", collection=True)
