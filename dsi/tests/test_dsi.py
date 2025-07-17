@@ -1220,12 +1220,12 @@ def test_find_range_duckdb_backend():
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
-def test_find_partial_sqlite_backend():
+def test_find_partial_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
-    test = DSI(filename=dbpath, backend_name= "Sqlite")
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
 
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
