@@ -667,10 +667,10 @@ class DuckDB(Filesystem):
             relation = f"BETWEEN {values[0]} AND {values[1]}"
         elif relation[0] == "~":
             column_name = f"CAST({column_name} AS TEXT)"
-            if relation[:2] == '~~':
-                relation = f"ILIKE '%' || {relation[3:]} || '%'"
-            else:
-                relation = f"ILIKE '%' || {relation[2:]} || '%'"
+            relation = relation[3:] if relation[:2] == '~~' else relation[2:]
+            if relation[0] == "'" and relation[-1] == "'":
+                relation = relation[1:-1]
+            relation = f"ILIKE '%{relation}%'"
         
         query = f"SELECT * FROM (SELECT ROW_NUMBER() OVER () AS row_num, * FROM {all_tables[0]}) WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()

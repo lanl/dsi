@@ -759,10 +759,10 @@ class Sqlite(Filesystem):
             relation = f"BETWEEN {values[0]} AND {values[1]}"
         elif relation[0] == "~":
             column_name = f"CAST({column_name} AS TEXT)"
-            if relation[:2] == '~~':
-                relation = f"LIKE '%' || {relation[3:]} || '%'"
-            else:
-                relation = f"LIKE '%' || {relation[2:]} || '%'"
+            relation = relation[3:] if relation[:2] == '~~' else relation[2:]
+            if relation[0] == "'" and relation[-1] == "'":
+                relation = relation[1:-1]
+            relation = f"LIKE '%{relation}%'"
 
         row_id_select = f"(SELECT COUNT(*) FROM {all_tables[0]} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num"
         query = f"SELECT {row_id_select}, * FROM {all_tables[0]} as t1 WHERE {column_name} {relation}"

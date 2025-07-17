@@ -562,15 +562,15 @@ class DSI():
             The data used to update a table. 
             DataFrame must include unchanged **`dsi_`** columns from `find()`, `search()`, `query()` or `get_table()` to successfully update.
 
-            - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
+            - If a `query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
         `backup` : bool, optional, default False. 
             If True, creates a backup file for the DSI backend before updating its data.
 
             If False (default), only updates the data.
 
-        - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
-        - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
+        - NOTE: Columns from the original table cannot be deleted during update. Only row edits or column additions are allowed.
+        - NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
