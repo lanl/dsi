@@ -150,12 +150,12 @@ class DSI():
                 - "Oceans11Datacard"     → .yaml or .yml
 
         `reader_name` : str
-            Name of the DSI reader to use for loading the data. 
+            Name of the DSI Reader to use for loading the data. 
 
-            If using a DSI-supported reader, this should be one of the reader_names from `list_readers()`.
+            If using a DSI-supported Reader, this should be one of the reader_names from `list_readers()`.
 
-            If using a custom reader, provide the relative file path to the Python script with the reader.  
-            For guidance on creating a DSI-compatible reader, view :ref:`custom_reader`.
+            If using a custom Reader, provide the relative file path to the Python script with the Reader.  
+            For guidance on creating a DSI-compatible Reader, view :ref:`custom_reader`.
 
         `table_name` : str, optional
             Name to assign to the loaded table. 
@@ -168,7 +168,7 @@ class DSI():
         
         if reader_name.endswith(".py"):
             if not os.path.exists(reader_name):
-                sys.exit("read() ERROR: `reader_name` must be a valid filepath to the custom reader. Please check again.")
+                sys.exit("read() ERROR: `reader_name` must be a valid filepath to the custom Reader. Please check again.")
 
             import ast
             parsed_data = None
@@ -176,7 +176,7 @@ class DSI():
                 with open(reader_name, "r", encoding="utf-8") as external_reader:
                     parsed_data = ast.parse(external_reader.read(), filename=reader_name)
             except Exception as e:
-                sys.exit(f"read() Error: Could not read the Python file with the custom reader.")
+                sys.exit(f"read() Error: Could not read the Python file with the custom Reader.")
 
             class_name = None
             init_params = []
@@ -194,7 +194,7 @@ class DSI():
 
             if class_name == None:
                 sys.exit(f"read() Error: The custom Reader must be structured as a Class in the Python script.")
-            elif init_params == []:
+            if init_params == []:
                 print("read() Error: The custom Reader must be DSI-compatible.")
                 sys.exit("Please review https://lanl.github.io/dsi/dev_readers.html to ensure it is compatible.")
             
@@ -382,16 +382,11 @@ class DSI():
         
     def find(self, query, collection = False):
         """
-        Finds all rows across all tables in the active backend where `query` can be found.
+        Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
 
-        If `query` is a string containing a column-level condition (e.g., "age > 4"), this method instead finds all rows 
-        in the first table where the condition is satisfied.
-
-        `query` : int, float, or str
-            The value to search for in all rows across all tables.
-
-            If `query` is a string with a condition, it must be in the format of a column name, operator, then value.
-            Valid operators on numbers or strings:
+        `query` : str
+            A column-level condition that must be in the format of a [column name] [operator] [value]. 
+            The value can be a string or number. Valid operators:
             
             - age > 4 
             - age < 4 
@@ -401,9 +396,11 @@ class DSI():
             - age == 4 
             - age != 4 
             - age (4, 8) --> inclusive range between 4 and 8
+            - age ~ 4    --> column age contains the number 4
+            - age ~~ 4   --> column age contains the number 4
 
         `collection` : bool, optional, default False. 
-            If True, returns a pandas DataFrame representing a subset of table rows that match or satisfy `query`.
+            If True, returns a pandas DataFrame representing a subset of table rows that satisfy the `query`.
 
             - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
               Drop them if not using ``update()``.
@@ -420,7 +417,7 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
         
         new_find = False
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if isinstance(query, str) and any(op in query for op in operators):
             result = self.t.manual_string_parsing(query)
             if len(result) > 1: # can split into column and operator
@@ -451,7 +448,7 @@ class DSI():
                     print("\n"+warn_msg.replace("database", "backend"))
                     return
         
-        if new_find == False:
+        if new_find == False: ## TO BE DEPRECEATED SOON. USE dsi.search() TO FIND ALL VALUES THAT MATCH INPUT
             val = f"'{query}'" if isinstance(query, str) else query
             print(f"Finding all instances of {val} in the active backend")
 
@@ -491,25 +488,89 @@ class DSI():
             first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
             print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
             return output_df
+    
+    def search(self, query, collection = False):
+        """
+        Finds all rows across all tables in the active backend where `query` can be found.
+
+        `query` : int, float, or str
+            The value to search for in all rows across all tables.
+
+        `collection` : bool, optional, default False. 
+            If True, returns a pandas DataFrame representing a subset of the first table where `query` is found.
+
+            - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
+              Drop them if not using ``update()``.
+
+            If False (default), prints the matching rows to the console.
+
+        `return` : If there are no matches found, then nothing is returned or printed
+        """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            sys.exit("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
+        if self.schema_read == True:
+            sys.exit("ERROR: Cannot search() until all associated data is loaded after a complex schema")
+        query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
+        query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
+
+        val = f"'{query}'" if isinstance(query, str) else query
+        print(f"Finding all instances of {val} in the active backend")
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                find_data = self.t.find_cell(query, row=True)
+        except Exception as e:
+            sys.exit(f"find() ERROR: {e}")
+        
+        if find_data is None:
+            print(f"WARNING: {val} was not found in this backend\n")
+            return
+        if collection == False:
+            print()
+            for val in find_data:
+                print(f"Table: {val.t_name}")
+                print(f"  - Columns: {val.c_name}")
+                print(f"  - Row Number: {val.row_num}")
+                print(f"  - Data: {val.value}")
+            print()
+        else:
+            table_name = None
+            output_df = None
+            row_list = []
+            for val in find_data:
+                if table_name is None:
+                    table_name = val.t_name
+                    output_df = pd.DataFrame([val.value], columns=val.c_name)
+                    row_list.append(val.row_num)
+                elif table_name == val.t_name and val.row_num not in row_list:
+                    output_df.loc[len(output_df)] = val.value
+                    row_list.append(val.row_num)
+
+            output_df.insert(0, "dsi_row_index", row_list)
+            output_df.insert(0, "dsi_table_name", table_name)
+            first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+            print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
+            return output_df
 
     def update(self, collection, backup = False):
         """
         Updates data in one or more tables in the active backend using the provided input. 
-        Intended to be used after modifying the output of `find()`, `query()`, or `get_table()`
+        Intended to be used after modifying the output of `find()`, `search()`, `query()`, or `get_table()`
 
         `collection` : pandas.DataFrame
             The data used to update a table. 
-            DataFrame must include unchanged **`dsi_`** columns from `find()`, `query()` or `get_table()` to successfully update.
+            DataFrame must include unchanged **`dsi_`** columns from `find()`, `search()`, `query()` or `get_table()` to successfully update.
 
-            - If a 'query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
+            - If a `query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
 
         `backup` : bool, optional, default False. 
             If True, creates a backup file for the DSI backend before updating its data.
 
             If False (default), only updates the data.
 
-        - NOTE: Columns from the original table cannot be deleted during update. Only edits or column additions are allowed.
-        - NOTE: If a updates affect a user-defined primary key column, row order may change upon reinsertion.
+        - NOTE: Columns from the original table cannot be deleted during update. Only row edits or column additions are allowed.
+        - NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
@@ -518,7 +579,7 @@ class DSI():
         print("Updating the active backend with the input collection of data")
 
         if not isinstance(collection, pd.DataFrame):
-            sys.exit("ERROR: update() expects a single DataFrame from find(), query(), or get_table()")
+            sys.exit("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
             sys.exit("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
         elif 'dsi_table_name' not in collection.columns:
@@ -610,7 +671,7 @@ class DSI():
         print("\nValid Writers for `writer_name` in write():", self.t.VALID_WRITERS, "\n")
         print("ER_Diagram  : Creates a visual ER diagram image based on all tables in DSI.")
         print("Table_Plot  : Generates a plot of numerical data from a specified table.")
-        print("Csv_Writer  : Exports the data of a specified table to a CSV file.")
+        print("Csv         : Exports the data of a specified table to a CSV file.")
         print()
 
     def write(self, filename, writer_name, table_name = None):
@@ -623,13 +684,18 @@ class DSI():
             Expected file extensions based on `writer_name`:
                 - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
                 - "Table_Plot"   → .png, .jpg, .jpeg
-                - "Csv_Writer"   → .csv
+                - "Csv"          → .csv
 
-        `writer_name` : str
-            Name of the DSI writer to use. Call `list_writers()` to view all available writers.
+        `writer_name` : str        
+            Name of the DSI Writer to export data. 
+            
+            If using a DSI-supported Writer, this should be one of the writer_names from `list_writers()`.
+
+            If using a custom Writer, provide the relative file path to the Python script with the Writer.  
+            For guidance on creating a DSI-compatible Writer, view :ref:`custom_writer`.
 
         `table_name`: str, optional
-            Required when using "Table_Plot" or "Csv_Writer" to specify which table to export.
+            Required when using "Table_Plot" or "Csv" to specify which table to export.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
@@ -640,27 +706,74 @@ class DSI():
             self.t.artifact_handler(interaction_type='process')
         except Exception as e:
             sys.exit(f"write() ERROR: {e}")
+
+        if writer_name.endswith(".py"):
+            if not os.path.exists(writer_name):
+                sys.exit("write() ERROR: `writer_name` must be a valid filepath to the custom Writer. Please check again.")
+
+            import ast
+            parsed_data = None
+            try:
+                with open(writer_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=writer_name)
+            except Exception as e:
+                sys.exit(f"write() Error: Could not read the Python file with the custom Writer.")
+
+            class_name = None
+            init_params = []
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    if "__init__" in functions and "get_rows" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name == None:
+                sys.exit(f"write() Error: The custom Writer must be structured as a Class in the Python script.")
+            if init_params == []:
+                print("write() Error: The custom Writer must be DSI-compatible.")
+                sys.exit("Please review https://lanl.github.io/dsi/dev_writers.html to ensure it is compatible.")
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = filename
+                if "table" in param.lower():
+                    updated[param] = table_name
+            
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
+                    self.t.load_module('plugin', class_name, 'writer', **updated)
+            except Exception as e:
+                sys.exit(f"write() ERROR: {e}")
+        else:
+            correct_writer = True
+            fnull = open(os.devnull, 'w')
+            try:
+                with redirect_stdout(fnull):
+                    if writer_name.lower() in ["er_diagram", "er diagram"]:
+                        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
+                    elif writer_name.lower() in ["table_plot", "table plot"]:
+                        self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name)
+                    elif writer_name.lower() in ["csv", "csv writer", "csv_writer"]:
+                        self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name)
+                    else:
+                        correct_writer = False
+            except Exception as e:
+                sys.exit(f"write() ERROR: {e}")
+            
+            if correct_writer == False:
+                print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
+                print(f"Eligible writers are: {self.list_writers()}")
+                return
         
-        correct_writer = True
-        fnull = open(os.devnull, 'w')
-        try:
-            with redirect_stdout(fnull):
-                if writer_name == "ER_Diagram":
-                    self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
-                elif writer_name == "Table_Plot":
-                    self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name)
-                elif writer_name == "Csv_Writer":
-                    self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name)
-                    writer_name = "Csv"
-                else:
-                    correct_writer = False
-        except Exception as e:
-            sys.exit(f"write() ERROR: {e}")
-        
-        if correct_writer == False:
-            print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
-            print(f"Eligible writers are: {self.list_writers()}")
-            return
         try:
             self.t.transload()
         except Exception as e:

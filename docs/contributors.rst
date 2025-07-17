@@ -4,11 +4,11 @@ Contributor Resources
 .. toctree::
    :maxdepth: 1
 
-   intro-dev
-   readers_writers
-   dev_readers
-   dev_writers
+   cr_intro
+   plugins
+   custom_reader
+   custom_writer
    backends
    core
-   tiers
-   examples_dev
+   development
+   cr_examples

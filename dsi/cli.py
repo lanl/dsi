@@ -253,17 +253,9 @@ class DSI_cli:
         query = args[0]
 
         new_find = False
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', '~', '~~']
         if isinstance(query, str) and any(op in query for op in operators):
-            pattern = r'(==|!=|>=|<=|=|<|>|\()'
-            parts = re.split(r'(".*?")', query)
-
-            result = []
-            for part in parts:
-                if part.startswith('"') and part.endswith('"'):
-                    result.append(part)
-                else:
-                    result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
+            result = self.t.manual_string_parsing(query)
             if len(result) > 1: # can split into column and operator
                 new_find = True
                 print(f"Finding all rows where '{query}' in the active backend")
@@ -283,9 +275,12 @@ class DSI_cli:
                         lines = warn_msg.splitlines()
                         start = lines[1].find('`')
                         between = lines[1][start + 1 : lines[1].find('`', start + 1)]
-                        lines[1] = lines[1].replace(between, "query")
-                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query")
+                        lines[1] = lines[1].replace(between, "dsi.query()")
+                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
                         warn_msg = '\n'.join(lines)
+                    elif "Could not find" in warn_msg:
+                        ending_ind = warn_msg.find("in this database")
+                        warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
                     print("\n"+warn_msg.replace("database", "backend"))
                     return
 

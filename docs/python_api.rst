@@ -125,3 +125,16 @@ Example 8: Write data
 Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.
 
 .. literalinclude:: ../examples/user/8.write.py
+
+.. _user_external_reader:
+
+Example 9: Load an external Reader
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Loading an external DSI-compatible Reader and its associated data into DSI to interact with and/or visualize the data.
+For more information on creating an external Reader/Writer, view :ref:`custom_reader` and :ref:`custom_writer`.
+
+.. literalinclude:: ../examples/user/9.external_reader.py
+
+``text_file_reader``:
+
+.. literalinclude:: ../examples/test/text_file_reader.py

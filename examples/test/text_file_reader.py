@@ -28,6 +28,6 @@ class TextFile(FileReader):
             temp_df = read_csv(filename)
             total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
 
-        self.text_file_data["text_file"] = OrderedDict(total_df.to_dict(orient='list'))
+        self.text_file_data["people"] = OrderedDict(total_df.to_dict(orient='list'))
 
         self.set_schema_2(self.text_file_data)

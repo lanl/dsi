@@ -60,7 +60,7 @@ DSI Functionalities
 
    * - Move
      - Core: Sync.Move
-     - Move data between file store types
+     - Move data between file stores
      - 1.1
 
    * - Versioning
