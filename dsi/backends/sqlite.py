@@ -10,18 +10,14 @@ from dsi.backends.filesystem import Filesystem
 
 # Holds table name and data properties
 class DataType:
+    """
+        Primary DataType Artifact class that stores database schema in memory.
+        A DataType is a generic construct that defines the schema for the tables inside of SQL. 
+        Used to execute CREATE TABLE statements.
+    """
     name = ""
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
-
-class Artifact:
-    # """
-    #     Primary Artifact class that holds database schema in memory.
-    #     An Artifact is a generic construct that defines the schema for metadata that
-    #     defines the tables inside of SQL
-    # """
-    name = ""
-    properties = {}
 
 class ValueObject:
     """
@@ -1002,22 +998,3 @@ class Sqlite(Filesystem):
         Closes the SQLite database's connection.
         """
         self.con.close()
-
-    # OLD FUNCTION TO DEPRECATE
-    def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
-        """
-        DSI 1.0 FUNCTIONALITY - DEPRECATING SOON, DO NOT USE
-        
-        Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
-
-        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
-        filled with rows to insert.
-
-        `tableName`: A passthrough to define a table and set the name of a table
-
-        `return`: none
-        """
-        # Define table name in local class space
-        self.types = DataType()
-        self.types.name = tableName
-        self.put_artifacts(collection, isVerbose)

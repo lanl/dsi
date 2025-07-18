@@ -8,6 +8,11 @@ from dsi.backends.filesystem import Filesystem
 
 # Holds table name and data properties
 class DataType:
+    """
+        Primary DataType Artifact class that stores database schema in memory.
+        A DataType is a generic construct that defines the schema for the tables inside of SQL. 
+        Used to execute CREATE TABLE statements.
+    """
     name = ""
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
