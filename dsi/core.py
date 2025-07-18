@@ -13,10 +13,6 @@ import csv
 import re
 import tarfile
 
-from dsi.backends.filesystem import Filesystem
-from dsi.backends.sqlite import Sqlite, DataType, Artifact
-from dsi.backends.hpss import HPSS
-
 class Terminal():
     """
     An instantiated Terminal is the DSI human/machine interface.
@@ -28,9 +24,9 @@ class Terminal():
     BACKEND_PREFIX = ['dsi.backends']
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb', 'hpss']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
@@ -814,7 +810,7 @@ class Terminal():
 
         if not isinstance(query_object, str):
             raise TypeError("`query_object` must be a string")
-        print(f"Finding all rows in the first table of the first loaded backend where {query_object}")
+        print(f"Finding all rows in the first loaded backend where {query_object}")
         query_object = query_object.replace("\\'", "'") if "\\'" in query_object else query_object
         query_object = query_object.replace('\\"', '"') if '\\"' in query_object else query_object
 
