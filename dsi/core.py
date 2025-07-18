@@ -1517,7 +1517,6 @@ class Sync():
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = self.local_location+"/"+self.project_name+".db"
             assert os.path.exists(f)
-
             if isVerbose:
                 print("db: ", f)
             t.load_module('backend','Sqlite','back-read', filename=f)
@@ -1718,14 +1717,15 @@ class HPSSSync():
         # Try to open existing local database to store filesystem info before copy
         # Open and validate local DSI data store
         t = Terminal()
+
+        f = self.project_name+".db"
         try:
-            f = self.project_name+".db"
+            assert os.path.exists(f)
             if isVerbose:
                 print("db: ", f)
-            if os.path.exists(f):
-                t.load_module('backend','Sqlite','back-write', filename=f)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+            t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception:
+            print(f"Databaase {f} not found")
             raise
 
         # See if filesystem exists

@@ -161,8 +161,10 @@ class DSI():
 
         `table_name` : str, optional
             Name to assign to the loaded table.
-            Only used when the input file contains a single table for the `CSV`, `JSON`, or `Ensemble` reader.
+
             Required when using the `Collection` reader to load an Ordered Dictionary representing only one table.
+            
+            Recommended when the input file contains a single table for the `CSV`, `JSON`, or `Ensemble` reader.
         """
         if isinstance(filenames, str) and not os.path.exists(filenames):
             sys.exit("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -510,7 +512,7 @@ class DSI():
             with redirect_stdout(fnull):
                 find_data = self.t.find_cell(query, row=True)
         except Exception as e:
-            sys.exit(f"find() ERROR: {e}")
+            sys.exit(f"search() ERROR: {e}")
         
         if find_data is None:
             print(f"WARNING: {val} was not found in this backend\n")
