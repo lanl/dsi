@@ -21,7 +21,8 @@ display <table_name> [-n num_rows] [-e filename] Displays a table's data. Option
 draw [-f filename]                               Draws an ER diagram of all tables in the
                                                   current DSI database
 exit                                             Exits the DSI Command Line Interface (CLI)
-find <variable>                                  Searches for a variable in DSI
+find <condition>                                 Finds all rows of a table that match a
+                                                  column-level condition.
 help                                             Shows this help message.
 list                                             Lists all tables in the current DSI database
 plot_table <table_name> [-f filename]            Plots numerical data from a table to an
@@ -30,6 +31,7 @@ query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes
                                                   limit printed rows or export to CSV/Parquet
 read <filename> [-t table_name]                  Reads a file or URL into the DSI database.
                                                   Optionally set table name.
+search <value>                                   Searches for a string or number across DSI.
 summary [-t table_name]                          Summary of the database or a specific table.
 write <filename>                                 Writes data in DSI database to a permanent
                                                   location.

@@ -133,7 +133,7 @@ def test_get_table_sqlite_backend():
     get_data = test.get_table(table_name="physics", collection=True)
     assert query_data.equals(get_data)
 
-def test_find_sqlite_backend():
+def test_search_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -177,7 +177,7 @@ def test_find_sqlite_backend():
     assert find_df["dsi_table_name"][0] == "math"
     assert find_df["dsi_row_index"].tolist() == [1,2]
 
-def test_find_update_sqlite_backend():
+def test_search_update_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -535,6 +535,18 @@ def test_find_relation_error_sqlite_backend():
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
+        test.find(query=2, collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input 'query' must be a string."
+    
+    try:
+        test.find(query="a", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+
+    try:
         test.find(query='"a" > "14"', collection=True)
         assert False
     except SystemExit as output:
@@ -550,23 +562,19 @@ def test_find_relation_error_sqlite_backend():
         test.find(query="'a' 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == 'find() ERROR: near "a": syntax error'
+        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
     
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query="a 1", collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a 1' in the active backend\n"
-    expected_output2 = "WARNING: 'a 1' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
 
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query='a ">1"', collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a \">1\"' in the active backend\n"
-    expected_output2 = "WARNING: 'a \">1\"' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True)
@@ -796,7 +804,7 @@ def test_query_update_schema_sqlite_backend():
     assert data['i'].tolist() == [123,234]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
-def test_find_update_schema_sqlite_backend():
+def test_search_update_schema_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -933,7 +941,7 @@ def test_get_table_duckdb_backend():
     get_data = test.get_table(table_name="physics", collection=True)
     assert query_data.equals(get_data)
 
-def test_find_duckdb_backend():
+def test_search_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -1316,6 +1324,18 @@ def test_find_relation_error_duckdb_backend():
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
+        test.find(query=2, collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input 'query' must be a string."
+    
+    try:
+        test.find(query="a", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+
+    try:
         test.find(query='"a" > "14"', collection=True)
         assert False
     except SystemExit as output:
@@ -1331,23 +1351,19 @@ def test_find_relation_error_duckdb_backend():
         test.find(query="'a' 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == 'find() ERROR: Parser Error: syntax error at or near "a"'
+        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
     
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query="a 1", collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a 1' in the active backend\n"
-    expected_output2 = "WARNING: 'a 1' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
 
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query='a ">1"', collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a \">1\"' in the active backend\n"
-    expected_output2 = "WARNING: 'a \">1\"' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True)
@@ -1520,7 +1536,7 @@ def test_find_relation_error_duckdb_backend():
          - SELECT * FROM physics WHERE specification = '!jack'\n""")
     assert output == expected_output
 
-def test_find_update_duckdb_backend():
+def test_search_update_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -1573,7 +1589,7 @@ def test_query_update_schema_duckdb_backend():
     assert data['specification'].tolist() == [123,234]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
-def test_find_update_schema_duckdb_backend():
+def test_search_update_schema_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
