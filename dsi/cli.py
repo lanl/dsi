@@ -313,8 +313,8 @@ class DSI_cli:
                 lines = warn_msg.splitlines()
                 start = lines[1].find('`')
                 between = lines[1][start + 1 : lines[1].find('`', start + 1)]
-                lines[1] = lines[1].replace(between, "dsi.query()")
-                lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
+                lines[1] = lines[1].replace(between, "query")
+                lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "`query`")
                 warn_msg = '\n'.join(lines)
             elif "Could not find" in warn_msg:
                 ending_ind = warn_msg.find("in this database")

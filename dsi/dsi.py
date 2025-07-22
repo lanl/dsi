@@ -48,11 +48,11 @@ class DSI():
         if filename == ".temp.db" and os.path.exists(filename):
             os.remove(filename)
 
-        if filename != ".temp.db" and backend_name == "Sqlite":
+        if filename != ".temp.db" and backend_name.lower() == "sqlite":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                 filename += ".db"
-        elif filename != ".temp.db" and backend_name == "DuckDB":
+        elif filename != ".temp.db" and backend_name.lower() == "duckdb":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "duckdb"]:
                 filename += ".db"
@@ -247,6 +247,10 @@ class DSI():
                         self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames)
                     elif reader_name.lower() == "collection":
                         self.t.load_module('plugin', 'Dict', 'reader', collection=filenames, table_name=table_name)
+                        if isinstance(filenames, OrderedDict):
+                            filenames = "the Ordered Dict"
+                        else:
+                            filenames = "the dictionary"
                     else:
                         correct_reader = False
             except Exception as e:

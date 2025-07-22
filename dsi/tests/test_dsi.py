@@ -4,7 +4,7 @@ import io
 from contextlib import redirect_stdout
 import textwrap
 from pandas import DataFrame
-
+from collections import OrderedDict
 
 def test_list_functions():
     test = DSI()
@@ -177,6 +177,106 @@ def test_search_sqlite_backend():
     assert find_df["dsi_table_name"][0] == "math"
     assert find_df["dsi_row_index"].tolist() == [1,2]
 
+def test_sanitize_inputs_sqlite():
+    my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
+                    'all': OrderedDict({'specification': ['!sam'], 'fileLoc': ['/home/sam/lib/data'], 'G': ['good memories'], 
+                                        'all': [9.8], 'i': [2], 'j': [3], 'k': [4], 'l': [1.0], 'm': [99]}), 
+                    'physics': OrderedDict({'specification': ['!amy', '!amy1'], 'n': [9.8, 91.8], 'o': ['gravity', 'gravity'], 
+                                            'p': [23, 233], 'q': ['home 23', 'home 23'], 'r': [1, 12], 's': [-0.0012, -0.0122]}), 
+                    'math': OrderedDict({'specification': [None, '!jack1'], 'a': [None, 2], '"math"': [None, 3], 'c': [None, 45.98], 
+                                         'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}), 
+                    'address': OrderedDict({'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
+                                            'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
+    
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+    test.read(my_dict, "collection")
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find('all > 9')
+    output = f.getvalue()
+
+    expected_output = 'Finding all rows where \'all > 9\' in the active backend' + textwrap.dedent("""
+    
+    Table: "all"
+      - Columns: ['specification', 'fileLoc', 'G', 'all', 'i', 'j', 'k', 'l', 'm']
+      - Row Number: 1
+      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.8, 2, 3, 4, 1.0, 99]
+                                                         
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('all > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"all" > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"math" < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['math']
+    assert find_df['math'].tolist() == [3]
+
+    find_df['math'] = 4
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('math')
+    output = f.getvalue()
+
+    expected_output = '\nTable: math' + textwrap.dedent("""
+
+    specification | a   | math | c     | d   | e    | f     
+    --------------------------------------------------------
+    None          | nan | nan  | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('b < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"2"']
+    assert find_df['b'].tolist() == [2]
+
+    find_df['b'] = 99
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('"2"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "2"' + textwrap.dedent("""
+
+    specification | a | b  | c     | d | e    | f     
+    --------------------------------------------------
+    !jack         | 1 | 99 | 45.98 | 2 | 34.8 | 0.0089
+    
+    """)
+    assert output == expected_output
+
 def test_search_update_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
@@ -213,7 +313,7 @@ def test_find_inequality_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a > 2' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a > 2\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a > 2  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -268,7 +368,7 @@ def test_find_inequality_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a>=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a>=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a>=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -305,7 +405,7 @@ def test_find_equality_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -435,7 +535,7 @@ def test_find_range_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a(3,4)' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a(3,4)\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a(3,4)  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -456,7 +556,7 @@ def test_find_partial_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'g~memorr' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g~memorr\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g~memorr  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -587,7 +687,7 @@ def test_find_relation_error_sqlite_backend():
         find_df = test.find(query="a > '<4'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'a > '<4'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a > '<4'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a > '<4'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -655,7 +755,7 @@ def test_find_relation_error_sqlite_backend():
         find_df = test.find(query="g == 'there '> \"temperature\" '?'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'g == 'there '> \"temperature\" '?'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g == 'there '> \"temperature\" '?'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g == 'there '> \"temperature\" '?'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -985,6 +1085,106 @@ def test_search_duckdb_backend():
     assert find_df["dsi_table_name"][0] == "address"
     assert find_df["dsi_row_index"].tolist() == [1]
 
+def test_sanitize_inputs_duckdb():
+    my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
+                    'all': OrderedDict({'specification': ['!sam'], 'fileLoc': ['/home/sam/lib/data'], 'G': ['good memories'], 
+                                        'all': [9.8], 'i': [2], 'j': [3], 'k': [4], 'l': [1.0], 'm': [99]}), 
+                    'physics': OrderedDict({'specification': ['!amy', '!amy1'], 'n': [9.8, 91.8], 'o': ['gravity', 'gravity'], 
+                                            'p': [23, 233], 'q': ['home 23', 'home 23'], 'r': [1, 12], 's': [-0.0012, -0.0122]}), 
+                    'math': OrderedDict({'specification': [None, '!jack1'], 'a': [None, 2], '"math"': [None, 3], 'c': [None, 45.98], 
+                                         'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}), 
+                    'address': OrderedDict({'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
+                                            'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
+    
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+    test.read(my_dict, "collection")
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find('all > 9')
+    output = f.getvalue()
+
+    expected_output = 'Finding all rows where \'all > 9\' in the active backend' + textwrap.dedent("""
+    
+    Table: "all"
+      - Columns: ['specification', 'fileLoc', 'G', 'all', 'i', 'j', 'k', 'l', 'm']
+      - Row Number: 1
+      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.8, 2, 3, 4, 1.0, 99]
+                                                         
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('all > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"all" > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"math" < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['math']
+    assert find_df['math'].tolist() == [3]
+
+    find_df['math'] = 4
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('math')
+    output = f.getvalue()
+
+    expected_output = '\nTable: math' + textwrap.dedent("""
+
+    specification | a   | math | c     | d   | e    | f     
+    --------------------------------------------------------
+    None          | nan | nan  | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('b < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"2"']
+    assert find_df['b'].tolist() == [2]
+
+    find_df['b'] = 99
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('"2"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "2"' + textwrap.dedent("""
+
+    specification | a | b  | c     | d | e    | f     
+    --------------------------------------------------
+    !jack         | 1 | 99 | 45.98 | 2 | 34.8 | 0.0089
+    
+    """)
+    assert output == expected_output
+
 def test_find_inequality_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
@@ -1002,7 +1202,7 @@ def test_find_inequality_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a > 2' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a > 2\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a > 2  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1057,7 +1257,7 @@ def test_find_inequality_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a>=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a>=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a>=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1094,7 +1294,7 @@ def test_find_equality_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1224,7 +1424,7 @@ def test_find_range_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a(3,4)' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a(3,4)\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a(3,4)  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1245,7 +1445,7 @@ def test_find_partial_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'g~memorr' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g~memorr\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g~memorr  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1376,7 +1576,7 @@ def test_find_relation_error_duckdb_backend():
         find_df = test.find(query="g < '<4'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'g < '<4'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g < '<4'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g < '<4'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1444,7 +1644,7 @@ def test_find_relation_error_duckdb_backend():
         find_df = test.find(query="g == 'there '> \"temperature\" '?'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'g == 'there '> \"temperature\" '?'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g == 'there '> \"temperature\" '?'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g == 'there '> \"temperature\" '?'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 

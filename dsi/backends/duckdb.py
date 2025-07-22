@@ -51,6 +51,10 @@ class DuckDB(Filesystem):
         self.con = duckdb.connect(filename)
         self.cur = self.con.cursor()
         self.runTable = DuckDB.runTable
+        
+        keywords_df = self.cur.execute("SELECT * FROM duckdb_keywords();").fetchdf()
+        filtered_df = keywords_df[keywords_df['keyword_category'] != 'unreserved']
+        self.duckdb_keywords = filtered_df["keyword_name"].tolist()
 
     def sql_type(self, input_list):
         """
@@ -73,10 +77,11 @@ class DuckDB(Filesystem):
                 return " VARCHAR"
         return " VARCHAR"
     
-    # OLD NAME OF ingest_table_helper. TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
-        self.ingest_table_helper(types, foreign_query, isVerbose)
-        
+    def duckdb_compatible_name(self, name):
+        if (name.startswith('"') and name.endswith('"')) or (name.lower() not in self.duckdb_keywords and name.isidentifier()):
+            return name
+        return f'"{name}"'
+    
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
         **Internal use only. Do not call**
@@ -102,10 +107,12 @@ class DuckDB(Filesystem):
                             """).fetchone():
             col_names = types.properties.keys()
             col_info = self.cur.execute(f"PRAGMA table_info({types.name});").fetchall()
-            query_cols = [column[1] for column in col_info]
+            query_cols = [self.duckdb_compatible_name(column[1]) for column in col_info]
             diff_cols = list(set(col_names) - set(query_cols))
             if len(diff_cols) > 0:
                 for col in diff_cols:
+                    if col.lower() in [c.lower() for c in query_cols]:
+                        return (ValueError, "Cannot have duplicate column names")
                     temp_name = col + self.sql_type(types.properties[col])
                     try:
                         self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
@@ -193,25 +200,31 @@ class DuckDB(Filesystem):
             types = DataType()
             types.properties = {}
             types.unit_keys = []
-            types.name = tableName
+
+            sql_table = tableName.replace(' ', '_').replace('-', '_')
+            types.name = self.duckdb_compatible_name(sql_table)
 
             foreign_query = ""
             for key in tableData:
+                sql_key = key.replace(' ', '_').replace('-', '_')
+                sql_key = self.duckdb_compatible_name(sql_key)
                 comboTuple = (tableName, key)
                 dsi_name = "dsi_relations"
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
                     foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
                     primaryTuple = artifacts[dsi_name]['primary_key'][foreignIndex]
-                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
+                    foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
                 
-                types.properties[key.replace('-','_minus_')] = tableData[key]
+                types.properties[sql_key] = tableData[key]
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(key + self.sql_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]) + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(key + self.sql_type(tableData[key]))
+                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]))
             
-            self.ingest_table_helper(types, foreign_query)
+            error = self.ingest_table_helper(types, foreign_query)
+            if error is not None:
+                return error
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -244,7 +257,7 @@ class DuckDB(Filesystem):
                 unit_result = self.cur.execute(f"""SELECT unit FROM dsi_units 
                                                 WHERE table_name = '{table_val}' AND column_name = '{col_val}';""").fetchone()
                 if unit_result and unit_result[0] != unit_val: #checks if unit for same table and col exists in db and if units match
-                    self.con.rollback()
+                    self.cur.execute("ROLLBACK")
                     return (TypeError, f"Cannot ingest different units for the column {col_val} in {table_val}")
                 elif not unit_result:
                     try:
@@ -300,7 +313,7 @@ class DuckDB(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                return (duckdb.Error, "Error in query_artifacts: Incorrect SELECT query on the data. Please try again")
+                return (duckdb.Error, "Error in query_artifacts: Incorrect query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
@@ -343,7 +356,7 @@ class DuckDB(Filesystem):
         `return`: list of str
             List of table names referenced in the query.
         """
-        all_names = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+        all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
         tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
         return tables
     
@@ -376,9 +389,10 @@ class DuckDB(Filesystem):
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
         for item in tableList:
-            tableName = item[0]
+            tableName = self.duckdb_compatible_name(item[0])
+
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchdf()
-            colDict = OrderedDict((col, []) for col in tableInfo['name'])
+            colDict = OrderedDict((self.duckdb_compatible_name(col), []) for col in tableInfo['name'])
 
             data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
             for row in data:
@@ -394,15 +408,17 @@ class DuckDB(Filesystem):
                                   SELECT table_name, constraint_column_names, referenced_table, referenced_column_names
                                   FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'""").fetchall()
         for row in fkData:
-            artifact["dsi_relations"]["primary_key"].append((row[2], row[3][0]))
-            artifact["dsi_relations"]["foreign_key"].append((row[0], row[1][0]))
-            pk_list.append((row[2], row[3][0])) 
+            curr_pk = (self.duckdb_compatible_name(row[2]), self.duckdb_compatible_name(row[3][0]))
+            artifact["dsi_relations"]["primary_key"].append(curr_pk)
+            artifact["dsi_relations"]["foreign_key"].append((self.duckdb_compatible_name(row[0]), self.duckdb_compatible_name(row[1][0])))
+            pk_list.append(curr_pk)
         
         pkData = self.cur.execute(f"""SELECT table_name, constraint_column_names FROM duckdb_constraints() 
                                   WHERE constraint_type = 'PRIMARY KEY'""").fetchall()
         for pk_table, pk_col in pkData:
-            if (pk_table, pk_col[0]) not in pk_list:
-                artifact["dsi_relations"]["primary_key"].append((pk_table, pk_col[0]))
+            curr_pk = (self.duckdb_compatible_name(pk_table), self.duckdb_compatible_name(pk_col[0]))
+            if curr_pk not in pk_list:
+                artifact["dsi_relations"]["primary_key"].append(curr_pk)
                 artifact["dsi_relations"]["foreign_key"].append((None, None))
 
         if len(artifact["dsi_relations"]["primary_key"]) == 0:
@@ -461,14 +477,14 @@ class DuckDB(Filesystem):
                                      SELECT table_name FROM information_schema.tables
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
-        tableList = [table[0] for table in tableList]
+        tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
 
         if isinstance(query_object, str):
             table_return_list = []
             for table in tableList:
                 if query_object in table:
                     colData = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
-                    col_names = [column[1] for column in colData]
+                    col_names = [self.duckdb_compatible_name(column[1]) for column in colData]
                     table_data = self.cur.execute(f"SELECT * FROM {table};").fetchall()
                     val = ValueObject()
                     val.t_name = table
@@ -512,21 +528,22 @@ class DuckDB(Filesystem):
                                      SELECT table_name FROM information_schema.tables
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
-        tableList = [table[0] for table in tableList]
+        tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
 
         if isinstance(query_object, str):
             col_return_list = []
             for table in tableList:
                 colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
                 for col in colList:
-                    if query_object in col[1]:
-                        returned_col = self.cur.execute(f"SELECT {col[1]} FROM {table};").fetchall()
+                    col_name = self.duckdb_compatible_name(col[1])
+                    if query_object in col_name:
+                        returned_col = self.cur.execute(f"SELECT {col_name} FROM {table};").fetchall()
                         colData = [row[0] for row in returned_col]
                         not_numeric = any(isinstance(item, str) for item in colData)
 
                         val = ValueObject()
                         val.t_name = table
-                        val.c_name = [col[1]]
+                        val.c_name = [col_name]
                         if range == True and not not_numeric:
                             numeric_col = [0 if item is None else item for item in colData]
                             val.value = [min(numeric_col), max(numeric_col)]
@@ -575,11 +592,11 @@ class DuckDB(Filesystem):
                                      SELECT table_name FROM information_schema.tables
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
-        tableList = [table[0] for table in tableList]
+        tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
         query_list = []
         for table in tableList:
             colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
-            all_cols = [column[1] for column in colList]
+            all_cols = [self.duckdb_compatible_name(col[1]) for col in colList]
             result = ', '.join(str(i) for i in all_cols)
             table_row_query = ""
             if row:
@@ -644,25 +661,28 @@ class DuckDB(Filesystem):
             - value:    full row of values
             - row_num:  row index of the match
             - type:     'relation'
-        """      
+        """
+        user_column = column_name
+        column_name = self.duckdb_compatible_name(column_name)
         tableList = self.cur.execute("""SELECT table_name FROM information_schema.tables
                                         WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                         """).fetchall()
-        tableList = [table[0] for table in tableList]
+        tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
 
         all_tables = []
         col_list = []
+        pragma_col_name = column_name[1:-1] if column_name[0] == '"' and column_name[-1] == '"' else column_name
         for table in tableList:
             colData = self.cur.execute(f"PRAGMA table_info({table})").fetchall()
             columns = [row[1] for row in colData]
-            if column_name in columns:
+            if pragma_col_name in columns:
                 all_tables.append(table)
                 col_list = columns        
         
         if len(all_tables) == 0:
-            if (column_name[0] == "'" and column_name[-1] == "'") or (column_name[0] == '"' and column_name[-1] == '"'):
-                return f"{column_name} is not a column in this database. Ensure the column is written first."
-            return f"'{column_name}' is not a column in this database. Ensure the column is written first."
+            if (user_column[0] == "'" and user_column[-1] == "'") or (user_column[0] == '"' and user_column[-1] == '"'):
+                return f"{user_column} is not a column in this database. Ensure the column is written first."
+            return f"'{user_column}' is not a column in this database. Ensure the column is written first."
         old_relation = relation
         old_col_name = column_name
         if relation[0] == '(' and relation[-1] == ')':
@@ -681,7 +701,7 @@ class DuckDB(Filesystem):
         output_data = self.cur.execute(query).fetchall()
         
         if not output_data and len(all_tables) == 1:
-            val = f'"{old_col_name} {old_relation}"' if "'" in old_relation else f"'{old_col_name} {old_relation}'"
+            val = f' {old_col_name} {old_relation} '
             return f"Could not find any rows where {val} in this database."
         if len(all_tables) > 1:
             query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
@@ -707,7 +727,7 @@ class DuckDB(Filesystem):
                                      SELECT table_name FROM information_schema.tables
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
-        tableList = [table[0] for table in tableList]
+        tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
         
         info_list = []
         for table in tableList:
@@ -747,9 +767,11 @@ class DuckDB(Filesystem):
 
             If None (default), all columns are displayed.
         """
+        table_name = self.duckdb_compatible_name(table_name.replace(' ', '_'))
+        duckdb_table_name = table_name[1:-1] if table_name[0] == '"' and table_name[-1] == '"' else table_name
         if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
-                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
-            return (ValueError, f"{table_name} does not exist in this DuckDB database")
+                                WHERE table_name = '{duckdb_table_name}'""").fetchone()[0] == 0:
+            return (ValueError, f"'{table_name}' does not exist in this DuckDB database")
         if display_cols == None:
             df = self.cur.execute(f"SELECT * FROM {table_name} LIMIT {num_rows};").fetchdf()
         else:
@@ -775,7 +797,7 @@ class DuckDB(Filesystem):
                                         SELECT table_name FROM information_schema.tables
                                         WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                         """).fetchall()
-            tableList = [table[0] for table in tableList]
+            tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
 
             summary_list = []
             for table in tableList:
@@ -784,9 +806,11 @@ class DuckDB(Filesystem):
             summary_list.insert(0, tableList)
             return summary_list
         else:
+            table_name = self.duckdb_compatible_name(table_name.replace(' ', '_'))
+            duckdb_table_name = table_name[1:-1] if table_name[0] == '"' and table_name[-1] == '"' else table_name
             if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
-                                WHERE table_name = '{table_name}'""").fetchone()[0] == 0:
-                return (ValueError, f"{table_name} does not exist in this DuckDB database")
+                                WHERE table_name = '{duckdb_table_name}'""").fetchone()[0] == 0:
+                return (ValueError, f"'{table_name}' does not exist in this DuckDB database")
             headers, rows = self.summary_helper(table_name)
             return pd.DataFrame(rows, columns=headers, dtype=object)
 
@@ -901,7 +925,8 @@ class DuckDB(Filesystem):
                 return (ValueError, f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
 
         for table_name in ordered_tables:
-            self.con.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
+            temp_name = table_name[1:-1] if table_name[0] == '"' and table_name[-1] == '"' else table_name
+            self.con.execute(f'DROP TABLE IF EXISTS "{temp_name}" CASCADE')
 
         temp_runTable_bool = self.runTable
         self.runTable = False
