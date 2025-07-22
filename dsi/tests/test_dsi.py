@@ -1113,7 +1113,7 @@ def test_sanitize_inputs_duckdb():
     Table: "all"
       - Columns: ['specification', 'fileLoc', 'G', 'all', 'i', 'j', 'k', 'l', 'm']
       - Row Number: 1
-      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.8, 2, 3, 4, 1.0, 99]
+      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.800000190734863, 2, 3, 4, 1.0, 99]
                                                          
     """)
     assert output == expected_output
@@ -1152,10 +1152,10 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c     | d   | e    | f     
-    --------------------------------------------------------
-    None          | nan | nan  | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a   | math | c                 | d   | e                 | f                  
+    ----------------------------------------------------------------------------------------------
+    None          | nan | nan  | nan               | nan | nan               | nan                
+    !jack1        | 2.0 | 4.0  | 45.97999954223633 | 3.0 | 44.79999923706055 | 0.00989999994635582
     
     """)
     assert output == expected_output
@@ -1178,9 +1178,9 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: "2"' + textwrap.dedent("""
 
-    specification | a | b  | c     | d | e    | f     
-    --------------------------------------------------
-    !jack         | 1 | 99 | 45.98 | 2 | 34.8 | 0.0089
+    specification | a | b  | c                 | d | e                 | f                   
+    -----------------------------------------------------------------------------------------
+    !jack         | 1 | 99 | 45.97999954223633 | 2 | 34.79999923706055 | 0.008899999782443047
     
     """)
     assert output == expected_output
