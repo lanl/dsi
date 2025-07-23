@@ -404,11 +404,11 @@ class DSI():
             - age >= 4 
             - age <= 4 
             - age = 4 
-            - age == 4 
-            - age != 4 
-            - age (4, 8) --> inclusive range between 4 and 8
+            - age == 4
             - age ~ 4    --> column age contains the number 4
             - age ~~ 4   --> column age contains the number 4
+            - age != 4 
+            - age (4, 8) --> all values in 'age' between 4 and 8 (inclusive)
 
         `collection` : bool, optional, default False. 
             If True, returns a pandas DataFrame representing a subset of table rows that satisfy the `query`.

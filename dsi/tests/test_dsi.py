@@ -639,13 +639,13 @@ def test_find_relation_error_sqlite_backend():
         test.find(query=2, collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must be a string."
+        assert str(output) == "find() ERROR: Input must be a string."
     
     try:
         test.find(query="a", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='"a" > "14"', collection=True)
@@ -663,13 +663,13 @@ def test_find_relation_error_sqlite_backend():
         test.find(query="'a' 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
     try:
         test.find(query="a 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='a ">1"', collection=True)
@@ -1529,13 +1529,13 @@ def test_find_relation_error_duckdb_backend():
         test.find(query=2, collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must be a string."
+        assert str(output) == "find() ERROR: Input must be a string."
     
     try:
         test.find(query="a", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='"a" > "14"', collection=True)
@@ -1553,13 +1553,13 @@ def test_find_relation_error_duckdb_backend():
         test.find(query="'a' 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
     try:
         test.find(query="a 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == "find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]"
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='a ">1"', collection=True)
