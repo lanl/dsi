@@ -67,11 +67,13 @@ Note for users:
 Collection Readers
 ------------------
 
-These Readers are created to load data from an in-memory data structure. Currently supports a Python ``dict`` or an ``OrderedDict`` from the ``collection`` module.
+This Reader is used to load data from an in-memory data structure. 
+Currently accepts a Python ``dict`` or an ``OrderedDict`` from the ``collection`` library.
 
 .. automodule:: dsi.plugins.collection_reader
    :members:
    :special-members: __init__
+   :exclude-members: CollectionReader
 
 Environment Plugins
 -------------------

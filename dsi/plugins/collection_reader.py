@@ -3,8 +3,8 @@ from dsi.plugins.metadata import StructuredMetadata
 
 class CollectionReader(StructuredMetadata):
     """
-    CollectionReader abstracted parent class. This stores information about the file to
-    be ingested, namely absolute path.
+    CollectionReader parent class. Keeps information about the data that
+    is being ingested, namely its type and structure.
     """
     def __init__(self, collections, **kwargs):
         super().__init__(**kwargs)
