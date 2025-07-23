@@ -240,40 +240,6 @@ class DSI_cli:
         
         self.t.active_metadata = OrderedDict()
     
-    def search(self, args):
-        '''
-        Global search to see where that value exists
-        '''
-        if not args:
-            print("search ERROR: need to specify an object to search for")
-            return
-        if len(args) > 1:
-            print("search ERROR: need to wrap a multi-word search in quotes. Ex: find 'this is'")
-            return
-        query = args[0]
-
-        val = f"'{query}'" if isinstance(query, str) else query
-        print(f"Finding all instances of {val} in the active backend")
-
-        fnull = open(os.devnull, 'w')
-        try:
-            with redirect_stdout(fnull):
-                find_data = self.t.find_cell(query, row=True)
-        except Exception as e:
-            print(f"search ERROR: {e}")
-            return
-        
-        if find_data is None:
-            print(f"WARNING: {val} was not found in this backend\n")
-            return
-        print()
-        for val in find_data:
-            print(f"Table: {val.t_name}")
-            print(f"  - Columns: {val.c_name}")
-            print(f"  - Row Number: {val.row_num}")
-            print(f"  - Data: {val.value}")
-        print()
-
     
     def find(self, args):
         '''
@@ -295,12 +261,12 @@ class DSI_cli:
             print("find ERROR: <condition> must contain an operator. If just searching for a value, use the 'search' command.")
             return
 
-        print(f"Finding all rows where '{query}' in the active backend")
+        print(f"Finding all rows where '{query}'")
         output = None
         try:
             f = io.StringIO()
             with redirect_stdout(f):
-                find_list = self.t.find_relation(query)
+                find_data = self.t.find_relation(query)
             output = f.getvalue()
         except Exception as e:
             e = str(e).replace("query_object", "condition")
@@ -322,12 +288,19 @@ class DSI_cli:
             print("\n"+warn_msg.replace("database", "backend"))
             return
 
-        print()
-        for val in find_list:
-            print(f"Table: {val.t_name}")
-            print(f"  - Columns: {val.c_name}")
-            print(f"  - Row Number: {val.row_num}")
-            print(f"  - Data: {val.value}")
+        table_name = None
+        output_df = None
+        row_list = [f.row_num for f in find_data]
+        for val in find_data:
+            if table_name is None:
+                table_name = val.t_name
+                output_df = pd.DataFrame([val.value], columns=val.c_name)
+            else:
+                output_df.loc[len(output_df)] = val.value
+        
+        print(f'\nTable: {table_name}')
+        output_df.insert(0, "row_index", row_list)
+        self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
         print()
     
 
@@ -425,7 +398,7 @@ class DSI_cli:
         
         headers = data.columns.tolist()
         rows = data.values.tolist()
-        self.t.table_print_helper(headers, rows, num_rows)
+        self.t.table_print_helper(headers, rows, len(rows), num_rows)
         
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
@@ -551,6 +524,41 @@ class DSI_cli:
             print("   - duckdb (extension: .duckdb, .db)\n")
             return
 
+        
+    def search(self, args):
+        '''
+        Global search to see where that value exists
+        '''
+        if not args:
+            print("search ERROR: need to specify an object to search for")
+            return
+        if len(args) > 1:
+            print("search ERROR: need to wrap a multi-word search in quotes. Ex: find 'this is'")
+            return
+        query = args[0]
+
+        val = f"'{query}'" if isinstance(query, str) else query
+        print(f"Searching for all instances of {val} in the active backend")
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                find_data = self.t.find_cell(query, row=True)
+        except Exception as e:
+            print(f"search ERROR: {e}")
+            return
+        
+        if find_data is None:
+            print(f"WARNING: {val} was not found in this backend\n")
+            return
+        print()
+        for val in find_data:
+            print(f"Table: {val.t_name}")
+            print(f"  - Columns: {val.c_name}")
+            print(f"  - Row Number: {val.row_num}")
+            print(f"  - Data: {val.value}")
+        print()
+    
 
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')

@@ -147,7 +147,7 @@ def test_search_sqlite_backend():
         test.search(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
+    expected_output = "Searching for all instances of 2 in the active backend\n" + textwrap.dedent("""
     Table: math
       - Columns: ['specification', 'a', 'b', 'c', 'd', 'e', 'f']
       - Row Number: 1
@@ -203,9 +203,10 @@ def test_sanitize_inputs_sqlite():
     expected_output = 'Finding all rows where \'all > 9\' in the active backend' + textwrap.dedent("""
     
     Table: "all"
-      - Columns: ['specification', 'fileLoc', 'G', 'all', 'i', 'j', 'k', 'l', 'm']
-      - Row Number: 1
-      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.8, 2, 3, 4, 1.0, 99]
+
+    row_index | specification | fileLoc            | G             | all | i | j | k | l   | m 
+    -------------------------------------------------------------------------------------------
+    1         | !sam          | /home/sam/lib/data | good memories | 9.8 | 2 | 3 | 4 | 1.0 | 99
                                                          
     """)
     assert output == expected_output
@@ -1055,7 +1056,7 @@ def test_search_duckdb_backend():
         test.search(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
+    expected_output = "Searching for all instances of 2 in the active backend\n" + textwrap.dedent("""
     Table: address
       - Columns: ['specification', 'fileLoc', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
       - Row Number: 1
@@ -1111,9 +1112,10 @@ def test_sanitize_inputs_duckdb():
     expected_output = 'Finding all rows where \'all > 9\' in the active backend' + textwrap.dedent("""
     
     Table: "all"
-      - Columns: ['specification', 'fileLoc', 'G', 'all', 'i', 'j', 'k', 'l', 'm']
-      - Row Number: 1
-      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.800000190734863, 2, 3, 4, 1.0, 99]
+
+    row_index | specification | fileLoc            | G             | all               | i | j | k | l   | m 
+    ---------------------------------------------------------------------------------------------------------
+    1         | !sam          | /home/sam/lib/data | good memories | 9.800000190734863 | 2 | 3 | 4 | 1.0 | 99
                                                          
     """)
     assert output == expected_output

@@ -428,10 +428,10 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         if not isinstance(query, str):
-            sys.exit("find() ERROR: Input 'query' must be a string.")
+            sys.exit("find() ERROR: Input must be a string.")
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if not any(op in query for op in operators):
-            sys.exit("find() ERROR: Input 'query' must contain an operator. Format: [column] [operator] [value]")
+            sys.exit("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
         
         print(f"Finding all rows where '{query}' in the active backend")
         output = None
@@ -458,26 +458,23 @@ class DSI():
                 warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
             print("\n"+warn_msg.replace("database", "backend"))
             return
-        
-        if collection == False:
-            print()
-            for val in find_data:
-                print(f"Table: {val.t_name}")
-                print(f"  - Columns: {val.c_name}")
-                print(f"  - Row Number: {val.row_num}")
-                print(f"  - Data: {val.value}")
+
+        table_name = None
+        output_df = None
+        row_list = [f.row_num for f in find_data]
+        for val in find_data:
+            if table_name is None:
+                table_name = val.t_name
+                output_df = pd.DataFrame([val.value], columns=val.c_name)
+            else:
+                output_df.loc[len(output_df)] = val.value
+
+        if not collection:
+            print(f'\nTable: {table_name}')
+            output_df.insert(0, "row_index", row_list)
+            self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
             print()
         else:
-            table_name = None
-            output_df = None
-            row_list = [f.row_num for f in find_data]
-            for val in find_data:
-                if table_name is None:
-                    table_name = val.t_name
-                    output_df = pd.DataFrame([val.value], columns=val.c_name)
-                else:
-                    output_df.loc[len(output_df)] = val.value
-
             output_df.insert(0, "dsi_row_index", row_list)
             output_df.insert(0, "dsi_table_name", table_name)
             first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
@@ -509,7 +506,7 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         val = f"'{query}'" if isinstance(query, str) else query
-        print(f"Finding all instances of {val} in the active backend")
+        print(f"Searching for all instances of {val} in the active backend")
 
         fnull = open(os.devnull, 'w')
         try:
