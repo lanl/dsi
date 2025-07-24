@@ -4,7 +4,7 @@ import io
 from contextlib import redirect_stdout
 import textwrap
 from pandas import DataFrame
-
+from collections import OrderedDict
 
 def test_list_functions():
     test = DSI()
@@ -133,7 +133,7 @@ def test_get_table_sqlite_backend():
     get_data = test.get_table(table_name="physics", collection=True)
     assert query_data.equals(get_data)
 
-def test_find_sqlite_backend():
+def test_search_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -147,7 +147,7 @@ def test_find_sqlite_backend():
         test.search(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
+    expected_output = "Searching for all instances of 2 in the active backend\n" + textwrap.dedent("""
     Table: math
       - Columns: ['specification', 'a', 'b', 'c', 'd', 'e', 'f']
       - Row Number: 1
@@ -177,7 +177,108 @@ def test_find_sqlite_backend():
     assert find_df["dsi_table_name"][0] == "math"
     assert find_df["dsi_row_index"].tolist() == [1,2]
 
-def test_find_update_sqlite_backend():
+def test_sanitize_inputs_sqlite():
+    my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
+                    'all': OrderedDict({'specification': ['!sam'], 'fileLoc': ['/home/sam/lib/data'], 'G': ['good memories'], 
+                                        'all': [9.8], 'i': [2], 'j': [3], 'k': [4], 'l': [1.0], 'm': [99]}), 
+                    'physics': OrderedDict({'specification': ['!amy', '!amy1'], 'n': [9.8, 91.8], 'o': ['gravity', 'gravity'], 
+                                            'p': [23, 233], 'q': ['home 23', 'home 23'], 'r': [1, 12], 's': [-0.0012, -0.0122]}), 
+                    'math': OrderedDict({'specification': [None, '!jack1'], 'a': [None, 2], '"math"': [None, 3], 'c': [None, 45.98], 
+                                         'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}), 
+                    'address': OrderedDict({'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
+                                            'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
+    
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+    test.read(my_dict, "collection")
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find('all > 9')
+    output = f.getvalue()
+
+    expected_output = 'Finding all rows where \'all > 9\' in the active backend' + textwrap.dedent("""
+    
+    Table: "all"
+
+    row_index | specification | fileLoc            | G             | all | i | j | k | l   | m 
+    -------------------------------------------------------------------------------------------
+    1         | !sam          | /home/sam/lib/data | good memories | 9.8 | 2 | 3 | 4 | 1.0 | 99
+                                                         
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('all > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"all" > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"math" < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['math']
+    assert find_df['math'].tolist() == [3]
+
+    find_df['math'] = 4
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('math')
+    output = f.getvalue()
+
+    expected_output = '\nTable: math' + textwrap.dedent("""
+
+    specification | a   | math | c     | d   | e    | f     
+    --------------------------------------------------------
+    None          | nan | nan  | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('b < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"2"']
+    assert find_df['b'].tolist() == [2]
+
+    find_df['b'] = 99
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('"2"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "2"' + textwrap.dedent("""
+
+    specification | a | b  | c     | d | e    | f     
+    --------------------------------------------------
+    !jack         | 1 | 99 | 45.98 | 2 | 34.8 | 0.0089
+    
+    """)
+    assert output == expected_output
+
+def test_search_update_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -213,7 +314,7 @@ def test_find_inequality_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a > 2' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a > 2\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a > 2  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -268,7 +369,7 @@ def test_find_inequality_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a>=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a>=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a>=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -305,7 +406,7 @@ def test_find_equality_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -435,7 +536,7 @@ def test_find_range_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a(3,4)' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a(3,4)\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a(3,4)  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -456,7 +557,7 @@ def test_find_partial_sqlite_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'g~memorr' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g~memorr\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g~memorr  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -535,6 +636,18 @@ def test_find_relation_error_sqlite_backend():
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
+        test.find(query=2, collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input must be a string."
+    
+    try:
+        test.find(query="a", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
+
+    try:
         test.find(query='"a" > "14"', collection=True)
         assert False
     except SystemExit as output:
@@ -550,23 +663,19 @@ def test_find_relation_error_sqlite_backend():
         test.find(query="'a' 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == 'find() ERROR: near "a": syntax error'
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query="a 1", collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a 1' in the active backend\n"
-    expected_output2 = "WARNING: 'a 1' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query='a ">1"', collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a \">1\"' in the active backend\n"
-    expected_output2 = "WARNING: 'a \">1\"' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True)
@@ -579,7 +688,7 @@ def test_find_relation_error_sqlite_backend():
         find_df = test.find(query="a > '<4'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'a > '<4'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a > '<4'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a > '<4'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -647,7 +756,7 @@ def test_find_relation_error_sqlite_backend():
         find_df = test.find(query="g == 'there '> \"temperature\" '?'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'g == 'there '> \"temperature\" '?'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g == 'there '> \"temperature\" '?'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g == 'there '> \"temperature\" '?'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -796,7 +905,7 @@ def test_query_update_schema_sqlite_backend():
     assert data['i'].tolist() == [123,234]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
-def test_find_update_schema_sqlite_backend():
+def test_search_update_schema_sqlite_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -933,7 +1042,7 @@ def test_get_table_duckdb_backend():
     get_data = test.get_table(table_name="physics", collection=True)
     assert query_data.equals(get_data)
 
-def test_find_duckdb_backend():
+def test_search_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -947,7 +1056,7 @@ def test_find_duckdb_backend():
         test.search(query=2)
     output = f.getvalue()
 
-    expected_output = "Finding all instances of 2 in the active backend\n" + textwrap.dedent("""
+    expected_output = "Searching for all instances of 2 in the active backend\n" + textwrap.dedent("""
     Table: address
       - Columns: ['specification', 'fileLoc', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
       - Row Number: 1
@@ -977,6 +1086,107 @@ def test_find_duckdb_backend():
     assert find_df["dsi_table_name"][0] == "address"
     assert find_df["dsi_row_index"].tolist() == [1]
 
+def test_sanitize_inputs_duckdb():
+    my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
+                    'all': OrderedDict({'specification': ['!sam'], 'fileLoc': ['/home/sam/lib/data'], 'G': ['good memories'], 
+                                        'all': [9.8], 'i': [2], 'j': [3], 'k': [4], 'l': [1.0], 'm': [99]}), 
+                    'physics': OrderedDict({'specification': ['!amy', '!amy1'], 'n': [9.8, 91.8], 'o': ['gravity', 'gravity'], 
+                                            'p': [23, 233], 'q': ['home 23', 'home 23'], 'r': [1, 12], 's': [-0.0012, -0.0122]}), 
+                    'math': OrderedDict({'specification': [None, '!jack1'], 'a': [None, 2], '"math"': [None, 3], 'c': [None, 45.98], 
+                                         'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}), 
+                    'address': OrderedDict({'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
+                                            'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
+    
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+    test.read(my_dict, "collection")
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.find('all > 9')
+    output = f.getvalue()
+
+    expected_output = 'Finding all rows where \'all > 9\' in the active backend' + textwrap.dedent("""
+    
+    Table: "all"
+
+    row_index | specification | fileLoc            | G             | all               | i | j | k | l   | m 
+    ---------------------------------------------------------------------------------------------------------
+    1         | !sam          | /home/sam/lib/data | good memories | 9.800000190734863 | 2 | 3 | 4 | 1.0 | 99
+                                                         
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('all > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"all" > 9', True)
+
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"all"']
+    assert find_df['G'].tolist() == ['good memories']
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('"math" < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['math']
+    assert find_df['math'].tolist() == [3]
+
+    find_df['math'] = 4
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('math')
+    output = f.getvalue()
+
+    expected_output = '\nTable: math' + textwrap.dedent("""
+
+    specification | a   | math | c                 | d   | e                 | f                  
+    ----------------------------------------------------------------------------------------------
+    None          | nan | nan  | nan               | nan | nan               | nan                
+    !jack1        | 2.0 | 4.0  | 45.97999954223633 | 3.0 | 44.79999923706055 | 0.00989999994635582
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        find_df = test.find('b < 9', True)
+    
+    assert not find_df.empty
+    assert find_df['dsi_table_name'].tolist() == ['"2"']
+    assert find_df['b'].tolist() == [2]
+
+    find_df['b'] = 99
+    test.update(find_df)
+    
+    f = io.StringIO()
+    with redirect_stdout(f):
+        test.display('"2"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "2"' + textwrap.dedent("""
+
+    specification | a | b  | c                 | d | e                 | f                   
+    -----------------------------------------------------------------------------------------
+    !jack         | 1 | 99 | 45.97999954223633 | 2 | 34.79999923706055 | 0.008899999782443047
+    
+    """)
+    assert output == expected_output
+
 def test_find_inequality_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
@@ -994,7 +1204,7 @@ def test_find_inequality_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a > 2' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a > 2\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a > 2  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1049,7 +1259,7 @@ def test_find_inequality_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a>=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a>=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a>=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1086,7 +1296,7 @@ def test_find_equality_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a=3' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a=3\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a=3  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1216,7 +1426,7 @@ def test_find_range_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'a(3,4)' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"a(3,4)\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  a(3,4)  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1237,7 +1447,7 @@ def test_find_partial_duckdb_backend():
     output = f.getvalue()
 
     expected_output1 = "Finding all rows where 'g~memorr' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g~memorr\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g~memorr  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1316,6 +1526,18 @@ def test_find_relation_error_duckdb_backend():
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
+        test.find(query=2, collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input must be a string."
+    
+    try:
+        test.find(query="a", collection=True)
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
+
+    try:
         test.find(query='"a" > "14"', collection=True)
         assert False
     except SystemExit as output:
@@ -1331,23 +1553,19 @@ def test_find_relation_error_duckdb_backend():
         test.find(query="'a' 1", collection=True)
         assert False
     except SystemExit as output:
-        assert str(output) == 'find() ERROR: Parser Error: syntax error at or near "a"'
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query="a 1", collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a 1' in the active backend\n"
-    expected_output2 = "WARNING: 'a 1' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
-    f = io.StringIO()
-    with redirect_stdout(f):
+    try:
         test.find(query='a ">1"', collection=True)
-    output = f.getvalue()
-    expected_output1 = "Finding all instances of 'a \">1\"' in the active backend\n"
-    expected_output2 = "WARNING: 'a \">1\"' was not found in this backend\n\n"
-    assert output == expected_output1 + expected_output2
+        assert False
+    except SystemExit as output:
+        assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True)
@@ -1360,7 +1578,7 @@ def test_find_relation_error_duckdb_backend():
         find_df = test.find(query="g < '<4'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'g < '<4'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g < '<4'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g < '<4'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1428,7 +1646,7 @@ def test_find_relation_error_duckdb_backend():
         find_df = test.find(query="g == 'there '> \"temperature\" '?'", collection=True)
     output = f.getvalue()
     expected_output1 = "Finding all rows where 'g == 'there '> \"temperature\" '?'' in the active backend\n\n"
-    expected_output2 = "WARNING: Could not find any rows where \"g == 'there '> \"temperature\" '?'\" in this backend.\n\n"
+    expected_output2 = "WARNING: Could not find any rows where  g == 'there '> \"temperature\" '?'  in this backend.\n\n"
     assert find_df is None
     assert output == expected_output1 + expected_output2
 
@@ -1520,7 +1738,7 @@ def test_find_relation_error_duckdb_backend():
          - SELECT * FROM physics WHERE specification = '!jack'\n""")
     assert output == expected_output
 
-def test_find_update_duckdb_backend():
+def test_search_update_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
@@ -1573,7 +1791,7 @@ def test_query_update_schema_duckdb_backend():
     assert data['specification'].tolist() == [123,234]
     assert data['new_col'].tolist() == ["test1", "test1"]
 
-def test_find_update_schema_duckdb_backend():
+def test_search_update_schema_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)

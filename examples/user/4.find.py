@@ -3,13 +3,15 @@ from dsi.dsi import DSI
 
 find_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
 
-#dsi.find(value)
-find_dsi.find("Jun 2025") # finds the value 2 in all tables
+#dsi.search(value)
+find_dsi.search("Jun 2025") # searches for the value 2 in all tables
 
-#dsi.find(value, True)
-find_df = find_dsi.find("Jun 2025", True) # Returns the first matching table as a DataFrame
+find_df = find_dsi.search("Jun 2025", True) # Returns the first matching table as a DataFrame
+
 
 #dsi.find(condition, True)
+find_dsi.find("state2_density > 5.0") # Finds all rows of one table that match the condition
+
 find_df = find_dsi.find("state2_density > 5.0", True) # Returns matching rows as a DataFrame
 
 find_dsi.close()

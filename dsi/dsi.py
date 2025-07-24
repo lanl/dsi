@@ -48,11 +48,11 @@ class DSI():
         if filename == ".temp.db" and os.path.exists(filename):
             os.remove(filename)
 
-        if filename != ".temp.db" and backend_name == "Sqlite":
+        if filename != ".temp.db" and backend_name.lower() == "sqlite":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                 filename += ".db"
-        elif filename != ".temp.db" and backend_name == "DuckDB":
+        elif filename != ".temp.db" and backend_name.lower() == "duckdb":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "duckdb"]:
                 filename += ".db"
@@ -116,6 +116,7 @@ class DSI():
         Prints a list of valid readers that can be used in the `reader_name` argument in `read()`
         """
         print("\nValid Readers for `reader_name` in read():\n" + "-"*50)
+        print("Collection           : Loads data from an Ordered Dict. If multiple tables, each table must be a nested OrderedDict.")
         print("CSV                  : Loads data from CSV files (one table per call)")
         print("YAML1                : Loads data from YAML files of a certain structure")
         print("TOML1                : Loads data from TOML files of a certain structure")
@@ -133,10 +134,11 @@ class DSI():
         """
         Loads data into DSI using the specified parameter `reader_name`
 
-        `filenames` : str or list of str
-            Path(s) to the data file(s) to be loaded.
+        `filenames` : str or list of str or data object
+            Either file path(s) to the data file(s) or an in-memory data object.
 
-            The expected file extension depends on the selected `reader_name`:
+            The expected input type depends on the selected `reader_name`:
+                - "Collection"           → Ordered Dictionary of table(s)
                 - "CSV"                  → .csv
                 - "YAML1"                → .yaml or .yml
                 - "TOML1"                → .toml
@@ -158,8 +160,11 @@ class DSI():
             For guidance on creating a DSI-compatible Reader, view :ref:`custom_reader`.
 
         `table_name` : str, optional
-            Name to assign to the loaded table. 
-            Only used when the input file contains a single table for the `CSV`, `JSON`, or `Ensemble` reader
+            Name to assign to the loaded table.
+
+            Required when using the `Collection` reader to load an Ordered Dictionary representing only one table.
+            
+            Recommended when the input file contains a single table for the `CSV`, `JSON`, or `Ensemble` reader.
         """
         if isinstance(filenames, str) and not os.path.exists(filenames):
             sys.exit("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -229,17 +234,23 @@ class DSI():
                     elif reader_name.lower() == "bueno":
                         self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
                     elif reader_name.lower() == "csv":
-                        self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name = table_name)
+                        self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name=table_name)
                     elif reader_name.lower() == "yaml1":
                         self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
                     elif reader_name.lower() == "toml1":
                         self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
                     elif reader_name.lower() == "ensemble":
-                        self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name = table_name)
+                        self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name=table_name)
                     elif reader_name.lower() == "json":
-                        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name = table_name)
+                        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name=table_name)
                     elif reader_name.lower() == "cloverleaf":
                         self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames)
+                    elif reader_name.lower() == "collection":
+                        self.t.load_module('plugin', 'Dict', 'reader', collection=filenames, table_name=table_name)
+                        if isinstance(filenames, OrderedDict):
+                            filenames = "the Ordered Dict"
+                        else:
+                            filenames = "the dictionary"
                     else:
                         correct_reader = False
             except Exception as e:
@@ -247,7 +258,7 @@ class DSI():
 
             if correct_reader == False:
                 print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                elg = "CSV, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
+                elg = "Collection, CSV, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
                 sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
@@ -386,18 +397,18 @@ class DSI():
 
         `query` : str
             A column-level condition that must be in the format of a [column name] [operator] [value]. 
-            The value can be a string or number. Valid operators:
+            The value can be a string or number. Valid operators as example queries:
             
             - age > 4 
             - age < 4 
             - age >= 4 
             - age <= 4 
             - age = 4 
-            - age == 4 
-            - age != 4 
-            - age (4, 8) --> inclusive range between 4 and 8
+            - age == 4
             - age ~ 4    --> column age contains the number 4
             - age ~~ 4   --> column age contains the number 4
+            - age != 4 
+            - age (4, 8) --> all values in 'age' between 4 and 8 (inclusive)
 
         `collection` : bool, optional, default False. 
             If True, returns a pandas DataFrame representing a subset of table rows that satisfy the `query`.
@@ -415,74 +426,55 @@ class DSI():
             sys.exit("ERROR: Cannot find() until all associated data is loaded after a complex schema")
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
-        
-        new_find = False
+
+        if not isinstance(query, str):
+            sys.exit("find() ERROR: Input must be a string.")
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
-        if isinstance(query, str) and any(op in query for op in operators):
-            result = self.t.manual_string_parsing(query)
-            if len(result) > 1: # can split into column and operator
-                new_find = True
-                print(f"Finding all rows where '{query}' in the active backend")
-
-                output = None
-                try:
-                    f = io.StringIO()
-                    with redirect_stdout(f):
-                        find_data = self.t.find_relation(query)
-                    output = f.getvalue()
-                except Exception as e:
-                    sys.exit(f"find() ERROR: {e}")
-                
-                if output and "WARNING" in output:
-                    warn_msg = output[output.find("WARNING"):]
-                    if "artifact_handler" in warn_msg:
-                        lines = warn_msg.splitlines()
-                        start = lines[1].find('`')
-                        between = lines[1][start + 1 : lines[1].find('`', start + 1)]
-                        lines[1] = lines[1].replace(between, "dsi.query()")
-                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
-                        warn_msg = '\n'.join(lines)
-                    elif "Could not find" in warn_msg:
-                        ending_ind = warn_msg.find("in this database")
-                        warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
-                    print("\n"+warn_msg.replace("database", "backend"))
-                    return
+        if not any(op in query for op in operators):
+            sys.exit("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
         
-        if new_find == False: ## TO BE DEPRECEATED SOON. USE dsi.search() TO FIND ALL VALUES THAT MATCH INPUT
-            val = f"'{query}'" if isinstance(query, str) else query
-            print(f"Finding all instances of {val} in the active backend")
-
-            fnull = open(os.devnull, 'w')
-            try:
-                with redirect_stdout(fnull):
-                    find_data = self.t.find_cell(query, row=True)
-            except Exception as e:
-                sys.exit(f"find() ERROR: {e}")
-        if find_data is None:
-            val = f"'{query}'" if isinstance(query, str) else query
-            print(f"WARNING: {val} was not found in this backend\n")
+        print(f"Finding all rows where '{query}' in the active backend")
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                find_data = self.t.find_relation(query)
+            output = f.getvalue()
+        except Exception as e:
+            e = str(e).replace("query_object", "query")
+            sys.exit(f"find() ERROR: {e}")
+        
+        if output and "WARNING" in output:
+            warn_msg = output[output.find("WARNING"):]
+            if "artifact_handler" in warn_msg:
+                lines = warn_msg.splitlines()
+                start = lines[1].find('`')
+                between = lines[1][start + 1 : lines[1].find('`', start + 1)]
+                lines[1] = lines[1].replace(between, "dsi.query()")
+                lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
+                warn_msg = '\n'.join(lines)
+            elif "Could not find" in warn_msg:
+                ending_ind = warn_msg.find("in this database")
+                warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
+            print("\n"+warn_msg.replace("database", "backend"))
             return
-        if collection == False:
-            print()
-            for val in find_data:
-                print(f"Table: {val.t_name}")
-                print(f"  - Columns: {val.c_name}")
-                print(f"  - Row Number: {val.row_num}")
-                print(f"  - Data: {val.value}")
+
+        table_name = None
+        output_df = None
+        row_list = [f.row_num for f in find_data]
+        for val in find_data:
+            if table_name is None:
+                table_name = val.t_name
+                output_df = pd.DataFrame([val.value], columns=val.c_name)
+            else:
+                output_df.loc[len(output_df)] = val.value
+
+        if not collection:
+            print(f'\nTable: {table_name}')
+            output_df.insert(0, "row_index", row_list)
+            self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
             print()
         else:
-            table_name = None
-            output_df = None
-            row_list = []
-            for val in find_data:
-                if table_name is None:
-                    table_name = val.t_name
-                    output_df = pd.DataFrame([val.value], columns=val.c_name)
-                    row_list.append(val.row_num)
-                elif table_name == val.t_name and val.row_num not in row_list:
-                    output_df.loc[len(output_df)] = val.value
-                    row_list.append(val.row_num)
-
             output_df.insert(0, "dsi_row_index", row_list)
             output_df.insert(0, "dsi_table_name", table_name)
             first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
@@ -514,14 +506,14 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         val = f"'{query}'" if isinstance(query, str) else query
-        print(f"Finding all instances of {val} in the active backend")
+        print(f"Searching for all instances of {val} in the active backend")
 
         fnull = open(os.devnull, 'w')
         try:
             with redirect_stdout(fnull):
                 find_data = self.t.find_cell(query, row=True)
         except Exception as e:
-            sys.exit(f"find() ERROR: {e}")
+            sys.exit(f"search() ERROR: {e}")
         
         if find_data is None:
             print(f"WARNING: {val} was not found in this backend\n")
@@ -631,7 +623,7 @@ class DSI():
                 actual_df = actual_df[table_df.columns]
             
             for col in actual_df.columns:
-                common_dtype = np.result_type(actual_df[col].dtype, table_df[col].dtype)
+                common_dtype = np.result_type(actual_df[col].to_numpy().dtype, table_df[col].to_numpy().dtype)
                 actual_df[col] = actual_df[col].astype(common_dtype)
                 table_df[col] = table_df[col].astype(common_dtype)
             

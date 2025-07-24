@@ -64,6 +64,17 @@ Note for users:
    :special-members: __init__
    :exclude-members: FileWriter
 
+Collection Readers
+------------------
+
+This Reader is used to load data from an in-memory data structure. 
+Currently accepts a Python ``dict`` or an ``OrderedDict`` from the ``collection`` library.
+
+.. automodule:: dsi.plugins.collection_reader
+   :members:
+   :special-members: __init__
+   :exclude-members: CollectionReader
+
 Environment Plugins
 -------------------
 .. automodule:: dsi.plugins.env

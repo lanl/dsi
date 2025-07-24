@@ -3,7 +3,8 @@ from dsi.core import Terminal
 
 terminal_ingest = Terminal()
 
-terminal_ingest.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/")
+# UNZIP clover3d.zip INSIDE EXAMPLES/CLOVER3D/
+terminal_ingest.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/clover3d/")
 
 terminal_ingest.load_module('backend','Sqlite','back-write', filename='data.db')
 
