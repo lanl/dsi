@@ -12,6 +12,7 @@ import pandas as pd
 import csv
 import re
 import tarfile
+import subprocess
 
 class Terminal():
     """
@@ -1534,8 +1535,8 @@ class Sync():
         
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         if tool == "copy":
-            print(self.file_list)
-            print(self.rfile_list)
+            #print(self.file_list)
+            #print(self.rfile_list)
             # Data movement via Unix Copy
             for file,file_remote in zip(self.file_list,self.rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
@@ -1543,7 +1544,11 @@ class Sync():
                     if isVerbose:
                         print( " mkdir " + abspath)
                     path = Path(abspath)
-                    path.mkdir(parents=True)
+                    try:
+                        path.mkdir(parents=True)
+                    except Exception:
+                        print(f"Unable to create folder {abspath} . Do you have access rights?")
+                        raise
 
                 if isVerbose:
                     print( " cp " + file + " " + file_remote)
@@ -1561,6 +1566,34 @@ class Sync():
             #  Data movement via SCP
             remote_user = os.getlogin()
             remote_host = "myremote"
+        elif tool == "conduit":
+            # Data movement via Conduit
+            if not os.path.exists(self.remote_location):
+                if isVerbose:
+                    print( " mkdir " + self.remote_location)
+                path = Path(self.remote_location)
+                try:
+                    path.mkdir(parents=True)
+                except Exception:
+                    print(f"Unable to create folder {abspath} . Do you have access rights?")
+                    raise
+
+            #for file,file_remote in zip(self.file_list,self.rfile_list):
+            #    abspath = os.path.dirname(os.path.abspath(file_remote))
+            #    if not os.path.exists(abspath):
+            #        if isVerbose:
+            #            print( " mkdir " + abspath)
+            #        path = Path(abspath)
+            #        try:
+            #            path.mkdir(parents=True)
+            #        except Exception:
+            #            print(f"Unable to create folder {abspath} . Do you have access rights?")
+            #            raise
+            #    if isVerbose:
+            #        print( "conduit cp " + file + " " + file_remote)
+
+            subprocess.run(["conduit", "cp", "-r", self.local_location, self.remote_location])
+
 
         elif tool == "ftp":
             True
