@@ -13,12 +13,12 @@ DSI is implemented in three parts:
 * Backends 
 * Core middleware
 
-For more information on these DSI modules, please refer to the `DSI Introduction Page <https://lanl.github.io/dsi/intro-users.html>`_.
+For more information on these DSI modules, please refer to the `DSI Introduction Page <https://lanl.github.io/dsi/introduction.html>`_.
 
 Users can interact with DSI seamlessly through two methods:
 
 * `Python API <https://lanl.github.io/dsi/python_api.html>`_ for more flexibility when loading/exporting data
-* `Command Line Interface API <https://lanl.github.io/dsi/cli_api.html>`_ for streamlined DSI functionality without requiring any knowledge of Python
+* `Command Line Interface API <https://lanl.github.io/dsi/cli.html>`_ for streamlined DSI functionality without requiring any knowledge of Python
 
 
 ========================
