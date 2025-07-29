@@ -1496,6 +1496,7 @@ class Sync():
             
             # Add filesystem table
             t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
+            #t.load_module('plugin', 'collection_reader', 'reader', st_dict )
             t.artifact_handler(interaction_type='ingest')
 
         self.file_list = file_list
