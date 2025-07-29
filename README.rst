@@ -1,6 +1,6 @@
-=============
-DSI
-=============
+===============
+DSI User Guide
+===============
 
 The goal of the Data Science Infrastructure Project (DSI) is to provide a flexible, 
 AI-ready metadata query capability which returns data subject to strict, POSIX-enforced file security. 
