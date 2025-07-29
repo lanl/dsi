@@ -1591,8 +1591,10 @@ class Sync():
             #            raise
             #    if isVerbose:
             #        print( "conduit cp " + file + " " + file_remote)
-
-            subprocess.run(["conduit", "cp", "-r", self.local_location, self.remote_location])
+            try:
+                subprocess.run(["conduit", "cp", "-r", self.local_location, self.remote_location], shell=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with error: {e.stderr} ")
 
 
         elif tool == "ftp":
