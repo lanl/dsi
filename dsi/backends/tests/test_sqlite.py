@@ -21,15 +21,6 @@ def test_artifact_ingest():
     # No error implies success
     assert True
 
-def test_wildfiredata_artifact_put_t():
-   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
-   dbpath = 'test_wildfiredata_artifact.db'
-   store = Sqlite(dbpath)
-   store.put_artifacts_t(OrderedDict([("wildfire", valid_middleware_datastructure)]), tableName="Wildfire")
-   store.close()
-   # No error implies success
-   assert True
-
 def test_artifact_query():
     valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
     dbpath = 'test_artifact.db'
@@ -253,6 +244,22 @@ def test_find_relation():
     assert row_data[0].row_num == 1
     assert row_data[1].value == [2,'2']
     assert row_data[1].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "~ '1'")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("bar", "~~ 'f'")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
     assert row_data[0].type == 'relation'
 
     store.close()

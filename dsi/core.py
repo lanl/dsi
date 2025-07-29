@@ -11,9 +11,7 @@ import sys
 import pandas as pd
 import csv
 import re
-
-from dsi.backends.filesystem import Filesystem
-from dsi.backends.sqlite import Sqlite, DataType, Artifact
+import tarfile
 
 class Terminal():
     """
@@ -24,15 +22,15 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb', 'hpss']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy', 'HPSS']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
@@ -276,6 +274,7 @@ class Terminal():
                         if mod_type == "backend":
                             self.loaded_backends.append(class_object)
                     except Exception as e:
+                        print(e)
                         if "runTable flag is only valid for in-situ workflows" in str(e):
                             if self.debug_level != 0:
                                 self.logger.error("runTable flag is only valid for in-situ workflows, not for populated backends wihout a runTable.")
@@ -786,7 +785,7 @@ class Terminal():
        
         `query_object` : str
             A relational expression combining column, operator, and value.
-            Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)".
+            Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)", "age ~ 4", "age ~~ 4".
 
         `return` : list
             A list of backend-specific result objects, each representing a row that satisfies the relation.
@@ -811,7 +810,7 @@ class Terminal():
 
         if not isinstance(query_object, str):
             raise TypeError("`query_object` must be a string")
-        print(f"Finding all rows in the first table of the first loaded backend where {query_object}")
+        print(f"Finding all rows in the first loaded backend where {query_object}")
         query_object = query_object.replace("\\'", "'") if "\\'" in query_object else query_object
         query_object = query_object.replace('\\"', '"') if '\\"' in query_object else query_object
 
@@ -821,7 +820,7 @@ class Terminal():
             value = value[1:-1] if is_literal(value) else value
             return "'" + re.sub(r"(?<!')'(?!')", "''", value) + "'"
 
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', '~', '~~']
         if not any(op in query_object for op in operators):
             raise ValueError("`query_object` is missing an operator to compare the column to a value.")
         result = self.manual_string_parsing(query_object)
@@ -830,8 +829,8 @@ class Terminal():
         elif len(result) == 2:
             raise ValueError("Input must include a column, operator, and value. Operator cannot be enclosed in quotes.")
         elif len(result) == 3 and not is_literal(result[2]) and any(op in result[2] for op in operators):
-            extra = "If matching value has an operator in it, make sure to wrap in single quotes."
-            raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]. {extra}")
+            extra = "or partial match [~,~~]. If matching value has an operator in it, make sure to wrap all in single quotes."
+            raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], {extra}")
         elif len(result) == 3 and result[2].startswith('"') and result[2].endswith('"'):
             raise ValueError(f"The value in the relational find() cannot be enclosed in double quotes")
         
@@ -848,7 +847,7 @@ class Terminal():
             elif ')' != result[2][-1]:
                 raise ValueError(f"{start_msg} it must end with closing parenthesis.")
             elif (result[2][result[2].rfind("'"):] if "'" in result[2] else result[2]).count(')') > 1:
-                raise ValueError("Can only apply one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], or range [()]")
+                raise ValueError("Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~].")
         
             values = result[2][:-1].strip()
             if values[0] == '"' or values[-1] == '"':
@@ -1277,7 +1276,7 @@ class Terminal():
     def manual_string_parsing(self, query):
         # splits on double quotes not within any single quotes
         # splits on operators outside of any quotes
-        op_pattern = re.compile(r'==|!=|>=|<=|=|<|>|\(')
+        op_pattern = re.compile(r'==|!=|~~|>=|<=|~|=|<|>|\(')
         parts = []
         buffer = ''
         in_single = False
@@ -1513,16 +1512,16 @@ class Sync():
         # See if FS table has been created
         t = Terminal()
 
+        f = self.project_name+".db"
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = self.local_location+"/"+self.project_name+".db"
-            f = self.project_name+".db"
+            assert os.path.exists(f)
             if isVerbose:
                 print("db: ", f)
-            if os.path.exists(f):
-                t.load_module('backend','Sqlite','back-read', filename=f)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+            t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception:
+            print(f"Databaase {f} not found")
             raise
 
         # See if filesystem exists
@@ -1599,3 +1598,196 @@ class Sync():
         DSI database
         '''
         True
+
+class TarFile():
+  def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
+    self.tar_name = tar_name
+    self.local_tmp_dir = local_tmp_dir
+    self.local_files = local_files
+    self.create_tar(self.local_files)
+      
+  def create_tar(self, local_files=[]):
+    """
+    Creates a tar file and returns the index
+      
+    tar_name: name of the tar file to create with .tar.gz as the extension
+    local_files: a list of files with full paths to include
+    
+    The tar file will be created in the local_tmp_dir directory
+    """
+
+    if not os.path.exists(self.local_tmp_dir):
+        try:
+            os.mkdir(self.local_tmp_dir)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+    
+    self.tar_path = self.local_tmp_dir + "/" + self.tar_name
+    tar = tarfile.open(self.tar_path, "w:gz")
+    for f in local_files:
+        tar.add(f)
+    tar.close()
+
+    # Create an index. Taken from: https://stackoverflow.com/questions/2018512/reading-tar-file-contents-without-untarring-it-in-python-script
+    tar = tarfile.open(self.tar_path)
+    index = {i.name: i for i in tar.getmembers()}
+    self.tar_index = ""
+    for file_name in index.keys():
+      self.tar_index += "%s : %d\n" % (file_name, index[file_name].size)
+
+    return True
+
+  def get_index(self):
+    return self.tar_index
+
+  def get_full_path(self):
+      return self.tar_path
+
+  def get_name(self):
+      return self.tar_name
+  
+class HPSSSync():
+    """
+    A class defined to assist in HPSS data management activities for DSI
+
+    Sync is where data movement functions such as copy (to HPSS) and 
+    sync (local filesystem with remote) exist.
+    """
+    remote_dir = None
+    local_files = []
+    tar_files = []
+    
+    def __init__(self, project_name="test"):
+        # Helper function to get parent module names.
+
+        self.project_name = project_name
+
+    def index(self, local_files, remote_dir, tar_name, isVerbose=False):
+        """
+        Helper function to gather local file information and to create a tar that should 
+        be in remote_dir or will be copied to the remote directory
+
+        local_files: a list of files or directories to add to a tar
+        remote_dir: a directory on HPSS that has or will have the tar file
+        """
+        
+        if isVerbose:
+            print("loc: "+ str(local_files) + " hpss remote: "+remote_dir)
+        
+        # Tar the local_files list
+        tar_file = TarFile(tar_name, local_files)
+        self.local_files = local_files
+        self.remote_dir = remote_dir
+        self.tar_files.append(tar_file)
+        st_list = []
+
+        # Create ordered dictionary to store file information
+        # Create ordered dictionary
+        st_dict = OrderedDict()
+        st_dict['file_origin'] = []
+        st_dict['size']= []
+        st_dict['modified_time'] = []
+        st_dict['created_time'] = []
+        st_dict['accessed_time'] = []
+        st_dict['mode'] = []
+        st_dict['inode'] = []
+        st_dict['device'] = []
+        st_dict['n_links'] = []
+        st_dict['uid'] = []
+        st_dict['gid'] = []
+        st_dict['file_remote'] = []
+
+        for tar_file in self.tar_files:
+            st = os.stat(tar_file.get_full_path())
+            # append future location to st
+            st_dict['file_origin'].append(tar_file.get_full_path())
+            st_dict['size'].append(st.st_size)
+            st_dict['modified_time'].append(st.st_mtime)
+            st_dict['created_time'].append(st.st_ctime)
+            st_dict['accessed_time'].append(st.st_atime)
+            st_dict['mode'].append(st.st_mode)
+            st_dict['inode'].append(0)
+            st_dict['device'].append(st.st_dev)
+            st_dict['n_links'].append(st.st_nlink)
+            st_dict['uid'].append(st.st_uid)
+            st_dict['gid'].append(st.st_gid)
+            st_dict['file_remote'].append(self.remote_dir + "/" + tar_file.get_name())
+            st_list.append(st)
+
+        # Try to open existing local database to store filesystem info before copy
+        # Open and validate local DSI data store
+        t = Terminal()
+
+        f = self.project_name+".db"
+        try:
+            assert os.path.exists(f)
+            if isVerbose:
+                print("db: ", f)
+            t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception:
+            print(f"Databaase {f} not found")
+            raise
+
+        # See if filesystem exists
+        fs_t = t.get_table("filesystem_hpss")
+        if fs_t.empty:
+            if isVerbose:
+                print( "Creating new hpss fs table")
+            # Create new filesystem collection with origin and remote locations
+            # Stage data for ingest
+            # Transpose the OrderedDict to a list of row dictionaries
+            num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
+            rows = []
+
+            for i in range(num_rows):
+                row = {col: values[i] for col, values in st_dict.items()}
+                rows.append(row)
+            # Temporary csv to ingest
+            output_file = '.fs.csv'
+            with open(output_file, mode='w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
+                writer.writeheader()
+                writer.writerows(rows)
+            
+            # Add filesystem table
+            t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem_hpss")
+            t.artifact_handler(interaction_type='ingest')
+
+    def move(self, tool="copy", isVerbose=False, **kwargs):
+        self.copy(tool,isVerbose,kwargs)
+
+    def copy(self, tool="copy", isVerbose=False, **kwargs):
+        """
+        Helper function to perform the 
+        data copy over using a preferred API
+        """
+        # See if FS table has been created
+        t = Terminal()
+
+        try:
+            f = self.project_name+".db"
+            if isVerbose:
+                print("db: ", f)
+            if os.path.exists(f):
+                t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            raise
+
+        # See if filesystem exists
+        fs_t = t.get_table("filesystem_hpss")
+        if fs_t.empty:
+            print( " Filesystem table not found. Try running Index first.")
+            print( " Data copy failed. ")
+            return
+      
+        hpss_files = {}
+        for f in self.tar_files:
+            hpss_files[self.remote_dir + "/" + f.get_name()] = f.get_full_path()
+            if isVerbose:
+                print( " copying " + f.get_full_path() + " to: " + self.remote_dir)
+
+        t.load_module('backend','HPSS', 'back-write', hpss_files=hpss_files)
+        # Data movement via the hsi HPSS commands
+        t.artifact_handler(interaction_type='ingest')
+        print( " Data Copy Complete! ")

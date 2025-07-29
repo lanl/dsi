@@ -3,13 +3,15 @@ from dsi.core import Terminal
 
 terminal = Terminal()
 
-terminal.load_module('plugin', 'Schema', 'reader', filename="../test/example_schema.json")
+# UNZIP clover3d.zip INSIDE EXAMPLES/CLOVER3D/
+terminal.load_module('plugin', 'Schema', 'reader', filename="../clover3d/schema.json")
 
-terminal.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/")
+terminal.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/clover3d/")
 
 terminal.load_module('backend','Sqlite','back-write', filename='schema_data.db')
 
 terminal.artifact_handler(interaction_type='ingest')
 
+# EXECUTE requirements.extras.txt  to be able to run this
 terminal.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.png')
 terminal.transload()

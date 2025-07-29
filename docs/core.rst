@@ -128,11 +128,11 @@ Example 9: External Readers/Writers
 Temporarily adding an external data reader to DSI, allowing DSI to interact with the associated data across all actions.
 In this instance, the data is ingested into a backend and viewed using ``display()``
 
-.. literalinclude:: ../examples/developer/9.external_plugin.py
+.. literalinclude:: ../examples/developer/9.external_reader.py
 
 ``text_file_reader``:
 
-.. literalinclude:: ../examples/developer/text_file_reader.py
+.. literalinclude:: ../examples/test/text_file_reader.py
 
 Example 10: Generate notebook
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

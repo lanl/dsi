@@ -10,18 +10,14 @@ from dsi.backends.filesystem import Filesystem
 
 # Holds table name and data properties
 class DataType:
+    """
+        Primary DataType Artifact class that stores database schema in memory.
+        A DataType is a generic construct that defines the schema for the tables inside of SQL. 
+        Used to execute CREATE TABLE statements.
+    """
     name = ""
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
-
-class Artifact:
-    # """
-    #     Primary Artifact class that holds database schema in memory.
-    #     An Artifact is a generic construct that defines the schema for metadata that
-    #     defines the tables inside of SQL
-    # """
-    name = ""
-    properties = {}
 
 class ValueObject:
     """
@@ -57,6 +53,20 @@ class Sqlite(Filesystem):
         self.con = sqlite3.connect(filename)
         self.cur = self.con.cursor()
         self.runTable = Sqlite.runTable
+        self.sqlite_keywords = ["ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE", "AND", "AS", "ASC", "ATTACH", 
+                                "AUTOINCREMENT", "BEFORE", "BEGIN", "BETWEEN", "BY", "CASCADE", "CASE", "CAST", "CHECK", "COLLATE", 
+                                "COLUMN", "COMMIT", "CONFLICT", "CONSTRAINT", "CREATE", "CROSS", "CURRENT", "CURRENT_DATE", "CURRENT_TIME", 
+                                "CURRENT_TIMESTAMP", "DATABASE", "DEFAULT", "DEFERRABLE", "DEFERRED", "DELETE", "DESC", "DETACH", "DISTINCT", 
+                                "DO", "DROP", "EACH", "ELSE", "END", "ESCAPE", "EXCEPT", "EXCLUDE", "EXCLUSIVE", "EXISTS", "EXPLAIN", "FAIL", 
+                                "FILTER", "FIRST", "FOLLOWING", "FOR", "FOREIGN", "FROM", "FULL", "GENERATED", "GLOB", "GROUP", "GROUPS", 
+                                "HAVING", "IF", "IGNORE", "IMMEDIATE", "IN", "INDEX", "INDEXED", "INITIALLY", "INNER", "INSERT", "INSTEAD", 
+                                "INTERSECT", "INTO", "IS", "ISNULL", "JOIN", "KEY", "LAST", "LEFT", "LIKE", "LIMIT", "MATCH", "MATERIALIZED", 
+                                "NATURAL", "NO", "NOT", "NOTHING", "NOTNULL", "NULL", "NULLS", "OF", "OFFSET", "ON", "OR", "ORDER", "OTHERS", 
+                                "OUTER", "OVER", "PARTITION", "PLAN", "PRAGMA", "PRECEDING", "PRIMARY", "QUERY", "RAISE", "RANGE", "RECURSIVE", 
+                                "REFERENCES", "REGEXP", "REINDEX", "RELEASE", "RENAME", "REPLACE", "RESTRICT", "RETURNING", "RIGHT", "ROLLBACK", 
+                                "ROW", "ROWS", "SAVEPOINT", "SELECT", "SET", "TABLE", "TEMP", "TEMPORARY", "THEN", "TIES", "TO", "TRANSACTION", 
+                                "TRIGGER", "UNBOUNDED", "UNION", "UNIQUE", "UPDATE", "USING", "VACUUM", "VALUES", "VIEW", "VIRTUAL", "WHEN", 
+                                "WHERE", "WINDOW", "WITH", "WITHOUT"]
 
     def sql_type(self, input_list):
         """
@@ -79,10 +89,11 @@ class Sqlite(Filesystem):
                 return " VARCHAR"
         return ""
     
-    # OLD NAME OF ingest_table_helper. TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifact_type(self, types, foreign_query = None, isVerbose=False):
-        self.ingest_table_helper(types, foreign_query, isVerbose)
-        
+    def sqlite_compatible_name(self, name):
+        if (name.startswith('"') and name.endswith('"')) or (name.upper() not in self.sqlite_keywords and name.isidentifier()):
+            return name
+        return f'"{name}"'
+
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
         **Internal use only. Do not call**
@@ -105,12 +116,18 @@ class Sqlite(Filesystem):
         if self.cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{types.name}';").fetchone():
             col_names = types.properties.keys()
             col_info = self.cur.execute(f"PRAGMA table_info({types.name});").fetchall()
-            query_cols = [column[1] for column in col_info]
+            query_cols = [self.sqlite_compatible_name(column[1]) for column in col_info]
             diff_cols = list(set(col_names) - set(query_cols))
             if len(diff_cols) > 0:
                 for col in diff_cols:
+                    if col.lower() in [c.lower() for c in query_cols]:
+                        return (ValueError, "Cannot have duplicate column names")
                     temp_name = col + self.sql_type(types.properties[col])
-                    self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
+                    try:
+                        self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
+                    except sqlite3.Error as e:
+                        self.con.rollback()
+                        return (sqlite3.Error, e)
         else:
             sql_cols = ', '.join(types.unit_keys)
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
@@ -124,7 +141,11 @@ class Sqlite(Filesystem):
 
             if isVerbose:
                 print(str_query)
-            self.cur.execute(str_query)
+            try:
+                self.cur.execute(str_query)
+            except sqlite3.Error as e:
+                self.con.rollback()
+                return (sqlite3.Error, e)
             self.types = types
 
     # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
@@ -172,27 +193,31 @@ class Sqlite(Filesystem):
             types = DataType()
             types.properties = {}
             types.unit_keys = []
-            types.name = tableName
+
+            sql_table = tableName.replace(' ', '_').replace('-', '_')
+            types.name = self.sqlite_compatible_name(sql_table)
 
             foreign_query = ""
             for key in tableData:
+                sql_key = key.replace(' ', '_').replace('-', '_')
+                sql_key = self.sqlite_compatible_name(sql_key)
                 comboTuple = (tableName, key)
                 dsi_name = "dsi_relations"
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
                     foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
                     primaryTuple = artifacts[dsi_name]['primary_key'][foreignIndex]
-                    foreign_query += f", FOREIGN KEY ({key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
+                    foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
                 
-                types.properties[key.replace('-','_minus_')] = tableData[key]
+                types.properties[sql_key] = tableData[key]
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(key + self.sql_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]) + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(key + self.sql_type(tableData[key]))
+                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]))
             
-            # DEPRECATE IN FUTURE DSI RELEASE FOR NEWER FUNCTION NAME
-            # self.put_artifact_type(types, foreign_query)
-            self.ingest_table_helper(types, foreign_query)
+            error = self.ingest_table_helper(types, foreign_query)
+            if error is not None:
+                return error
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -224,7 +249,7 @@ class Sqlite(Filesystem):
             self.cur.execute(create_query)
             units_data = artifacts["dsi_units"]
             for table_val, col_val, unit_val in zip(units_data["table_name"], units_data["column_name"], units_data["unit"]):
-                str_query = f'INSERT INTO dsi_units VALUES ("{table_val}", "{col_val}", "{unit_val}")'
+                str_query = f"INSERT INTO dsi_units VALUES ('{table_val}', '{col_val}', '{unit_val}')"
                 unit_result = self.cur.execute(f"""SELECT unit FROM dsi_units 
                                                 WHERE table_name = '{table_val}' AND column_name = '{col_val}';""").fetchone()
                 if unit_result and unit_result[0] != unit_val: #checks if unit for same table and col exists in db and if units match
@@ -280,7 +305,7 @@ class Sqlite(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect SELECT query on the data. Please try again")
+                return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
         
@@ -323,7 +348,7 @@ class Sqlite(Filesystem):
         `return`: list of str
             List of table names referenced in the query.
         """
-        all_names = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', query, re.IGNORECASE)
+        all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
         tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
         return tables
 
@@ -468,16 +493,17 @@ class Sqlite(Filesystem):
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         pkList = []
         for item in tableList:
-            tableName = item[0]
+            tableName = self.sqlite_compatible_name(item[0])
             if tableName == "sqlite_sequence":
                 continue
 
             tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchall()
             colDict = OrderedDict()
             for colInfo in tableInfo:
-                colDict[colInfo[1]] = []
+                col_name = self.sqlite_compatible_name(colInfo[1])
+                colDict[col_name] = []
                 if colInfo[5] == 1:
-                    pkList.append((tableName, colInfo[1]))
+                    pkList.append((tableName, col_name))
 
             if only_units_relations == False:
                 data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
@@ -491,10 +517,11 @@ class Sqlite(Filesystem):
 
             fkData = self.cur.execute(f"PRAGMA foreign_key_list({tableName});").fetchall()
             for row in fkData:
-                artifact["dsi_relations"]["primary_key"].append((row[2], row[4]))
-                artifact["dsi_relations"]["foreign_key"].append((tableName, row[3]))
-                if (row[2], row[4]) in pkList:
-                    pkList.remove((row[2], row[4]))
+                curr_pk = (self.sqlite_compatible_name(row[2]), self.sqlite_compatible_name(row[4]))
+                artifact["dsi_relations"]["primary_key"].append(curr_pk)
+                artifact["dsi_relations"]["foreign_key"].append((self.sqlite_compatible_name(tableName), self.sqlite_compatible_name(row[3])))
+                if curr_pk in pkList:
+                    pkList.remove(curr_pk)
 
         for pk_tuple in pkList:
             if pk_tuple not in artifact["dsi_relations"]["primary_key"]:
@@ -554,16 +581,14 @@ class Sqlite(Filesystem):
             - type:     'table'
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
+        tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
 
         if isinstance(query_object, str):
             table_return_list = []
             for table in tableList:
                 if query_object in table:
                     colData = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
-                    col_names = [column[1] for column in colData]
+                    col_names = [self.sqlite_compatible_name(column[1]) for column in colData]
                     table_data = self.cur.execute(f"SELECT * FROM {table};").fetchall()
                     val = ValueObject()
                     val.t_name = table
@@ -604,23 +629,22 @@ class Sqlite(Filesystem):
                 - If range=False: 'column'
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
+        tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
 
         if isinstance(query_object, str):
             col_return_list = []
             for table in tableList:
                 colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
                 for col in colList:
-                    if query_object in col[1]:
-                        returned_col = self.cur.execute(f"SELECT {col[1]} FROM {table};").fetchall()
+                    col_name = self.sqlite_compatible_name(col[1])
+                    if query_object in col_name:
+                        returned_col = self.cur.execute(f"SELECT {col_name} FROM {table};").fetchall()
                         colData = [row[0] for row in returned_col]
                         not_numeric = any(isinstance(item, str) for item in colData)
 
                         val = ValueObject()
                         val.t_name = table
-                        val.c_name = [col[1]]
+                        val.c_name = [col_name]
                         if range == True and not not_numeric:
                             numeric_col = [0 if item is None else item for item in colData]
                             val.value = [min(numeric_col), max(numeric_col)]
@@ -666,9 +690,7 @@ class Sqlite(Filesystem):
                 - If row=False: 'cell'
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
+        tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
                     
         query_list = []
         for table in tableList:
@@ -676,17 +698,18 @@ class Sqlite(Filesystem):
             all_cols = [column[1] for column in colList]
             row_list = []
             for col in colList:
+                col_name = self.sqlite_compatible_name(col[1])
                 middle= None
                 if row:
                     middle = f'"{all_cols}", *'
                 else:
-                    middle = f"'{col[1]}', {col[1]}"
+                    middle = f"'{col_name}', {col_name}"
                 query = f"SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, {middle} FROM {table} AS t1 WHERE "
                 # query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
                 if isinstance(query_object, str):
-                    query += f"{col[1]} LIKE '%{query_object}%'" 
+                    query += f"{col_name} LIKE '%{query_object}%'" 
                 else:
-                    query += f"CAST({col[1]} AS TEXT) LIKE '%{query_object}%'" 
+                    query += f"CAST({col_name} AS TEXT) LIKE '%{query_object}%'" 
                 row_list.append(query)            
 
             table_row_query = " UNION ".join(row_list) + ";"
@@ -720,7 +743,7 @@ class Sqlite(Filesystem):
             The name of the column to apply the relation to.
         
         `relation` : str
-            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5)
+            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5), ~4, ~~4
 
         `return` : list of ValueObjects
             One ValueObject per matching row in that first table.
@@ -732,37 +755,45 @@ class Sqlite(Filesystem):
             - row_num:  row index of the match
             - type:     'relation'
         """
+        user_column = column_name
+        column_name = self.sqlite_compatible_name(column_name)
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
+        tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
 
         all_tables = []
         col_list = []
+        pragma_col_name = column_name[1:-1] if column_name[0] == '"' and column_name[-1] == '"' else column_name
         for table in tableList:
             colData = self.cur.execute(f"PRAGMA table_info({table})").fetchall()
             columns = [row[1] for row in colData]
-            if column_name in columns:
+            if pragma_col_name in columns:
                 all_tables.append(table)
                 col_list = columns        
         
         if len(all_tables) == 0:
-            if (column_name[0] == "'" and column_name[-1] == "'") or (column_name[0] == '"' and column_name[-1] == '"'):
-                return f"{column_name} is not a column in this database. Ensure the column is written first."
-            return f"'{column_name}' is not a column in this database. Ensure the column is written first."
+            if (user_column[0] == "'" and user_column[-1] == "'") or (user_column[0] == '"' and user_column[-1] == '"'):
+                return f"{user_column} is not a column in this database. Ensure the column is written first."
+            return f"'{user_column}' is not a column in this database. Ensure the column is written first."
         old_relation = relation
+        old_col_name = column_name
         if relation[0] == '(' and relation[-1] == ')':
             values = relation[1:-1].strip()
             values = re.sub(r"\s*,\s*(?=(?:[^']*'[^']*')*[^']*$)", ",", values)
             values = re.split(r",(?=(?:[^']*'[^']*')*[^']*$)", values)
             relation = f"BETWEEN {values[0]} AND {values[1]}"
+        elif relation[0] == "~":
+            column_name = f"CAST({column_name} AS TEXT)"
+            relation = relation[3:] if relation[:2] == '~~' else relation[2:]
+            if relation[0] == "'" and relation[-1] == "'":
+                relation = relation[1:-1]
+            relation = f"LIKE '%{relation}%'"
 
         row_id_select = f"(SELECT COUNT(*) FROM {all_tables[0]} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num"
         query = f"SELECT {row_id_select}, * FROM {all_tables[0]} as t1 WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()
         
         if not output_data and len(all_tables) == 1:
-            val = f'"{column_name} {old_relation}"' if "'" in old_relation else f"'{column_name} {old_relation}'"
+            val = f' {old_col_name} {old_relation} '
             return f"Could not find any rows where {val} in this database."
         if len(all_tables) > 1:
             query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
@@ -785,9 +816,7 @@ class Sqlite(Filesystem):
         Return a list of all tables and their dimensions from this SQLite backend
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
-        tableList = [table[0] for table in tableList]
-        if "sqlite_sequence" in tableList:
-            tableList.remove("sqlite_sequence")
+        tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
         
         info_list = []
         for table in tableList:
@@ -823,14 +852,15 @@ class Sqlite(Filesystem):
 
             If None (default), all columns are displayed.
         """
+        table_name = self.sqlite_compatible_name(table_name.replace(' ', '_'))
         if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
-            return (ValueError, f"{table_name} does not exist in this SQLite database")
+            return (ValueError, f"'{table_name}' does not exist in this SQLite database")
         if display_cols == None:
             df = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT {num_rows};", self.con) 
         else:
             sql_list = ", ".join(display_cols)
             try:
-                df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name}  LIMIT {num_rows};", self.con)
+                df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name} LIMIT {num_rows};", self.con)
             except Exception as e:
                 return (sqlite3.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
@@ -847,7 +877,7 @@ class Sqlite(Filesystem):
         """
         if table_name is None:
             tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table' AND name != 'sqlite_sequence';").fetchall()
-            tableList = [table[0] for table in tableList]
+            tableList = [self.sqlite_compatible_name(table[0]) for table in tableList]
 
             summary_list = []
             for table in tableList:
@@ -856,8 +886,9 @@ class Sqlite(Filesystem):
             summary_list.insert(0, tableList)
             return summary_list
         else:
+            table_name = self.sqlite_compatible_name(table_name.replace(' ', '_'))
             if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
-                return (ValueError, f"{table_name} does not exist in this SQLite database")
+                return (ValueError, f"'{table_name}' does not exist in this SQLite database")
             headers, rows = self.summary_helper(table_name)
             return pd.DataFrame(rows, columns=headers, dtype=object)
 
@@ -940,7 +971,7 @@ class Sqlite(Filesystem):
 
             if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) > 0:
                 relations = OrderedDict([('primary_key', []), ('foreign_key', [])])
-                tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall() 
+                tableInfo = self.cur.execute(f"PRAGMA table_info({table_name});").fetchall()
                 for colInfo in tableInfo:
                     if colInfo[5] == 1:
                         relations["primary_key"].append((table_name, colInfo[1]))
@@ -975,7 +1006,8 @@ class Sqlite(Filesystem):
                         print(f"WARNING: The data in {name}'s primary key column was edited which could reorder rows in the table.")
         
         for name in temp_data.keys():
-            self.cur.execute(f'DROP TABLE IF EXISTS "{name}";')
+            temp_name = name[1:-1] if name[0] == '"' and name[-1] == '"' else name
+            self.cur.execute(f'DROP TABLE IF EXISTS "{temp_name}";')
             self.con.commit()
         
         temp_runTable_bool = self.runTable
@@ -995,22 +1027,3 @@ class Sqlite(Filesystem):
         Closes the SQLite database's connection.
         """
         self.con.close()
-
-    # OLD FUNCTION TO DEPRECATE
-    def put_artifacts_t(self, collection, tableName="TABLENAME", isVerbose=False):
-        """
-        DSI 1.0 FUNCTIONALITY - DEPRECATING SOON, DO NOT USE
-        
-        Primary class for insertion of collection of Artifacts metadata into a defined schema, with a table passthrough
-
-        `collection`: A Python Collection of an Artifact derived class that has multiple regular structures of a defined schema,
-        filled with rows to insert.
-
-        `tableName`: A passthrough to define a table and set the name of a table
-
-        `return`: none
-        """
-        # Define table name in local class space
-        self.types = DataType()
-        self.types.name = tableName
-        self.put_artifacts(collection, isVerbose)

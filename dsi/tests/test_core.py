@@ -899,3 +899,125 @@ def get_table_duckdb_backend():
     physics_get = a.get_table(table_name="physics")
     assert physics_query.equals(physics_get)
     a.close()
+
+def test_sanitize_input():
+    my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
+                    'all': OrderedDict({'specification': ['!sam'], 'fileLoc': ['/home/sam/lib/data'], 'G': ['good memories'], 
+                                        'all': [9.8], 'i': [2], 'j': [3], 'k': [4], 'l': [1.0], 'm': [99]}), 
+                    'physics': OrderedDict({'specification': ['!amy', '!amy1'], 'n': [9.8, 91.8], 'o': ['gravity', 'gravity'], 
+                                            'p': [23, 233], 'q': ['home 23', 'home 23'], 'r': [1, 12], 's': [-0.0012, -0.0122]}), 
+                    '"math"': OrderedDict({'specification': [None, '!jack1'], 'a': [None, 2], 'b': [None, 3], 'c': [None, 45.98], 
+                                         'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}), 
+                    'address': OrderedDict({'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
+                                            'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
+    
+    a = Terminal()
+    a.load_module('plugin', 'Dict', 'reader', collection=my_dict)
+    
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    a.load_module('backend','Sqlite','back-write', filename='data.db')
+    a.artifact_handler(interaction_type='ingest')
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        a.display('2')
+    output = f.getvalue()
+
+    expected_output = "\nTable: 2" + textwrap.dedent("""
+
+    specification | a | b | c     | d | e    | f     
+    -------------------------------------------------
+    !jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        a.display('"2"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "2"' + textwrap.dedent("""
+
+    specification | a | b | c     | d | e    | f     
+    -------------------------------------------------
+    !jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        a.display('all')
+    output = f.getvalue()
+
+    expected_output = '\nTable: all' + textwrap.dedent("""
+
+    specification | fileLoc            | G             | all | i | j | k | l   | m 
+    -------------------------------------------------------------------------------
+    !sam          | /home/sam/lib/data | good memories | 9.8 | 2 | 3 | 4 | 1.0 | 99
+    
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        a.display('"math"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "math"' + textwrap.dedent("""
+
+    specification | a   | b   | c     | d   | e    | f     
+    -------------------------------------------------------
+    None          | nan | nan | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+    
+    """)
+    assert output == expected_output
+
+    a.artifact_handler(interaction_type="process")
+    a.artifact_handler(interaction_type='ingest')
+
+    assert 'math' in a.active_metadata.keys()
+    assert '"math"' not in a.active_metadata.keys()
+    assert '"all"' in a.active_metadata.keys()
+    assert 'all' not in a.active_metadata.keys()
+    assert '"2"' in a.active_metadata.keys()
+    assert '2' not in a.active_metadata.keys()
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        a.display('"math"')
+    output = f.getvalue()
+
+    expected_output = '\nTable: "math"' + textwrap.dedent("""
+
+    specification | a   | b   | c     | d   | e    | f     
+    -------------------------------------------------------
+    None          | nan | nan | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+    None          | nan | nan | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+        
+    """)
+    assert output == expected_output
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        a.display('math')
+    output = f.getvalue()
+
+    expected_output = '\nTable: math' + textwrap.dedent("""
+
+    specification | a   | b   | c     | d   | e    | f     
+    -------------------------------------------------------
+    None          | nan | nan | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+    None          | nan | nan | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+        
+    """)
+    assert output == expected_output

@@ -41,8 +41,22 @@ draw [-f filename]
 exit
     Exits the CLI and closes all active DSI modules.
 
-find <var>
-    Searches for an input variable from all data loaded into DSI. Can match table names, columns, or data values.
+find <condition>
+    Finds all rows of a table that match the condition in the format: [column] [operator] [value]. 
+    Ex: find 'age = 6'
+
+    Valid operators:
+
+        - age > 4 
+        - age < 4 
+        - age >= 4 
+        - age <= 4 
+        - age = 4 
+        - age == 4
+        - age ~ 4    --> column age contains the number 4
+        - age ~~ 4   --> column age contains the number 4
+        - age != 4 
+        - age (4, 8) --> all values in 'age' between 4 and 8 (inclusive)
 
 list
     Lists the names of all tables and their dimensions.
@@ -54,7 +68,7 @@ plot_table <table_name> [-f filename]
     - `filename` is optional; default is `<table_name>_plot.png`.
 
 query <SQL query> [-n num rows] [-e filename]
-    Prints the result of the specified query (in quotes) with optional arguments.
+    Executes a specified query (in quotes) and prints the result with optional arguments.
 
     - `SQL query` is mandatory and must match SQLite or DuckDB syntax.
     - `num_rows` is optional; prints the first N rows of the result.
@@ -66,9 +80,12 @@ read <filename> [-t table name]
     - `filename` is a mandatory input of data to ingest. Accepted formats: 
     
         - CSV, JSON, TOML, YAML, Parquet, SQLite databases, DuckDB databases
-        - URL of data stored online that is in one of the above formats
+        - URL pointing to data stored in one of the above formats
 
     - `table_name` is optional. If reading a CSV, JSON, or Parquet, users can specify table_name
+
+search <value>
+    Searches for an input value across all data loaded into DSI. Can be a number or text.
 
 summary [-t table_name]
     Displays numerical statistics of all tables or a specified table.

@@ -9,7 +9,6 @@ from collections import OrderedDict
 import textwrap
 from contextlib import redirect_stdout
 import sys
-import re
 import io
 
 from dsi.core import Terminal
@@ -84,13 +83,14 @@ class DSI_cli:
             "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             ("draw [-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             ("exit", "Exits the DSI Command Line Interface (CLI)"),
-            ("find <variable>", "Searches for a variable in DSI"),
+            ("find <condition>", "Finds all rows of a table that match a column-level condition."),
             ("help", "Shows this help message."),
             ("list", "Lists all tables in the current DSI database"),
             ("plot_table <table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
             ("query <SQL_query> [-n num_rows] [-e filename]",
             "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
             ("read <filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            ("search <value>", "Searches for a string or number across DSI."),
             ("summary [-t table_name]", "Summary of the database or a specific table."),
             ("write <filename>", "Writes data in DSI database to a permanent location."),
             ("ls", "Lists all files in the current or specified directory."),
@@ -147,6 +147,7 @@ class DSI_cli:
             self.t.display(table_name, num_rows)
         except Exception as e:
             print(f"display ERROR: {e}")
+            return
         
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
@@ -242,7 +243,7 @@ class DSI_cli:
     
     def find(self, args):
         '''
-        Global find to see where that string exists
+        Global find to see where the condition is met
         '''
         if not args:
             print("find ERROR: need to specify an object to find")
@@ -252,64 +253,54 @@ class DSI_cli:
             return
         query = args[0]
 
-        new_find = False
-        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(']
-        if isinstance(query, str) and any(op in query for op in operators):
-            pattern = r'(==|!=|>=|<=|=|<|>|\()'
-            parts = re.split(r'(".*?")', query)
-
-            result = []
-            for part in parts:
-                if part.startswith('"') and part.endswith('"'):
-                    result.append(part)
-                else:
-                    result.extend([p.strip() for p in re.split(pattern, part) if p.strip()])
-            if len(result) > 1: # can split into column and operator
-                new_find = True
-                print(f"Finding all rows where '{query}' in the active backend")
-
-                output = None
-                try:
-                    f = io.StringIO()
-                    with redirect_stdout(f):
-                        find_list = self.t.find_relation(query)
-                    output = f.getvalue()
-                except Exception as e:
-                    sys.exit(f"find() ERROR: {e}")
-                
-                if output and "WARNING" in output:
-                    warn_msg = output[output.find("WARNING"):]
-                    if "artifact_handler" in warn_msg:
-                        lines = warn_msg.splitlines()
-                        start = lines[1].find('`')
-                        between = lines[1][start + 1 : lines[1].find('`', start + 1)]
-                        lines[1] = lines[1].replace(between, "query")
-                        lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query")
-                        warn_msg = '\n'.join(lines)
-                    print("\n"+warn_msg.replace("database", "backend"))
-                    return
-
-        if new_find == False:
-            val = f"'{query}'" if isinstance(query, str) else query
-            print(f"Finding all instances of {val} in DSI")
-            
-            fnull = open(os.devnull, 'w')
-            try:
-                with redirect_stdout(fnull):
-                    find_list = self.t.find_cell(query, row=True)
-            except Exception as e:
-                print(f"find ERROR: {e}")
-                return
-        if find_list is None:
-            val = f"'{query}'" if isinstance(query, str) else query
-            print(f"WARNING: {val} was not found")
+        if not isinstance(query, str):
+            print("find ERROR: <condition> must be a string.")
             return
-        print()
-        for val in find_list:
-            print(f"Table: {val.t_name}")
-            print(f"  - Columns: {val.c_name}")
-            print(f"  - Row Number: {val.row_num}")
-            print(f"  - Data: {val.value}")
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
+        if not any(op in query for op in operators):
+            print("find ERROR: <condition> must contain an operator. If just searching for a value, use the 'search' command.")
+            return
+
+        print(f"Finding all rows where '{query}'")
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                find_data = self.t.find_relation(query)
+            output = f.getvalue()
+        except Exception as e:
+            e = str(e).replace("query_object", "condition")
+            print(f"find ERROR: {e}")
+            return
+        
+        if output and "WARNING" in output:
+            warn_msg = output[output.find("WARNING"):]
+            if "artifact_handler" in warn_msg:
+                lines = warn_msg.splitlines()
+                start = lines[1].find('`')
+                between = lines[1][start + 1 : lines[1].find('`', start + 1)]
+                lines[1] = lines[1].replace(between, "query")
+                lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "`query`")
+                warn_msg = '\n'.join(lines)
+            elif "Could not find" in warn_msg:
+                ending_ind = warn_msg.find("in this database")
+                warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
+            print("\n"+warn_msg.replace("database", "backend"))
+            return
+
+        table_name = None
+        output_df = None
+        row_list = [f.row_num for f in find_data]
+        for val in find_data:
+            if table_name is None:
+                table_name = val.t_name
+                output_df = pd.DataFrame([val.value], columns=val.c_name)
+            else:
+                output_df.loc[len(output_df)] = val.value
+        
+        print(f'\nTable: {table_name}')
+        output_df.insert(0, "row_index", row_list)
+        self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
         print()
     
 
@@ -407,7 +398,7 @@ class DSI_cli:
         
         headers = data.columns.tolist()
         rows = data.values.tolist()
-        self.t.table_print_helper(headers, rows, num_rows)
+        self.t.table_print_helper(headers, rows, len(rows), num_rows)
         
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
@@ -533,6 +524,41 @@ class DSI_cli:
             print("   - duckdb (extension: .duckdb, .db)\n")
             return
 
+        
+    def search(self, args):
+        '''
+        Global search to see where that value exists
+        '''
+        if not args:
+            print("search ERROR: need to specify an object to search for")
+            return
+        if len(args) > 1:
+            print("search ERROR: need to wrap a multi-word search in quotes. Ex: find 'this is'")
+            return
+        query = args[0]
+
+        val = f"'{query}'" if isinstance(query, str) else query
+        print(f"Searching for all instances of {val} in the active backend")
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                find_data = self.t.find_cell(query, row=True)
+        except Exception as e:
+            print(f"search ERROR: {e}")
+            return
+        
+        if find_data is None:
+            print(f"WARNING: {val} was not found in this backend\n")
+            return
+        print()
+        for val in find_data:
+            print(f"Table: {val.t_name}")
+            print(f"  - Columns: {val.c_name}")
+            print(f"  - Row Number: {val.row_num}")
+            print(f"  - Data: {val.value}")
+        print()
+    
 
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')
@@ -642,6 +668,7 @@ COMMANDS = {
     'query' : (cli.get_query_parser, cli.query),
     'write' : (cli.get_write_parser, cli.write_to_file),
     'summary' : (cli.get_summary_parser, cli.summary),
+    'search' : (None, cli.search),
     'ls' : (None, cli.ls),
     'cd' : (None, cli.cd)
 }
