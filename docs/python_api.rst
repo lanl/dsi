@@ -69,9 +69,9 @@ Examples of each data card standard for the Wildfire dataset can be found in ``e
 User Examples
 --------------
 Examples below display various ways users can incorporate DSI into their data science workflows.
-They are located in ``examples/user/`` and must be run from that directory.
+They must be executed from their directory in ``examples/user/``
 
-All of them either load or refer to data in ``examples/clover3d/``. 
+To run them successfully, please unzip ``clover3d.zip`` located in ``examples/clover3d/``, and execute ``requirements.extras.txt``.
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,15 +93,20 @@ Printing various data and metadata from a DSI backend - number of tables, list o
 
 Example 4: Find data
 ~~~~~~~~~~~~~~~~~~~~
-Finding data from an active DSI backend that matches an input query - a string or a number.
-Prints all matches by default. If ``True`` is passed as an additional argument, returns rows of the first table that satisfies the query.
+Finding data from an active DSI backend that matches an input object. 
+
+If using ``search()``, the input can be a string or number. 
+If using ``find()``, the input must be a string in the form of a condition - [column] [operator] [value].
+
+By default, all matches are printed. If ``True`` is passed as an additional argument, the matching rows are returned as a DataFrame instead.
 
 .. literalinclude:: ../examples/user/4.find.py
 
 Example 5: Update data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Updating data from the edited output of ``find()``. Input can be output of either ``find()``, ``query()``, or ``get_table()``.
-Users must NOT change metadata columns starting with **`dsi_`** even if adding new rows.
+Updating data from the edited output of ``find()``. Users must NOT modify metadata columns starting with **`dsi_`** even when adding new rows.
+
+The input can be the output of either ``find()``, ``search()``, ``query()``, or ``get_table()``.
 
 .. literalinclude:: ../examples/user/5.update.py
 
@@ -109,6 +114,8 @@ Example 6: Query data
 ~~~~~~~~~~~~~~~~~~~~~
 Querying data from an active DSI backend. 
 Users can either use ``query()`` to view specific data with a SQL statement, or ``get_table()`` to view all data from a specified table.
+
+By default, all matches are printed. If ``True`` is passed as an additional argument, the matching rows are returned as a DataFrame instead.
 
 .. literalinclude:: ../examples/user/6.query.py
 

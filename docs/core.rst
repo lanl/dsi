@@ -60,9 +60,9 @@ by creating a DSI database in the process, or retrieving an existing DSI databas
 Examples
 --------
 Examples below display various ways users can incorporate DSI into their data science workflows.
-They are located in ``examples/developer/`` and must be run from that directory.
+They must be executed from their directory in ``examples/developer/``
 
-Most of them either load or refer to data from ``examples/clover3d/``.
+To run them successfully, please unzip ``clover3d.zip`` located in ``examples/clover3d/``, and execute ``requirements.extras.txt``.
 
 Example 1: Intro use case
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

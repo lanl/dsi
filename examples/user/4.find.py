@@ -4,7 +4,7 @@ from dsi.dsi import DSI
 find_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
 
 #dsi.search(value)
-find_dsi.search("Jun 2025") # searches for the value 2 in all tables
+find_dsi.search("Jun 2025") # searches for the value 'Jun 2025' in all tables
 
 find_df = find_dsi.search("Jun 2025", True) # Returns the first matching table as a DataFrame
 

@@ -25,7 +25,4 @@ terminal_visualize.summary()
 # prints numerical stats for only 'input'
 terminal_visualize.summary("input")
 
-# prints numerical stats for only 'input' and prints first 5 rows of the actual table
-terminal_visualize.summary("input", 5)
-
 terminal_visualize.close()
