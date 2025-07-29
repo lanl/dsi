@@ -24,7 +24,4 @@ visual_dsi.summary()
 # prints numerical stats for only 'input'
 visual_dsi.summary("input")
 
-# prints numerical stats for only 'input' and prints first 5 rows of the actual table
-visual_dsi.summary("input", 5)
-
 visual_dsi.close()

@@ -7,11 +7,9 @@ schema_dsi = DSI("schema_data.db")
 schema_dsi.schema("../clover3d/schema.json") # must execute before reading Cloverleaf data
 
 #dsi.read(path, reader)
-# UNZIP clover3d.zip INSIDE EXAMPLES/CLOVER3D/
-schema_dsi.read("../clover3d/clover3d/", 'Cloverleaf')
+schema_dsi.read("../clover3d/", 'Cloverleaf')
 
 #dsi.write(filename, writer)
-# EXECUTE requirements.extras.txt  to be able to run this
 schema_dsi.write("clover_er_diagram.png", "ER_Diagram")
 
 #dsi.display(table_name, num_rows, display_cols)

@@ -4,9 +4,8 @@ from dsi.core import Terminal
 terminal_notebook = Terminal()
 
 #read data
-# UNZIP clover3d.zip INSIDE EXAMPLES/CLOVER3D/
 terminal_notebook.load_module('plugin', 'Schema', 'reader', filename="../clover3d/schema.json")
-terminal_notebook.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/clover3d/")
+terminal_notebook.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/")
 
 #ingest data to Sqlite backend
 terminal_notebook.load_module('backend','Sqlite','back-write', filename='jupyter_data.db')

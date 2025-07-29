@@ -7,7 +7,6 @@ terminal_process = Terminal()
 terminal_process.load_module('backend','Sqlite','back-read', filename='schema_data.db')   
 terminal_process.artifact_handler(interaction_type="process")
 
-# EXECUTE requirements.extras.txt  to be able to run this
 terminal_process.load_module('plugin', 'ER_Diagram', 'writer', filename = 'er_diagram.png')
 
 terminal_process.load_module('plugin', "Table_Plot", "writer", table_name = "output", filename = "output_plot.png")

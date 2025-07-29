@@ -38,12 +38,12 @@ DuckDB
    :members:
    :special-members: __init__
 
-SQLAlchemy
------------
+.. SQLAlchemy
+.. -----------
 
-.. automodule:: dsi.backends.sqlalchemy
-   :members:
-   :special-members: __init__
+.. .. automodule:: dsi.backends.sqlalchemy
+..    :members:
+..    :special-members: __init__
 
 GUFI
 ------

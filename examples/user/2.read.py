@@ -4,8 +4,7 @@ from dsi.dsi import DSI
 read_dsi = DSI("data.db") # Target a backend, defaults to SQLite if not defined
 
 #dsi.read(path, reader)
-# UNZIP clover3d.zip INSIDE EXAMPLES/CLOVER3D/
-read_dsi.read("../clover3d/clover3d/", 'Cloverleaf') # Read data into memory
+read_dsi.read("../clover3d/", 'Cloverleaf') # Read data into memory
 
 #dsi.display(table_name)
 read_dsi.display("input") # Print the specific table's data from the Cloverleaf data

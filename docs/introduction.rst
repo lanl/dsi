@@ -35,16 +35,21 @@ The DSI API is broken into three main categories:
 Expected Data Standards
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before using DSI, users are expected to preprocess their data into a standardized format.
-DSI's actions are strict and will not commit any database actions if the data is unstable.
+Before using DSI, users should first standardize their data in a format that can be represented as a table. 
+DSI supports many widely used formats, including, but not limited to, CSV, JSON, YAML, TOML, and in-memory dictionaries.
+If the data is structured in a unique format, users can create an external DSI reader by following the steps in :ref:`custom_reader`.
 
-This can be achieved by organizing the data so it can be represented as a table in DSI. 
-It is also expected that each data point is a discrete value, rather than a complex data structure.
-If metadata is crucial to data representation, users should ensure it is stored with the data to be captured by DSI actions.
+When using a DSI-supported Reader, each data point is expected to be a discrete value — not a nested structure.
+Users must flatten any nested data to ensure compatibility with DSI.
 
-Users expecting to load a complex schema into DSI should also consider which columns in tables will be related to each other.
-This requires prior knowledge of primary and foreign keys, and writing a JSON file to represent this schema. 
-For more information on creating a schema compatible with DSI, please view :ref:`user_schema_example_label`.
+Metadata is important for many data workflows and should be stored with the data when relevant.
+For example, if simulation parameters are required for future analysis, that metadata should be included in the same table as the data.
+
+Advanced users familiar with database relationships can also load a complex relational schema into DSI alongside their data.
+This requires prior knowledge of primary and foreign keys, as well as how columns across tables should be related.
+
+Users must load this relational schema as a JSON into DSI using a Schema Reader.
+For more information on formatting the schema file correctly, refer to :ref:`user_schema_example_label`.
 
 DSI Readers/Writers
 ~~~~~~~~~~~~~~~~~~~~
@@ -62,6 +67,7 @@ Currently, DSI has the following Readers:
   - Schema (A complex schema reader)
   - YAML1
   - TOML1
+  - Collection (To load a Python dictionary or OrderedDict)
   - Bueno
   - Ensemble (Reader to ingest ensemble data. Ex: the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . 
     Assumes each data row is a separate sim.)
