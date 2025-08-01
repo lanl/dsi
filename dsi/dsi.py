@@ -549,7 +549,7 @@ class DSI():
                 if val.t_name not in output_dict:
                     output_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
                 else:
-                    output_dict[val.t_name].loc(len(output_dict[val.t_name])) = val.value
+                    output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
             
             return list(output_dict.values())
 
