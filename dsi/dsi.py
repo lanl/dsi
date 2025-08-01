@@ -301,7 +301,7 @@ class DSI():
         else:
             print(f"Loaded {filenames} into the table {table_keys[0]}")
 
-    def query(self, statement, collection = False):
+    def query(self, statement, collection = False, update = False):
         """
         Executes a SQL query on the active backend.
 
@@ -309,12 +309,14 @@ class DSI():
             A SQL query to execute. Only `SELECT` and `PRAGMA` statements are allowed.
 
         `collection` : bool, optional, default False.
-            If True, returns the result as a pandas.DataFrame
-
-            - DataFrame includes 'dsi_table_name' column required for ``dsi.update()``.
-              Drop if not using ``update()``.
+            If True, returns the result as a pandas DataFrame.
             
             If False (default), prints the result.
+
+        `update` : bool, optional, default False.
+            If True, includes a 'dsi_table_name' column required for ``dsi.update()``. 
+
+            If False (default), return object does not include this column.
 
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
@@ -345,11 +347,12 @@ class DSI():
             print()
         else:
             print(f"Storing the result of the SQL query: {statement} as a collection")
-            df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
-            print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
+            if update:
+                df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+                print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
             return df
     
-    def get_table(self, table_name, collection = False):
+    def get_table(self, table_name, collection = False, update = False):
         """
         Retrieves all data from a specified table without requiring knowledge of the active backend's query language.
         
@@ -359,12 +362,14 @@ class DSI():
             Name of the table from which all data will be retrieved.
 
         `collection` : bool, optional, default False.
-            If True, returns the result as a pandas.DataFrame
-
-            - DataFrame includes 'dsi_table_name' column required for ``dsi.update()``.
-              Drop if not using ``update()``.
+            If True, returns the result as a pandas DataFrame.
             
             If False (default), prints the result.
+        
+        `update` : bool, optional, default False.
+            If True, includes a 'dsi_table_name' column required for ``dsi.update()``. 
+
+            If False (default), return object does not include this column.
         
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
@@ -387,11 +392,12 @@ class DSI():
             print()
         else:
             print(f"Storing all data for the table: {table_name} as a collection")
-            df.insert(0, "dsi_table_name", table_name)
-            print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
+            if update:
+                df.insert(0, "dsi_table_name", table_name)
+                print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
             return df
         
-    def find(self, query, collection = False):
+    def find(self, query, collection = False, update = False):
         """
         Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
 
@@ -410,13 +416,15 @@ class DSI():
             - age != 4 
             - age (4, 8) --> all values in 'age' between 4 and 8 (inclusive)
 
-        `collection` : bool, optional, default False. 
+        `collection` : bool, optional, default False.
             If True, returns a pandas DataFrame representing a subset of table rows that satisfy the `query`.
+            
+            If False (default), prints the result.
 
-            - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
-              Drop them if not using ``update()``.
+        `update` : bool, optional, default False.
+            If True, includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
 
-            If False (default), prints the matching rows to the console.
+            If False (default), return object does not include these columns.
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
@@ -471,14 +479,14 @@ class DSI():
 
         if not collection:
             print(f'\nTable: {table_name}')
-            output_df.insert(0, "row_index", row_list)
             self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
             print()
         else:
-            output_df.insert(0, "dsi_row_index", row_list)
-            output_df.insert(0, "dsi_table_name", table_name)
-            first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
-            print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
+            if update:
+                output_df.insert(0, "dsi_row_index", row_list)
+                output_df.insert(0, "dsi_table_name", table_name)
+                first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+                print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
             return output_df
     
     def search(self, query, collection = False):
@@ -489,14 +497,9 @@ class DSI():
             The value to search for in all rows across all tables.
 
         `collection` : bool, optional, default False. 
-            If True, returns a pandas DataFrame representing a subset of the first table where `query` is found.
+            If True, returns a list of pandas DataFrames representing a subset of tables where `query` is found.
 
-            - DataFrame includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
-              Drop them if not using ``update()``.
-
-            If False (default), prints the matching rows to the console.
-
-        `return` : If there are no matches found, then nothing is returned or printed
+            If False (default), prints the matches to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
@@ -511,39 +514,44 @@ class DSI():
         fnull = open(os.devnull, 'w')
         try:
             with redirect_stdout(fnull):
-                find_data = self.t.find_cell(query, row=True)
+                find_cell = self.t.find_cell(query, row=True)
+                find_table = self.t.find_table(query)
+                find_col = self.t.find_column(query)
         except Exception as e:
             sys.exit(f"search() ERROR: {e}")
         
-        if find_data is None:
+        if find_cell is None and find_col is None and find_table is None:
             print(f"WARNING: {val} was not found in this backend\n")
             return
         if collection == False:
             print()
-            for val in find_data:
+            for val in find_table or []:
+                print(f"Found Table: '{val.t_name}' in database\n")
+            for val in find_col or []:
+                print(f"Found Column '{val.c_name[0]}' in Table: '{val.t_name}' in database\n")
+            for val in find_cell or []:
                 print(f"Table: {val.t_name}")
                 print(f"  - Columns: {val.c_name}")
                 print(f"  - Row Number: {val.row_num}")
-                print(f"  - Data: {val.value}")
-            print()
+                print(f"  - Data: {val.value}\n")
         else:
-            table_name = None
-            output_df = None
-            row_list = []
-            for val in find_data:
-                if table_name is None:
-                    table_name = val.t_name
-                    output_df = pd.DataFrame([val.value], columns=val.c_name)
-                    row_list.append(val.row_num)
-                elif table_name == val.t_name and val.row_num not in row_list:
-                    output_df.loc[len(output_df)] = val.value
-                    row_list.append(val.row_num)
-
-            output_df.insert(0, "dsi_row_index", row_list)
-            output_df.insert(0, "dsi_table_name", table_name)
-            first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
-            print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
-            return output_df
+            # ADD CHECKER IF VALUE OBJECT IS A TABLE THEN JUST MAKE MINI DATAFRAME FOR TABLES AND SIMILARLY FOR COL MATCH
+            output_dict = {}
+            for val in find_table or []:
+                if 'table_match' not in output_dict:
+                    output_dict['table_match'] = pd.DataFrame(columns=['table_name'])
+                output_dict['table_match'].loc[len(output_dict['table_match'])] = val.t_name
+            for val in find_col or []:
+                if 'col_match' not in output_dict:
+                    output_dict['col_match'] = pd.DataFrame(columns=['table_name', 'column_name'])
+                output_dict['col_match'].loc[len(output_dict['col_match'])] = [val.t_name, val.c_name[0]]
+            for val in find_cell or []:
+                if val.t_name not in output_dict:
+                    output_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
+                else:
+                    output_dict[val.t_name].loc(len(output_dict[val.t_name])) = val.value
+            
+            return list(output_dict.values())
 
     def update(self, collection, backup = False):
         """
@@ -613,7 +621,8 @@ class DSI():
             
             if len(row_num_list) > len(actual_df) or any(ind > len(actual_df) for ind in row_num_list):
                 sys.exit("update() ERROR: 'dsi_row_index' was modified. When adding new rows, values for 'dsi_row_index' must be empty.")
-
+            
+            # currently prevents users from dropping columns from the original table
             if not set(actual_df.columns).issubset(set(table_df.columns)):
                 sys.exit(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
             new_cols = list(set(table_df.columns) - set(actual_df.columns))
