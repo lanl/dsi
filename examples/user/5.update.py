@@ -4,7 +4,7 @@ from dsi.dsi import DSI
 update_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
 
 #dsi.find(condition, collection)
-find_df = update_dsi.find("state2_density > 5.0", True) # Returns matching rows as a DataFrame
+find_df = update_dsi.find("state2_density > 5.0", True, True) # Returns matching rows as a DataFrame
 
 update_dsi.display(find_df["dsi_table_name"][0], 5) # display table before update
 

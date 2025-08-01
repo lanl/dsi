@@ -106,7 +106,7 @@ Example 5: Update data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Updating data from the edited output of ``find()``. Users must NOT modify metadata columns starting with **`dsi_`** even when adding new rows.
 
-The input can be the output of either ``find()``, ``search()``, ``query()``, or ``get_table()``.
+The input can be the output of either ``find()``, ``query()``, or ``get_table()``.
 
 .. literalinclude:: ../examples/user/5.update.py
 
