@@ -821,6 +821,13 @@ class DSI():
             If specified, only the numerical metadata for that table will be printed.
             
             If None (default), metadata for all available tables is printed.
+        
+        `collection` : bool, optional, default False. 
+            If True, and table_name specified, returns a Pandas DataFrame of the summary of that table.
+
+            If True, and table_name not specified, returns a list of Pandas DataFrames of the summary of all tables.
+            
+            If False (default), prints each table's name and dimensions to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
