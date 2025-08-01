@@ -207,7 +207,7 @@ def test_sanitize_inputs_sqlite():
     Table: "all"
 
     specification | fileLoc            | G             | all | i | j | k | l   | m 
-    -------------------------------------------------------------------------------------------
+    -------------------------------------------------------------------------------
     !sam          | /home/sam/lib/data | good memories | 9.8 | 2 | 3 | 4 | 1.0 | 99
                                                          
     """)
@@ -1073,16 +1073,16 @@ def test_sanitize_inputs_duckdb():
     
     Table: "all"
 
-    row_index | specification | fileLoc            | G             | all               | i | j | k | l   | m 
-    ---------------------------------------------------------------------------------------------------------
-    1         | !sam          | /home/sam/lib/data | good memories | 9.800000190734863 | 2 | 3 | 4 | 1.0 | 99
+    specification | fileLoc            | G             | all               | i | j | k | l   | m 
+    ---------------------------------------------------------------------------------------------
+    !sam          | /home/sam/lib/data | good memories | 9.800000190734863 | 2 | 3 | 4 | 1.0 | 99
                                                          
     """)
     assert output == expected_output
 
     f = io.StringIO()
     with redirect_stdout(f):
-        find_df = test.find('all > 9', True)
+        find_df = test.find('all > 9', collection=True, update=True)
 
     assert not find_df.empty
     assert find_df['dsi_table_name'].tolist() == ['"all"']
@@ -1090,7 +1090,7 @@ def test_sanitize_inputs_duckdb():
 
     f = io.StringIO()
     with redirect_stdout(f):
-        find_df = test.find('"all" > 9', True)
+        find_df = test.find('"all" > 9', collection=True, update=True)
 
     assert not find_df.empty
     assert find_df['dsi_table_name'].tolist() == ['"all"']
@@ -1098,7 +1098,7 @@ def test_sanitize_inputs_duckdb():
 
     f = io.StringIO()
     with redirect_stdout(f):
-        find_df = test.find('"math" < 9', True)
+        find_df = test.find('"math" < 9', collection=True, update=True)
     
     assert not find_df.empty
     assert find_df['dsi_table_name'].tolist() == ['math']
@@ -1124,7 +1124,7 @@ def test_sanitize_inputs_duckdb():
 
     f = io.StringIO()
     with redirect_stdout(f):
-        find_df = test.find('b < 9', True)
+        find_df = test.find('b < 9', collection=True, update=True)
     
     assert not find_df.empty
     assert find_df['dsi_table_name'].tolist() == ['"2"']
