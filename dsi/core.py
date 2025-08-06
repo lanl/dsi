@@ -1585,6 +1585,8 @@ class Sync():
             remote_host = "myremote"
         elif tool == "conduit":
             # Data movement via Conduit
+            env = os.environ.copy()
+            
             if not os.path.exists(self.remote_location):
                 if isVerbose:
                     print( " mkdir " + self.remote_location)
@@ -1609,7 +1611,31 @@ class Sync():
             #    if isVerbose:
             #        print( "conduit cp " + file + " " + file_remote)
             try:
-                subprocess.run(["conduit", "cp", "-r", self.local_location, self.remote_location], shell=True)
+                #subprocess.call(["conduit", "cp", "-r", self.local_location, self.remote_location], env=env, shell=True)
+
+                # File Movement
+                if isVerbose:
+                    print( "conduit cp -r " + os.path.join(self.local_location, self.project_name) + " " + os.path.join(self.remote_location, self.project_name) )
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r',os.path.join(self.local_location, self.project_name),  os.path.join(self.remote_location, self.project_name)]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+                
+                print( " DSI submitted Conduit job. ")
+
+                # Database Movement
+                if isVerbose:
+                    print( " conduit cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+                
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+            
+                print( " DSI submitted Conduit job. ")
+
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
 
@@ -1620,6 +1646,8 @@ class Sync():
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
+
+        
 
 
     def dircrawl(self,filepath):
