@@ -13,6 +13,7 @@ import csv
 import re
 import tarfile
 import subprocess
+from contextlib import redirect_stdout
 
 class Terminal():
     """
@@ -1460,45 +1461,56 @@ class Sync():
         # Open and validate local DSI data store
         t = Terminal()
 
+        f = self.project_name+".db"
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = local_loc+"/"+self.project_name+".db"
-            f = self.project_name+".db"
             if isVerbose:
                 print("trying db: ", f)
-            if os.path.exists(f):
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
                 t.load_module('backend','Sqlite','back-write', filename=f)
             
         except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+            print(f"Database {f} not found")
             raise
 
         # See if filesystem exists
         fs_t = t.get_table("filesystem")
         if fs_t.empty:
             if isVerbose:
-                print( "Creating new fs table")
-            # Create new filesystem collection with origin and remote locations
-            # Stage data for ingest
-            # Transpose the OrderedDict to a list of row dictionaries
-            num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
-            rows = []
+                print("Creating new Filesystem table")
 
-            for i in range(num_rows):
-                row = {col: values[i] for col, values in st_dict.items()}
-                rows.append(row)
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                t.load_module('plugin', "Dict", "reader", collection=st_dict)
+                t.artifact_handler(interaction_type='ingest')
 
-            # Temporary csv to ingest
-            output_file = '.fs.csv'
-            with open(output_file, mode='w', newline='') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
-                writer.writeheader()
-                writer.writerows(rows)
+            # # Create new filesystem collection with origin and remote locations
+            # # Stage data for ingest
+            # # Transpose the OrderedDict to a list of row dictionaries
+            # num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
+            # rows = []
+
+            # for i in range(num_rows):
+            #     row = {col: values[i] for col, values in st_dict.items()}
+            #     rows.append(row)
+
+            # # Temporary csv to ingest
+            # output_file = '.fs.csv'
+            # with open(output_file, mode='w', newline='') as csvfile:
+            #     writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
+            #     writer.writeheader()
+            #     writer.writerows(rows)
             
-            # Add filesystem table
-            t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
-            #t.load_module('plugin', 'collection_reader', 'reader', st_dict )
-            t.artifact_handler(interaction_type='ingest')
+            # # Add filesystem table
+            # t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
+            # #t.load_module('plugin', 'collection_reader', 'reader', st_dict )
+            # t.artifact_handler(interaction_type='ingest')
+        
+        t.close()
 
         self.file_list = file_list
         self.rfile_list = rfile_list
@@ -1518,21 +1530,26 @@ class Sync():
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = self.local_location+"/"+self.project_name+".db"
-            assert os.path.exists(f)
             if isVerbose:
-                print("db: ", f)
-            t.load_module('backend','Sqlite','back-read', filename=f)
+                print("trying db: ", f)
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                t.load_module('backend','Sqlite','back-read', filename=f)
         except Exception:
-            print(f"Databaase {f} not found")
+            print(f"Database {f} not found")
             raise
 
         # See if filesystem exists
         fs_t = t.get_table("filesystem")
         if fs_t.empty:
-            print( " Filesystem table not found. Try running Index first.")
-            print( " Data copy failed. ")
+            print(" Filesystem table not found. Try running Index first.")
+            print(" Data copy failed.")
             return
         
+        t.close()
+
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         if tool == "copy":
             #print(self.file_list)
@@ -1561,7 +1578,7 @@ class Sync():
             #shutil.copy2(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
             shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
 
-            print( " Data Copy Complete! ")
+            print(" Data Copy Complete!")
         elif tool == "scp":
             #  Data movement via SCP
             remote_user = os.getlogin()
@@ -1603,7 +1620,6 @@ class Sync():
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
-
 
 
     def dircrawl(self,filepath):
@@ -1756,10 +1772,13 @@ class HPSSSync():
 
         f = self.project_name+".db"
         try:
-            assert os.path.exists(f)
             if isVerbose:
-                print("db: ", f)
-            t.load_module('backend','Sqlite','back-read', filename=f)
+                print("trying db: ", f)
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                t.load_module('backend','Sqlite','back-read', filename=f)
         except Exception:
             print(f"Databaase {f} not found")
             raise
@@ -1768,7 +1787,7 @@ class HPSSSync():
         fs_t = t.get_table("filesystem_hpss")
         if fs_t.empty:
             if isVerbose:
-                print( "Creating new hpss fs table")
+                print("Creating new hpss Filesystem table")
             # Create new filesystem collection with origin and remote locations
             # Stage data for ingest
             # Transpose the OrderedDict to a list of row dictionaries
@@ -1788,6 +1807,8 @@ class HPSSSync():
             # Add filesystem table
             t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem_hpss")
             t.artifact_handler(interaction_type='ingest')
+        
+        t.close()
 
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
@@ -1800,14 +1821,17 @@ class HPSSSync():
         # See if FS table has been created
         t = Terminal()
 
+        f = self.project_name+".db"
         try:
-            f = self.project_name+".db"
             if isVerbose:
-                print("db: ", f)
-            if os.path.exists(f):
+                print("trying db: ", f)
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
                 t.load_module('backend','Sqlite','back-read', filename=f)
         except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+            print(f"Database {f} not found")
             raise
 
         # See if filesystem exists
@@ -1816,6 +1840,8 @@ class HPSSSync():
             print( " Filesystem table not found. Try running Index first.")
             print( " Data copy failed. ")
             return
+        
+        t.close()
       
         hpss_files = {}
         for f in self.tar_files:
