@@ -1412,7 +1412,7 @@ class Sync():
         st_dict['created_time'] = []
         st_dict['accessed_time'] = []
         st_dict['mode'] = []
-        st_dict['inode'] = []
+        #st_dict['inode'] = []
         st_dict['device'] = []
         st_dict['n_links'] = []
         st_dict['uid'] = []
@@ -1433,7 +1433,7 @@ class Sync():
             st_dict['created_time'].append(st.st_ctime)
             st_dict['accessed_time'].append(st.st_atime)
             st_dict['mode'].append(st.st_mode)
-            st_dict['inode'].append(st.st_ino)
+            #st_dict['inode'].append(st.st_ino)
             st_dict['device'].append(st.st_dev)
             st_dict['n_links'].append(st.st_nlink)
             st_dict['uid'].append(st.st_uid)
@@ -1485,7 +1485,7 @@ class Sync():
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
-                t.load_module('plugin', "Dict", "reader", collection=st_dict)
+                t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
                 t.artifact_handler(interaction_type='ingest')
 
             # # Create new filesystem collection with origin and remote locations
@@ -1526,7 +1526,11 @@ class Sync():
         # See if FS table has been created
         t = Terminal()
 
-        f = self.project_name+".db"
+        f = self.project_name 
+        if ".db" not in f:
+            f = self.project_name+".db"
+
+
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = self.local_location+"/"+self.project_name+".db"
@@ -1615,8 +1619,8 @@ class Sync():
 
                 # File Movement
                 if isVerbose:
-                    print( "conduit cp -r " + os.path.join(self.local_location, self.project_name) + " " + os.path.join(self.remote_location, self.project_name) )
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r',os.path.join(self.local_location, self.project_name),  os.path.join(self.remote_location, self.project_name)]
+                    print( "conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r',self.local_location,  os.path.join(self.remote_location, self.project_name)]
                 process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
                 
                 stdout, stderr = process.communicate()
