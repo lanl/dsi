@@ -5,7 +5,6 @@ import pandas as pd
 import os
 import sys
 from contextlib import redirect_stdout
-import re
 import io
 
 import warnings
@@ -900,7 +899,9 @@ class DSI():
     #help, edge-finding (find this/that)
     def get(self, dbname):
         pass
+    
     def move(self, filepath):
         pass
+
     def fetch(self, fname):
         pass
