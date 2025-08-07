@@ -68,13 +68,19 @@ class DuckDB(Filesystem):
         `return`: str
             A string representing the inferred DuckDB data type for the input list.
         """
-        for item in input_list:
-            if isinstance(item, int):
-                return " INTEGER"
-            elif isinstance(item, float):
-                return " FLOAT"
-            elif isinstance(item, str):
-                return " VARCHAR"
+        DUCKDB_BIGINT_MIN = -9223372036854775808
+        DUCKDB_BIGINT_MAX =  9223372036854775807
+        DUCKDB_INT_MIN = -2147483648
+        DUCKDB_INT_MAX =  2147483647
+
+        if all(isinstance(x, int) for x in input_list):
+            if any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in input_list):
+                return " BIGINT"
+            elif any(x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX for x in input_list):
+                return " DOUBLE"
+            return " INTEGER"
+        elif all(isinstance(x, float) for x in input_list):
+            return " DOUBLE"
         return " VARCHAR"
     
     def duckdb_compatible_name(self, name):
@@ -822,7 +828,7 @@ class DuckDB(Filesystem):
         """
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
-        numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE'}
+        numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE', 'BIGINT'}
         headers = ['column', 'type', 'min', 'max', 'avg', 'std_dev']
         rows = []
 
