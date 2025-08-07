@@ -1487,28 +1487,6 @@ class Sync():
             with redirect_stdout(fnull):
                 t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
                 t.artifact_handler(interaction_type='ingest')
-
-            # # Create new filesystem collection with origin and remote locations
-            # # Stage data for ingest
-            # # Transpose the OrderedDict to a list of row dictionaries
-            # num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
-            # rows = []
-
-            # for i in range(num_rows):
-            #     row = {col: values[i] for col, values in st_dict.items()}
-            #     rows.append(row)
-
-            # # Temporary csv to ingest
-            # output_file = '.fs.csv'
-            # with open(output_file, mode='w', newline='') as csvfile:
-            #     writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
-            #     writer.writeheader()
-            #     writer.writerows(rows)
-            
-            # # Add filesystem table
-            # t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
-            # #t.load_module('plugin', 'collection_reader', 'reader', st_dict )
-            # t.artifact_handler(interaction_type='ingest')
         
         t.close()
 
