@@ -28,7 +28,7 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["student_test1.yml", "stud
 # a.transload()
 
 
-''' Example of loading a Sqlite DSI backend, and its data interactions: ingest, query, notebook, process '''
+''' Example of loading a DSI backend, and its data interactions: ingest, query, notebook, process '''
 a.load_module('backend','Sqlite','back-write', filename='data.db')
 # a.load_module('backend','DuckDB','back-write', filename='data.db')
 
