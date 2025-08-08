@@ -83,11 +83,11 @@ class Sqlite(Filesystem):
         SQLITE_INT_MIN = -9223372036854775808
         SQLITE_INT_MAX =  9223372036854775807
 
-        if all(isinstance(x, int) for x in input_list):
-            if any(x < SQLITE_INT_MIN or x > SQLITE_INT_MAX for x in input_list):
+        if all(isinstance(x, int) for x in input_list if x is not None):
+            if any(x < SQLITE_INT_MIN or x > SQLITE_INT_MAX for x in input_list if x is not None):
                 return " FLOAT"
             return " INTEGER"
-        elif all(isinstance(x, float) for x in input_list):
+        elif all(isinstance(x, float) for x in input_list if x is not None):
             return " FLOAT"
         return " VARCHAR"
     

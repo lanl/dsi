@@ -74,12 +74,12 @@ class DuckDB(Filesystem):
         DUCKDB_INT_MAX =  2147483647
 
         if all(isinstance(x, int) for x in input_list):
-            if any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in input_list):
+            if any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in input_list if x is not None):
                 return " BIGINT"
-            elif any(x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX for x in input_list):
+            elif any(x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX for x in input_list if x is not None):
                 return " DOUBLE"
             return " INTEGER"
-        elif all(isinstance(x, float) for x in input_list):
+        elif all(isinstance(x, float) for x in input_list if x is not None):
             return " DOUBLE"
         return " VARCHAR"
     
