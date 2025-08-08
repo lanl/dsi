@@ -958,7 +958,7 @@ def test_query_duckdb_backend():
     assert len(query_data) == 2
     assert query_data["n"].tolist() == [9.8, 91.8]
     assert query_data["dsi_table_name"][0] == "physics"
-test_query_duckdb_backend()
+
 def test_query_update_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
@@ -1114,9 +1114,9 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c     | d   | e    | f                  
+    specification | a   | math | c     | d   | e    | f     
     --------------------------------------------------------
-    None          | nan | nan  | nan   | nan | nan  | nan                
+    None          | nan | nan  | nan   | nan | nan  | nan   
     !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
     
     """)
@@ -1140,7 +1140,7 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: "2"' + textwrap.dedent("""
 
-    specification | a | b  | c     | d | e    | f                   
+    specification | a | b  | c     | d | e    | f     
     --------------------------------------------------
     !jack         | 1 | 99 | 45.98 | 2 | 34.8 | 0.0089
     
