@@ -948,7 +948,7 @@ def test_query_duckdb_backend():
     specification | n    | o       | p   | q       | r  | s      
     -------------------------------------------------------------
     !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
-    !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122 
+    !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     """)
     assert output == excepted_output
 
@@ -958,7 +958,7 @@ def test_query_duckdb_backend():
     assert len(query_data) == 2
     assert query_data["n"].tolist() == [9.8, 91.8]
     assert query_data["dsi_table_name"][0] == "physics"
-
+test_query_duckdb_backend()
 def test_query_update_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
