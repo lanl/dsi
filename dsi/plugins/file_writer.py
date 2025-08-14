@@ -156,7 +156,10 @@ class ER_Diagram(FileWriter):
             subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
             os.remove(self.output_filename + ".dot")
         else:
-            dot.render(self.output_filename, cleanup=True)
+            try:
+                dot.render(self.output_filename, cleanup=True)
+            except:
+                return (EnvironmentError, "Graphviz executable must be downloaded to global environment using sudo or homebrew.")
 
 class Csv_Writer(FileWriter):
     """
