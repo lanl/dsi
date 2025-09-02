@@ -712,7 +712,7 @@ class Oceans11Datacard(FileReader):
                             temp_data[field].append(val2)
                         field_names.append(field)
 
-            if sorted(field_names) != sorted(["name", "description", "data_uses", "creators", "creation_date", 
+            if sorted(field_names) != sorted(["name", "description", "keywords", "data_uses", "creators", "creation_date", 
                                               "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
                                               "num_simulations", "version", "license", "live_dataset"]):
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
