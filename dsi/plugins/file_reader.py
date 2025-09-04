@@ -699,6 +699,8 @@ class Oceans11Datacard(FileReader):
             field_names = []
             for element, val in data.items():
                 if element not in ['authorship', 'data']:
+                    if isinstance(val, list):
+                        val = ", ".join(val)
                     if element not in temp_data.keys():
                         temp_data[element] = [val]
                     else:
