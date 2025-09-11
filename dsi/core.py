@@ -878,7 +878,7 @@ class Terminal():
                 self.logger.error(f"Error finding rows due to {return_object[1]}")
             raise return_object[0](return_object[1])
         elif isinstance(return_object, list) and isinstance(return_object[0], str):
-            err_msg = f"'{column_name}' appeared in more than one table. Can only do a conditional find if '{column_name}' is in one table"
+            err_msg = f"'{column_name}' appeared in more than one table. Can only find if '{column_name}' is in one table"
             if self.debug_level != 0:
                 self.logger.warning(err_msg)
             print(f"WARNING: {err_msg}")

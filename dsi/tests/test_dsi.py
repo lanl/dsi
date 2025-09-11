@@ -599,7 +599,7 @@ def test_find_partial_sqlite_backend():
     assert find_df is None    
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification~~y1' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM math WHERE CAST(specification AS TEXT) LIKE '%y1%'
@@ -823,7 +823,7 @@ def test_find_relation_error_sqlite_backend():
     assert find_df is None    
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification = '!jack'' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM math WHERE specification = '!jack'
@@ -1466,7 +1466,7 @@ def test_find_partial_duckdb_backend():
     assert find_df is None    
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification~~y1' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM address WHERE CAST(specification AS TEXT) ILIKE '%y1%'
@@ -1690,7 +1690,7 @@ def test_find_relation_error_duckdb_backend():
     assert find_df is None
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification = '!jack'' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM address WHERE specification = '!jack'
