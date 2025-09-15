@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import pyarrow as pa
+from pyarrow import parquet as pq
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -170,7 +172,7 @@ class Csv_Writer(FileWriter):
         Initializes the CSV Writer with the specified inputs
 
         `table_name` : str
-            Name of the table to export from the DSI backend.
+            Name of the table to export from DSI.
 
         `filename` : str
             Name of the CSV file to be generated.
@@ -312,3 +314,57 @@ class Table_Plot(FileWriter):
             return ("Warning", f"Even though {not_plot_cols} are in display_cols, they are not numeric and cannot be plotted")
         elif len(not_plot_cols) == 1:
             return ("Warning", f"Even though '{not_plot_cols[0]}' is in display_cols, it is not numeric and cannot be plotted")
+
+class Parquet_Writer(FileWriter):
+    """
+    DSI Writer to output certain data as a Parquet file
+    """
+    def __init__(self, table_name, filename, export_cols = None, **kwargs):
+        """
+        Initializes the Parquet Writer with the specified inputs
+
+        `table_name` : str
+            Name of the table to export from DSI.
+
+        `filename` : str
+            Name of the Parquet file to be generated.
+
+        `export_cols` : list of str, optional, default is None.
+            A list of column names to include in the exported Parquet file.
+            
+            If None , all columns from the table will be included.
+
+            - Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to Parquet
+        """
+        super().__init__(filename, **kwargs)
+        self.parquet_file_name = filename
+        self.table_name = table_name
+        self.export_cols = export_cols
+
+    def get_rows(self, collection) -> None:
+        """
+        Exports data from the given DSI data collection to a Parquet file.
+
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
+        """
+        if self.table_name not in collection.keys():
+            return (KeyError, f"{self.table_name} does not exist in memory")
+        if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
+            return (ValueError, f"Inputted list of column names to plot for {self.table_name} is incorrect")
+
+        df = pd.DataFrame(collection[self.table_name])
+        
+        if self.export_cols is not None:
+            try:
+                df = df[self.export_cols]
+            except:
+                return (ValueError, f"Could not export to Parquet as the specified column input {self.export_cols} is incorrect")
+
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, self.parquet_file_name, compression="snappy")
