@@ -9,6 +9,7 @@ import yaml
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
 import os
+from pyarrow import parquet as pq
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -459,6 +460,52 @@ class TOML1(FileReader):
 
         self.set_schema_2(self.toml_data)
 
+class Parquet(FileReader):
+    """
+    DSI Reader that loads data stored in a Parquet file as a table. Users can choose to specify the table name upon reading too.
+    """
+    def __init__(self, filenames, table_name = None, **kwargs):
+        """
+        Initializes the Parquet Reader with user specified filenames and an optional table_name.
+
+        `filenames` : str or list of str
+            Required. One or more Parquet file paths to be loaded into DSI.
+            If multiple files are provided, all data must correspond to the same table.
+
+        `table_name` : str, optional
+            Optional name to assign to the loaded table.
+            If not provided, DSI will default to using "Parquet" as the table name.
+        """
+        super().__init__(filenames, **kwargs)
+        self.parquet_data = OrderedDict()
+        if isinstance(filenames, str):
+            self.filenames = [filenames]
+        else:
+            self.filenames = filenames
+        self.table_name = table_name
+    
+    def add_rows(self) -> None:
+        """Parses Parquet data and stores data into a table as an Ordered Dictionary."""
+        total_df = DataFrame()
+        
+        for filename in self.filenames:
+            table = pq.read_table(filename).to_pandas()
+            try:
+                total_df = concat([total_df, table], axis=0, ignore_index=True)
+            except:
+                raise TypeError(f"Error in adding {filename} to the existing Parquet data. Please recheck column names and data structure")
+
+        table_data = OrderedDict(total_df.to_dict(orient='list'))
+        for col, coldata in table_data.items():  # replace NaNs with None
+            table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+
+        if self.table_name is not None:
+            self.parquet_data[self.table_name] = table_data
+        else:
+            self.parquet_data = table_data
+        
+        self.set_schema_2(self.parquet_data)
+        
 class Ensemble(FileReader):
     """
     DSI Reader that loads ensemble simulation data stored in a CSV file.
