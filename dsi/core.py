@@ -24,15 +24,15 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb', 'hpss']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
-    VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
+    VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy', 'HPSS']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
@@ -503,13 +503,7 @@ class Terminal():
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
-            # Only used when reading data from Parquet backend in CLI API (Parquet uses query not process) - 
-            # TODO fix this passthrough by updating Parquet to use process_artifacts()
-            # TODO query all backends
-            if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
-                    first_backend = self.loaded_backends[1]
-                    parent_backend = first_backend.__class__.__bases__[0].__name__
+            # TODO query all backends together
             if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
@@ -878,7 +872,7 @@ class Terminal():
                 self.logger.error(f"Error finding rows due to {return_object[1]}")
             raise return_object[0](return_object[1])
         elif isinstance(return_object, list) and isinstance(return_object[0], str):
-            err_msg = f"'{column_name}' appeared in more than one table. Can only do a conditional find if '{column_name}' is in one table"
+            err_msg = f"'{column_name}' appeared in more than one table. Can only find if '{column_name}' is in one table"
             if self.debug_level != 0:
                 self.logger.warning(err_msg)
             print(f"WARNING: {err_msg}")
@@ -1362,8 +1356,6 @@ class Terminal():
                 valid = True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
-            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
-                valid = True
         return valid
 
 
@@ -1487,28 +1479,6 @@ class Sync():
             with redirect_stdout(fnull):
                 t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
                 t.artifact_handler(interaction_type='ingest')
-
-            # # Create new filesystem collection with origin and remote locations
-            # # Stage data for ingest
-            # # Transpose the OrderedDict to a list of row dictionaries
-            # num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
-            # rows = []
-
-            # for i in range(num_rows):
-            #     row = {col: values[i] for col, values in st_dict.items()}
-            #     rows.append(row)
-
-            # # Temporary csv to ingest
-            # output_file = '.fs.csv'
-            # with open(output_file, mode='w', newline='') as csvfile:
-            #     writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
-            #     writer.writeheader()
-            #     writer.writerows(rows)
-            
-            # # Add filesystem table
-            # t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem")
-            # #t.load_module('plugin', 'collection_reader', 'reader', st_dict )
-            # t.artifact_handler(interaction_type='ingest')
         
         t.close()
 

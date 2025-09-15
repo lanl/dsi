@@ -20,6 +20,7 @@ test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAM
 # test.read(filenames=['bueno1.data', 'bueno2.data'], reader_name='Bueno')
 # test.read(filenames="../clover3d/", reader_name='Cloverleaf')
 # test.read(filenames="test.txt", reader_name="text_file_reader.py")
+# test.read(filenames="wildfiredata.pq", reader_name="Parquet", table_name="Wildfire_parquet")
 
 # test.read(filenames=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
 # test.read(filenames="../wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
@@ -31,6 +32,7 @@ test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAM
 # test.write(filename="er_diagram.png", writer_name="ER_Diagram")
 # test.write(filename="physics_plot.png", writer_name="Table_Plot", table_name="physics")
 # test.write(filename="physics.csv", writer_name="Csv_Writer", table_name="physics")
+# test.write(filename="wildfire_test.pq", writer_name="Parquet_Writer", table_name="Wildfire_parquet")
 
 
 ''' Backend data interactions: query()/get_table() and find(). Manipulating their outputs to update() the backend '''

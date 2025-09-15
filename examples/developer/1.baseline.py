@@ -11,7 +11,7 @@ print(base_terminal.list_available_modules('plugin'))
 # ['GitInfo', 'Hostname', 'SystemKernel', 'Bueno', 'Csv']
 
 print(base_terminal.list_available_modules('backend'))
-# ['Gufi', 'Sqlite', 'Parquet']
+# ['Gufi', 'Sqlite', 'DuckDB', 'HPSS']
 
 print(base_terminal.list_loaded_modules())
 # {'writer': [],

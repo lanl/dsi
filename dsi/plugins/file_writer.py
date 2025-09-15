@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import pyarrow as pa
+from pyarrow import parquet as pq
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -22,7 +24,7 @@ class ER_Diagram(FileWriter):
     """
     DSI Writer that generates an ER Diagram from the current data in the DSI abstraction
     """
-    def __init__(self, filename, target_table_prefix = None, **kwargs):
+    def __init__(self, filename, target_table_prefix = None, max_cols = None, **kwargs):
         """
         Initializes the ER Diagram writer
 
@@ -33,10 +35,15 @@ class ER_Diagram(FileWriter):
             If provided, filters the ER Diagram to only include tables whose names begin with this prefix.
 
             - Ex: If prefix = "student", only "student__address", "student__math", "student__physics" tables are included
+
+        `max_cols` : int, optional, default None
+            If provided, limits the number of columns displayed for each table in the ER Diagram.
+            If relational data is included, this must be >= number of primary and foreign keys for a table.
         """
         super().__init__(filename, **kwargs)
         self.output_filename = filename
         self.target_table_prefix = target_table_prefix
+        self.max_cols = max_cols
 
     def get_rows(self, collection) -> None:
         """
@@ -97,7 +104,23 @@ class ER_Diagram(FileWriter):
             
             col_list = tableData.keys()
             if tableName == "dsi_units":
-                col_list = ["table_name", "column_and_unit"]
+                col_list = ["table_name", "column_name", "unit"]
+            if self.max_cols is not None:
+                if "dsi_relations" in collection.keys():
+                    fk_cols = [t[1] for t in collection["dsi_relations"]["foreign_key"] if t[0] == tableName]
+                    pk_cols = [t[1] for t in collection["dsi_relations"]["primary_key"] if t[0] == tableName]
+                    rel_cols = set(pk_cols + fk_cols)
+
+                    if rel_cols:
+                        if len(rel_cols) > self.max_cols:
+                            return (ValueError, "'max_cols' must be >= to the number of primary/foreign key columns.")
+                        other_cols = [col for col in col_list if col not in rel_cols]
+                        combined = list(rel_cols) + other_cols[:self.max_cols - len(rel_cols)]
+                        col_list = [k for k in col_list if k in combined]
+                col_list = col_list[:self.max_cols]
+                if len(tableData.keys()) > self.max_cols:
+                    col_list.append("...")
+
             curr_row = 0
             inner_brace = 0
             for col_name in col_list:
@@ -119,9 +142,9 @@ class ER_Diagram(FileWriter):
 
         if "dsi_relations" in collection.keys():
             for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
-                if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
+                if self.target_table_prefix is not None and f_table is not None and self.target_table_prefix not in f_table:
                     continue
-                if f_table != None:
+                if f_table is not None:
                     foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
                     fk_string = f"{f_table}:{f_col}"
                     pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
@@ -135,7 +158,10 @@ class ER_Diagram(FileWriter):
             subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
             os.remove(self.output_filename + ".dot")
         else:
-            dot.render(self.output_filename, cleanup=True)
+            try:
+                dot.render(self.output_filename, cleanup=True)
+            except:
+                return (EnvironmentError, "Graphviz executable must be downloaded to global environment using sudo or homebrew.")
 
 class Csv_Writer(FileWriter):
     """
@@ -146,7 +172,7 @@ class Csv_Writer(FileWriter):
         Initializes the CSV Writer with the specified inputs
 
         `table_name` : str
-            Name of the table to export from the DSI backend.
+            Name of the table to export from DSI.
 
         `filename` : str
             Name of the CSV file to be generated.
@@ -288,3 +314,57 @@ class Table_Plot(FileWriter):
             return ("Warning", f"Even though {not_plot_cols} are in display_cols, they are not numeric and cannot be plotted")
         elif len(not_plot_cols) == 1:
             return ("Warning", f"Even though '{not_plot_cols[0]}' is in display_cols, it is not numeric and cannot be plotted")
+
+class Parquet_Writer(FileWriter):
+    """
+    DSI Writer to output certain data as a Parquet file
+    """
+    def __init__(self, table_name, filename, export_cols = None, **kwargs):
+        """
+        Initializes the Parquet Writer with the specified inputs
+
+        `table_name` : str
+            Name of the table to export from DSI.
+
+        `filename` : str
+            Name of the Parquet file to be generated.
+
+        `export_cols` : list of str, optional, default is None.
+            A list of column names to include in the exported Parquet file.
+            
+            If None , all columns from the table will be included.
+
+            - Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to Parquet
+        """
+        super().__init__(filename, **kwargs)
+        self.parquet_file_name = filename
+        self.table_name = table_name
+        self.export_cols = export_cols
+
+    def get_rows(self, collection) -> None:
+        """
+        Exports data from the given DSI data collection to a Parquet file.
+
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
+        """
+        if self.table_name not in collection.keys():
+            return (KeyError, f"{self.table_name} does not exist in memory")
+        if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
+            return (ValueError, f"Inputted list of column names to plot for {self.table_name} is incorrect")
+
+        df = pd.DataFrame(collection[self.table_name])
+        
+        if self.export_cols is not None:
+            try:
+                df = df[self.export_cols]
+            except:
+                return (ValueError, f"Could not export to Parquet as the specified column input {self.export_cols} is incorrect")
+
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, self.parquet_file_name, compression="snappy")

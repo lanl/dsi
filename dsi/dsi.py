@@ -117,6 +117,7 @@ class DSI():
         print("\nValid Readers for `reader_name` in read():\n" + "-"*50)
         print("Collection           : Loads data from an Ordered Dict. If multiple tables, each table must be a nested OrderedDict.")
         print("CSV                  : Loads data from CSV files (one table per call)")
+        print("Parquet              : Loads data from Parquet - a columnar storage format for Apache Hadoop (one table per call)")
         print("YAML1                : Loads data from YAML files of a certain structure")
         print("TOML1                : Loads data from TOML files of a certain structure")
         print("JSON                 : Loads single-table data from JSON files")
@@ -139,6 +140,7 @@ class DSI():
             The expected input type depends on the selected `reader_name`:
                 - "Collection"           → Ordered Dictionary of table(s)
                 - "CSV"                  → .csv
+                - "Parquet"              → .pq
                 - "YAML1"                → .yaml or .yml
                 - "TOML1"                → .toml
                 - "JSON"                 → .json
@@ -163,7 +165,7 @@ class DSI():
 
             Required when using the `Collection` reader to load an Ordered Dictionary representing only one table.
             
-            Recommended when the input file contains a single table for the `CSV`, `JSON`, or `Ensemble` reader.
+            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
         if isinstance(filenames, str) and not os.path.exists(filenames):
             sys.exit("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -234,6 +236,8 @@ class DSI():
                         self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
                     elif reader_name.lower() == "csv":
                         self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name=table_name)
+                    elif reader_name.lower() == "parquet":
+                        self.t.load_module('plugin', 'Parquet', 'reader', filenames=filenames, table_name=table_name)
                     elif reader_name.lower() == "yaml1":
                         self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
                     elif reader_name.lower() == "toml1":
@@ -257,7 +261,7 @@ class DSI():
 
             if correct_reader == False:
                 print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                elg = "Collection, CSV, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
+                elg = "Collection, CSV, Parquet, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
                 sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
@@ -672,6 +676,7 @@ class DSI():
         print("ER_Diagram  : Creates a visual ER diagram image based on all tables in DSI.")
         print("Table_Plot  : Generates a plot of numerical data from a specified table.")
         print("Csv         : Exports the data of a specified table to a CSV file.")
+        print("Parquet     : Exports the data of a specified table to a Parquet file.")
         print()
 
     def write(self, filename, writer_name, table_name = None):
@@ -685,6 +690,7 @@ class DSI():
                 - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
                 - "Table_Plot"   → .png, .jpg, .jpeg
                 - "Csv"          → .csv
+                - "Parquet"      → .pq
 
         `writer_name` : str        
             Name of the DSI Writer to export data. 
@@ -695,7 +701,7 @@ class DSI():
             For guidance on creating a DSI-compatible Writer, view :ref:`custom_writer`.
 
         `table_name`: str, optional
-            Required when using "Table_Plot" or "Csv" to specify which table to export.
+            Required when using "Table_Plot", "Csv" or "Parquet" to specify which table to export.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
@@ -764,6 +770,8 @@ class DSI():
                         self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name)
                     elif writer_name.lower() in ["csv", "csv writer", "csv_writer"]:
                         self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name)
+                    elif writer_name.lower() in ["parquet", "parquet writer", "parquet_writer"]:
+                        self.t.load_module('plugin', 'Parquet_Writer', 'writer', filename=filename, table_name = table_name)
                     else:
                         correct_writer = False
             except Exception as e:

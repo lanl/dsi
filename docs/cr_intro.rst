@@ -42,7 +42,6 @@ All DSI backends include:
 - DuckDB: In-process SQL database designed for fast queries on large data files
 - GUFI: the `Grand Unified File Index system <https://github.com/mar-file-system/GUFI>`_ ; developed at LANL. 
   GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.
-- Parquet: a columnar storage format for `Apache Hadoop <https://hadoop.apache.org>`_.
 
 DSI Core
 ~~~~~~~~
