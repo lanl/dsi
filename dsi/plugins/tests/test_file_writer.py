@@ -56,6 +56,7 @@ def test_parquet_writer():
     assert os.path.exists("student_physics_parquet.pq")
     
     a.load_module('plugin', 'Parquet', 'reader', filenames="student_physics_parquet.pq")
-
     assert "Parquet" in a.active_metadata.keys()
     assert a.active_metadata["Parquet"]["specification"] == ["!amy", "!amy1"]
+
+    os.remove("student_physics_parquet.pq")

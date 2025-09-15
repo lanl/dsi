@@ -313,6 +313,9 @@ class Parquet_Writer(FileWriter):
             - Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to Parquet
         """
         super().__init__(filename, **kwargs)
+        file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+        if file_extension not in ["pq", "parquet"]:
+            filename = filename + ".pq"
         self.parquet_file_name = filename
         self.table_name = table_name
         self.export_cols = export_cols
