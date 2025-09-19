@@ -128,3 +128,11 @@ def test_schema_reader():
     for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         assert len(tableData["primary_key"]) == len(tableData["foreign_key"])
+
+def test_parquet_reader():
+    a=Terminal()
+    a.load_module('plugin', 'Parquet', 'reader', filenames="examples/test/wildfiredata.pq")
+
+    assert len(a.active_metadata.keys()) == 1
+    assert "Parquet" in a.active_metadata.keys()
+    assert a.active_metadata["Parquet"]["wind_speed"] == [2,8,8,5]

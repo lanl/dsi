@@ -24,15 +24,15 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'parquet', 'duckdb', 'hpss']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
-    VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer']
+    VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'Parquet', 'DuckDB', 'SqlAlchemy', 'HPSS']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
@@ -503,13 +503,7 @@ class Terminal():
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
         if interaction_type in ['query', 'get']:
-            # Only used when reading data from Parquet backend in CLI API (Parquet uses query not process) - 
-            # TODO fix this passthrough by updating Parquet to use process_artifacts()
-            # TODO query all backends
-            if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
-                    first_backend = self.loaded_backends[1]
-                    parent_backend = first_backend.__class__.__bases__[0].__name__
+            # TODO query all backends together
             if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
@@ -1361,8 +1355,6 @@ class Terminal():
             if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
                 valid = True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
-                valid = True
-            if backend.__class__.__name__ == "Parquet" and os.path.getsize(backend.filename) > 100:
                 valid = True
         return valid
 

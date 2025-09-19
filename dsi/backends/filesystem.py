@@ -78,7 +78,6 @@ class Filesystem(Backend):
     # Declare store types
     GUFI_STORE = "gufi"
     SQLITE_STORE = "sqlite"
-    PARQUET_STORE = "parquet"
 
     # Declare comparison types
     GT = ">"

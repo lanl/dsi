@@ -219,9 +219,7 @@ class DSI_cli:
                 elif file_extension.lower() == "csv":
                     self.t.load_module('plugin', "Csv_Writer", "writer", filename = filename, table_name = table_name)
                 elif file_extension.lower() in ['pq', 'parquet']:
-                    table_data = self.t.active_metadata[table_name]
-                    df = pd.DataFrame(table_data)
-                    df.to_parquet(filename, engine='pyarrow', index=False)
+                    self.t.load_module('plugin', "Parquet_Writer", "writer", filename = filename, table_name = table_name)
                 else:
                     success_load = False
         except Exception as e:
@@ -481,14 +479,8 @@ class DSI_cli:
                     self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
                 elif file_extension.lower() == 'json':
                     self.t.load_module('plugin', "JSON", "reader", filenames = dbfile)
-                elif file_extension.lower() == 'pq' or file_extension.lower() == 'parquet':
-                    self.t.load_module('backend','Parquet','back-write', filename=dbfile)
-                    data = OrderedDict(self.t.artifact_handler(interaction_type="query")) #Parquet's query() returns a normal dict
-                    if table_name is not None:
-                        self.t.active_metadata[table_name] = data
-                    else:
-                        self.t.active_metadata["Parquet"] = data
-                    self.t.unload_module('backend','Parquet','back-write')
+                elif file_extension.lower() in ['pq', 'parquet']:
+                    self.t.load_module('plugin', "Parquet", "reader", filenames = dbfile, table_name = table_name)
         except Exception as e:
             print(f"read ERROR: {e}\n")
             self.t.active_metadata = OrderedDict()

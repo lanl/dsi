@@ -46,3 +46,17 @@ def test_table_plot():
     pixel_mean = np.mean(plot_image)
     os.remove("student_physics_plot.png")
     assert pixel_mean != 255 #check if image is all white pixels (no diagram generated)
+
+def test_parquet_writer():
+    a=Terminal()
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', "Parquet_Writer", "writer", table_name = "student__physics", filename = "student_physics_parquet")
+    a.transload()
+
+    assert os.path.exists("student_physics_parquet.pq")
+    
+    a.load_module('plugin', 'Parquet', 'reader', filenames="student_physics_parquet.pq")
+    assert "Parquet" in a.active_metadata.keys()
+    assert a.active_metadata["Parquet"]["specification"] == ["!amy", "!amy1"]
+
+    os.remove("student_physics_parquet.pq")
