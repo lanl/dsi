@@ -59,7 +59,7 @@ Copyright and License
 
 This program is open source under the BSD-3 License.
 
-© 2025. Triad National Security, LLC. All rights reserved.
+© 2025. Triad National Security, LLC. All rights reserved. LA-UR-25-29245
 
 Redistribution and use in source and binary forms, with or without modification, are permitted
 provided that the following conditions are met:
