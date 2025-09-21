@@ -45,12 +45,12 @@ class Sqlite(Filesystem):
     """
     runTable = False
 
-    def __init__(self, filename):
+    def __init__(self, filename, **kwargs):
         """
         Initializes a SQLite backend with a user inputted filename, and creates other internal variables
         """
         self.filename = filename
-        self.con = sqlite3.connect(filename)
+        self.con = sqlite3.connect(filename, **kwargs['kwargs'])
         self.cur = self.con.cursor()
         self.runTable = Sqlite.runTable
         self.sqlite_keywords = ["ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE", "AND", "AS", "ASC", "ATTACH", 

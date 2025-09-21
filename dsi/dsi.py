@@ -17,7 +17,7 @@ class DSI():
     The DSI Class abstracts Core.Terminal for managing metadata and Core.Sync for data management and movement.
     '''
 
-    def __init__(self, filename = ".temp.db", backend_name = "Sqlite"):
+    def __init__(self, filename = ".temp.db", backend_name = "Sqlite", **kwargs):
         """
         Initializes DSI by activating a backend for data operations; default is a Sqlite backend for temporary data analysis.
         If users specify `filename`, data is saved to a permanent backend file.
@@ -61,7 +61,7 @@ class DSI():
         try:
             if backend_name.lower() == 'sqlite':
                 with redirect_stdout(fnull):
-                    self.t.load_module('backend','Sqlite','back-write', filename=filename)
+                    self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
                     self.backend_name = "sqlite"
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
