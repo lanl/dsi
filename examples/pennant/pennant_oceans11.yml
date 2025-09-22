@@ -1,20 +1,20 @@
-name: "PENNANT"
+title: "PENNANT"
 description: "PENNANT is an unstructured mesh physics mini-app designed for advanced architecture research.  It contains mesh data structures and a few physics algorithms adapted from the LANL rad-hydro code FLAG, and gives a sample of the typical memory access patterns of FLAG."
-keywords: ""
-data_uses: ""
+keywords: ["key1", "key2", "key3"]
+instructions_of_use: "Follow instructions in the README in dsi/examples/wildfire/"
 
 authorship:
-  creators: "Charles R. Ferenbaugh"
-  creation_date: "March 2012"
+  authors: ["Charles R. Ferenbaugh"]
+  release_date: "March 2012"
   la_ur: "LA-CC-12-021"
-  owner: "Charles R. Ferenbaugh"
   funding: ""
-  publisher: ""
-  published_date: "February 2016"
+  rights: "Copyright (c) 2012, Triad National Security, LLC. All rights reserved. This software was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security Administration."
 
 data:
-  origin_location: "oceans11 open data server"
-  num_simulations: 0
+  file_types: "OUT file"
+  num_simulations: 1
+  file_size: "885 bytes"
+  num_files: 10
+  dataset_size: "8.85 KB"
   version: 0.9
-  license: "Copyright (c) 2012, Triad National Security, LLC. All rights reserved. This software was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security Administration."
-  live_dataset: No
+  doi: "doi url"

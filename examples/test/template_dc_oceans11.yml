@@ -1,20 +1,20 @@
-name: "data set name"
+title: "data set name"
 description: ""
 keywords: []
-data_uses: ""
+instructions_of_use: "software/platform necessary to open the data and how to run it"
 
 authorship:
-  creators: ""
-  creation_date: ""
+  authors: []
+  release_date: ""
   la_ur: ""
-  owner: ""
   funding: ""
-  publisher: ""
-  published_date: ""
+  rights: ""
 
 data:
-  origin_location: ""
+  file_types: ""
   num_simulations: 0
+  file_size: ""
+  num_files: 0
+  dataset_size: ""
   version: 0
-  license: ""
-  live_dataset: No
+  doi: ""
