@@ -746,6 +746,8 @@ class Oceans11Datacard(FileReader):
             field_names = []
             for element, val in data.items():
                 if element not in ['authorship', 'data']:
+                    if isinstance(val, list):
+                        val = ",, ".join(val)
                     if element not in temp_data.keys():
                         temp_data[element] = [val]
                     else:
@@ -753,15 +755,17 @@ class Oceans11Datacard(FileReader):
                     field_names.append(element)
                 else:
                     for field, val2 in val.items():
+                        if isinstance(val2, list):
+                            val2 = ",, ".join(val2)
                         if field not in temp_data.keys():
                             temp_data[field] = [val2]
                         else:
                             temp_data[field].append(val2)
                         field_names.append(field)
 
-            if sorted(field_names) != sorted(["name", "description", "data_uses", "creators", "creation_date", 
-                                              "la_ur", "owner", "funding", "publisher", "published_date", "origin_location", 
-                                              "num_simulations", "version", "license", "live_dataset"]):
+            if sorted(field_names) != sorted(["title", "description", "keywords", "instructions_of_use", "authors", 
+                                              "release_date", "la_ur", "funding", "rights", "file_types", "num_simulations", 
+                                              "file_size", "num_files", "dataset_size", "version", "doi"]):
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
 
         self.datacard_data["oceans11_datacard"] = temp_data

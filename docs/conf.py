@@ -8,7 +8,7 @@
 exec(open("../dsi/_version.py").read())
 
 project = 'DSI'
-copyright = '2025, Triad National Security, LLC. All rights reserved.'
+copyright = '2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248'
 author = 'The DSI Project team'
 release = __version__
 

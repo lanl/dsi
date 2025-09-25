@@ -599,7 +599,7 @@ def test_find_partial_sqlite_backend():
     assert find_df is None    
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification~~y1' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM math WHERE CAST(specification AS TEXT) LIKE '%y1%'
@@ -823,7 +823,7 @@ def test_find_relation_error_sqlite_backend():
     assert find_df is None    
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification = '!jack'' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM math WHERE specification = '!jack'
@@ -945,10 +945,10 @@ def test_query_duckdb_backend():
     output = "\n".join(output.splitlines()[1:])
 
     excepted_output = textwrap.dedent("""
-    specification | n                 | o       | p   | q       | r  | s                     
-    -----------------------------------------------------------------------------------------
-    !amy          | 9.800000190734863 | gravity | 23  | home 23 | 1  | -0.0012000000569969416
-    !amy1         | 91.80000305175781 | gravity | 233 | home 23 | 12 | -0.012199999764561653 
+    specification | n    | o       | p   | q       | r  | s      
+    -------------------------------------------------------------
+    !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+    !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     """)
     assert output == excepted_output
 
@@ -956,7 +956,7 @@ def test_query_duckdb_backend():
     assert isinstance(query_data, DataFrame)
     assert query_data.columns.tolist() == ['dsi_table_name','specification','n','o','p','q','r','s']
     assert len(query_data) == 2
-    assert query_data["n"].tolist() == [9.800000190734863, 91.80000305175781]
+    assert query_data["n"].tolist() == [9.8, 91.8]
     assert query_data["dsi_table_name"][0] == "physics"
 
 def test_query_update_duckdb_backend():
@@ -1018,27 +1018,27 @@ def test_search_duckdb_backend():
     Table: address
       - Columns: ['specification', 'fileLoc', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
       - Row Number: 1
-      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.800000190734863, 2, 3, 4, 1.0, 99]
+      - Data: ['!sam', '/home/sam/lib/data', 'good memories', 9.8, 2, 3, 4, 1.0, 99]
     
     Table: math
       - Columns: ['specification', 'a', 'b', 'c', 'd', 'e', 'f']
       - Row Number: 1
-      - Data: ['!jack', 1, 2, 45.97999954223633, 2, 34.79999923706055, 0.008899999782443047]
+      - Data: ['!jack', 1, 2, 45.98, 2, 34.8, 0.0089]
     
     Table: math
       - Columns: ['specification', 'a', 'b', 'c', 'd', 'e', 'f']
       - Row Number: 2
-      - Data: ['!jack1', 2, 3, 45.97999954223633, 3, 44.79999923706055, 0.00989999994635582]
+      - Data: ['!jack1', 2, 3, 45.98, 3, 44.8, 0.0099]
     
     Table: physics
       - Columns: ['specification', 'n', 'o', 'p', 'q', 'r', 's']
       - Row Number: 1
-      - Data: ['!amy', 9.800000190734863, 'gravity', 23, 'home 23', 1, -0.0012000000569969416]
+      - Data: ['!amy', 9.8, 'gravity', 23, 'home 23', 1, -0.0012]
     
     Table: physics
       - Columns: ['specification', 'n', 'o', 'p', 'q', 'r', 's']
       - Row Number: 2
-      - Data: ['!amy1', 91.80000305175781, 'gravity', 233, 'home 23', 12, -0.012199999764561653]
+      - Data: ['!amy1', 91.8, 'gravity', 233, 'home 23', 12, -0.0122]
     
     """)
     assert output == expected_output
@@ -1073,9 +1073,9 @@ def test_sanitize_inputs_duckdb():
     
     Table: "all"
 
-    specification | fileLoc            | G             | all               | i | j | k | l   | m 
-    ---------------------------------------------------------------------------------------------
-    !sam          | /home/sam/lib/data | good memories | 9.800000190734863 | 2 | 3 | 4 | 1.0 | 99
+    specification | fileLoc            | G             | all | i | j | k | l   | m 
+    -------------------------------------------------------------------------------
+    !sam          | /home/sam/lib/data | good memories | 9.8 | 2 | 3 | 4 | 1.0 | 99
                                                          
     """)
     assert output == expected_output
@@ -1114,10 +1114,10 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c                 | d   | e                 | f                  
-    ----------------------------------------------------------------------------------------------
-    None          | nan | nan  | nan               | nan | nan               | nan                
-    !jack1        | 2.0 | 4.0  | 45.97999954223633 | 3.0 | 44.79999923706055 | 0.00989999994635582
+    specification | a   | math | c     | d   | e    | f     
+    --------------------------------------------------------
+    None          | nan | nan  | nan   | nan | nan  | nan   
+    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
     
     """)
     assert output == expected_output
@@ -1140,9 +1140,9 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: "2"' + textwrap.dedent("""
 
-    specification | a | b  | c                 | d | e                 | f                   
-    -----------------------------------------------------------------------------------------
-    !jack         | 1 | 99 | 45.97999954223633 | 2 | 34.79999923706055 | 0.008899999782443047
+    specification | a | b  | c     | d | e    | f     
+    --------------------------------------------------
+    !jack         | 1 | 99 | 45.98 | 2 | 34.8 | 0.0089
     
     """)
     assert output == expected_output
@@ -1466,7 +1466,7 @@ def test_find_partial_duckdb_backend():
     assert find_df is None    
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification~~y1' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM address WHERE CAST(specification AS TEXT) ILIKE '%y1%'
@@ -1690,7 +1690,7 @@ def test_find_relation_error_duckdb_backend():
     assert find_df is None
     expected_output = textwrap.dedent("""\
         Finding all rows where 'specification = '!jack'' in the active backend\n
-        WARNING: 'specification' appeared in more than one table. Can only do a conditional find if 'specification' is in one table
+        WARNING: 'specification' appeared in more than one table. Can only find if 'specification' is in one table
         Try using `dsi.query()` to retrieve the matching rows for a specific table
         These are recommended inputs for query():
          - SELECT * FROM address WHERE specification = '!jack'

@@ -7,16 +7,16 @@ a=Terminal(debug=0, backup_db = False, runTable=False)
 # a.load_module('plugin','Bueno','reader', filenames=['bueno1.data', 'bueno2.data'])
 # a.load_module('plugin','Hostname','reader')
 
-# a.load_module('plugin', 'Schema', 'reader', filename="example_schema.json")
+a.load_module('plugin', 'Schema', 'reader', filename="example_schema.json")
 # a.load_module('plugin', 'Schema', 'reader', filename="yaml1_schema.json")
 
-# a.load_module('plugin', 'YAML1', 'reader', filenames=["student_test1.yml", "student_test2.yml"])
+a.load_module('plugin', 'YAML1', 'reader', filenames=["student_test1.yml", "student_test2.yml"])
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["results.toml", "results1.toml"], target_table_prefix = "results")
 # a.load_module('plugin', 'Csv', 'reader', filenames="yosemite5.csv")
 # a.load_module('plugin', 'Ensemble', 'reader', filenames="wildfiredata.csv")
 # a.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/")
 
-a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'])
+# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'])
 # a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="../wildfire/wildfire_dublin_core.xml")
 # a.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames="../wildfire/wildfire_schema_org.json")
 # a.load_module('plugin', 'GoogleDatacard', 'reader', filenames="../wildfire/wildfire_google.yml")
@@ -28,7 +28,7 @@ a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['../wildfire/wi
 # a.transload()
 
 
-''' Example of loading a Sqlite DSI backend, and its data interactions: ingest, query, notebook, process '''
+''' Example of loading a DSI backend, and its data interactions: ingest, query, notebook, process '''
 a.load_module('backend','Sqlite','back-write', filename='data.db')
 # a.load_module('backend','DuckDB','back-write', filename='data.db')
 
