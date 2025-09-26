@@ -12,7 +12,6 @@ authorship:
 
 data:
   file_types: "CSV"
-  num_simulations: 6
   file_size: "1 GB"
   num_files: 75
   dataset_size: "450 GB"
