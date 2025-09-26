@@ -12,7 +12,6 @@ authorship:
 
 data:
   file_types: "OUT file"
-  num_simulations: 1
   file_size: "885 bytes"
   num_files: 10
   dataset_size: "8.85 KB"
