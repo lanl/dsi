@@ -167,9 +167,10 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
-        if isinstance(filenames, str) and not os.path.exists(filenames):
+        # only DSI-repo readers require filename input. Custom readers do not.
+        if isinstance(filenames, str) and not os.path.exists(filenames) and not reader_name.endswith(".py"):
             sys.exit("read() ERROR: The input file must be a valid filepath. Please check again.")
-        if isinstance(filenames, list) and not all(os.path.exists(f) for f in filenames):
+        if isinstance(filenames, list) and not all(os.path.exists(f) for f in filenames) and not reader_name.endswith(".py"):
             sys.exit("read() ERROR: All input files must have a valid filepath. Please check again.")
         
         if reader_name.endswith(".py"):
@@ -200,9 +201,6 @@ class DSI():
 
             if class_name == None:
                 sys.exit(f"read() Error: The custom Reader must be structured as a Class in the Python script.")
-            if init_params == []:
-                print("read() Error: The custom Reader must be DSI-compatible.")
-                sys.exit("Please review https://lanl.github.io/dsi/dev_readers.html to ensure it is compatible.")
             
             updated = {}
             for param in init_params:
@@ -741,9 +739,6 @@ class DSI():
 
             if class_name == None:
                 sys.exit(f"write() Error: The custom Writer must be structured as a Class in the Python script.")
-            if init_params == []:
-                print("write() Error: The custom Writer must be DSI-compatible.")
-                sys.exit("Please review https://lanl.github.io/dsi/dev_writers.html to ensure it is compatible.")
             
             updated = {}
             for param in init_params:
