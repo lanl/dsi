@@ -769,9 +769,6 @@ class Oceans11Datacard(FileReader):
                 return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
 
         self.datacard_data["oceans11_datacard"] = temp_data
-        
-        self.datacard_data["oceans11_datacard"]["remote"] = [""] * len(self.datacard_files)
-        self.datacard_data["oceans11_datacard"]["local"] = [""] * len(self.datacard_files)
         self.set_schema_2(self.datacard_data)
 
 class DublinCoreDatacard(FileReader):
