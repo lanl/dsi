@@ -102,7 +102,7 @@ class ER_Diagram(FileWriter):
                 html_table = f"{tableName} [label="
             html_table += f"<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>"
             
-            col_list = tableData.keys()
+            col_list = list(tableData.keys())
             if tableName == "dsi_units":
                 col_list = ["table_name", "column_name", "unit"]
             if self.max_cols is not None:
