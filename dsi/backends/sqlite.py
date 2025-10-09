@@ -357,10 +357,20 @@ class Sqlite(Filesystem):
         tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
         return tables
 
+    def get_schema(self):
+        """
+        Returns the structural schema of this database in the form of CREATE TABLE statements.
+
+       `return`: str
+            Each table's CREATE TABLE statement is concatenated into one large string.
+        """
+        schema_stmts = self.query_artifacts(query="SELECT sql FROM sqlite_master where sql NOT NULL ORDER BY type, name")
+        return schema_stmts["sql"].str.cat(sep="\n")
+
     # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
     def inspect_artifacts(self, interactive=False):
         return self.notebook(interactive)
-    
+
     def notebook(self, interactive=False):
         """
         Generates a Jupyter notebook displaying all the data in the SQLite database.
