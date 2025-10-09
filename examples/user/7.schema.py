@@ -11,8 +11,12 @@ schema_dsi.read("../clover3d/", 'Cloverleaf')
 
 # ER_Diagram writer requires GraphViz to be installed
 # pip install graphviz
-#dsi.write(filename, writer)
-schema_dsi.write("clover_er_diagram.png", "ER_Diagram")
+try:
+    #dsi.write(filename, writer)
+    schema_dsi.write("clover_er_diagram.png", "ER_Diagram")
+except Exception as e:
+    print(f"Error {e} occurred. Do you have graphviz installed?")
+    pass
 
 #dsi.display(table_name, num_rows, display_cols)
 schema_dsi.display("simulation")
