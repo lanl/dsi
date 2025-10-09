@@ -97,7 +97,7 @@ class DSI():
             The schema should follow the format described in :ref:`user_schema_example_label`
         
         `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
-        **If loading a relational schema, this function must be called before reading in any associated data files **
+        **If loading a relational schema, this function must be called before reading in any associated data files**
         """
         if filename:
             if not os.path.exists(filename):
