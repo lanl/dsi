@@ -9,6 +9,8 @@ schema_dsi.schema("../clover3d/schema.json") # must execute before reading Clove
 #dsi.read(path, reader)
 schema_dsi.read("../clover3d/", 'Cloverleaf')
 
+# ER_Diagram writer requires GraphViz to be installed
+# pip install graphviz
 #dsi.write(filename, writer)
 schema_dsi.write("clover_er_diagram.png", "ER_Diagram")
 
