@@ -21,6 +21,6 @@ $path_to_db/bin/mysql -u root --socket=$path_to_db/mysql.sock -e "FLUSH PRIVILEG
 $path_to_db/bin/mysql -u root --socket=$path_to_db/mysql.sock -e "SHOW GRANTS FOR '$user'@'localhost'";  # check permissions"
 $path_to_db/bin/mysql -u root --socket=$path_to_db/mysql.sock -e "USE $database";  # check permissions"
 
-
+echo "All done!"
 # usage: source create_db_user.sh <path_to_db> <database> <user> <password>
 #   e.g. source create_db_user.sh /home/pascalgrosset/projects/alchemy_dsi/test/my_sql_db sample1 dev_user1 dev_passwd

@@ -17,5 +17,6 @@ $path_to_db/bin/mysqld --basedir=$path_to_db --datadir=$path_to_data --socket=$p
 ps aux | grep mysqld
 
 
+echo "All done!"
 # usage: source start_mysql.sh <path_to_db_installation> <path_to_data>  <port>
 #  e.g. source start_mysql.sh /home/pascalgrosset/projects/alchemy_dsi/test/my_sql_db /home/pascalgrosset/projects/alchemy_dsi/test/mysql_data 3310

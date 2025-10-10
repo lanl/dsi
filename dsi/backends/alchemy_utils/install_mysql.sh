@@ -16,6 +16,7 @@ echo "mysql: "$myql_version
 
 # Get mysql
 wget https://dev.mysql.com/get/Downloads/MySQL-8.0/$myql_version.tar.xz
+#https://downloads.mysql.com/archives/community/
 
 
 # Extract
@@ -41,6 +42,6 @@ EOF
 
 echo "YAML file '$OUTPUT_FILE' created successfully."
 
-
+echo "All done!"
 # usage: source install_mysql.sh <path_to_db_installation> <folder_name_of_mysql_db> <data folder>
 # e.g.   source install_mysql.sh /home/pascalgrosset/projects/alchemy_dsi/test my_sql_db mysql_data

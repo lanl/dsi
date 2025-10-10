@@ -12,6 +12,7 @@ import subprocess
 import os
 from datetime import datetime
 import pandas as pd
+import time
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -96,12 +97,15 @@ class SqlAlchemy(Filesystem):
         args = [self.path_to_db_installation, self.path_to_data, str(self.sql_server_port)]
         subprocess.run([start_mqsql_path] + args, check=True)
 
+        time.sleep(10)   # wait for things to happen
+
 
         # Launch the script to create DB and user
         create_db_user_path = os.path.join(self.current_dir, 'alchemy_utils', 'create_db_user.sh')
         args = [self.path_to_db_installation, self.database, self.user, self.dsi_password]
         subprocess.run([create_db_user_path] + args, check=True)
 
+        time.sleep(5)   # wait for things to happen
 
         # Connect to the Server
         url=f"mysql+pymysql://{self.user}:{self.dsi_password}@{self.host}:{self.sql_server_port}/{self.database}"
