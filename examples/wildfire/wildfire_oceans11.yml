@@ -1,0 +1,19 @@
+title: "Firetec"
+description: "This ensemble data set presents the study of wildfires, and more specifically, the phenomena known as vorticity-driven lateral spread (VLS) [1], in wildfires of mountain and canyon topographies."
+keywords: ["key2", "key3"]
+instructions_of_use: "run wildfire.py in dsi/examples/wildfire/"
+
+authorship:
+  authors: ["Divya Banesh", "Rodman Ray Linn", "John M Patchett"]
+  release_date: "October 28, 2021"
+  la_ur: "LA-UR-21-30892"
+  funding: ""
+  rights: "Copyright (c) 2021, Triad National Security, LLC. All rights reserved."
+
+data:
+  file_types: "CSV"
+  file_size: "1 GB"
+  num_files: 75
+  dataset_size: "450 GB"
+  version: 1.0
+  doi: "doi url"

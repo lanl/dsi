@@ -1,75 +1,114 @@
+Introduction
+============
 
+The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  
+DSI capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing. 
 
+DSI infrastructure is designed to be flexible and with these considerations in mind:
+    - Data management is subject to strict, POSIX-enforced, file security.
+    - DSI capabilities support a wide range of common metadata queries.
+    - DSI interfaces with multiple database technologies and archival storage options.
+    - Query-driven data movement is supported and is transparent to the user.
+    - The DSI API can be used to develop user-specific workflows.
 
-The goal of the Data Science Infrastructure Project (DSI) is to manage data through metadata capture and curation.  DSI  capabilities can be used to develop workflows to support management of simulation data, AI/ML approaches, ensemble data, and other sources of data typically found in scientific computing.  DSI infrastructure is designed to be flexible and with these considerations in mind:
-
-- Data management is subject to strict, POSIX-enforced, file security.
-- DSI capabilities support a wide range of common metadata queries.
-- DSI interfaces with multiple database technologies and archival storage options.
-- Query-driven data movement is supported and is transparent to the user.
-- The DSI API can be used to develop user-specific workflows.
-
-..  figure:: data_lifecycle.png
+..  figure:: images/data_lifecycle.png
     :alt: Figure depicting the data life cycle
     :class: with-shadow
     :scale: 50%
+    :align: center
 
-    A depiction of data life cycle can be seen here. The Data Science Infrastructure API supports the user to manage the life cycle aspects of their data.
+    A depiction of data life cycle can be seen here. The DSI API supports the user to manage the life cycle aspects of their data.
 
-DSI system design has been driven by specific use cases, both AI/ML and more generic usage.  These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities.  DSI uses Object Oriented design principles to encourage modularity and to support contributions by the user community.  The DSI API is Python-based.
+DSI system design has been driven by specific use cases, both AI/ML and more generic usage.  
+These use cases can often be generalized to user stories and needs that can be addressed by specific features, e.g., flexible, human-readable query capabilities. 
 
 Implementation Overview
-=======================
+-----------------------
 
 The DSI API is broken into three main categories:
 
-- Plugins: these are frontend capabilities that will be commonly used by the generic DSI user.  These include readers and writers.
-- Backends: these are used to interact with storage devices and other ways of moving data.
-- DSI Core: the *middleware* that contains the basic functionality to use the DSI API.
+- Readers/Writers: frontend capabilities that DSI users will use to import/export data.
+- Backends: objects that are used to interact with storage devices and other ways of moving data. 
+- DSI Core: the *middleware* that contains the basic functionality to use the DSI API. 
+  This connects Readers/Writers to Backends through several modules exposed to users.
 
-Plugin Abstract Classes
------------------------
+Expected Data Standards
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-Plugins transform an arbitrary data source into a format that is compatible with the DSI core. The parsed and queryable attributes of the data are called *metadata* -- data about the data. Metadata share the same security profile as the source data.
+Before using DSI, users should first standardize their data in a format that can be represented as a table. 
+DSI supports many widely used formats, including, but not limited to, CSV, JSON, YAML, TOML, and in-memory dictionaries.
+If the data is structured in a unique format, users can create an external DSI reader by following the steps in :ref:`custom_reader`.
 
-Plugins can operate as data readers or data writers. A simple data reader might parse an application's output file and place it into a core-compatible data structure such as Python built-ins and members of the popular Python ``collection`` module. A simple data writer might execute an application to supplement existing data and queryable metadata, e.g., adding locations of outputs data or plots after running an analysis workflow.
+When using a DSI-supported Reader, each data point is expected to be a discrete value — not a nested structure.
+Users must flatten any nested data to ensure compatibility with DSI.
 
-Plugins are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.
+Metadata is important for many data workflows and should be stored with the data when relevant.
+For example, if simulation parameters are required for future analysis, that metadata should be included in the same table as the data.
 
-Currently, DSI has the following readers:
+Advanced users familiar with database relationships can also load a complex relational schema into DSI alongside their data.
+This requires prior knowledge of primary and foreign keys, as well as how columns across tables should be related.
 
-   - CSV file reader: reads in comma separated value (CSV) files.
-   - Bueno reader: can be used to capture performance data from `Bueno <https://github.com/lanl/bueno>`_.
+Users must load this relational schema as a JSON into DSI using a Schema Reader.
+For more information on formatting the schema file correctly, refer to :ref:`user_schema_example_label`.
 
-..  figure:: PluginClassHierarchy.png
-    :alt: Figure depicting the current plugin class hierarchy.
-    :class: with-shadow
-    :scale: 100%
+DSI Readers/Writers
+~~~~~~~~~~~~~~~~~~~~
 
-    Figure depicting the current DSI plugin class hierarchy.
+Readers/Writers transform an arbitrary data source into a format that is compatible with the DSI core. 
+The parsed and queryable attributes of the data are called *metadata* -- data about the data. 
+Metadata shares the same security profile as the source data.
 
-Backend Abstract Classes
-------------------------
+Data Readers parse an input file of its metadata and data and stores it within DSI memory.
+Data Writers convert metadata and data stored in DSI to an output file - ex: an image or a CSV
 
-Backends are an interface between the core and a storage medium.
-Backends are designed to support a user-needed functionality.  Given a set of user metadata captured by a DSI frontend, a typical functionality needed by DSI users is to query that metadata by SQL query. Because the files associated with the queryable metadata may be spread across filesystems and security domains, a supporting backend is required to assemble query results and present them to the DSI core for transformation and return.
+Currently, DSI has the following Readers:
+  - CSV
+  - JSON
+  - Schema (A complex schema reader)
+  - YAML1
+  - TOML1
+  - Collection (To load a Python dictionary or OrderedDict)
+  - Bueno
+  - Ensemble (Reader to ingest ensemble data. Ex: the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . 
+    Assumes each data row is a separate sim.)
+  - Oceans11Datacard (Data card for datasets on the `Oceans11 LANL data server <https://oceans11.lanl.gov>`_)
+  - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
+  - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
+  - GoogleDatacard (Data card that adheres to the `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_ )
 
-.. figure:: user_story.png
+Currently, DSI has the following Writers:
+  - Csv_Writer
+  - ER_Diagram
+  - Table_Plot
+
+DSI Backends
+~~~~~~~~~~~~~
+
+Backends are an interface between the DSI Core and a storage medium.
+Backends are designed to support a user-needed functionality.
+The default backend used in DSI is **SQLite**, but there are an options to use others such as DuckDB as well.
+
+Users can interact with a backend by ingesting data into one from DSI, querying its data through abstracted find functions, or processing its data into DSI.
+Users can also find instances of an object in a backend, display a table's data, or view statistics of each table in a backend.
+
+.. figure:: images/user_story.png
    :alt: This figure depicts a user asking a typical query on the user's metadata
    :class: with-shadow
    :scale: 50%
+   :align: center
 
-   In this typical **user story**, the user has metadata about their data stored in DSI storage of some type.  The user needs to extract all files with the variable **foo** above a specific threshold.  DSI backends query the DSI metadata store to locate and return all such files.
+   In this example **user story**, the user has metadata about their data stored in DSI storage of some type.  
+   The user needs to extract all instances of the variable **foo**. 
+   DSI backends find data from the DSI metadata to locate and return all such information.
 
 Current DSI backends include:
 
-- Sqlite: Python based SQL database and backend; the default DSI API backend.
-- GUFI: the Grand Unified File Index system `Grand Unified File-Index <https://github.com/mar-file-system/GUFI>`_ ; developed at LANL, GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.
-- Parquet: a columnar storage format for `Apache Hadoop <https://hadoop.apache.org>`_.
+- SQLite: Python based SQL database and backend; the **default** DSI API backend.
+- DuckDB: In-process SQL database designed for fast queries on large data files
 
 DSI Core
---------
+~~~~~~~~
 
-DSI basic functionality is contained within the middleware known as the *core*.  The DSI core is focused on delivering user-queries on unified metadata which can be distributed across many files and security domains. DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions. The DSI core is a home for DSI Plugins and an interface for DSI Backends.
-
-Core Documentation
+DSI basic functionality is contained within the middleware known as the *core*.
+Users will leverage Core to employ Readers, Writers, and Backends to interact with their data.
+The two primary methods to achieve this are with the :ref:`python_api_label` or the :ref:`cli_api_label`

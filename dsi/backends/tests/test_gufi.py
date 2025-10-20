@@ -11,6 +11,6 @@ def test_artifact_query():
     column = "sample_col"
     store = Gufi(prefix, index, dbpath, table, column, isVerbose)
     sqlstr = "select * from dsi_entries"
-    rows = store.get_artifacts(sqlstr)
+    rows = store.query_artifacts(sqlstr)
     store.close()
     assert len(rows) > 0

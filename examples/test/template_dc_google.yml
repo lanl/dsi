@@ -1,0 +1,59 @@
+summary:
+  dataset_name: ''
+  summary: ''
+  dataset_link: ''
+  documentation_link: ''
+
+authorship:
+  datacard_author1: name and owner/contributor/manager
+  datacard_author2: name and owner/contributor/manager
+  datacard_author3: name and owner/contributor/manager
+  publishing_organization: Organization Name
+  publishing_POC: Provide the name for a POC for this dataset's publishers
+  publishing_POC_affiliation: Provide the POC's institutional affiliation
+  publishing_POC_contact: Provide the POC's contact details
+  dataset_owner1: name
+  dataset_owner2: name
+  dataset_owner3: name
+  dataset_owners_affiliation: Provide the affiliation of the dataset owners
+  dataset_owners_contact: Provide the email of the dataset owners
+  funding_institution: ''
+  funding_summary: ''
+
+overview:
+  data_subjects: ''
+  data_sensitivity: Internal - Unrestricted / Internal - Restricted / External - Open Access / Others (please specify)
+  version: 1.0
+  maintenance_status: Regularly Updated / Actively Maintained / Limited Maintenance / Deprecated / Not Maintained
+  last_updated: MM/YYYY
+  release_date: MM/YYYY
+  motivation: Monitoring / Research / Production / Others (please specify)
+  dataset_uses: Safe for production use / Safe for research use / Conditional use - some unsafe applications / Only approved use / Others (please specify)
+  citation_guidelines: ''
+  citation_bibtex: ''
+
+provenance:
+  collection_methods_used: ''
+  source: Describe here. Include links where available.
+  platform: (platform_name), Describe platform here. Include links where relevant.
+  dates_of_collection: mmm_yyyy - mmm_yyyy
+  type_of_data: image / text / tabular / audio / video / time_series / graph / geospatial / unknown / others
+  data_selection: Summarize data selection criteria here. Include links where available.
+  data_inclusion: Summarize data inclusion criteria here. Include links where available.
+  data_exclusion: Summarize data exclusion criteria here. Include links where available.
+
+# it is optional to include this table - meant for AI/ML data
+sampling_methods:
+  sampling_method_used: cluster / haphazard / multi_stage / random / retrospective / stratified / systematic / weighted / unknown / unsampled / other
+  sampling_criteria1: summarize method here. include links where applicable.
+  sampling_criteria2: summarize method here. include links where applicable.
+  sampling_criteria3: summarize method here. include links where applicable.
+
+# it is optional to include this table - meant for AI/ML data
+known_applications_and_benchmarks:
+  ml_applications: ''
+  ml_model_name: ''
+  evaluation_accuracy: 123 (params)
+  evaluation_precision: 123 (params)
+  evaluation_recall: 123 (params)
+  evaluation_performance_metric: 123 (params)

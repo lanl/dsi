@@ -1,61 +1,265 @@
-import git
 from collections import OrderedDict
 
-from dsi.backends.sqlite import Sqlite, DataType
+from dsi.backends.sqlite import Sqlite
+import os
 
-isVerbose = True
-
-
-def get_git_root(path):
-    git_repo = git.Repo(path, search_parent_directories=True)
-    git_root = git_repo.git.rev_parse("--show-toplevel")
-    return (git_root)
-
-
-def test_wildfire_data_sql_artifact():
+def test_sql_artifact():
     dbpath = "wildfire.db"
     store = Sqlite(dbpath)
     store.close()
     # No error implies success
     assert True
 
-def test_wildfire_data_csv_artifact():
-    csvpath = '/'.join([get_git_root('.'), 'dsi/data/wildfiredata.csv'])
-    dbpath = "wildfire.db"
+def test_artifact_ingest():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
     store = Sqlite(dbpath)
-    store.put_artifacts_csv(csvpath, "simulation", isVerbose=isVerbose)
+    store.ingest_artifacts(valid_middleware_datastructure)
     store.close()
     # No error implies success
     assert True
-
-def test_wildfiredata_artifact_put():
-   valid_middleware_datastructure = OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})
-   dbpath = 'test_wildfiredata_artifact.sqlite_data'
-   store = Sqlite(dbpath)
-   store.put_artifacts(valid_middleware_datastructure)
-   store.close()
-   # No error implies success
-   assert True
-
-def test_yosemite_data_csv_artifact():
-    csvpath = '/'.join([get_git_root('.'), 'dsi/data/yosemite5.csv'])
-    dbpath = "yosemite.db"
-    store = Sqlite(dbpath)
-    store.put_artifacts_csv(csvpath, "vision", isVerbose=isVerbose)
-    store.close()
-    # No error implies success
-    assert True
-
 
 def test_artifact_query():
-    dbpath = "wildfire.db"
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
     store = Sqlite(dbpath)
-    _ = store.get_artifact_list(isVerbose=isVerbose)
-    data_type = DataType()
-    data_type.name = "simulation"
-    result = store.sqlquery("SELECT *, MAX(wind_speed) AS max_windspeed FROM " +
-                            str(data_type.name) + " GROUP BY safe_unsafe_fire_behavior")
-    store.export_csv(result, "query.csv")
+    store.ingest_artifacts(valid_middleware_datastructure)
+    query_data = store.query_artifacts(query = "SELECT * FROM wildfire;")
     store.close()
-    # No error implies success
+    correct_output = [[1, 3], [2, 2], [3, 1]]
+    assert query_data.values.tolist() == correct_output
+
+def test_artifact_query():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+    get_data = store.get_table("wildfire")
+    query_data = store.query_artifacts(query = "SELECT * FROM wildfire;")
+    store.close()
+    correct_output = [[1, 3], [2, 2], [3, 1]]
+    assert get_data.values.tolist() == correct_output == query_data.values.tolist()
+
+def test_artifact_notebook():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+    store.notebook()
+    store.close()
     assert True
+
+def test_artifact_process():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':[3,2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+    artifact = store.process_artifacts()
+    store.close()
+    assert artifact == valid_middleware_datastructure
+
+def test_find():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    find_data = store.find("f")
+    assert len(find_data) == 3
+    assert find_data[0].t_name == "wildfire"
+    assert find_data[0].c_name == ['foo', 'bar']
+    assert find_data[0].type == 'table'
+    assert find_data[1].t_name == "wildfire"
+    assert find_data[1].c_name == ['foo']
+    assert find_data[1].value == [1,2,3]
+    assert find_data[1].type == 'column'
+    assert find_data[0].row_num == find_data[1].row_num
+    assert find_data[2].t_name == "wildfire"
+    assert find_data[2].c_name == ['bar']
+    assert find_data[2].value == "f"
+    assert find_data[2].type == 'cell'
+    assert find_data[2].row_num == 1
+
+    store.close()
+
+def test_find_table():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    table_data = store.find_table("f")
+    assert table_data[0].t_name == "wildfire"
+    assert table_data[0].c_name == ['foo', 'bar']
+    assert table_data[0].type == 'table'
+    store.close()
+
+def test_find_column():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    col_data = store.find_column("f")
+    assert col_data[0].t_name == "wildfire"
+    assert col_data[0].c_name == ['foo']
+    assert col_data[0].value == [1,2,3]
+    assert col_data[0].type == 'column'
+    store.close()
+
+def test_find_range():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    range_data = store.find_column("f", range=True)
+    assert range_data[0].t_name == "wildfire"
+    assert range_data[0].c_name == ['foo']
+    assert range_data[0].value == [1,3]
+    assert range_data[0].type == 'range'
+    store.close()
+
+def test_find_cell():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    cell_data = store.find_cell("f")
+    assert cell_data[0].t_name == "wildfire"
+    assert cell_data[0].c_name == ['bar']
+    assert cell_data[0].value == "f"
+    assert cell_data[0].row_num == 1
+    assert cell_data[0].type == 'cell'
+    store.close()
+
+def test_find_row():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    row_data = store.find_cell("f", row = True)
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'row'
+    store.close()
+
+def test_find_relation():
+    valid_middleware_datastructure = OrderedDict({"wildfire": OrderedDict({'foo':[1,2,3],'bar':["f",2,1]})})
+    dbpath = 'test_artifact.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+    store = Sqlite(dbpath)
+    store.ingest_artifacts(valid_middleware_datastructure)
+
+    row_data = store.find_relation("foo", ">1")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [2,'2']
+    assert row_data[0].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "<2")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", ">=2")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [2,'2']
+    assert row_data[0].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "<=1")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "=3")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [3,'1']
+    assert row_data[0].row_num == 3
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "==3")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [3,'1']
+    assert row_data[0].row_num == 3
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "!=2")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[1].value == [3,'1']
+    assert row_data[1].row_num == 3
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "(1,2)")
+    assert len(row_data) == 2
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[1].value == [2,'2']
+    assert row_data[1].row_num == 2
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("foo", "~ '1'")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    row_data = store.find_relation("bar", "~~ 'f'")
+    assert len(row_data) == 1
+    assert row_data[0].t_name == "wildfire"
+    assert row_data[0].c_name == ['foo', 'bar']
+    assert row_data[0].value == [1,"f"]
+    assert row_data[0].row_num == 1
+    assert row_data[0].type == 'relation'
+
+    store.close()

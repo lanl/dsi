@@ -1,0 +1,35 @@
+name: file_writer test
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements.extras.txt
+        pip install .
+        sudo apt-get install graphviz
+    - name: Test File Writer Plugins
+      run: |
+        pip install pytest
+        pytest dsi/plugins/tests/test_file_writer.py

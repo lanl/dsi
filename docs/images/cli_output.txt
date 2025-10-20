@@ -1,0 +1,135 @@
+(mydsi) viyer@pn2405703 examples % dsi
+    _____           ___                          
+   /  /  \         /  /\         ___     
+  /  / /\ \       /  / /_       /  /\    
+ /  / /  \ \     /  / / /\     /  / /    
+/__/ / \__\ |   /  / / /  \   /__/  \    
+\  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+ \  \ \  / /   \  \ \/ / / /     \  \ \/\
+  \  \ \/ /     \  \  / / /       \__\  /
+   \  \  /       \__\/ / /        /__/ / 
+    \__\/          /__/ /         \__\/  
+                   \__\/                   v1.1.1
+
+Created a temporary sqlite DSI backend
+
+Enter "help" for usage hints.
+dsi> help
+
+display <table_name> [-n num_rows] [-e filename] Displays a table's data. Optionally limit
+                                                  displayed rows and export to CSV/Parquet
+draw [-f filename]                               Draws an ER diagram of all tables in the
+                                                  current DSI database
+exit                                             Exits the DSI Command Line Interface (CLI)
+find <condition>                                 Finds all rows of a table that match a
+                                                  column-level condition.
+help                                             Shows this help message.
+list                                             Lists all tables in the current DSI database
+plot_table <table_name> [-f filename]            Plots numerical data from a table to an
+                                                  optional file name argument
+query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes). Optionally
+                                                  limit printed rows or export to CSV/Parquet
+read <filename> [-t table_name]                  Reads a file or URL into the DSI database.
+                                                  Optionally set table name.
+search <value>                                   Searches for a string or number across DSI.
+summary [-t table_name]                          Summary of the database or a specific table.
+write <filename>                                 Writes data in DSI database to a permanent
+                                                  location.
+ls                                               Lists all files in the current or specified
+                                                  directory.
+cd <path>                                        Changes the working directory within the CLI
+                                                  environment.
+
+dsi> cd test/
+Changed directory to /Users/viyer/dsi/examples/test
+
+dsi> read student_test1.yml
+Loaded student_test1.yml into tables: math, address, physics
+Database now has 4 tables
+
+dsi> read student_test2.yml
+Loaded student_test2.yml into tables: math, address, physics
+Database now has 4 tables
+
+dsi> read results.toml
+Loaded results.toml into the table people
+Database now has 5 tables
+
+dsi> read yosemite5.csv
+Loaded yosemite5.csv into the table yosemite5
+Database now has 6 tables
+
+dsi> list
+
+Table: math
+  - num of columns: 7
+  - num of rows: 2
+
+Table: address
+  - num of columns: 9
+  - num of rows: 2
+
+Table: physics
+  - num of columns: 7
+  - num of rows: 2
+
+Table: dsi_units
+  - num of columns: 3
+  - num of rows: 8
+
+Table: people
+  - num of columns: 3
+  - num of rows: 1
+
+Table: yosemite5
+  - num of columns: 9
+  - num of rows: 4
+
+
+dsi> query "SELECT * FROM physics" -e physics_output.csv
+Printing the result from input SQL query: SELECT * FROM physics
+
+specification | n    | o       | p   | q       | r  | s      
+-------------------------------------------------------------
+!amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+!amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
+
+Exported the query result to physics_output.csv
+
+dsi> display math -e math_output.csv
+
+Table: math
+
+specification | a | b | c     | d | e    | f     
+-------------------------------------------------
+!jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
+!jack1        | 2 | 3 | 45.98 | 3 | 44.8 | 0.0099
+
+Exported math to math_output.csv
+
+dsi> draw -f dsi_er_diagram.png
+Successfully drew an ER Diagram in dsi_er_diagram.png
+
+dsi> plot_table physics -f physics_plot.png
+Successfully plotted physics in physics_plot.png
+
+dsi> summary -t physics
+
+Table: physics
+
+column        | type    | min     | max     | avg     | std_dev              
+-----------------------------------------------------------------------------
+specification | VARCHAR | None    | None    | None    | None                 
+n             | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
+o             | VARCHAR | None    | None    | None    | None                 
+p             | INTEGER | 23      | 233     | 128.0   | 105.0                
+q             | VARCHAR | None    | None    | None    | None                 
+r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
+s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
+
+dsi> write dsi_output.db
+Sucessfully wrote all data to dsi_output.db
+
+dsi> exit
+Exiting...
+(mydsi) viyer@pn2405703 examples % 

@@ -11,8 +11,10 @@ all: html
 html:
 	python ./plugins/generate_plugin_class_hierarchy.py ../dsi/plugins/
 	python ./backends/generate_backend_class_hierarchy.py ../dsi/backends/
-	mv PluginClassHierarchy.gv.png PluginClassHierarchy.png
-	mv BackendClassHierarchy.gv.png BackendClassHierarchy.png
+	mv PluginClassHierarchy.gv.png images/PluginClassHierarchy.png
+	mv BackendClassHierarchy.gv.png images/BackendClassHierarchy.png
+	rm PluginClassHierarchy.gv
+	rm BackendClassHierarchy.gv
 	rm -rf $(BUILDDIR)/html
 	$(SPHINXBUILD) -b html . $(BUILDDIR)/html
 #	pytest --cov --cov-report=html ../
@@ -32,19 +34,20 @@ html:
 #	git add --force ./htmlcov && \
 
 gh-pages: _build/html
-	root="$$(git rev-parse --show-toplevel)" && \
 	cd _build/html && \
 	rm -rf .git && \
 	touch .nojekyll && \
 	git init && \
 	git add . && \
 	git commit -m "DSI Documentation" && \
-	git push -f $$root master:gh-pages && \
+	git branch -M gh-pages && \
+	git remote add origin https://github.com/lanl/dsi.git && \
+	git push -f origin gh-pages && \
 	rm -rf .git
 
-# Push to external docs site
-publish:
-	git push -f origin gh-pages
+# # Push to external docs site
+# publish:
+# 	git push -f origin gh-pages
 
 # Make a PDF
 latexpdf:

@@ -1,122 +1,59 @@
 import os
 import pandas as pd
 import urllib.request 
-from dsi.backends.sqlite import Sqlite, DataType
-import shutil
 
-isVerbose = True
+from dsi.dsi import DSI
 
-"""
-Read and download the images from the SDSC server
-"""
-def downloadImages(dstFolder, path_to_csv, imageFolder):
-    df = pd.read_csv (path_to_csv)
+def downloadImages(path_to_csv, imageFolder):
+    """
+    Read and download the images from the SDSC server
+    """
+    if not os.path.exists(imageFolder):
+        os.makedirs(imageFolder)
 
-    for index, row in df.iterrows():
-        url = row['FILE'] 
+    df = pd.read_csv(path_to_csv)
+    for url in df["FILE"]:
         filename = url.rsplit('/', 1)[1]
-        isExist = os.path.exists(imageFolder)
-        if not isExist:
-            os.makedirs(imageFolder)
         
         dst = imageFolder + filename
-        urllib.request.urlretrieve(url, dst)
-
-"""
-Create the wildfire database from the csv file
-"""
-def generateWildfireDB(dstFolder, path_to_csv, path_to_db, dbName):
-    store = Sqlite(path_to_db)
-    store.put_artifacts_csv(path_to_csv, dbName, isVerbose=isVerbose)
-    store.close()   
-
-"""
-Update the urls in the db to the local paths
-"""
-def updateDBImagePaths(path_to_db, dbName, imageFolderName):
-    store = Sqlite(path_to_db)
-    data_type = DataType()
-    data_type.name = dbName
-
-    query = "SELECT FILE FROM " + str(data_type.name) + ";"
-    result = store.sqlquery(query)
-
-    for name in result:
-        filename = name[0].rsplit('/', 1)[1]
-        filePath = imageFolderName + filename
-        updateQuery = "UPDATE " + str(data_type.name) + " SET FILE = '" + filePath  + "' WHERE FILE = '" + name[0] + "';"
-        store.sqlquery(updateQuery)    
-
-    store.close()
-
-"""
-Query the db to identify columns of interest
-"""
-def extractDBColumns(path_to_db, columns_to_keep, dbName, path_to_csv_output):
-    store = Sqlite(path_to_db)
-    data_type = DataType()
-    data_type.name = dbName
-
-    # for name in result:
-    #     filename = name[0].rsplit('/', 1)[1]
-    #     filePath = "images/" + filename
-    #     updateQuery = "UPDATE " + str(data_type.name) + " SET FILE = '" + filePath  + "' WHERE FILE = '" + name[0] + "';"
-    #     store.sqlquery(updateQuery)
-
-    #get column names
-    query = "SELECT name FROM PRAGMA_TABLE_INFO('" + str(data_type.name) + "')"
-    result = store.sqlquery(query)
-    print(result)
-    columnNames = list(map(result.__getitem__, columns_to_keep))
-    names = ""
-    for name in columnNames:
-        name = name[0]
-        names += name + ","
-    names = names[:-1]
-
-    # query the columns of interest
-    query = "SELECT " + names + " FROM " + str(data_type.name) + ";"
-    #query = "SELECT * FROM " + str(data_type.name) + " WHERE wind_speed > 5;"
-    #result = store.sqlquery(query) + ";"
-    store.export_csv_query(query, path_to_csv_output)
-    store.close()
+        if not os.path.exists(dst):
+            urllib.request.urlretrieve(url, dst)
 
 if __name__ == "__main__":
-    # predefined paths
-    dstFolder = "examples/wildfire/"
-    imageFolderName = "images/"
-    imgDstFolder = dstFolder + imageFolderName
-    path_to_csv_input = dstFolder + "wildfiredataSmall.csv"
-    path_to_sqlite_db = dstFolder + 'wildfire.db'
-    path_to_cinema_db = dstFolder + "wildfire.cdb/"
-    path_to_cinema_images = path_to_cinema_db + imageFolderName
-    path_to_cinema_csv = path_to_cinema_db + "data.csv"
-    dbName = "wfdata"
-    columns_to_keep = [0,1,2,9,10]
+    image_path = "images/"
+    input_csv = "wildfiredataSmall.csv"
+    db_name = 'wildfire.db'
+    output_csv = "wildfire_output.csv"
+    datacard = "wildfire_oceans11.yml"
+    table_name = "wfdata"
+    columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "LOCAL_PATH"]
 
-    # for each row, read the url in column 'FILE' and download the images
-    downloadImages(dstFolder, path_to_csv_input, imgDstFolder)
+    #downloads wildfire images to a local path -- external to DSI
+    if not os.path.exists(image_path):
+        os.makedirs(image_path)
+    downloadImages(input_csv, image_path)
 
-    # generate the SQLite database
-    dbExist = os.path.exists(path_to_sqlite_db)
-    if dbExist:
-        os.remove(path_to_sqlite_db)
-    generateWildfireDB(dstFolder, path_to_csv_input, path_to_sqlite_db, dbName)
-    # moves the images to the Cinema Database folder
-    isExist = os.path.exists(path_to_cinema_db)
-    if not isExist:
-        os.makedirs(path_to_cinema_db)
-    imgDirExist = os.path.exists(path_to_cinema_images)
-    if imgDirExist:
-        shutil.rmtree(path_to_cinema_images)
-    os.rename(imgDstFolder, path_to_cinema_images)
+    if os.path.exists(db_name):
+        os.remove(db_name)
 
-    # update the paths in the database to the local paths
-    updateDBImagePaths(path_to_sqlite_db, dbName, imageFolderName)
+    dsi = DSI(db_name)
 
-    # extract columns of interest
-    extractDBColumns(path_to_sqlite_db, columns_to_keep, dbName, path_to_cinema_csv)
+    dsi.read(input_csv, "Ensemble", table_name=table_name)
+    dsi.read(datacard, "Oceans11Datacard")
+
+    #get wildfire table's data
+    wildfire_data = dsi.get_table(table_name, collection=True)
     
+    updatedFilePaths = []
+    for url_image in wildfire_data['FILE']:
+        image_name = url_image.rsplit('/', 1)[1]
+        filePath = image_path + image_name
+        updatedFilePaths.append(filePath)
+    wildfire_data['LOCAL_PATH'] = updatedFilePaths
 
+    #update wildfire table with new column of local paths to the downloaded wildfire images
+    dsi.update(wildfire_data)
+    
+    dsi.write(output_csv, "Csv_Writer", table_name=table_name)
 
-
+    dsi.display(table_name, display_cols=columns_to_keep)

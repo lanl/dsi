@@ -12,11 +12,10 @@ The Data Science Infrastructure Project (DSI)
 
    introduction
    installation
-   plugins
-   backends
-   core
-   tiers
+   python_api
+   cli
    examples
+   contributors
 
 Indices and tables
 ==================
