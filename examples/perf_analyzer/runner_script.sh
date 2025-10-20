@@ -23,6 +23,6 @@ echo "================================ Compile Done ============================
     
 echo "============================= Running CloverLeaf ============================= "j
 mpirun -np 2 tau_exec $SOURCE_BASE_DIRECTORY/clover_leaf
-pprof -s > tau_results
+pprof > tau_results
 cd -
 conda deactivate

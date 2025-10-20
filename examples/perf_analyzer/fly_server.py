@@ -22,7 +22,7 @@ import os
 import git
 import subprocess
 
-import parse_clover_output
+import parse_output_analyzer
 import code_sensing
 
 fetched_branches = list()
@@ -62,12 +62,13 @@ def initAndLoadCachedData(workignDir='/tmp/fly_dsi'):
     local_cached_data = diskcache.Index(cpath)
     if 'git_nodes' not in local_cached_data:
         local_cached_data['git_nodes'] = dict()
+    print("Cached data loaded")
         
 
 
 def getGitRepo(user_repo):
     GITHUB_ACCESS_TOKEN = ""
-    g = Github(GITHUB_ACCESS_TOKEN)
+    g = Github(GITHUB_ACCESS_TOKEN,verify=True)
     return g.get_repo(user_repo)
 
 def getGitGraph(user_repo, selected_branches):
@@ -292,7 +293,6 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
                             secondary_y = False
                             )
 
-
     if mk_data is not None:
         print('mk data found', mk_data['hash'])
 
@@ -341,6 +341,88 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
     gitFig.update_traces(xaxis='x3')
     return gitFig
 
+def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
+    if git_nodes is None or len(git_nodes) == 0:
+        fig1 = go.Figure().add_annotation(
+            x=2, y=2,
+            text="Select Branches",
+            font=dict(family="sans serif",size=25,color="crimson"),
+            showarrow=False,
+            yshift=10)
+        fig1.update_layout(
+            xaxis =  { "visible": False },
+            yaxis = { "visible": False })
+        return fig1
+    
+    git_nodes_df = pd.DataFrame(git_nodes)
+
+    merged_df = git_nodes_df
+    if sorted_df is not None:
+        merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
+    combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
+    combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
+    sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
+
+
+    combined_all_df = combined_all_df.dropna(subset=perf_filter.extend(["date"])).reset_index(drop=True)
+
+    # print(combined_all_df["formatted_date"])
+    parCordValues = list()
+    if sorted_df is not None and len(sorted_df) > 0:
+        f_col = combined_all_df.index.values
+        parCordValues.append(
+            dict(range = [f_col.min(), f_col.max()],
+                values = f_col,
+                label = "Commit<br>Time", tickvals = f_col, ticktext = combined_all_df["formatted_date"].astype(str))
+        )
+        for col_name in perf_filter:# ["pdv", "cell_advection", "mpi_halo_exchange", "self_halo_exchange", "momentum_advection", "total"]:
+            if col_name == "date":
+                continue
+            f_col = combined_all_df[col_name].astype(float)
+            # Replace the second to last underscore with a white space in the label
+            parts = col_name.split('_')
+            csum = 0
+            label = ''
+            for part in parts:
+                if csum > 0:
+                    label += '_'
+                csum += len(part) + 1
+                label += part
+                if csum > len(col_name) // 2:
+                    label += "<br>"
+                    csum = 0
+            parCordValues.append(
+                dict(range = [f_col.min(), f_col.max()],
+                     label = label, values = f_col)
+            )
+    
+    if len(parCordValues) == 0:
+        fig = go.Figure().add_annotation(
+            x=2, y=2,
+            text="No data to plot",
+            font=dict(family="sans serif",size=25,color="crimson"),
+            showarrow=False,
+            yshift=10)
+        fig.update_layout(
+            xaxis =  { "visible": False },
+            yaxis = { "visible": False })
+    else:
+        fig = go.Figure(data=go.Parcoords(
+                    line = dict(color = parCordValues[0]['values'],
+                            colorscale = 'Electric',
+                            showscale = False,
+                            colorbar = dict(x=-0.15, showticklabels=False),
+                            width = 3,
+                            cmin = parCordValues[0]['range'][0],
+                            cmax = parCordValues[0]['range'][1]),
+                    dimensions = parCordValues,
+                    labelangle = 0,
+                    labelside = "bottom",
+                )
+            )
+    fig.update_layout(margin=dict(l=150))
+    return fig
+
 # @callback(
 #     Output('perf_graph', 'figure'),
 #     Input('git_graph', 'hoverData'))
@@ -350,7 +432,38 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
 #     return generatePerfChart(current_time)
 
 def main(perf_data, git_nodes):
-    app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_callback_exceptions=True)
+    js_scripts = [
+        { 'src':"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js",
+          'integrity':"sha512-6yoqbrcLAHDWAdQmiRlHG4+m0g/CT/V9AGyxabG8j7Jk8j3r3K6due7oqpiRMZqcYe9WM2gPcaNNxnl2ux+3tA==",
+          'crossorigin':"anonymous",
+          'referrerpolicy':"no-referrer"
+        }
+    ]
+    css_scripts = [
+        {
+            'rel':"stylesheet",
+            'href':"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark-dimmed.min.css",
+            'integrity':"sha512-zcatBMvxa7rT7dDklfjauWsfiSFParF+hRfCdf4Zr40/MmA1gkFcBRbop0zMpvYF3FmznYFgcL8wlcuO/GwHoA==",
+            'crossorigin':"anonymous",
+            'referrerpolicy':"no-referrer"
+        },
+        # {
+        #     'rel':"stylesheet",
+        #     'href':"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css",
+        #     'integrity':"sha512-0aPQyyeZrWj9sCA46UlmWgKOP0mUipLQ6OZXu8l4IcAmD2u31EPEy9VcIMvl7SoAaKe8bLXZhYoMaE/in+gcgA==",
+        #     'crossorigin':"anonymous",
+        #     'referrerpolicy':"no-referrer"
+        # },
+        # {
+        #     'rel':"stylesheet",
+        #     'href':"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/stackoverflow-light.min.css",
+        #     'integrity':"sha512-RDtnAhiPytLVV3AwzHkGVMVI4szjtSjxxyhDaH3gqdHPIw5qwQld1MVGuMu1EYoof+CaEccrO3zUVb13hQFU/A==",
+        #     'crossorigin':"anonymous",
+        #     'referrerpolicy':"no-referrer"
+        # },
+        dbc.themes.FLATLY
+    ]
+    app = Dash(__name__, external_stylesheets=css_scripts, external_scripts=js_scripts, suppress_callback_exceptions=True)
     app.layout = dbc.Container([
         html.Div([
             html.Div([
@@ -360,7 +473,7 @@ def main(perf_data, git_nodes):
                     html.Span("PerfAnalyzer")
                 ]),
                 # html.P("Analyze performance accross commit")
-            ], style={"vertical-alignment": "top"}),
+            ], style={"verticalAlignment": "top"}),
             
 
 
@@ -389,12 +502,12 @@ def main(perf_data, git_nodes):
                         ),
                         # html.Div(id='branch-selection_text', children='Selected branches')
                     ])
-                ], style={'width': '59%', 'display': 'inline-block', 'margin-left': 0, 'margin-right': 0, 'vertical-align': 'top'}),
+                ], style={'width': '59%', 'display': 'inline-block', 'marginLeft': 0, 'marginRight': 0, 'verticalAlign': 'top'}),
             ],
             style={
-                'margin-top': 0,
-                'margin-bottom': 10,
-                "vertical-alignment": "top"
+                'marginTop': 0,
+                'marginBottom': 10,
+                "verticalAlignment": "top"
             }),
 
             html.Div([
@@ -405,7 +518,12 @@ def main(perf_data, git_nodes):
                     clearable=True,
                     optionHeight=40,
                     multi=True,
-                    style={'margin-bottom': 10, 'width': '100%'}
+                    style={'marginBottom': 10, 'width': '100%'}
+                ),
+                dcc.Loading(
+                    [dcc.Graph(figure=generateParCordChart(perf_data, git_nodes), id='par-coord-graph')],
+                    overlay_style={"visibility":"visible", "opacity": .5, "backgroundColor": "white"},
+                    custom_spinner=html.H2(["Loading Performance data", dbc.Spinner(color="primary")]),
                 ),
                 dcc.Loading(
                     [dcc.Graph(figure=generateGitChart(perf_data, git_nodes), id='git-graph')],
@@ -414,7 +532,7 @@ def main(perf_data, git_nodes):
                 ),
                 html.Div(
                     html.Button('Run performance with selected commits', id='run-perf-commit', n_clicks=0, disabled=True
-                    ), style={'margin-top': 20,'margin-bottom': 20}),
+                    ), style={'marginTop': 20,'marginBottom': 20}),
                 html.H4('Selected Commits:'),
                 dash_table.DataTable(id='selected-second-commits-table',
                                     columns=[
@@ -440,22 +558,22 @@ def main(perf_data, git_nodes):
                                         # 'textOverflow': 'ellipsis',
                                     }
                                      ),
-            ], style={'width': 790,'margin-top': 0,'margin-left': 0})
+            ], style={'width': 790,'marginTop': 0,'marginLeft': 0})
             # html.Div(
             #     html.Img(src='assets/image.svg',
-            #             style={'margin-left': 15, 'margin-right': 15, 'margin-top': 30, 'width': 310})
+            #             style={'marginLeft': 15, 'marginRight': 15, 'marginTop': 30, 'width': 310})
             # )
         ], style={
             'width': '60%',
             'height': '1000px',
-            'margin-left': 10,
-            'margin-top': 5,
-            'margin-right': 10
+            'marginLeft': 10,
+            'marginTop': 5,
+            'marginRight': 10
         }),
         html.Div([
             html.Div([
                 html.H4("Search any variable, (regex or plaintext):"),
-                dcc.Input(id='custom-var-search', value='pragma, define', type='text', style={'margin-bottom': 10}),
+                dcc.Input(id='custom-var-search', value='pragma, define', type='text', style={'marginBottom': 10}),
                 html.Div(id='search-var-info', children='Choose files types to filter'),
                 dcc.Dropdown(
                     options={r"\.c":".c", r"\.cc": ".cc", r"\.py":".py", r"\.f90":".f90", r"\.ipynb": ".ipynb"},
@@ -465,7 +583,7 @@ def main(perf_data, git_nodes):
                     optionHeight=40,
                     multi=True
                 ),
-                html.Div(id='file-filter-selection-text', children='Filtered Files', style={'margin-bottom': 10}),
+                html.Div(id='file-filter-selection-text', children='Filtered Files', style={'marginBottom': 10}),
                 html.Button('Search', id='submit-var-search', n_clicks=0, disabled=True),
                 dash_table.DataTable(id='var-search-table',
                                     columns=[
@@ -492,22 +610,23 @@ def main(perf_data, git_nodes):
                                         # 'textOverflow': 'ellipsis',
                                     }
                                      ),
-                # html.Div(id='var-results-table', style={'margin-top': 10}),
-                html.Div(id='code-view', style={'margin-top': 10,
+                # html.Div(id='var-results-table', style={'marginTop': 10}),
+                html.Div(id='code-view', style={'marginTop': 10,
                                                 'height': '1000px', 'maxHeight': '1000px',
                                                 'overflow': 'auto',
                                                 }),
-            ], style={'margin-left': 0, 'margin-top': 5}),
+            ], style={'marginLeft': 0, 'marginTop': 5}),
         ], style={
             'width': '40%',
-            'margin-left': 0,
+            'marginLeft': 0,
         }),
     ],
     fluid=True,
     style={'display': 'flex'},
     className='dashboard-container')
 
-    app.run_server(debug=True)
+    # app.run_server(debug=True, host = '127.0.0.1')
+    app.run(debug=True, host = '127.0.0.1')
 
 
 @callback(
@@ -540,6 +659,8 @@ def update_var_result_table(n_clicks, search_var, filtered_files):
         cached_data[candidate_commit_hash] = cached_data.get(candidate_commit_hash, dict())
 
         all_var_list = list()
+        if not search_var:
+            return list()
         for each_var in search_var.split(","):
             ev = each_var.rstrip()
             if ev not in cached_data[candidate_commit_hash]:
@@ -591,12 +712,15 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
     if cached_data is None:
         return no_update
     
-    
-    if len(derived_selected_commits_list) < 2:
+    if len(derived_selected_commits_list) == 0 \
+        and (derived_virtual_selected_rows is None or len(derived_virtual_selected_rows) == 0 or len(rows) < derived_virtual_selected_rows[0]):
+            return blank_markdown
+    if (len(derived_selected_commits_list) == 1) and \
+        (derived_virtual_selected_rows is not None and len(derived_virtual_selected_rows) > 0 and len(rows) >= derived_virtual_selected_rows[0]):
         line_padding = 5
         selected_hash = ""
-        if derived_virtual_selected_rows is None or len(derived_virtual_selected_rows) == 0 or len(rows) < derived_virtual_selected_rows[0]:
-            return blank_markdown
+        # if derived_virtual_selected_rows is None or len(derived_virtual_selected_rows) == 0 or len(rows) < derived_virtual_selected_rows[0]:
+        #     return blank_markdown
     
         mk_string = "\n\n Commit: " + rows[derived_virtual_selected_rows[0]]['hash'][:7] + "\n\n"
         for i in range(len(derived_virtual_selected_rows)):
@@ -633,7 +757,7 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
         return mk_component
     elif len(derived_selected_commits_list) > 2:
         return dcc.Markdown("##### Please select upto two commits", id='actual-source-block')
-    
+        
     if derived_virtual_selected_rows is not None and len(derived_virtual_selected_rows) > 0 and len(rows) >= derived_virtual_selected_rows[0]:
         mk_data = list()
         for i in range(len(derived_virtual_selected_rows)):
@@ -670,7 +794,7 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
 )
 def update_search_var_output_text(n_clicks, search_var):
     global perf_runner
-    results = parse_clover_output.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
+    results = parse_output_analyzer.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
     if results is not None and len(results) > 0:
         pass
     return 'Searched vars: {}'.format(
@@ -729,6 +853,7 @@ def find_interesting_perf_metric(df):
 
 @callback(
     Output('git-graph', 'figure'),
+    Output('par-coord-graph', 'figure'),
     Output('perf-metric-option', 'options'),
     Output('perf-metric-option', 'value'),
     Input('input-on-submit', 'value'),
@@ -749,14 +874,19 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
         selected_branches = value
         git_nodes = getGitGraph(repo_name, selected_branches)
 
-        results = parse_clover_output.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
+        results = parse_output_analyzer.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
         sorted_df = None
         if results is not None and len(results) > 0:
             sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
         pfl = perf_list
         if perf_list is None or len(perf_list) == 0:
             pfl = find_interesting_perf_metric(sorted_df)
-        return [generateGitChart(sorted_df, git_nodes,perf_filter=pfl), get_browsable_perf_metric(sorted_df), pfl]
+        # return [generateGitChart(sorted_df, git_nodes,perf_filter=pfl), get_browsable_perf_metric(sorted_df), pfl]
+        return [generateGitChart(sorted_df, git_nodes,perf_filter=pfl),
+                # no_update,
+                generateParCordChart(sorted_df, git_nodes,perf_filter=pfl), 
+                get_browsable_perf_metric(sorted_df), 
+                pfl]
 
     elif 'run-perf-commit' in changed_id:
         if selectedData is None:
@@ -784,7 +914,7 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
         for ind in table_df.index:
             candidate_commit_hash = table_df['hash'][ind]
             
-            if parse_clover_output.test_artifact_query(perf_runner.testname, perf_runner.current_working_directory, candidate_commit_hash):
+            if parse_output_analyzer.test_artifact_query(perf_runner.testname, perf_runner.current_working_directory, candidate_commit_hash):
                 try:
                     result = subprocess.run('cd ' + perf_runner.current_git_directory + ' && git checkout -f ' + candidate_commit_hash, shell=True)
                 except subprocess.CalledProcessError as cpe:
@@ -796,33 +926,33 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
                 my_env = os.environ.copy()
                 my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
                 my_env['SOURCE_BASE_DIRECTORY'] = perf_runner.current_git_directory
-                my_env['CANDIDATE_COMMIT_HASH'] = candidate_commit_hash
                 # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
                 try:
-                    command = ['source runner_script.sh']
+                    command = ['cd /Users/ssakin/projects/dsi/tools/perf_analyzer && source runner_script.sh']
                     result = subprocess.run(command, env=my_env, shell=True)
                 except subprocess.CalledProcessError as cpe:
                     result = cpe.output
                 finally:
                     print("final done")
                     
-                    data = parse_clover_output.parse_clover_output_file(perf_runner.testname, perf_runner.current_git_directory)
-                    tau_data = parse_clover_output.parse_tau_output_file(perf_runner.testname, perf_runner.current_git_directory)
+                    data = parse_output_analyzer.parse_sim_output_file(perf_runner.testname, perf_runner.current_git_directory)
+                    tau_data = parse_output_analyzer.parse_tau_output_file(perf_runner.testname, perf_runner.current_git_directory)
                     data.update(tau_data)
-                    parse_clover_output.add_output_to_dsi(data, perf_runner.testname, perf_runner.current_working_directory)
+                    parse_output_analyzer.add_output_to_dsi(data, perf_runner.testname, perf_runner.current_working_directory)
 
             cached_data[candidate_commit_hash] = cached_data.get(candidate_commit_hash, dict())
-            for each_var in search_var.split(","):
-                ev = each_var.rstrip()
-                if ev not in cached_data[candidate_commit_hash]:
-                    var_dict = code_sensing.recursive_customized_match([ev], filtered_files, perf_runner.current_git_directory)
-                    cached_data[candidate_commit_hash][ev] = cached_data[candidate_commit_hash].get(ev, dict())
-                    cached_data[candidate_commit_hash][ev].update(var_dict)
+            if search_var:
+                for each_var in search_var.split(","):
+                    ev = each_var.rstrip()
+                    if ev not in cached_data[candidate_commit_hash]:
+                        var_dict = code_sensing.recursive_customized_match([ev], filtered_files, perf_runner.current_git_directory)
+                        cached_data[candidate_commit_hash][ev] = cached_data[candidate_commit_hash].get(ev, dict())
+                        cached_data[candidate_commit_hash][ev].update(var_dict)
 
 
         print('got chart updates')
         local_cached_data['code_sensing'] = cached_data
-        results = parse_clover_output.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
+        results = parse_output_analyzer.get_all_db_data(perf_runner.testname, perf_runner.current_working_directory)
         if results is not None and len(results) > 0 and value is not None:
             sorted_df = results.sort_values(by=['git_committed_date'], ascending=True)
             selected_branches = value
@@ -833,9 +963,13 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
             pfl = perf_list
             if perf_list is None or len(perf_list) == 0:
                 pfl = find_interesting_perf_metric(sorted_df)
-            return [generateGitChart(sorted_df, git_nodes, mk_data, pfl), get_browsable_perf_metric(sorted_df), pfl]
-        return [no_update, no_update, no_update]
-    return [no_update, no_update, no_update]
+            return [generateGitChart(sorted_df, git_nodes, mk_data, pfl), 
+                    # no_update,
+                    generateParCordChart(sorted_df, git_nodes,perf_filter=pfl), 
+                    get_browsable_perf_metric(sorted_df), 
+                    pfl]
+        return [no_update, no_update, no_update, no_update]
+    return [no_update, no_update, no_update, no_update]
 
 
 @callback(
