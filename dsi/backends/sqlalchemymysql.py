@@ -1,8 +1,10 @@
-import sqlalchemy
-from sqlalchemy import Table, Column, Integer, String, Float, TEXT
-from sqlalchemy.types import Text
+# import dsi.backends.sqlalchemymysql as sqlalchemymysql
+# from dsi.backends.sqlalchemymysql import Table, Column, Integer, String, Float, TEXT
+
+import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
+from sqlalchemy.dialects.mysql import TEXT, MEDIUMTEXT, LONGTEXT  # dialect-specific types (uppercase)
+from sqlalchemy.types import Text  # generic Text type (lowercase class)
 
 import random
 import socket
@@ -48,7 +50,7 @@ class ValueObject:
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 
-class SqlAlchemy(Filesystem):
+class SqlAlchemyMySQL(Filesystem):
     """
     SQLAlchemy Backend to access databases such as mysql, ...
     """
@@ -62,6 +64,56 @@ class SqlAlchemy(Filesystem):
                     return port  # Found a free one
                 except OSError:
                     continue  # Try another port
+
+
+    def __infer_types(self, columns, rows):
+        col_types = []
+        for col_idx in range(len(columns)):
+            types_in_col = {type(row[col_idx]).__name__ for row in rows}
+            # If all are the same type, show one; else show multiple
+            inferred_type = ', '.join(sorted(types_in_col))
+            col_types.append(inferred_type)
+
+        return col_types
+
+
+    def __create_table(self, table_name: str, headers: list[str], data_types: list[str]):
+        metadata = sa.MetaData()
+
+        # Define the table
+        columns = []
+        for name, col_type in zip(headers, data_types):
+            columns.append(sa.Column(name, self.get_sqlalchemy_type(col_type)))
+
+        tbl = sa.Table(table_name, metadata, *columns)
+
+        # Create it
+        metadata.create_all(self.engine)
+
+
+    def __insert_data_mysql(self, table_name: str, column_names: list[str], data_rows: list):
+        metadata = sa.MetaData()
+        try:
+            # Reflect existing table
+            table = sa.Table(table_name, metadata, autoload_with=self.engine)
+
+            # Build list of dicts for bulk insert
+            values_to_insert = [
+                dict(zip(column_names, row)) for row in data_rows
+            ]
+
+            with self.engine.connect() as conn:
+                stmt = sa.insert(table)
+                result = conn.execute(stmt, values_to_insert)
+                conn.commit()
+
+            return result.rowcount
+        
+        except Exception as e:
+            print(f"Error occurred: {e}")
+            return 0 
+
+
 
 
     def __init__(self, filename: str):
@@ -111,11 +163,11 @@ class SqlAlchemy(Filesystem):
         url=f"mysql+pymysql://{self.user}:{self.dsi_password}@{self.host}:{self.sql_server_port}/{self.database}"
 
         try:
-            self.engine = sqlalchemy.create_engine(url)
+            self.engine = sa.create_engine(url)
 
             try:
                 self.conn = self.engine.connect()
-                result = self.conn.execute(sqlalchemy.text("SELECT NOW();"))
+                result = self.conn.execute(sa.text("SELECT NOW();"))
                 print("Connection successful. Server time:", result.scalar())
             except Exception as e:
                 print("Transaction Error:", e)
@@ -126,29 +178,9 @@ class SqlAlchemy(Filesystem):
     
 
     def query_artifacts(self, sql_query: str, isVerbose: bool = False, dict_return: bool = False):
-        """
-        Executes a SQL query on the SQLALchemy backend and returns the result in the specified format dependent on `dict_return`
-
-        `query` : str
-            Must be a SELECT or PRAGMA SQL query. Aggregate functions like COUNT are allowed.
-            If `dict_return` is True, the query must target a single table and cannot include joins. 
-
-        `isVerbose` : bool, optional, default=False
-            If True, prints the SQL SELECT statements being executed.
-
-        `dict_return` : bool, optional, default=False
-            If True, returns the result as an OrderedDict.
-            If False, returns the result as a pandas DataFrame.
-        
-        `return` : pandas.DataFrame or OrderedDict or tuple
-            - If query is valid and `dict_return` is False: returns a DataFrame.
-            - If query is valid and `dict_return` is True: returns an OrderedDict.
-            - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
-        """
-
         try:
             with self.engine.connect() as conn:
-                output = conn.execute(sqlalchemy.text(sql_query))
+                output = conn.execute(sa.text(sql_query))
                 conn.commit()  # important for DELETE/INSERT/UPDATE
 
                 if output.returns_rows:
@@ -161,6 +193,26 @@ class SqlAlchemy(Filesystem):
             return None
 
 
+    def ingest_artifacts(self, collection, isVerbose=False):
+        list_of_tables = list(collection.keys())
+
+        data_files = list(collection.values())
+        for index, the_data in enumerate(data_files):
+            columns = list(the_data.keys())
+
+            lengths = [len(v) for v in the_data.values()]
+            num_rows = max(lengths) if lengths else 0
+            rows = [
+                    [the_data[col][i] for col in columns]
+                    for i in range(num_rows)
+                ]
+
+            data_types = self.__infer_types(columns, rows)
+            self.__create_table(list_of_tables[index], columns, data_types)
+            self.__insert_data_mysql(list_of_tables[index], columns, rows)
+    
+
+
 
     def close(self):
         """ Close the database """
@@ -168,3 +220,4 @@ class SqlAlchemy(Filesystem):
         stop_mqsql_path = os.path.join(self.current_dir, 'alchemy_utils', 'stop_mysql.sh')
         args = [self.path_to_db_installation]
         subprocess.run([stop_mqsql_path] + args, check=True)
+

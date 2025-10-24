@@ -23,8 +23,8 @@ class Terminal():
     back-reads or back-writes. Plugins may be writers or readers. See documentation
     for more information.
     """
-    BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss']
+    BACKEND_PREFIX = ['dsi.backends'] 
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'sqlalchemymysql', 'hpss']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
@@ -32,13 +32,15 @@ class Terminal():
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
+    #VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemyMySQL', 'HPSS']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
                               'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['put', 'get', 'inspect', 'read', 'ingest', 'query', 'notebook', 'process']
 
     def __init__(self, debug = 0, backup_db = False, runTable = False):
+        print("Terminal")
         """
         Initialization function to configure optional DSI core parameters.
 
@@ -60,14 +62,21 @@ class Terminal():
             return (['.'.join(i) for i in product(prefix, implementations)])
 
         self.module_collection = {}
+        #print(f"1. self.module_collection['backend']: {self.module_collection['backend']}")
+        print(f"self.BACKEND_PREFIX: {self.BACKEND_PREFIX}")
+        print(f"self.BACKEND_IMPLEMENTATIONS: {self.BACKEND_IMPLEMENTATIONS}")
         backend_modules = static_munge(self.BACKEND_PREFIX, self.BACKEND_IMPLEMENTATIONS)
         self.module_collection['backend'] = {}
         for module in backend_modules:
+            print(f"module: {module}")
             try:
                 imported = import_module(module)
                 self.module_collection['backend'][module] = imported
             except ImportError as e:
+                print(f"error module: {module}, {e}")
                 continue
+
+        print(f"2. self.module_collection['backend']: {self.module_collection['backend']}")
 
         plugin_modules = static_munge(self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
         self.module_collection['plugin'] = {}
@@ -130,6 +139,9 @@ class Terminal():
         If a loaded module has mod_type='plugin' & mod_function='reader', it is automatically activated and then unloaded as well.
         Therefore, a user does not have to activate it separately with transload() (only used by plugin writers) or call unload_module()
         """
+        print(f"load_module: {mod_type}, {mod_name}, {mod_function}")
+        print(self.module_collection[mod_type].keys())
+
         if self.debug_level != 0:
             self.logger.info(f"-------------------------------------")
             self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
@@ -151,6 +163,10 @@ class Terminal():
                 self.logger.error("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
             raise ValueError("You are trying to load a mismatched backend. Please check the VALID_MODULE_FUNCTIONS and VALID_BACKENDS again")
         if mod_type == "backend" and not any(mod_name.lower() in item for item in self.module_collection[mod_type].keys()):
+            print(f"mod_type: {mod_type}")
+            print(f"mod_name: {mod_name}")
+            print(f"modules: {self.module_collection[mod_type].keys()}")
+
             if self.debug_level != 0:
                 self.logger.error("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extras.txt")
             raise ValueError("You are trying to load a backend that is not installed in a base dsi setup. Please run requirements.extras.txt")
@@ -164,6 +180,7 @@ class Terminal():
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
             try:
+                print("XXXXX")
                 this_module = import_module(python_module)
                 class_ = getattr(this_module, mod_name)
                 load_success = True
@@ -249,6 +266,7 @@ class Terminal():
                 else:
                     try:
                         if mod_type == "backend" and hasattr(class_, 'runTable'):
+                            print("AAAAA")
                             parent_classes = class_.__bases__
                             if parent_classes and parent_classes[0].__name__ == "Filesystem" and 'filename' in kwargs:
                                 backend_filename = kwargs['filename']
@@ -260,7 +278,10 @@ class Terminal():
                                         has_data = True
                                     elif class_.__name__ == "DuckDB" and os.path.getsize(backend_filename) > 13000:
                                         has_data = True
+                                    elif class_.__name__ == "SqlAlchemyMySQL" and os.path.getsize(backend_filename) > 100:
+                                        has_data = True
                                 if has_data:
+                                    print("BBBBB")
                                     with open(backend_filename, 'rb') as fb:
                                         content = fb.read()
                                     if b'runTable' in content:
@@ -1356,6 +1377,8 @@ class Terminal():
                 valid = True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
+            if backend.__class__.__name__ == "SqlAlchemyMySQL" and os.path.getsize(backend.filename) > 100:
+                valid = True
         return valid
 
 
@@ -1620,9 +1643,6 @@ class Sync():
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
-
-        
-
 
     def dircrawl(self,filepath):
         """

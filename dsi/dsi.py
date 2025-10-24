@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+import re
 from contextlib import redirect_stdout
 import io
 
@@ -33,9 +34,11 @@ class DSI():
                 - If backend_name = "DuckDB" → .duckdb, .db
             
         `backend_name` : str, optional
-            Name of the backend to activate. Must be either "Sqlite" or "DuckDB".
+            Name of the backend to activate. Must be either "Sqlite" or "DuckDB" or "SqlAlchemyMySQL".
             Default is "Sqlite".
         """
+        print("hellohello")
+
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
         self.t.user_wrapper = True
@@ -44,9 +47,15 @@ class DSI():
         self.schema_tables = set()
         self.loaded_tables = set()
 
+
+        # removes special characters and spaces to leave only numbers and letters in lowercase
+        cleaned_name = re.sub(r'[^A-Za-z0-9]', '', backend_name)
+        backend_name = cleaned_name.lower()
+        print(f"backend_name: {backend_name}")
+
+
         if filename == ".temp.db" and os.path.exists(filename):
             os.remove(filename)
-
         if filename != ".temp.db" and backend_name.lower() == "sqlite":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
@@ -55,21 +64,28 @@ class DSI():
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "duckdb"]:
                 filename += ".db"
+
         self.database_name = filename
 
-        fnull = open(os.devnull, 'w')
+        
+        #fnull = open(os.devnull, 'w')
         try:
             if backend_name.lower() == 'sqlite':
-                with redirect_stdout(fnull):
-                    self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
-                    self.backend_name = "sqlite"
+                #with redirect_stdout(fnull):
+                self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
+                self.backend_name = "sqlite"
             elif backend_name.lower() == 'duckdb':
-                with redirect_stdout(fnull):
-                    self.t.load_module('backend','DuckDB','back-write', filename=filename)
-                    self.backend_name = "duckdb"
+                #with redirect_stdout(fnull):
+                self.t.load_module('backend','DuckDB','back-write', filename=filename)
+                self.backend_name = "duckdb"
+            elif backend_name.lower() == 'sqlalchemymysql':
+                #with redirect_stdout(fnull):
+                print("loading SqlAlchemyMySQL")
+                self.t.load_module('backend','sqlalchemymysql','back-write', filename=filename)
+                self.backend_name = "sqlalchemy_mysql"
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
-                print(f"Eligible backend_names are: Sqlite, DuckDB")
+                print(f"Eligible backend_names are: Sqlite, DuckDB, SqlAlchemyMySQL")
         except Exception as e:
             sys.exit(f"backend ERROR: {e}")
 
@@ -85,7 +101,8 @@ class DSI():
         """
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
-        print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
+        print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
+        print("SqlAlchemyMySQL: SQLAlchemy Interface to MySQL.\n")
         print()
 
     def schema(self, filename):
@@ -284,6 +301,16 @@ class DSI():
                 self.loaded_tables = set()
 
             elif self.backend_name == "duckdb" and self.loaded_tables == self.schema_tables:
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    sys.exit(f"read() ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
+            
+            elif self.backend_name == "sqlalchemy_mysql" and self.loaded_tables == self.schema_tables:
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:

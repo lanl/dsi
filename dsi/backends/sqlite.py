@@ -178,6 +178,7 @@ class Sqlite(Filesystem):
         Ex: (ValueError, "this is an error")
         """
         artifacts = collection
+        print(collection)
 
         # if "dsi_relations" in artifacts.keys():
         #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
