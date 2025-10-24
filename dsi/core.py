@@ -56,6 +56,8 @@ class Terminal():
             - If True, a 'runTable' is created, and timestamped each time new data/metadata is ingested.
               Recommended for in-situ use-cases.
         """
+        sys.tracebacklimit = 0
+        
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
 
