@@ -10,6 +10,7 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
+import subprocess
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -56,19 +57,19 @@ class DSI_cli:
         self.t.user_wrapper = True
 
         self.start_dir = os.getcwd()
-        db_path = os.path.join(self.start_dir, ".temp.db")
-        if os.path.exists(db_path):
-            os.remove(db_path)
+        self.db_path = os.path.join(self.start_dir, ".temp.db")
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
 
         fnull = open(os.devnull, 'w')
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
-                    self.t.load_module('backend','DuckDB','back-write', filename = db_path)
+                    self.t.load_module('backend','DuckDB','back-write', filename = self.db_path)
                     self.name = "duckdb"
                 else:
                     backend = "sqlite"
-                    self.t.load_module('backend','Sqlite','back-write', filename = db_path)
+                    self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)
                     self.name = "sqlite"
         except Exception as e:
             print(f"backend ERROR: {e}")
@@ -92,6 +93,8 @@ class DSI_cli:
             ("read <filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
             ("search <value>", "Searches for a string or number across DSI."),
             ("summary [-t table_name]", "Summary of the database or a specific table."),
+            ("viewers", "Prints the available viewers for the user."),
+            ("view <valid DSI viewer>", "Creates an instance of the DSI viewer in another application."),
             ("write <filename>", "Writes data in DSI database to a permanent location."),
             ("ls", "Lists all files in the current or specified directory."),
             ("cd <path>", "Changes the working directory within the CLI environment.")
@@ -505,8 +508,8 @@ class DSI_cli:
             self.t.active_metadata = OrderedDict()
         else:
             print()
-            print("Ensure file has data stored correctly.")
-            print("Currently supported formats are: ")
+            print("Ensure input data is structured properly.")
+            print("Supported formats: ")
             print("   - csv (extension: .csv)")
             print("   - json (extension: .json)")
             print("   - toml (extension: .toml)")
@@ -577,6 +580,53 @@ class DSI_cli:
         Output the version of DSI being used
         '''
         return str(__version__)
+    
+
+    def viewers(self, args):
+        print("Available viewers are: ml_emulator.")
+        return
+
+    def view(self, args):
+        if not args:
+            print("view ERROR: need to specify which DSI viewer to use")
+            return
+        if len(args) > 1:
+            print("view ERROR: can only use one DSI viewer at a time")
+            return
+        viewer = args[0]
+
+        #check if current db is empty
+        if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
+            print("view ERROR: need to read in data files or an existing database to use a viewer.")
+            return
+
+        if viewer.lower() in ['ml', 'ml_emulator']:
+            # print("\nUsers can view the ML emulator at http://localhost:8501.")
+            # print("Users must enter [Ctrl + C] to exit.")
+            env = dict(os.environ)
+            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
+            cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath, "--", self.db_path, self.name]
+            # Optional: add "--server.headless=true" to suppress auto browser
+            # cmd += ["--server.headless=true"]
+
+            #ISSUE ON ROCI COULD BE DUE TO start_new_session=True
+            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
+                try:
+                    for idx, line in enumerate(proc.stdout):
+                        if idx == 3:
+                            print("\nView the ML emulator at", line[line.index("http"):-1])
+                            print("To exit the emulator, enter [Ctrl + C]")
+                        elif idx>10:
+                            print(line)
+                except KeyboardInterrupt:
+                    print("\nClosing ML Emulator.")
+                    proc.terminate()
+                    proc.wait()
+            
+        else:
+            print("view ERROR: input viewer was invalid. Please try again.")
+            return
 
 
     def get_write_parser(self):
@@ -655,12 +705,14 @@ COMMANDS = {
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
-    'read' : (cli.get_read_parser, cli.read),
-    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
+    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),    
     'query' : (cli.get_query_parser, cli.query),
-    'write' : (cli.get_write_parser, cli.write_to_file),
-    'summary' : (cli.get_summary_parser, cli.summary),
+    'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
+    'summary' : (cli.get_summary_parser, cli.summary),
+    'viewers' : (None, cli.viewers),
+    'view' : (None, cli.view),
+    'write' : (cli.get_write_parser, cli.write_to_file),    
     'ls' : (None, cli.ls),
     'cd' : (None, cli.cd)
 }
