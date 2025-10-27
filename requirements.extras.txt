@@ -7,3 +7,6 @@ duckdb>=1.2.0
 xmltodict>=0.14.2
 jupyterlab>=4.4.0
 numpy==1.26.4
+# mysqlalchemy-msql backend
+pymysql
+cryptography

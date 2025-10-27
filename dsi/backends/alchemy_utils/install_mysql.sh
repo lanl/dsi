@@ -44,4 +44,5 @@ echo "YAML file '$OUTPUT_FILE' created successfully."
 
 echo "All done!"
 # usage: source install_mysql.sh <path_to_db_installation> <folder_name_of_mysql_db> <data folder>
-# e.g.   source install_mysql.sh /home/pascalgrosset/projects/alchemy_dsi/test my_sql_db mysql_data
+#    - e.g.   source install_mysql.sh /home/pascalgrosset/projects/dsi/scratch my_sql_db mysql_data
+#    - this will create a sqlalchemy_dsi_config.yaml file that needs to be copied to the home folder

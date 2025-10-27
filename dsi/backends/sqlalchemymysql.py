@@ -6,9 +6,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.mysql import TEXT, MEDIUMTEXT, LONGTEXT  # dialect-specific types (uppercase)
 from sqlalchemy.types import Text  # generic Text type (lowercase class)
 
+import secrets
 import random
 import socket
 import re
+import sys
 import yaml
 import subprocess
 import os
@@ -54,6 +56,8 @@ class SqlAlchemyMySQL(Filesystem):
     """
     SQLAlchemy Backend to access databases such as mysql, ...
     """
+
+    runTable = False
 
     def __get_random_free_port(self, start: int = 1024, end: int = 65535) -> int:
         while True:
@@ -129,7 +133,9 @@ class SqlAlchemyMySQL(Filesystem):
             with open("sqlalchemy_dsi_config.yaml", "r") as file:
                 sqlalchemy_dsi_config = yaml.safe_load(file)
         except:
-            print("Please make sre that sqlalchemy_dsi_config.yaml is in the same folder as the launch path")
+            print("Please make sre that sqlalchemy_dsi_config.yaml is in the same folder as the launch path. \n This YAML file is created by install_mysql.sh")
+            print("DSI with the backend did not start!")
+            sys.exit(0)
             return
 
         # initialize some parameters
@@ -140,13 +146,16 @@ class SqlAlchemyMySQL(Filesystem):
         self.sql_server_port = self.__get_random_free_port(1024, 65535)
         self.host = "localhost"
         self.database = filename
-        self.user = "dsi_user"
-        self.dsi_password = "dsi_password"
+        rand_num = secrets.randbelow(10000000)  # returns 0–9
+        self.user = "dsi_user_" + str(rand_num)
+        rand_num = secrets.randbelow(10000000)  # returns 0–9
+        self.dsi_password = "dsi_password_" + str(rand_num)
 
 
         # Launch the script to start mysql server
         start_mqsql_path = os.path.join(self.current_dir, 'alchemy_utils', 'start_mysql.sh')
         args = [self.path_to_db_installation, self.path_to_data, str(self.sql_server_port)]
+        print(f"launch command ([start_mqsql_path] + args): {[start_mqsql_path] + args}")
         subprocess.run([start_mqsql_path] + args, check=True)
 
         time.sleep(10)   # wait for things to happen
@@ -155,12 +164,14 @@ class SqlAlchemyMySQL(Filesystem):
         # Launch the script to create DB and user
         create_db_user_path = os.path.join(self.current_dir, 'alchemy_utils', 'create_db_user.sh')
         args = [self.path_to_db_installation, self.database, self.user, self.dsi_password]
+        print(f"launch command ([create_db_user_path] + args): {[create_db_user_path] + args}")
         subprocess.run([create_db_user_path] + args, check=True)
 
         time.sleep(5)   # wait for things to happen
 
         # Connect to the Server
         url=f"mysql+pymysql://{self.user}:{self.dsi_password}@{self.host}:{self.sql_server_port}/{self.database}"
+        print(f"url: {url}")
 
         try:
             self.engine = sa.create_engine(url)

@@ -37,8 +37,6 @@ class DSI():
             Name of the backend to activate. Must be either "Sqlite" or "DuckDB" or "SqlAlchemyMySQL".
             Default is "Sqlite".
         """
-        print("hellohello")
-
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
         self.t.user_wrapper = True
@@ -51,8 +49,6 @@ class DSI():
         # removes special characters and spaces to leave only numbers and letters in lowercase
         cleaned_name = re.sub(r'[^A-Za-z0-9]', '', backend_name)
         backend_name = cleaned_name.lower()
-        print(f"backend_name: {backend_name}")
-
 
         if filename == ".temp.db" and os.path.exists(filename):
             os.remove(filename)
@@ -68,21 +64,20 @@ class DSI():
         self.database_name = filename
 
         
-        #fnull = open(os.devnull, 'w')
+        fnull = open(os.devnull, 'w')
         try:
             if backend_name.lower() == 'sqlite':
-                #with redirect_stdout(fnull):
-                self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
-                self.backend_name = "sqlite"
+                with redirect_stdout(fnull):
+                    self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
+                    self.backend_name = "sqlite"
             elif backend_name.lower() == 'duckdb':
-                #with redirect_stdout(fnull):
-                self.t.load_module('backend','DuckDB','back-write', filename=filename)
-                self.backend_name = "duckdb"
+                with redirect_stdout(fnull):
+                    self.t.load_module('backend','DuckDB','back-write', filename=filename)
+                    self.backend_name = "duckdb"
             elif backend_name.lower() == 'sqlalchemymysql':
-                #with redirect_stdout(fnull):
-                print("loading SqlAlchemyMySQL")
-                self.t.load_module('backend','sqlalchemymysql','back-write', filename=filename)
-                self.backend_name = "sqlalchemy_mysql"
+                with redirect_stdout(fnull):
+                    self.t.load_module('backend','SqlAlchemyMySQL','back-write', filename=filename)
+                    self.backend_name = "sqlalchemy_mysql"
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print(f"Eligible backend_names are: Sqlite, DuckDB, SqlAlchemyMySQL")
