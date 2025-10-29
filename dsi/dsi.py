@@ -100,27 +100,33 @@ class DSI():
         print("SqlAlchemyMySQL: SQLAlchemy Interface to MySQL.\n")
         print()
 
-    def schema(self, filename):
+    def schema(self, filename = None):
         """
-       Loads a relational database schema into DSI from a specified `filename`
+        Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
 
-        `filename` : str
-            Path to a JSON file describing the structure of a relational database.
+        `filename` : str, optional
+            Path to a JSON file describing the relationships of the tables in a database.
             The schema should follow the format described in :ref:`user_schema_example_label`
-
-        **Must be called before reading in any data files associated with the schema**
+        
+        `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
+        **If loading a relational schema, this function must be called before reading in any associated data files**
         """
-        if not os.path.exists(filename):
-            sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+        if filename:
+            if not os.path.exists(filename):
+                sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
 
-        fnull = open(os.devnull, 'w')
-        with redirect_stdout(fnull):
-            self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
-        self.schema_read = True
-        pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
-        fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
-        self.schema_tables = pk_tables.union(fk_tables)
-        print(f"Successfully loaded the schema file: {filename}")
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+            self.schema_read = True
+            pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
+            fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
+            self.schema_tables = pk_tables.union(fk_tables)
+            print(f"Successfully loaded the schema file: {filename}")
+        else:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                return self.t.get_schema()
 
     def list_readers(self):
         """
@@ -179,9 +185,10 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
-        if isinstance(filenames, str) and not os.path.exists(filenames):
+        # only DSI-repo readers require filename input. Custom readers do not.
+        if isinstance(filenames, str) and not os.path.exists(filenames) and not reader_name.endswith(".py"):
             sys.exit("read() ERROR: The input file must be a valid filepath. Please check again.")
-        if isinstance(filenames, list) and not all(os.path.exists(f) for f in filenames):
+        if isinstance(filenames, list) and not all(os.path.exists(f) for f in filenames) and not reader_name.endswith(".py"):
             sys.exit("read() ERROR: All input files must have a valid filepath. Please check again.")
         
         if reader_name.endswith(".py"):
@@ -212,9 +219,6 @@ class DSI():
 
             if class_name == None:
                 sys.exit(f"read() Error: The custom Reader must be structured as a Class in the Python script.")
-            if init_params == []:
-                print("read() Error: The custom Reader must be DSI-compatible.")
-                sys.exit("Please review https://lanl.github.io/dsi/dev_readers.html to ensure it is compatible.")
             
             updated = {}
             for param in init_params:
@@ -754,9 +758,6 @@ class DSI():
 
             if class_name == None:
                 sys.exit(f"write() Error: The custom Writer must be structured as a Class in the Python script.")
-            if init_params == []:
-                print("write() Error: The custom Writer must be DSI-compatible.")
-                sys.exit("Please review https://lanl.github.io/dsi/dev_writers.html to ensure it is compatible.")
             
             updated = {}
             for param in init_params:

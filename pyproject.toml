@@ -29,3 +29,7 @@ py-modules = ["dsi"]
 
 [project.scripts]
 dsi = "dsi.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["clover3d"]

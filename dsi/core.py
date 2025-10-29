@@ -628,6 +628,36 @@ class Terminal():
         if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
             return output
 
+    def get_schema(self):
+        """
+        Returns the first loaded database's structural schema as several CREATE TABLE statements.
+
+        `return`: str
+            Each table's CREATE TABLE statement is concatenated into one large string.
+        """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error(f'Getting the structural schema of the first loaded backend')
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error('Need to load a valid backend to be able to get its structural schema')
+            raise NotImplementedError('Need to load a valid backend to be able to get its structural schema')
+        backend = self.loaded_backends[0]
+        parent_backend = backend.__class__.__bases__[0].__name__
+        if not self.valid_backend(backend, parent_backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to get its structural schema")
+            raise RuntimeError("First loaded backend needs to have data to get its structural schema")
+        start = datetime.now()
+
+        output = backend.get_schema()
+
+        end = datetime.now()
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+        
+        return output
+
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
