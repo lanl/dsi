@@ -146,6 +146,7 @@ class SqlAlchemyMySQL(Filesystem):
         self.sql_server_port = self.__get_random_free_port(1024, 65535)
         self.host = "localhost"
         self.database = filename
+        self.filename = filename
         rand_num = secrets.randbelow(10000000)  # returns 0–9
         self.user = "dsi_user_" + str(rand_num)
         rand_num = secrets.randbelow(10000000)  # returns 0–9

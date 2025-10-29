@@ -345,6 +345,7 @@ class DSI():
 
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
+        
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             sys.exit("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
         if self.schema_read == True:
@@ -679,16 +680,6 @@ class DSI():
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             sys.exit(f"update() ERROR: {e}")
-    
-    # def nb(self):
-    #     """
-    #     Generates a Python notebook and stores data from the first activated backend
-    #     """
-    #     if not self.t.loaded_backends:
-    #         raise ValueError("Must load a backend first. Call backend() before this")
-        
-    #     self.t.artifact_handler(interaction_type="notebook")
-    #     print("Notebook .ipynb and .html generated.")
 
     def list_writers(self):
         """
