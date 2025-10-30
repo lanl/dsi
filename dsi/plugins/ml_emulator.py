@@ -111,6 +111,7 @@ if run:
 
         results = []
         for model_name in selected_models:
+            grid = None
             if model_name == "Decision Tree":
                 param_grid = {'max_depth': [1, 2, 3, 4, 5, 6 ,7, 8, 9, 10, 12, 15, 17, 20, 25, 30, 35, 40, 45, 50],
                             'min_samples_split': [2, 3, 4, 5]}
@@ -131,22 +132,24 @@ if run:
                     grid = GridSearchCV(KNeighborsClassifier(), param_grid, scoring='accuracy')
                 else:
                     grid = GridSearchCV(KNeighborsRegressor(), param_grid, scoring='neg_mean_squared_error')
-            elif model_name == "Linear Regression": # NO CLASSIFICATION 
+            elif model_name == "Linear Regression" and pred_type == "Regression": # NO CLASSIFICATION 
                 param_grid = {'fit_intercept': [True, False], 'positive': [True, False]}
                 grid = GridSearchCV(LinearRegression(), param_grid, scoring='neg_mean_squared_error', cv=5) #scoring = r2 or neg mse??
 
-            elif model_name == "Ridge Regression": # NO CLASSIFICATION 
+            elif model_name == "Ridge Regression" and pred_type == "Regression": # NO CLASSIFICATION 
                 param_grid = {'alpha': [0.001, 0.01, 0.1, 1, 10, 100], 'fit_intercept': [True, False]}
                 grid = GridSearchCV(Ridge(), param_grid, scoring='neg_mean_squared_error', cv=5) #scoring = r2 or neg mse??
             
-            elif model_name == "Lasso Regression": # NO CLASSIFICATION 
+            elif model_name == "Lasso Regression" and pred_type == "Regression": # NO CLASSIFICATION 
                 param_grid = {'alpha': [0.001, 0.01, 0.1, 1, 10],  'fit_intercept': [True, False], 'max_iter': [1000, 5000, 10000]}
                 grid = GridSearchCV(Lasso(), param_grid, scoring='neg_mean_squared_error', cv=5) #scoring = r2 or neg mse??
             
-            elif model_name == "ElasticNet": # NO CLASSIFICATION 
+            elif model_name == "ElasticNet" and pred_type == "Regression": # NO CLASSIFICATION 
                 param_grid = {'alpha': [0.001, 0.01, 0.1, 1, 10], 'l1_ratio': [0.1, 0.3, 0.5, 0.7, 0.9], 'fit_intercept': [True, False]}
                 grid = GridSearchCV(ElasticNet(), param_grid, scoring='neg_mean_squared_error', cv=5) #scoring = r2 or neg mse??
             
+            if grid is None:
+                raise RuntimeError(f"Wrong selection of models with {pred_type} prediction")
             grid.fit(x_train, y_train)
             y_pred = grid.predict(x_test)
 
