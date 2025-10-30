@@ -183,6 +183,80 @@ class Sqlite(Filesystem):
         #     self.cur.execute("PRAGMA FOREIGN KEYS = ON;")
         #     self.con.commit()
 
+        #there are tables in db, only dsi_relations to be ingested
+        if self.list() is not None and list(artifacts.keys()) == ["dsi_relations"]: 
+            pk_list = artifacts["dsi_relations"]["primary_key"]
+            fk_list = artifacts["dsi_relations"]["foreign_key"]
+            pk_tables = set(t[0] for t in pk_list)
+            fk_tables = set(t[0] for t in fk_list if t[0] != None)
+            all_schema_tables = pk_tables.union(fk_tables)
+            db_tables = [t[0] for t in self.list() if t[0] != "dsi_units"]
+            # check if tables from dsi_relations are all in the db
+            if all_schema_tables.issubset(set(db_tables)):
+                for table in all_schema_tables:
+                    pk_cols = list({v for k, v in pk_list if k == table})
+                    fk_dict = {fks[1]: pks for pks, fks, in zip(pk_list, fk_list) if fks[0] == table}
+                    
+                    #1. create new table using existing table's columns but with new relations
+                        # use consistent naming scheme. ex: table1 --> table1_dsi_temmp
+                    create_stmt = f"CREATE TABLE {table}_dsi_temp ("
+                    table_info = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
+                    for col in table_info:
+                        if col[1] in pk_cols:
+                            create_stmt += f"{col[1]} {col[2]} PRIMARY KEY, "
+                        else:
+                            create_stmt += f"{col[1]} {col[2]}, "
+                    
+                    if fk_dict:
+                        fk_stmt = "FOREIGN KEY "
+                        for k, v in fk_dict.items():
+                            if k not in create_stmt:
+                                msg = f"Input schema references a nonexistent column, {k}, in the foreign_key section of {table}"
+                                raise ValueError(msg)
+                            fk_stmt += f"({k}) REFERENCES {v[0]}({v[1]}), "
+                        create_stmt += fk_stmt
+                    create_stmt = create_stmt[:-2] + ");"
+
+                    #2. move all data from existing to new table
+                    try:
+                        self.cur.execute(create_stmt)
+                        self.cur.execute(f"INSERT INTO {table}_dsi_temp SELECT * FROM {table};")
+                    except sqlite3.Error as e:
+                        self.con.rollback()
+                        return (sqlite3.Error, e)
+                
+                # check if other non-schema tables have constraints -- if yes, make temp table, move data, and drop old table with schema tables
+                other_tables = list(set(db_tables) - all_schema_tables)
+                for table in other_tables:
+                    table_info = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
+                    if any(col[5] > 0 for col in table_info) or len(self.cur.execute(f"PRAGMA foreign_key_list({table});").fetchall()) > 0:
+                        create_stmt = f"CREATE TABLE {table}_dsi_temp ("
+                        create_stmt += ", ".join(f"{col[1]} {col[2]}" for col in table_info)
+                        create_stmt += ");"
+                        try:
+                            self.cur.execute(create_stmt)
+                            self.cur.execute(f"INSERT INTO {table}_dsi_temp SELECT * FROM {table};")
+                        except sqlite3.Error as e:
+                            self.con.rollback()
+                            return (sqlite3.Error, e)
+                        all_schema_tables.add(table)
+
+                # reaching here means no errors with new schema --- SQLITE doesnt care about order of tables deleted
+                # drop all tables in schema and rename temp tables to original names
+                for table in all_schema_tables:
+                    self.cur.execute(f'DROP TABLE IF EXISTS "{table}";')
+                    self.cur.execute(f'ALTER TABLE {table}_dsi_temp RENAME TO {table};')
+                
+                try:
+                    self.con.commit()
+                except Exception as e:
+                    self.con.rollback()
+                    return (sqlite3.Error, e)
+            
+                return #early return so dont make any other changes to db
+            else:
+                print("WARNING: Complex schemas can only be ingested if all referenced data tables are loaded into DSI.")
+            
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
@@ -831,6 +905,8 @@ class Sqlite(Filesystem):
         Return a list of all tables and their dimensions from this SQLite backend
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
+        if not tableList:
+            return None
         tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
         
         info_list = []

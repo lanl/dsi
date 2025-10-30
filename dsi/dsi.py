@@ -39,7 +39,6 @@ class DSI():
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
         self.t.user_wrapper = True
-        self.backend_name = None
         self.schema_read = False
         self.schema_tables = set()
         self.loaded_tables = set()
@@ -62,11 +61,9 @@ class DSI():
             if backend_name.lower() == 'sqlite':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
-                    self.backend_name = "sqlite"
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','DuckDB','back-write', filename=filename)
-                    self.backend_name = "duckdb"
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print(f"Eligible backend_names are: Sqlite, DuckDB")
@@ -102,14 +99,30 @@ class DSI():
         if filename:
             if not os.path.exists(filename):
                 sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+            if "dsi_relations" in self.t.active_metadata:
+                sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
-            self.schema_read = True
+
             pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
             fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
-            self.schema_tables = pk_tables.union(fk_tables)
+            all_schema_tables = pk_tables.union(fk_tables)
+            
+            has_data = self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__)
+            if has_data and all_schema_tables.issubset(set(self.list(True))):
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    sys.exit(f"schema() ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
+            else:
+                self.schema_read = True
+                self.schema_tables = all_schema_tables
             print(f"Successfully loaded the schema file: {filename}")
         else:
             fnull = open(os.devnull, 'w')
@@ -274,20 +287,8 @@ class DSI():
             if not overlap_tables: # at least one table from schema in the first read()
                 sys.exit("read() ERROR: Users must load all associated data for a schema after loading a complex schema.")
             self.loaded_tables.update(overlap_tables)
-            
-            if self.backend_name == "sqlite":
-                try:
-                    self.t.artifact_handler(interaction_type='ingest')
-                except Exception as e:
-                    sys.exit(f"read() ERROR: {e}")
-                self.t.active_metadata = OrderedDict()
 
-                # if self.loaded_tables == self.schema_tables:
-                self.schema_read = False
-                self.schema_tables = set()
-                self.loaded_tables = set()
-
-            elif self.backend_name == "duckdb" and self.loaded_tables == self.schema_tables:
+            if self.loaded_tables == self.schema_tables:
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
