@@ -149,7 +149,7 @@ if run:
                 grid = GridSearchCV(ElasticNet(), param_grid, scoring='neg_mean_squared_error', cv=5) #scoring = r2 or neg mse??
             
             if grid is None:
-                raise RuntimeError(f"Wrong selection of models with {pred_type} prediction")
+                raise RuntimeError(f"Wrong selection of model: {model_name} with {pred_type} prediction")
             grid.fit(x_train, y_train)
             y_pred = grid.predict(x_test)
 
