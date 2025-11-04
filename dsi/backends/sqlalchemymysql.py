@@ -2,6 +2,7 @@
 # from dsi.backends.sqlalchemymysql import Table, Column, Integer, String, Float, TEXT
 
 import sqlalchemy as sa
+from sqlalchemy import Table, Column, Integer, String, Float, TEXT
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.mysql import TEXT, MEDIUMTEXT, LONGTEXT  # dialect-specific types (uppercase)
 from sqlalchemy.types import Text  # generic Text type (lowercase class)
@@ -9,7 +10,6 @@ from sqlalchemy.types import Text  # generic Text type (lowercase class)
 import secrets
 import random
 import socket
-import re
 import sys
 import yaml
 import subprocess
@@ -17,8 +17,8 @@ import os
 from datetime import datetime
 import pandas as pd
 import time
-
 from collections import OrderedDict
+
 from dsi.backends.filesystem import Filesystem
 
 class DataType:
@@ -79,6 +79,73 @@ class SqlAlchemyMySQL(Filesystem):
             col_types.append(inferred_type)
 
         return col_types
+    
+
+    def __get_sqlalchemy_type(self, type_str):
+        """
+        Map inferred type labels (including composites like 'NoneType, str')
+        to SQLAlchemy types. 'NoneType' only signals nullability and is ignored
+        for the choice of the SQL type (caller should set nullable=True).
+        """
+        # Keep original for error messages
+        original = type_str
+
+        # Normalize to string
+        if not isinstance(type_str, str):
+            type_str = str(type_str)
+
+        # Split composite labels like "NONETYPE, STR"
+        parts = [p.strip().upper() for p in type_str.split(",") if p.strip()]
+        parts_set = set(parts)
+
+        # Treat NONETYPE as a nullability hint; ignore for type selection
+        parts_set.discard("NONETYPE")
+
+        # Canonicalize synonyms
+        normalized = set()
+        for p in parts_set:
+            if p in {"INT", "INTEGER"}:
+                normalized.add("INT")
+            elif p in {"NONETYPE"}:
+                normalized.add("LONGTEXT")
+            elif p in {"STR", "STRING", "TEXT"}:
+                normalized.add("LONGTEXT")
+            elif p in {"FLOAT", "DOUBLE", "REAL", "DECIMAL"}:
+                normalized.add("FLOAT")
+            elif p in {"MEDIUMTEXT"}:
+                normalized.add("MEDIUMTEXT")
+            elif p in {"LONGTEXT"}:
+                normalized.add("LONGTEXT")
+            else:
+                normalized.add(p)  # keep unknowns to trigger a clear error later
+
+        # Decision rules (widest compatible type wins)
+        # Explicit MySQL text types first
+        if "LONGTEXT" in normalized:
+            return LONGTEXT
+        if "MEDIUMTEXT" in normalized:
+            return MEDIUMTEXT
+
+        # Any presence of string => String(255)
+        if "STR" in normalized:
+            return String(255)
+
+        # Mixed numeric => Float
+        if {"INT", "FLOAT"} <= normalized:
+            return Float
+
+        # Pure numeric
+        if "FLOAT" in normalized:
+            return Float
+        if "INT" in normalized:
+            return Integer
+
+        # If everything was just NONETYPE (i.e., normalized is empty), default to String
+        if not normalized:
+            return String(255)
+
+        # Unknown type label(s)
+        raise ValueError(f"Unsupported type: {original}")
 
 
     def __create_table(self, table_name: str, headers: list[str], data_types: list[str]):
@@ -87,7 +154,7 @@ class SqlAlchemyMySQL(Filesystem):
         # Define the table
         columns = []
         for name, col_type in zip(headers, data_types):
-            columns.append(sa.Column(name, self.get_sqlalchemy_type(col_type)))
+            columns.append(sa.Column(name, self.__get_sqlalchemy_type(col_type)))
 
         tbl = sa.Table(table_name, metadata, *columns)
 
@@ -187,25 +254,66 @@ class SqlAlchemyMySQL(Filesystem):
         except Exception as e:
             print("Engine connect failed:", e)
 
-    
 
-    def query_artifacts(self, sql_query: str, isVerbose: bool = False, dict_return: bool = False):
+    def __del__(self):
+        self.close()
+
+
+    def query_artifacts(self, query: str, isVerbose: bool = False, dict_return: bool = False):
+        """
+        Execute an arbitrary SQL query against the current SQLAlchemy engine.
+
+        Parameters
+        ----------
+        query : str
+            The SQL query string to execute.
+        isVerbose : bool, optional
+            If True, prints the query output to stdout.
+        dict_return : bool, optional
+            If True, returns an OrderedDict for SELECT queries.
+            Otherwise, returns a pandas DataFrame.
+
+        Returns
+        -------
+        Union[pandas.DataFrame, OrderedDict, str, None]
+            - DataFrame (or OrderedDict) for SELECT-type queries.
+            - Success message string for non-SELECT queries.
+            - None if an error occurs.
+        """
         try:
             with self.engine.connect() as conn:
-                output = conn.execute(sa.text(sql_query))
-                conn.commit()  # important for DELETE/INSERT/UPDATE
+                output = conn.execute(sa.text(query))
+                conn.commit()  # Important for DML (INSERT/UPDATE/DELETE)
 
                 if output.returns_rows:
-                    return output.fetchall(), list(output.keys())
+                    rows = output.fetchall()
+                    columns = list(output.keys())
+
+                    # Print if verbose
+                    if isVerbose:
+                        print(pd.DataFrame(rows, columns=columns))
+
+                    # Return format based on dict_return flag
+                    if dict_return:
+                        result = OrderedDict()
+                        for i, row in enumerate(rows):
+                            result[i] = OrderedDict(zip(columns, row))
+                        return result
+                    else:
+                        return pd.DataFrame(rows, columns=columns)
+
                 else:
-                    return f"Query executed successfully. {output.rowcount} rows affected.", None
+                    msg = f"Query executed successfully. {output.rowcount} rows affected."
+                    if isVerbose:
+                        print(msg)
+                    return msg, None
 
         except Exception as e:
-            print(f"Failed to run query {sql_query}, with error: {e}")   
+            print(f"Failed to run query '{query}', with error: {e}")
             return None
 
 
-    def ingest_artifacts(self, collection, isVerbose=False):
+    def ingest_artifacts(self, collection, isVerbose: bool = False):
         list_of_tables = list(collection.keys())
 
         data_files = list(collection.values())
@@ -228,8 +336,11 @@ class SqlAlchemyMySQL(Filesystem):
 
     def close(self):
         """ Close the database """
-        # Launch the script to stop mysql server
-        stop_mqsql_path = os.path.join(self.current_dir, 'alchemy_utils', 'stop_mysql.sh')
-        args = [self.path_to_db_installation]
-        subprocess.run([stop_mqsql_path] + args, check=True)
+        try:
+            # Launch the script to stop mysql server
+            stop_mqsql_path = os.path.join(self.current_dir, 'alchemy_utils', 'stop_mysql.sh')
+            args = [self.path_to_db_installation]
+            subprocess.run([stop_mqsql_path] + args, check=True)
+        except:
+            pass
 

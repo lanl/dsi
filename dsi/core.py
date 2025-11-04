@@ -1393,7 +1393,8 @@ class Terminal():
                 valid = True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
-            if backend.__class__.__name__ == "SqlAlchemyMySQL" and os.path.getsize(backend.filename) > 100:
+            #if backend.__class__.__name__ == "SqlAlchemyMySQL" and os.path.getsize(backend.filename) > 100:
+            if backend.__class__.__name__ == "SqlAlchemyMySQL":
                 valid = True
         return valid
 
