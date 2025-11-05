@@ -332,8 +332,6 @@ class SqlAlchemyMySQL(Filesystem):
             self.__insert_data_mysql(list_of_tables[index], columns, rows)
     
 
-
-
     def close(self):
         """ Close the database """
         try:
@@ -344,3 +342,19 @@ class SqlAlchemyMySQL(Filesystem):
         except:
             pass
 
+
+    #TODOs
+    def process_artifacts(self, kwargs):
+        pass
+
+    def find(self, query_object, kwargs):
+        pass
+
+    def find_table(self, query_object, kwargs):
+        pass
+
+    def find_column(self, query_object, kwargs):
+        pass
+
+    def find_cell(self, query_object, kwargs):
+        pass 
