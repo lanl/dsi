@@ -11,6 +11,7 @@ from contextlib import redirect_stdout
 import sys
 import io
 import subprocess
+from pathlib import Path
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -645,8 +646,9 @@ class DSI_cli:
             env = dict(os.environ)
             ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
             cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath, "--", self.db_path, self.name]
-            # Optional: add "--server.headless=true" to suppress auto browser
-            # cmd += ["--server.headless=true"]
+            cmd += ["--browser.gatherUsageStats=false"]
+            # Optional: add "--server.headless=true" to suppress auto browser and first-time user prompt
+            cmd += ["--server.headless=true"]
 
             #ISSUE ON ROCI COULD BE DUE TO start_new_session=True
             with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
