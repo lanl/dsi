@@ -1,5 +1,4 @@
-try: import streamlit as st
-except ModuleNotFoundError: raise SystemExit("Install requirements.extras.txt to use this viewer")
+import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +12,7 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              mean_squared_error, root_mean_squared_error, mean_absolute_error, r2_score)
 
@@ -67,11 +66,12 @@ with col2:
                         min_value=0, max_value=100, value=15, step=1, 
                         help="Fixed integer used for reproducible results.")
 
-st.write("### Select Prediction Type")
-pred_type = st.radio("label", ["Classification", "Regression"], horizontal=True, label_visibility="collapsed")
+# st.write("### Select Prediction Type")
+# pred_type = st.radio("label", ["Classification", "Regression"], horizontal=True, label_visibility="collapsed")
+pred_type = "Regression"
 
 st.write("### Choose ML Models")
-all_models = ["Decision Tree", "Random Forest", "K-Nearest Neighbors"]
+all_models = ["Decision Tree", "Random Forest", "KNN"]
 if pred_type == "Classification":
     # all_models += ["Naive Bayes"]
     pass
@@ -104,8 +104,9 @@ if run:
         X = df[features].select_dtypes(include=[np.number]).fillna(0)
         y = df[target]
 
-        if pred_type == "Classification":
-            y = y.astype("category").cat.codes
+        # if pred_type == "Classification":
+        y = y.astype("category").cat.codes
+        X = X.apply(lambda col: col.astype("category").cat.codes)
 
         x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SIZE, random_state=SEED)
 
@@ -150,6 +151,7 @@ if run:
             
             if grid is None:
                 raise RuntimeError(f"Wrong selection of model: {model_name} with {pred_type} prediction")
+            
             grid.fit(x_train, y_train)
             y_pred = grid.predict(x_test)
 

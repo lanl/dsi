@@ -52,10 +52,33 @@ class DSI_cli:
         self.start_dir = os.getcwd() + "/"
         return
     
+    def viewers_check(self):
+        available_viewers = []
+        all_viewers = ["ml", "jupyter"]
+
+        # ml checker
+        try: 
+            import streamlit
+            import sklearn
+            available_viewers.append("ml")
+        except ModuleNotFoundError:
+            pass
+
+        # jupyter checker
+        try: 
+            import ipykernel
+            import nbformat
+            available_viewers.append("jupyter")
+        except ModuleNotFoundError:
+            pass
+        
+        return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
+    
     def startup(self, backend="sqlite"):
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
 
+        self.valid_viewers, self.all_viewers = self.viewers_check()
         self.start_dir = os.getcwd()
         self.db_path = os.path.join(self.start_dir, ".temp.db")
         if os.path.exists(self.db_path):
@@ -79,31 +102,34 @@ class DSI_cli:
 
 
     def help_fn(self, args):
-        commands = [
-            ("display <table_name> [-n num_rows] [-e filename]", 
-            "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
-            ("draw [-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
-            ("exit", "Exits the DSI Command Line Interface (CLI)"),
-            ("find <condition>", "Finds all rows of a table that match a column-level condition."),
-            ("help", "Shows this help message."),
-            ("list", "Lists all tables in the current DSI database"),
-            ("plot_table <table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
-            ("query <SQL_query> [-n num_rows] [-e filename]",
-            "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
-            ("read <filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
-            ("search <value>", "Searches for a string or number across DSI."),
-            ("summary [-t table_name]", "Summary of the database or a specific table."),
-            ("viewers", "Prints the available viewers for the user."),
-            ("view <valid DSI viewer>", "Creates an instance of the DSI viewer in another application."),
-            ("write <filename>", "Writes data in DSI database to a permanent location."),
-            ("ls", "Lists all files in the current or specified directory."),
-            ("cd <path>", "Changes the working directory within the CLI environment.")
-        ]
+        commands = {
+            'display' :("<table_name> [-n num_rows] [-e filename]", 
+                "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
+            'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
+            'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
+            'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
+            'help': ("", "Shows this help message."),
+            'list' : ("", "Lists all tables in the current DSI database"),
+            'plot_table' : ("<table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            'query' : ("<SQL_query> [-n num_rows] [-e filename]",
+                "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
+            'read' : ("<filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            'search' : ("<value>", "Searches for a string or number across DSI."),
+            'summary' : ("[-t table_name]", "Summary of the database or a specific table."),
+            'viewers' : ("", "Prints the available viewers for the user."),
+            'view' : ("<available viewer>", "Creates an instance of the DSI viewer in another application."),
+            'write' : ("<filename>", "Writes data in DSI database to a permanent location."),
+            'ls' : ("", "Lists all files in the current or specified directory."),
+            'cd' : ("<path>", "Changes the working directory within the CLI environment.")
+        }
+        if self.viewers_check()[0] is None:
+            del commands["view"]
 
         print()
         terminal_width = shutil.get_terminal_size().columns
-        for cmd, desc in commands:
-            print(textwrap.fill(f"{cmd:48} {desc}", width=terminal_width, subsequent_indent=' ' * 50))
+        for key, val in commands.items():
+            cmd = f'{key} {val[0]}'
+            print(textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50))
         print()
 
 
@@ -580,27 +606,40 @@ class DSI_cli:
         Output the version of DSI being used
         '''
         return str(__version__)
-    
+
 
     def viewers(self, args):
-        print("Available viewers are: ml_emulator.")
-        return
+        if self.valid_viewers is None:
+            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            return
+        print(f"Available viewers are: {", ".join(self.valid_viewers)}")
+
 
     def view(self, args):
+        if self.valid_viewers is None:
+            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            return
         if not args:
             print("view ERROR: need to specify which DSI viewer to use")
             return
         if len(args) > 1:
             print("view ERROR: can only use one DSI viewer at a time")
             return
+        
         viewer = args[0]
+        if viewer not in self.all_viewers:
+            print("view ERROR: This viewer does not exist.")
+            return
+        if viewer not in self.valid_viewers:
+            print("view ERROR: To load this viewer, install requirements.extras.txt.")
+            return
 
         #check if current db is empty
         if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
             print("view ERROR: need to read in data files or an existing database to use a viewer.")
             return
 
-        if viewer.lower() in ['ml', 'ml_emulator']:
+        if viewer.lower() == "ml":
             # print("\nUsers can view the ML emulator at http://localhost:8501.")
             # print("Users must enter [Ctrl + C] to exit.")
             env = dict(os.environ)
@@ -756,8 +795,8 @@ def main():
             command, *args = tokens
             
             if command not in COMMANDS:
-                print(f"Unknown command: {command}")
-                print("Type \"help\" to get valid commands.\n")
+                print(f"Unknown command. Type \"help\" to see valid commands.\n")
+                continue
                 
             parser_factory, handler = COMMANDS[command]
 
