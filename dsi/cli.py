@@ -11,7 +11,6 @@ from contextlib import redirect_stdout
 import sys
 import io
 import subprocess
-from pathlib import Path
 
 from dsi.core import Terminal
 from ._version import __version__
