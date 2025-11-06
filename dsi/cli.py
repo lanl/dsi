@@ -54,7 +54,7 @@ class DSI_cli:
     
     def viewers_check(self):
         available_viewers = []
-        all_viewers = ["ml", "jupyter"]
+        all_viewers = ["ml"]
 
         # ml checker
         try: 
@@ -64,13 +64,13 @@ class DSI_cli:
         except ModuleNotFoundError:
             pass
 
-        # jupyter checker
-        try: 
-            import ipykernel
-            import nbformat
-            available_viewers.append("jupyter")
-        except ModuleNotFoundError:
-            pass
+        # # jupyter checker
+        # try: 
+        #     import ipykernel
+        #     import nbformat
+        #     available_viewers.append("jupyter")
+        # except ModuleNotFoundError:
+        #     pass
         
         return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
     
