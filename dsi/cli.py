@@ -612,7 +612,7 @@ class DSI_cli:
         if self.valid_viewers is None:
             print("There are no available viewers. Install requirements.extras.txt to access them.")
             return
-        print(f"Available viewers are: {", ".join(self.valid_viewers)}")
+        print(f'Available viewers are: {", ".join(self.valid_viewers)}')
 
 
     def view(self, args):
