@@ -18,7 +18,7 @@ class DSI():
     The DSI Class abstracts Core.Terminal for managing metadata and Core.Sync for data management and movement.
     '''
 
-    def __init__(self, filename = ".temp.db", backend_name = "Sqlite", **kwargs):
+    def __init__(self, filename = ".temp_dsi.db", backend_name = "Sqlite", **kwargs):
         """
         Initializes DSI by activating a backend for data operations; default is a Sqlite backend for temporary data analysis.
         If users specify `filename`, data is saved to a permanent backend file.
@@ -50,13 +50,13 @@ class DSI():
         cleaned_name = re.sub(r'[^A-Za-z0-9]', '', backend_name)
         backend_name = cleaned_name.lower()
 
-        if filename == ".temp.db" and os.path.exists(filename):
+        if filename == ".temp_dsi.db" and os.path.exists(filename):
             os.remove(filename)
-        if filename != ".temp.db" and backend_name.lower() == "sqlite":
+        if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                 filename += ".db"
-        elif filename != ".temp.db" and backend_name.lower() == "duckdb":
+        elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "duckdb"]:
                 filename += ".db"
@@ -85,7 +85,7 @@ class DSI():
             sys.exit(f"backend ERROR: {e}")
 
         self.main_backend_obj = self.t.loaded_backends[0]
-        if filename != ".temp.db":
+        if filename != ".temp_dsi.db":
             print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
         else:
             print("Created an instance of DSI")
