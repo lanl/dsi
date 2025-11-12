@@ -56,7 +56,7 @@ class DSI_cli:
         self.t.user_wrapper = True
 
         self.start_dir = os.getcwd()
-        db_path = os.path.join(self.start_dir, ".temp.db")
+        db_path = os.path.join(self.start_dir, ".temp_dsi.db")
         if os.path.exists(db_path):
             os.remove(db_path)
 
@@ -590,7 +590,7 @@ class DSI_cli:
         '''
         new_name = args.filename
         file_extension = new_name.rsplit(".", 1)[-1] if '.' in new_name else ''
-        dsi_db_path = os.path.join(self.start_dir, ".temp.db")
+        dsi_db_path = os.path.join(self.start_dir, ".temp_dsi.db")
         final_name = None
         if "sqlite" == self.name:
             if file_extension.lower() in ["db", "sqlite", "sqlite3"]:

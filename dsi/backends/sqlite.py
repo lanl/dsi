@@ -51,9 +51,9 @@ class Sqlite(Filesystem):
         """
         self.filename = filename
         if 'kwargs' in kwargs:
-            self.con = sqlite3.connect(filename, **kwargs['kwargs'])
+            self.con = sqlite3.connect(filename, check_same_thread=False, **kwargs['kwargs'])
         else:
-            self.con = sqlite3.connect(filename)
+            self.con = sqlite3.connect(filename, check_same_thread=False)
         self.cur = self.con.cursor()
         self.runTable = Sqlite.runTable
         self.sqlite_keywords = ["ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE", "AND", "AS", "ASC", "ATTACH", 
