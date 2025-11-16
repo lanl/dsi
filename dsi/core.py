@@ -1629,7 +1629,7 @@ class Sync():
                 stdout, stderr = process.communicate()
                 returncode = process.communicate()
                 
-                print( " DSI submitted Conduit job. ")
+                print( " DSI submitted Conduit data movement job. ")
 
                 # Database Movement
                 if isVerbose:
@@ -1641,20 +1641,56 @@ class Sync():
                 stdout, stderr = process.communicate()
                 returncode = process.communicate()
             
-                print( " DSI submitted Conduit job. ")
+                print( " DSI submitted Conduit data movement job. ")
 
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
+        elif tool == "pfcp":
+            env = os.environ.copy()
+            
+            if not os.path.exists(self.remote_location):
+                if isVerbose:
+                    print( " mkdir " + self.remote_location)
+                path = Path(self.remote_location)
+                try:
+                    path.mkdir(parents=True)
+                except Exception:
+                    print(f"Unable to create folder {abspath} . Do you have access rights?")
+                    raise
+            
+            try:
+                #subprocess.call(["pfcp", "-r", self.local_location, self.remote_location], env=env, shell=True)
 
+                # File Movement
+                if isVerbose:
+                    print( "pfcp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
+                cmd = ['pfcp','-r',self.local_location,  os.path.join(self.remote_location, self.project_name)]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+                
+                print( " DSI submitted pfcp data movement job. ")
 
+                # Database Movement
+                if isVerbose:
+                    print( " pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+                
+                cmd = ['pfcp','-r', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+            
+                print( " DSI submitted pfcp data movement job. ")
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with error: {e.stderr} ")
         elif tool == "ftp":
             True
         elif tool == "git":
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
-
-        
 
 
     def dircrawl(self,filepath):
