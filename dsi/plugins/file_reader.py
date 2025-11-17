@@ -977,7 +977,7 @@ class GenesisDatacard(FileReader):
 
             required_columns = ["Metadata Element", "Supporting Element", "Requirement Level", "LANL Input Example"]
             if not set(required_columns).issubset(temp_df.columns.tolist()):
-                raise ValueError(f"The required metadata columns are {", ".join(required_columns)}")
+                raise ValueError(f"The required metadata columns are {', '.join(required_columns)}")
             
             for _, row in temp_df.iterrows():
                 if row['Requirement Level'].lower() == "mandatory":
