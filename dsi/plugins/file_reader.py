@@ -3,7 +3,7 @@ from os.path import abspath
 from hashlib import sha1
 import json
 from math import isnan
-from pandas import DataFrame, read_csv, concat
+from pandas import DataFrame, read_csv, concat, read_excel
 import re
 import yaml
 try: import tomllib
@@ -946,13 +946,13 @@ class GoogleDatacard(FileReader):
 class GenesisDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `genesis_datacard` table.
-    Input datacard should follow template in `examples/test/template_dc_geneis.csv`
+    Input datacard should follow template in `examples/test/template_dc_genesis.xlsx`
     """
     def __init__(self, filenames, **kwargs):
         """
         `filenames` : str or list of str
-            File name(s) of CSV data card files to ingest. Each file must adhere to the
-            LANL Gensis metadata standard.
+            File name(s) of Excel data card files to ingest. Each file must adhere to the
+            LANL Gensis metadata standard. The Excel file must only have one sheet.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -971,7 +971,7 @@ class GenesisDatacard(FileReader):
         temp_data = OrderedDict()
         for filename in self.datacard_files:
             try:
-                temp_df = read_csv(filename)
+                temp_df = read_excel(filename, sheet_name = 0)
             except:
                 raise ValueError(f"Error reading in {filename} for the Genesis data card reader")
 
