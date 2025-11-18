@@ -981,12 +981,12 @@ class GenesisDatacard(FileReader):
             
             for _, row in temp_df.iterrows():
                 if row['Requirement Level'].lower() == "mandatory":
-                    if row['Metadata Element'].strip() not in ["", None]:
+                    if type(row['Metadata Element']) == str and row['Metadata Element'].strip() not in ["", None]:
                         if row["Metadata Element"] in temp_data.keys():
                             temp_data[row["Metadata Element"]].append(row["LANL Input Example"])
                         else:
                             temp_data[row["Metadata Element"]] = [row["LANL Input Example"]]
-                    elif row['Supporting Element'].strip() not in ["", None]:
+                    elif type(row['Supporting Element']) == str and row['Supporting Element'].strip() not in ["", None]:
                         if row["Supporting Element"] in temp_data.keys():
                             temp_data[row["Supporting Element"]].append(row["LANL Input Example"])
                         else:
