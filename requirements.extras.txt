@@ -5,3 +5,4 @@ graphviz>=0.20.3
 opencv-python>=4.9.0.80
 duckdb>=1.2.0
 xmltodict>=0.14.2
+openpyxl>=3.1.5

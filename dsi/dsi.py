@@ -134,6 +134,7 @@ class DSI():
         print("SchemaOrgDatacard    : Loads dataset metadata adhering to schema.org (JSON)")
         print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
         print("Oceans11Datacard     : Loads dataset metadata for Oceans11 DSI data server (oceans11.lanl.gov) (YAML)")
+        print("GenesisDatacard      : Loads dataset metadata for LANL Genesis data standard (CSV)")
         print()
 
     def read(self, filenames, reader_name, table_name = None):
@@ -157,6 +158,7 @@ class DSI():
                 - "SchemaOrgDatacard"    → .json
                 - "GoogleDatacard"       → .yaml or .yml
                 - "Oceans11Datacard"     → .yaml or .yml
+                - "GenesisDatacard"      → .csv
 
         `reader_name` : str
             Name of the DSI Reader to use for loading the data. 
@@ -236,6 +238,8 @@ class DSI():
                         self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
                     elif reader_name.lower() == "googledatacard":
                         self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "genesisdatacard":
+                        self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=filenames)
                     elif reader_name.lower() == "bueno":
                         self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
                     elif reader_name.lower() == "csv":
@@ -266,7 +270,7 @@ class DSI():
             if correct_reader == False:
                 print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
                 elg = "Collection, CSV, Parquet, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
-                sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard")
+                sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard, GenesisDatacard")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
