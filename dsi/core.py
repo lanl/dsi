@@ -13,6 +13,7 @@ import csv
 import re
 import tarfile
 import subprocess
+import uuid
 from contextlib import redirect_stdout
 
 class Terminal():
@@ -1434,11 +1435,12 @@ class Sync():
         st_dict['created_time'] = []
         st_dict['accessed_time'] = []
         st_dict['mode'] = []
-        #st_dict['inode'] = []
+        st_dict['inode'] = []
         st_dict['device'] = []
         st_dict['n_links'] = []
         st_dict['uid'] = []
         st_dict['gid'] = []
+        st_dict['uuid'] = []
         st_dict['file_remote'] = []
 
         for file in file_list:
@@ -1455,11 +1457,12 @@ class Sync():
             st_dict['created_time'].append(st.st_ctime)
             st_dict['accessed_time'].append(st.st_atime)
             st_dict['mode'].append(st.st_mode)
-            #st_dict['inode'].append(st.st_ino)
+            st_dict['inode'].append(st.st_ino)
             st_dict['device'].append(st.st_dev)
             st_dict['n_links'].append(st.st_nlink)
             st_dict['uid'].append(st.st_uid)
             st_dict['gid'].append(st.st_gid)
+            st_dict['uuid'].append(self.gen_uuid(st))
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
 
@@ -1626,7 +1629,7 @@ class Sync():
                 stdout, stderr = process.communicate()
                 returncode = process.communicate()
                 
-                print( " DSI submitted Conduit job. ")
+                print( " DSI submitted Conduit data movement job. ")
 
                 # Database Movement
                 if isVerbose:
@@ -1638,20 +1641,56 @@ class Sync():
                 stdout, stderr = process.communicate()
                 returncode = process.communicate()
             
-                print( " DSI submitted Conduit job. ")
+                print( " DSI submitted Conduit data movement job. ")
 
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
+        elif tool == "pfcp":
+            env = os.environ.copy()
+            
+            if not os.path.exists(self.remote_location):
+                if isVerbose:
+                    print( " mkdir " + self.remote_location)
+                path = Path(self.remote_location)
+                try:
+                    path.mkdir(parents=True)
+                except Exception:
+                    print(f"Unable to create folder {abspath} . Do you have access rights?")
+                    raise
+            
+            try:
+                #subprocess.call(["pfcp", "-r", self.local_location, self.remote_location], env=env, shell=True)
 
+                # File Movement
+                if isVerbose:
+                    print( "pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
+                cmd = ['pfcp','-R',self.local_location,  os.path.join(self.remote_location, self.project_name)]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+                
+                print( " DSI submitted pfcp data movement job. ")
 
+                # Database Movement
+                if isVerbose:
+                    print( " pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+                
+                cmd = ['pfcp', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+            
+                print( " DSI submitted pfcp data movement job. ")
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with error: {e.stderr} ")
         elif tool == "ftp":
             True
         elif tool == "git":
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
-
-        
 
 
     def dircrawl(self,filepath):
@@ -1682,6 +1721,22 @@ class Sync():
         DSI database
         '''
         True
+
+    def gen_uuid(self, st):
+        '''
+        Generates a unique file identifier using the os.stat data object as the input
+        
+        '''
+        inode=st.st_ino
+        ctime=st.st_ctime
+        unique_str = f"{inode}-{ctime}"
+
+        file_uuid = uuid.uuid5(uuid.NAMESPACE_URL, unique_str)
+        print(f"UUID:{file_uuid}")
+        return file_uuid
+
+
+    
 
 class TarFile():
   def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
