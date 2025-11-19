@@ -1663,8 +1663,8 @@ class Sync():
 
                 # File Movement
                 if isVerbose:
-                    print( "pfcp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
-                cmd = ['pfcp','-r',self.local_location,  os.path.join(self.remote_location, self.project_name)]
+                    print( "pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
+                cmd = ['pfcp','-R',self.local_location,  os.path.join(self.remote_location, self.project_name)]
                 process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
                 
                 stdout, stderr = process.communicate()
@@ -1676,7 +1676,7 @@ class Sync():
                 if isVerbose:
                     print( " pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
                 
-                cmd = ['pfcp','-r', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
+                cmd = ['pfcp', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
                 process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
                 
                 stdout, stderr = process.communicate()
