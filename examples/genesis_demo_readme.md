@@ -39,7 +39,7 @@ Finrally, register the Jupyter Environment with jupyter lab so that the packages
 python -m ipykernel install --user --name=venv_dsi_genesis 
 ```
 
-### Using / Launching the dmoe
+### Using / Launching the demo
  Note: if starting from a new run, do: source venv_dsi_genesis/bin/activate to go in the DSI environment
 
 ```bash
