@@ -1,0 +1,56 @@
+field_glossary:
+  Title:
+    desc: Short human-readable name of the resource.
+    ex: "LANL Wind Simulation Dataset"
+
+  Keywords:
+    desc: Tags/keywords describing the content.
+    ex: "simulation, wind, turbulence"
+
+  Update_Date:
+    desc: Last modification date.
+    ex: "2024-01-15"
+
+  Theme_Category:
+    desc: High-level domain or thematic category.
+    ex: "Climate Modeling / Atmospheric Dynamics"
+
+  Description:
+    desc: One-sentence summary of the resource.
+    ex: "High-resolution 3D wind-field simulations."
+
+  Contact_Point:
+    desc: Primary individual or group for inquiries.
+    ex: "Dr. Jane Smith"
+
+  Formatted_Name:
+    desc: Structured contact name fields.
+    ex: { first: "Jane", middle: "A.", last: "Smith" }
+
+  Email:
+    desc: Contact email.
+    ex: "jane.smith@lanl.gov"
+
+  Access_Rights:
+    desc: Security or access classification.
+    ex: "Unclassified // Official Use Only"
+
+  CUI_Restriction:
+    desc: CUI status and restriction category.
+    ex: "CUI//SP-FIN"
+
+  CUI_Banner:
+    desc: Banner marking required for CUI data.
+    ex: "CONTROLLED // FINANCIAL INFORMATION"
+
+  CUI_Designation:
+    desc: Specific CUI category indicator.
+    ex: "FIN"
+
+  Originating_Organization:
+    desc: Organization or project that produced the resource.
+    ex: "LANL – DIANA Project"
+
+  dsi_database:
+    desc: Path or identifier for associated DSI database that can be loaded.
+    ex: "/path/to/dataset.db"
