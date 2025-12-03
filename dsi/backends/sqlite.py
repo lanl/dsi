@@ -992,12 +992,13 @@ class Sqlite(Filesystem):
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
         numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE'}
-        headers = ['column', 'type', 'min', 'max', 'avg', 'std_dev']
+        headers = ['column', 'type', 'unique', 'min', 'max', 'avg', 'std_dev']
         rows = []
 
         for col in col_info:
             col_name = col[1]
             col_type = col[2].upper()
+            unique_vals = self.cur.execute(f"SELECT COUNT(DISTINCT {col_name}) FROM {table_name};").fetchone()[0]
             is_primary = col[5] > 0
             display_name = f"{col_name}*" if is_primary else col_name
 
@@ -1031,7 +1032,7 @@ class Sqlite(Filesystem):
             
             if avg_val != None and std_dev == None:
                 std_dev = 0
-            rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
+            rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
 
