@@ -4,6 +4,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pyarrow as pa
 from pyarrow import parquet as pq
+import re
 
 from dsi.plugins.metadata import StructuredMetadata
 
@@ -44,6 +45,10 @@ class ER_Diagram(FileWriter):
         self.output_filename = filename
         self.target_table_prefix = target_table_prefix
         self.max_cols = max_cols
+
+    def graphviz_name(self, name) -> str:
+        """ Converts non-alphanumeric characters in a table/col name to underscores"""
+        return re.sub(r'[^a-zA-Z0-9_]', '_', name)
 
     def get_rows(self, collection) -> None:
         """
@@ -127,7 +132,7 @@ class ER_Diagram(FileWriter):
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 1
                     html_table += "<TR>"
-                html_table += f"<TD PORT=\"{col_name}\">{col_name}</TD>"
+                html_table += f"<TD PORT=\"{self.graphviz_name(col_name)}\">{col_name}</TD>"
                 curr_row += 1
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 0
@@ -146,8 +151,9 @@ class ER_Diagram(FileWriter):
                     continue
                 if f_table is not None:
                     foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                    fk_string = f"{f_table}:{f_col}"
-                    pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
+                    fk_string = f"{f_table}:{self.graphviz_name(f_col)}"
+                    pk_tuple = collection['dsi_relations']['primary_key'][foreignIndex]
+                    pk_string = f"{pk_tuple[0]}:{self.graphviz_name(pk_tuple[1])}"
                     
                     if manual_dot: dot_file.write(f"{pk_string} -> {fk_string}; ")
                     else: dot.edge(pk_string, fk_string)
