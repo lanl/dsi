@@ -52,5 +52,5 @@ field_glossary:
     ex: "LANL – DIANA Project"
 
   dsi_database:
-    desc: Path for associated DSI database. Use this path when asked to load/read in ...  using the load DSI tool.
+    desc: Path for associated DSI database that can be loaded. Use this path when asked to load/read in ... using the DSI tool.
     ex: "/path/to/dataset.db"
