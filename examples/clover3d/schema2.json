@@ -1,0 +1,26 @@
+{
+   "genesis_datacard": {
+       "primary_key": "Title"
+   },
+    "simulation": {
+       "primary_key": "sim_id",
+       "foreign_key": {
+             "dataset": ["genesis_datacard", "Title"]
+       }
+    }, 
+    "input": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    }, 
+    "output": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    },
+    "viz_files": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    }
+}
