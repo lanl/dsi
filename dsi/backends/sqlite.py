@@ -208,12 +208,12 @@ class Sqlite(Filesystem):
                             create_stmt += f"{col[1]} {col[2]}, "
                     
                     if fk_dict:
-                        fk_stmt = "FOREIGN KEY "
+                        fk_stmt = ""
                         for k, v in fk_dict.items():
                             if k not in create_stmt:
                                 msg = f"Input schema references a nonexistent column, {k}, in the foreign_key section of {table}"
                                 raise ValueError(msg)
-                            fk_stmt += f"({k}) REFERENCES {v[0]}({v[1]}), "
+                            fk_stmt += f"FOREIGN KEY ({k}) REFERENCES {v[0]}({v[1]}), "
                         create_stmt += fk_stmt
                     create_stmt = create_stmt[:-2] + ");"
 

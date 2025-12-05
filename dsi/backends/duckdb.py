@@ -175,6 +175,56 @@ class DuckDB(Filesystem):
         """
         artifacts = collection
 
+        self.cur.execute("BEGIN TRANSACTION")
+
+        if self.list() is not None and list(artifacts.keys()) == ["dsi_relations"]: 
+            pk_list = artifacts["dsi_relations"]["primary_key"]
+            fk_list = artifacts["dsi_relations"]["foreign_key"]
+            pk_tables = set(t[0] for t in pk_list)
+            fk_tables = set(t[0] for t in fk_list if t[0] != None)
+            all_schema_tables = pk_tables.union(fk_tables)
+            db_tables = [t[0] for t in self.list() if t[0] != "dsi_units"]
+
+            # check if tables from dsi_relations are all in the db
+            if all_schema_tables.issubset(set(db_tables)):
+                circ, _ = self.check_table_relations(all_schema_tables, artifacts["dsi_relations"])
+                if circ:
+                    return (ValueError, f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
+
+                drop_order = all_schema_tables
+                collect = self.process_artifacts()
+                if "dsi_relations" in collect.keys():
+                    curr_pk_tables = set(t[0] for t in collect["dsi_relations"]["primary_key"])
+                    curr_fk_tables = set(t[0] for t in collect["dsi_relations"]["foreign_key"] if t[0] != None)
+                    curr_schema_tables = curr_pk_tables.union(curr_fk_tables)
+
+                    # need to drop and reingest all tables in old schema and new schema
+                    all_schema_tables = all_schema_tables.union(curr_schema_tables)
+
+                    _, ord_tables1 = self.check_table_relations(all_schema_tables, collect["dsi_relations"])
+                    drop_order = ord_tables1
+                
+                for table in drop_order:
+                    self.cur.execute(f'DROP TABLE IF EXISTS "{table}";')
+                try:
+                    self.con.commit()
+                except Exception as e:
+                    self.cur.execute("ROLLBACK")
+                    self.cur.execute("CHECKPOINT")
+                    return (duckdb.Error, e)
+                
+                #do not reingest tables not in old or new schema as they will be the same
+                non_schema_tables = set(db_tables) - all_schema_tables 
+                for t in non_schema_tables:
+                    del collect[t]
+                
+                collect["dsi_relations"] = artifacts["dsi_relations"]
+                artifacts = collect
+
+            else:
+                print("WARNING: Complex schemas can only be ingested if all referenced data tables are loaded into DSI.")
+            
+
         table_order = artifacts.keys()
         if "dsi_relations" in artifacts.keys():
             circular, ordered_tables = self.check_table_relations(artifacts.keys(), artifacts["dsi_relations"])
@@ -184,10 +234,8 @@ class DuckDB(Filesystem):
             else:
                 table_order = list(reversed(ordered_tables)) # ingest primary key tables first then children
 
-        self.cur.execute("BEGIN TRANSACTION")
         if self.runTable:
-            runTable_create = "CREATE TABLE IF NOT EXISTS runTable " \
-            "(run_id INTEGER PRIMARY KEY, run_timestamp TEXT UNIQUE);"
+            runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
 
             sequence_run_id = "CREATE SEQUENCE IF NOT EXISTS seq_run_id START 1;"
@@ -387,12 +435,15 @@ class DuckDB(Filesystem):
     def read_to_artifact(self):
         return self.process_artifacts()
     
-    def process_artifacts(self):
+    def process_artifacts(self, only_units_relations = False):
         """
         Reads data from the DuckDB database into a nested OrderedDict.
         Keys are table names, and values are OrderedDicts containing table data.
 
         If the database contains PK/FK relationships, they are stored in a special `dsi_relations` table.
+
+        `only_units_relations` : bool, default=False
+            **USERS SHOULD IGNORE THIS FLAG.** Used internally by duckdb.py.
 
         `return` : OrderedDict
             A nested OrderedDict containing all data from the DuckDB database.
@@ -404,20 +455,22 @@ class DuckDB(Filesystem):
                                      SELECT table_name FROM information_schema.tables
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
-        for item in tableList:
-            tableName = self.duckdb_compatible_name(item[0])
 
-            tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchdf()
-            colDict = OrderedDict((self.duckdb_compatible_name(col), []) for col in tableInfo['name'])
+        if only_units_relations == False:
+            for item in tableList:
+                tableName = self.duckdb_compatible_name(item[0])
 
-            data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
-            for row in data:
-                for colName, val in zip(colDict.keys(), row):
-                    if val == "NULL":
-                        colDict[colName].append(None)
-                    else:
-                        colDict[colName].append(val)
-            artifact[tableName] = colDict
+                tableInfo = self.cur.execute(f"PRAGMA table_info({tableName});").fetchdf()
+                colDict = OrderedDict((self.duckdb_compatible_name(col), []) for col in tableInfo['name'])
+
+                data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
+                for row in data:
+                    for colName, val in zip(colDict.keys(), row):
+                        if val == "NULL":
+                            colDict[colName].append(None)
+                        else:
+                            colDict[colName].append(val)
+                artifact[tableName] = colDict
 
         pk_list = []
         fkData = self.cur.execute(f"""
@@ -743,6 +796,8 @@ class DuckDB(Filesystem):
                                      SELECT table_name FROM information_schema.tables
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
+        if not tableList:
+            return None
         tableList = [self.duckdb_compatible_name(table[0]) for table in tableList]
         
         info_list = []
@@ -839,12 +894,13 @@ class DuckDB(Filesystem):
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
         numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE', 'BIGINT'}
-        headers = ['column', 'type', 'min', 'max', 'avg', 'std_dev']
+        headers = ['column', 'type', 'unique', 'min', 'max', 'avg', 'std_dev']
         rows = []
 
         for col in col_info:
             col_name = col[1]
             col_type = col[2].upper()
+            unique_vals = self.cur.execute(f"SELECT COUNT(DISTINCT {col_name}) FROM {table_name};").fetchone()[0]
             is_primary = col[5] > 0
             display_name = f"{col_name}*" if is_primary else col_name
 
@@ -863,7 +919,7 @@ class DuckDB(Filesystem):
             
             if avg_val != None and std_dev == None:
                 std_dev = 0
-            rows.append([display_name, col_type, min_val, max_val, avg_val, std_dev])
+            rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
 
@@ -1007,7 +1063,7 @@ class DuckDB(Filesystem):
         if any(visit(node) for node in list(graph.keys())):
             return True, None  # Circular dependency detected
 
-        # Step 3: Order tables from least dependencies to most (if no circular dependencies)
+        # Order tables from least dependencies to most (if no circular dependencies)
         in_degree = {table: 0 for table in tables}
         for child in graph:
             for parent in graph[child]:

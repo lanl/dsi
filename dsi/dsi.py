@@ -304,10 +304,10 @@ class DSI():
                 sys.exit(f"read() ERROR: {e}")
             self.t.active_metadata = OrderedDict()
 
-        if len(table_keys) > 1:
-            print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
-        else:
+        if len(table_keys) == 1:
             print(f"Loaded {filenames} into the table {table_keys[0]}")
+        else:
+            print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
 
     def query(self, statement, collection = False, update = False):
         """
