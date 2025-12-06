@@ -112,3 +112,10 @@ DSI Core
 DSI basic functionality is contained within the middleware known as the *core*.
 Users will leverage Core to employ Readers, Writers, and Backends to interact with their data.
 The two primary methods to achieve this are with the :ref:`python_api_label` or the :ref:`cli_api_label`
+
+Contact Us
+----------
+
+For general inquiries or help, reach us at dsi-help (at) lanl.gov
+
+Bugs/Feature Requests: `DSI GitHub Requests <https://github.com/lanl/dsi/issues>`_

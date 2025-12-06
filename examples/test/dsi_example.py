@@ -10,7 +10,8 @@ test = DSI("data.db")
 # test.list_writers()
 
 ''' Example uses of loading DSI readers '''
-# test.schema(filename="yaml1_schema.json") # must be loaded first
+# test.schema(filename="yaml1_circular_schema.json") # must be loaded first
+test.schema(filename="yaml1_schema.json") # must be loaded first
 # test.schema(filename="example_schema.json") # must be loaded first
 
 test.read(filenames=["student_test1.yml", "student_test2.yml"], reader_name='YAML1')
