@@ -100,7 +100,7 @@ class DSI():
             if not os.path.exists(filename):
                 sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
             if "dsi_relations" in self.t.active_metadata:
-                sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+                sys.exit("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):

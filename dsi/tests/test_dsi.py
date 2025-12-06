@@ -858,10 +858,9 @@ def test_error_schema_sqlite_backend():
 
     try:
         test.schema(filename="examples/test/yaml1_schema.json")
-        test.query("SELECT * FROM math") # Querying data but need to load in associated data after loading in schema
         assert False
     except SystemExit as e:
-        expected = "ERROR: Cannot query() on an empty backend. Please ensure there is data in it."
+        expected = "schema() ERROR: There is already a complex schema in memory. First load all its associated files."
         assert str(e) == expected
 
 def test_query_update_schema_sqlite_backend():
@@ -1797,5 +1796,6 @@ def test_fail_overwrite_schema_duckdb_backend():
     try:
         test.schema(filename="examples/test/yaml1_circular_schema.json") # should not allow circular dependency overwrite
         assert False
-    except:
-        assert True
+    except SystemExit as e:
+        expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
+        assert str(e) == expected
