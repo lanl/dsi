@@ -344,8 +344,7 @@ class DSI():
             output = f.getvalue()
         except Exception as e:
             raise RuntimeError(f"query() ERROR: {e}")
-
-            
+   
         if df.empty:
             if output:
                 print(output)
@@ -874,9 +873,7 @@ class DSI():
         try:
             self.t.num_tables()
         except Exception as e:
-            raise RuntimeError(f"query() ERROR: {e}")
-
-       
+            raise RuntimeError(f"query() ERROR: {e}")       
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
