@@ -344,8 +344,7 @@ class DSI():
             output = f.getvalue()
         except Exception as e:
             raise RuntimeError(f"query() ERROR: {e}")
-        # except Exception as e:
-        #     #sys.exit(f"query() ERROR: {e}")
+
             
         if df.empty:
             if output:
@@ -819,7 +818,8 @@ class DSI():
                 self.t.list()
             output = f.getvalue()
         except Exception as e:
-            sys.exit(f"list() ERROR: {e}")
+            raise RuntimeError(f"list() ERROR: {e}")
+
         
         if collection:
             output_list = output.split('\n')
