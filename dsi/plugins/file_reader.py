@@ -618,7 +618,7 @@ class Cloverleaf(FileReader):
         simulation_dict = OrderedDict({'sim_id': [], 'sim_datetime': []})
 
         sim_num = 1
-        all_runs = sorted([f.name for f in os.scandir(self.folder_path) if f.is_dir()])
+        all_runs = sorted([f.name for f in os.scandir(self.folder_path) if f.is_dir() and not f.name.startswith('.') ])
         for run_name in all_runs:
             input_file = f"{self.folder_path}/{run_name}/clover.in"
             
