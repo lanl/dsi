@@ -5,6 +5,7 @@ from contextlib import redirect_stdout
 import textwrap
 from pandas import DataFrame
 from collections import OrderedDict
+import hashlib
 
 def test_list_functions():
     test = DSI()
@@ -857,10 +858,9 @@ def test_error_schema_sqlite_backend():
 
     try:
         test.schema(filename="examples/test/yaml1_schema.json")
-        test.query("SELECT * FROM math") # Querying data but need to load in associated data after loading in schema
         assert False
     except SystemExit as e:
-        expected = "ERROR: Cannot query() on an empty backend. Please ensure there is data in it."
+        expected = "schema() ERROR: There is already a complex schema in memory. First load all its associated files."
         assert str(e) == expected
 
 def test_query_update_schema_sqlite_backend():
@@ -887,6 +887,31 @@ def test_query_update_schema_sqlite_backend():
     data = test.get_table("address", collection=True, update=True)
     assert data['i'].tolist() == [123,234]
     assert data['new_col'].tolist() == ["test1", "test1"]
+
+def test_overwrite_schema_sqlite_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "Sqlite")
+    test.schema(filename="examples/test/yaml1_schema.json")
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.write(filename="full_erd.png", writer_name="ER_Diagram")
+
+    test.schema(filename="examples/test/yaml1_circular_schema.json")
+    test.write(filename="new_erd.png", writer_name="ER_Diagram")
+
+    def file_hash(path):
+        sha = hashlib.sha256()
+        with open(path, "rb") as f:
+            sha.update(f.read())
+        return sha.hexdigest()
+
+    hash1 = file_hash("full_erd.png")
+    hash2 = file_hash("new_erd.png")
+
+    assert hash1 != hash2
+
 
 
 # DUCKDB
@@ -1731,3 +1756,46 @@ def test_query_update_schema_duckdb_backend():
     data = test.get_table("math", collection=True, update=True)
     assert data['specification'].tolist() == [123,234]
     assert data['new_col'].tolist() == ["test1", "test1"]
+
+def test_overwrite_schema_duckdb_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+    test.schema(filename="examples/test/yaml1_schema.json")
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.write(filename="full_erd.png", writer_name="ER_Diagram")
+
+    #loophole to assign new schema since there isnt another schema file that can be used with yaml data (circular wont work here)
+    new_schema = OrderedDict({'primary_key': [('address', 'i'), ('math', 'specification')], 'foreign_key': [('math', 'b'), (None, None)]})
+    test.read(filenames=new_schema, reader_name="Collection", table_name="dsi_relations") #loophole to assign new schema since
+    test.write(filename="new_erd.png", writer_name="ER_Diagram")
+
+    def file_hash(path):
+        sha = hashlib.sha256()
+        with open(path, "rb") as f:
+            sha.update(f.read())
+        return sha.hexdigest()
+
+    hash1 = file_hash("full_erd.png")
+    hash2 = file_hash("new_erd.png")
+
+    assert hash1 != hash2
+
+def test_fail_overwrite_schema_duckdb_backend():
+    dbpath = 'data.db'
+    if os.path.exists(dbpath):
+        os.remove(dbpath)
+
+    test = DSI(filename=dbpath, backend_name= "DuckDB")
+    test.schema(filename="examples/test/yaml1_schema.json")
+    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.write(filename="full_erd.png", writer_name="ER_Diagram")
+
+    try:
+        test.schema(filename="examples/test/yaml1_circular_schema.json") # should not allow circular dependency overwrite
+        assert False
+    except SystemExit as e:
+        expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
+        assert str(e) == expected
