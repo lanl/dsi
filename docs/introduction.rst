@@ -113,6 +113,37 @@ DSI basic functionality is contained within the middleware known as the *core*.
 Users will leverage Core to employ Readers, Writers, and Backends to interact with their data.
 The two primary methods to achieve this are with the :ref:`python_api_label` or the :ref:`cli_api_label`
 
+Slides
+------
+
+.. only:: html
+
+   .. raw:: html
+
+      <div>
+        <iframe src="_static/dsi_slides.pdf"
+                width="100%"
+                height="600px"
+                style="border: none; margin-bottom: 15px;">
+        </iframe>
+
+        <a href="_static/dsi_slides.pdf"
+           download
+           style="
+             display: inline-block;
+             width: 100%;
+             text-align: center;
+             padding: 8px 14px;
+             background: #4A90E2;
+             color: white;
+             text-decoration: none;
+             border-radius: 4px;
+             margin-bottom: 20px;
+           ">
+           ⬇ Download Slides
+        </a>
+      </div>
+
 Contact Us
 ----------
 
