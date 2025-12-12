@@ -893,14 +893,14 @@ class DuckDB(Filesystem):
         """
         col_info = self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()
 
-        numeric_types = {'INTEGER', 'REAL', 'FLOAT', 'NUMERIC', 'DECIMAL', 'DOUBLE', 'BIGINT'}
+        numeric_types = {'INTEGER', 'REAL', 'NUMERIC', 'DECIMAL', 'DOUBLE', 'BIGINT'}
         headers = ['column', 'type', 'unique', 'min', 'max', 'avg', 'std_dev']
         rows = []
 
         for col in col_info:
             col_name = col[1]
             col_type = col[2].upper()
-            unique_vals = self.cur.execute(f"SELECT COUNT(DISTINCT {col_name}) FROM {table_name};").fetchone()[0]
+            unique_vals = self.cur.execute(f"SELECT COUNT(DISTINCT {self.duckdb_compatible_name(col_name)}) FROM {table_name};").fetchone()[0]
             is_primary = col[5] > 0
             display_name = f"{col_name}*" if is_primary else col_name
 
