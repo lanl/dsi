@@ -85,6 +85,10 @@ Reading Cloverleaf data into a DSI backend, and displaying some of that data
 
 .. literalinclude:: ../examples/user/2.read.py
 
+Example workflow of reading CSV data into a DSI backend and specifiying the table name (default is CSV)
+
+.. literalinclude:: ../examples/user/2.read_csv.py
+
 Example 3: Visualize data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics
