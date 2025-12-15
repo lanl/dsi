@@ -1,0 +1,754 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Python API &mdash; DSI 1.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=00f267c6"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Command Line Interface API" href="cli.html" />
+    <link rel="prev" title="Quick Start: Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dsi-dsi">Dsi: DSI</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.dsi.DSI"><code class="docutils literal notranslate"><span class="pre">DSI</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.__init__"><code class="docutils literal notranslate"><span class="pre">DSI.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.close"><code class="docutils literal notranslate"><span class="pre">DSI.close()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.display"><code class="docutils literal notranslate"><span class="pre">DSI.display()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.find"><code class="docutils literal notranslate"><span class="pre">DSI.find()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.get_table"><code class="docutils literal notranslate"><span class="pre">DSI.get_table()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.list"><code class="docutils literal notranslate"><span class="pre">DSI.list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.list_backends"><code class="docutils literal notranslate"><span class="pre">DSI.list_backends()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.list_readers"><code class="docutils literal notranslate"><span class="pre">DSI.list_readers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.list_writers"><code class="docutils literal notranslate"><span class="pre">DSI.list_writers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.num_tables"><code class="docutils literal notranslate"><span class="pre">DSI.num_tables()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.query"><code class="docutils literal notranslate"><span class="pre">DSI.query()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.read"><code class="docutils literal notranslate"><span class="pre">DSI.read()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.schema"><code class="docutils literal notranslate"><span class="pre">DSI.schema()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.search"><code class="docutils literal notranslate"><span class="pre">DSI.search()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.summary"><code class="docutils literal notranslate"><span class="pre">DSI.summary()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.update"><code class="docutils literal notranslate"><span class="pre">DSI.update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.dsi.DSI.write"><code class="docutils literal notranslate"><span class="pre">DSI.write()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dsi-data-cards">DSI Data Cards</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#user-examples">User Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#example-1-intro-use-case">Example 1: Intro use case</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-2-read-data">Example 2: Read data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-3-visualize-data">Example 3: Visualize data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-4-find-data">Example 4: Find data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-5-update-data">Example 5: Update data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-6-query-data">Example 6: Query data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-7-complex-schema-with-data">Example 7: Complex schema with data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-8-write-data">Example 8: Write data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-9-load-an-external-reader">Example 9: Load an external Reader</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributors.html">Contributor Resources</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Python API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/python_api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="python-api">
+<span id="python-api-label"></span><h1>Python API<a class="headerlink" href="#python-api" title="Link to this heading"></a></h1>
+<p>Users can interact with DSI modules using the DSI class which provides an interface for Readers, Writers, and Backends.
+This can be seen below and in <code class="docutils literal notranslate"><span class="pre">dsi/dsi.py</span></code>. Example workflows using these functions can be seen in the following section: <a class="reference internal" href="#user-example-section-label"><span class="std std-ref">User Examples</span></a></p>
+<section id="dsi-dsi">
+<h2>Dsi: DSI<a class="headerlink" href="#dsi-dsi" title="Link to this heading"></a></h2>
+<p>The DSI class is a user-level class that encapsulates the Terminal and Sync classes from DSI Core.
+DSI interacts with several functions within Terminal and Sync without requiring the user to differentiate them.
+The functionality has been simplified to improve user experience and reduce complexity.</p>
+<p>When creating an instance of DSI(), users can optionally specify the type of backend and filename to use
+If neither is provided, a temporary backend is automatically created, allowing users to interact with their data.
+Read the <code class="docutils literal notranslate"><span class="pre">__init__</span></code> documentation below for more details on the supported backend types.</p>
+<p>Users should use <code class="docutils literal notranslate"><span class="pre">read()</span></code> to load data into DSI and <code class="docutils literal notranslate"><span class="pre">write()</span></code> to export data from DSI into supported external formats.
+Their respective list functions print all valid readers/writers that can be used.</p>
+<p>The primary backend interactions are <code class="docutils literal notranslate"><span class="pre">find()</span></code> , <code class="docutils literal notranslate"><span class="pre">query()</span></code>, and <code class="docutils literal notranslate"><span class="pre">get_table()</span></code> where users can print a search result, or retrieve the result as a collection of data.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>If users modify these collections, they can call <code class="docutils literal notranslate"><span class="pre">update()</span></code> to apply the changes to the active backend.
+Users must NOT edit any columns beginning with <strong>`dsi_`</strong>. Read <code class="docutils literal notranslate"><span class="pre">update()</span></code> below to better understand its behavior.</p></li>
+</ul>
+</div></blockquote>
+<p>Users can also view various data/metadata of an active backend with <code class="docutils literal notranslate"><span class="pre">list()</span></code>, <code class="docutils literal notranslate"><span class="pre">num_tables()</span></code>, <code class="docutils literal notranslate"><span class="pre">display()</span></code>, <code class="docutils literal notranslate"><span class="pre">summary()</span></code></p>
+<dl class="simple">
+<dt>Notes for users:</dt><dd><ul class="simple">
+<li><p>When using a complex schema, must call <code class="docutils literal notranslate"><span class="pre">schema()</span></code> prior to <code class="docutils literal notranslate"><span class="pre">read()</span></code> to store the relations with the associated data.</p></li>
+<li><p>If input to <code class="docutils literal notranslate"><span class="pre">update()</span></code> is a modified output from <code class="docutils literal notranslate"><span class="pre">query()</span></code>, the existing table will be <strong>overwritten</strong>.
+Ensure data is secure or add <cite>backup</cite> flag in <code class="docutils literal notranslate"><span class="pre">update()</span></code> to create a backup database.</p></li>
+<li><p>Read the <a class="reference internal" href="#datacard-section-label"><span class="std std-ref">DSI Data Cards</span></a> section to learn which data card standards are supported and where to find templates compatible with DSI.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.dsi.DSI">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.dsi.</span></span><span class="sig-name descname"><span class="pre">DSI</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.temp_dsi.db'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Sqlite'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI" title="Link to this definition"></a></dt>
+<dd><p>A user-facing interface for DSI’s Core middleware.</p>
+<p>The DSI Class abstracts Core.Terminal for managing metadata and Core.Sync for data management and movement.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.temp_dsi.db'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Sqlite'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes DSI by activating a backend for data operations; default is a Sqlite backend for temporary data analysis.
+If users specify <cite>filename</cite>, data is saved to a permanent backend file.
+Can now call read(), find(), update(), query(), write() or any backend printing operations</p>
+<dl>
+<dt><cite>filename</cite><span class="classifier">str, optional</span></dt><dd><p>If not specified, a temporary, hidden backend file is created for users to analyze their data.
+If specified and backend file already exists, it is activated for a user to explore its data.
+If specified and backend file does not exist, a file with this name is created.</p>
+<dl class="simple">
+<dt>Accepted file extensions:</dt><dd><ul class="simple">
+<li><p>If backend_name = “Sqlite” → .db, .sqlite, .sqlite3</p></li>
+<li><p>If backend_name = “DuckDB” → .duckdb, .db</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>backend_name</cite><span class="classifier">str, optional</span></dt><dd><p>Name of the backend to activate. Must be either “Sqlite” or “DuckDB”.
+Default is “Sqlite”.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.close" title="Link to this definition"></a></dt>
+<dd><p>Closes the connection to the active backend and clears all loaded DSI modules.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.display">
+<span class="sig-name descname"><span class="pre">display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.display" title="Link to this definition"></a></dt>
+<dd><p>Prints data from a specified table in the active backend.</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table to display.</p>
+</dd>
+<dt><cite>num_rows</cite><span class="classifier">int, optional, default=25</span></dt><dd><p>Maximum number of rows to print. If the table contains fewer rows, only those are shown.</p>
+</dd>
+<dt><cite>display_cols</cite><span class="classifier">list of str, optional</span></dt><dd><p>List of specific column names to display from the table.</p>
+<p>If None (default), all columns are displayed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.find">
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.find" title="Link to this definition"></a></dt>
+<dd><p>Finds all rows in the table where a column-level condition (e.g., “age &gt; 4”) is satisfied.</p>
+<dl>
+<dt><cite>query</cite><span class="classifier">str</span></dt><dd><p>A column-level condition that must be in the format of a [column name] [operator] [value]. 
+The value can be a string or number. Valid operators as example queries:</p>
+<ul class="simple">
+<li><p>age &gt; 4</p></li>
+<li><p>age &lt; 4</p></li>
+<li><p>age &gt;= 4</p></li>
+<li><p>age &lt;= 4</p></li>
+<li><p>age = 4</p></li>
+<li><p>age == 4</p></li>
+<li><p>age ~ 4    –&gt; column age contains the number 4</p></li>
+<li><p>age ~~ 4   –&gt; column age contains the number 4</p></li>
+<li><p>age != 4</p></li>
+<li><p>age (4, 8) –&gt; all values in ‘age’ between 4 and 8 (inclusive)</p></li>
+</ul>
+</dd>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False.</span></dt><dd><p>If True, returns a pandas DataFrame representing a subset of table rows that satisfy the <cite>query</cite>.</p>
+<p>If False (default), prints the result.</p>
+</dd>
+<dt><cite>update</cite><span class="classifier">bool, optional, default False.</span></dt><dd><p>If True, includes ‘dsi_table_name’ and ‘dsi_row_index’ columns required for <code class="docutils literal notranslate"><span class="pre">dsi.update()</span></code>.</p>
+<p>If False (default), return object does not include these columns.</p>
+</dd>
+</dl>
+<p><cite>return</cite> : If there are no matches found, then nothing is returned or printed</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.get_table">
+<span class="sig-name descname"><span class="pre">get_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.get_table" title="Link to this definition"></a></dt>
+<dd><p>Retrieves all data from a specified table without requiring knowledge of the active backend’s query language.</p>
+<p>This method offers a simplified alternative to <cite>query()</cite> for retrieving a full table data without using SQL.</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table from which all data will be retrieved.</p>
+</dd>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False.</span></dt><dd><p>If True, returns the result as a pandas DataFrame.</p>
+<p>If False (default), prints the result.</p>
+</dd>
+<dt><cite>update</cite><span class="classifier">bool, optional, default False.</span></dt><dd><p>If True, includes a ‘dsi_table_name’ column required for <code class="docutils literal notranslate"><span class="pre">dsi.update()</span></code>.</p>
+<p>If False (default), return object does not include this column.</p>
+</dd>
+</dl>
+<p><cite>return</cite>: If <cite>table_name</cite> does not exist in the backend, then nothing is returned or printed</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.list">
+<span class="sig-name descname"><span class="pre">list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.list" title="Link to this definition"></a></dt>
+<dd><p>Gets the names and dimensions (rows x columns) of all tables in the active backend.</p>
+<dl>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False. </span></dt><dd><p>If True, returns a Python list of all the table names</p>
+<p>If False (default), prints each table’s name and dimensions to the console.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.list_backends">
+<span class="sig-name descname"><span class="pre">list_backends</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.list_backends" title="Link to this definition"></a></dt>
+<dd><p>Prints a list of valid backends that can be used in the <cite>backend_name</cite> argument in <cite>backend()</cite></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.list_readers">
+<span class="sig-name descname"><span class="pre">list_readers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.list_readers" title="Link to this definition"></a></dt>
+<dd><p>Prints a list of valid readers that can be used in the <cite>reader_name</cite> argument in <cite>read()</cite></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.list_writers">
+<span class="sig-name descname"><span class="pre">list_writers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.list_writers" title="Link to this definition"></a></dt>
+<dd><p>Prints a list of valid writers that can be used in the <cite>writer_name</cite> argument in <cite>write()</cite></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.num_tables">
+<span class="sig-name descname"><span class="pre">num_tables</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.num_tables" title="Link to this definition"></a></dt>
+<dd><p>Prints the number of tables in the active backend.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.query">
+<span class="sig-name descname"><span class="pre">query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">statement</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.query" title="Link to this definition"></a></dt>
+<dd><p>Executes a SQL query on the active backend.</p>
+<dl>
+<dt><cite>statement</cite><span class="classifier">str</span></dt><dd><p>A SQL query to execute. Only <cite>SELECT</cite> and <cite>PRAGMA</cite> statements are allowed.</p>
+</dd>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False.</span></dt><dd><p>If True, returns the result as a pandas DataFrame.</p>
+<p>If False (default), prints the result.</p>
+</dd>
+<dt><cite>update</cite><span class="classifier">bool, optional, default False.</span></dt><dd><p>If True, includes a ‘dsi_table_name’ column required for <code class="docutils literal notranslate"><span class="pre">dsi.update()</span></code>.</p>
+<p>If False (default), return object does not include this column.</p>
+</dd>
+</dl>
+<p><cite>return</cite>: If the <cite>statement</cite> is incorrectly formatted, then nothing is returned or printed</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.read">
+<span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reader_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.read" title="Link to this definition"></a></dt>
+<dd><p>Loads data into DSI using the specified parameter <cite>reader_name</cite></p>
+<dl>
+<dt><cite>filenames</cite><span class="classifier">str or list of str or data object</span></dt><dd><p>Either file path(s) to the data file(s) or an in-memory data object.</p>
+<dl class="simple">
+<dt>The expected input type depends on the selected <cite>reader_name</cite>:</dt><dd><ul class="simple">
+<li><p>“Collection”           → Ordered Dictionary of table(s)</p></li>
+<li><p>“CSV”                  → .csv</p></li>
+<li><p>“Parquet”              → .pq</p></li>
+<li><p>“YAML1”                → .yaml or .yml</p></li>
+<li><p>“TOML1”                → .toml</p></li>
+<li><p>“JSON”                 → .json</p></li>
+<li><p>“Ensemble”             → .csv</p></li>
+<li><p>“Cloverleaf”           → /path/to/data/directory/</p></li>
+<li><p>“Bueno”                → .data</p></li>
+<li><p>“DublinCoreDatacard”   → .xml</p></li>
+<li><p>“SchemaOrgDatacard”    → .json</p></li>
+<li><p>“GoogleDatacard”       → .yaml or .yml</p></li>
+<li><p>“Oceans11Datacard”     → .yaml or .yml</p></li>
+<li><p>“GenesisDatacard”      → .csv</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>reader_name</cite><span class="classifier">str</span></dt><dd><p>Name of the DSI Reader to use for loading the data.</p>
+<p>If using a DSI-supported Reader, this should be one of the reader_names from <cite>list_readers()</cite>.</p>
+<p>If using a custom Reader, provide the relative file path to the Python script with the Reader.  
+For guidance on creating a DSI-compatible Reader, view <a class="reference internal" href="custom_reader.html#custom-reader"><span class="std std-ref">Custom DSI Reader</span></a>.</p>
+</dd>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>Name to assign to the loaded table.</p>
+<p>Required when using the <cite>Collection</cite> reader to load an Ordered Dictionary representing only one table.</p>
+<p>Recommended when the input file contains a single table for the <cite>CSV</cite>, <cite>Parquet</cite>, <cite>JSON</cite>, or <cite>Ensemble</cite> reader.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.schema">
+<span class="sig-name descname"><span class="pre">schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.schema" title="Link to this definition"></a></dt>
+<dd><p>Either loads a relational database schema into DSI with a specified <cite>filename</cite> OR returns this database’s structural schema.</p>
+<dl class="simple">
+<dt><cite>filename</cite><span class="classifier">str, optional</span></dt><dd><p>Path to a JSON file describing the relationships of the tables in a database.
+The schema should follow the format described in <a class="reference internal" href="examples.html#user-schema-example-label"><span class="std std-ref">Cloverleaf (Complex Schemas)</span></a></p>
+</dd>
+</dl>
+<p><cite>return</cite> : If filename = None, returns the structural schema of this database - table/col names and their units.
+<strong>If loading a relational schema, this function must be called before reading in any associated data files</strong></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.search">
+<span class="sig-name descname"><span class="pre">search</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.search" title="Link to this definition"></a></dt>
+<dd><p>Finds all rows across all tables in the active backend where <cite>query</cite> can be found.</p>
+<dl>
+<dt><cite>query</cite><span class="classifier">int, float, or str</span></dt><dd><p>The value to search for in all rows across all tables.</p>
+</dd>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False. </span></dt><dd><p>If True, returns a list of pandas DataFrames representing a subset of tables where <cite>query</cite> is found.</p>
+<p>If False (default), prints the matches to the console.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.summary" title="Link to this definition"></a></dt>
+<dd><p>Prints numerical metadata and (optionally) sample data from tables in the active backend.</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>If specified, only the numerical metadata for that table will be printed.</p>
+<p>If None (default), metadata for all available tables is printed.</p>
+</dd>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False. </span></dt><dd><p>If True, and table_name specified, returns a Pandas DataFrame of the summary of that table.</p>
+<p>If True, and table_name not specified, returns a list of Pandas DataFrames of the summary of all tables.</p>
+<p>If False (default), prints each table’s name and dimensions to the console.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.update" title="Link to this definition"></a></dt>
+<dd><p>Updates data in one or more tables in the active backend using the provided input. 
+Intended to be used after modifying the output of <cite>find()</cite>, <cite>search()</cite>, <cite>query()</cite>, or <cite>get_table()</cite></p>
+<dl>
+<dt><cite>collection</cite><span class="classifier">pandas.DataFrame</span></dt><dd><p>The data used to update a table. 
+DataFrame must include unchanged <strong>`dsi_`</strong> columns from <cite>find()</cite>, <cite>search()</cite>, <cite>query()</cite> or <cite>get_table()</cite> to successfully update.</p>
+<ul class="simple">
+<li><p>If a <cite>query()</cite> DataFrame is the input, the corresponding table in the backend will be completely overwritten.</p></li>
+</ul>
+</dd>
+<dt><cite>backup</cite><span class="classifier">bool, optional, default False. </span></dt><dd><p>If True, creates a backup file for the DSI backend before updating its data.</p>
+<p>If False (default), only updates the data.</p>
+</dd>
+</dl>
+<ul class="simple">
+<li><p>NOTE: Columns from the original table cannot be deleted during update. Only row edits or column additions are allowed.</p></li>
+<li><p>NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.dsi.DSI.write">
+<span class="sig-name descname"><span class="pre">write</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.dsi.DSI.write" title="Link to this definition"></a></dt>
+<dd><p>Exports data from the active backend using the specified <cite>writer_name</cite>.</p>
+<dl>
+<dt><cite>filename</cite><span class="classifier">str</span></dt><dd><p>Name of the output file to write.</p>
+<dl class="simple">
+<dt>Expected file extensions based on <cite>writer_name</cite>:</dt><dd><ul class="simple">
+<li><p>“ER_Diagram”   → .png, .pdf, .jpg, .jpeg</p></li>
+<li><p>“Table_Plot”   → .png, .jpg, .jpeg</p></li>
+<li><p>“Csv”          → .csv</p></li>
+<li><p>“Parquet”      → .pq</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>writer_name</cite><span class="classifier">str        </span></dt><dd><p>Name of the DSI Writer to export data.</p>
+<p>If using a DSI-supported Writer, this should be one of the writer_names from <cite>list_writers()</cite>.</p>
+<p>If using a custom Writer, provide the relative file path to the Python script with the Writer.  
+For guidance on creating a DSI-compatible Writer, view <a class="reference internal" href="custom_writer.html#custom-writer"><span class="std std-ref">Custom DSI Writer</span></a>.</p>
+</dd>
+<dt><cite>table_name</cite>: str, optional</dt><dd><p>Required when using “Table_Plot”, “Csv” or “Parquet” to specify which table to export.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="dsi-data-cards">
+<span id="datacard-section-label"></span><h2>DSI Data Cards<a class="headerlink" href="#dsi-data-cards" title="Link to this heading"></a></h2>
+<p>DSI is expanding its support of several dataset metadata standards. Currently supported standards include:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="https://www.dublincore.org/resources/metadata-basics/">Dublin Core</a></p></li>
+<li><p><a class="reference external" href="https://schema.org/Dataset">Schema.org’s Dataset object</a></p></li>
+<li><p><a class="reference external" href="https://sites.research.google/datacardsplaybook/">Google Data Cards Playbook</a></p></li>
+<li><p><a class="reference external" href="https://oceans11.lanl.gov/">Oceans11 DSI Data Server</a></p></li>
+</ul>
+</div></blockquote>
+<p>Template file structures can be found and copied in <code class="docutils literal notranslate"><span class="pre">examples/test/</span></code>.</p>
+<p>To be compatible with DSI, a user’s data card must contain all the fields in its corresponding template.
+However, if certain metadata is not available for a dataset, the values of those fields may be left empty.</p>
+<p>The supported datacards can be read into DSI by creating an instance of DSI() and calling:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">read(&quot;file/path/to/datacard.XML&quot;,</span> <span class="pre">'DublinCoreDatacard')</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">read(&quot;file/path/to/datacardh.JSON&quot;,</span> <span class="pre">'SchemaOrgDatacard')</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">read(&quot;file/path/to/datacard.YAML&quot;,</span> <span class="pre">'GoogleDatacard')</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">read(&quot;file/path/to/datacard.YAML&quot;,</span> <span class="pre">'Oceans11Datacard')</span></code></p></li>
+</ul>
+</div></blockquote>
+<p>Examples of each data card standard for the Wildfire dataset can be found in <code class="docutils literal notranslate"><span class="pre">examples/wildfire/</span></code></p>
+</section>
+<section id="user-examples">
+<span id="user-example-section-label"></span><h2>User Examples<a class="headerlink" href="#user-examples" title="Link to this heading"></a></h2>
+<p>Examples below display various ways users can incorporate DSI into their data science workflows.
+They must be executed from their directory in <code class="docutils literal notranslate"><span class="pre">examples/user/</span></code></p>
+<p>To run them successfully, please unzip <code class="docutils literal notranslate"><span class="pre">clover3d.zip</span></code> located in <code class="docutils literal notranslate"><span class="pre">examples/clover3d/</span></code>, and execute <code class="docutils literal notranslate"><span class="pre">requirements.extras.txt</span></code>.</p>
+<section id="example-1-intro-use-case">
+<h3>Example 1: Intro use case<a class="headerlink" href="#example-1-intro-use-case" title="Link to this heading"></a></h3>
+<p>Baseline use of DSI to list all valid Readers, Writers, and Backends, and descriptions of each.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/1.baseline.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">baseline_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">()</span>
+
+<span class="c1"># Lists available backends, readers, and writers in this dsi installation</span>
+<span class="n">baseline_dsi</span><span class="o">.</span><span class="n">list_backends</span><span class="p">()</span>
+<span class="n">baseline_dsi</span><span class="o">.</span><span class="n">list_readers</span><span class="p">()</span>
+<span class="n">baseline_dsi</span><span class="o">.</span><span class="n">list_writers</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-2-read-data">
+<h3>Example 2: Read data<a class="headerlink" href="#example-2-read-data" title="Link to this heading"></a></h3>
+<p>Reading Cloverleaf data into a DSI backend, and displaying some of that data</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/2a.read.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">read_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="c1"># Target a backend, defaults to SQLite if not defined</span>
+
+<span class="c1">#dsi.read(path, reader)</span>
+<span class="n">read_dsi</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">)</span> <span class="c1"># Read data into memory</span>
+
+<span class="c1">#dsi.display(table_name)</span>
+<span class="n">read_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span> <span class="c1"># Print the specific table&#39;s data from the Cloverleaf data</span>
+
+<span class="n">read_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c1"># cleans DSI memory of all DSI modules - readers/writers/backends</span>
+</pre></div>
+</div>
+<p>Example workflow of reading CSV data into a DSI backend and specifiying the table name (default is CSV)</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/2b.read_csv.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">csv_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;wildfire_data.db&quot;</span><span class="p">)</span> <span class="c1"># Target a backend, defaults to SQLite if not defined</span>
+
+<span class="c1">#dsi.read(path/to/csv, &quot;CSV&quot;, &quot;optional table name&quot;)</span>
+<span class="n">csv_dsi</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;../test/wildfiredata.csv&quot;</span><span class="p">,</span> <span class="s2">&quot;CSV&quot;</span><span class="p">,</span> <span class="s2">&quot;wfdata&quot;</span><span class="p">)</span>
+
+<span class="n">csv_dsi</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+
+<span class="c1">#dsi.display(table_name)</span>
+<span class="n">csv_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;wfdata&quot;</span><span class="p">)</span> <span class="c1"># Print the wfdata table&#39;s data</span>
+
+<span class="n">csv_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-3-visualize-data">
+<h3>Example 3: Visualize data<a class="headerlink" href="#example-3-visualize-data" title="Link to this heading"></a></h3>
+<p>Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/3.visualize.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">visual_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="c1"># Assuming data.db has data from 2a.read.py:</span>
+
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">num_tables</span><span class="p">()</span>
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+
+<span class="c1">#dsi.display(table_name, num_rows, display_cols)</span>
+<span class="c1"># prints all data from &#39;input&#39;</span>
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+
+<span class="c1"># optional input to specify number of rows from &#39;input&#39; to print</span>
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># optional input to specify which columns to print</span>
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;sim_id&quot;</span><span class="p">,</span> <span class="s2">&quot;state1_density&quot;</span><span class="p">,</span> <span class="s2">&quot;state2_density&quot;</span><span class="p">,</span> <span class="s2">&quot;initial_timestep&quot;</span><span class="p">,</span> <span class="s2">&quot;end_step&quot;</span><span class="p">])</span>
+
+
+<span class="c1">#dsi.summary(table_name, num_rows)</span>
+<span class="c1"># prints numerical stats for every table in a backend</span>
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+
+<span class="c1"># prints numerical stats for only &#39;input&#39;</span>
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+
+<span class="n">visual_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-4-find-data">
+<h3>Example 4: Find data<a class="headerlink" href="#example-4-find-data" title="Link to this heading"></a></h3>
+<p>Finding data from an active DSI backend that matches an input object.</p>
+<p>If using <code class="docutils literal notranslate"><span class="pre">search()</span></code>, the input can be a string or number.
+If using <code class="docutils literal notranslate"><span class="pre">find()</span></code>, the input must be a string in the form of a condition - [column] [operator] [value].</p>
+<p>By default, all matches are printed. If <code class="docutils literal notranslate"><span class="pre">True</span></code> is passed as an additional argument, the matching rows are returned as a DataFrame instead.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/4.find.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">find_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="c1"># Assuming data.db has data from 2a.read.py:</span>
+
+<span class="c1">#dsi.search(value)</span>
+<span class="n">find_dsi</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s2">&quot;Jun 2025&quot;</span><span class="p">)</span> <span class="c1"># searches for the value &#39;Jun 2025&#39; in all tables</span>
+
+<span class="n">find_df</span> <span class="o">=</span> <span class="n">find_dsi</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s2">&quot;Jun 2025&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="c1"># Returns the first matching table as a DataFrame</span>
+
+
+<span class="c1">#dsi.find(condition, True)</span>
+<span class="n">find_dsi</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;state2_density &gt; 5.0&quot;</span><span class="p">)</span> <span class="c1"># Finds all rows of one table that match the condition</span>
+
+<span class="n">find_df</span> <span class="o">=</span> <span class="n">find_dsi</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;state2_density &gt; 5.0&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="c1"># Returns matching rows as a DataFrame</span>
+
+<span class="n">find_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-5-update-data">
+<h3>Example 5: Update data<a class="headerlink" href="#example-5-update-data" title="Link to this heading"></a></h3>
+<p>Updating data from the edited output of <code class="docutils literal notranslate"><span class="pre">find()</span></code>. Users must NOT modify metadata columns starting with <strong>`dsi_`</strong> even when adding new rows.</p>
+<p>The input can be the output of either <code class="docutils literal notranslate"><span class="pre">find()</span></code>, <code class="docutils literal notranslate"><span class="pre">query()</span></code>, or <code class="docutils literal notranslate"><span class="pre">get_table()</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/5.update.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">update_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="c1"># Assuming data.db has data from 2a.read.py:</span>
+
+<span class="c1">#dsi.find(condition, collection)</span>
+<span class="n">find_df</span> <span class="o">=</span> <span class="n">update_dsi</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;state2_density &gt; 5.0&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="c1"># Returns matching rows as a DataFrame</span>
+
+<span class="n">update_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="n">find_df</span><span class="p">[</span><span class="s2">&quot;dsi_table_name&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="mi">5</span><span class="p">)</span> <span class="c1"># display table before update</span>
+
+<span class="n">find_df</span><span class="p">[</span><span class="s2">&quot;new_col&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">50</span>   <span class="c1"># add new column to this DataFrame</span>
+<span class="n">find_df</span><span class="p">[</span><span class="s2">&quot;max_timestep&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span> <span class="c1"># update existing column</span>
+
+<span class="c1">#dsi.update(collection, backup)</span>
+<span class="n">update_dsi</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">find_df</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="c1"># update the table in the backend</span>
+
+<span class="n">update_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="n">find_df</span><span class="p">[</span><span class="s2">&quot;dsi_table_name&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="mi">5</span><span class="p">)</span> <span class="c1"># display table after update</span>
+
+<span class="n">update_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-6-query-data">
+<h3>Example 6: Query data<a class="headerlink" href="#example-6-query-data" title="Link to this heading"></a></h3>
+<p>Querying data from an active DSI backend.
+Users can either use <code class="docutils literal notranslate"><span class="pre">query()</span></code> to view specific data with a SQL statement, or <code class="docutils literal notranslate"><span class="pre">get_table()</span></code> to view all data from a specified table.</p>
+<p>By default, all matches are printed. If <code class="docutils literal notranslate"><span class="pre">True</span></code> is passed as an additional argument, the matching rows are returned as a DataFrame instead.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/6.query.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">query_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;data.db&quot;</span><span class="p">)</span> <span class="c1"># Assuming data.db has data from 2a.read.py:</span>
+
+<span class="c1">#dsi.query(sql_statement)</span>
+<span class="n">query_dsi</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;SELECT * FROM input&quot;</span><span class="p">)</span>
+
+<span class="c1">#dsi.get_table(table_name)</span>
+<span class="n">query_dsi</span><span class="o">.</span><span class="n">get_table</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span> <span class="c1"># alternative to query() if want all data</span>
+
+<span class="n">query_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-7-complex-schema-with-data">
+<h3>Example 7: Complex schema with data<a class="headerlink" href="#example-7-complex-schema-with-data" title="Link to this heading"></a></h3>
+<p>Loading a complex JSON file with <code class="docutils literal notranslate"><span class="pre">schema()</span></code>, the associated Cloverleaf data with <code class="docutils literal notranslate"><span class="pre">read()</span></code>, and an ER Diagram to display the data relations.</p>
+<p>Read <a class="reference internal" href="examples.html#user-schema-example-label"><span class="std std-ref">Cloverleaf (Complex Schemas)</span></a> to learn how to structure a DSI-compatible input file for <code class="docutils literal notranslate"><span class="pre">schema()</span></code></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/7.schema.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">schema_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;schema_data.db&quot;</span><span class="p">)</span>
+
+<span class="c1"># dsi.schema(filename)</span>
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="s2">&quot;../clover3d/schema.json&quot;</span><span class="p">)</span> <span class="c1"># must execute before reading Cloverleaf data</span>
+
+<span class="c1">#dsi.read(path, reader)</span>
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">)</span>
+
+<span class="c1"># ER_Diagram writer requires GraphViz to be installed</span>
+<span class="c1"># pip install graphviz</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="c1">#dsi.write(filename, writer)</span>
+    <span class="n">schema_dsi</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;clover_er_diagram.png&quot;</span><span class="p">,</span> <span class="s2">&quot;ER_Diagram&quot;</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2"> occurred. Do you have graphviz installed?&quot;</span><span class="p">)</span>
+    <span class="k">pass</span>
+
+<span class="c1">#dsi.display(table_name, num_rows, display_cols)</span>
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;simulation&quot;</span><span class="p">)</span>
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;sim_id&quot;</span><span class="p">,</span> <span class="s2">&quot;state1_density&quot;</span><span class="p">,</span> <span class="s2">&quot;state2_density&quot;</span><span class="p">,</span> <span class="s2">&quot;initial_timestep&quot;</span><span class="p">,</span> <span class="s2">&quot;end_step&quot;</span><span class="p">])</span>
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;sim_id&quot;</span><span class="p">,</span> <span class="s2">&quot;step&quot;</span><span class="p">,</span> <span class="s2">&quot;wall_clock&quot;</span><span class="p">,</span> <span class="s2">&quot;average_time_per_cell&quot;</span><span class="p">])</span>
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;viz_files&quot;</span><span class="p">)</span>
+
+<span class="n">schema_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-8-write-data">
+<h3>Example 8: Write data<a class="headerlink" href="#example-8-write-data" title="Link to this heading"></a></h3>
+<p>Writing data from a DSI backend as an Entity Relationship diagram, table plot, and CSV.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/8.write.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">write_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;schema_data.db&quot;</span><span class="p">)</span> <span class="c1"># Assuming schema_data.db has data from 7.schema.py:</span>
+
+<span class="c1">#dsi.write(filename, writer, table)</span>
+<span class="n">write_dsi</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;er_diagram.png&quot;</span><span class="p">,</span> <span class="s2">&quot;ER_Diagram&quot;</span><span class="p">)</span>
+
+<span class="n">write_dsi</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;input_table_plot.png&quot;</span><span class="p">,</span> <span class="s2">&quot;Table_Plot&quot;</span><span class="p">,</span> <span class="s2">&quot;input&quot;</span><span class="p">)</span>
+
+<span class="n">write_dsi</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;input.csv&quot;</span><span class="p">,</span> <span class="s2">&quot;Csv_Writer&quot;</span><span class="p">,</span> <span class="s2">&quot;input&quot;</span><span class="p">)</span>
+
+<span class="n">write_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-9-load-an-external-reader">
+<span id="user-external-reader"></span><h3>Example 9: Load an external Reader<a class="headerlink" href="#example-9-load-an-external-reader" title="Link to this heading"></a></h3>
+<p>Loading an external DSI-compatible Reader and its associated data into DSI to interact with and/or visualize the data.
+For more information on creating an external Reader/Writer, view <a class="reference internal" href="custom_reader.html#custom-reader"><span class="std std-ref">Custom DSI Reader</span></a> and <a class="reference internal" href="custom_writer.html#custom-writer"><span class="std std-ref">Custom DSI Writer</span></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/user/9.external_reader.py</span>
+<span class="kn">from</span> <span class="nn">dsi.dsi</span> <span class="kn">import</span> <span class="n">DSI</span>
+
+<span class="n">external_dsi</span> <span class="o">=</span> <span class="n">DSI</span><span class="p">(</span><span class="s2">&quot;external_data.db&quot;</span><span class="p">)</span>
+
+<span class="c1">#dsi.read(filename, path/to/custom/dsi/reader.py)</span>
+<span class="n">external_dsi</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;../test/test.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;../test/text_file_reader.py&quot;</span><span class="p">)</span>
+
+<span class="c1">#dsi.display(table_name)</span>
+<span class="n">external_dsi</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;people&quot;</span><span class="p">)</span>
+
+<span class="n">external_dsi</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">text_file_reader</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">pandas</span> <span class="kn">import</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">read_csv</span><span class="p">,</span> <span class="n">concat</span>
+
+<span class="kn">from</span> <span class="nn">dsi.plugins.file_reader</span> <span class="kn">import</span> <span class="n">FileReader</span>
+
+<span class="k">class</span> <span class="nc">TextFile</span><span class="p">(</span><span class="n">FileReader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    External Plugin to read in an individual or a set of text files.</span>
+<span class="sd">    Assuming all text files have data for same table</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filenames</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        `filenames`: one text file or a list of text files to be ingested</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">filenames</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">filenames</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">text_files</span> <span class="o">=</span> <span class="p">[</span><span class="n">filenames</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">text_files</span> <span class="o">=</span> <span class="n">filenames</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">text_file_data</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">add_rows</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parses text file data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">total_df</span> <span class="o">=</span> <span class="n">DataFrame</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">text_files</span><span class="p">:</span>
+            <span class="n">temp_df</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+            <span class="n">total_df</span> <span class="o">=</span> <span class="n">concat</span><span class="p">([</span><span class="n">total_df</span><span class="p">,</span> <span class="n">temp_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">text_file_data</span><span class="p">[</span><span class="s2">&quot;people&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">total_df</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s1">&#39;list&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_schema_2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">text_file_data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Quick Start: Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cli.html" class="btn btn-neutral float-right" title="Command Line Interface API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

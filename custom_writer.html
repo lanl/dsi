@@ -1,0 +1,184 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom DSI Writer &mdash; DSI 1.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=00f267c6"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Backends" href="backends.html" />
+    <link rel="prev" title="Custom DSI Reader" href="custom_reader.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cr_intro.html">Contributor Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">DSI Readers/Writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_reader.html">Custom DSI Reader</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Custom DSI Writer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#loading-custom-writer-into-dsi">Loading Custom Writer into DSI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#initializer-init-self-none">Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-rows-get-rows-self-collection-none">Get Rows: <code class="docutils literal notranslate"><span class="pre">get_rows(self,</span> <span class="pre">collection)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#contributing-your-writer">Contributing Your Writer</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="development.html">DSI Development Plans</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cr_examples.html">DSI Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">Custom DSI Writer</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/custom_writer.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="custom-dsi-writer">
+<span id="custom-writer"></span><h1>Custom DSI Writer<a class="headerlink" href="#custom-dsi-writer" title="Link to this heading"></a></h1>
+<p>DSI Writers are the primary way to translate data from DSI to an external format.
+All Writers must be structured as a Class with 2 mandatory methods: <code class="docutils literal notranslate"><span class="pre">__init__</span></code>, and <code class="docutils literal notranslate"><span class="pre">get_rows</span></code>.</p>
+<section id="loading-custom-writer-into-dsi">
+<h2>Loading Custom Writer into DSI<a class="headerlink" href="#loading-custom-writer-into-dsi" title="Link to this heading"></a></h2>
+<p>Before understanding the structure of Writers, it is important to know how they can be loaded via the User API and the Contributor API:</p>
+<ul>
+<li><p><strong>User API</strong>: Users loading a custom external Writer can use the <code class="docutils literal notranslate"><span class="pre">write()</span></code> method from the DSI class.
+Unlike a normal <code class="docutils literal notranslate"><span class="pre">write()</span></code>, the second argument should be the path to the Python script containing the user’s custom Writer.</p>
+<p>While there currently isn’t an example of loading an external Writer, <a class="reference internal" href="python_api.html#user-external-reader"><span class="std std-ref">Example 9: Load an external Reader</span></a> has a similar process to load an external Reader.</p>
+</li>
+<li><p><strong>Contributor API</strong>: Users loading a custom external Writer must first call <code class="docutils literal notranslate"><span class="pre">Terminal.add_external_python_module()</span></code> to temporarily register the Writer
+with DSI before loading the Writer and its data normally. For detailed instructions, follow <a class="reference internal" href="core.html#external-readers-writers-label"><span class="std std-ref">Example 9: External Readers/Writers</span></a>.</p>
+<p>Users intending to add the custom Writer to DSI’s codebase must include the file in the <a class="reference external" href="https://github.com/lanl/dsi/tree/main/dsi/plugins">dsi/plugins</a>
+directory and include the Writer name in the <code class="docutils literal notranslate"><span class="pre">Terminal.VALID_WRITERS</span></code> class variable of <a class="reference external" href="https://github.com/lanl/dsi/blob/main/dsi/core.py">dsi/core.py</a>.
+If done correctly, the Writer will be accessible by <code class="docutils literal notranslate"><span class="pre">Terminal.load_module()</span></code>.</p>
+</li>
+</ul>
+</section>
+<section id="initializer-init-self-none">
+<h2>Initializer: <code class="docutils literal notranslate"><span class="pre">__init__(self)</span> <span class="pre">-&gt;</span> <span class="pre">None:</span></code><a class="headerlink" href="#initializer-init-self-none" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">__init__</span></code> is where you can include all of your initialization logic, and specify the parameters needed for a given application.</p>
+<p>Example <code class="docutils literal notranslate"><span class="pre">__init__</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">table_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+  <span class="c1"># see &quot;plugins&quot; to determine which superclass your Writer should extend</span>
+  <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+  <span class="bp">self</span><span class="o">.</span><span class="n">output_filename</span> <span class="o">=</span> <span class="n">filename</span>
+
+  <span class="c1"># a Writer might be table-specific and require a table_name input. Ex: Plotting a table&#39;s data.</span>
+  <span class="bp">self</span><span class="o">.</span><span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span>
+</pre></div>
+</div>
+</section>
+<section id="get-rows-get-rows-self-collection-none">
+<h2>Get Rows: <code class="docutils literal notranslate"><span class="pre">get_rows(self,</span> <span class="pre">collection)</span> <span class="pre">-&gt;</span> <span class="pre">None</span></code><a class="headerlink" href="#get-rows-get-rows-self-collection-none" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">get_rows</span></code> is responsible for converting data from DSI’s internal abstraction, an OrderedDict, to whichever format this Writer’s goal is.</p>
+<p>It is important to note that <code class="docutils literal notranslate"><span class="pre">collection</span></code> will be a nested OrderedDict with at least one table of data.
+Essentially, each entry in the larger OrderedDict has a table’s name as a key and its data as a value.
+That table’s data will be an inner OrderedDict.</p>
+<p>Unlike DSI Readers, there is no standard structure for <code class="docutils literal notranslate"><span class="pre">get_rows</span></code> as each Writer can have a vastly different output.
+If a Writer requires units of data, or primary key/foreign key relations, they are stored in tables named ‘dsi_units’ and ‘dsi_relations’ respectively.</p>
+<p>Various examples of <code class="docutils literal notranslate"><span class="pre">get_rows</span></code> can be found in <a class="reference external" href="https://github.com/lanl/dsi/blob/main/dsi/plugins/file_writer.py">dsi/plugins/file_writer.py</a>.</p>
+</section>
+<section id="contributing-your-writer">
+<h2>Contributing Your Writer<a class="headerlink" href="#contributing-your-writer" title="Link to this heading"></a></h2>
+<p>If your Writer is helpful and acceptable for public use, you should consider making a pull request (PR) into DSI.</p>
+<dl class="simple">
+<dt>Please note that any accepted PRs into DSI should satisfy the following:</dt><dd><ul class="simple">
+<li><p>Passes all tests in <code class="docutils literal notranslate"><span class="pre">dsi/plugins/tests</span></code></p></li>
+<li><p>Has no <code class="docutils literal notranslate"><span class="pre">pylama</span></code> errors/warnings (see <a class="reference external" href="https://github.com/lanl/dsi/tree/main/.githooks">dsi/.githooks</a>)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="custom_reader.html" class="btn btn-neutral float-left" title="Custom DSI Reader" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="backends.html" class="btn btn-neutral float-right" title="Backends" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

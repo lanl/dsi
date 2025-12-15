@@ -1,0 +1,1244 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DSI Readers/Writers &mdash; DSI 1.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=00f267c6"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Custom DSI Reader" href="custom_reader.html" />
+    <link rel="prev" title="Contributor Introduction" href="cr_intro.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cr_intro.html">Contributor Introduction</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">DSI Readers/Writers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.plugins.plugin.Plugin"><code class="docutils literal notranslate"><span class="pre">Plugin</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin.Plugin.__init__"><code class="docutils literal notranslate"><span class="pre">Plugin.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin.Plugin.add_to_output"><code class="docutils literal notranslate"><span class="pre">Plugin.add_to_output()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#metadata-processing">Metadata Processing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.metadata.StructuredMetadata"><code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#file-readers">File Readers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Bueno"><code class="docutils literal notranslate"><span class="pre">Bueno</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Cloverleaf"><code class="docutils literal notranslate"><span class="pre">Cloverleaf</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Csv"><code class="docutils literal notranslate"><span class="pre">Csv</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.DublinCoreDatacard"><code class="docutils literal notranslate"><span class="pre">DublinCoreDatacard</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Ensemble"><code class="docutils literal notranslate"><span class="pre">Ensemble</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.GenesisDatacard"><code class="docutils literal notranslate"><span class="pre">GenesisDatacard</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.GoogleDatacard"><code class="docutils literal notranslate"><span class="pre">GoogleDatacard</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.JSON"><code class="docutils literal notranslate"><span class="pre">JSON</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.MetadataReader1"><code class="docutils literal notranslate"><span class="pre">MetadataReader1</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Oceans11Datacard"><code class="docutils literal notranslate"><span class="pre">Oceans11Datacard</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Parquet"><code class="docutils literal notranslate"><span class="pre">Parquet</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.Schema"><code class="docutils literal notranslate"><span class="pre">Schema</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.SchemaOrgDatacard"><code class="docutils literal notranslate"><span class="pre">SchemaOrgDatacard</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.TOML1"><code class="docutils literal notranslate"><span class="pre">TOML1</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_reader.YAML1"><code class="docutils literal notranslate"><span class="pre">YAML1</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#file-writers">File Writers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_writer.Csv_Writer"><code class="docutils literal notranslate"><span class="pre">Csv_Writer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_writer.ER_Diagram"><code class="docutils literal notranslate"><span class="pre">ER_Diagram</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_writer.Parquet_Writer"><code class="docutils literal notranslate"><span class="pre">Parquet_Writer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.file_writer.Table_Plot"><code class="docutils literal notranslate"><span class="pre">Table_Plot</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#collection-readers">Collection Readers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.collection_reader.Dict"><code class="docutils literal notranslate"><span class="pre">Dict</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-dsi.plugins.env">Environment Plugins</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.env.Environment"><code class="docutils literal notranslate"><span class="pre">Environment</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.env.GitInfo"><code class="docutils literal notranslate"><span class="pre">GitInfo</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.env.Hostname"><code class="docutils literal notranslate"><span class="pre">Hostname</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.env.SystemKernel"><code class="docutils literal notranslate"><span class="pre">SystemKernel</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#optional-plugin-type-enforcement">Optional Plugin Type Enforcement</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin_models.EnvironmentModel"><code class="docutils literal notranslate"><span class="pre">EnvironmentModel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin_models.GitInfoModel"><code class="docutils literal notranslate"><span class="pre">GitInfoModel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin_models.HostnameModel"><code class="docutils literal notranslate"><span class="pre">HostnameModel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin_models.SystemKernelModel"><code class="docutils literal notranslate"><span class="pre">SystemKernelModel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.plugins.plugin_models.create_dynamic_model"><code class="docutils literal notranslate"><span class="pre">create_dynamic_model()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="custom_reader.html">Custom DSI Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_writer.html">Custom DSI Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="development.html">DSI Development Plans</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cr_examples.html">DSI Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">DSI Readers/Writers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/plugins.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dsi-readers-writers">
+<h1>DSI Readers/Writers<a class="headerlink" href="#dsi-readers-writers" title="Link to this heading"></a></h1>
+<p>Readers/Writers connect data-producing applications to DSI core functionalities.
+A Reader function deals with existing data files or input streams.
+A Writer function deals with generating new data formats.</p>
+<p>Readers/Writers are modular to support user contribution and contributors are encouraged to offer custom Readers/Writers abstract classes and implementations.
+A contributed Reader/Writer abstract class may either extend another Reader/Writer to inherit the properties of the parent, or be a completely new structure.</p>
+<p>In order to be compatible with DSI, Readers should store data in data structures sourced from the Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> library (OrderedDict).
+Similarly, Writers should be compatible by accepting data structures from Python <code class="docutils literal notranslate"><span class="pre">collections</span></code> (OrderedDict) to export data/generate an image.</p>
+<p>Any contributed Readers/Writers, or extension of one, should include unit tests in  <code class="docutils literal notranslate"><span class="pre">plugins/tests</span></code> to demonstrate the new capability.</p>
+<figure class="align-default" id="id1">
+<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current Readers/Writers class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 989.0999999999999px; height: 242.89999999999998px;" /></a>
+<figcaption>
+<p><span class="caption-text">Figure depicts prominent portion of the current DSI Readers/Writers class hierarchy.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<dl class="py class" id="module-dsi.plugins.plugin">
+<dt class="sig sig-object py" id="dsi.plugins.plugin.Plugin">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin.</span></span><span class="sig-name descname"><span class="pre">Plugin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin.Plugin" title="Link to this definition"></a></dt>
+<dd><p>Plugin abstract class for DSI core product.</p>
+<p>A Plugin connects a data reader or writer to a compatible middleware
+data structure.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.plugin.Plugin.__init__">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin.Plugin.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize Plugin setup.</p>
+<p>Read a Plugin file. Return a Plugin object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.plugin.Plugin.add_to_output">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin.Plugin.add_to_output" title="Link to this definition"></a></dt>
+<dd><p>Initialize Plugin setup.</p>
+<p>Read a Plugin file. Return a Plugin object.</p>
+</dd></dl>
+
+</dd></dl>
+
+<section id="metadata-processing">
+<h2>Metadata Processing<a class="headerlink" href="#metadata-processing" title="Link to this heading"></a></h2>
+<p><strong>Note for users:</strong> <code class="docutils literal notranslate"><span class="pre">StructuredMetadata</span></code> class is used to assign data from a <cite>file_reader</cite> to the DSI abstraction in core.
+If data in a user-written reader is structured as an OrderedDict, only need to call <code class="docutils literal notranslate"><span class="pre">set_schema_2()</span></code> at the end of the reader’s <code class="docutils literal notranslate"><span class="pre">add_rows()</span></code></p>
+<dl class="py class" id="module-dsi.plugins.metadata">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.metadata.</span></span><span class="sig-name descname"><span class="pre">StructuredMetadata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata" title="Link to this definition"></a></dt>
+<dd><p>plugin superclass that provides handy methods for structured data</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes StructuredMetadata class with an output collector (Ordered Dictionary)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.add_to_output">
+<span class="sig-name descname"><span class="pre">add_to_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tableName</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.add_to_output" title="Link to this definition"></a></dt>
+<dd><p><strong>Old function to be deprecated soon. Do not use.</strong></p>
+<p>Adds a row of data to the output_collector with enforced structure.</p>
+<p>This method is typically used within a plugin’s <cite>add_rows()</cite> method to incrementally
+build table output in a consistent format.</p>
+<dl class="simple">
+<dt><cite>row</cite><span class="classifier">list</span></dt><dd><p>A single row of data to be added. Must match the expected structure for the target table.</p>
+</dd>
+<dt><cite>tableName</cite><span class="classifier">str, optional</span></dt><dd><p>Name of the table to which the row should be added. 
+If None, the function identifies which plugin called it and assigns tableName for that data</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.schema_is_set">
+<span class="sig-name descname"><span class="pre">schema_is_set</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.schema_is_set" title="Link to this definition"></a></dt>
+<dd><p><strong>Old function to be deprecated soon. Do not use.</strong></p>
+<p>Helper method to see if the schema has been set</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.set_schema">
+<span class="sig-name descname"><span class="pre">set_schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validation_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.set_schema" title="Link to this definition"></a></dt>
+<dd><p><strong>Old function to be deprecated soon. Do not use.</strong></p>
+<p>Initializes column structure in the output_collector and table_cnt.</p>
+<p>This method is typically used within a plugin <cite>pack_header()</cite> method to define
+the expected schema before rows are added.</p>
+<dl class="simple">
+<dt><cite>table_data</cite><span class="classifier">list</span></dt><dd><p>Defines the table structure to be used.</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>For multple-table data:</dt><dd><p>A list of tuples, each structured as (table_name, list_of_column_names)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>For single-table data:</dt><dd><p>A simple list of column names.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.metadata.StructuredMetadata.set_schema_2">
+<span class="sig-name descname"><span class="pre">set_schema_2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validation_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.metadata.StructuredMetadata.set_schema_2" title="Link to this definition"></a></dt>
+<dd><p><strong>Use this if data in a Reader’s ``add_rows()`` is structured as an OrderedDict()</strong></p>
+<p>Faster update of the DSI abstraction when input data is structured as an OrderedDict.</p>
+<p>This method is optimized for plugins where <cite>add_rows()</cite> passes data as an OrderedDict, and avoids
+the incremental row ingest via <cite>set_schema()</cite> and <code class="docutils literal notranslate"><span class="pre">add_to_output()</span></code>.</p>
+<dl class="simple">
+<dt><cite>collection</cite><span class="classifier">OrderedDict</span></dt><dd><p>The plugin’s data structure (with data) passed from a plugin.</p>
+<ul class="simple">
+<li><p>If collection only contains one table, the data will be wrapped in another OrderedDict,
+where the plugin’s class name is the table name key.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="file-readers">
+<h2>File Readers<a class="headerlink" href="#file-readers" title="Link to this heading"></a></h2>
+<dl>
+<dt>Note for users:</dt><dd><ul>
+<li><p>DSI assumes data structure from all data sources are consistent/stable. Ex: table/column names MUST be consistent.
+Number of columns in a table CAN vary.</p></li>
+<li><p>DSI Readers can handle data files with mismatched number of columns. Ex: file1: table1 has columns a, b, c. file2: table1 has columns a, b, d</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>if only reading in one table at a time, users can utilize python pandas to stack mulutiple dataframes vertically (ex: CSV reader)</p></li>
+<li><p>if multiple tables in a file, users must pad tables with null values (ex: YAML1, which has example code at bottom of <code class="docutils literal notranslate"><span class="pre">add_rows()</span></code> to implement this)</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</dd>
+</dl>
+<dl class="py class" id="module-dsi.plugins.file_reader">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Bueno">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Bueno</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Bueno" title="Link to this definition"></a></dt>
+<dd><p>A DSI Reader that captures performance data from Bueno (github.com/lanl/bueno)</p>
+<p>Bueno outputs performance data in keyvalue pairs in a file. Keys and values are delimited by <code class="docutils literal notranslate"><span class="pre">:</span></code>. Keyval pairs are delimited by <code class="docutils literal notranslate"><span class="pre">\n</span></code>.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Bueno.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Bueno.__init__" title="Link to this definition"></a></dt>
+<dd><p><cite>filenames</cite>: one Bueno file or a list of Bueno files to be ingested</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Bueno.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Bueno.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses Bueno data and adds a list containing 1 or more rows.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Cloverleaf">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Cloverleaf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder_path</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Cloverleaf" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that stores input and output Cloverleaf data from a directory for each simulation run</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Cloverleaf.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder_path</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Cloverleaf.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>folder_path</cite><span class="classifier">str</span></dt><dd><p>Filepath to the directory where the Cloverleaf data is stored. 
+The directory should have a subfolder for each simulation run, each containing input and output data</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Cloverleaf.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Cloverleaf.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Flattens data from each simulation’s input file as a row in the <cite>input</cite> table.
+Flattens data from each simulation’s output file as a row in the <cite>output</cite> table.
+Creates a simulation table which is stores each simulation’s number and execution datetime.</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Csv">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Csv" title="Link to this definition"></a></dt>
+<dd><p>A DSI Reader that reads in CSV data</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Csv.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Csv.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the CSV Reader with user specified filenames and optional table_name.</p>
+<dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>Required. One or more CSV file paths to be loaded into DSI.
+If multiple files are provided, all data must correspond to the same table.</p>
+</dd>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>Optional name to assign to the loaded table.
+If not provided, DSI will default to using “Csv” as the table name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Csv.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Csv.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Adds a list containing one or more rows of the CSV along with file_info to output.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.DublinCoreDatacard">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">DublinCoreDatacard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.DublinCoreDatacard" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that stores a dataset’s data card as a row in the <cite>dublin_core_datacard</cite> table.
+Input datacard should follow template in <cite>examples/test/template_dc_dublin_core.xml</cite></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.DublinCoreDatacard.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.DublinCoreDatacard.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>File name(s) of XML data card files to ingest. Each file must adhere to the
+Dublin Core metadata standard.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.DublinCoreDatacard.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.DublinCoreDatacard.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Flattens data in the input data card as a row in the <cite>dublin_core_datacard</cite> table</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Ensemble">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Ensemble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sim_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Ensemble" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that loads ensemble simulation data stored in a CSV file.</p>
+<p>Designed to handle simulation outputs where each row represents an individual simulation run. 
+Specifically for single-run use cases when data is post-processed.</p>
+<p>Automatically generates a simulation metadata table to accompany the data.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Ensemble.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sim_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Ensemble.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes Ensemble Reader with user specified parameters.</p>
+<dl>
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>Required input. One or more Ensemble data files in CSV format.
+All files must correspond to the same table.</p>
+</dd>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>Optional name to assign to the table when loading the Ensemble data.
+If not provided, the default table name, ‘Ensemble’, will be used.</p>
+</dd>
+<dt><cite>sim_table</cite><span class="classifier">bool, default=True</span></dt><dd><p>If True, creates a simulation metadata table (<cite>sim_table</cite>) where each row 
+in the input data table represents a separate simulation run.</p>
+<ul class="simple">
+<li><p>Adds a new column to the input data to associate each row with its corresponding entry in the simulation table.</p></li>
+</ul>
+<p>If False, skips creation of the simulation table.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Ensemble.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Ensemble.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Creates an OrderedDict representation of the Ensemble data to load into DSI.</p>
+<p>When sim_table = True, a sim_table Ordered Dict is created alongside the Ensemble data table OrderedDict.
+Both tables are nested within a larger OrderedDict.</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.GenesisDatacard">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">GenesisDatacard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.GenesisDatacard" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that stores a dataset’s data card as a row in the <cite>genesis_datacard</cite> table.
+Input datacard should follow template in <cite>examples/test/template_dc_genesis.xlsx</cite></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.GenesisDatacard.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.GenesisDatacard.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>File name(s) of Excel data card files to ingest. Each file must adhere to the
+LANL Gensis metadata standard. The Excel file must only have one sheet.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.GenesisDatacard.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.GenesisDatacard.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Flattens data in the input data card as a row in the <cite>genesis_datacard</cite> table</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.GoogleDatacard">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">GoogleDatacard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.GoogleDatacard" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that stores a dataset’s data card as a row in the <cite>google_datacard</cite> table.
+Input datacard should follow template in <cite>examples/test/template_dc_google.yml</cite></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.GoogleDatacard.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.GoogleDatacard.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>File name(s) of YAML data card files to ingest. 
+Each file must adhere to the Google Data Cards Playbook metadata standard.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.GoogleDatacard.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.GoogleDatacard.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Flattens data in the input data card as a row in the <cite>google_datacard</cite> table</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.JSON">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">JSON</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.JSON" title="Link to this definition"></a></dt>
+<dd><p>A DSI Reader for ingesting generic JSON data with flat key-value pairs.</p>
+<p>This reader assumes that all values are primitive data types (e.g., str, int, float),
+and that there are no nested dictionaries, arrays, or complex structures.</p>
+<p>The keys in the JSON object are treated as column names, and their corresponding values are interpreted as rows.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.JSON.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.JSON.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the generic JSON reader with user-specified filenames</p>
+<dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>Required input. One or more JSON file paths to be loaded into DSI.
+If multiple files are provided, all data must all correspond to the same table</p>
+</dd>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>Name to assign to the loaded table. If not provided, DSI defaults to using “JSON” 
+as the table name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.JSON.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.JSON.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses JSON data and stores data into a table as an Ordered Dictionary.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.MetadataReader1">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">MetadataReader1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.MetadataReader1" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that reads in an individual or a set of JSON metadata files</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.MetadataReader1.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.MetadataReader1.__init__" title="Link to this definition"></a></dt>
+<dd><p><cite>filenames</cite>: one metadata json file or a list of metadata json files to be ingested</p>
+<p><cite>target_table_prefix</cite>: prefix to be added to every table created to differentiate between other metadata file sources</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.MetadataReader1.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.MetadataReader1.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses metadata json files and creates an ordered dict whose keys are file names and values are an ordered dict of that file’s data</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Oceans11Datacard">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Oceans11Datacard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Oceans11Datacard" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that stores a dataset’s data card as a row in the <cite>oceans11_datacard</cite> table.
+Input datacard should follow template in <cite>examples/test/template_dc_oceans11.yml</cite></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Oceans11Datacard.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Oceans11Datacard.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>File name(s) of YAML data card files to ingest. Each file must adhere to the
+Oceans 11 LANL Data Server metadata standard.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Oceans11Datacard.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Oceans11Datacard.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Flattens data in the input data card as a row in the <cite>oceans11_datacard</cite> table</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Parquet">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Parquet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Parquet" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that loads data stored in a Parquet file as a table. Users can choose to specify the table name upon reading too.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Parquet.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Parquet.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the Parquet Reader with user specified filenames and an optional table_name.</p>
+<dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>Required. One or more Parquet file paths to be loaded into DSI.
+If multiple files are provided, all data must correspond to the same table.</p>
+</dd>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>Optional name to assign to the loaded table.
+If not provided, DSI will default to using “Parquet” as the table name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Parquet.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Parquet.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses Parquet data and stores data into a table as an Ordered Dictionary.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Schema">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">Schema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Schema" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader for parsing and ingesting a relational schema alongside its associated data.</p>
+<p>Schema file input should be a JSON file that defines primary and foreign key relationships between tables in a data source.
+Parsed relationships are stored in the global <cite>dsi_relations</cite> table, which is used for creating backends and used by writers.</p>
+<p>This reader is essential when working with complex, multi-table data structures. 
+See <a class="reference internal" href="cr_examples.html#schema-section"><span class="std std-ref">Cloverleaf (Complex Schemas)</span></a> to learn how a schema file should be structured</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Schema.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.Schema.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the Schema reader with the specified schema file.</p>
+<dl class="simple">
+<dt><cite>filename</cite>: str</dt><dd><p>Path to the JSON file containing the schema to be ingested. This file should define
+primary and foreign key relationships between tables.</p>
+</dd>
+<dt><cite>target_table_prefix</cite><span class="classifier">str, optional</span></dt><dd><p>A prefix to prepend to every table name in the primary and foreign key lists.
+Useful for avoiding naming conflicts in shared environments.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.Schema.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.Schema.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Generates a <cite>dsi_relations</cite> OrderedDict to be added to the internal DSI abstraction.</p>
+<p>The Ordered Dict has 2 keys, primary key and foreign key, with their values a list of PK and FK tuples associating tables and columns</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.SchemaOrgDatacard">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">SchemaOrgDatacard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.SchemaOrgDatacard" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that stores a dataset’s data card as a row in the <cite>schema_org_datacard</cite> table.
+Input datacard should follow template in <cite>examples/test/template_dc_schema_org.json</cite></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.SchemaOrgDatacard.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.SchemaOrgDatacard.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>File name(s) of JSON data card files to ingest. Each file must adhere to the
+Schema.org metadata standard.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.SchemaOrgDatacard.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.SchemaOrgDatacard.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Flattens data in the input data card as a row in the <cite>schema_org_datacard</cite> table</p>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.TOML1">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">TOML1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.TOML1" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that reads in an individual or a set of TOML files</p>
+<p>Table names are the keys for the main ordered dictionary and column names are the keys for each table’s nested ordered dictionary</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.TOML1.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.TOML1.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>One TOML file or a list of TOML files to be loaded into DSI.</p>
+</dd>
+<dt><cite>target_table_prefix</cite>: str, optional</dt><dd><p>A prefix to be added to each table name created from the TOML data.
+Useful for distinguishing between tables from other data sources.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.TOML1.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.TOML1.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses TOML data and constructs a nested OrderedDict to load into DSI.</p>
+<p>The resulting structure has:</p>
+<blockquote>
+<div><ul>
+<li><p>Top-level keys as table names.</p></li>
+<li><p>Each value is an OrderedDict where:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Keys are column names.</p></li>
+<li><p>Values are lists representing column data.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.YAML1">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_reader.</span></span><span class="sig-name descname"><span class="pre">YAML1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yamlSpace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'</span>&#160; <span class="pre">'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.YAML1" title="Link to this definition"></a></dt>
+<dd><p>DSI Reader that reads in an individual or a set of YAML files</p>
+<p>Table names are the keys for the main ordered dictionary and column names are the keys for each table’s nested ordered dictionary</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.YAML1.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yamlSpace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'</span>&#160; <span class="pre">'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_reader.YAML1.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the YAML1 reader with the specified YAML file(s)</p>
+<dl class="simple">
+<dt><cite>filenames</cite><span class="classifier">str or list of str</span></dt><dd><p>One YAML file or a list of YAML files to be loaded into DSI.</p>
+</dd>
+<dt><cite>target_table_prefix</cite>: str, optional</dt><dd><p>A prefix to be added to each table name created from the YAML data.
+Useful for distinguishing between tables from other data sources.</p>
+</dd>
+<dt><cite>yamlSpace</cite><span class="classifier">str, default=’  ‘</span></dt><dd><p>The indentation used in the input YAML files. 
+Defaults to two spaces, but can be customized to match the formatting in certain files.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_reader.YAML1.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_reader.YAML1.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses YAML data and constructs a nested OrderedDict to load into DSI.</p>
+<p>The resulting structure has:</p>
+<blockquote>
+<div><ul>
+<li><p>Top-level keys as table names.</p></li>
+<li><p>Each value is an OrderedDict where:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Keys are column names.</p></li>
+<li><p>Values are lists representing column data.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+<dl class="simple">
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="file-writers">
+<h2>File Writers<a class="headerlink" href="#file-writers" title="Link to this heading"></a></h2>
+<dl>
+<dt>Note for users:</dt><dd><ul>
+<li><p>DSI’s <cite>runTable</cite> is only included in File Writers if data was previously ingested into a backend in a Core.Terminal workflow
+where <cite>runTable</cite> was set to True.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Ex: in <a class="reference internal" href="core.html#process-label"><span class="std std-ref">Example 5: Process and Write data</span></a>, <cite>runTable</cite> is included in a generated ER Diagram since it uses ingested data from
+<a class="reference internal" href="core.html#ingest-label"><span class="std std-ref">Example 2: Ingest data</span></a> where <cite>runTable</cite> = True</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</dd>
+</dl>
+<dl class="py class" id="module-dsi.plugins.file_writer">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Csv_Writer">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_writer.</span></span><span class="sig-name descname"><span class="pre">Csv_Writer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.Csv_Writer" title="Link to this definition"></a></dt>
+<dd><p>DSI Writer to output queries as CSV data</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Csv_Writer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.Csv_Writer.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the CSV Writer with the specified inputs</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table to export from DSI.</p>
+</dd>
+<dt><cite>filename</cite><span class="classifier">str</span></dt><dd><p>Name of the CSV file to be generated.</p>
+</dd>
+<dt><cite>export_cols</cite><span class="classifier">list of str, optional, default is None.</span></dt><dd><p>A list of column names to include in the exported CSV file.</p>
+<p>If None , all columns from the table will be included.</p>
+<ul class="simple">
+<li><p>Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to the CSV</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Csv_Writer.get_rows">
+<span class="sig-name descname"><span class="pre">get_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_writer.Csv_Writer.get_rows" title="Link to this definition"></a></dt>
+<dd><p>Exports data from the given DSI data collection to a CSV file.</p>
+<dl class="simple">
+<dt><cite>collection</cite><span class="classifier">OrderedDict</span></dt><dd><dl class="simple">
+<dt>The internal DSI abstraction. This is a nested OrderedDict where:</dt><dd><ul class="simple">
+<li><p>Top-level keys are table names.</p></li>
+<li><p>Each value is another OrderedDict representing the table’s data (with column names as keys and lists of values).</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.ER_Diagram">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_writer.</span></span><span class="sig-name descname"><span class="pre">ER_Diagram</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.ER_Diagram" title="Link to this definition"></a></dt>
+<dd><p>DSI Writer that generates an ER Diagram from the current data in the DSI abstraction</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.ER_Diagram.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_table_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.ER_Diagram.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the ER Diagram writer</p>
+<dl class="simple">
+<dt><cite>filename</cite><span class="classifier">str</span></dt><dd><p>File name for the generated ER diagram. Supported formats are .png, .pdf, .jpg, or .jpeg.</p>
+</dd>
+<dt><cite>target_table_prefix</cite><span class="classifier">str, optional</span></dt><dd><p>If provided, filters the ER Diagram to only include tables whose names begin with this prefix.</p>
+<ul class="simple">
+<li><p>Ex: If prefix = “student”, only “student__address”, “student__math”, “student__physics” tables are included</p></li>
+</ul>
+</dd>
+<dt><cite>max_cols</cite><span class="classifier">int, optional, default None</span></dt><dd><p>If provided, limits the number of columns displayed for each table in the ER Diagram.
+If relational data is included, this must be &gt;= number of primary and foreign keys for a table.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.ER_Diagram.get_rows">
+<span class="sig-name descname"><span class="pre">get_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_writer.ER_Diagram.get_rows" title="Link to this definition"></a></dt>
+<dd><p>Generates the ER Diagram from the given DSI data collection.</p>
+<dl class="simple">
+<dt><cite>collection</cite><span class="classifier">OrderedDict</span></dt><dd><dl class="simple">
+<dt>The internal DSI abstraction. This is a nested OrderedDict where:</dt><dd><ul class="simple">
+<li><p>Top-level keys are table names.</p></li>
+<li><p>Each value is another OrderedDict representing the table’s data (with column names as keys and lists of values).</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.ER_Diagram.graphviz_name">
+<span class="sig-name descname"><span class="pre">graphviz_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.plugins.file_writer.ER_Diagram.graphviz_name" title="Link to this definition"></a></dt>
+<dd><p>Converts non-alphanumeric characters in a table/col name to underscores</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Parquet_Writer">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_writer.</span></span><span class="sig-name descname"><span class="pre">Parquet_Writer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.Parquet_Writer" title="Link to this definition"></a></dt>
+<dd><p>DSI Writer to output certain data as a Parquet file</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Parquet_Writer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.Parquet_Writer.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the Parquet Writer with the specified inputs</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table to export from DSI.</p>
+</dd>
+<dt><cite>filename</cite><span class="classifier">str</span></dt><dd><p>Name of the Parquet file to be generated.</p>
+</dd>
+<dt><cite>export_cols</cite><span class="classifier">list of str, optional, default is None.</span></dt><dd><p>A list of column names to include in the exported Parquet file.</p>
+<p>If None , all columns from the table will be included.</p>
+<ul class="simple">
+<li><p>Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to Parquet</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Parquet_Writer.get_rows">
+<span class="sig-name descname"><span class="pre">get_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_writer.Parquet_Writer.get_rows" title="Link to this definition"></a></dt>
+<dd><p>Exports data from the given DSI data collection to a Parquet file.</p>
+<dl class="simple">
+<dt><cite>collection</cite><span class="classifier">OrderedDict</span></dt><dd><dl class="simple">
+<dt>The internal DSI abstraction. This is a nested OrderedDict where:</dt><dd><ul class="simple">
+<li><p>Top-level keys are table names.</p></li>
+<li><p>Each value is another OrderedDict representing the table’s data (with column names as keys and lists of values).</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Table_Plot">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.file_writer.</span></span><span class="sig-name descname"><span class="pre">Table_Plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.Table_Plot" title="Link to this definition"></a></dt>
+<dd><p>DSI Writer that plots all numeric column data for a specified table</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Table_Plot.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.file_writer.Table_Plot.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the Table Plot writer with specified inputs</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table to plot</p>
+</dd>
+<dt><cite>filename</cite><span class="classifier">str</span></dt><dd><p>Name of the output file where the generated plot will be saved.</p>
+</dd>
+<dt><cite>display_cols</cite>: list of str, optional, default is None.</dt><dd><p>A list of column names to include in the plot. All included columns must contain
+numerical data.</p>
+<p>If None (default), all numerical columns in the specified table will be plotted.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.file_writer.Table_Plot.get_rows">
+<span class="sig-name descname"><span class="pre">get_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.file_writer.Table_Plot.get_rows" title="Link to this definition"></a></dt>
+<dd><p>Generates a plot of a specified table from the given DSI data collection.</p>
+<dl class="simple">
+<dt><cite>collection</cite><span class="classifier">OrderedDict</span></dt><dd><dl class="simple">
+<dt>The internal DSI abstraction. This is a nested OrderedDict where:</dt><dd><ul class="simple">
+<li><p>Top-level keys are table names.</p></li>
+<li><p>Each value is another OrderedDict representing the table’s data (with column names as keys and lists of values).</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt><cite>return</cite>: None. </dt><dd><p>If an error occurs, a tuple in the format - (ErrorType, “error message”) - is returned to and printed by the core</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="collection-readers">
+<h2>Collection Readers<a class="headerlink" href="#collection-readers" title="Link to this heading"></a></h2>
+<p>This Reader is used to load data from an in-memory data structure.
+Currently accepts a Python <code class="docutils literal notranslate"><span class="pre">dict</span></code> or an <code class="docutils literal notranslate"><span class="pre">OrderedDict</span></code> from the <code class="docutils literal notranslate"><span class="pre">collection</span></code> library.</p>
+<dl class="py class" id="module-dsi.plugins.collection_reader">
+<dt class="sig sig-object py" id="dsi.plugins.collection_reader.Dict">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.collection_reader.</span></span><span class="sig-name descname"><span class="pre">Dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.collection_reader.Dict" title="Link to this definition"></a></dt>
+<dd><p>A Plugin to capture data from a Dictionary/ Ordered Dictionary</p>
+<p>The input Dictionary/Ordered Dictionary can either represent a single table or multiple tables. 
+If it is multiple tables, each table must be represented as a nested Dictionary/Ordered Dictionary.
+Regardless of the nesting, a table’s Dictionary/Ordered Dictionary must contain column names as keys with the respective row data as a list.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.collection_reader.Dict.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.collection_reader.Dict.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes StructuredMetadata class with an output collector (Ordered Dictionary)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.collection_reader.Dict.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.collection_reader.Dict.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Reads the input Dictionary/Ordered Dictionary and stores it as either one table or multiple tables in the DSI Abstraction</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-dsi.plugins.env">
+<span id="environment-plugins"></span><h2>Environment Plugins<a class="headerlink" href="#module-dsi.plugins.env" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.Environment">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Environment</span></span><a class="headerlink" href="#dsi.plugins.env.Environment" title="Link to this definition"></a></dt>
+<dd><p>Environment Plugins inspect the calling process’ context.</p>
+<p>Environments assume a POSIX-compliant filesystem and always collect UID/GID
+information.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Environment.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.Environment.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes StructuredMetadata class with an output collector (Ordered Dictionary)</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">GitInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">git_repo_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.GitInfo" title="Link to this definition"></a></dt>
+<dd><p>A Plugin to capture Git information.</p>
+<p>Adds the current git remote and git commit to metadata.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">git_repo_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.GitInfo.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes the git repo in the given directory and access to git commands</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.GitInfo.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Adds a row to the output with POSIX info, git remote, and git commit</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.GitInfo.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.GitInfo.pack_header" title="Link to this definition"></a></dt>
+<dd><p>Set schema with POSIX and Git columns</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">Hostname</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.env.Hostname" title="Link to this definition"></a></dt>
+<dd><p>An example Environment implementation.</p>
+<p>This plugin collects the hostname of the machine, and couples this with the POSIX
+information gathered by the Environment base class.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Hostname.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes StructuredMetadata class with an output collector (Ordered Dictionary)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Hostname.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses environment provenance data and adds the row.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.Hostname.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.Hostname.pack_header" title="Link to this definition"></a></dt>
+<dd><p>Set schema with keys of prov_info.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.env.</span></span><span class="sig-name descname"><span class="pre">SystemKernel</span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel" title="Link to this definition"></a></dt>
+<dd><p>Plugin for reading environment provenance data.</p>
+<p>An environment provenance plugin which does the following:</p>
+<ol class="arabic simple">
+<li><p>System Kernel Version</p></li>
+<li><p>Kernel compile-time config</p></li>
+<li><p>Kernel boot config</p></li>
+<li><p>Kernel runtime config</p></li>
+<li><p>Kernel modules and module config</p></li>
+<li><p>Container information, if containerized</p></li>
+</ol>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize SystemKernel with inital provenance info.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.add_rows">
+<span class="sig-name descname"><span class="pre">add_rows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.add_rows" title="Link to this definition"></a></dt>
+<dd><p>Parses environment provenance data and adds the row.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_cmd_output">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_cmd_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_stderr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_cmd_output" title="Link to this definition"></a></dt>
+<dd><p>Runs a given command and returns the stdout if successful.</p>
+<p>If stderr is not empty, an exception is raised with the stderr text.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_bt_config">
+<span class="sig-name descname"><span class="pre">get_kernel_bt_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_bt_config" title="Link to this definition"></a></dt>
+<dd><p>Kernel boot-time configuration is collected by looking at /proc/cmdline.</p>
+<p>The output of this command is one string of boot-time parameters. This string is
+returned in a dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_ct_config">
+<span class="sig-name descname"><span class="pre">get_kernel_ct_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_ct_config" title="Link to this definition"></a></dt>
+<dd><p>Kernel compile-time configuration is collected by looking at /boot/config-(kernel version)
+and removing comments and empty lines.</p>
+<p>The output of said command is newline-delimited option=value pairs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_mod_config">
+<span class="sig-name descname"><span class="pre">get_kernel_mod_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_mod_config" title="Link to this definition"></a></dt>
+<dd><p>Kernel module configuration is collected with the “lsmod” and “modinfo” commands.</p>
+<p>Each module and modinfo are stored as a key-value pair in the returned dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_rt_config">
+<span class="sig-name descname"><span class="pre">get_kernel_rt_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_rt_config" title="Link to this definition"></a></dt>
+<dd><p>Kernel run-time configuration is collected with the “sysctl -a” command.</p>
+<p>The output of this command is lines consisting of two possibilities:
+option = value (note the spaces), and sysctl: permission denied …
+The option = value pairs are added to the output dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_kernel_version">
+<span class="sig-name descname"><span class="pre">get_kernel_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_kernel_version" title="Link to this definition"></a></dt>
+<dd><p>Kernel version is obtained by the “uname -r” command, returns it in a dict.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.get_prov_info">
+<span class="sig-name descname"><span class="pre">get_prov_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.get_prov_info" title="Link to this definition"></a></dt>
+<dd><p>Collect and return the different categories of provenance info.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.plugins.env.SystemKernel.pack_header">
+<span class="sig-name descname"><span class="pre">pack_header</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dsi.plugins.env.SystemKernel.pack_header" title="Link to this definition"></a></dt>
+<dd><p>Set schema with keys of prov_info.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="optional-plugin-type-enforcement">
+<h2>Optional Plugin Type Enforcement<a class="headerlink" href="#optional-plugin-type-enforcement" title="Link to this heading"></a></h2>
+<p>Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI.
+Plugins may enforce types, but they are not required to enforce types.</p>
+<p>Plugin type enforcement can be static, like the Hostname default plugin.
+Plugin type enforcement can also be dynamic, like the Bueno default plugin.</p>
+<p id="module-dsi.plugins.plugin_models">A collection of pydantic models for Plugin schema validation</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.EnvironmentModel">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin_models.</span></span><span class="sig-name descname"><span class="pre">EnvironmentModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">uid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effective_gid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">moniker</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gid_list</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin_models.EnvironmentModel" title="Link to this definition"></a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.EnvironmentModel.model_computed_fields">
+<span class="sig-name descname"><span class="pre">model_computed_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ComputedFieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.EnvironmentModel.model_computed_fields" title="Link to this definition"></a></dt>
+<dd><p>A dictionary of computed field names and their corresponding <cite>ComputedFieldInfo</cite> objects.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.EnvironmentModel.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.EnvironmentModel.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.EnvironmentModel.model_fields">
+<span class="sig-name descname"><span class="pre">model_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'effective_gid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True),</span> <span class="pre">'gid_list':</span> <span class="pre">FieldInfo(annotation=list[int],</span> <span class="pre">required=True),</span> <span class="pre">'moniker':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'uid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True)}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.EnvironmentModel.model_fields" title="Link to this definition"></a></dt>
+<dd><p>Metadata about the fields defined on the model,
+mapping of field names to [<cite>FieldInfo</cite>][pydantic.fields.FieldInfo].</p>
+<p>This replaces <cite>Model.__fields__</cite> from Pydantic V1.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.GitInfoModel">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin_models.</span></span><span class="sig-name descname"><span class="pre">GitInfoModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">uid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effective_gid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">moniker</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gid_list</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_remote</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">git_commit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin_models.GitInfoModel" title="Link to this definition"></a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.GitInfoModel.model_computed_fields">
+<span class="sig-name descname"><span class="pre">model_computed_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ComputedFieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.GitInfoModel.model_computed_fields" title="Link to this definition"></a></dt>
+<dd><p>A dictionary of computed field names and their corresponding <cite>ComputedFieldInfo</cite> objects.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.GitInfoModel.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.GitInfoModel.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.GitInfoModel.model_fields">
+<span class="sig-name descname"><span class="pre">model_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'effective_gid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True),</span> <span class="pre">'gid_list':</span> <span class="pre">FieldInfo(annotation=list[int],</span> <span class="pre">required=True),</span> <span class="pre">'git_commit':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'git_remote':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'moniker':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'uid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True)}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.GitInfoModel.model_fields" title="Link to this definition"></a></dt>
+<dd><p>Metadata about the fields defined on the model,
+mapping of field names to [<cite>FieldInfo</cite>][pydantic.fields.FieldInfo].</p>
+<p>This replaces <cite>Model.__fields__</cite> from Pydantic V1.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.HostnameModel">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin_models.</span></span><span class="sig-name descname"><span class="pre">HostnameModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">uid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effective_gid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">moniker</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gid_list</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hostname</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin_models.HostnameModel" title="Link to this definition"></a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.HostnameModel.model_computed_fields">
+<span class="sig-name descname"><span class="pre">model_computed_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ComputedFieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.HostnameModel.model_computed_fields" title="Link to this definition"></a></dt>
+<dd><p>A dictionary of computed field names and their corresponding <cite>ComputedFieldInfo</cite> objects.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.HostnameModel.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.HostnameModel.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.HostnameModel.model_fields">
+<span class="sig-name descname"><span class="pre">model_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'effective_gid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True),</span> <span class="pre">'gid_list':</span> <span class="pre">FieldInfo(annotation=list[int],</span> <span class="pre">required=True),</span> <span class="pre">'hostname':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'moniker':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'uid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True)}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.HostnameModel.model_fields" title="Link to this definition"></a></dt>
+<dd><p>Metadata about the fields defined on the model,
+mapping of field names to [<cite>FieldInfo</cite>][pydantic.fields.FieldInfo].</p>
+<p>This replaces <cite>Model.__fields__</cite> from Pydantic V1.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.SystemKernelModel">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin_models.</span></span><span class="sig-name descname"><span class="pre">SystemKernelModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">uid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effective_gid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">moniker</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gid_list</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.plugins.plugin_models.SystemKernelModel" title="Link to this definition"></a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.SystemKernelModel.model_computed_fields">
+<span class="sig-name descname"><span class="pre">model_computed_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ComputedFieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.SystemKernelModel.model_computed_fields" title="Link to this definition"></a></dt>
+<dd><p>A dictionary of computed field names and their corresponding <cite>ComputedFieldInfo</cite> objects.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.SystemKernelModel.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.SystemKernelModel.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.SystemKernelModel.model_fields">
+<span class="sig-name descname"><span class="pre">model_fields</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'effective_gid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True),</span> <span class="pre">'gid_list':</span> <span class="pre">FieldInfo(annotation=list[int],</span> <span class="pre">required=True),</span> <span class="pre">'kernel_info':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'moniker':</span> <span class="pre">FieldInfo(annotation=str,</span> <span class="pre">required=True),</span> <span class="pre">'uid':</span> <span class="pre">FieldInfo(annotation=int,</span> <span class="pre">required=True)}</span></em><a class="headerlink" href="#dsi.plugins.plugin_models.SystemKernelModel.model_fields" title="Link to this definition"></a></dt>
+<dd><p>Metadata about the fields defined on the model,
+mapping of field names to [<cite>FieldInfo</cite>][pydantic.fields.FieldInfo].</p>
+<p>This replaces <cite>Model.__fields__</cite> from Pydantic V1.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dsi.plugins.plugin_models.create_dynamic_model">
+<span class="sig-prename descclassname"><span class="pre">dsi.plugins.plugin_models.</span></span><span class="sig-name descname"><span class="pre">create_dynamic_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_types</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">type</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">BaseModel</span></span></span><a class="headerlink" href="#dsi.plugins.plugin_models.create_dynamic_model" title="Link to this definition"></a></dt>
+<dd><p>Creates a pydantic model at runtime with given name, column names
+and types, and an optional base model to extend.</p>
+<p>This is useful for when column names are not known until
+they are retrieved at runtime.</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cr_intro.html" class="btn btn-neutral float-left" title="Contributor Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="custom_reader.html" class="btn btn-neutral float-right" title="Custom DSI Reader" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

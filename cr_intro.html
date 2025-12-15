@@ -1,0 +1,169 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contributor Introduction &mdash; DSI 1.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=00f267c6"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="DSI Readers/Writers" href="plugins.html" />
+    <link rel="prev" title="Contributor Resources" href="contributors.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Contributor Introduction</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi-readers-writers-classes">DSI Readers/Writers Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#backend-abstract-classes">Backend Abstract Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dsi-core">DSI Core</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">DSI Readers/Writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_reader.html">Custom DSI Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_writer.html">Custom DSI Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="development.html">DSI Development Plans</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cr_examples.html">DSI Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">Contributor Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/cr_intro.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="contributor-introduction">
+<h1>Contributor Introduction<a class="headerlink" href="#contributor-introduction" title="Link to this heading"></a></h1>
+<p>The main Introduction page gave a brief description of the Readers/Writers, Backends, and DSI Core.
+This page will provide a more detailed explanation of them, with the following pages delving into how contributors can create their own compatible with DSI.</p>
+<p>Similar to the Python User API which uses <code class="docutils literal notranslate"><span class="pre">dsi.py</span></code>, contributors can view <code class="docutils literal notranslate"><span class="pre">core.py</span></code> and its documentation, <a class="reference internal" href="core.html#core-page"><span class="std std-ref">Core</span></a>, to use the most-flexible version of DSI.</p>
+<section id="dsi-readers-writers-classes">
+<h2>DSI Readers/Writers Classes<a class="headerlink" href="#dsi-readers-writers-classes" title="Link to this heading"></a></h2>
+<p>Readers/Writers transform an arbitrary data source into a format that is compatible with the DSI core.
+The parsed and queryable attributes of the data are called <em>metadata</em> – data about the data. Metadata share the same security profile as the source data.</p>
+<p>A simple data reader might parse an application’s output file and place it into a core-compatible data structure such as Python built-ins and members of the popular Python <code class="docutils literal notranslate"><span class="pre">collection</span></code> module.
+A simple data writer might execute an application to supplement existing data and queryable metadata, e.g., adding locations of outputs data or plots after running an analysis workflow.</p>
+<p>Readers/Writers are defined by a base abstract class, and support child abstract classes which inherit the properties of their ancestors.</p>
+<p>A subset of DSI’s Readers and Writers are:</p>
+<figure class="align-default" id="id1">
+<a class="with-shadow reference internal image-reference" href="_images/PluginClassHierarchy.png"><img alt="Figure depicting the current Reader/Writer class hierarchy." class="with-shadow" src="_images/PluginClassHierarchy.png" style="width: 989.0999999999999px; height: 242.89999999999998px;" /></a>
+<figcaption>
+<p><span class="caption-text">Figure depicting the current DSI Reader/Writer class hierarchy.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="backend-abstract-classes">
+<h2>Backend Abstract Classes<a class="headerlink" href="#backend-abstract-classes" title="Link to this heading"></a></h2>
+<p>Backends are an interface between the core and a storage medium.
+Backends are designed to support a user-needed functionality.
+Given a set of user metadata captured by a DSI frontend, a typical functionality needed by DSI users is to query that metadata by SQL query.
+Because the files associated with the queryable metadata may be spread across filesystems and security domains,
+a supporting backend is required to assemble query results and present them to the DSI core for transformation and return.</p>
+<p>All DSI backends include:</p>
+<ul class="simple">
+<li><p>SQLite: Python based SQL database and backend; the <strong>default</strong> DSI API backend.</p></li>
+<li><p>DuckDB: In-process SQL database designed for fast queries on large data files</p></li>
+<li><p>GUFI: the <a class="reference external" href="https://github.com/mar-file-system/GUFI">Grand Unified File Index system</a> ; developed at LANL.
+GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.</p></li>
+</ul>
+</section>
+<section id="dsi-core">
+<h2>DSI Core<a class="headerlink" href="#dsi-core" title="Link to this heading"></a></h2>
+<p>DSI basic functionality is contained within the middleware known as the <em>core</em>.
+The DSI core is focused on delivering user-queries on unified metadata which can be distributed across many files and security domains.
+DSI currently supports Linux, and is tested on RedHat- and Debian-based distributions.
+The DSI core is a home for DSI Readers/Writers and an interface for DSI Backends.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="contributors.html" class="btn btn-neutral float-left" title="Contributor Resources" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="plugins.html" class="btn btn-neutral float-right" title="DSI Readers/Writers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

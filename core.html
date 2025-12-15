@@ -1,0 +1,900 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core &mdash; DSI 1.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=00f267c6"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="DSI Development Plans" href="development.html" />
+    <link rel="prev" title="Backends" href="backends.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cr_intro.html">Contributor Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">DSI Readers/Writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_reader.html">Custom DSI Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_writer.html">Custom DSI Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Core</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#core-terminal">Core: Terminal</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Terminal"><code class="docutils literal notranslate"><span class="pre">Terminal</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#core-sync">Core: Sync</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.core.Sync"><code class="docutils literal notranslate"><span class="pre">Sync</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#examples">Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#example-1-intro-use-case">Example 1: Intro use case</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-2-ingest-data">Example 2: Ingest data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-3-complex-schema-with-data">Example 3: Complex schema with data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-4-visualize-data">Example 4: Visualize data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-5-process-and-write-data">Example 5: Process and Write data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-6-find-data">Example 6: Find data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-7-query-data">Example 7: Query data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-8-overwrite-data">Example 8: Overwrite data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-9-external-readers-writers">Example 9: External Readers/Writers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-10-generate-notebook">Example 10: Generate notebook</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="development.html">DSI Development Plans</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cr_examples.html">DSI Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">Core</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/core.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="core">
+<span id="core-page"></span><h1>Core<a class="headerlink" href="#core" title="Link to this heading"></a></h1>
+<p>The DSI Core middleware defines the <cite>Terminal</cite> and <cite>Sync</cite> concepts.
+An instantiated <cite>Terminal</cite> is the human/machine DSI interface to connect Readers/Writers and DSI backends.
+An instantiated <cite>Sync</cite> supports data movement capabilities between local and remote locations and captures metadata documentation</p>
+<section id="core-terminal">
+<h2>Core: Terminal<a class="headerlink" href="#core-terminal" title="Link to this heading"></a></h2>
+<p>The Terminal class is a structure through which users can interact with Readers/Writers and Backends as “module” objects.
+Each reader/writer/backend can be “loaded” to be ready for use and users can interact with backends by ingesting, querying, processing, or finding data,
+as well as generating an interactive notebook of the data.</p>
+<p>All relevant functions have been listed below for further clarity. <a class="reference internal" href="#example-section-label"><span class="std std-ref">Examples</span></a> displays different workflows using this Terminal class.</p>
+<dl>
+<dt>Notes for users:</dt><dd><ul>
+<li><p>All DSI Writers that are loaded must be followed by calling <code class="docutils literal notranslate"><span class="pre">Terminal.transload</span></code> after to execute them.
+Readers are automatically executed upon loading.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Terminal.load_module</span></code>: if users wants to group related tables of data from a DSI Reader under the same name,
+they can use the <cite>target_table_prefix</cite> input to specify a shared prefix.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>users must remember that when accessing data from these tables, their names will include the specified prefix.
+Ex: collection1__math, collection1__english</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Terminal.artifact_handler</span></code>: ‘notebook’ interaction_type stores data from first loaded backend, NOT existing DSI abstraction, in new notebook file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Terminal.artifact_handler</span></code>: review this function description below to clarify which backends are targeted by which interaction_types</p></li>
+<li><p>Terminal find functions only access the first loaded backend</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Terminal.unload_module</span></code>: removes last loaded backend of specified mod_name. Ex: if there are 2 loaded Sqlite backends, second is unloaded</p></li>
+<li><p>Terminal handles errors from any loaded DSI/user-written modules (Readers/Writers/backends).</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>If writing an external Reader/Writer/backend, return any intentionally caught errors as a tuple (error type, error message).
+Ex: (ValueError, “this is an error”)</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.core.Terminal">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.core.</span></span><span class="sig-name descname"><span class="pre">Terminal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backup_db</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">runTable</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal" title="Link to this definition"></a></dt>
+<dd><p>An instantiated Terminal is the DSI human/machine interface.</p>
+<p>Terminals are a home for Plugins and an interface for Backends. Backends may be
+back-reads or back-writes. Plugins may be writers or readers. See documentation
+for more information.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backup_db</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">runTable</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialization function to configure optional DSI core parameters.</p>
+<section id="optional-flags">
+<h3>Optional flags<a class="headerlink" href="#optional-flags" title="Link to this heading"></a></h3>
+<dl>
+<dt><cite>debug</cite><span class="classifier">int, default=0 </span></dt><dd><p>{0: off, 1: user debug log, 2: user + developer debug log}</p>
+<p>When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.</p>
+</dd>
+<dt><cite>backup_db</cite><span class="classifier">bool, default=False</span></dt><dd><ul class="simple">
+<li><p>If True, creates a backup of the current backend database before committing any new changes.</p></li>
+</ul>
+</dd>
+<dt><cite>runTable</cite><span class="classifier">bool, default=False</span></dt><dd><ul class="simple">
+<li><p>If True, a ‘runTable’ is created, and timestamped each time new data/metadata is ingested.
+Recommended for in-situ use-cases.</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.add_external_python_module">
+<span class="sig-name descname"><span class="pre">add_external_python_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.add_external_python_module" title="Link to this definition"></a></dt>
+<dd><p>Adds an external, meaning not from the DSI repo, Python module to the module_collection. 
+Afterwards, load_module can be used to load a DSI module from the added Python module.</p>
+<p>Note: mod_type is needed because each Python module only implements plugins or backends.</p>
+<p>View <a class="reference internal" href="#external-readers-writers-label"><span class="std std-ref">Example 9: External Readers/Writers</span></a> to see how to use this function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.artifact_handler">
+<span class="sig-name descname"><span class="pre">artifact_handler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interaction_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.artifact_handler" title="Link to this definition"></a></dt>
+<dd><p>Interact with loaded DSI backends by ingesting or retrieving data from them.</p>
+<dl>
+<dt><cite>interaction_type</cite><span class="classifier">str</span></dt><dd><p>Specifies the type of action to perform. Accepted values:</p>
+<blockquote>
+<div><ul>
+<li><p>‘ingest’ or ‘put’: ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>if backup_db flag = True in Core instance, a backup is created prior to ingesting data</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>‘query’ or ‘get’: retrieves data from first loaded backend based on a specified ‘query’</p></li>
+<li><p>‘notebook’ or ‘inspect’: generates an interactive Python notebook with all data from first loaded backend</p></li>
+<li><p>‘process’ or ‘read’: overwrites current DSI abstraction with all data from first loaded BACK-READ backend</p></li>
+</ul>
+</div></blockquote>
+</dd>
+<dt><cite>query</cite><span class="classifier">str, optional</span></dt><dd><p>Required only when <cite>interaction_type</cite> is ‘query’ or ‘get’, and it is an input to a backend’s <cite>query_artifact()</cite> method.</p>
+</dd>
+<dt>kwargs<span class="classifier"></span></dt><dd><p>Additional keyword arguments passed to underlying backend functions. 
+View relevant functions in the DSI backend file to understand other arguments to pass in.</p>
+</dd>
+<dt><cite>return</cite>: only when <cite>interaction_type</cite> = ‘query’</dt><dd><p>By default stores query result as a Pandas.DataFrame. If specified, returns it as an OrderedDict</p>
+</dd>
+</dl>
+<p>A DSI Core Terminal may load zero or more Backends with storage functionality.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.close" title="Link to this definition"></a></dt>
+<dd><p>Immediately closes all active modules: backends, plugin writers, plugin readers</p>
+<p>Clears out the current DSI abstraction</p>
+<p>NOTE - This step cannot be undone.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.display">
+<span class="sig-name descname"><span class="pre">display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_rows</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_cols</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.display" title="Link to this definition"></a></dt>
+<dd><p>Prints data from a specified table in the first loaded backend.</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table to display.</p>
+</dd>
+<dt><cite>num_rows</cite><span class="classifier">int, optional, default=25</span></dt><dd><p>Number of rows to print. If the table contains fewer rows, only those are shown.</p>
+</dd>
+<dt><cite>display_cols</cite><span class="classifier">list of str, optional</span></dt><dd><p>List of specific column names to display from the table.</p>
+<p>If None (default), all columns are displayed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.find">
+<span class="sig-name descname"><span class="pre">find</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.find" title="Link to this definition"></a></dt>
+<dd><p>Find all instances of <cite>query_object</cite> across all tables, columns, and cells in the first loaded backend.</p>
+<dl class="simple">
+<dt><cite>query_object</cite><span class="classifier">any</span></dt><dd><p>The object to search for in the backend. Can be of any type, including str, float, or int.</p>
+</dd>
+<dt><cite>return</cite><span class="classifier">list</span></dt><dd><p>A list of backend-specific result objects, each representing a match for <cite>query_object</cite>.
+The structure of each object depends on the backend implementation.</p>
+<ul class="simple">
+<li><p>Refer to the first loaded backend’s documentation to understand the structure of the objects in this list</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.find_cell">
+<span class="sig-name descname"><span class="pre">find_cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.find_cell" title="Link to this definition"></a></dt>
+<dd><p>Find all cells that match the <cite>query_object</cite> in the first loaded backend.</p>
+<dl>
+<dt><cite>query_object</cite><span class="classifier">any</span></dt><dd><p>The object to search for in the backend. Can be of any type, including str, float, or int.</p>
+</dd>
+<dt><cite>row</cite><span class="classifier">bool, default=False</span></dt><dd><p>If True, includes the entire row of data for each matching cell in return.</p>
+<p>If False, includes only the value of the matching cell</p>
+</dd>
+<dt><cite>return</cite><span class="classifier">list</span></dt><dd><p>A list of backend-specific result objects, each representing a match for <cite>query_object</cite>.
+The structure of each object depends on the backend implementation.</p>
+<ul class="simple">
+<li><p>Refer to the first loaded backend’s documentation to understand the structure of the objects in this list</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.find_column">
+<span class="sig-name descname"><span class="pre">find_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.find_column" title="Link to this definition"></a></dt>
+<dd><p>Find all columns whose name matches <cite>query_object</cite> in the first loaded backend.</p>
+<dl>
+<dt><cite>query_object</cite><span class="classifier">str</span></dt><dd><p>The object to search for in the backend. HAS TO BE A str.</p>
+</dd>
+<dt><cite>range</cite>: bool, optional, default False. </dt><dd><p>If True, then data-range of all numerical columns which match <cite>query_object</cite> is included in return</p>
+<p>If False, then data for each column that matches <cite>query_object</cite> is included in return</p>
+</dd>
+<dt><cite>return</cite><span class="classifier">list</span></dt><dd><p>A list of backend-specific result objects, each representing a match for <cite>query_object</cite>.
+The structure of each object depends on the backend implementation.</p>
+<ul class="simple">
+<li><p>Refer to the first loaded backend’s documentation to understand the structure of the objects in this list</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.find_helper">
+<span class="sig-name descname"><span class="pre">find_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">find_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.find_helper" title="Link to this definition"></a></dt>
+<dd><p><strong>Users should not call this. Used internally.</strong></p>
+<p>Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.find_relation">
+<span class="sig-name descname"><span class="pre">find_relation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.find_relation" title="Link to this definition"></a></dt>
+<dd><p>Finds all rows in the first table of the first loaded backend that satisfy a column-level condition.
+<cite>query_object</cite> must include a column, operator, and value to define a valid relational condition.</p>
+<dl class="simple">
+<dt><cite>query_object</cite><span class="classifier">str</span></dt><dd><p>A relational expression combining column, operator, and value.
+Ex: “age &gt; 4”, “age &lt; 4”, “age &gt;= 4”, “age &lt;= 4”, “age = 4”, “age == 4”, “age != 4”, “age (4, 8)”, “age ~ 4”, “age ~~ 4”.</p>
+</dd>
+<dt><cite>return</cite><span class="classifier">list</span></dt><dd><p>A list of backend-specific result objects, each representing a row that satisfies the relation.
+The structure of each object depends on the backend implementation.</p>
+<ul class="simple">
+<li><p>Refer to the first loaded backend’s documentation to understand the structure of the objects in this list</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.find_table">
+<span class="sig-name descname"><span class="pre">find_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query_object</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.find_table" title="Link to this definition"></a></dt>
+<dd><p>Find all tables whose name matches <cite>query_object</cite> in the first loaded backend.</p>
+<dl class="simple">
+<dt><cite>query_object</cite><span class="classifier">str</span></dt><dd><p>The object to search for in the backend. HAS TO BE A str.</p>
+</dd>
+<dt><cite>return</cite><span class="classifier">list</span></dt><dd><p>A list of backend-specific result objects, each representing a match for <cite>query_object</cite>.
+The structure of each object depends on the backend implementation.</p>
+<ul class="simple">
+<li><p>Refer to the first loaded backend’s documentation to understand the structure of the objects in this list</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.get_current_abstraction">
+<span class="sig-name descname"><span class="pre">get_current_abstraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.get_current_abstraction" title="Link to this definition"></a></dt>
+<dd><p>Returns the current DSI abstraction as a nested Ordered Dict.</p>
+<dl>
+<dt>The abstraction is organized such that:</dt><dd><ul class="simple">
+<li><p>The outer OrderedDict has table names as keys.</p></li>
+<li><p>Each value is an inner OrderedDict representing a table, where keys are column names and values are lists of column data.</p></li>
+</ul>
+</dd>
+<dt><cite>table_name</cite><span class="classifier">str, optional, default is None.</span></dt><dd><p>If specified, returns only the OrderedDict corresponding to that table.</p>
+<p>If None (default), returns the full nested OrderedDict containing all tables.</p>
+</dd>
+<dt><cite>return</cite><span class="classifier">OrderedDict</span></dt><dd><p>If <cite>table_name</cite> is None: returns a nested OrderedDict of all tables.</p>
+<p>If <cite>table_name</cite> is provided: returns a single OrderedDict for that table.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.get_schema">
+<span class="sig-name descname"><span class="pre">get_schema</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.get_schema" title="Link to this definition"></a></dt>
+<dd><p>Returns the first loaded database’s structural schema as several CREATE TABLE statements.</p>
+<dl class="simple">
+<dt><cite>return</cite>: str</dt><dd><p>Each table’s CREATE TABLE statement is concatenated into one large string.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.get_table">
+<span class="sig-name descname"><span class="pre">get_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dict_return</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.get_table" title="Link to this definition"></a></dt>
+<dd><p>Returns all data from a specified table in the first loaded backend.</p>
+<dl class="simple">
+<dt><cite>table_name</cite><span class="classifier">str</span></dt><dd><p>Name of the table to retrieve data from.</p>
+</dd>
+<dt><cite>dict_return</cite>: bool, optional, default=False.</dt><dd><p>If True, returns the data as an OrderedDict.
+If False (default), returns the data as a pandas DataFrame.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.get_table_names">
+<span class="sig-name descname"><span class="pre">get_table_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.get_table_names" title="Link to this definition"></a></dt>
+<dd><p>Extracts and returns all table names referenced in a given query.</p>
+<dl class="simple">
+<dt><cite>query</cite><span class="classifier">str</span></dt><dd><p>A query string written in a database language (typically SQL).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list">
+<span class="sig-name descname"><span class="pre">list</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list" title="Link to this definition"></a></dt>
+<dd><p>Prints a list of all tables and their dimensions in the first loaded backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list_available_modules">
+<span class="sig-name descname"><span class="pre">list_available_modules</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list_available_modules" title="Link to this definition"></a></dt>
+<dd><p>List available DSI modules of an arbitrary module type.</p>
+<p>This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
+are supported, but this getter can be extended to support any new DSI module types which are added.</p>
+<p>Note: self.VALID_MODULES refers to _DSI_ Modules however, DSI Modules are classes, hence the naming idiosynchrocies below.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.list_loaded_modules">
+<span class="sig-name descname"><span class="pre">list_loaded_modules</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.list_loaded_modules" title="Link to this definition"></a></dt>
+<dd><p>List DSI modules which have already been loaded.</p>
+<p>These Plugins and Backends are active or ready to execute a post-processing task.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.load_module">
+<span class="sig-name descname"><span class="pre">load_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_function</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.load_module" title="Link to this definition"></a></dt>
+<dd><p>Load a DSI module from the available Plugin and Backend module collection.</p>
+<p>DSI modules may be loaded which are not explicitly listed by the list_available_modules.
+This flexibility ensures that advanced users can access higher level abstractions.</p>
+<p>We expect most users will work with module implementations rather than templates, but
+but all high level class abstractions are accessible with this method.</p>
+<p>If a loaded module has mod_type=’plugin’ &amp; mod_function=’reader’, it is automatically activated and then unloaded as well.
+Therefore, a user does not have to activate it separately with transload() (only used by plugin writers) or call unload_module()</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.num_tables">
+<span class="sig-name descname"><span class="pre">num_tables</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.num_tables" title="Link to this definition"></a></dt>
+<dd><p>Prints number of tables in the first loaded backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.overwrite_table">
+<span class="sig-name descname"><span class="pre">overwrite_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.overwrite_table" title="Link to this definition"></a></dt>
+<dd><p>Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).</p>
+<p>If a relational schema has been previously loaded into the backend, it will be reapplied to the table.
+<strong>Note:</strong> This function permanently deletes the existing table and its data, before inserting the new data.</p>
+<dl class="simple">
+<dt><cite>table_name</cite><span class="classifier">str or list</span></dt><dd><ul class="simple">
+<li><p>If str, name of the table to overwrite in the backend.</p></li>
+<li><p>If list, list of all tables to overwrite in the backend</p></li>
+</ul>
+</dd>
+<dt><cite>collection</cite><span class="classifier">pandas.DataFrame  or list of Pandas.DataFrames</span></dt><dd><ul class="simple">
+<li><p>If one item, a DataFrame containing the updated data will be written to the table.</p></li>
+<li><p>If a list, all DataFrames with updated data will be written to their own table</p></li>
+</ul>
+</dd>
+<dt><cite>backup</cite><span class="classifier">bool, optional, default False.</span></dt><dd><ul class="simple">
+<li><p>If True, creates a backup file for the DSI backend before updating its data.</p></li>
+<li><p>If False, (default), only updates the data.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.summary" title="Link to this definition"></a></dt>
+<dd><p>Returns/Prints numerical metadata from tables in the first loaded backend.</p>
+<dl>
+<dt><cite>table_name</cite><span class="classifier">str, optional</span></dt><dd><p>If specified, only the numerical metadata for that table will be returned/printed.</p>
+<p>If None (default), metadata for all available tables is returned/printed.</p>
+</dd>
+<dt><cite>collection</cite><span class="classifier">bool, optional, default False.</span></dt><dd><ul class="simple">
+<li><p>If True, returns either a list of DataFrames (table_name = None), or a single DataFrame of metadata</p></li>
+<li><p>If False (default), prints metadata from all tables (table_name = None), or just a single table</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.transload">
+<span class="sig-name descname"><span class="pre">transload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.transload" title="Link to this definition"></a></dt>
+<dd><p>Transloading signals to the DSI Core Terminal that Plugin set up is complete.</p>
+<p>Activates all loaded plugin writers by generating their various output files such as an ER Diagram or an image of a table plot</p>
+<p>All loaded plugin writers will be unloaded after activation, so there is no need to separately call unload_module() for them</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.unload_module">
+<span class="sig-name descname"><span class="pre">unload_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mod_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mod_function</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.unload_module" title="Link to this definition"></a></dt>
+<dd><p>Unloads a specific DSI module from the active_modules collection.</p>
+<p>Primarily used when unloading backends, as plugin readers and writers are automatically unloaded elsewhere.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Terminal.update_abstraction">
+<span class="sig-name descname"><span class="pre">update_abstraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Terminal.update_abstraction" title="Link to this definition"></a></dt>
+<dd><p>Updates the DSI abstraction, by creating/overwriting the specified table_name with the input table_data</p>
+<dl>
+<dt><cite>table_name</cite>: str</dt><dd><p>Name of the table to update/create.</p>
+</dd>
+<dt><cite>table_data</cite><span class="classifier">OrderedDict or Pandas DataFrame</span></dt><dd><p>The new data to store in the table. If it is an Ordered Dict:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Keys are column names.</p></li>
+<li><p>Values are lists representing column data.</p></li>
+</ul>
+</div></blockquote>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="core-sync">
+<h2>Core: Sync<a class="headerlink" href="#core-sync" title="Link to this heading"></a></h2>
+<p>The DSI Core middleware also defines data management functionality in <code class="docutils literal notranslate"><span class="pre">Sync</span></code>.</p>
+<p>The purpose of <code class="docutils literal notranslate"><span class="pre">Sync</span></code> is to provide file metadata documentation and data movement capabilities when moving data to/from local and remote locations.
+The purpose of data documentation is to capture and archive metadata
+(i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates)
+and track their movement to the remote location for future access.</p>
+<p>The primary functions, <code class="docutils literal notranslate"><span class="pre">Copy</span></code>, <code class="docutils literal notranslate"><span class="pre">Move</span></code>, and <code class="docutils literal notranslate"><span class="pre">Get</span></code> serve as mechanisms to copy data, move data, or retrieve data from remote locations
+by creating a DSI database in the process, or retrieving an existing DSI database that contains the location(s) of the target data.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.core.Sync">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsi.core.</span></span><span class="sig-name descname"><span class="pre">Sync</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'test'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync" title="Link to this definition"></a></dt>
+<dd><p>A class defined to assist in data management activities for DSI</p>
+<p>Sync is where data movement functions such as copy (to remote location) and 
+sync (local filesystem with remote) exist.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'test'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tool</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'copy'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.copy" title="Link to this definition"></a></dt>
+<dd><p>Helper function to perform the 
+data copy over using a preferred API</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.dircrawl">
+<span class="sig-name descname"><span class="pre">dircrawl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.dircrawl" title="Link to this definition"></a></dt>
+<dd><p>Crawls the root ‘filepath’ directory and returns files</p>
+<p><cite>filepath</cite>: source filepath to be crawled</p>
+<p><cite>return</cite>: returns crawled file-list</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.gen_uuid">
+<span class="sig-name descname"><span class="pre">gen_uuid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">st</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.gen_uuid" title="Link to this definition"></a></dt>
+<dd><p>Generates a unique file identifier using the os.stat data object as the input</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Project'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.get" title="Link to this definition"></a></dt>
+<dd><p>Helper function that searches remote location based on project name, and retrieves
+DSI database</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.core.Sync.index">
+<span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.core.Sync.index" title="Link to this definition"></a></dt>
+<dd><p>Helper function to gather filesystem information, local and remote locations
+to create a filesystem entry in a new or existing database</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="examples">
+<span id="example-section-label"></span><h2>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h2>
+<p>Examples below display various ways users can incorporate DSI into their data science workflows.
+They must be executed from their directory in <code class="docutils literal notranslate"><span class="pre">examples/developer/</span></code></p>
+<p>To run them successfully, please unzip <code class="docutils literal notranslate"><span class="pre">clover3d.zip</span></code> located in <code class="docutils literal notranslate"><span class="pre">examples/clover3d/</span></code>, and execute <code class="docutils literal notranslate"><span class="pre">requirements.extras.txt</span></code>.</p>
+<section id="example-1-intro-use-case">
+<h3>Example 1: Intro use case<a class="headerlink" href="#example-1-intro-use-case" title="Link to this heading"></a></h3>
+<p>Baseline use of DSI to list Modules</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/1.baseline.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="c1">#optional parameters</span>
+<span class="c1">#   debug = 0, 1, 2 (creates log file to analyze runtime)</span>
+<span class="c1">#   backup_db = True/False (creates backup database prior to ingesting data)</span>
+<span class="c1">#   runTable = True/False (creates a runTable to organize rows in all tables by ingest number)</span>
+<span class="n">base_terminal</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">(</span><span class="n">debug</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">backup_db</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">runTable</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">base_terminal</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">))</span>
+<span class="c1"># [&#39;GitInfo&#39;, &#39;Hostname&#39;, &#39;SystemKernel&#39;, &#39;Bueno&#39;, &#39;Csv&#39;]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">base_terminal</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">))</span>
+<span class="c1"># [&#39;Gufi&#39;, &#39;Sqlite&#39;, &#39;DuckDB&#39;, &#39;HPSS&#39;]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">base_terminal</span><span class="o">.</span><span class="n">list_loaded_modules</span><span class="p">())</span>
+<span class="c1"># {&#39;writer&#39;: [],</span>
+<span class="c1">#  &#39;reader&#39;: [],</span>
+<span class="c1">#  &#39;back-read&#39;: [],</span>
+<span class="c1">#  &#39;back-write&#39;: []}</span>
+</pre></div>
+</div>
+</section>
+<section id="example-2-ingest-data">
+<span id="ingest-label"></span><h3>Example 2: Ingest data<a class="headerlink" href="#example-2-ingest-data" title="Link to this heading"></a></h3>
+<p>Loading a Cloverleaf reader and ingesting that data into a Sqlite DSI backend</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/2.ingest.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_ingest</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="n">terminal_ingest</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">)</span>
+
+<span class="n">terminal_ingest</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;data.db&#39;</span><span class="p">)</span>
+
+<span class="n">terminal_ingest</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-3-complex-schema-with-data">
+<h3>Example 3: Complex schema with data<a class="headerlink" href="#example-3-complex-schema-with-data" title="Link to this heading"></a></h3>
+<p>Ingesting data from a Cloverleaf Reader to a DSI backend along with a complex schema stored in a JSON file.
+Read <a class="reference internal" href="cr_examples.html#schema-section"><span class="std std-ref">Cloverleaf (Complex Schemas)</span></a> to better understand how to structure this schema JSON file for the Schema Reader</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/3.schema.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Schema&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;../clover3d/schema.json&quot;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;ER_Diagram&#39;</span><span class="p">,</span> <span class="s1">&#39;writer&#39;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;er_diagram.png&#39;</span><span class="p">)</span>
+<span class="n">terminal</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-4-visualize-data">
+<h3>Example 4: Visualize data<a class="headerlink" href="#example-4-visualize-data" title="Link to this heading"></a></h3>
+<p>Printing various data and metadata from a DSI backend - number of tables, list of tables, actual table data, and summary of table statistics</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/4.visualize.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_visualize</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1"># Run 3.schema.py so schema_data.db is not empty</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>
+
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">num_tables</span><span class="p">()</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+
+<span class="c1"># prints all data from &#39;input&#39;</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+
+<span class="c1"># optional input to specify number of rows from &#39;input&#39; to print</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># optional input to specify which columns to print</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;sim_id&quot;</span><span class="p">,</span> <span class="s2">&quot;state1_density&quot;</span><span class="p">,</span> <span class="s2">&quot;state2_density&quot;</span><span class="p">,</span> <span class="s2">&quot;initial_timestep&quot;</span><span class="p">,</span> <span class="s2">&quot;end_step&quot;</span><span class="p">])</span>
+
+
+<span class="c1"># prints numerical stats for every table in a backend</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+
+<span class="c1"># prints numerical stats for only &#39;input&#39;</span>
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+
+<span class="n">terminal_visualize</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-5-process-and-write-data">
+<span id="process-label"></span><h3>Example 5: Process and Write data<a class="headerlink" href="#example-5-process-and-write-data" title="Link to this heading"></a></h3>
+<p>Processing data from a Sqlite DSI backend and useing a Writer to generate an ER diagram, table plot and CSV file.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/5.process.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_process</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1"># Run 3.schema.py so schema_data.db is not empty</span>
+<span class="n">terminal_process</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-read&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>   
+<span class="n">terminal_process</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s2">&quot;process&quot;</span><span class="p">)</span>
+
+<span class="n">terminal_process</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Table_Plot&quot;</span><span class="p">,</span> <span class="s2">&quot;writer&quot;</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;output_plot.png&quot;</span><span class="p">)</span>
+
+<span class="n">terminal_process</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Csv_Writer&quot;</span><span class="p">,</span> <span class="s2">&quot;writer&quot;</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;input.csv&quot;</span><span class="p">)</span>
+
+<span class="c1"># ER_Diagram writer requires GraphViz to be installed</span>
+<span class="c1"># pip install graphviz</span>
+<span class="n">terminal_process</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;ER_Diagram&#39;</span><span class="p">,</span> <span class="s1">&#39;writer&#39;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;er_diagram.png&#39;</span><span class="p">)</span>
+
+<span class="c1"># After loading a plugin WRITER, need to call transload() to execute it</span>
+<span class="n">terminal_process</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-6-find-data">
+<h3>Example 6: Find data<a class="headerlink" href="#example-6-find-data" title="Link to this heading"></a></h3>
+<p>Finding data from a Sqlite DSI backend - tables, columns, cells, or all matches.
+If matching data found, it is returned as a list of ValueObject().
+Refer to each backend’s ValueObject() description in <a class="reference internal" href="backends.html#backend-section-label"><span class="std std-ref">Backends</span></a>, as its structure varies by backend.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/6.find.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_find</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1"># Run 3.schema.py so schema_data.db is not empty</span>
+<span class="n">terminal_find</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>
+
+<span class="c1">## TABLE match                      - return matching table data</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_find</span><span class="o">.</span><span class="n">find_table</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">t_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">c_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">row_num</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+
+<span class="c1">## COLUMN match                     - return matching column data</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_find</span><span class="o">.</span><span class="n">find_column</span><span class="p">(</span><span class="s2">&quot;density&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">t_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">c_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">row_num</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+
+<span class="c1">## RANGE match (range = True)       - return [min, max] of matching cols</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_find</span><span class="o">.</span><span class="n">find_column</span><span class="p">(</span><span class="s2">&quot;density&quot;</span><span class="p">,</span> <span class="nb">range</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">t_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">c_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">row_num</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+
+<span class="c1">## CELL match                       - return the cells which match the search term</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_find</span><span class="o">.</span><span class="n">find_cell</span><span class="p">(</span><span class="s2">&quot;rectangle&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">t_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">c_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">row_num</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+
+<span class="c1">## ROW match (row_return = True)    - return the rows where cells match the search term</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_find</span><span class="o">.</span><span class="n">find_cell</span><span class="p">(</span><span class="s2">&quot;rectangle&quot;</span><span class="p">,</span> <span class="n">row</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">t_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">c_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">row_num</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+
+<span class="c1">## ALL match                        - find all instances where the search term is found: table, column, cell</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_find</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;Jun&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">t_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">c_name</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">row_num</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-7-query-data">
+<h3>Example 7: Query data<a class="headerlink" href="#example-7-query-data" title="Link to this heading"></a></h3>
+<p>Querying data from a Sqlite DSI backend.
+Users can either use <code class="docutils literal notranslate"><span class="pre">artifact_handler('query',</span> <span class="pre">SQL_query)</span></code> to store certain data, or <code class="docutils literal notranslate"><span class="pre">get_table()</span></code> to retrieve all data from a specified table.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/7.query.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_query</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1"># Run 3.schema.py so schema_data.db is not empty</span>
+<span class="n">terminal_query</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_query</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;query&#39;</span><span class="p">,</span> <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT * FROM input;&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># Use if want to retrieve all data from a table</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_query</span><span class="o">.</span><span class="n">get_table</span><span class="p">(</span><span class="n">table_name</span><span class="o">=</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-8-overwrite-data">
+<h3>Example 8: Overwrite data<a class="headerlink" href="#example-8-overwrite-data" title="Link to this heading"></a></h3>
+<p>Overwriting a table using modified data from <code class="docutils literal notranslate"><span class="pre">get_table()</span></code></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/8.overwrite.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_overwrite</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1"># Run 3.schema.py so schema_data.db is not empty</span>
+<span class="n">terminal_overwrite</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">terminal_overwrite</span><span class="o">.</span><span class="n">get_table</span><span class="p">(</span><span class="n">table_name</span><span class="o">=</span><span class="s2">&quot;input&quot;</span><span class="p">)</span> <span class="c1"># data in form of Pandas DataFrame</span>
+
+<span class="n">data</span><span class="p">[</span><span class="s2">&quot;new_column&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">200</span>    <span class="c1"># creating new column</span>
+<span class="n">data</span><span class="p">[</span><span class="s2">&quot;end_step&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">35</span>       <span class="c1"># editing existing column</span>
+
+<span class="n">terminal_overwrite</span><span class="o">.</span><span class="n">overwrite_table</span><span class="p">(</span><span class="n">table_name</span> <span class="o">=</span> <span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="n">collection</span> <span class="o">=</span> <span class="n">data</span><span class="p">)</span>
+
+<span class="n">terminal_overwrite</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="n">num_rows</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">display_cols</span><span class="o">=</span> <span class="p">[</span><span class="s2">&quot;sim_id&quot;</span><span class="p">,</span> <span class="s2">&quot;state1_density&quot;</span><span class="p">,</span> <span class="s2">&quot;state2_density&quot;</span><span class="p">,</span> <span class="s2">&quot;end_step&quot;</span><span class="p">,</span> <span class="s2">&quot;new_column&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+</section>
+<section id="example-9-external-readers-writers">
+<span id="external-readers-writers-label"></span><h3>Example 9: External Readers/Writers<a class="headerlink" href="#example-9-external-readers-writers" title="Link to this heading"></a></h3>
+<p>Temporarily adding an external data reader to DSI, allowing DSI to interact with the associated data across all actions.
+In this instance, the data is ingested into a backend and viewed using <code class="docutils literal notranslate"><span class="pre">display()</span></code></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/9.external_reader.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">term</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1"># Second input is name of the python file where the Reader/Writer is stored</span>
+<span class="c1"># Third input is full filepath to the python file </span>
+<span class="n">term</span><span class="o">.</span><span class="n">add_external_python_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;text_file_reader&#39;</span><span class="p">,</span> <span class="s1">&#39;../test/text_file_reader.py&#39;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">list_available_modules</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">))</span> <span class="c1"># includes TextFile at end of list</span>
+
+<span class="c1"># Second input must be the exact spelling of the class name in the external file</span>
+<span class="n">term</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;TextFile&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">filenames</span> <span class="o">=</span> <span class="s2">&quot;../test/test.txt&quot;</span><span class="p">)</span>
+
+<span class="n">term</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;text_data.db&#39;</span><span class="p">)</span>
+
+<span class="n">term</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+<span class="n">term</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="s2">&quot;people&quot;</span><span class="p">)</span> <span class="c1">#name of the table created in the TextFile external reader</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">text_file_reader</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">pandas</span> <span class="kn">import</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">read_csv</span><span class="p">,</span> <span class="n">concat</span>
+
+<span class="kn">from</span> <span class="nn">dsi.plugins.file_reader</span> <span class="kn">import</span> <span class="n">FileReader</span>
+
+<span class="k">class</span> <span class="nc">TextFile</span><span class="p">(</span><span class="n">FileReader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    External Plugin to read in an individual or a set of text files.</span>
+<span class="sd">    Assuming all text files have data for same table</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filenames</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        `filenames`: one text file or a list of text files to be ingested</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">filenames</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">filenames</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">text_files</span> <span class="o">=</span> <span class="p">[</span><span class="n">filenames</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">text_files</span> <span class="o">=</span> <span class="n">filenames</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">text_file_data</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">add_rows</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parses text file data and creates an ordered dict whose keys are table names and values are an ordered dict for each table.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">total_df</span> <span class="o">=</span> <span class="n">DataFrame</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">text_files</span><span class="p">:</span>
+            <span class="n">temp_df</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+            <span class="n">total_df</span> <span class="o">=</span> <span class="n">concat</span><span class="p">([</span><span class="n">total_df</span><span class="p">,</span> <span class="n">temp_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">text_file_data</span><span class="p">[</span><span class="s2">&quot;people&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">total_df</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s1">&#39;list&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_schema_2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">text_file_data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-10-generate-notebook">
+<h3>Example 10: Generate notebook<a class="headerlink" href="#example-10-generate-notebook" title="Link to this heading"></a></h3>
+<p>Generating a python notebook (mostly Jupyter notebook) from a Sqlite DSI backend to view data interactively.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/10.notebook.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_notebook</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1">#read data</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Schema&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;../clover3d/schema.json&quot;</span><span class="p">)</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">)</span>
+
+<span class="c1">#ingest data to Sqlite backend</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;jupyter_data.db&#39;</span><span class="p">)</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+<span class="c1">#generate Jupyter notebook</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s2">&quot;notebook&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="backends.html" class="btn btn-neutral float-left" title="Backends" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="development.html" class="btn btn-neutral float-right" title="DSI Development Plans" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

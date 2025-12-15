@@ -1,0 +1,479 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DSI Examples &mdash; DSI 1.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=00f267c6"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="DSI Development Plans" href="development.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cr_intro.html">Contributor Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">DSI Readers/Writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_reader.html">Custom DSI Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_writer.html">Custom DSI Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="development.html">DSI Development Plans</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">DSI Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pennant-mini-app">PENNANT mini-app</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wildfire-dataset">Wildfire Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cloverleaf-complex-schemas">Cloverleaf (Complex Schemas)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#jupyter-notebook">Jupyter Notebook</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">DSI Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/cr_examples.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dsi-examples">
+<h1>DSI Examples<a class="headerlink" href="#dsi-examples" title="Link to this heading"></a></h1>
+<section id="pennant-mini-app">
+<h2>PENNANT mini-app<a class="headerlink" href="#pennant-mini-app" title="Link to this heading"></a></h2>
+<p><cite>PENNANT</cite> is an unstructured mesh physics mini-application developed at Los Alamos National Laboratory
+for advanced architecture research.
+It contains mesh data structures and a few
+physics algorithms from radiation hydrodynamics and serves as an example of
+typical memory access patterns for an HPC simulation code.</p>
+<p>This DSI PENNANT example is used to show a common use case: create and query a set of metadata derived from an ensemble of simulation runs.
+The example GitHub directory includes 10 PENNANT runs using the PENNANT <em>Leblanc</em> test problem.</p>
+<p>In the first step, a python script is used to parse the slurm output files and create a CSV (comma separated value) file with the output metadata.</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>python3 parse_slurm_output<span class="s">.python</span>
+</pre></div>
+</div>
+<p>In the second step, another python script,</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>python3 dsi_pennant_dev<span class="s">.py</span>
+</pre></div>
+</div>
+<p>reads in the CSV file and creates a database:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This script reads in the csv file created from parse_slurm_output.py.</span>
+<span class="sd">Then it creates a DSI db from the csv file and performs a query.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">test_name</span> <span class="o">=</span> <span class="s2">&quot;leblanc&quot;</span>
+    <span class="n">table_name</span> <span class="o">=</span> <span class="s2">&quot;rundata&quot;</span>
+    <span class="n">csvpath</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;pennant_</span><span class="si">{</span><span class="n">test_name</span><span class="si">}</span><span class="s1">.csv&#39;</span>
+    <span class="n">dbpath</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;pennant_</span><span class="si">{</span><span class="n">test_name</span><span class="si">}</span><span class="s1">.db&#39;</span>
+    <span class="n">datacard</span> <span class="o">=</span> <span class="s2">&quot;pennant_oceans11.yml&quot;</span>
+    <span class="n">output_csv</span> <span class="o">=</span> <span class="s2">&quot;pennant_output.csv&quot;</span>
+
+    <span class="n">core</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+    <span class="c1"># This reader creates a manual simulation table where each row of Pennant is its own simulation</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Ensemble&quot;</span><span class="p">,</span> <span class="s2">&quot;reader&quot;</span><span class="p">,</span> <span class="n">filenames</span> <span class="o">=</span> <span class="n">csvpath</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">sim_table</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Oceans11Datacard&quot;</span><span class="p">,</span> <span class="s2">&quot;reader&quot;</span><span class="p">,</span> <span class="n">filenames</span> <span class="o">=</span> <span class="n">datacard</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dbpath</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">dbpath</span><span class="p">)</span>
+
+    <span class="c1">#load data into sqlite db</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="n">dbpath</span><span class="p">)</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+    <span class="c1"># update dsi abstraction using a query to the sqlite db</span>
+    <span class="n">query_data</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;query&#39;</span><span class="p">,</span> <span class="n">query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;SELECT * FROM </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2"> WHERE hydro_cycle_run_time &gt; 0.006;&quot;</span><span class="p">,</span> <span class="n">dict_return</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">update_abstraction</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">query_data</span><span class="p">)</span>
+
+    <span class="c1">#export to csv</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Csv_Writer&quot;</span><span class="p">,</span> <span class="s2">&quot;writer&quot;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">output_csv</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span><span class="p">)</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Resulting in the output of the query:</p>
+<figure class="align-default" id="id1">
+<img alt="Screenshot of computer program output." class="with-shadow" src="_images/example-pennant-output.png" />
+<figcaption>
+<p><span class="caption-text">The output of the PENNANT example.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="wildfire-dataset">
+<h2>Wildfire Dataset<a class="headerlink" href="#wildfire-dataset" title="Link to this heading"></a></h2>
+<p>This example highlights the use of the DSI framework with QUIC-Fire simulation data and resulting images.
+QUIC-Fire is a fire-atmosphere modeling framework for prescribed fire burn analysis.
+It is light-weight (able to run on a laptop), allowing scientists to generate ensembles of thousands of simulations in weeks.
+This QUIC-fire dataset is an ensemble of prescribed fire burns for the Wawona region of Yosemite National Park.</p>
+<p>The original file, wildfire.csv, lists 1889 runs of a wildfire simulation. Each row is a unique run with input and output values and associated image url.
+The columns list the various parameters of interest.
+The input columns are: wild_speed, wdir (wind direction), smois (surface moisture), fuels, ignition, safe_unsafe_ignition_pattern,
+safe_unsafe_fire_behavior, does_fire_meet_objectives, and rationale_if_unsafe.
+The output of the simulation (and post-processing steps) include the burned_area and the url to the wildfire images stored on the San Diego Super Computer.</p>
+<p>After loading dsi, run this example within the <code class="docutils literal notranslate"><span class="pre">dsi/examples/wildfire/</span></code> folder as all filepaths are relative to that location:</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>python3 wildfire_dev<span class="s">.py</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">urllib.request</span> 
+
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="k">def</span> <span class="nf">downloadImages</span><span class="p">(</span><span class="n">path_to_csv</span><span class="p">,</span> <span class="n">imageFolder</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read and download the images from the SDSC server</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">imageFolder</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">imageFolder</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path_to_csv</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;FILE&quot;</span><span class="p">]:</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+        
+        <span class="n">dst</span> <span class="o">=</span> <span class="n">imageFolder</span> <span class="o">+</span> <span class="n">filename</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dst</span><span class="p">):</span>
+            <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">input_csv</span> <span class="o">=</span> <span class="s2">&quot;wildfiredata.csv&quot;</span>
+    <span class="n">db_name</span> <span class="o">=</span> <span class="s1">&#39;wildfire.db&#39;</span>
+    <span class="n">cinema_db_name</span> <span class="o">=</span> <span class="s2">&quot;wildfire.cdb/&quot;</span>
+    <span class="n">path_to_cinema_images</span> <span class="o">=</span> <span class="n">cinema_db_name</span> <span class="o">+</span> <span class="s2">&quot;images/&quot;</span>
+    <span class="n">datacard</span> <span class="o">=</span> <span class="s2">&quot;wildfire_oceans11.yml&quot;</span>
+    <span class="n">output_csv</span> <span class="o">=</span> <span class="n">cinema_db_name</span> <span class="o">+</span> <span class="s2">&quot;wildfire_output.csv&quot;</span>
+    <span class="n">table_name</span> <span class="o">=</span> <span class="s2">&quot;wfdata&quot;</span>
+    <span class="n">columns_to_keep</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;wind_speed&quot;</span><span class="p">,</span> <span class="s2">&quot;wdir&quot;</span><span class="p">,</span> <span class="s2">&quot;smois&quot;</span><span class="p">,</span> <span class="s2">&quot;burned_area&quot;</span><span class="p">,</span> <span class="s2">&quot;LOCAL_PATH&quot;</span><span class="p">]</span>
+
+    <span class="c1"># downloads wildfire images and moves them to the Cinema Database folder - external to DSI</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">cinema_db_name</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">cinema_db_name</span><span class="p">)</span>
+    <span class="n">downloadImages</span><span class="p">(</span><span class="n">input_csv</span><span class="p">,</span> <span class="n">path_to_cinema_images</span><span class="p">)</span>
+
+    <span class="n">core</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+    <span class="c1">#creating manual simulation table where each row of wildfire is its own simulation</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Ensemble&quot;</span><span class="p">,</span> <span class="s2">&quot;reader&quot;</span><span class="p">,</span> <span class="n">filenames</span> <span class="o">=</span> <span class="n">input_csv</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span><span class="p">)</span>
+
+    <span class="c1">#ingest metadata information via data card</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Oceans11Datacard&quot;</span><span class="p">,</span> <span class="s2">&quot;reader&quot;</span><span class="p">,</span> <span class="n">filenames</span> <span class="o">=</span> <span class="n">datacard</span><span class="p">)</span>
+
+    <span class="c1"># update DSI abstraction directly</span>
+    <span class="n">updatedFilePaths</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">wildfire_table</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_current_abstraction</span><span class="p">(</span><span class="n">table_name</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">url_image</span> <span class="ow">in</span> <span class="n">wildfire_table</span><span class="p">[</span><span class="s1">&#39;FILE&#39;</span><span class="p">]:</span>
+        <span class="n">image_name</span> <span class="o">=</span> <span class="n">url_image</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">filePath</span> <span class="o">=</span> <span class="n">path_to_cinema_images</span> <span class="o">+</span> <span class="n">image_name</span>
+        <span class="n">updatedFilePaths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filePath</span><span class="p">)</span>
+    <span class="n">wildfire_table</span><span class="p">[</span><span class="s1">&#39;LOCAL_PATH&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">updatedFilePaths</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">update_abstraction</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">wildfire_table</span><span class="p">)</span>
+
+    <span class="c1"># export data with revised filepaths to CSV</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s2">&quot;Csv_Writer&quot;</span><span class="p">,</span> <span class="s2">&quot;writer&quot;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">output_csv</span><span class="p">,</span> <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">export_cols</span> <span class="o">=</span> <span class="n">columns_to_keep</span><span class="p">)</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">db_name</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">db_name</span><span class="p">)</span>
+
+    <span class="c1">#load data to a sqlite database</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="n">db_name</span><span class="p">)</span>
+    <span class="n">core</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+
+</pre></div>
+</div>
+<p>This will generate a wildfire.cdb folder with downloaded images from the server and a data.csv file of numerical properties of interest.
+This cdb folder is called a <a class="reference external" href="https://github.com/cinemascience">Cinema</a> database (CDB).
+Cinema is an ecosystem for management and analysis of high dimensional data artifacts that promotes flexible and interactive data exploration and analysis.
+A Cinema database is comprised of a CSV file where each row of the table is a data element (ex: run or ensemble member of a simulation) and each column is a property of the data element.
+Any column name that starts with ‘FILE’ is a path to a file associated with the data element.
+This could be an image, a plot, a simulation mesh or other data artifact.</p>
+<p>Cinema databases can be visualized through various tools. We illustrate two options below:</p>
+<p>To visualize the results using Jupyter Lab and Plotly, run:</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>python3 -m pip install plotly
+python3 -m pip install jupyterlab
+</pre></div>
+</div>
+<p>Open Jupyter Lab with:</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>jupyter lab --browser Firefox
+</pre></div>
+</div>
+<p>and navigate to <code class="docutils literal notranslate"><span class="pre">wildfire_plotly.ipynb</span></code>.  Run the cells to visualize the results of the DSI pipeline.</p>
+<figure class="align-default" id="id2">
+<a class="with-shadow reference internal image-reference" href="_images/example-wildfire-jupyter.png"><img alt="User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot." class="with-shadow" src="_images/example-wildfire-jupyter.png" style="width: 724.5px; height: 469.5px;" /></a>
+<figcaption>
+<p><span class="caption-text">Screenshot of the JupyterLab workflow.
+The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Another option is to use <a class="reference external" href="https://github.com/cinemascience/pycinema">Pycinema</a>, a QT-based GUI that supports visualization and analysis of Cinema databases.
+To open a pycinema viewer, first install pycinema and then run the example script.</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>python3 -m pip install pycinema
+cinema examples<span class="s">/wildfire/wildfire_pycinema.py</span>
+</pre></div>
+</div>
+<figure class="align-default" id="id3">
+<a class="with-shadow reference internal image-reference" href="_images/example-wildfire-pycinema.png"><img alt="_images/example-wildfire-pycinema.png" class="with-shadow" src="_images/example-wildfire-pycinema.png" style="width: 912.8000000000001px; height: 416.8px;" /></a>
+<figcaption>
+<p><span class="caption-text">Screenshot of the Pycinema user interface showing the minimal set of components.
+Left: the nodeview showing the various pycinema components in the visualization pipeline;
+upper-right: the table-view;
+lower-right: the image view.
+Pycinema components are linked such that making a selection in one view will propagate to the other views.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="cloverleaf-complex-schemas">
+<span id="schema-section"></span><h2>Cloverleaf (Complex Schemas)<a class="headerlink" href="#cloverleaf-complex-schemas" title="Link to this heading"></a></h2>
+<p>This example shows how to use DSI with ensemble data from 8 Cloverleaf_Serial runs, and how to create a complex schema compatible with DSI.</p>
+<p>The directory with this sample input and output data can be found in <code class="docutils literal notranslate"><span class="pre">examples/clover3d/</span></code> where each run has its own subfolder.
+Each run’s input file is <code class="docutils literal notranslate"><span class="pre">clover.in</span></code> and the output is <code class="docutils literal notranslate"><span class="pre">clover.out</span></code> and the associated VTK files.</p>
+<p>After loading dsi, run this example within the <code class="docutils literal notranslate"><span class="pre">dsi/examples/developer/</span></code> folder as all filepaths are relative to that location:</p>
+<div class="highlight-unixconfig notranslate"><div class="highlight"><pre><span></span>python3 3<span class="s">.schema.py</span>
+</pre></div>
+</div>
+<p>This workflow uses a custom Cloverleaf reader to load the data, along with a complex schema that maps the input data, output data, and VTK files to the respective simulation runs.
+Once executing the workflow, users can see that the state2_density value is the only input parameter changed for each run.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/3.schema.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Schema&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;../clover3d/schema.json&quot;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;schema_data.db&#39;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+<span class="n">terminal</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;ER_Diagram&#39;</span><span class="p">,</span> <span class="s1">&#39;writer&#39;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;er_diagram.png&#39;</span><span class="p">)</span>
+<span class="n">terminal</span><span class="o">.</span><span class="n">transload</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">examples/test/example_schema.json</span></code> is:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">   </span><span class="nt">&quot;simulation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;primary_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span>
+<span class="w">   </span><span class="p">},</span>
+<span class="w">   </span><span class="nt">&quot;input&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;sim_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">},</span>
+<span class="w">   </span><span class="nt">&quot;output&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;sim_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">},</span>
+<span class="w">   </span><span class="nt">&quot;viz_files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;sim_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>and the generated ER diagram is:</p>
+<figure class="align-center" id="id4">
+<a class="reference internal image-reference" href="_images/schema_erd.png"><img alt="_images/schema_erd.png" src="_images/schema_erd.png" style="width: 422.79999999999995px; height: 1323.35px;" /></a>
+<figcaption>
+<p><span class="caption-text">Entity Relationship Diagram of Cloverleaf data.
+Displays relations between the simulation, input, output, and viz_files tables.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>This section explains how to define primary and foreign key relationships in a JSON file for <code class="docutils literal notranslate"><span class="pre">schema()</span></code>, such as <code class="docutils literal notranslate"><span class="pre">examples/test/example_schema.json</span></code></p>
+<p>For futher clarity, each schema file must be structured as a dictionary where:</p>
+<blockquote>
+<div><ul>
+<li><p>each table with a relation is a key whose value is a nested dictionary storing primary and foreign key information</p></li>
+<li><p>The nested dictionary has 2 keys: ‘primary_key’ and ‘foreign_key’ which must be spelled exactly the same to be processed:</p></li>
+<li><p>The value of ‘primary_key’ is the string name of the column in this table that is a primary key</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Ex: “primary_key” : “id”</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>The value of ‘foreign_key’ is another inner dictionary, since a table can have multiple foreign keys:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Each inner dictionary’s key is a column in this table that is a foreign key to another table’s primary key</p></li>
+<li><p>The key’s value is a list of 2 elements - the other table storing the primary key, and the column in that table that is the primary key</p></li>
+<li><p>Ex: “foreign_key” : { “name” : [“table1”, “id”] , “age” : [“table2”, “id”] }</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>If a table does not have a primary key there is no need to include an empty key/value pair for the table</p></li>
+<li><p>If a table does not have foreign keys, there is no need for an empty inner dictionary</p></li>
+</ul>
+</div></blockquote>
+<p>For example, if a user has a a table ‘Payments’ with a primary key ‘id’
+and a foreign key ‘user_name’ that points to another table ‘Users’ with primary key ‘name’, the schema is:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">   </span><span class="nt">&quot;Payments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;primary_key&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;id&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="nt">&quot;user_name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Users&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>For example, if we update the Cloverleaf schema by adding a new primary and foreign key relation (assuming the columns exist):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">   </span><span class="nt">&quot;simulation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;primary_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span>
+<span class="w">   </span><span class="p">},</span>
+<span class="w">   </span><span class="nt">&quot;input&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;primary_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;input_id&quot;</span><span class="p">,</span><span class="w">                  </span><span class="c1">// &lt;--- new primary key</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;sim_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">},</span>
+<span class="w">   </span><span class="nt">&quot;output&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;sim_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span><span class="p">],</span>
+<span class="w">            </span><span class="nt">&quot;input_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;input&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;input_id&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1">// &lt;--- new foreign key</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">},</span>
+<span class="w">   </span><span class="nt">&quot;viz_files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;foreign_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;sim_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;simulation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sim_id&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>our new ER diagram is:</p>
+<figure class="align-center" id="id5">
+<a class="reference internal image-reference" href="_images/schema_erd_added.png"><img alt="_images/schema_erd_added.png" src="_images/schema_erd_added.png" style="width: 641.55px; height: 1017.4499999999999px;" /></a>
+<figcaption>
+<p><span class="caption-text">ER Diagram of same data. However, there is now an additional primary/foreign key relation from “input” to “output”</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="jupyter-notebook">
+<h2>Jupyter Notebook<a class="headerlink" href="#jupyter-notebook" title="Link to this heading"></a></h2>
+<p>This example displays an example workflow for a user to read data into DSI, ingest it into a backend and then view the data interactively with a Jupyter notebook.</p>
+<p><code class="docutils literal notranslate"><span class="pre">examples/developer/10.notebook.py</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># examples/developer/10.notebook.py</span>
+<span class="kn">from</span> <span class="nn">dsi.core</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="n">terminal_notebook</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">()</span>
+
+<span class="c1">#read data</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Schema&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;../clover3d/schema.json&quot;</span><span class="p">)</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;plugin&#39;</span><span class="p">,</span> <span class="s1">&#39;Cloverleaf&#39;</span><span class="p">,</span> <span class="s1">&#39;reader&#39;</span><span class="p">,</span> <span class="n">folder_path</span><span class="o">=</span><span class="s2">&quot;../clover3d/&quot;</span><span class="p">)</span>
+
+<span class="c1">#ingest data to Sqlite backend</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">load_module</span><span class="p">(</span><span class="s1">&#39;backend&#39;</span><span class="p">,</span><span class="s1">&#39;Sqlite&#39;</span><span class="p">,</span><span class="s1">&#39;back-write&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;jupyter_data.db&#39;</span><span class="p">)</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s1">&#39;ingest&#39;</span><span class="p">)</span>
+
+<span class="c1">#generate Jupyter notebook</span>
+<span class="n">terminal_notebook</span><span class="o">.</span><span class="n">artifact_handler</span><span class="p">(</span><span class="n">interaction_type</span><span class="o">=</span><span class="s2">&quot;notebook&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The above workflow generates <code class="docutils literal notranslate"><span class="pre">dsi_sqlite_backend_output.ipynb</span></code> which can be seen below.
+Users can make further edits to the Jupyter notebook to interact with the data.</p>
+<figure class="align-center">
+<a class="reference internal image-reference" href="_images/jupyter_1.png"><img alt="_images/jupyter_1.png" src="_images/jupyter_1.png" style="width: 722.8000000000001px; height: 555.1px;" /></a>
+</figure>
+<figure class="align-center" id="id6">
+<a class="reference internal image-reference" href="_images/jupyter_2.png"><img alt="_images/jupyter_2.png" src="_images/jupyter_2.png" style="width: 722.8000000000001px; height: 345.15000000000003px;" /></a>
+<figcaption>
+<p><span class="caption-text">Screenshots of an example Jupyter notebook with loaded data.</span><a class="headerlink" href="#id6" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="development.html" class="btn btn-neutral float-left" title="DSI Development Plans" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
