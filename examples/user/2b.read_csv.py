@@ -1,4 +1,4 @@
-# examples/user/2.read_csv.py
+# examples/user/2b.read_csv.py
 from dsi.dsi import DSI
 
 csv_dsi = DSI("wildfire_data.db") # Target a backend, defaults to SQLite if not defined

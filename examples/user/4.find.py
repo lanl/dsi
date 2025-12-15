@@ -1,7 +1,7 @@
 # examples/user/4.find.py
 from dsi.dsi import DSI
 
-find_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
+find_dsi = DSI("data.db") # Assuming data.db has data from 2a.read.py:
 
 #dsi.search(value)
 find_dsi.search("Jun 2025") # searches for the value 'Jun 2025' in all tables
