@@ -1509,7 +1509,9 @@ class Sync():
                 dbfile.seek(0)
                 full_header = dbfile.read(12) 
                 if full_header[8:12] == b'DUCK':
-                    t.load_module('backend','DuckDB','back-write', filename=f)            
+                    fnull = open(os.devnull, 'w')
+                    with redirect_stdout(fnull):
+                        t.load_module('backend','DuckDB','back-write', filename=f)            
         except Exception as err:
             print(f"Invalid Database {f}: {err}")
             raise
