@@ -485,7 +485,7 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
                     if self.user_wrapper:
-                        if errorMessage[1].startswith("A complex schema"):
+                        if isinstance(errorMessage[1], str) and errorMessage[1].startswith("A complex schema"):
                             raise errorMessage[0](errorMessage[1])
                         raise errorMessage[0](f"Error ingesting data due to {errorMessage[1]}")
                     else:

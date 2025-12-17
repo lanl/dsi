@@ -278,14 +278,16 @@ class Sqlite(Filesystem):
 
             foreign_query = ""
             for key in tableData:
-                sql_key = key.replace(' ', '_').replace('-', '_')
-                sql_key = self.sqlite_compatible_name(sql_key)
+                sql_key = key.replace('-', '_')
+                sql_key = self.sqlite_compatible_name(re.sub(r'[\r\n]+', ' ', sql_key))
                 comboTuple = (tableName, key)
                 dsi_name = "dsi_relations"
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["foreign_key"]:
                     foreignIndex = artifacts[dsi_name]["foreign_key"].index(comboTuple)
                     primaryTuple = artifacts[dsi_name]['primary_key'][foreignIndex]
-                    foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
+                    primary_table = self.sqlite_compatible_name(primaryTuple[0].replace(' ', '_').replace('-', '_'))
+                    primary_col = self.sqlite_compatible_name(re.sub(r'[\r\n]+', ' ', primaryTuple[1].replace('-', '_')))
+                    foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primary_table} ({primary_col})"
                 
                 types.properties[sql_key] = tableData[key]
                 
@@ -998,7 +1000,7 @@ class Sqlite(Filesystem):
         for col in col_info:
             col_name = col[1]
             col_type = col[2].upper()
-            unique_vals = self.cur.execute(f"SELECT COUNT(DISTINCT {col_name}) FROM {table_name};").fetchone()[0]
+            unique_vals = self.cur.execute(f"SELECT COUNT(DISTINCT {self.sqlite_compatible_name(col_name)}) FROM {table_name};").fetchone()[0]
             is_primary = col[5] > 0
             display_name = f"{col_name}*" if is_primary else col_name
 
