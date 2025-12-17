@@ -1489,6 +1489,8 @@ class Sync():
         t = Terminal()
 
         f = self.project_name+".db"
+        isDuckDB=False
+        isSQLite=False
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = local_loc+"/"+self.project_name+".db"
@@ -1501,21 +1503,25 @@ class Sync():
                 # Detect sqlite
                 header_bytes = dbfile.read(16)
                 if header_bytes == b'SQLite format 3\x00':
-                    fnull = open(os.devnull, 'w')
-                    with redirect_stdout(fnull):
-                        t.load_module('backend','Sqlite','back-write', filename=f)
-
+                    isSQLite=True
                 # Detect duckdb
                 dbfile.seek(0)
                 full_header = dbfile.read(12) 
                 if full_header[8:12] == b'DUCK':
-                    fnull = open(os.devnull, 'w')
-                    with redirect_stdout(fnull):
-                        t.load_module('backend','DuckDB','back-write', filename=f)            
+                    isDuckDB=True
         except Exception as err:
-            print(f"Invalid Database {f}: {err}")
+            print(f"Database {f} not found: {err}")
             raise
 
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            if isSQLite:
+                t.load_module('backend','DuckDB','back-write', filename=f)
+            elif isDuckDB:
+                t.load_module('backend','DuckDB','back-write', filename=f)
+            else:
+                assert True, "Unsupported Database type!"
+                
         # See if filesystem exists
         fs_t = t.get_table("filesystem")
         if fs_t.empty:
@@ -1543,24 +1549,39 @@ class Sync():
         # See if FS table has been created
         t = Terminal()
 
-        f = self.project_name 
-        if ".db" not in f:
-            f = self.project_name+".db"
-
-
+        f = self.project_name+".db"
+        isDuckDB=False
+        isSQLite=False
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
-            #f = self.local_location+"/"+self.project_name+".db"
+            #f = local_loc+"/"+self.project_name+".db"
             if isVerbose:
                 print("trying db: ", f)
             assert os.path.exists(f)
 
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                t.load_module('backend','Sqlite','back-read', filename=f)
-        except Exception:
-            print(f"Database {f} not found")
+            # Detect to see which reader we should use
+            with open(f, 'rb') as dbfile:
+                # Detect sqlite
+                header_bytes = dbfile.read(16)
+                if header_bytes == b'SQLite format 3\x00':
+                    isSQLite=True
+                # Detect duckdb
+                dbfile.seek(0)
+                full_header = dbfile.read(12) 
+                if full_header[8:12] == b'DUCK':
+                    isDuckDB=True
+        except Exception as err:
+            print(f"Database {f} not found: {err}")
             raise
+
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            if isSQLite:
+                t.load_module('backend','DuckDB','back-write', filename=f)
+            elif isDuckDB:
+                t.load_module('backend','DuckDB','back-write', filename=f)
+            else:
+                assert True, "Unsupported Database type!"
 
         # See if filesystem exists
         fs_t = t.get_table("filesystem")

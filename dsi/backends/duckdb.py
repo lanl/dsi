@@ -323,10 +323,10 @@ class DuckDB(Filesystem):
                             
         try:
             self.cur.execute("COMMIT")
-            self.cur.execute("CHECKPOINT")
+            self.cur.execute("FORCE CHECKPOINT")
         except duckdb.Error as e:
             self.cur.execute("ROLLBACK")
-            self.cur.execute("CHECKPOINT")
+            self.cur.execute("FORCE CHECKPOINT")
             return (duckdb.Error, e)
 
 
