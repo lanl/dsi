@@ -6,6 +6,8 @@ import time
 import sys
 import os
 from contextlib import redirect_stdout
+import io
+import re
 
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
@@ -30,13 +32,23 @@ def get_db():
 st.set_page_config(page_title="DSI ML Emulator", layout="wide")
 st.title("DSI ML Emulator")
 
-tables = get_db().list(collection=True)
+f1 = io.StringIO()
+with redirect_stdout(f1):
+    get_db().list()
+output = f1.getvalue()
+
+pattern = re.compile(r"Table:\s*(?P<table>\w+).*?- num of rows:\s*(?P<rows>\d+)", re.DOTALL)
+tables = [m.group("table") for m in pattern.finditer(output) if int(m.group("rows")) > 5]
+
+if len(tables) == 0:
+    st.warning("Emulator requires tables with at least 5 rows. Please try again with a larger dataset.")
+    st.stop()
 
 sel_key = "selected_table"
 if sel_key not in st.session_state:
     st.session_state[sel_key] = tables[0] if tables else None
 
-st.write("### Select Table")
+st.write("### Select Table (only showing those with more than 5 rows)")
 selected = st.radio("Tables", options=tables, horizontal=True, key=sel_key, label_visibility="collapsed")
 
 table = st.session_state[sel_key]
