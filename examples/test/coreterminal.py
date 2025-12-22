@@ -9,6 +9,7 @@ a=Terminal(debug=0, backup_db = False, runTable=False)
 
 # a.load_module('plugin', 'Schema', 'reader', filename="example_schema.json")
 a.load_module('plugin', 'Schema', 'reader', filename="yaml1_schema.json")
+# a.load_module('plugin', 'Schema', 'reader', filename="yaml1_circular_schema.json")
 
 a.load_module('plugin', 'YAML1', 'reader', filenames=["student_test1.yml", "student_test2.yml"])
 # a.load_module('plugin', 'TOML1', 'reader', filenames=["results.toml", "results1.toml"], target_table_prefix = "results")

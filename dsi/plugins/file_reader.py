@@ -3,7 +3,7 @@ from os.path import abspath
 from hashlib import sha1
 import json
 from math import isnan
-from pandas import DataFrame, read_csv, concat
+from pandas import DataFrame, read_csv, concat, read_excel
 import re
 import yaml
 try: import tomllib
@@ -618,7 +618,7 @@ class Cloverleaf(FileReader):
         simulation_dict = OrderedDict({'sim_id': [], 'sim_datetime': []})
 
         sim_num = 1
-        all_runs = sorted([f.name for f in os.scandir(self.folder_path) if f.is_dir()])
+        all_runs = sorted([f.name for f in os.scandir(self.folder_path) if f.is_dir() and not f.name.startswith('.') ])
         for run_name in all_runs:
             input_file = f"{self.folder_path}/{run_name}/clover.in"
             
@@ -943,6 +943,58 @@ class GoogleDatacard(FileReader):
         self.datacard_data["google_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
+class GenesisDatacard(FileReader):
+    """
+    DSI Reader that stores a dataset's data card as a row in the `genesis_datacard` table.
+    Input datacard should follow template in `examples/test/template_dc_genesis.xlsx`
+    """
+    def __init__(self, filenames, **kwargs):
+        """
+        `filenames` : str or list of str
+            File name(s) of Excel data card files to ingest. Each file must adhere to the
+            LANL Gensis metadata standard. The Excel file must only have one sheet.
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.datacard_files = [filenames]
+        else:
+            self.datacard_files = filenames
+        self.genesis_data = OrderedDict()
+
+    def add_rows(self) -> None:
+        """
+        Flattens data in the input data card as a row in the `genesis_datacard` table
+
+        `return`: None. 
+            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
+        """
+        temp_data = OrderedDict()
+        for filename in self.datacard_files:
+            try:
+                temp_df = read_excel(filename, sheet_name = 0)
+            except:
+                raise ValueError(f"Error reading in {filename} for the Genesis data card reader")
+
+            required_columns = ["Metadata Element", "Supporting Element", "Requirement Level", "LANL Input Example"]
+            if not set(required_columns).issubset(temp_df.columns.tolist()):
+                raise ValueError(f"The required metadata columns are {', '.join(required_columns)}")
+            
+            for _, row in temp_df.iterrows():
+                if row['Requirement Level'].lower() == "mandatory":
+                    if type(row['Metadata Element']) == str and row['Metadata Element'].strip() not in ["", None]:
+                        if row["Metadata Element"] in temp_data.keys():
+                            temp_data[row["Metadata Element"]].append(row["LANL Input Example"])
+                        else:
+                            temp_data[row["Metadata Element"]] = [row["LANL Input Example"]]
+                    elif type(row['Supporting Element']) == str and row['Supporting Element'].strip() not in ["", None]:
+                        if row["Supporting Element"] in temp_data.keys():
+                            temp_data[row["Supporting Element"]].append(row["LANL Input Example"])
+                        else:
+                            temp_data[row["Supporting Element"]] = [row["LANL Input Example"]]
+
+        self.genesis_data["genesis_datacard"] = temp_data
+        self.set_schema_2(self.genesis_data)
+        
 class MetadataReader1(FileReader):
     """
     DSI Reader that reads in an individual or a set of JSON metadata files

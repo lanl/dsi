@@ -13,6 +13,7 @@ import csv
 import re
 import tarfile
 import subprocess
+import uuid
 from contextlib import redirect_stdout
 
 class Terminal():
@@ -29,7 +30,7 @@ class Terminal():
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
     VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
-    VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard']
+    VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
@@ -89,8 +90,8 @@ class Terminal():
 
         self.user_wrapper = False
         self.new_tables = None
-        self.dsi_tables = ["runtable", "filesystem", "oceans11_datacard", "dublin_core_datacard", "schema_org_datacard", "google_datacard"]
-
+        self.dsi_tables = ["runtable", "filesystem", "oceans11_datacard", "dublin_core_datacard", 
+                           "schema_org_datacard", "google_datacard", "genesis_datacard"]
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug
         if debug == 1 or debug == 2:
@@ -486,6 +487,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
                     if self.user_wrapper:
+                        if isinstance(errorMessage[1], str) and errorMessage[1].startswith("A complex schema"):
+                            raise errorMessage[0](errorMessage[1])
                         raise errorMessage[0](f"Error ingesting data due to {errorMessage[1]}")
                     else:
                         raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
@@ -552,7 +555,7 @@ class Terminal():
         # only processes data from first backend for now - TODO process data from all active backends later
         elif interaction_type in ["process", "read"]:
             if len(self.loaded_backends) > 1:
-                if parent_backend == "Filesystem" and ".temp.db" in first_backend.filename:
+                if parent_backend == "Filesystem" and ".temp_dsi.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
             if self.valid_backend(first_backend, parent_backend):
@@ -1444,11 +1447,12 @@ class Sync():
         st_dict['created_time'] = []
         st_dict['accessed_time'] = []
         st_dict['mode'] = []
-        #st_dict['inode'] = []
+        st_dict['inode'] = []
         st_dict['device'] = []
         st_dict['n_links'] = []
         st_dict['uid'] = []
         st_dict['gid'] = []
+        st_dict['uuid'] = []
         st_dict['file_remote'] = []
 
         for file in file_list:
@@ -1465,11 +1469,12 @@ class Sync():
             st_dict['created_time'].append(st.st_ctime)
             st_dict['accessed_time'].append(st.st_atime)
             st_dict['mode'].append(st.st_mode)
-            #st_dict['inode'].append(st.st_ino)
+            st_dict['inode'].append(st.st_ino)
             st_dict['device'].append(st.st_dev)
             st_dict['n_links'].append(st.st_nlink)
             st_dict['uid'].append(st.st_uid)
             st_dict['gid'].append(st.st_gid)
+            st_dict['uuid'].append(self.gen_uuid(st))
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
 
@@ -1636,7 +1641,7 @@ class Sync():
                 stdout, stderr = process.communicate()
                 returncode = process.communicate()
                 
-                print( " DSI submitted Conduit job. ")
+                print( " DSI submitted Conduit data movement job. ")
 
                 # Database Movement
                 if isVerbose:
@@ -1648,20 +1653,56 @@ class Sync():
                 stdout, stderr = process.communicate()
                 returncode = process.communicate()
             
-                print( " DSI submitted Conduit job. ")
+                print( " DSI submitted Conduit data movement job. ")
 
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
+        elif tool == "pfcp":
+            env = os.environ.copy()
+            
+            if not os.path.exists(self.remote_location):
+                if isVerbose:
+                    print( " mkdir " + self.remote_location)
+                path = Path(self.remote_location)
+                try:
+                    path.mkdir(parents=True)
+                except Exception:
+                    print(f"Unable to create folder {abspath} . Do you have access rights?")
+                    raise
+            
+            try:
+                #subprocess.call(["pfcp", "-r", self.local_location, self.remote_location], env=env, shell=True)
 
+                # File Movement
+                if isVerbose:
+                    print( "pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
+                cmd = ['pfcp','-R',self.local_location,  os.path.join(self.remote_location, self.project_name)]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+                
+                print( " DSI submitted pfcp data movement job. ")
 
+                # Database Movement
+                if isVerbose:
+                    print( " pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+                
+                cmd = ['pfcp', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
+                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+                
+                stdout, stderr = process.communicate()
+                returncode = process.communicate()
+            
+                print( " DSI submitted pfcp data movement job. ")
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with error: {e.stderr} ")
         elif tool == "ftp":
             True
         elif tool == "git":
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
-
-        
 
 
     def dircrawl(self,filepath):
@@ -1692,6 +1733,22 @@ class Sync():
         DSI database
         '''
         True
+
+    def gen_uuid(self, st):
+        '''
+        Generates a unique file identifier using the os.stat data object as the input
+        
+        '''
+        inode=st.st_ino
+        ctime=st.st_ctime
+        unique_str = f"{inode}-{ctime}"
+
+        file_uuid = uuid.uuid5(uuid.NAMESPACE_URL, unique_str)
+        #print(f"UUID:{file_uuid}")
+        return str(file_uuid)
+
+
+    
 
 class TarFile():
   def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):

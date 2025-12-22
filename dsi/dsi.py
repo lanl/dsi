@@ -17,7 +17,7 @@ class DSI():
     The DSI Class abstracts Core.Terminal for managing metadata and Core.Sync for data management and movement.
     '''
 
-    def __init__(self, filename = ".temp.db", backend_name = "Sqlite", **kwargs):
+    def __init__(self, filename = ".temp_dsi.db", backend_name = "Sqlite", **kwargs):
         """
         Initializes DSI by activating a backend for data operations; default is a Sqlite backend for temporary data analysis.
         If users specify `filename`, data is saved to a permanent backend file.
@@ -39,19 +39,18 @@ class DSI():
         self.t = Terminal(debug = 0, runTable=False)
         self.s = Sync()
         self.t.user_wrapper = True
-        self.backend_name = None
         self.schema_read = False
         self.schema_tables = set()
         self.loaded_tables = set()
 
-        if filename == ".temp.db" and os.path.exists(filename):
+        if filename == ".temp_dsi.db" and os.path.exists(filename):
             os.remove(filename)
 
-        if filename != ".temp.db" and backend_name.lower() == "sqlite":
+        if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                 filename += ".db"
-        elif filename != ".temp.db" and backend_name.lower() == "duckdb":
+        elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
             file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
             if file_extension.lower() not in ["db", "duckdb"]:
                 filename += ".db"
@@ -62,11 +61,9 @@ class DSI():
             if backend_name.lower() == 'sqlite':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
-                    self.backend_name = "sqlite"
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','DuckDB','back-write', filename=filename)
-                    self.backend_name = "duckdb"
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print(f"Eligible backend_names are: Sqlite, DuckDB")
@@ -74,7 +71,7 @@ class DSI():
             sys.exit(f"backend ERROR: {e}")
 
         self.main_backend_obj = self.t.loaded_backends[0]
-        if filename != ".temp.db":
+        if filename != ".temp_dsi.db":
             print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
         else:
             print("Created an instance of DSI")
@@ -102,14 +99,30 @@ class DSI():
         if filename:
             if not os.path.exists(filename):
                 sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+            if "dsi_relations" in self.t.active_metadata:
+                sys.exit("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
-            self.schema_read = True
+
             pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
             fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
-            self.schema_tables = pk_tables.union(fk_tables)
+            all_schema_tables = pk_tables.union(fk_tables)
+            
+            has_data = self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__)
+            if has_data and all_schema_tables.issubset(set(self.list(True))):
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    sys.exit(f"schema() ERROR: {e}")
+                self.t.active_metadata = OrderedDict()
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
+            else:
+                self.schema_read = True
+                self.schema_tables = all_schema_tables
             print(f"Successfully loaded the schema file: {filename}")
         else:
             fnull = open(os.devnull, 'w')
@@ -134,6 +147,7 @@ class DSI():
         print("SchemaOrgDatacard    : Loads dataset metadata adhering to schema.org (JSON)")
         print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
         print("Oceans11Datacard     : Loads dataset metadata for Oceans11 DSI data server (oceans11.lanl.gov) (YAML)")
+        print("GenesisDatacard      : Loads dataset metadata for LANL Genesis data standard (CSV)")
         print()
 
     def read(self, filenames, reader_name, table_name = None):
@@ -157,6 +171,7 @@ class DSI():
                 - "SchemaOrgDatacard"    → .json
                 - "GoogleDatacard"       → .yaml or .yml
                 - "Oceans11Datacard"     → .yaml or .yml
+                - "GenesisDatacard"      → .csv
 
         `reader_name` : str
             Name of the DSI Reader to use for loading the data. 
@@ -236,6 +251,8 @@ class DSI():
                         self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
                     elif reader_name.lower() == "googledatacard":
                         self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "genesisdatacard":
+                        self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=filenames)
                     elif reader_name.lower() == "bueno":
                         self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
                     elif reader_name.lower() == "csv":
@@ -266,7 +283,7 @@ class DSI():
             if correct_reader == False:
                 print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
                 elg = "Collection, CSV, Parquet, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
-                sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard")
+                sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard, GenesisDatacard")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
@@ -274,20 +291,8 @@ class DSI():
             if not overlap_tables: # at least one table from schema in the first read()
                 sys.exit("read() ERROR: Users must load all associated data for a schema after loading a complex schema.")
             self.loaded_tables.update(overlap_tables)
-            
-            if self.backend_name == "sqlite":
-                try:
-                    self.t.artifact_handler(interaction_type='ingest')
-                except Exception as e:
-                    sys.exit(f"read() ERROR: {e}")
-                self.t.active_metadata = OrderedDict()
 
-                # if self.loaded_tables == self.schema_tables:
-                self.schema_read = False
-                self.schema_tables = set()
-                self.loaded_tables = set()
-
-            elif self.backend_name == "duckdb" and self.loaded_tables == self.schema_tables:
+            if self.loaded_tables == self.schema_tables:
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
@@ -303,10 +308,10 @@ class DSI():
                 sys.exit(f"read() ERROR: {e}")
             self.t.active_metadata = OrderedDict()
 
-        if len(table_keys) > 1:
-            print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
-        else:
+        if len(table_keys) == 1:
             print(f"Loaded {filenames} into the table {table_keys[0]}")
+        else:
+            print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
 
     def query(self, statement, collection = False, update = False):
         """
@@ -339,7 +344,8 @@ class DSI():
                 df = self.t.artifact_handler(interaction_type='query', query=statement)
             output = f.getvalue()
         except Exception as e:
-            sys.exit(f"query() ERROR: {e}")
+            raise RuntimeError(f"query() ERROR: {e}")
+   
         if df.empty:
             if output:
                 print(output)
@@ -812,7 +818,8 @@ class DSI():
                 table_list = self.t.list(collection)
             output = f.getvalue()
         except Exception as e:
-            sys.exit(f"list() ERROR: {e}")
+            raise RuntimeError(f"list() ERROR: {e}")
+
         
         if collection:
             return table_list
@@ -865,7 +872,7 @@ class DSI():
         try:
             self.t.num_tables()
         except Exception as e:
-            sys.exit(f"num_tables() ERROR: {e}")
+            raise RuntimeError(f"query() ERROR: {e}")       
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
