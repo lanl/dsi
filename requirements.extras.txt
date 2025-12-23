@@ -1,3 +1,14 @@
+# Baseline
+pandas>=2.0.2
+pyarrow>=12.0.1
+pydantic>=2.1.1
+nbconvert>=7.13.0
+gitpython>=3.0.0
+matplotlib>=3.6.0
+pyyaml>=6.0
+pyreadline3; platform_system == "Windows"
+
+# Extras packages
 sqlalchemy>=2.0.35
 ipykernel>=6.27.1
 nbformat>=5.10.2
@@ -5,4 +16,6 @@ graphviz>=0.20.3
 opencv-python>=4.9.0.80
 duckdb>=1.2.0
 xmltodict>=0.14.2
+scikit-learn>=1.7.0
+streamlit>=1.48.0
 openpyxl>=3.1.5
