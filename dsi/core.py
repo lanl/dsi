@@ -14,6 +14,7 @@ import re
 import tarfile
 import subprocess
 import uuid
+import time
 from contextlib import redirect_stdout
 
 class Terminal():
@@ -1419,7 +1420,10 @@ class Sync():
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
         # Data Crawl and gather metadata of local location
-        file_list = self.dircrawl(local_loc)
+        file_list = self.dircrawl(local_loc, isVerbose)
+
+        if isVerbose:
+            print("Collected "+str(len(file_list))+" files.")
 
         self.remote_location = remote_loc
         self.local_location = local_loc
@@ -1473,6 +1477,8 @@ class Sync():
         # Future: iterate through remote/server list here, for now:::
         remote_list = [ os.path.join(remote_loc,self.project_name) ]
         for remote in remote_list:
+            if isVerbose:
+                print(f"Testing access to '{remote}' directory.")
             try: # Try for file permissions
                 if os.path.exists(remote): # Check if exists
                     print(f"The directory '{remote}' already exists remotely.")
@@ -1537,6 +1543,9 @@ class Sync():
 
         self.file_list = file_list
         self.rfile_list = rfile_list
+
+        if isVerbose:
+            print("DSI Index complete!")
 
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
@@ -1728,7 +1737,7 @@ class Sync():
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
 
 
-    def dircrawl(self,filepath):
+    def dircrawl(self,filepath, verbose=False):
         """
         Crawls the root 'filepath' directory and returns files
 
@@ -1736,17 +1745,25 @@ class Sync():
 
         `return`: returns crawled file-list
         """
+        start_time = time.perf_counter()
+        
         file_list = []
         for root, dirs, files in os.walk(filepath):
             #if os.path.basename(filepath) != 'tmp': # Lets skip some files
             #    continue
+            if verbose:
+                print(f"Crawling directory: {root}")
+                print(f"  Found {len(files)} files, {len(dirs)} subdirectories")
 
             for f in files: # Appent root-level files
                 file_list.append(os.path.join(root, f))
-            for d in dirs: # Recursively dive into directories
-                sub_list = self.dircrawl(os.path.join(root, d))
-                for sf in sub_list:
-                    file_list.append(sf)
+            
+        elapsed = time.perf_counter() - start_time
+
+        if verbose:
+            print(f"\nFinished crawling: {filepath}")
+            print(f"Total files found: {len(file_list)}")
+            print(f"Runtime: {elapsed:.2f} seconds")
     
         return file_list
     
