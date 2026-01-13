@@ -1423,7 +1423,7 @@ class Sync():
         file_list = self.dircrawl(local_loc, isVerbose)
 
         if isVerbose:
-            print("Collected "+str(len(file_list))+" files.")
+            print("Crawled "+str(len(file_list))+" files.")
 
         self.remote_location = remote_loc
         self.local_location = local_loc
@@ -1449,6 +1449,8 @@ class Sync():
         st_dict['uuid'] = []
         st_dict['file_remote'] = []
 
+        if isVerbose:
+            print("Collection object [", end="")
         for file in file_list:
             rel_file = os.path.relpath(file,local_loc) #rel path
             #utils.isgroupreadable(file) # quick test
@@ -1471,7 +1473,15 @@ class Sync():
             st_dict['uuid'].append(self.gen_uuid(st))
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
+            if isVerbose:
+                last = -10
+                progress = int(len(st_list) / len(file_list) * 100)
+                if progress % 10 == 0 and progress != last:
+                    print(".", end="")
+                    last = progress
 
+        if isVerbose:
+            print("] Collection object created.")
 
         # Test remote location validity, try to check access
         # Future: iterate through remote/server list here, for now:::
@@ -1501,7 +1511,7 @@ class Sync():
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = local_loc+"/"+self.project_name+".db"
             if isVerbose:
-                print("trying db: ", f)
+                print("Trying to open db: ", f)
             assert os.path.exists(f)
 
             # Detect to see which reader we should use
@@ -1538,6 +1548,12 @@ class Sync():
             with redirect_stdout(fnull):
                 t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
                 t.artifact_handler(interaction_type='ingest')
+        else:
+            # Do nothing for now to prevent a re-index,
+            if isVerbose:
+                print("Error: Filesystem table already exists! DSI Index skipped.")
+                return
+
         
         t.close()
 
