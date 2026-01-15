@@ -15,6 +15,8 @@ import tarfile
 import subprocess
 import uuid
 import time
+import itertools
+from typing import Iterator
 from contextlib import redirect_stdout
 
 class Terminal():
@@ -1419,11 +1421,17 @@ class Sync():
         """
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
+        
+        # Warn about relative paths (..) may not work
+
         # Data Crawl and gather metadata of local location
-        file_list = self.dircrawl(local_loc, isVerbose)
+        file_list = self.dircrawl2(local_loc, isVerbose)
+
 
         if isVerbose:
-            print("Crawled "+str(len(file_list))+" files.")
+            file_list, tmp = itertools.tee(file_list)
+            file_len=sum(1 for _ in tmp)
+            print("Crawled "+str(file_len)+" files.")
 
         self.remote_location = remote_loc
         self.local_location = local_loc
@@ -1451,6 +1459,8 @@ class Sync():
 
         if isVerbose:
             print("Collection object [", end="")
+            last = -10
+
         for file in file_list:
             rel_file = os.path.relpath(file,local_loc) #rel path
             #utils.isgroupreadable(file) # quick test
@@ -1474,14 +1484,13 @@ class Sync():
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
             if isVerbose:
-                last = -10
-                progress = int(len(st_list) / len(file_list) * 100)
-                if progress % 10 == 0 and progress != last:
+                progress = int(len(st_list) / file_len * 100)
+                if progress % 5 == 0 and progress != last:
                     print(".", end="")
                     last = progress
 
         if isVerbose:
-            print("] Collection object created.")
+            print(f"] Collection object created with {len(st_list)} entries.")
 
         # Test remote location validity, try to check access
         # Future: iterate through remote/server list here, for now:::
@@ -1520,11 +1529,16 @@ class Sync():
                 header_bytes = dbfile.read(16)
                 if header_bytes == b'SQLite format 3\x00':
                     isSQLite=True
+                    if isVerbose:
+                        print("Detected SQLiteDB.")
+                
                 # Detect duckdb
                 dbfile.seek(0)
                 full_header = dbfile.read(12) 
                 if full_header[8:12] == b'DUCK':
                     isDuckDB=True
+                    if isVerbose:
+                        print("Detected DuckDB.")
         except Exception as err:
             print(f"Database {f} not found: {err}")
             raise
@@ -1782,7 +1796,29 @@ class Sync():
             print(f"Runtime: {elapsed:.2f} seconds")
     
         return file_list
-    
+ 
+    def dircrawl2(self, root: str, verbose: bool = False) -> Iterator[str]:
+        start = time.perf_counter()
+
+        # iterative stack avoids deep recursion limits
+        stack = [root]
+        while stack:
+            path = stack.pop()
+            try:
+                with os.scandir(path) as it:
+                    for entry in it:
+                        # follow_symlinks=False avoids surprises and extra stat calls
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            yield entry.path
+            except (PermissionError, FileNotFoundError):
+                # permissions/races happen a lot at scale
+                continue
+
+        if verbose:
+            print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
+
     def get(self, project_name = "Project"):
         '''
         Helper function that searches remote location based on project name, and retrieves
