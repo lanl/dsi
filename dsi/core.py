@@ -1797,11 +1797,11 @@ class Sync():
     
         return file_list
  
-    def dircrawl2(self, root: str, verbose: bool = False) -> Iterator[str]:
+    def dircrawl2(self, filepath: str, verbose: bool = False) -> Iterator[str]:
         start = time.perf_counter()
 
         # iterative stack avoids deep recursion limits
-        stack = [root]
+        stack = [filepath]
         while stack:
             path = stack.pop()
             try:
@@ -1817,6 +1817,7 @@ class Sync():
                 continue
 
         if verbose:
+            print(f"\nFinished crawling: {filepath}")
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
     def get(self, project_name = "Project"):
