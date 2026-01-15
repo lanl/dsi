@@ -1485,7 +1485,8 @@ class Sync():
             st_list.append(st)
             if isVerbose:
                 progress = int(len(st_list) / file_len * 100)
-                if progress % 5 == 0 and progress != last:
+                # Print progress bar every 2%
+                if progress % 2 == 0 and progress != last:
                     print(".", end="")
                     last = progress
 
@@ -1809,6 +1810,8 @@ class Sync():
                     for entry in it:
                         # follow_symlinks=False avoids surprises and extra stat calls
                         if entry.is_dir(follow_symlinks=False):
+                            if verbose:
+                                print(f"Crawling directory: {entry.path}")
                             stack.append(entry.path)
                         elif entry.is_file(follow_symlinks=False):
                             yield entry.path
