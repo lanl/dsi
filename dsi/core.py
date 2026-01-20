@@ -1549,7 +1549,8 @@ class Sync():
             if isSQLite:
                 t.load_module('backend','DuckDB','back-write', filename=f)
             elif isDuckDB:
-                t.load_module('backend','DuckDB','back-write', filename=f)
+                assert True, "Duckdb indexing support not available for dsi."
+                #t.load_module('backend','DuckDB','back-write', filename=f)
             else:
                 assert True, "Unsupported Database type!"
                 
