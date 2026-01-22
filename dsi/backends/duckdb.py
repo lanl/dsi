@@ -81,6 +81,30 @@ class DuckDB(Filesystem):
             return " INTEGER"
         elif all(isinstance(x, float) for x in input_list if x is not None):
             return " DOUBLE"
+        elif all(isinstance(x, dict) for x in input_list if x is not None):
+            # Find the superset of all keys in the list of dicts.
+            all_keys = set()
+            for x in input_list:
+                all_keys = all_keys | set(x.keys())
+
+            # Recursively find types of each field in the dict.
+            type_list = ""
+            for k in all_keys:
+                t = self.sql_type([l[k] for l in input_list])
+                type_list += f"{k} {t}, "
+
+            # Return STRUCT type with the column types found above.
+            return f" STRUCT({type_list[:-2]})"
+        elif all(isinstance(x, list) for x in input_list if x is not None):
+            # Find type of list elements by recursively calling this self.sql_type().
+            type_list = [self.sql_type(input_list=l) for l in input_list]
+
+            # If all types are the same (i.e., list is homogeneous), add to table as a list.
+            # Otherwise, fallback on VARCHAR.
+            if all(t == type_list[0] for t in type_list):
+                return type_list[0] + "[]"
+            else:
+                return " VARCHAR"
         return " VARCHAR"
     
     def duckdb_compatible_name(self, name):
@@ -906,7 +930,7 @@ class DuckDB(Filesystem):
             is_primary = col[5] > 0
             display_name = f"{col_name}*" if is_primary else col_name
 
-            if any(nt in col_type for nt in numeric_types):
+            if col_type in numeric_types:
                 min_val, max_val, avg_val, std_dev = self.cur.execute(f"""
                     SELECT
                         MIN("{col_name}"),
