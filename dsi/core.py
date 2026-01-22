@@ -1669,6 +1669,33 @@ class Sync():
             # Data movement via Conduit
             env = os.environ.copy()
             
+            # Test Kerberos
+            if isVerbose:
+                print( "Testing: klist")
+            cmd = ['klist']
+            process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+            stdout, stderr = process.communicate()
+            returncode = process.returncode
+            
+            if "No credentials" in stdout:
+                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
+                assert True, print("Kerberos message: " + str(stdout))
+
+            # Test Conduit status
+            if isVerbose:
+                print( "Testing Conduit: conduit get")
+            cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
+            process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+            stdout, stderr = process.communicate()
+            returncode = process.returncode
+            
+            if "TRANSFER_ID" in stdout:
+                if isVerbose:
+                    print("Testing Conduit: conduit is authenticated.")
+            else:
+                assert True, print("Conduit Error: " + str(stdout))
+
+            # Check remote access for permissions and create folder
             if not os.path.exists(self.remote_location):
                 if isVerbose:
                     print( " mkdir " + self.remote_location)
