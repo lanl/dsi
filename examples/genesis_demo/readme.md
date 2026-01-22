@@ -10,7 +10,6 @@ These steps under "Setup DSI" needs to be done only once.
 ```bash
 git clone https://github.com/lanl/dsi.git #Get the repo
 cd dsi
-git checkout ai_dev # change to branch for the ai demo
 ```
 
 ### Install the python libraries for the demo 
