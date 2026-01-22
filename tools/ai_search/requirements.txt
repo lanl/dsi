@@ -1,0 +1,10 @@
+feedparser
+requests
+rich
+beautifulsoup4
+ipython
+typing-extensions
+langchain-core
+langchain-openai
+langchain-experimental
+langgraph
