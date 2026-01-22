@@ -960,7 +960,7 @@ def main():
     # Interactive loop
     while True:
         try:
-            user_input = rlinput("[bold cyan]URDA-DSI> [/bold cyan]").strip()
+            user_input = rlinput("[bold cyan]AI-DSI> [/bold cyan]").strip()
         except (KeyboardInterrupt, EOFError):
             print("\nExiting.")
             break

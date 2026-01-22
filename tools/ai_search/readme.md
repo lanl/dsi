@@ -42,7 +42,7 @@ python src/ursa/agents/dsi_explorer_agent.py \<name of the dataset\>
 Example:
 
 ```bash
-(ursa) pascalgrosset@pn2035929:~/projects/ursa$ python src/ursa/agents/dsi_explorer_agent.py examples/single_agent_examples/dsi_explorer/private_stuff/data/diana/diana_tier1_metadata.db 
+$ python tools/ai_search/dsi_explorer_agent.py tools/ai_search/data/oceans_11/ocean_11_datasets.db
 ```
 
 This will produce:
@@ -65,7 +65,7 @@ All other text is sent to the DSI Explorer.
 Example:
   Tell me the data you have.
 
-URDA-DSI> 
+AIDSI> 
 ```
  and you will then use the command line ```URSA-DSI>```to interact with the database.
 
