@@ -1617,7 +1617,7 @@ class Sync():
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             if isSQLite:
-                t.load_module('backend','DuckDB','back-write', filename=f)
+                t.load_module('backend','Sqlite','back-write', filename=f)
             elif isDuckDB:
                 t.load_module('backend','DuckDB','back-write', filename=f)
             else:
