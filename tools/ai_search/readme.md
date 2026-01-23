@@ -29,16 +29,16 @@ Then, launch Jupyter lab as follows:
 jupyter lab&
 ```
 
-From Jupyter, open: ```examples/single_agent_examples/dsi_explorer/dsi_data_explorer.ipynb```
+From Jupyter, open: ``tools/ai_search/dsi_data_explorer.ipynb```
 
-Then, you need to pick the venv_ursa kernel. From the menu bar at the top:```Kernel -> Change Kernel ...```, choose ```venv_ursa```.
+Then, you need to pick the venv_ursa kernel. From the menu bar at the top:```Kernel -> Change Kernel ...```, choose ```venv_dsi_ai```.
 
 
 
 
 ### Terminal
 From the terminal, type:
-python src/ursa/agents/dsi_explorer_agent.py \<name of the dataset\>  
+python src/tools/ai_search/dsi_explorer_agent.py \<name of the dataset\>  
 Example:
 
 ```bash
@@ -50,7 +50,7 @@ This will produce:
 ╭────────────────────╮
 │  DSI EXPLORER CLI  │
 ╰────────────────────╯
-Dataset examples/single_agent_examples/dsi_explorer/private_stuff/data/diana/diana_tier1_metadata.db has been loaded.
+Dataset tools/ai_search/data/oceans_11/ocean_11_datasets.db has been loaded.
 The DSI Data Explorer agent is ready.
 
 Type a question and press Enter.
