@@ -75,13 +75,13 @@ class DuckDB(Filesystem):
 
         if all(isinstance(x, int) for x in input_list if x is not None):
             if any(x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX for x in input_list if x is not None):
-                return " DOUBLE"
+                return " DOUBLE", [float(x) for x in input_list]
             elif any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in input_list if x is not None):
-                return " BIGINT"
-            return " INTEGER"
+                return " BIGINT", input_list
+            return " INTEGER", input_list
         elif all(isinstance(x, float) for x in input_list if x is not None):
-            return " DOUBLE"
-        return " VARCHAR"
+            return " DOUBLE", input_list
+        return " VARCHAR", [str(x) for x in input_list]
     
     def duckdb_compatible_name(self, name):
         if (name.startswith('"') and name.endswith('"')) or (name.lower() not in self.duckdb_keywords and name.isidentifier()):
@@ -119,7 +119,7 @@ class DuckDB(Filesystem):
                 for col in diff_cols:
                     if col.lower() in [c.lower() for c in query_cols]:
                         return (ValueError, "Cannot have duplicate column names")
-                    temp_name = col + self.sql_type(types.properties[col])
+                    temp_name = col + self.sql_type(types.properties[col])[0]
                     try:
                         self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
                     except duckdb.Error as e:
@@ -269,12 +269,13 @@ class DuckDB(Filesystem):
                     primaryTuple = artifacts[dsi_name]['primary_key'][foreignIndex]
                     foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
                 
-                types.properties[sql_key] = tableData[key]
+                col_type, col_list = self.sql_type(tableData[key])
+                types.properties[sql_key] = col_list
                 
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(sql_key + col_type + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]))
+                    types.unit_keys.append(sql_key + col_type)
             
             error = self.ingest_table_helper(types, foreign_query)
             if error is not None:

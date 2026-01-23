@@ -88,11 +88,11 @@ class Sqlite(Filesystem):
 
         if all(isinstance(x, int) for x in input_list if x is not None):
             if any(x < SQLITE_INT_MIN or x > SQLITE_INT_MAX for x in input_list if x is not None):
-                return " FLOAT"
-            return " INTEGER"
+                return " FLOAT", [float(x) for x in input_list]
+            return " INTEGER", input_list
         elif all(isinstance(x, float) for x in input_list if x is not None):
-            return " FLOAT"
-        return " VARCHAR"
+            return " FLOAT", input_list
+        return " VARCHAR", [str(x) for x in input_list]
     
     def sqlite_compatible_name(self, name):
         if (name.startswith('"') and name.endswith('"')) or (name.upper() not in self.sqlite_keywords and name.isidentifier()):
@@ -127,7 +127,7 @@ class Sqlite(Filesystem):
                 for col in diff_cols:
                     if col.lower() in [c.lower() for c in query_cols]:
                         return (ValueError, "Cannot have duplicate column names")
-                    temp_name = col + self.sql_type(types.properties[col])
+                    temp_name = col + self.sql_type(types.properties[col])[0]
                     try:
                         self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
                     except sqlite3.Error as e:
@@ -287,12 +287,13 @@ class Sqlite(Filesystem):
                     primaryTuple = artifacts[dsi_name]['primary_key'][foreignIndex]
                     foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primaryTuple[0]} ({primaryTuple[1]})"
                 
-                types.properties[sql_key] = tableData[key]
-                
+                col_type, col_list = self.sql_type(tableData[key])
+                types.properties[sql_key] = col_list
+
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(sql_key + col_type + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]))
+                    types.unit_keys.append(sql_key + col_type)
             
             error = self.ingest_table_helper(types, foreign_query)
             if error is not None:
