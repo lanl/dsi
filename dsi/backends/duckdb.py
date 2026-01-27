@@ -56,6 +56,88 @@ class DuckDB(Filesystem):
         filtered_df = keywords_df[keywords_df['keyword_category'] != 'unreserved']
         self.duckdb_keywords = filtered_df["keyword_name"].tolist()
 
+    # def sql_type_helper(self, input_list, recursive = True):
+    #     """
+    #     **Internal use only. Do not call**
+
+    #     Helper function that evaluates a list for ints, floats and strings. Can be called recursively in sql_type()
+
+    #     `input_list` : list
+    #         A list of values to analyze for type compatibility.
+
+    #     `recursive` : bool, default=True
+    #         Boolean indicating whether the return object is just the column type string or is a tuple
+        
+    #     `return`: str or (str, list)
+    #         If a string, it represents the inferred DuckDB data type for the input list.
+    #         If a tuple, it is the (DuckDB data type for the input list, input list with any type changes)
+    #     """
+    #     DUCKDB_BIGINT_MIN = -9223372036854775808
+    #     DUCKDB_BIGINT_MAX =  9223372036854775807
+    #     DUCKDB_INT_MIN = -2147483648
+    #     DUCKDB_INT_MAX =  2147483647
+
+    #     if all(isinstance(x, int) for x in input_list if x is not None):
+    #         if any(x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX for x in input_list if x is not None):
+    #             if recursive:
+    #                 return " DOUBLE"
+    #             return " DOUBLE", [float(x) if x is not None else x for x in input_list]
+    #         elif any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in input_list if x is not None):
+    #             if recursive:
+    #                 return " BIGINT"
+    #             return " BIGINT", input_list
+    #         if recursive:
+    #             return " INTEGER"
+    #         return " INTEGER", input_list
+    #     elif all(isinstance(x, float) for x in input_list if x is not None):
+    #         if recursive:
+    #             return " DOUBLE"
+    #         return " DOUBLE", input_list
+    #     if recursive:
+    #         return " VARCHAR"
+    #     return " VARCHAR", [str(x) if x is not None else x for x in input_list]
+
+    # def sql_type(self, input_list):
+    #     """
+    #     **Internal use only. Do not call**
+
+    #     Evaluates a list and returns the predicted compatible DuckDB Type
+
+    #     `input_list` : list
+    #         A list of values to analyze for type compatibility.
+
+    #     `return`: str
+    #         A string representing the inferred DuckDB data type for the input list.
+    #     """
+    #     if all(isinstance(x, dict) for x in input_list if x is not None):
+    #         # Find the superset of all keys in the list of dicts.
+    #         all_keys = set()
+    #         for x in input_list:
+    #             all_keys = all_keys | set(x.keys())
+
+    #         # Recursively find types of each field in the dict.
+    #         type_list = ""
+    #         for parent_key, child_key in all_keys:
+    #             col_type, col_list = self.sql_type(input_list=input_list[parent_key][child_key], recursive=False)
+    #             input_list[parent_key][child_key] = col_list
+    #             type_list += f"{child_key} {col_type}, "
+
+    #         # Return STRUCT type with the column types found above.
+    #         return f" STRUCT({type_list[:-2]})", input_list
+    #     elif all(isinstance(x, list) for x in input_list if x is not None):
+    #         # Find type of list elements by recursively calling this self.sql_type().
+    #         type_list = [self.sql_type_helper(input_list=l, recursive=True) for l in input_list if l is not None]
+
+    #         # If all types are the same (i.e., list is homogeneous), add to table as a list.
+    #         # Otherwise, fallback on VARCHAR.
+    #         if all(t == type_list[0] for t in type_list):
+    #             return f"{type_list[0]}[]", input_list
+    #         else:
+    #             return " VARCHAR", [str(x) if x is not None else x for x in input_list]
+    #     else:
+    #         return self.sql_type_helper(input_list, recursive=False)
+
+
     def sql_type(self, input_list):
         """
         **Internal use only. Do not call**
@@ -75,13 +157,37 @@ class DuckDB(Filesystem):
 
         if all(isinstance(x, int) for x in input_list if x is not None):
             if any(x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX for x in input_list if x is not None):
-                return " DOUBLE", [float(x) for x in input_list]
+                return " DOUBLE", [float(x) if x is not None else x for x in input_list]
             elif any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in input_list if x is not None):
                 return " BIGINT", input_list
             return " INTEGER", input_list
         elif all(isinstance(x, float) for x in input_list if x is not None):
             return " DOUBLE", input_list
-        return " VARCHAR", [str(x) for x in input_list]
+        elif all(isinstance(x, dict) for x in input_list if x is not None):
+            # Find the superset of all keys in the list of dicts.
+            all_keys = set()
+            for x in input_list:
+                all_keys = all_keys | set(x.keys())
+
+            # Recursively find types of each field in the dict.
+            type_list = ""
+            for k in all_keys:
+                t = self.sql_type([l[k] for l in input_list])
+                type_list += f"{k} {t}, "
+
+            # Return STRUCT type with the column types found above.
+            return f" STRUCT({type_list[:-2]})", input_list
+        elif all(isinstance(x, list) for x in input_list if x is not None):
+            # Find type of list elements by recursively calling this self.sql_type().
+            type_list = [self.sql_type(input_list=l) for l in input_list]
+
+            # If all types are the same (i.e., list is homogeneous), add to table as a list.
+            # Otherwise, fallback on VARCHAR.
+            if all(t == type_list[0] for t in type_list):
+                return f"{type_list[0]}[]", input_list
+            else:
+                return " VARCHAR", [str(x) if x is not None else x for x in input_list]
+        return " VARCHAR", [str(x) if x is not None else x for x in input_list]
     
     def duckdb_compatible_name(self, name):
         if (name.startswith('"') and name.endswith('"')) or (name.lower() not in self.duckdb_keywords and name.isidentifier()):

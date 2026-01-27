@@ -88,11 +88,11 @@ class Sqlite(Filesystem):
 
         if all(isinstance(x, int) for x in input_list if x is not None):
             if any(x < SQLITE_INT_MIN or x > SQLITE_INT_MAX for x in input_list if x is not None):
-                return " FLOAT", [float(x) for x in input_list]
+                return " FLOAT", [float(x) if x is not None else x for x in input_list]
             return " INTEGER", input_list
         elif all(isinstance(x, float) for x in input_list if x is not None):
             return " FLOAT", input_list
-        return " VARCHAR", [str(x) for x in input_list]
+        return " VARCHAR", [str(x) if x is not None else x for x in input_list]
     
     def sqlite_compatible_name(self, name):
         if (name.startswith('"') and name.endswith('"')) or (name.upper() not in self.sqlite_keywords and name.isidentifier()):
