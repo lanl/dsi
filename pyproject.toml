@@ -5,21 +5,20 @@ build-backend = "setuptools.build_meta"
 [project]
 name="dsi-workflow"
 license={text = "BSD-3-Clause"}
-description="A Data Science Infrastructure Metadatabase"
+description="A Data Science Infrastructure Project"
 readme = "README.rst"
 authors=[
-	{name = 'Jesus Pulido', email = 'pulido@lanl.gov'},
-	{name = 'James Ahrens', email = 'ahrens@lanl.gov'},
-	{name = 'Divya Banesh', email = 'dbanesh@lanl.gov'},
-	{name = 'Hugh Greenberg', email = 'hng@lanl.gov'},
-	{name = 'Ben Sims', email = 'bsims@lanl.gov'},
-	{name = 'Christine Sweeney', email = 'cahrens@lanl.gov'},
-	{name = 'Terry Turton', email = 'tlturton@lanl.gov'},
-	{name = 'Quincy Wofford', email = 'qwofford@lanl.gov'},
-]
-classifiers=[
-    "Programming Language :: Python"
-]
+	{name = 'Jesus Pulido', 	email = 'pulido@lanl.gov'},
+	{name = 'James Ahrens', 	email = 'ahrens@lanl.gov'},
+	{name = 'Divya Banesh', 	email = 'dbanesh@lanl.gov'},
+	{name = 'Hugh Greenberg', 	email = 'hng@lanl.gov'},
+	{name = 'Pascal Grosset', 	email = 'pascalgrosset@lanl.gov'},
+	{name = 'Vedant Iyer', 		email = 'iyer@lanl.gov'},
+	{name = 'Benjamin Sims', 	email = 'bsims@lanl.gov'},
+	{name = 'Terece Turton', 	email = 'tlturton@lanl.gov'},
+	]
+classifiers=["Programming Language :: Python"]
+
 dynamic = ["dependencies","version"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]} 

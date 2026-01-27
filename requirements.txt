@@ -5,3 +5,6 @@ nbconvert>=7.13.0
 gitpython>=3.0.0
 matplotlib>=3.6.0
 pyyaml>=6.0
+
+# Windows package
+pyreadline3; platform_system == "Windows"

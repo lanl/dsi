@@ -1,7 +1,7 @@
 # examples/user/5.update.py
 from dsi.dsi import DSI
 
-update_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
+update_dsi = DSI("data.db") # Assuming data.db has data from 2a.read.py:
 
 #dsi.find(condition, collection)
 find_df = update_dsi.find("state2_density > 5.0", True, True) # Returns matching rows as a DataFrame

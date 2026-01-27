@@ -10,6 +10,7 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
+import subprocess
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -51,24 +52,47 @@ class DSI_cli:
         self.start_dir = os.getcwd() + "/"
         return
     
+    def viewers_check(self):
+        available_viewers = []
+        all_viewers = ["ml"]
+
+        # ml checker
+        try: 
+            import streamlit
+            import sklearn
+            available_viewers.append("ml")
+        except ModuleNotFoundError:
+            pass
+
+        # # jupyter checker
+        # try: 
+        #     import ipykernel
+        #     import nbformat
+        #     available_viewers.append("jupyter")
+        # except ModuleNotFoundError:
+        #     pass
+        
+        return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
+    
     def startup(self, backend="sqlite"):
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
 
+        self.valid_viewers, self.all_viewers = self.viewers_check()
         self.start_dir = os.getcwd()
-        db_path = os.path.join(self.start_dir, ".temp_dsi.db")
-        if os.path.exists(db_path):
-            os.remove(db_path)
+        self.db_path = os.path.join(self.start_dir, ".temp_dsi.db")
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
 
         fnull = open(os.devnull, 'w')
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
-                    self.t.load_module('backend','DuckDB','back-write', filename = db_path)
+                    self.t.load_module('backend','DuckDB','back-write', filename = self.db_path)
                     self.name = "duckdb"
                 else:
                     backend = "sqlite"
-                    self.t.load_module('backend','Sqlite','back-write', filename = db_path)
+                    self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)
                     self.name = "sqlite"
         except Exception as e:
             print(f"backend ERROR: {e}")
@@ -78,29 +102,34 @@ class DSI_cli:
 
 
     def help_fn(self, args):
-        commands = [
-            ("display <table_name> [-n num_rows] [-e filename]", 
-            "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
-            ("draw [-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
-            ("exit", "Exits the DSI Command Line Interface (CLI)"),
-            ("find <condition>", "Finds all rows of a table that match a column-level condition."),
-            ("help", "Shows this help message."),
-            ("list", "Lists all tables in the current DSI database"),
-            ("plot_table <table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
-            ("query <SQL_query> [-n num_rows] [-e filename]",
-            "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
-            ("read <filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
-            ("search <value>", "Searches for a string or number across DSI."),
-            ("summary [-t table_name]", "Summary of the database or a specific table."),
-            ("write <filename>", "Writes data in DSI database to a permanent location."),
-            ("ls", "Lists all files in the current or specified directory."),
-            ("cd <path>", "Changes the working directory within the CLI environment.")
-        ]
+        commands = {
+            'display' :("<table_name> [-n num_rows] [-e filename]", 
+                "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
+            'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
+            'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
+            'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
+            'help': ("", "Shows this help message."),
+            'list' : ("", "Lists all tables in the current DSI database"),
+            'plot_table' : ("<table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            'query' : ("<SQL_query> [-n num_rows] [-e filename]",
+                "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
+            'read' : ("<filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            'search' : ("<value>", "Searches for a string or number across DSI."),
+            'summary' : ("[-t table_name]", "Summary of the database or a specific table."),
+            'viewers' : ("", "Prints the available viewers for the user."),
+            'view' : ("<available viewer>", "Creates an instance of the DSI viewer in another application."),
+            'write' : ("<filename>", "Writes data in DSI database to a permanent location."),
+            'ls' : ("", "Lists all files in the current or specified directory."),
+            'cd' : ("<path>", "Changes the working directory within the CLI environment.")
+        }
+        if self.viewers_check()[0] is None:
+            del commands["view"]
 
         print()
         terminal_width = shutil.get_terminal_size().columns
-        for cmd, desc in commands:
-            print(textwrap.fill(f"{cmd:48} {desc}", width=terminal_width, subsequent_indent=' ' * 50))
+        for key, val in commands.items():
+            cmd = f'{key} {val[0]}'
+            print(textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50))
         print()
 
 
@@ -505,8 +534,8 @@ class DSI_cli:
             self.t.active_metadata = OrderedDict()
         else:
             print()
-            print("Ensure file has data stored correctly.")
-            print("Currently supported formats are: ")
+            print("Ensure input data is structured properly.")
+            print("Supported formats: ")
             print("   - csv (extension: .csv)")
             print("   - json (extension: .json)")
             print("   - toml (extension: .toml)")
@@ -577,6 +606,67 @@ class DSI_cli:
         Output the version of DSI being used
         '''
         return str(__version__)
+
+
+    def viewers(self, args):
+        if self.valid_viewers is None:
+            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            return
+        print(f'Available viewers are: {", ".join(self.valid_viewers)}')
+
+
+    def view(self, args):
+        if self.valid_viewers is None:
+            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            return
+        if not args:
+            print("view ERROR: need to specify which DSI viewer to use")
+            return
+        if len(args) > 1:
+            print("view ERROR: can only use one DSI viewer at a time")
+            return
+        
+        viewer = args[0]
+        if viewer not in self.all_viewers:
+            print("view ERROR: This viewer does not exist.")
+            return
+        if viewer not in self.valid_viewers:
+            print("view ERROR: To load this viewer, install requirements.extras.txt.")
+            return
+
+        #check if current db is empty
+        if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
+            print("view ERROR: need to read in data files or an existing database to use a viewer.")
+            return
+
+        if viewer.lower() == "ml":
+            # print("\nUsers can view the ML emulator at http://localhost:8501.")
+            # print("Users must enter [Ctrl + C] to exit.")
+            env = dict(os.environ)
+            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
+            cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath, "--", self.db_path, self.name]
+            cmd += ["--browser.gatherUsageStats=false"]
+            # Optional: add "--server.headless=true" to suppress auto browser and first-time user prompt
+            cmd += ["--server.headless=true"]
+
+            #ISSUE ON ROCI COULD BE DUE TO start_new_session=True
+            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
+                try:
+                    for idx, line in enumerate(proc.stdout):
+                        if idx == 3:
+                            print("\nView the ML emulator at", line[line.index("http"):-1])
+                            print("To exit the emulator, enter [Ctrl + C]")
+                        elif idx>10:
+                            print(line)
+                except KeyboardInterrupt:
+                    print("\nClosing ML Emulator.")
+                    proc.terminate()
+                    proc.wait()
+            
+        else:
+            print("view ERROR: input viewer was invalid. Please try again.")
+            return
 
 
     def get_write_parser(self):
@@ -655,12 +745,14 @@ COMMANDS = {
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
-    'read' : (cli.get_read_parser, cli.read),
-    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
+    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),    
     'query' : (cli.get_query_parser, cli.query),
-    'write' : (cli.get_write_parser, cli.write_to_file),
-    'summary' : (cli.get_summary_parser, cli.summary),
+    'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
+    'summary' : (cli.get_summary_parser, cli.summary),
+    'viewers' : (None, cli.viewers),
+    'view' : (None, cli.view),
+    'write' : (cli.get_write_parser, cli.write_to_file),    
     'ls' : (None, cli.ls),
     'cd' : (None, cli.cd)
 }
@@ -704,8 +796,8 @@ def main():
             command, *args = tokens
             
             if command not in COMMANDS:
-                print(f"Unknown command: {command}")
-                print("Type \"help\" to get valid commands.\n")
+                print(f"Unknown command. Type \"help\" to see valid commands.\n")
+                continue
                 
             parser_factory, handler = COMMANDS[command]
 

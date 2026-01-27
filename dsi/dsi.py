@@ -815,15 +815,13 @@ class DSI():
         try:
             f = io.StringIO()
             with redirect_stdout(f):
-                self.t.list()
+                table_list = self.t.list(collection)
             output = f.getvalue()
         except Exception as e:
             raise RuntimeError(f"list() ERROR: {e}")
 
         
         if collection:
-            output_list = output.split('\n')
-            table_list = [line[7:] for line in output_list if line.startswith('Table: ')]
             return table_list
         else:
             print(output)

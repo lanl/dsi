@@ -83,7 +83,11 @@ Example 2: Read data
 ~~~~~~~~~~~~~~~~~~~~~~
 Reading Cloverleaf data into a DSI backend, and displaying some of that data
 
-.. literalinclude:: ../examples/user/2.read.py
+.. literalinclude:: ../examples/user/2a.read.py
+
+Example workflow of reading CSV data into a DSI backend and specifiying the table name (default is CSV)
+
+.. literalinclude:: ../examples/user/2b.read_csv.py
 
 Example 3: Visualize data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

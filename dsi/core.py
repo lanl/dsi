@@ -60,6 +60,8 @@ class Terminal():
             - If True, a 'runTable' is created, and timestamped each time new data/metadata is ingested.
               Recommended for in-situ use-cases.
         """
+        sys.tracebacklimit = 0
+        
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
 
@@ -488,7 +490,7 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
                     if self.user_wrapper:
-                        if errorMessage[1].startswith("A complex schema"):
+                        if isinstance(errorMessage[1], str) and errorMessage[1].startswith("A complex schema"):
                             raise errorMessage[0](errorMessage[1])
                         raise errorMessage[0](f"Error ingesting data due to {errorMessage[1]}")
                     else:
@@ -997,9 +999,13 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
     
-    def list(self):
+    def list(self, collection = False):
         """
-        Prints a list of all tables and their dimensions in the first loaded backend
+        Prints/Returns a list of all tables and their dimensions from the first loaded backend
+
+        `collection` : bool, optional, default False.
+            - If True, returns the list of table names.  (table_name = None), or a single DataFrame of metadata
+            - If False (default), prints metadata of all the tables: table names and dimensions.
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -1017,15 +1023,19 @@ class Terminal():
         start = datetime.now()
         
         table_list = backend.list()
-        for table in table_list:
-            print(f"\nTable: {table[0]}")
-            print(f"  - num of columns: {table[1]}")
-            print(f"  - num of rows: {table[2]}")
-        print()
 
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
+
+        if collection:
+            return [t[0] for t in table_list]
+        else:
+            for table in table_list:
+                print(f"\nTable: {table[0]}")
+                print(f"  - num of columns: {table[1]}")
+                print(f"  - num of rows: {table[2]}")
+            print()
 
     def summary(self, table_name = None, collection = False):
         """

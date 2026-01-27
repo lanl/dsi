@@ -1,4 +1,4 @@
-# examples/user/2.read.py
+# examples/user/2a.read.py
 from dsi.dsi import DSI
 
 read_dsi = DSI("data.db") # Target a backend, defaults to SQLite if not defined

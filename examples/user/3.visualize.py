@@ -1,7 +1,7 @@
 # examples/user/3.visualize.py
 from dsi.dsi import DSI
 
-visual_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
+visual_dsi = DSI("data.db") # Assuming data.db has data from 2a.read.py:
 
 visual_dsi.num_tables()
 visual_dsi.list()

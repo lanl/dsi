@@ -1,7 +1,7 @@
 # examples/user/6.query.py
 from dsi.dsi import DSI
 
-query_dsi = DSI("data.db") # Assuming data.db has data from 2.read.py:
+query_dsi = DSI("data.db") # Assuming data.db has data from 2a.read.py:
 
 #dsi.query(sql_statement)
 query_dsi.query("SELECT * FROM input")
