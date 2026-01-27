@@ -14,6 +14,9 @@ import re
 import tarfile
 import subprocess
 import uuid
+import time
+import itertools
+from typing import Iterator
 from contextlib import redirect_stdout
 
 class Terminal():
@@ -1428,8 +1431,17 @@ class Sync():
         """
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
+        
+        # Warn about relative paths (..) may not work
+
         # Data Crawl and gather metadata of local location
-        file_list = self.dircrawl(local_loc)
+        file_list = self.dircrawl2(local_loc, isVerbose)
+
+
+        if isVerbose:
+            file_list, tmp = itertools.tee(file_list)
+            file_len=sum(1 for _ in tmp)
+            print("Crawled "+str(file_len)+" files.")
 
         self.remote_location = remote_loc
         self.local_location = local_loc
@@ -1455,6 +1467,10 @@ class Sync():
         st_dict['uuid'] = []
         st_dict['file_remote'] = []
 
+        if isVerbose:
+            print("Collection object [", end="")
+            last = -10
+
         for file in file_list:
             rel_file = os.path.relpath(file,local_loc) #rel path
             #utils.isgroupreadable(file) # quick test
@@ -1477,12 +1493,22 @@ class Sync():
             st_dict['uuid'].append(self.gen_uuid(st))
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
+            if isVerbose:
+                progress = int(len(st_list) / file_len * 100)
+                # Print progress bar every 2%
+                if progress % 2 == 0 and progress != last:
+                    print(".", end="")
+                    last = progress
 
+        if isVerbose:
+            print(f"] Collection object created with {len(st_list)} entries.")
 
         # Test remote location validity, try to check access
         # Future: iterate through remote/server list here, for now:::
         remote_list = [ os.path.join(remote_loc,self.project_name) ]
         for remote in remote_list:
+            if isVerbose:
+                print(f"Testing access to '{remote}' directory.")
             try: # Try for file permissions
                 if os.path.exists(remote): # Check if exists
                     print(f"The directory '{remote}' already exists remotely.")
@@ -1499,21 +1525,44 @@ class Sync():
         t = Terminal()
 
         f = self.project_name+".db"
+        isDuckDB=False
+        isSQLite=False
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
             #f = local_loc+"/"+self.project_name+".db"
             if isVerbose:
-                print("trying db: ", f)
+                print("Trying to open db: ", f)
             assert os.path.exists(f)
 
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                t.load_module('backend','Sqlite','back-write', filename=f)
-            
+            # Detect to see which reader we should use
+            with open(f, 'rb') as dbfile:
+                # Detect sqlite
+                header_bytes = dbfile.read(16)
+                if header_bytes == b'SQLite format 3\x00':
+                    isSQLite=True
+                    if isVerbose:
+                        print("Detected SQLiteDB.")
+                
+                # Detect duckdb
+                dbfile.seek(0)
+                full_header = dbfile.read(12) 
+                if full_header[8:12] == b'DUCK':
+                    isDuckDB=True
+                    if isVerbose:
+                        print("Detected DuckDB.")
         except Exception as err:
-            print(f"Database {f} not found")
+            print(f"Database {f} not found: {err}")
             raise
 
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            if isSQLite:
+                t.load_module('backend','Sqlite','back-write', filename=f)
+            elif isDuckDB:
+                t.load_module('backend','DuckDB','back-write', filename=f)
+            else:
+                assert True, "Unsupported Database type!"
+                
         # See if filesystem exists
         fs_t = t.get_table("filesystem")
         if fs_t.empty:
@@ -1524,11 +1573,20 @@ class Sync():
             with redirect_stdout(fnull):
                 t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
                 t.artifact_handler(interaction_type='ingest')
+        else:
+            # Do nothing for now to prevent a re-index,
+            if isVerbose:
+                print("Error: Filesystem table already exists! DSI Index skipped.")
+                return
+
         
         t.close()
 
         self.file_list = file_list
         self.rfile_list = rfile_list
+
+        if isVerbose:
+            print("DSI Index complete!")
 
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
@@ -1541,24 +1599,39 @@ class Sync():
         # See if FS table has been created
         t = Terminal()
 
-        f = self.project_name 
-        if ".db" not in f:
-            f = self.project_name+".db"
-
-
+        f = self.project_name+".db"
+        isDuckDB=False
+        isSQLite=False
         try:
             #f = os.path.join((local_loc, str(self.project_name+".db") ))
-            #f = self.local_location+"/"+self.project_name+".db"
+            #f = local_loc+"/"+self.project_name+".db"
             if isVerbose:
                 print("trying db: ", f)
             assert os.path.exists(f)
 
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                t.load_module('backend','Sqlite','back-read', filename=f)
-        except Exception:
-            print(f"Database {f} not found")
+            # Detect to see which reader we should use
+            with open(f, 'rb') as dbfile:
+                # Detect sqlite
+                header_bytes = dbfile.read(16)
+                if header_bytes == b'SQLite format 3\x00':
+                    isSQLite=True
+                # Detect duckdb
+                dbfile.seek(0)
+                full_header = dbfile.read(12) 
+                if full_header[8:12] == b'DUCK':
+                    isDuckDB=True
+        except Exception as err:
+            print(f"Database {f} not found: {err}")
             raise
+
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            if isSQLite:
+                t.load_module('backend','Sqlite','back-write', filename=f)
+            elif isDuckDB:
+                t.load_module('backend','DuckDB','back-write', filename=f)
+            else:
+                assert True, "Unsupported Database type!"
 
         # See if filesystem exists
         fs_t = t.get_table("filesystem")
@@ -1606,6 +1679,33 @@ class Sync():
             # Data movement via Conduit
             env = os.environ.copy()
             
+            # Test Kerberos
+            if isVerbose:
+                print( "Testing: klist")
+            cmd = ['klist']
+            process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+            stdout, stderr = process.communicate()
+            returncode = process.returncode
+            
+            if "No credentials" in stdout:
+                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
+                assert True, print("Kerberos message: " + str(stdout))
+
+            # Test Conduit status
+            if isVerbose:
+                print( "Testing Conduit: conduit get")
+            cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
+            process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+            stdout, stderr = process.communicate()
+            returncode = process.returncode
+            
+            if "TRANSFER_ID" in stdout:
+                if isVerbose:
+                    print("Testing Conduit: conduit is authenticated.")
+            else:
+                assert True, print("Conduit Error: " + str(stdout))
+
+            # Check remote access for permissions and create folder
             if not os.path.exists(self.remote_location):
                 if isVerbose:
                     print( " mkdir " + self.remote_location)
@@ -1705,7 +1805,7 @@ class Sync():
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
 
 
-    def dircrawl(self,filepath):
+    def dircrawl(self,filepath, verbose=False):
         """
         Crawls the root 'filepath' directory and returns files
 
@@ -1713,20 +1813,53 @@ class Sync():
 
         `return`: returns crawled file-list
         """
+        start_time = time.perf_counter()
+        
         file_list = []
         for root, dirs, files in os.walk(filepath):
             #if os.path.basename(filepath) != 'tmp': # Lets skip some files
             #    continue
+            if verbose:
+                print(f"Crawling directory: {root}")
+                print(f"  Found {len(files)} files, {len(dirs)} subdirectories")
 
             for f in files: # Appent root-level files
                 file_list.append(os.path.join(root, f))
-            for d in dirs: # Recursively dive into directories
-                sub_list = self.dircrawl(os.path.join(root, d))
-                for sf in sub_list:
-                    file_list.append(sf)
+            
+        elapsed = time.perf_counter() - start_time
+
+        if verbose:
+            print(f"\nFinished crawling: {filepath}")
+            print(f"Total files found: {len(file_list)}")
+            print(f"Runtime: {elapsed:.2f} seconds")
     
         return file_list
-    
+ 
+    def dircrawl2(self, filepath: str, verbose: bool = False) -> Iterator[str]:
+        start = time.perf_counter()
+
+        # iterative stack avoids deep recursion limits
+        stack = [filepath]
+        while stack:
+            path = stack.pop()
+            try:
+                with os.scandir(path) as it:
+                    for entry in it:
+                        # follow_symlinks=False avoids surprises and extra stat calls
+                        if entry.is_dir(follow_symlinks=False):
+                            if verbose:
+                                print(f"Crawling directory: {entry.path}")
+                            stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            yield entry.path
+            except (PermissionError, FileNotFoundError):
+                # permissions/races happen a lot at scale
+                continue
+
+        if verbose:
+            print(f"\nFinished crawling: {filepath}")
+            print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
+
     def get(self, project_name = "Project"):
         '''
         Helper function that searches remote location based on project name, and retrieves

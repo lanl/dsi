@@ -1,7 +1,7 @@
 # examples/user/2a.read.py
 from dsi.dsi import DSI
 
-read_dsi = DSI("data.db") # Target a backend, defaults to SQLite if not defined
+read_dsi = DSI("clover3d.db") # Target a backend, defaults to SQLite if not defined
 
 #dsi.read(path, reader)
 read_dsi.read("../clover3d/", 'Cloverleaf') # Read data into memory
