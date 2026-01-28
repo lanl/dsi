@@ -1433,6 +1433,8 @@ class Sync():
             print("loc: "+local_loc+ " rem: "+remote_loc)
         
         # Warn about relative paths (..) may not work
+        if ".." in local_loc:
+            assert True, print ("Error: Please use absolute paths instead of relative")
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, isVerbose)
@@ -1640,6 +1642,11 @@ class Sync():
             print(" Data copy failed.")
             return
         
+        # Check if the location has been set
+        if not self.remote_location:
+            self.remote_location
+            self.local_location
+
         t.close()
 
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
