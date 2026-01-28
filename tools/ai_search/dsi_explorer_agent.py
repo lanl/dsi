@@ -37,6 +37,8 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
+from openai import OpenAI
+
 from dsi.dsi import DSI
 
 ########################################################################
@@ -63,7 +65,7 @@ db_schema = ""
 db_description = None
 master_db_folder = ""
 
-
+client = OpenAI()
 
 ########################################################################
 #### Utility functions
@@ -574,6 +576,25 @@ def send_email_tool(recipient: str, subject: str, body: str, smtp_host: str = "s
 
 
 
+
+@tool
+def upload_paper(path: str) -> Dict[str, str]:
+    """
+    Upload a local PDF to OpenAI Files API and return identifiers.
+    Intended for later use as an input_file in Responses API.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+    if not path.lower().endswith(".pdf"):
+        raise ValueError("This tool expects a .pdf file path.")
+
+    f = client.files.create(
+        file=open(path, "rb"),
+        purpose="user_data",  # recommended for files you plan to use as model inputs
+    )
+    return {"file_id": f.id, "filename": os.path.basename(path)}
+
+
 # Register the tools
 tools = [query_dsi_tool, 
          python_repl_tool, 
@@ -582,7 +603,8 @@ tools = [query_dsi_tool,
          arxiv_search_tool,
          wikipedia_search_tool,
          web_search_tool,
-         send_email_tool
+         send_email_tool,
+         upload_paper
          ]
 
 
@@ -722,6 +744,7 @@ class DSIExplorer:
         datetime_str = now.strftime("%Y_%m_%d__%H_%M")
         workspace_name = "dsi_explorer_agent__" +  datetime_str
         absolute_workspace_path = os.path.abspath(workspace_name)
+        print(f"Creating workspace at: {absolute_workspace_path}")
 
         # Create the woking directory and switch to it
         os.makedirs(absolute_workspace_path, exist_ok=True)
