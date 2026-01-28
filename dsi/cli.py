@@ -714,6 +714,7 @@ class DSI_cli:
 
         try:
             with open(file_path, 'rb') as f:
+                f.seek(8)
                 header = f.read(4)
                 return header == b'DUCK'
         except Exception as e:
