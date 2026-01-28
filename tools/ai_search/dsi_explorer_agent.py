@@ -64,44 +64,13 @@ dsi_store = None
 db_schema = ""
 db_description = None
 master_db_folder = ""
+master_datbase_path = ""
+code_path = ""
 
 client = OpenAI()
 
 ########################################################################
 #### Utility functions
-
-def check_chatgpt_api_key(env_var="OPENAI_API_KEY") -> bool:
-    """ Check if the ChatGPT/OpenAI API key is set in the environment.
-
-    Arg:
-        env_var (str): the environment variable name to check
-
-    Returns:    
-        bool: True if the API key is set, False otherwise
-    """
-
-    api_key = os.getenv(env_var)
-
-    if not api_key:
-        return False
-    else:
-        return True
-
-
-def get_chatgpt_api_key() -> None:
-    """Capture the ChatGPT/OpenAI API key from user input and store it in the environment variable."""
-
-    api_key = getpass("Please enter your ChatGPT/OpenAI API key: ").strip()
-
-    if not api_key:
-        raise ValueError("No API key provided.")
-
-    # store for the current process
-    env_var = "OPENAI_API_KEY"
-    os.environ[env_var] = api_key
-    print(f"API key stored in environment variable '{env_var}' for this session.")
-
-
 
 def redirect_stdout_to_logger(logger: logging.Logger, level=logging.INFO) -> io.StringIO:
     """Capture all print() output within the context and redirect it to the logger.
@@ -210,22 +179,36 @@ def load_dsi(path: str) -> str:
         str: message indicating success or failure
     """
 
+
     logger.info(f"\n\n!!!load_dsi :: running on: {path}\n\n")
     
     global dsi_store
     global db_schema
     global master_db_folder
+    global master_datbase_path
     
-
     p = Path(path)
-    if not p.is_absolute():
-        db_path = str(master_db_folder + '/' + path)
-    else:
-        db_path = path
 
-    data_path = db_path.strip()
+    if master_db_folder == "":
+    # the ai is loading the master database for the first time
+        if not p.is_absolute():
+            master_datbase_path = str( (Path(code_path) / path).expanduser() )
+            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
+        else:
+            master_datbase_path = path
+            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
+
+        data_path = master_datbase_path.strip()
+    else:
+        if not p.is_absolute():
+            db_path = str(master_db_folder + '/' + path)
+        else:
+            db_path = path
+
+        data_path = db_path.strip()
+
     
-    logger.info(f"\n\n!!!load_dsi :: loading database at: {db_path}\n\n")
+    logger.info(f"\n\n!!!load_dsi :: loading database at: {data_path}\n\n")
 
     
     # Check if the path exists and there is data
@@ -268,8 +251,10 @@ def load_dsi(path: str) -> str:
             load_db_description(data_path)
         except Exception as e:
             logger.debug("load_dsi :: No master database description to load.")
-        
-        
+
+
+
+
         return "Successfully loaded DSI object and extracted database information"
         
     except Exception as e:
@@ -297,6 +282,9 @@ def query_dsi_tool(query_str: str) -> list:
     """
 
     logger.info(f"\n\n!!!query_dsi_tool :: running on {query_str}\n\n")
+
+    if master_datbase_path == "":
+        return {"error": "No DSI database loaded. Please load a DSI database first using load_dsi_tool."}
     
     global dsi_store   
     s = dsi_store
@@ -578,7 +566,7 @@ def send_email_tool(recipient: str, subject: str, body: str, smtp_host: str = "s
 
 
 @tool
-def upload_paper(path: str) -> Dict[str, str]:
+def upload_paper_tool(path: str) -> Dict[str, str]:
     """
     Upload a local PDF to OpenAI Files API and return identifiers.
     Intended for later use as an input_file in Responses API.
@@ -604,8 +592,8 @@ tools = [query_dsi_tool,
          wikipedia_search_tool,
          web_search_tool,
          send_email_tool,
-         upload_paper
-         ]
+         upload_paper_tool
+        ]
 
 
 ########################################################################
@@ -623,7 +611,6 @@ class DSIExplorerWorker:
     """A simple DSI worker that executes tasks based on the prompt and messages."""
     
     def __init__(self, llm, prompt=None, name="worker"):
-        self.llm = llm
         self.prompt = prompt
         self.name = name  # add a name for easier tracing
         self.llm = llm.bind_tools(tools)
@@ -669,25 +656,34 @@ def should_call_tools(state: State) -> str:
 class DSIExplorer:
     """DSIExplorer agent for data analysis and execution."""
     
-    def __init__(self, db_index_name:str="", output_mode:str="jupyter"):
+    def __init__(self, llm, db_index_name:str="", output_mode:str="jupyter"):
         self.store = None
         self.tables = None
         self.schema = None
         self.msg = {}
-        self.master_datbase_path = ""
+        #self.master_datbase_path = ""
         self.output_mode = output_mode
 
-        global master_db_folder
-        
-        # Get absolute path of dataset
-        relative_db_path = Path(db_index_name)
-        absolute_db_path = str(relative_db_path.resolve())
+        global code_path
+        code_path = os.getcwd()
         
         self.wrsk_path = self.create_workspace()
         self.create_checkpoint()
 
         self.thread_id = str(random.randint(1, 20000))
+
+
+        # set LLM
+        if llm is None:
+            try:
+                self.llm = ChatOpenAI(model="gpt-5.1", temperature=0.1, request_timeout=120)
+            except Exception as e:
+                print(f"[ERROR] Failed to initialize ChatOpenAI LLM. Error: {repr(e)}")
+                sys.exit(1)
+        else:
+            self.llm = llm
         
+
         # setup logging to file
         log_file = os.path.join(self.wrsk_path, "run.log")
         file_handler = logging.FileHandler(log_file, mode="w")
@@ -700,36 +696,60 @@ class DSIExplorer:
         logger.info(f"Workspace created at: {self.wrsk_path}")   
         logger.info(f"Checkpoint database created with thread id: {self.thread_id}")
 
-        master_db_folder = "/".join(absolute_db_path.split("/")[:-1]) + '/'
-        logger.debug("master_db_folder: " + master_db_folder)
+        
 
-        self.load_master_db(absolute_db_path)
+        self.load_master_db(db_index_name)
         self.create_graph()
         
         logger.info("DSI Explorer agent initialization complete.")
-        print(f"Dataset {db_index_name} has been loaded.\nThe DSI Data Explorer agent is ready.")
+        
         
 
 
-    def load_master_db(self, master_db_path: str) -> None:
+    def load_master_db(self, db_index_name: str) -> None:
         """Load the  master dataset from the given path.
         
         Arg:
             path (str): the path to the DSI object
         """
         
-        if master_db_path != "":
-            logger.info(f"load_master :: Using database index: {master_db_path}")
-            output_msg = load_dsi(master_db_path)
-            if "Failed" in output_msg:
-                print(f"[ERROR] A valid DSI file is needed. {master_db_path}. We will now exit!")
-                sys.exit(1)
+        if db_index_name == "":        
+            print("No DSI database provided. Please load one")
+            return
 
-            #load_db_description(master_db_path)
-            self.master_datbase_path = master_db_path
+        # Get absolute path of dataset
+        global master_db_folder
+        global master_datbase_path
+
+        p = Path(db_index_name)
+        if not p.is_absolute():
+            master_datbase_path = str( (Path(code_path) / db_index_name).expanduser() )
+            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
+        else:
+            master_datbase_path = db_index_name
+            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
+        
+        absolute_db_path = master_datbase_path
+        logger.debug("master_db_folder: " + master_db_folder)
+
+        
+        if absolute_db_path != "":
+            print(f"loading the dataset at {absolute_db_path}...")
+        
+            logger.info(f"load_master :: Using database index: {absolute_db_path}")
+            output_msg = load_dsi(absolute_db_path)
+            if "Failed" in output_msg:
+                print(f"[ERROR] A valid DSI file is needed. {absolute_db_path}. We will now exit!")
+                sys.exit(1)
+            else:
+                print(f"Dataset {db_index_name} has been loaded.\nThe DSI Data Explorer agent is ready.")
+
+
+            logger.debug("master_datbase_path: " + master_datbase_path)
+            logger.debug("master_db_folder: " + master_db_folder)
         else:        
-            print("No DSI database provided. We will now exit!")
-            sys.exit(1)
+            print("No DSI database provided. Please load one")
+            #sys.exit(1)
         
 
 
@@ -779,7 +799,7 @@ class DSIExplorer:
         - generate plots and diagrams,
         - analyze and summarize data.
 
-        The dsi_explorer master dataset is avilable at {self.master_datbase_path} in case you need to reload it.
+        The dsi_explorer master dataset is avilable at {master_datbase_path} in case you need to reload it.
 
         Requirements:
         - Planning: Think carefully about the problem, but **do not show your reasoning**.
@@ -792,8 +812,7 @@ class DSIExplorer:
         - Do not restate the prompt or reasoning; just act and report the outcome briefly.
         """
         
-        llm = ChatOpenAI(model="gpt-5.1", temperature=0.1, request_timeout=120)
-        dsi_explorer_executor = DSIExplorerWorker(llm, worker_prompt)
+        dsi_explorer_executor = DSIExplorerWorker(self.llm, worker_prompt)
         
         logger.info("Worker agent created.")
         logger.debug("Worker prompt: " + worker_prompt)
@@ -839,7 +858,7 @@ class DSIExplorer:
 
             When the user asks to reload, refresh, reset, reinitialize, restart, or 
             the **master database**, interpret that as a request to reload the 
-            DSIExplorer master database using the tool load_dsi_tool("{self.master_datbase_path}"),
+            DSIExplorer master database using the tool load_dsi_tool("{master_datbase_path}"),
             load the last dataset in the context.
 
             Do no reload or load the master dataset unless explicitly asked by the user.
@@ -915,8 +934,6 @@ class DSIExplorer:
 
 
 
-
-
 def main():    
     """Main function to run the DSI Explorer CLI."""
 
@@ -945,8 +962,12 @@ def main():
     )
     console.print(banner)
 
+
+    # Use chat GPT-5.1 model by default
+    model = ChatOpenAI(model="gpt-5.1", max_tokens=100000, timeout=None, max_retries=2)
+
     # Initialize the explorer in console output mode
-    explorer = DSIExplorer(db_index_name=args.db, output_mode="console")
+    explorer = DSIExplorer(model, db_index_name=args.db, output_mode="console")
 
     
     def show_help():
@@ -973,7 +994,6 @@ def main():
 
         # Let readline manage only the user input part
         return input()
-
 
 
     print("\nType a question and press Enter.")
