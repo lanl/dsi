@@ -346,7 +346,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.info(f"{mod_name} {mod_function} {mod_type} unloaded successfully.")
                 self.logger.info(f"Runtime: {end-start}")
-        else:            
+        else:
             print(f"WARNING: {mod_name} {mod_type} {mod_function} could not be found in active_modules. No action taken.")
             if self.debug_level != 0:
                 self.logger.warning(f"{mod_name} {mod_function} {mod_type} could not be found in active_modules. No action taken.")
@@ -588,7 +588,7 @@ class Terminal():
                 not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
-            raise NotImplementedError(not_run_msg)    
+            raise NotImplementedError(not_run_msg)
     
     def get_table(self, table_name, dict_return = False):
         """
@@ -690,7 +690,7 @@ class Terminal():
         return self.find_helper(query_object, return_object, start, "")
     
     def find_table(self, query_object):
-        """   
+        """
         Find all tables whose name matches `query_object` in the first loaded backend.
        
         `query_object` : str
@@ -806,14 +806,14 @@ class Terminal():
         elif isinstance(return_object, tuple):
             if self.debug_level != 0:
                 self.logger.error(f"Error finding data due to {return_object[1]}")
-            raise return_object[0](return_object[1])        
+            raise return_object[0](return_object[1])
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
     
     def find_relation(self, query_object):
-        """   
+        """
         Finds all rows in the first table of the first loaded backend that satisfy a column-level condition.
         `query_object` must include a column, operator, and value to define a valid relational condition.
        
@@ -1302,6 +1302,25 @@ class Terminal():
             self.active_modules[func] = []
             self.loaded_backends = []
     
+    # Internal function to identify if an input file is a DSI-compatible backend
+    def identify_backend(self, filename):
+        if not os.path.exists(filename) or not os.path.isfile(filename):
+            return None
+        
+        try:
+            with open(filename, 'rb') as f:
+                #Sqlite check
+                if f.read(16) == b'SQLite format 3\x00':
+                    return "Sqlite"
+                #DuckDB check
+                f.seek(8)
+                if f.read(4) == b'DUCK':
+                    return "DuckDB"
+        except Exception as err:
+            print(f"Error opening '{f}' : {err}")
+            raise
+        return None
+
     # Internal function to return input string as either int, float or still a string
     def check_type(self, text):
         try:
@@ -1412,18 +1431,43 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and 
     sync (local filesystem with remote) exist.
     """
-    remote_location = []
-    local_location = []
-
-    file_list = []
-    rfile_list = []
-
     def __init__(self, project_name="test"):
-        # Helper function to get parent module names.
-        #self.remote_location = {}
-        #self.local_location = {}
         self.project_name = project_name
+        extension = ""
+        for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
+            if project_name.lower().endswith(ext):
+                self.project_name = project_name[:-len(ext)]
+                extension = ext
+                break
+        if extension != "":
+            f = self.project_name + extension
+        else:
+            f = self.project_name+".db"
 
+        self.remote_location = []
+        self.local_location = []
+
+        self.file_list = []
+        self.rfile_list = []
+
+        self.t = Terminal()
+        backend_name = self.t.identify_backend(f)
+        if backend_name is None:
+            print("Unsupported DSI database type")
+            raise
+        print(f"Detected {backend_name}")
+
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            self.t.load_module('backend', backend_name, 'back-write', filename=f)
+
+    def execute_cmd(self, cmd, cmd_name):
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            raise RuntimeError(f"{cmd_name} failed: {stderr}")
+        return stdout
+    
     def index(self, local_loc, remote_loc, isVerbose=False):
         """
         Helper function to gather filesystem information, local and remote locations
@@ -1475,7 +1519,6 @@ class Sync():
 
         for file in file_list:
             rel_file = os.path.relpath(file,local_loc) #rel path
-            #utils.isgroupreadable(file) # quick test
             filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
@@ -1515,74 +1558,30 @@ class Sync():
                 if os.path.exists(remote): # Check if exists
                     print(f"The directory '{remote}' already exists remotely.")
                 else:
-                    os.makedirs(remote) # Create it
+                    path = Path(remote)
+                    path.mkdir(parents=True, exist_ok=True)
+                    # os.makedirs(remote) # Create it
                     print(f"The directory '{remote}' has been created remotely.")
             except Exception as err:
-                print(f"Unexpected {err=}, {type(err)=}")
+                print(f"Error creating remote directory. Check access rights.")
                 raise
-
-        
-        # Try to open existing local database to store filesystem info before copy
-        # Open and validate local DSI data store
-        t = Terminal()
-
-        f = self.project_name+".db"
-        isDuckDB=False
-        isSQLite=False
-        try:
-            #f = os.path.join((local_loc, str(self.project_name+".db") ))
-            #f = local_loc+"/"+self.project_name+".db"
-            if isVerbose:
-                print("Trying to open db: ", f)
-            assert os.path.exists(f)
-
-            # Detect to see which reader we should use
-            with open(f, 'rb') as dbfile:
-                # Detect sqlite
-                header_bytes = dbfile.read(16)
-                if header_bytes == b'SQLite format 3\x00':
-                    isSQLite=True
-                    if isVerbose:
-                        print("Detected SQLiteDB.")
-                
-                # Detect duckdb
-                dbfile.seek(0)
-                full_header = dbfile.read(12) 
-                if full_header[8:12] == b'DUCK':
-                    isDuckDB=True
-                    if isVerbose:
-                        print("Detected DuckDB.")
-        except Exception as err:
-            print(f"Database {f} not found: {err}")
-            raise
-
-        fnull = open(os.devnull, 'w')
-        with redirect_stdout(fnull):
-            if isSQLite:
-                t.load_module('backend','Sqlite','back-write', filename=f)
-            elif isDuckDB:
-                t.load_module('backend','DuckDB','back-write', filename=f)
-            else:
-                assert True, "Unsupported Database type!"
                 
         # See if filesystem exists
-        fs_t = t.get_table("filesystem")
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            fs_t = self.t.get_table("filesystem")
         if fs_t.empty:
             if isVerbose:
-                print("Creating new Filesystem table")
+                print("Creating filesystem table")
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
-                t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
-                t.artifact_handler(interaction_type='ingest')
-        else:
-            # Do nothing for now to prevent a re-index,
+                self.t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
+                self.t.artifact_handler(interaction_type='ingest')
+        else: # Currently prevent re-indexing
             if isVerbose:
-                print("Error: Filesystem table already exists! DSI Index skipped.")
-                return
-
-        
-        t.close()
+                print("Error: filesystem table already exists! DSI Index skipped.")
+            return
 
         self.file_list = file_list
         self.rfile_list = rfile_list
@@ -1595,215 +1594,130 @@ class Sync():
 
     def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
-        Helper function to perform the 
-        data copy over using a preferred API
+        Helper function to perform the data copy over using a preferred API
         """
-        # See if FS table has been created
-        t = Terminal()
-
-        f = self.project_name+".db"
-        isDuckDB=False
-        isSQLite=False
-        try:
-            #f = os.path.join((local_loc, str(self.project_name+".db") ))
-            #f = local_loc+"/"+self.project_name+".db"
-            if isVerbose:
-                print("trying db: ", f)
-            assert os.path.exists(f)
-
-            # Detect to see which reader we should use
-            with open(f, 'rb') as dbfile:
-                # Detect sqlite
-                header_bytes = dbfile.read(16)
-                if header_bytes == b'SQLite format 3\x00':
-                    isSQLite=True
-                # Detect duckdb
-                dbfile.seek(0)
-                full_header = dbfile.read(12) 
-                if full_header[8:12] == b'DUCK':
-                    isDuckDB=True
-        except Exception as err:
-            print(f"Database {f} not found: {err}")
-            raise
-
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            if isSQLite:
-                t.load_module('backend','Sqlite','back-write', filename=f)
-            elif isDuckDB:
-                t.load_module('backend','DuckDB','back-write', filename=f)
-            else:
-                assert True, "Unsupported Database type!"
-
-        # See if filesystem exists
-        fs_t = t.get_table("filesystem")
+            fs_t = self.t.get_table("filesystem")
         if fs_t.empty:
-            print(" Filesystem table not found. Try running Index first.")
+            print(" filesystem table not found. Must run Index first.")
             print(" Data copy failed.")
             return
-        
-        # Check if the location has been set
-        if not self.remote_location:
-            self.remote_location
-            self.local_location
-
-        t.close()
 
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         if tool == "copy":
-            #print(self.file_list)
-            #print(self.rfile_list)
             # Data movement via Unix Copy
             for file,file_remote in zip(self.file_list,self.rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
                     if isVerbose:
-                        print( " mkdir " + abspath)
+                        print(" mkdir " + abspath)
                     path = Path(abspath)
                     try:
                         path.mkdir(parents=True)
                     except Exception:
-                        print(f"Unable to create folder {abspath} . Do you have access rights?")
+                        print(f"Unable to create folder {abspath}. Check your access rights")
                         raise
-
+            
                 if isVerbose:
-                    print( " cp " + file + " " + file_remote)
+                    print(" cp " + file + " " + file_remote)
                 shutil.copy2(file , file_remote)
                 
 
             # Database movement
             if isVerbose:
-                print( " cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
-            #shutil.copy2(os.path.join(self.local_location, str(self.project_name+".db") ), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
-            shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
+                print(" cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
+            shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
 
             print(" Data Copy Complete!")
+        
+        
         elif tool == "scp":
             #  Data movement via SCP
             remote_user = os.getlogin()
             remote_host = "myremote"
+        
         elif tool == "conduit":
-            # Data movement via Conduit
-            env = os.environ.copy()
-            
             # Test Kerberos
             if isVerbose:
                 print( "Testing: klist")
             cmd = ['klist']
-            process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-            stdout, stderr = process.communicate()
-            returncode = process.returncode
-            
+            stdout = self.execute_cmd(cmd, "Testing klist")
             if "No credentials" in stdout:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 assert True, print("Kerberos message: " + str(stdout))
 
             # Test Conduit status
             if isVerbose:
-                print( "Testing Conduit: conduit get")
+                print("Testing Conduit: conduit get")
             cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
-            process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-            stdout, stderr = process.communicate()
-            returncode = process.returncode
+            stdout = self.execute_cmd(cmd, "Testing conduit get")
             
-            if "TRANSFER_ID" in stdout:
-                if isVerbose:
-                    print("Testing Conduit: conduit is authenticated.")
-            else:
-                assert True, print("Conduit Error: " + str(stdout))
+            if "TRANSFER_ID" in stdout and isVerbose:
+                print("Conduit is authenticated.")
+            elif "TRANSFER_ID" not in stdout:
+                print("Conduit Error: " + str(stdout))
+                raise
 
-            # Check remote access for permissions and create folder
-            if not os.path.exists(self.remote_location):
-                if isVerbose:
-                    print( " mkdir " + self.remote_location)
-                path = Path(self.remote_location)
-                try:
-                    path.mkdir(parents=True)
-                except Exception:
-                    print(f"Unable to create folder {abspath} . Do you have access rights?")
-                    raise
+            # # Check remote access for permissions and create folder
+            # if not os.path.exists(self.remote_location):
+            #     if isVerbose:
+            #         print( " mkdir " + self.remote_location)
+            #     path = Path(self.remote_location)
+            #     try:
+            #         path.mkdir(parents=True)
+            #     except Exception:
+            #         print(f"Unable to create folder {abspath} . Do you have access rights?")
+            #         raise
 
-            #for file,file_remote in zip(self.file_list,self.rfile_list):
-            #    abspath = os.path.dirname(os.path.abspath(file_remote))
-            #    if not os.path.exists(abspath):
-            #        if isVerbose:
-            #            print( " mkdir " + abspath)
-            #        path = Path(abspath)
-            #        try:
-            #            path.mkdir(parents=True)
-            #        except Exception:
-            #            print(f"Unable to create folder {abspath} . Do you have access rights?")
-            #            raise
-            #    if isVerbose:
-            #        print( "conduit cp " + file + " " + file_remote)
             try:
-                #subprocess.call(["conduit", "cp", "-r", self.local_location, self.remote_location], env=env, shell=True)
-
+                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
                 # File Movement
                 if isVerbose:
-                    print( "conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r',self.local_location,  os.path.join(self.remote_location, self.project_name)]
-                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-                
-                stdout, stderr = process.communicate()
-                returncode = process.communicate()
-                
-                print( " DSI submitted Conduit data movement job. ")
+                    print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
+                cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
+                self.execute_cmd(cmd, "Conduit copy data")
+                print(" DSI submitted Conduit data movement job.")
 
                 # Database Movement
                 if isVerbose:
-                    print( " conduit cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
-                
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
-                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-                
-                stdout, stderr = process.communicate()
-                returncode = process.communicate()
-            
-                print( " DSI submitted Conduit data movement job. ")
+                    print("conduit cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
+                cmd = base_cmd + [str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+                self.execute_cmd(cmd, "Conduit copy database")
+                print(" DSI submitted Conduit database movement job.")
 
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
+                raise
+
         elif tool == "pfcp":
-            env = os.environ.copy()
-            
-            if not os.path.exists(self.remote_location):
-                if isVerbose:
-                    print( " mkdir " + self.remote_location)
-                path = Path(self.remote_location)
-                try:
-                    path.mkdir(parents=True)
-                except Exception:
-                    print(f"Unable to create folder {abspath} . Do you have access rights?")
-                    raise
+            # if not os.path.exists(self.remote_location):
+            #     if isVerbose:
+            #         print( " mkdir " + self.remote_location)
+            #     path = Path(self.remote_location)
+            #     try:
+            #         path.mkdir(parents=True)
+            #     except Exception:
+            #         print(f"Unable to create folder {abspath} . Do you have access rights?")
+            #         raise
             
             try:
-                #subprocess.call(["pfcp", "-r", self.local_location, self.remote_location], env=env, shell=True)
-
                 # File Movement
                 if isVerbose:
-                    print( "pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name) )
+                    print("pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = ['pfcp','-R',self.local_location,  os.path.join(self.remote_location, self.project_name)]
-                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-                
-                stdout, stderr = process.communicate()
-                returncode = process.communicate()
-                
-                print( " DSI submitted pfcp data movement job. ")
+                self.execute_cmd(cmd, "pfcp move data")
+                print(" DSI submitted pfcp data movement job.")
 
                 # Database Movement
                 if isVerbose:
-                    print( " pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db" ) )
-                
-                cmd = ['pfcp', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db" )]
-                process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-                
-                stdout, stderr = process.communicate()
-                returncode = process.communicate()
-            
-                print( " DSI submitted pfcp data movement job. ")
+                    print("pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
+                cmd = ['pfcp', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+                self.execute_cmd(cmd, "pfcp move database")
+                print(" DSI submitted pfcp database movement job.")
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
+        
         elif tool == "ftp":
             True
         elif tool == "git":
@@ -1888,7 +1802,6 @@ class Sync():
         return str(file_uuid)
 
 
-    
 
 class TarFile():
   def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
