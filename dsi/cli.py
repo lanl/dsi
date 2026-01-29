@@ -492,14 +492,11 @@ class DSI_cli:
         fnull = open(os.devnull, 'w')
         try:
             with redirect_stdout(fnull):
-                if self.__is_sqlite3_file(dbfile):
-                    self.t.load_module('backend','Sqlite','back-read', filename=dbfile)
+                backend_name = self.t.identify_backend(dbfile)
+                if backend_name:
+                    self.t.load_module('backend',backend_name,'back-read', filename=dbfile)
                     self.t.artifact_handler(interaction_type="process")
-                    self.t.unload_module('backend','Sqlite','back-read')
-                elif self.__is_duckdb_file(dbfile):
-                    self.t.load_module('backend','DuckDB','back-read', filename=dbfile)
-                    self.t.artifact_handler(interaction_type="process")
-                    self.t.unload_module('backend','DuckDB','back-read')
+                    self.t.unload_module('backend',backend_name,'back-read')
                 elif file_extension.lower() == 'csv':
                     self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() == 'toml':
@@ -697,29 +694,6 @@ class DSI_cli:
                 shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name) + ".duckdb")
                 final_name = new_name + ".duckdb"
         print(f"Sucessfully wrote all data to {final_name}\n")
-
-
-    # TODO: Abstract later to __is_valid_file and have independent checks in the dsi.backends
-    def __is_sqlite3_file(self, filename):
-        if not os.path.isfile(filename):
-            return False
-
-        with open(filename, 'rb') as f:
-            header = f.read(16)
-        return header == b'SQLite format 3\x00'
-
-    def __is_duckdb_file(self, file_path):
-        if not os.path.isfile(file_path):
-            return False
-
-        try:
-            with open(file_path, 'rb') as f:
-                f.seek(8)
-                header = f.read(4)
-                return header == b'DUCK'
-        except Exception as e:
-            print(f"Error reading file: {e}")
-            return False
     
     def __is_url(self, s):
         '''

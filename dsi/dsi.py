@@ -37,7 +37,7 @@ class DSI():
             Default is "Sqlite".
         """
         self.t = Terminal(debug = 0, runTable=False)
-        self.s = Sync()
+        # self.s = Sync()
         self.t.user_wrapper = True
         self.schema_read = False
         self.schema_tables = set()
