@@ -9,3 +9,4 @@ langchain-openai
 langchain-experimental
 langgraph
 langgraph-checkpoint-sqlite
+jupyter lab
