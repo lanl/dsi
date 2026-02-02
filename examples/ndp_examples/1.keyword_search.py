@@ -9,7 +9,7 @@ from dsi.dsi import DSI
 dsi = DSI("climate_search.db")
 
 # Simple string search - finds datasets containing "climate" with CSV files
-dsi.read("climate CSV", reader_name="CKAN_Search")
+dsi.read("wildfire CSV", reader_name="CKAN_Search")
 
 # List all loaded tables
 dsi.list()
