@@ -37,7 +37,6 @@ class DSI():
             Default is "Sqlite".
         """
         self.t = Terminal(debug = 0, runTable=False)
-        # self.s = Sync()
         self.t.user_wrapper = True
         self.schema_read = False
         self.schema_tables = set()
@@ -667,16 +666,6 @@ class DSI():
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             sys.exit(f"update() ERROR: {e}")
-    
-    # def nb(self):
-    #     """
-    #     Generates a Python notebook and stores data from the first activated backend
-    #     """
-    #     if not self.t.loaded_backends:
-    #         raise ValueError("Must load a backend first. Call backend() before this")
-        
-    #     self.t.artifact_handler(interaction_type="notebook")
-    #     print("Notebook .ipynb and .html generated.")
 
     def list_writers(self):
         """

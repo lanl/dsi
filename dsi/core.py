@@ -1444,17 +1444,15 @@ class Sync():
         else:
             f = self.project_name+".db"
 
-        self.remote_location = []
-        self.local_location = []
-
-        self.file_list = []
-        self.rfile_list = []
+        self.remote_location = None
+        self.local_location = None
+        self.file_list = None
+        self.rfile_list = None
 
         self.t = Terminal()
         backend_name = self.t.identify_backend(f)
         if backend_name is None:
-            print("Unsupported DSI database type")
-            raise
+            raise ValueError("Unsupported DSI database type")
         print(f"Detected {backend_name}")
 
         fnull = open(os.devnull, 'w')
@@ -1473,6 +1471,15 @@ class Sync():
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
+        # throw error if filesystem exists -- in future, drop filesystem table if it exists.
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            fs_t = self.t.get_table("filesystem")
+        if not fs_t.empty:
+            if isVerbose:
+                print("Warning: filesystem table already exists! DSI Index skipped.")
+            return
+        
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
         
@@ -1482,7 +1489,6 @@ class Sync():
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, isVerbose)
-
 
         if isVerbose:
             file_list, tmp = itertools.tee(file_list)
@@ -1563,31 +1569,20 @@ class Sync():
                     # os.makedirs(remote) # Create it
                     print(f"The directory '{remote}' has been created remotely.")
             except Exception as err:
-                print(f"Error creating remote directory. Check access rights.")
-                raise
+                raise RuntimeError(f"Error creating remote directory: {err}")
                 
-        # See if filesystem exists
+        if isVerbose:
+            print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            fs_t = self.t.get_table("filesystem")
-        if fs_t.empty:
-            if isVerbose:
-                print("Creating filesystem table")
-
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                self.t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
-                self.t.artifact_handler(interaction_type='ingest')
-        else: # Currently prevent re-indexing
-            if isVerbose:
-                print("Error: filesystem table already exists! DSI Index skipped.")
-            return
+            self.t.load_module('plugin', "Dict", "reader", collection=st_dict, table_name="filesystem")
+            self.t.artifact_handler(interaction_type='ingest')
 
         self.file_list = file_list
         self.rfile_list = rfile_list
 
         if isVerbose:
-            print("DSI Index complete!")
+            print("DSI Index complete!\n")
 
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
@@ -1596,6 +1591,9 @@ class Sync():
         """
         Helper function to perform the data copy over using a preferred API
         """
+        if any(x is None for x in (self.remote_location, self.local_location, self.file_list, self.rfile_list)):
+            raise RuntimeError("Must execute DSI Index right before Copy")
+        
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             fs_t = self.t.get_table("filesystem")
@@ -1616,21 +1614,18 @@ class Sync():
                     try:
                         path.mkdir(parents=True)
                     except Exception:
-                        print(f"Unable to create folder {abspath}. Check your access rights")
-                        raise
+                        raise RuntimeError(f"Unable to create folder {abspath}. Check your access rights")
             
                 if isVerbose:
                     print(" cp " + file + " " + file_remote)
                 shutil.copy2(file , file_remote)
                 
-
             # Database movement
             if isVerbose:
                 print(" cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
             shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
 
             print(" Data Copy Complete!")
-        
         
         elif tool == "scp":
             #  Data movement via SCP
@@ -1645,7 +1640,7 @@ class Sync():
             stdout = self.execute_cmd(cmd, "Testing klist")
             if "No credentials" in stdout:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
-                assert True, print("Kerberos message: " + str(stdout))
+                raise RuntimeError("Kerberos message: " + str(stdout))
 
             # Test Conduit status
             if isVerbose:
@@ -1656,19 +1651,7 @@ class Sync():
             if "TRANSFER_ID" in stdout and isVerbose:
                 print("Conduit is authenticated.")
             elif "TRANSFER_ID" not in stdout:
-                print("Conduit Error: " + str(stdout))
-                raise
-
-            # # Check remote access for permissions and create folder
-            # if not os.path.exists(self.remote_location):
-            #     if isVerbose:
-            #         print( " mkdir " + self.remote_location)
-            #     path = Path(self.remote_location)
-            #     try:
-            #         path.mkdir(parents=True)
-            #     except Exception:
-            #         print(f"Unable to create folder {abspath} . Do you have access rights?")
-            #         raise
+                raise RuntimeError("Conduit Error: " + str(stdout))
 
             try:
                 base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
@@ -1687,20 +1670,10 @@ class Sync():
                 print(" DSI submitted Conduit database movement job.")
 
             except subprocess.CalledProcessError as e:
-                print(f"Command failed with error: {e.stderr} ")
-                raise
+                raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
 
-        elif tool == "pfcp":
-            # if not os.path.exists(self.remote_location):
-            #     if isVerbose:
-            #         print( " mkdir " + self.remote_location)
-            #     path = Path(self.remote_location)
-            #     try:
-            #         path.mkdir(parents=True)
-            #     except Exception:
-            #         print(f"Unable to create folder {abspath} . Do you have access rights?")
-            #         raise
-            
+
+        elif tool == "pfcp":           
             try:
                 # File Movement
                 if isVerbose:
