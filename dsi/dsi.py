@@ -229,8 +229,15 @@ class DSI():
         `data_sources` : str, list of str, or data object (dict or pandas DataFrame)
             File path(s) to the data, or an in-memory data object.
 
+<<<<<<< HEAD
             The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
                 - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
+=======
+            The expected input type depends on the selected `reader_name`:
+                - "CKAN"                 → resource_id or dataset_id string
+                - "CKAN_Search"          → dict with search params OR search string
+                - "Collection"           → Ordered Dictionary of table(s)
+>>>>>>> 086e4f9 (Added version 0 changes to CKAN search implementation)
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
                 - "YAML"                 → .yaml or .yml
