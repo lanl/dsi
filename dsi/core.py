@@ -1480,12 +1480,12 @@ class Sync():
                 print("Warning: filesystem table already exists! DSI Index skipped.")
             return
         
+        # Relative paths (..) will not work
+        if ".." in local_loc:
+            raise ValueError("Error: Please use absolute paths instead of relative")
+        
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
-        
-        # Warn about relative paths (..) may not work
-        if ".." in local_loc:
-            assert True, print ("Error: Please use absolute paths instead of relative")
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, isVerbose)
@@ -1592,7 +1592,7 @@ class Sync():
         Helper function to perform the data copy over using a preferred API
         """
         if any(x is None for x in (self.remote_location, self.local_location, self.file_list, self.rfile_list)):
-            raise RuntimeError("Must execute DSI Index right before Copy")
+            raise RuntimeError("Must run successful DSI Index right before Copy")
         
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
@@ -1649,7 +1649,7 @@ class Sync():
             stdout = self.execute_cmd(cmd, "Testing conduit get")
             
             if "TRANSFER_ID" in stdout and isVerbose:
-                print("Conduit is authenticated.")
+                print(" Conduit is authenticated.")
             elif "TRANSFER_ID" not in stdout:
                 raise RuntimeError("Conduit Error: " + str(stdout))
 
@@ -1668,6 +1668,10 @@ class Sync():
                 cmd = base_cmd + [str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
                 self.execute_cmd(cmd, "Conduit copy database")
                 print(" DSI submitted Conduit database movement job.")
+
+                print("Type 'conduit get' to track status of both jobs.")
+                print("  If 'WaitingForLease' status, that is fine.")
+                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error ouput.")
 
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Conduit failed with error: {e.stderr} ")

@@ -27,7 +27,7 @@ Quick Start: Installation
 
       git clone https://github.com/lanl/dsi.git
       cd dsi
-      pip install .
+      pip install . -r requirements.txt
 
    Supported release: Published versions on PyPI at https://pypi.org/project/dsi-workflow/. Install the latest version by:
 
