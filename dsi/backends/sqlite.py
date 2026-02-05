@@ -374,7 +374,7 @@ class Sqlite(Filesystem):
             - If query is valid and `dict_return` is True: returns an OrderedDict.
             - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
         """
-        if query[:6].lower() == "select" or query[:6].lower() == "pragma":
+        if query[:6].lower() == "select" or query[:6].lower() == "pragma" or "filesystem" in query: #remove fileystem passthrough in future
             try:
                 data = pd.read_sql_query(query, self.con) 
                 if isVerbose:

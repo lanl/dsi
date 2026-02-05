@@ -1443,6 +1443,9 @@ class Sync():
             f = self.project_name + extension
         else:
             f = self.project_name+".db"
+            for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
+                if os.path.exists(self.project_name + ext):
+                    f = self.project_name + ext
 
         self.remote_location = None
         self.local_location = None
@@ -1452,8 +1455,7 @@ class Sync():
         self.t = Terminal()
         backend_name = self.t.identify_backend(f)
         if backend_name is None:
-            raise ValueError("Unsupported DSI database type")
-        print(f"Detected {backend_name}")
+            raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
@@ -1465,6 +1467,14 @@ class Sync():
         if process.returncode != 0:
             raise RuntimeError(f"{cmd_name} failed: {stderr}")
         return stdout
+    
+    def reindex(self, local_loc, remote_loc, isVerbose = False):
+        """
+        Helper function that allows users to index their data again by dropping existing fileystem information.
+        """
+        # drop filesystem table and call index(). future -- use existing db to "reindex" by updating the filepath cols
+        self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
+        self.index(local_loc, remote_loc, isVerbose)
     
     def index(self, local_loc, remote_loc, isVerbose=False):
         """
@@ -1633,6 +1643,8 @@ class Sync():
             remote_host = "myremote"
         
         elif tool == "conduit":
+            from multiprocessing import Process
+
             # Test Kerberos
             if isVerbose:
                 print( "Testing: klist")
@@ -1641,18 +1653,31 @@ class Sync():
             if "No credentials" in stdout:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
-
-            # Test Conduit status
-            if isVerbose:
-                print("Testing Conduit: conduit get")
-            cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
-            stdout = self.execute_cmd(cmd, "Testing conduit get")
             
-            if "TRANSFER_ID" in stdout and isVerbose:
-                print(" Conduit is authenticated.")
-            elif "TRANSFER_ID" not in stdout:
-                raise RuntimeError("Conduit Error: " + str(stdout))
+            # Test Conduit status
+            def task():
+                if isVerbose:
+                    print("Testing Conduit: conduit get")
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
+                stdout = self.execute_cmd(cmd, "Testing conduit get")
+                if "TRANSFER_ID" in stdout and isVerbose:
+                    print(" Conduit is authenticated.")
+                elif "TRANSFER_ID" not in stdout:
+                    raise RuntimeError("Conduit Error: " + str(stdout))
 
+            while True:
+                p = Process(target=task)
+                p.start()
+                p.join(timeout=2)
+
+                if p.is_alive():
+                    p.terminate()
+                    p.join()
+                    # print("Enter OTP Token Value:")
+                    input("Enter OTP Token Value:")
+                else:
+                    break
+            
             try:
                 base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
                 # File Movement
@@ -1671,7 +1696,7 @@ class Sync():
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, that is fine.")
-                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error ouput.")
+                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error output.")
 
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
