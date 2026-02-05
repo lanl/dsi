@@ -405,7 +405,8 @@ class DuckDB(Filesystem):
             - If query is valid and `dict_return` is True: returns an OrderedDict.
             - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
         """
-        if query[:6].lower() == "select" or query[:6].lower() == "pragma" or "filesystem" in query: #remove fileystem passthrough in future
+        data = None
+        if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
@@ -418,6 +419,17 @@ class DuckDB(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
+                return (duckdb.Error, "Error in query_artifacts: Incorrect query on the data. Please try again")
+        elif "filesystem" in query: #remove fileystem passthrough in future
+            try:
+                self.con.execute(query)
+                self.con.commit()
+            except Exception as e:
+                message = str(e)
+                if "Table" in message and "does not exist" in message:
+                    table_name = message[message.find("Table"):message.find("Did you mean")-2]
+                    print(f"WARNING: {table_name} in this database")
+                    return
                 return (duckdb.Error, "Error in query_artifacts: Incorrect query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts: Can only run SELECT or PRAGMA queries on the data")
