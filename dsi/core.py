@@ -1472,7 +1472,9 @@ class Sync():
         """
         Helper function that allows users to index their data again by dropping existing fileystem information.
         """
-        # drop filesystem table and call index(). future -- use existing db to "reindex" by updating the filepath cols
+        # drop filesystem table and call index()
+        # future -- use existing db to "reindex" by updating the filepath cols, not dropping table.
+        #   remove filesystem pass through in query_artifacts if not dropping table
         self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
         self.index(local_loc, remote_loc, isVerbose)
     
@@ -1643,7 +1645,7 @@ class Sync():
             remote_host = "myremote"
         
         elif tool == "conduit":
-            from multiprocessing import Process
+            import signal
 
             # Test Kerberos
             if isVerbose:
@@ -1655,28 +1657,23 @@ class Sync():
                 raise RuntimeError("Kerberos message: " + str(stdout))
             
             # Test Conduit status
-            def task():
+            def alarm_handler(signum, frame):
+                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
+            signal.signal(signal.SIGALRM, alarm_handler)
+            signal.alarm(10)
+
+            try:
                 if isVerbose:
                     print("Testing Conduit: conduit get")
                 cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
+                
                 if "TRANSFER_ID" in stdout and isVerbose:
                     print(" Conduit is authenticated.")
                 elif "TRANSFER_ID" not in stdout:
                     raise RuntimeError("Conduit Error: " + str(stdout))
-
-            while True:
-                p = Process(target=task)
-                p.start()
-                p.join(timeout=2)
-
-                if p.is_alive():
-                    p.terminate()
-                    p.join()
-                    # print("Enter OTP Token Value:")
-                    input("Enter OTP Token Value:")
-                else:
-                    break
+            finally:
+                signal.alarm(0)
             
             try:
                 base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
@@ -1696,7 +1693,7 @@ class Sync():
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, that is fine.")
-                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error output.")
+                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error ouput.")
 
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
