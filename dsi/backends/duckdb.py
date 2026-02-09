@@ -78,11 +78,12 @@ class DuckDB(Filesystem):
         if not non_null:
             return " VARCHAR", [None if x is None else str(x) for x in input_list]
 
-        if all(isinstance(x, (int, float)) for x in non_null):
+        special_floats = ["Infinity", "-Infinity", "NaN"]
+        if all(isinstance(x, (int, float)) or (x in special_floats) for x in non_null):
             if any(isinstance(x, int) and (x < DUCKDB_BIGINT_MIN or x > DUCKDB_BIGINT_MAX) for x in non_null):
                 return " DOUBLE", [None if x is None else float(x) for x in input_list]
             if any(isinstance(x, float) for x in non_null):
-                return " DOUBLE", [None if x is None else float(x) for x in input_list]
+                return " FLOAT", [None if x is None else float(x) for x in input_list]
             if any(x < DUCKDB_INT_MIN or x > DUCKDB_INT_MAX for x in non_null):
                 return " BIGINT", input_list
             return " INTEGER", input_list
