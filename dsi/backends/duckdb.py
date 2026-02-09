@@ -132,7 +132,11 @@ class DuckDB(Filesystem):
         return " VARCHAR", [None if x is None else str(x) for x in input_list]
     
     def duckdb_compatible_name(self, name):
-        if (name.startswith('"') and name.endswith('"')) or (name.lower() not in self.duckdb_keywords and name.isidentifier()):
+        pattern = r"^[A-Za-z_][A-Za-z_0-9_]*$"
+        if ((name.startswith('"') and name.endswith('"')) 
+            or (name.lower() not in self.duckdb_keywords) 
+            and name.isidentifier() 
+            and (re.match(pattern, name) is not None)):
             return name
         return f'"{name}"'
     
