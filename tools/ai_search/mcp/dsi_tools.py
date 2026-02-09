@@ -6,8 +6,8 @@ from contextlib import redirect_stdout, redirect_stderr
 import pandas as pd
 
 from dsi.dsi import DSI
-     
-      
+
+
 def load_db_description(db_path: str) -> str:
     """Load the database description from a YAML file when provided with the path to a DSI database.
 
@@ -54,8 +54,8 @@ def check_db_valid(db_path: str) -> bool:
             return False
 
     return True
-          
-          
+      
+    
 def query_dsi_tool(query_str: str, db_path: str) ->list:
     """Execute a SQL query on a DSI object
 
@@ -88,7 +88,7 @@ def query_dsi_tool(query_str: str, db_path: str) ->list:
                 _store.close()
             except Exception:
                 pass
-       
+
 
 def get_db_tool(db_path: str) -> tuple[list, dict, str]:
     """Load the database information (tables and schema) from a DSI database.
@@ -123,9 +123,8 @@ def get_db_tool(db_path: str) -> tuple[list, dict, str]:
 
     except Exception as e:
         return tables, schema, desc
-    
-    
-    
+
+
 def test_dsi_tools():
     db_path = "/Users/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
     
@@ -149,13 +148,11 @@ def test_dsi_tools():
     print("Tables:", tables)
     print("Schema:", json.dumps(schema, indent=2))
     print("Description:", desc)
-    
-   
-   
-    
+
+
 def main() -> None:
     test_dsi_tools()
-    
+
 
 if __name__ == "__main__":
     main()

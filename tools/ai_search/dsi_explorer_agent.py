@@ -1,4 +1,3 @@
-import feedparser
 import argparse
 import io
 import logging
@@ -9,10 +8,12 @@ import smtplib
 import sqlite3
 import sys
 import time
-import atexit
+import json
+import feedparser
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown as RichMarkdown
+from contextlib import redirect_stdout, redirect_stderr
 
 
 from bs4 import BeautifulSoup
@@ -59,15 +60,6 @@ logger.setLevel(logging.DEBUG)
 logger.propagate = False    
 
 
-# define some global variables
-dsi_store = None
-db_schema = ""
-db_description = None
-master_db_folder = ""
-master_datbase_path = ""
-code_path = ""
-
-client = OpenAI()
 
 ########################################################################
 #### Utility functions
@@ -97,40 +89,31 @@ def redirect_stdout_to_logger(logger: logging.Logger, level=logging.INFO) -> io.
 
 
 
+
 def extract_message_texts(result) -> str:
-    """Extract readable message content from either a dict or list of LangGraph messages. 
-       Used for logging: CHATGPT Generated but seems to work!
-    
-    Arg:
-        result (dict or list): the result containing messages
-        
-    Returns:
-        str: concatenated message contents
-    """
-    
-    # Case 1: result is a dict that contains messages
+    """Extract readable message content from either a dict or list of LangGraph messages."""
     if isinstance(result, dict) and "messages" in result:
         messages = result["messages"]
-        
-    # Case 2: result is already a list of messages
     elif isinstance(result, list):
         messages = result
-        
     else:
         messages = []
 
     lines = []
     for m in messages:
-        # Handle LangGraph message objects
         if hasattr(m, "content"):
             text = m.content
-        # Handle plain dicts with 'content' key
         elif isinstance(m, dict) and "content" in m:
             text = m["content"]
         else:
-            text = str(m)
+            text = m
 
-        # Unescape literal newlines
+        # Ensure text is a string (ToolMessage content can be list/dict)
+        if isinstance(text, (list, dict)):
+            text = json.dumps(text, indent=2, default=str)
+        else:
+            text = str(text)
+
         text = text.replace("\\n", "\n")
         lines.append(text.strip())
 
@@ -142,160 +125,220 @@ def load_db_description(db_path: str) -> str:
     """Load the database description from a YAML file when provided with the path to a DSI database.
 
     Arg:
-        db_path (str): the path of the DSI database
+        db_path (str): the absolute path of the DSI database
+        
     Returns:
         str: message indicating success or failure
     """
-
+    
     logger.info(f"\n\n!!!load_db_description :: running on {db_path}\n\n")
 
-    global db_description
-
     try:
+        # The description file is expected to be in the same directory as the database, with the same name but ending in '_description.yaml'
         db_description_path = db_path.rsplit(".", 1)[0] + '_description.yaml'
         logger.info(f"load_db_description :: db_description_path: {db_description_path}")
         
         with open(db_description_path, "r") as f:
-            db_description = f.read()
+            db_desc = f.read()
 
-        return "Successfully loaded database description."
+        return str(db_desc)
     except:
-        db_description = None
         logger.info(f"load_db_description :: Failed: No database description file found at  {db_description_path}")
-        return "Failed to load database description."
+        return ""
 
+
+
+def check_db_valid(db_path: str) -> bool:
+    """Check if the provided path points to a valid DSI database.
+
+    Arg:
+        db_path (str): the absolute path of the DSI database
+        
+    Returns:
+        bool: True if the database is valid, False otherwise
+    """
+    if not os.path.exists(db_path):
+        return False
+    else:
+        try:
+            with open(os.devnull, "w") as fnull:
+                with redirect_stdout(fnull), redirect_stderr(fnull):
+                    temp_store = DSI(db_path, check_same_thread=False)
+                    temp_tables = temp_store.list(True) # force things to fail if the table is empty
+                    temp_store.close()
+                    
+        except Exception as e:
+            return False
+
+    return True
+
+
+
+def get_db_info(db_path: str) -> tuple[list, dict, str]:
+    """Load the database information (tables and schema) from a DSI database.
+
+    Arg:
+        db_path (str): the absolute path of the DSI database    
+        
+    Returns:
+        list: the list of tables in the database
+        dict: the schema of the database
+        str: the description of the database (if available, otherwise empty string)
+    """
+    
+    tables = []
+    schema = {}
+    desc = ""
+    
+    if check_db_valid(db_path) == False:
+        return tables, schema, desc
+    
+    try:
+        with open(os.devnull, "w") as fnull:
+            with redirect_stdout(fnull), redirect_stderr(fnull):
+                _dsi_store = DSI(db_path, check_same_thread=False)
+                tables = _dsi_store.list(True)
+                schema = _dsi_store.schema()
+                desc = load_db_description(db_path)
+                _dsi_store.close()
+             
+            return tables, schema, desc
+
+    except Exception as e:
+        return tables, schema, desc
+    
+    
+    
+def get_db_abs_path(db_path: str, run_path: str) -> [str, str]:
+    """Get the absolute path of a DSI database given its path.
+
+    Arg:
+        db_path (str): the path of the DSI database (can be relative or absolute)
+        run_path (str): the path of the codebase to resolve relative paths against
+        
+    Returns:
+        str: the absolute path of the DSI database
+        str: the absolute path of the folder containing the DSI database
+    """
+    
+    p = Path(db_path)
+    if not p.is_absolute():
+        master_database_path = str( (Path(run_path) / db_path).expanduser() )
+        master_db_folder = "/".join(master_database_path.split("/")[:-1]) + '/'
+    else:
+        master_database_path = db_path
+        master_db_folder = "/".join(master_database_path.split("/")[:-1]) + '/'
+        
+    return master_database_path, master_db_folder
 
 
 ########################################################################
 #### Tools Available
 
-def load_dsi(path: str) -> str:
+@tool
+def load_dsi_tool(path: str, run_path: str = "", master_db_folder: str = "") -> dict:
     """Load a DSI object from the path and add information to the context for the llm to use.
 
     Arg:
-        path (str): the path to the DSI object
+        path (str): the path to the DSI object to load
+        run_path (str): the path this code is being run from
+        master_db_folder (str): the folder containing the master database, used to resolve relative paths when loading new databases
         
     Returns:
         str: message indicating success or failure
     """
 
 
-    logger.info(f"\n\n!!!load_dsi :: running on: {path}\n\n")
+    logger.info(f"\n\n!!!load_dsi :: running on: {path} at {run_path} \n\n")
     
-    global dsi_store
-    global db_schema
-    global master_db_folder
-    global master_datbase_path
-    
-    p = Path(path)
-
+    master_database_previously_set = True
     if master_db_folder == "":
-    # the ai is loading the master database for the first time
-        if not p.is_absolute():
-            master_datbase_path = str( (Path(code_path) / path).expanduser() )
-            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
-        else:
-            master_datbase_path = path
-            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
-
-        data_path = master_datbase_path.strip()
+        master_database_previously_set = False
+        print("No master database loaded.")
+        print(run_path)
+        # the ai is loading the master database for the first time
+        master_database_path, master_db_folder = get_db_abs_path(path, run_path)
+        data_path = master_database_path.strip()
     else:
+        p = Path(path)
         if not p.is_absolute():
             db_path = str(master_db_folder + '/' + path)
         else:
             db_path = path
 
         data_path = db_path.strip()
-
-    
+        
+        
     logger.info(f"\n\n!!!load_dsi :: loading database at: {data_path}\n\n")
 
-    
-    # Check if the path exists and there is data
-    
-    if not os.path.exists(data_path):
-        return f"Failed to extract database information at: {data_path}"
-    
-    else:
-        try:
-            with redirect_stdout_to_logger(logger, level=logging.DEBUG):
-                temp_store = DSI(data_path, backend_name = "Sqlite", check_same_thread=False)
-                temp_tables = temp_store.list(True) # force things to fail if the table is empty
-                temp_store.close()
-        except Exception as e:
-            logger.debug(f"load_dsi :: Failed to extract database information at: {data_path}. Error: {repr(e)}")
-            return f"Failed to extract database information at: {data_path}"
+
+    if not check_db_valid(data_path):
+        return f"Failed to load DSI database at: {data_path}. Please check the path and ensure it points to a valid DSI .db file."
             
-            
-    # if the above works, actually load the DSI object
     try:
-        with redirect_stdout_to_logger(logger, level=logging.DEBUG):
-            if dsi_store is not None:
-                dsi_store.close()
+        _, _db_schema, _db_description = get_db_info(data_path)
+        _current_db_abs_path = data_path
 
-            dsi_store = DSI(data_path, backend_name = "Sqlite", check_same_thread=False)
-            tables = dsi_store.list(True)
-            schema = dsi_store.schema()
-
-
-        # Append the database information to the context
-        logger.info(f"""load_dsi :: Loading {dsi_store}; the DSI Object has a database that has {len(tables)} tables: {tables}.
-        The schema of the database is {schema} \n""")
+        if master_database_previously_set == False:
+            return {
+                "the current working database path (current_db_abs_path) is": _current_db_abs_path,
+                "the master database path (master_database_path) is": master_database_path,
+                "the master databse folder (master_db_folder) is": master_db_folder,
+                "the current databse schema is": _db_schema,
+                "the database description is": _db_description
+            }
+        else:
+            return {
+                "the current working database path (current_db_abs_path) is": _current_db_abs_path,
+                "the current databse schema is": _db_schema,
+                "the database description is": _db_description
+            }
         
-        db_schema += f"""The DSI Object has a database that has {len(tables)} tables: {tables}.
-            The schema of the database is {schema} \n"""
-        
-            
-        # load the database description if available
-        try:
-            load_db_description(data_path)
-        except Exception as e:
-            logger.debug("load_dsi :: No master database description to load.")
-
-
-
-
-        return "Successfully loaded DSI object and extracted database information"
         
     except Exception as e:
         logger.debug(f"Failed to extract database information. Error: {repr(e)}")
-        return "Failed to extract database information"
+        return "Failed to load database information"
     
-    
-load_dsi_tool = Tool(
-    name="load_dsi_tool",
-    description="Load a DSI object from a path and update LLM context.",
-    func=load_dsi,
-)
-
 
 
 @tool
-def query_dsi_tool(query_str: str) -> list:
+def query_dsi_tool(query_str: str, db_path: str) ->dict:
     """Execute a SQL query on a DSI object
 
     Arg:
         query_str (str): the SQL query to run on DSI object
+        db_path (str): the absolute path to the DSI database to query
 
     Returns:
         collection: the results of the query
     """
-
-    logger.info(f"\n\n!!!query_dsi_tool :: running on {query_str}\n\n")
-
-    if master_datbase_path == "":
-        return {"error": "No DSI database loaded. Please load a DSI database first using load_dsi_tool."}
     
-    global dsi_store   
-    s = dsi_store
-
-    with redirect_stdout_to_logger(logger, level=logging.DEBUG):
-        df = s.query(query_str, collection=True)
-        
-    if df is None:
+    logger.info(f"\n\n!!!query_dsi_tool :: running on {query_str}\n\n")
+    
+    #print(f"query {query_str}, db_path: {db_path}")
+    
+    _store = None
+    try:
+        with open(os.devnull, "w") as fnull:
+            with redirect_stdout(fnull), redirect_stderr(fnull):
+                _store = DSI(db_path, check_same_thread=False)
+                df = _store.query(query_str, collection=True)
+                
+        if df is None:
+            return {}
+        return df.to_dict(orient="records")
+    
+    except Exception as e:   
         return {}
-
-    return df.to_dict(orient="records")
+    
+    finally:
+        if _store is not None:
+            try:
+                with open(os.devnull, "w") as fnull:
+                    with redirect_stdout(fnull), redirect_stderr(fnull):
+                        _store.close()
+            except Exception:
+                pass
 
 
 
@@ -571,6 +614,9 @@ def upload_paper_tool(path: str) -> Dict[str, str]:
     Upload a local PDF to OpenAI Files API and return identifiers.
     Intended for later use as an input_file in Responses API.
     """
+    
+    client = OpenAI()
+    
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     if not path.lower().endswith(".pdf"):
@@ -604,6 +650,11 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
     response: str
     metadata: Dict[str, Any]
+    
+    # db_schema: str
+    # db_description: str
+    # current_db_abs_path: str
+    # run_path: str
 
 
 
@@ -657,15 +708,16 @@ class DSIExplorer:
     """DSIExplorer agent for data analysis and execution."""
     
     def __init__(self, llm, db_index_name:str="", output_mode:str="jupyter"):
-        self.store = None
-        self.tables = None
-        self.schema = None
-        self.msg = {}
-        #self.master_datbase_path = ""
-        self.output_mode = output_mode
+        self.db_tables = []
+        self.db_schema = ""
+        self.db_description = ""
+        
+        self.master_db_folder = ""
+        self.master_database_path = ""
+        self.current_db_abs_path = ""
 
-        global code_path
-        code_path = os.getcwd()
+        self.output_mode = output_mode
+        self.run_path = os.getcwd()
         
         self.wrsk_path = self.create_workspace()
         self.create_checkpoint()
@@ -705,7 +757,6 @@ class DSIExplorer:
         
         
 
-
     def load_master_db(self, db_index_name: str) -> None:
         """Load the  master dataset from the given path.
         
@@ -717,38 +768,24 @@ class DSIExplorer:
             print("No DSI database provided. Please load one")
             return
 
-        # Get absolute path of dataset
-        global master_db_folder
-        global master_datbase_path
+        _master_datbase_path, _master_db_folder = get_db_abs_path(db_index_name, self.run_path)
+        absolute_db_path = _master_datbase_path
 
-        p = Path(db_index_name)
-        if not p.is_absolute():
-            master_datbase_path = str( (Path(code_path) / db_index_name).expanduser() )
-            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
-        else:
-            master_datbase_path = db_index_name
-            master_db_folder = "/".join(master_datbase_path.split("/")[:-1]) + '/'
+        logger.debug("master_db_folder: " + _master_db_folder)
         
-        absolute_db_path = master_datbase_path
-        logger.debug("master_db_folder: " + master_db_folder)
-
-        
-        if absolute_db_path != "":
-            print(f"loading the dataset at {absolute_db_path}...")
-        
-            logger.info(f"load_master :: Using database index: {absolute_db_path}")
-            output_msg = load_dsi(absolute_db_path)
-            if "Failed" in output_msg:
-                print(f"[ERROR] A valid DSI file is needed. {absolute_db_path}. We will now exit!")
-                sys.exit(1)
-            else:
-                print(f"Dataset {db_index_name} has been loaded.\nThe DSI Data Explorer agent is ready.")
+        if check_db_valid(absolute_db_path):
+            self.db_tables, self.db_schema, self.db_description = get_db_info(absolute_db_path)
+            
+            # set the values now that we know things are correct
+            self.current_db_abs_path =  absolute_db_path
+            self.master_database_path = absolute_db_path
+            self.master_db_folder = _master_db_folder
 
 
-            logger.debug("master_datbase_path: " + master_datbase_path)
-            logger.debug("master_db_folder: " + master_db_folder)
+            logger.debug("master_database_path: " + self.master_database_path)
+            logger.debug("master_db_folder: " + self.master_db_folder)
         else:        
-            print("No DSI database provided. Please load one")
+            print("No valid DSI database provided. Please load one")
             #sys.exit(1)
         
 
@@ -790,16 +827,14 @@ class DSIExplorer:
         worker_prompt = f"""
         You are a data-analysis agent who can write python code, SQL queries, and generate plots to answer user questions based on the data available in a DSI object.
         Use the load_dsi_tool tool to load DSI files that have a .db extension
-        The currently loaded DSI object is stored in dsi_store global variable. Use query_dsi_tool to run SQL queries on it.
+        Use query_dsi_tool to run SQL queries on it
         When a user asks for data or dataset or ... you have, do NOT list the schema or metadata information you have about tables. Query the DSI objects for data and list the data in the tables.
         
         You can:
         - write and execute Python code,
-        - compose SQL statements,
+        - compose SQL statements but ONLY select; no update or delete
         - generate plots and diagrams,
         - analyze and summarize data.
-
-        The dsi_explorer master dataset is avilable at {master_datbase_path} in case you need to reload it.
 
         Requirements:
         - Planning: Think carefully about the problem, but **do not show your reasoning**.
@@ -809,7 +844,9 @@ class DSIExplorer:
             - When creating plots or files, always save them directly to disk (do not embed inline output).
             - Do not infer or assume any data beyond what is provided by the tools.
         - Keep all responses concise and focused on the requested task.
+        - Only load a dataset when explicitly asked by a user
         - Do not restate the prompt or reasoning; just act and report the outcome briefly.
+        - All downloaded files, generated plots, and outputs must be saved to  {self.wrsk_path}.
         """
         
         dsi_explorer_executor = DSIExplorerWorker(self.llm, worker_prompt)
@@ -846,8 +883,8 @@ class DSIExplorer:
     def craft_message(self, human_msg):
         """Craft the message with context if available."""
 
-        global db_schema
-        global db_description
+        # global db_schema
+        # global db_description
 
         base_system_context = f"""
             The following phrases all refer to this same database:
@@ -858,20 +895,27 @@ class DSIExplorer:
 
             When the user asks to reload, refresh, reset, reinitialize, restart, or 
             the **master database**, interpret that as a request to reload the 
-            DSIExplorer master database using the tool load_dsi_tool("{master_datbase_path}"),
-            load the last dataset in the context.
-
+            DSIExplorer master database at {self.master_database_path} using the tool load_dsi_tool. 
             Do no reload or load the master dataset unless explicitly asked by the user.
+            
+            The the path this code is being run from (run_path) is {self.run_path}
         """
+
 
         # Build remaining dynamic system context parts
         system_parts = [base_system_context]
+        
+        if self.current_db_abs_path != "":
+            system_parts.append("The current working database path (current_db_abs_path) is: " + self.current_db_abs_path)
+            
+        if self.master_database_path != "":
+            system_parts.append("The master database path (master_database_path) is: " + self.master_database_path)
+            
+        if self.db_schema != "":
+            system_parts.append("The schema of the dataset loaded: " + self.db_schema)
 
-        if db_schema != "":
-            system_parts.append("You have this dataset loaded: " + db_schema)
-
-        if db_description is not None:
-            system_parts.append("Dataset description: " + db_description)
+        if self.db_description != "":
+            system_parts.append("Dataset description: " + self.db_description)
 
         # Combine
         if system_parts:
@@ -880,9 +924,12 @@ class DSIExplorer:
         else:
             messages = [HumanMessage(content=human_msg)]
 
+
         # clear
-        db_schema = ""
-        db_description = None
+        self.db_schema = ""
+        self.db_description = ""
+        self.master_database_path = ""
+        self.current_db_abs_path = ""
         
 
         return {"messages": messages}
