@@ -18,6 +18,7 @@ import time
 import itertools
 from typing import Iterator
 from contextlib import redirect_stdout
+import tempfile
 
 class Terminal():
     """
@@ -1422,6 +1423,18 @@ class Terminal():
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
         return valid
+    
+    # Internal function that returns if a user can create a file/db in a specified location
+    def can_create_file_here(self, dir = "."):
+        dir_path = Path(dir)
+        if not (dir_path.exists() and dir_path.is_dir()):
+            dir = "."
+        try:
+            with tempfile.NamedTemporaryFile(dir=dir, delete=True):
+                pass
+            return True
+        except (PermissionError, OSError):
+            return False
 
 
 class Sync():
@@ -1453,6 +1466,14 @@ class Sync():
         self.rfile_list = None
 
         self.t = Terminal()
+        # first check if user can create db here
+        if "/" in project_name:
+            create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
+        else:
+            create_bool = self.t.can_create_file_here()
+        if create_bool is False:
+            raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
+    
         backend_name = self.t.identify_backend(f)
         if backend_name is None:
             raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
@@ -1460,6 +1481,9 @@ class Sync():
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.load_module('backend', backend_name, 'back-write', filename=f)
+
+        if not self.t.valid_backend(self.t.loaded_backends[0], self.t.loaded_backends[0].__class__.__bases__[0].__name__):
+            raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
 
     def execute_cmd(self, cmd, cmd_name):
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
