@@ -86,7 +86,7 @@ class DSI_cli:
         if not self.t.can_create_file_here(self.start_dir):
             print("Cannot start the DSI CLI due to write permissions in this directory. Please try elsewhere.")
             with redirect_stdout(fnull):
-                self.exit_cli()
+                self.exit_cli([])
         
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
@@ -103,7 +103,7 @@ class DSI_cli:
         except Exception as e:
             print(f"backend ERROR: {e}")
             with redirect_stdout(fnull):
-                self.exit_cli()
+                self.exit_cli([])
         print(f"Created a temporary {backend} DSI backend")
 
 
