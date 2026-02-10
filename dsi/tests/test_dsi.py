@@ -944,8 +944,6 @@ def test_read_duckdb_backend():
     test.read(filenames="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
     test.read(filenames="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
     test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
-
-    test.close()
     assert True
 
 def test_write_duckdb_backend():
@@ -1734,7 +1732,7 @@ def test_schema_duckdb_backend():
     test.schema(filename="examples/test/yaml1_schema.json")
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
-
+test_schema_duckdb_backend()
 def test_query_update_schema_duckdb_backend():
     dbpath = 'data.db'
     if os.path.exists(dbpath):
