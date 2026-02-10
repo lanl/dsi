@@ -82,6 +82,7 @@ class DSI_cli:
         self.start_dir = os.getcwd()
         self.db_path = os.path.join(self.start_dir, ".temp_dsi.db")
 
+        fnull = open(os.devnull, 'w')
         if not self.t.can_create_file_here(self.start_dir):
             print("Cannot start the DSI CLI due to write permissions in this directory. Please try elsewhere.")
             with redirect_stdout(fnull):
@@ -90,7 +91,6 @@ class DSI_cli:
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
-        fnull = open(os.devnull, 'w')
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
