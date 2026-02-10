@@ -944,6 +944,8 @@ def test_read_duckdb_backend():
     test.read(filenames="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
     test.read(filenames="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
     test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
+
+    test.close()
     assert True
 
 def test_write_duckdb_backend():
