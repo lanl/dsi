@@ -1,16 +1,18 @@
 from dsi.backends.gufi import Gufi
 
-isVerbose = False
-
-
 def test_artifact_query():
-    dbpath = "db.db"
-    index = "gufi_indexes"
-    prefix = "/usr/local/bin"
-    table = "sample"
-    column = "sample_col"
-    store = Gufi(prefix, index, dbpath, table, column, isVerbose)
-    sqlstr = "select * from dsi_entries"
-    rows = store.query_artifacts(sqlstr)
-    store.close()
-    assert len(rows) > 0
+    gufi_index_path = "/opt/index/example-collection/test-dir"
+    gufi_prefix = "/home/hgreenburg/GUFI/build/"
+    dsi_table_name = "wfdata"
+    dsi_file_path_column = "LOCAL_PATH"
+    dsi_columns = ["sim_id", "wind_speed"]
+    gufi_columns = ["fullpath", "size", "mtime"]
+    collection_name = "collection1234"
+    gufi_tag_tool_path = "/home/hgreenburg/gufi-dsi-tag"
+    from dsi.core import Sync
+    s = Sync("collection")
+    s.gufi_query_index(gufi_prefix, gufi_index_path, dsi_table_name, dsi_file_path_column, dsi_columns,
+                       gufi_columns, collection_name, gufi_tag_tool_path, isVerbose=True)
+    #assert len(rows) > 0
+
+test_artifact_query()

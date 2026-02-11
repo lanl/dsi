@@ -2041,6 +2041,89 @@ class HPSSSync():
             t.artifact_handler(interaction_type='ingest')
         
         t.close()
+        
+    def gufi_query_index(self, gufi_prefix, gufi_index, dsi_table_name, dsi_file_column, dsi_columns, gufi_columns,
+                         collection_name, gufi_dsi_tag_tool_path, isVerbose=False):
+        """
+        Helper function to query GUFI for metadata and join on the dsi table by uuid
+
+        `gufi_prefix`: the directory where GUFI is installed
+
+        `gufi_index`: the directory where GUFI indexes are
+
+        `dsi_table_name`: the DSI table name that has the UUID for each file as a column
+
+        `dsi_file_column`: the DSI column name that has the local file path
+
+        `dsi_columns`: the DSI table columns that should be included in the join with GUFI
+
+        `gufi_columns`: the GUFI columns that should be included in the join with DSI
+
+        `collection_name`: the name that identifies the collection that the DSI database belongs to
+
+        `gufi_dsi_tag_tool_path`: the path of the gufi dsi tag tool
+
+        `local_loc`: the local directory to scan for files
+        """
+        
+        if isVerbose:
+            print(f"dsi table name {dsi_table_name}")
+
+        # Try to open existing local database to store filesystem info before copy
+        # Open and validate local DSI data store
+        t = Terminal()
+
+        f = self.project_name+".db"
+        try:
+            if isVerbose:
+                print("trying db: ", f)
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                t.load_module('backend','Sqlite','back-write', filename=f)
+        except Exception as err:
+            print(f"Database {f} not found")
+            raise
+
+        got_uuid = False
+        try:
+            rows = t.artifact_handler(interaction_type='query', query = f"select uuid from {dsi_table_name};")
+            if len(rows.columns) == 0:
+                print(f"uuid column not found in {dsi_table_name}")
+            else:
+                got_uuid = True
+        except Exception as err:
+            print(f"uuid column not found in {dsi_table_name}")
+
+        rows = t.artifact_handler(interaction_type='query', query=f"select * from {dsi_table_name};", dict_return=True)
+        file_paths = rows[dsi_file_column]
+        uuids = []
+        if not got_uuid:
+            for f in file_paths:
+                st = os.stat(f)
+                uuid = self.gen_uuid(st)
+                uuids.append(uuid)
+
+            rows['uuid'] = uuids
+            t.load_module('plugin', "Dict", "reader", collection=rows, table_name=f"{dsi_table_name}_uuid")
+            t.artifact_handler(interaction_type='ingest')
+        else:
+            uuids = rows['uuid']
+        
+        t.unload_module('backend', 'Sqlite', 'back-write')
+
+        # GUFI Query
+#        with redirect_stdout(fnull):
+        files_with_uuids = {'LOCAL_PATH': file_paths.copy(), 'UUID': uuids}
+        t.load_module('backend', 'Gufi', 'back-read', gufi_prefix=gufi_prefix, gufi_index=gufi_index, dsi_table_name=f"{dsi_table_name}_uuid", 
+                      dsi_columns=dsi_columns, gufi_columns=gufi_columns, collection_name=collection_name,
+                      gufi_dsi_tag_tool_path=gufi_dsi_tag_tool_path, files_with_uuids=files_with_uuids, dsi_db=f)
+        metadata = t.artifact_handler(interaction_type='query', query = 'select * from uview')
+        t.unload_module('backend', 'Gufi', 'back-read')
+        t.close()
+
+        return metadata
 
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
