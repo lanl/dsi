@@ -650,11 +650,6 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
     response: str
     metadata: Dict[str, Any]
-    
-    # db_schema: str
-    # db_description: str
-    # current_db_abs_path: str
-    # run_path: str
 
 
 
@@ -761,7 +756,7 @@ class DSIExplorer:
         """Load the  master dataset from the given path.
         
         Arg:
-            path (str): the path to the DSI object
+            db_index_name (str): the path to the DSI object
         """
         
         if db_index_name == "":        
