@@ -1,3 +1,4 @@
+import io
 import json
 import os
 from pathlib import Path
@@ -6,7 +7,7 @@ from contextlib import redirect_stdout, redirect_stderr
 import pandas as pd
 
 from dsi.dsi import DSI
-
+_NULL = io.StringIO()  # to hide DSI outputs
 
 def load_db_description(db_path: str) -> str:
     """Load the database description from a YAML file when provided with the path to a DSI database.
@@ -44,11 +45,12 @@ def check_db_valid(db_path: str) -> bool:
         return False
     else:
         try:
-            with open(os.devnull, "w") as fnull:
-                with redirect_stdout(fnull), redirect_stderr(fnull):
-                    temp_store = DSI(db_path, check_same_thread=False)
-                    temp_tables = temp_store.list(True) # force things to fail if the table is empty
-                    temp_store.close()
+            # with open(os.devnull, "w") as fnull:
+            #     with redirect_stdout(fnull), redirect_stderr(fnull):
+            with redirect_stdout(_NULL), redirect_stderr(_NULL):
+                temp_store = DSI(db_path, check_same_thread=False)
+                temp_tables = temp_store.list(True) # force things to fail if the table is empty
+                temp_store.close()
                     
         except Exception as e:
             return False
@@ -71,9 +73,10 @@ def query_dsi_tool(query_str: str, db_path: str) ->list:
     try:
         _store = DSI(db_path, check_same_thread=False)
 
-        with open(os.devnull, "w") as fnull:
-            with redirect_stdout(fnull), redirect_stderr(fnull):
-                df = _store.query(query_str, collection=True)
+        # with open(os.devnull, "w") as fnull:
+        #     with redirect_stdout(fnull), redirect_stderr(fnull):
+        with redirect_stdout(_NULL), redirect_stderr(_NULL):
+            df = _store.query(query_str, collection=True)
                 
         if df is None:
             return []
@@ -85,7 +88,8 @@ def query_dsi_tool(query_str: str, db_path: str) ->list:
     finally:
         if _store is not None:
             try:
-                _store.close()
+                with redirect_stdout(_NULL), redirect_stderr(_NULL):
+                    _store.close()
             except Exception:
                 pass
 
@@ -111,15 +115,16 @@ def get_db_tool(db_path: str) -> tuple[list, dict, str]:
     
     
     try:
-        with open(os.devnull, "w") as fnull:
-            with redirect_stdout(fnull), redirect_stderr(fnull):
-                _dsi_store = DSI(db_path, check_same_thread=False)
-                tables = _dsi_store.list(True)
-                schema = _dsi_store.schema()
-                desc = load_db_description(db_path)
-                _dsi_store.close()
-                
-                return tables, schema, desc
+        # with open(os.devnull, "w") as fnull:
+        #     with redirect_stdout(fnull), redirect_stderr(fnull):
+        with redirect_stdout(_NULL), redirect_stderr(_NULL):
+            _dsi_store = DSI(db_path, check_same_thread=False)
+            tables = _dsi_store.list(True)
+            schema = _dsi_store.schema()
+            desc = load_db_description(db_path)
+            _dsi_store.close()
+            
+        return tables, schema, desc
 
     except Exception as e:
         return tables, schema, desc
