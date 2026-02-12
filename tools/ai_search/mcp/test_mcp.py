@@ -4,7 +4,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
 URL = "http://127.0.0.1:8000/mcp"
-DB_PATH = "/Users/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
+#DB_PATH = "/Users/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
+DB_PATH = "/home/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
 QUERY_OK = "SELECT * FROM genesis_datacard LIMIT 3"
 
 
@@ -47,4 +48,4 @@ if __name__ == "__main__":
     
     
 # Run as:
-# python test_mcp.py
+# python tools/ai_search/mcp/test_mcp.py

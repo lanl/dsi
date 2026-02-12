@@ -10,3 +10,5 @@ langchain-experimental
 langgraph
 langgraph-checkpoint-sqlite
 jupyter lab
+mcp
+langchain-mcp-adapters

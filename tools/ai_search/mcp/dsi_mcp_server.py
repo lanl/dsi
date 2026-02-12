@@ -27,4 +27,4 @@ if __name__ == "__main__":
 
 
 # Run as:
-# python -m tools.ai_search.mcp.dsi_mcp_server
+# python tools/ai_search/mcp/dsi_mcp_server.py
