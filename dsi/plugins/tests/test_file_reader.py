@@ -107,6 +107,18 @@ def test_yaml_reader():
             continue
         assert all(len(colData) == numRows for colData in tableData.values())
 
+def test_yaml_reader_v1_2():
+    a=Terminal()
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student",yaml_version = "1.2")
+
+    assert len(a.active_metadata.keys()) == 4 # 4 tables - math, address, physics, dsi_units
+    for name, tableData in a.active_metadata.items():
+        assert isinstance(tableData, OrderedDict)
+        numRows = 2
+        if name == "dsi_units":
+            continue
+        assert all(len(colData) == numRows for colData in tableData.values())
+
 def test_toml_reader():
     a=Terminal()
     a.load_module('plugin', 'TOML1', 'reader', filenames="examples/test/results.toml", target_table_prefix = "results")

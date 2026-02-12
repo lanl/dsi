@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import Any, Iterator
 from os.path import abspath
 from hashlib import sha1
 import json
@@ -6,6 +7,7 @@ from math import isnan
 from pandas import DataFrame, read_csv, concat, read_excel
 import re
 import yaml
+import ruamel.yaml 
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
 import os
@@ -249,7 +251,7 @@ class YAML1(FileReader):
 
     Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
     """
-    def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
+    def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ',yaml_version: str = "1.1", **kwargs):
         """
         Initializes the YAML1 reader with the specified YAML file(s)
 
@@ -260,9 +262,13 @@ class YAML1(FileReader):
             A prefix to be added to each table name created from the YAML data.
             Useful for distinguishing between tables from other data sources.
 
+
+
         `yamlSpace` : str, default='  '
             The indentation used in the input YAML files. 
             Defaults to two spaces, but can be customized to match the formatting in certain files.
+        `yaml_version: str, default = "1.1" 
+            Major and minor version of YAML specification.   
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -270,9 +276,34 @@ class YAML1(FileReader):
         else:
             self.yaml_files = filenames
         self.yamlSpace = yamlSpace
+        self.yaml_version = yaml_version
         self.yaml_data = OrderedDict()
         self.target_table_prefix = target_table_prefix
-            
+        self.ruamel_yaml_safe_loader = None
+
+    def _get_ruamel_yaml_safe_loader(self)->ruamel.yaml.YAML:
+        if self.ruamel_yaml_safe_loader is None:
+            self.ruamel_yaml_safe_loader = ruamel.yaml.YAML(typ = "safe")
+        return self.ruamel_yaml_safe_loader  
+    def _safe_load(self,data: Any)-> Any:
+        match self.yaml_version:
+            case "1"|"1.0"|"1.1":
+                return_value = yaml.safe_load(data)
+            case "1.2":
+                return_value = self._get_ruamel_yaml_safe_loader().load(data)
+            case _:
+                raise ValueError(f"Invalid YAML version {self.yaml_version}. Did you only provide major/minor versions (e.g., '1.1')?")
+        return return_value
+    
+    def _safe_load_all(self,data: Any)-> Iterator[Any]:
+        match self.yaml_version:
+            case "1"|"1.0"|"1.1":
+                return_value = yaml.safe_load_all(data)
+            case "1.2":
+                return_value = self._get_ruamel_yaml_safe_loader().load_all(data)
+            case _:
+                raise ValueError(f"Invalid YAML version {self.yaml_version}. Did you only provide major/minor versions (e.g., '1.1')?")
+        return return_value
     def add_rows(self) -> None:
         """
         Parses YAML data and constructs a nested OrderedDict to load into DSI.
@@ -294,7 +325,7 @@ class YAML1(FileReader):
                 editedString = yaml_file.read()
                 editedString = re.sub('specification', f'columns:\n{self.yamlSpace}specification', editedString)
                 editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
-                yaml_load_data = list(yaml.safe_load_all(editedString))
+                yaml_load_data = list(self._safe_load_all(editedString))
 
                 if "dsi_units" not in self.yaml_data.keys():
                     self.yaml_data["dsi_units"] = OrderedDict()
@@ -713,7 +744,7 @@ class Cloverleaf(FileReader):
         self.cloverleaf_data["viz_files"] = viz_dict
         self.set_schema_2(self.cloverleaf_data)
     
-class Oceans11Datacard(FileReader):
+class Oceans11Datacard(YAML1):
     """
     DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
     Input datacard should follow template in `examples/test/template_dc_oceans11.yml`
@@ -741,7 +772,7 @@ class Oceans11Datacard(FileReader):
         temp_data = OrderedDict()
         for filename in self.datacard_files:
             with open(filename, 'r') as yaml_file:
-                data = yaml.safe_load(yaml_file)
+                data = self._safe_load(yaml_file)
                 
             field_names = []
             for element, val in data.items():
@@ -873,7 +904,7 @@ class SchemaOrgDatacard(FileReader):
         self.datacard_data["schema_org_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
-class GoogleDatacard(FileReader):
+class GoogleDatacard(YAML1):
     """
     DSI Reader that stores a dataset's data card as a row in the `google_datacard` table.
     Input datacard should follow template in `examples/test/template_dc_google.yml`
@@ -902,7 +933,7 @@ class GoogleDatacard(FileReader):
 
         for filename in self.datacard_files:
             with open(filename, 'r') as yaml_file:
-                data = yaml.safe_load(yaml_file)
+                data = self._safe_load(yaml_file)
                 
             if not set(data.keys()).issubset(["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]):
                 return (KeyError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
