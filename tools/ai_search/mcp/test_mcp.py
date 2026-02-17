@@ -4,21 +4,30 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
 URL = "http://127.0.0.1:8000/mcp"
-#DB_PATH = "/Users/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
-DB_PATH = "/home/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
+DB_PATH = "/Users/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
+#DB_PATH = "/home/pascalgrosset/projects/dsi/tools/ai_search/data/oceans_11/ocean_11_datasets.db"
 QUERY_OK = "SELECT * FROM genesis_datacard LIMIT 3"
 
 
 def unwrap_text_json(blocks):
-    # blocks is the list you showed: [{"type":"text","text":"{...json...}", ...}]
-    if isinstance(blocks, list) and blocks and isinstance(blocks[0], dict) and "text" in blocks[0]:
-        return json.loads(blocks[0]["text"])
+    # Adapter variants:
+    # 1) raw JSON string: '{ ... }'
+    # 2) list of content blocks: [{"type":"text","text":"{...}"}]
+    # 3) dict already parsed (sometimes)
+    if isinstance(blocks, str):
+        return json.loads(blocks)
+    if isinstance(blocks, dict):
+        return blocks
+    if isinstance(blocks, list) and blocks:
+        first = blocks[0]
+        if isinstance(first, dict) and "text" in first:
+            return json.loads(first["text"])
     raise TypeError(f"Unexpected tool return: {type(blocks)} {blocks!r}")
 
 
 async def main():
     client = MultiServerMCPClient(
-        connections={"dsi-tools": {"transport": "http", "url": URL}}
+        connections={"dsi-tools": {"transport": "streamable_http", "url": URL}}
     )
 
     tools = await client.get_tools()
