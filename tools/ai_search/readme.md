@@ -10,6 +10,7 @@ The capabilities are:
 
 
 ## Install
+Install DSI using the instructions [here](https://lanl.github.io/dsi/installation.html)
 From DSI
 ```bash
 python -m pip install -r tools/ai_search/requirements.txt
