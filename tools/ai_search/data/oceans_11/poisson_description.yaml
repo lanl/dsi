@@ -1,0 +1,22 @@
+Field_glossary for DSI dataset: poisson
+
+Table: poisson
+  desc: 1000-record HDF5 dataset generated from simulations implementing Poisson’s equations for electrostatics.
+Fields:
+  name:
+    desc: Short human-readable name of the resource.
+
+  LAUR:
+    desc: URL to a PDF document describing the dataset.
+
+  example:
+    desc: URL to a png image showing an example of the dataset.
+
+  environment:
+    desc: UTL to a YAML file describing the software packages used to generate the dataset.
+
+  data:
+    desc: URL to the HDF5 file containing the dataset.
+
+  statistics:
+    desc: URL to a JSON file containing global statistics about the dataset.
