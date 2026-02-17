@@ -21,7 +21,7 @@ python -m pip install -r tools/ai_search/requirements.txt
 ### Jupyter notebook
 The interface to DSI Explorer is Jupyter Lab. Before launching Jupyter Lab, you need to register your current environment to Jupyter Lab as follows:
 ```bash
-python -m ipykernel install --user --name venv_dsi_ai --display-name "venv_dsi_ai"
+python -m ipykernel install --user --name mydsi --display-name "mydsi"
 ```
 
 Then, launch Jupyter lab as follows:
@@ -31,7 +31,7 @@ jupyter lab&
 
 From Jupyter, open: ``tools/ai_search/dsi_data_explorer.ipynb```
 
-Then, you need to pick the venv_ursa kernel. From the menu bar at the top:```Kernel -> Change Kernel ...```, choose ```venv_dsi_ai```.
+Then, you need to pick the venv_ursa kernel. From the menu bar at the top:```Kernel -> Change Kernel ...```, choose ```mydsi```.
 
 
 

@@ -9,6 +9,6 @@ langchain-openai
 langchain-experimental
 langgraph
 langgraph-checkpoint-sqlite
-jupyter lab
+jupyterlab
 mcp
 langchain-mcp-adapters
