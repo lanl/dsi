@@ -970,10 +970,10 @@ def test_sanitize_input():
 
     expected_output = '\nTable: "math"' + textwrap.dedent("""
 
-    specification | a   | b   | c     | d   | e    | f     
-    -------------------------------------------------------
-    None          | nan | nan | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | b    | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 3.0  | 45.98 | 3.0  | 44.8 | 0.0099
     
     """)
     assert output == expected_output
@@ -995,12 +995,12 @@ def test_sanitize_input():
 
     expected_output = '\nTable: "math"' + textwrap.dedent("""
 
-    specification | a   | b   | c     | d   | e    | f     
-    -------------------------------------------------------
-    None          | nan | nan | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
-    None          | nan | nan | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | b    | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 3.0  | 45.98 | 3.0  | 44.8 | 0.0099
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 3.0  | 45.98 | 3.0  | 44.8 | 0.0099
         
     """)
     assert output == expected_output
@@ -1012,12 +1012,12 @@ def test_sanitize_input():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | b   | c     | d   | e    | f     
-    -------------------------------------------------------
-    None          | nan | nan | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
-    None          | nan | nan | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 3.0 | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | b    | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 3.0  | 45.98 | 3.0  | 44.8 | 0.0099
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 3.0  | 45.98 | 3.0  | 44.8 | 0.0099
         
     """)
     assert output == expected_output

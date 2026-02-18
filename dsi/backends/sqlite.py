@@ -970,6 +970,7 @@ class Sqlite(Filesystem):
             except Exception as e:
                 return (sqlite3.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
+        df = df.astype(object).where(df.notna(), None)
         return df
     
     def summary(self, table_name = None):

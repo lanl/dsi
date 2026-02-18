@@ -77,14 +77,14 @@ def test_query_sqlite_backend():
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
 
-    excepted_output = textwrap.dedent("""
+    expected_output = textwrap.dedent("""
     specification | n    | o       | p   | q       | r  | s      
     -------------------------------------------------------------
     !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
     !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     """)
     
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     assert isinstance(query_data, DataFrame)
@@ -125,10 +125,10 @@ def test_get_table_sqlite_backend():
     query_f = io.StringIO()
     with redirect_stdout(query_f):
         test.query("SELECT * FROM physics")
-    excepted_output = query_f.getvalue()
-    excepted_output = "\n".join(excepted_output.splitlines()[1:])
+    expected_output = query_f.getvalue()
+    expected_output = "\n".join(expected_output.splitlines()[1:])
 
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     get_data = test.get_table(table_name="physics", collection=True, update=True)
@@ -248,10 +248,10 @@ def test_sanitize_inputs_sqlite():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c     | d   | e    | f     
-    --------------------------------------------------------
-    None          | nan | nan  | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | math | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 4.0  | 45.98 | 3.0  | 44.8 | 0.0099
     
     """)
     assert output == expected_output
@@ -968,13 +968,13 @@ def test_query_duckdb_backend():
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
 
-    excepted_output = textwrap.dedent("""
+    expected_output = textwrap.dedent("""
     specification | n    | o       | p   | q       | r  | s      
     -------------------------------------------------------------
     !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
     !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     """)
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     assert isinstance(query_data, DataFrame)
@@ -1015,10 +1015,10 @@ def test_get_table_duckdb_backend():
     query_f = io.StringIO()
     with redirect_stdout(query_f):
         test.query("SELECT * FROM physics")
-    excepted_output = query_f.getvalue()
-    excepted_output = "\n".join(excepted_output.splitlines()[1:])
+    expected_output = query_f.getvalue()
+    expected_output = "\n".join(expected_output.splitlines()[1:])
 
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     get_data = test.get_table(table_name="physics", collection=True, update=True)
@@ -1138,10 +1138,10 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c     | d   | e    | f     
-    --------------------------------------------------------
-    None          | nan | nan  | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | math | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 4.0  | 45.98 | 3.0  | 44.8 | 0.0099
     
     """)
     assert output == expected_output
