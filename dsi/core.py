@@ -1169,7 +1169,7 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         
-        if table_name is not None and isinstance(output, pd.DataFrame):
+        if isinstance(output, pd.DataFrame):
             max_rows = output.attrs["max_rows"]
             print(f"\nTable: {table_name}")
             headers = output.columns.tolist()
