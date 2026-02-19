@@ -31,4 +31,4 @@ jobs:
     - name: Test File Writer Plugins
       run: |
         pip install pytest
-        pytest dsi/plugins/tests/test_file_writer.py
+        pytest dsi/plugins/tests/test_file_writer.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO

@@ -29,4 +29,4 @@ jobs:
     - name: Test File Reader Plugins
       run: |
         pip install pytest
-        pytest dsi/plugins/tests/test_file_reader.py
+        pytest dsi/plugins/tests/test_file_reader.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO

@@ -29,4 +29,4 @@ jobs:
     - name: Test Core
       run: |
         pip install pytest
-        pytest dsi/tests/test_core.py
+        pytest dsi/tests/test_core.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO
