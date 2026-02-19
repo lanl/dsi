@@ -30,4 +30,4 @@ jobs:
     - name: Test SQLAlchemy
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_sqlalchemy.py
+        pytest dsi/backends/tests/test_sqlalchemy.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO

@@ -30,4 +30,4 @@ jobs:
     - name: Test DSI User API
       run: |
         pip install pytest
-        pytest dsi/tests/test_dsi.py  -vv -s --maxfail=1 --full-trace --log-cli-level=INFO
+        pytest dsi/tests/test_dsi.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO
