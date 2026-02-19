@@ -374,6 +374,7 @@ class Sqlite(Filesystem):
             - If query is valid and `dict_return` is True: returns an OrderedDict.
             - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
         """
+        data = None
         if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
                 data = pd.read_sql_query(query, self.con) 
@@ -387,6 +388,17 @@ class Sqlite(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
+                return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect query on the data. Please try again")
+        elif "filesystem" in query: #remove fileystem passthrough in future
+            try:
+                self.cur.execute(query)
+                self.con.commit()
+            except Exception as e:
+                message = str(e)
+                if "no such table" in message:
+                    table_name = message[message.rfind(":")+2:]
+                    print(f"WARNING: '{table_name}' does not exist in this database")
+                    return
                 return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect query on the data. Please try again")
         else:
             return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
@@ -958,6 +970,7 @@ class Sqlite(Filesystem):
             except Exception as e:
                 return (sqlite3.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
+        df = df.astype(object).where(df.notna(), None)
         return df
     
     def summary(self, table_name = None):

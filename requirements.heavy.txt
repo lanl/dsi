@@ -15,3 +15,8 @@ graphviz>=0.20.3
 duckdb>=1.2.0
 xmltodict>=0.14.2
 openpyxl>=3.1.5
+
+# Heavy packages
+sqlalchemy>=2.0.35
+scikit-learn>=1.7.0
+streamlit>=1.48.0

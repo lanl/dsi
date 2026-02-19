@@ -37,11 +37,17 @@ class DSI():
             Default is "Sqlite".
         """
         self.t = Terminal(debug = 0, runTable=False)
-        self.s = Sync()
         self.t.user_wrapper = True
         self.schema_read = False
         self.schema_tables = set()
         self.loaded_tables = set()
+
+        if "/" in filename:
+            create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
+        else:
+            create_bool = self.t.can_create_file_here()
+        if create_bool is False:
+            raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
 
         if filename == ".temp_dsi.db" and os.path.exists(filename):
             os.remove(filename)
@@ -667,16 +673,6 @@ class DSI():
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             sys.exit(f"update() ERROR: {e}")
-    
-    # def nb(self):
-    #     """
-    #     Generates a Python notebook and stores data from the first activated backend
-    #     """
-    #     if not self.t.loaded_backends:
-    #         raise ValueError("Must load a backend first. Call backend() before this")
-        
-    #     self.t.artifact_handler(interaction_type="notebook")
-    #     print("Notebook .ipynb and .html generated.")
 
     def list_writers(self):
         """
