@@ -1,14 +1,14 @@
 from dsi.backends.gufi import Gufi
 
 def test_artifact_query():
-    gufi_index_path = "/opt/index/example-collection/test-dir"
+    gufi_index_path = "/opt/example-collection"
     gufi_prefix = "/home/hgreenburg/GUFI/build/"
     dsi_table_name = "wfdata"
     dsi_file_path_column = "LOCAL_PATH"
     dsi_columns = ["sim_id", "wind_speed"]
     gufi_columns = ["fullpath", "size", "mtime"]
     collection_name = "collection1234"
-    gufi_tag_tool_path = "/home/hgreenburg/gufi-dsi-tag"
+    gufi_tag_tool_path = "/home/hgreenburg/gufi-dsi-tag-user-namespace/target/release/gufi-dsi-tag"
     from dsi.core import Sync
     s = Sync("collection")
     s.gufi_query_index(gufi_prefix, gufi_index_path, dsi_table_name, dsi_file_path_column, dsi_columns,
