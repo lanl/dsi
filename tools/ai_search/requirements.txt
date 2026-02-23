@@ -12,3 +12,5 @@ langgraph-checkpoint-sqlite
 jupyterlab
 mcp
 langchain-mcp-adapters
+langchain-mcp-tools
+nest_asyncio
