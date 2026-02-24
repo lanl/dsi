@@ -1706,15 +1706,15 @@ class Sync():
             print("Creating remote directory if it doesn't exist yet")
             self.execute_cmd(cmd, "Creating remote dir")
             
-            if isVerbose:
-                print("scp", "-r", self.local_location, os.path.join(self.remote_location, self.project_name))
             cmd = ["scp", "-r", self.local_location, os.path.join(self.remote_location, self.project_name)]
+            if isVerbose:
+                print(*cmd)
             self.execute_cmd(cmd, "scp data")
             print(" DSI submitted SCP data movement job.")
             
-            if isVerbose:
-                print("scp", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
             cmd = ["scp", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+            if isVerbose:
+                print(*cmd)
             self.execute_cmd(cmd, "scp database")
             print(" DSI submitted SCP database movement job.")
         
@@ -1728,17 +1728,16 @@ class Sync():
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
-            if isVerbose:
-                print("rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
-                      self.local_location, os.path.join(self.remote_location, self.project_name))
             cmd = ["rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
                    self.local_location, os.path.join(self.remote_location, self.project_name)]
+            if isVerbose:
+                print(*cmd)
             self.execute_cmd(cmd, "rsync data")
             print(" DSI submitted the Rsync data movement job.")
             
-            if isVerbose:
-                print("rsync", "-avz", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name))
             cmd = ["rsync", "-avz", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name)]
+            if isVerbose:
+                print(*cmd)
             self.execute_cmd(cmd, "rsync database")
             print(" DSI submitted the Rsync database movement job.")
         
