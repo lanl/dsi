@@ -12,7 +12,7 @@ REMOTE_USER="$(whoami)"
 
 if [[ -n "${SSH_CONNECTION-}" || -n "${SSH_CLIENT-}" || -n "${SSH_TTY-}" ]]; then
   echo "remote"
-  echo "In another terminal on your local machine, run:"
+  echo "In a separate terminal on your local machine, run:"
   echo " ssh -L ${PORT}:localhost:${PORT} ${REMOTE_USER}@${REMOTE_HOST}"
   echo "http://localhost:${PORT}"
 else

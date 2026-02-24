@@ -678,14 +678,15 @@ class DSI_cli:
                             if idx in [1, 2] or idx > 9:
                                 print(line[:-1])
                             if idx == 3:
-                                print("\nView the Dashboard at ", line[:-1])
+                                print(" Leave the new terminal running while using the Dashboard.")
+                                print("\nView the Dashboard at", line[:-1])
                                 print("\nTo exit, press [Ctrl + C] here")
                         else:
                             if idx == 4:
                                 print("\nView the Dashboard at", line[line.index("http"):-1])
                                 print("\nTo exit, press [Ctrl + C] here")
                             elif idx>12:
-                                print(idx, line[:-1])
+                                print(line[:-1])
                 except KeyboardInterrupt:
                     print("\nClosing Dashboard.")
                     os.killpg(proc.pid, signal.SIGTERM)
@@ -717,14 +718,15 @@ class DSI_cli:
                             if idx in [1, 2] or idx > 9:
                                 print(line[:-1])
                             if idx == 3:
-                                print("\nView the ML emulator at ", line[:-1])
+                                print(" Leave the new terminal running while using the Emulator.")
+                                print("\nView the ML emulator at", line[:-1])
                                 print("\nTo exit, press [Ctrl + C] here")
                         else:
                             if idx == 4:
                                 print("\nView the ML emulator at", line[line.index("http"):-1])
                                 print("\nTo exit, press [Ctrl + C] here")
                             elif idx>12:
-                                print(idx, line[:-1])
+                                print(line[:-1])
                 except KeyboardInterrupt:
                     print("\n Closing ML Emulator.")
                     os.killpg(proc.pid, signal.SIGTERM)

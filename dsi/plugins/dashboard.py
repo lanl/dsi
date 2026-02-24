@@ -242,7 +242,7 @@ except Exception:
 if not selected_dir:
     st.info("Check a directory to see its top-level breakdown.")
 
-    st.subheader("Directory usage vs storage limit")
+    st.subheader("Overall directory used vs storage limit")
 
     dirs = df_table["directory"].tolist()
     used_vals = [max(int(x), 1) for x in df_table["total_bytes"].tolist()]
