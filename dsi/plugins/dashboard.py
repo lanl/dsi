@@ -12,13 +12,6 @@ from matplotlib.ticker import FuncFormatter
 
 DIRECTORIES = sys.argv[1:]
 
-# DIRECTORIES = [
-#     "/Users/viyer/dsi/",
-#     "/Users/viyer/dsi/docs/",
-#     # add more...
-# ]
-
-
 def run_cmd(cmd: list[str]) -> tuple[str | None, str | None, int]:
     """Run a command. Return (stdout, stderr, returncode). Never raises."""
     try:
@@ -135,7 +128,7 @@ def du_depth1_with_total_bytes(path: str) -> Tuple[int | None, Dict[str, int]]:
     #Getting total directory size
     out, err, rc = run_cmd(["du", "-k", "-s", path])
     if rc != 0 or not out:
-        st.warning(f"`du -k -s {path}` failed: {err or 'unknown error'}")
+        st.warning(f"`du {path}` failed: {err or 'unknown error'}")
         return None, {}
 
     try:
@@ -214,7 +207,7 @@ st.title("Diana Dashboard")
 df_table, du_map = collect_data(DIRECTORIES)
 
 if df_table.empty:
-    st.error("No valid directories found / no data collected.")
+    st.error("No valid directories found.")
     st.stop()
 
 st.subheader("Directory breakdown")
@@ -222,18 +215,6 @@ st.subheader("Directory breakdown")
 df_view = df_table.copy()
 df_view["total"] = df_view["total_bytes"].apply(bytes_to_human)
 df_view["limit"] = df_view["limit_bytes"].apply(bytes_to_human)
-
-# st.dataframe(
-#     df_view[["directory", "total", "limit"]],
-#     width="stretch",
-#     hide_index=True,
-# )
-
-# selected_dir = st.radio(
-#     "Select a directory",
-#     options=df_view["directory"].tolist(),
-#     index=None,   # requires Streamlit >= 1.31-ish; if it errors, set index=0
-# )
 
 df_view.insert(0, "select", False)
 
@@ -360,7 +341,7 @@ fig, ax = plt.subplots(figsize=(6, 5))
 
 wedges, _, _ = ax.pie(
     final_values,
-    labels=None,          # prevent overlap
+    labels=None,
     autopct=autopct_fmt,
     startangle=90,
     pctdistance=0.75,

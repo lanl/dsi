@@ -703,7 +703,11 @@ class DSI_cli:
                         if idx == 0 and line == "remote\n":
                             is_remote = True
                         if is_remote:
-                            print(idx, line[:-1])
+                            if idx != 3:
+                                print(idx, line[:-1])
+                            if idx == 3:
+                                print("\nView the ML emulator at ", line[:-1])
+                                print("\nTo exit, press [Ctrl + C] here")
                         else:
                             if idx == 4:
                                 print("\nView the ML emulator at", line[line.index("http"):-1])

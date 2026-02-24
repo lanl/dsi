@@ -20,21 +20,22 @@ REMOTE_USER="$(whoami)"
 
 if [[ -n "${SSH_CONNECTION-}" || -n "${SSH_CLIENT-}" || -n "${SSH_TTY-}" ]]; then
   echo "remote"
-  echo "On your laptop, run: ssh -L ${PORT}:localhost:${PORT} ${REMOTE_USER}@${REMOTE_HOST}"
-  echo "Open: http://localhost:${PORT}"
-  echo "Leave that SSH command running while you use the app."
+  echo "In another terminal on your local machine, run:"
+  echo " ssh -L ${PORT}:localhost:${PORT} ${REMOTE_USER}@${REMOTE_HOST}"
+  echo "http://localhost:${PORT}"
 
-  exec streamlit run "$APP" \
-    --server.port="$PORT" \
-    --server.address=127.0.0.1 \
-    --server.headless=true \
-    --browser.gatherUsageStats=false \
-    -- "$@"
+  # exec streamlit run "$APP" \
+  #   --server.port="$PORT" \
+  #   --server.address=127.0.0.1 \
+  #   --server.headless=true \
+  #   --browser.gatherUsageStats=false \
+  #   -- "$@"
 
 else
   echo "local"
-  exec streamlit run "$APP" \
-    --server.headless=true \
-    --browser.gatherUsageStats=false \
-    -- "$@"
+  
 fi
+exec streamlit run "$APP" \
+  --server.headless=true \
+  --browser.gatherUsageStats=false \
+  -- "$@"
