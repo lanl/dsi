@@ -112,7 +112,7 @@ class DSI_cli:
             print(f"backend ERROR: {e}")
             with redirect_stdout(fnull):
                 self.exit_cli([])
-        print(f"Created a temporary {backend} DSI backend")
+        print(f"Created a temporary {backend.capitalize()} DSI backend")
 
 
     def help_fn(self, args):

@@ -19,6 +19,11 @@ import itertools
 from typing import Iterator
 from contextlib import redirect_stdout
 import tempfile
+from packaging import version
+
+# temporary check since pandas 3.0+ has unstable releases
+if version.parse(pd.__version__) >= version.parse("3.0.0"):
+    raise ImportError("Pandas 3.0+ is not compatible with DSI due to unstable releases.")
 
 class Terminal():
     """
