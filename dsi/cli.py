@@ -11,6 +11,7 @@ from contextlib import redirect_stdout
 import sys
 import io
 import subprocess
+import signal
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -226,7 +227,7 @@ class DSI_cli:
         '''
         Exits the CLI
         '''
-        print("Exiting...")
+        print("\nExiting...")
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.close()
@@ -651,36 +652,48 @@ class DSI_cli:
         bash_script_filepath = f"{os.path.dirname(__file__)}/plugins/launch_streamlit.sh"
 
         if viewer.lower() == "dashboard":
-            env = dict(os.environ)
             # user must specify at least one directory
             if len(args) == 1:
-                print("view ERROR: must specify at least one input directory for the dashboard viewer.")
+                print("view ERROR: dashboard viewer requires at least one input directory.")
                 return
             # check if other inputs are valid folder paths
             for f in args[1:]:
                 if not os.path.isdir(f):
-                    print(f"dashboard view ERROR: '{f}' must be a valid folder path to display the dashboard.")
+                    print(f"view ERROR: dashboard viewer has an invalid input directory: {f}")
                     return
+                
+            subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
+
+            env = dict(os.environ)
             dashboard_code_filepath = f"{os.path.dirname(__file__)}/plugins/dashboard.py"
-            cmd = [sys.executable, "-m", "streamlit", "run", dashboard_code_filepath]
-            cmd += ["--browser.gatherUsageStats=false", "--server.headless=true", "--"]
-            for i in args[1:]:
-                cmd += [i]
-            
-            # POSSIBLE ISSUE ON HPC DUE TO start_new_session=True
-            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
+            bash_command = [bash_script_filepath, dashboard_code_filepath] + args[1:]
+            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
                 try:
+                    is_remote = False
                     for idx, line in enumerate(proc.stdout):
-                        if idx == 3:
-                            print("\nView the Dashboard at", line[line.index("http"):-1])
-                            print("To exit the Dashboard, enter [Ctrl + C] here")
-                        elif idx>10:
-                            print(line)
+                        if idx == 0 and line == "remote\n":
+                            is_remote = True
+                        if is_remote:
+                            if idx in [1, 2] or idx > 9:
+                                print(line[:-1])
+                            if idx == 3:
+                                print("\nView the Dashboard at ", line[:-1])
+                                print("\nTo exit, press [Ctrl + C] here")
+                        else:
+                            if idx == 4:
+                                print("\nView the Dashboard at", line[line.index("http"):-1])
+                                print("\nTo exit, press [Ctrl + C] here")
+                            elif idx>12:
+                                print(idx, line[:-1])
                 except KeyboardInterrupt:
                     print("\nClosing Dashboard.")
-                    proc.terminate()
-                    proc.wait()
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait()
 
         elif viewer.lower() == "ml":
             #check if current db is empty
@@ -688,12 +701,10 @@ class DSI_cli:
                 print("view ERROR: the ml viewer requires data to run models.")
                 return
             
-            env = dict(os.environ)
-            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
-            
             subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
             
-            # POSSIBLE ISSUE ON HPC DUE TO start_new_session=True
+            env = dict(os.environ)
+            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
             bash_command = [bash_script_filepath, ml_code_filepath, self.db_path, self.name]
             with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
@@ -703,8 +714,8 @@ class DSI_cli:
                         if idx == 0 and line == "remote\n":
                             is_remote = True
                         if is_remote:
-                            if idx != 3:
-                                print(idx, line[:-1])
+                            if idx in [1, 2] or idx > 9:
+                                print(line[:-1])
                             if idx == 3:
                                 print("\nView the ML emulator at ", line[:-1])
                                 print("\nTo exit, press [Ctrl + C] here")
@@ -716,8 +727,12 @@ class DSI_cli:
                                 print(idx, line[:-1])
                 except KeyboardInterrupt:
                     print("\n Closing ML Emulator.")
-                    proc.terminate()
-                    proc.wait()
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait()
             
         else:
             print("view ERROR: input viewer was invalid. Please try again.")

@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# Usage on REMOTE:
-#   ./streamlit_remote.sh <app.py>
-# Example:
-#   ./streamlit_remote.sh app.py
+# Example call within cli.py: ./launch_streamlit.sh app.py {extra args}
 
 set -euo pipefail
-
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 <app.py>"
-  exit 1
-fi
 
 PORT=8501
 APP="$1"
@@ -23,19 +15,13 @@ if [[ -n "${SSH_CONNECTION-}" || -n "${SSH_CLIENT-}" || -n "${SSH_TTY-}" ]]; the
   echo "In another terminal on your local machine, run:"
   echo " ssh -L ${PORT}:localhost:${PORT} ${REMOTE_USER}@${REMOTE_HOST}"
   echo "http://localhost:${PORT}"
-
-  # exec streamlit run "$APP" \
-  #   --server.port="$PORT" \
-  #   --server.address=127.0.0.1 \
-  #   --server.headless=true \
-  #   --browser.gatherUsageStats=false \
-  #   -- "$@"
-
 else
-  echo "local"
-  
+  echo "local"  
 fi
+
 exec streamlit run "$APP" \
+  --server.port="$PORT" \
   --server.headless=true \
   --browser.gatherUsageStats=false \
   -- "$@"
+#  --server.address=127.0.0.1 \

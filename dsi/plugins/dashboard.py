@@ -9,7 +9,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
-
 DIRECTORIES = sys.argv[1:]
 
 def run_cmd(cmd: list[str]) -> tuple[str | None, str | None, int]:
