@@ -4,11 +4,14 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+import logging
 from contextlib import redirect_stdout
 import io
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+logger = logging.getLogger(__name__)
 
 class DSI():
     '''
@@ -42,6 +45,8 @@ class DSI():
         self.schema_tables = set()
         self.loaded_tables = set()
 
+        self.silence_messages = kwargs.pop('silence_messages', False)
+
         if "/" in filename:
             create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
         else:
@@ -74,13 +79,15 @@ class DSI():
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print(f"Eligible backend_names are: Sqlite, DuckDB")
         except Exception as e:
-            sys.exit(f"backend ERROR: {e}")
+            logger.error(f"Failed to load {backend_name} backend: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to load {backend_name} backend") from e
 
         self.main_backend_obj = self.t.loaded_backends[0]
-        if filename != ".temp_dsi.db":
-            print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
-        else:
-            print("Created an instance of DSI")
+        if not self.silence_messages:
+            if filename != ".temp_dsi.db":
+                print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
+            else:
+                print("Created an instance of DSI")
 
     def list_backends(self):
         """
@@ -793,19 +800,30 @@ class DSI():
         self.t.active_metadata = OrderedDict()
         print(f"Successfully wrote to the output file {filename}")
     
-    def list(self, collection = False):
+
+    def list(self, collection: bool = False) -> list | None:
         """
         Gets the names and dimensions (rows x columns) of all tables in the active backend.
 
-        `collection` : bool, optional, default False. 
-            If True, returns a Python list of all the table names
-            
-            If False (default), prints each table's name and dimensions to the console.
+        Arguments:
+            collection (bool): If True, returns a Python list of all the table names else if False (default), prints each table's name and dimensions to the console.
+
+        Returns:
+            list | None : list of table names if collection is True, else None. If there are no tables in the backend, then nothing is returned or printed.
+
+        Raises:
+            ValueError: If backend is empty or invalid.
+            RuntimeError: If called before schema data is loaded or if listing fails.
         """
+  
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
-        if self.schema_read == True:
-            sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+            raise ValueError("Cannot list() tables of an empty backend. Please ensure there is data in it.")
+            #sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
+    
+        if self.schema_read:
+            #sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+            raise RuntimeError("Cannot call list() until all associated data is loaded after a complex schema")
+
 
         output = None
         try:
@@ -814,13 +832,15 @@ class DSI():
                 table_list = self.t.list(collection)
             output = f.getvalue()
         except Exception as e:
-            raise RuntimeError(f"list() ERROR: {e}")
+            raise RuntimeError(f"list() ERROR: {e}") from e
 
         
         if collection:
             return table_list
         else:
             print(output)
+            return None
+        
 
     def summary(self, table_name = None, collection = False):
         """
@@ -857,6 +877,7 @@ class DSI():
         else:
             print(output)
     
+    
     def num_tables(self):
         """
         Prints the number of tables in the active backend.
@@ -868,7 +889,9 @@ class DSI():
         try:
             self.t.num_tables()
         except Exception as e:
-            raise RuntimeError(f"query() ERROR: {e}")       
+            raise RuntimeError(f"num_tables() ERROR: {e}") from e
+        
+
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
@@ -904,7 +927,9 @@ class DSI():
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.close()
-        print("Closing this instance of DSI()")
+        
+        if not self.silence_messages:
+            print("Closing this instance of DSI()")
     
     #help, edge-finding (find this/that)
     def get(self, dbname):
