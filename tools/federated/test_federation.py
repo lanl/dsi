@@ -98,13 +98,12 @@ def main():
             except Exception as e:
                 print(f" -- Error downloading file from HPC: {e}")
                 continue
-
             
         else:
             print(f"Location type {location_type} for database {db} is unsupported. Skipping.")
             continue
 
-    print(f"\nFinished gathering databases. Successfully downloaded {counter} files to {workspace_folder}.")
+    print(f"\nFinished gathering databases. Successfully downloaded {counter} databases to {workspace_folder}.")
 
 if __name__=="__main__":
     main()
