@@ -150,6 +150,9 @@ class DSI():
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
+        # NEW CKAN
+        print("CKAN   : Data catalog backend for discovering and accessing open data resources.\n")
+
         print()
 
     def schema(self, filename = None):
@@ -229,15 +232,8 @@ class DSI():
         `data_sources` : str, list of str, or data object (dict or pandas DataFrame)
             File path(s) to the data, or an in-memory data object.
 
-<<<<<<< HEAD
             The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
                 - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
-=======
-            The expected input type depends on the selected `reader_name`:
-                - "CKAN"                 → resource_id or dataset_id string
-                - "CKAN_Search"          → dict with search params OR search string
-                - "Collection"           → Ordered Dictionary of table(s)
->>>>>>> 086e4f9 (Added version 0 changes to CKAN search implementation)
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
                 - "YAML"                 → .yaml or .yml
