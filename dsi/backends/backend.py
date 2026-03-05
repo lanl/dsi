@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 
 class Backend(metaclass=ABCMeta):
     @abstractmethod
-    def __init__(self, filename) -> None:
+    def __init__(self) -> None:
         pass
 
     @property
