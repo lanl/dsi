@@ -14,7 +14,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 from collections import OrderedDict
-from dsi.backends.filesystem import Filesystem
+from dsi.backends.webserver import Webserver
 
 # Holds table name and data properties
 class DataType:
@@ -47,7 +47,7 @@ class ValueObject:
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 
-class CKAN(Filesystem):
+class CKAN(Webserver):
     """
     CKAN Backend to search, browse, and access CKAN data catalog metadata
     
