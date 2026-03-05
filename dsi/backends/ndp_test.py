@@ -30,13 +30,14 @@ Provides read-only access to CKAN catalog via API
 import requests
 import urllib3
 from collections import OrderedDict
-from dsi.backends.filesystem import Backend
+#from dsi.backends.filesystem import Backend
+from dsi.backends.webserver import Webserver
 
 # Disable SSL warnings for development
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-class NDP(Backend):
+class NDP(Webserver):
     """
     National Data Platform (CKAN) Backend
     
