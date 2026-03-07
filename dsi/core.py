@@ -39,7 +39,7 @@ class Terminal():
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
-    VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'], 
+    VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
     VALID_ARTIFACT_INTERACTION_TYPES = ['put', 'get', 'inspect', 'read', 'ingest', 'query', 'notebook', 'process']
 
@@ -49,9 +49,9 @@ class Terminal():
 
         Optional flags
         --------------
-        `debug` : int, default=0 
-            {0: off, 1: user debug log, 2: user + developer debug log} 
-            
+        `debug` : int, default=0
+            {0: off, 1: user debug log, 2: user + developer debug log}
+
             When set to 1 or 2, debug info will write to a local debug.log text file with various benchmarks.
 
         `backup_db` : bool, default=False
@@ -62,7 +62,7 @@ class Terminal():
               Recommended for in-situ use-cases.
         """
         sys.tracebacklimit = 0
-        
+
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
 
@@ -85,7 +85,7 @@ class Terminal():
         valid_module_functions_flattened = self.VALID_MODULE_FUNCTIONS['plugin'] + self.VALID_MODULE_FUNCTIONS['backend']
         for valid_function in valid_module_functions_flattened:
             self.active_modules[valid_function] = []
-        
+
         self.active_metadata = OrderedDict()
         self.loaded_backends = []
 
@@ -94,7 +94,7 @@ class Terminal():
 
         self.user_wrapper = False
         self.new_tables = None
-        self.dsi_tables = ["runtable", "filesystem", "oceans11_datacard", "dublin_core_datacard", 
+        self.dsi_tables = ["runtable", "filesystem", "oceans11_datacard", "dublin_core_datacard",
                            "schema_org_datacard", "google_datacard", "genesis_datacard"]
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug
@@ -111,8 +111,8 @@ class Terminal():
         List available DSI modules of an arbitrary module type.
 
         This method is useful for Core Terminal setup. Plugin and Backend type DSI modules
-        are supported, but this getter can be extended to support any new DSI module types which are added. 
-        
+        are supported, but this getter can be extended to support any new DSI module types which are added.
+
         Note: self.VALID_MODULES refers to _DSI_ Modules however, DSI Modules are classes, hence the naming idiosynchrocies below.
         """
         # "DSI Modules" are Python Classes
@@ -130,7 +130,7 @@ class Terminal():
 
         DSI modules may be loaded which are not explicitly listed by the list_available_modules.
         This flexibility ensures that advanced users can access higher level abstractions.
-        
+
         We expect most users will work with module implementations rather than templates, but
         but all high level class abstractions are accessible with this method.
 
@@ -167,14 +167,14 @@ class Terminal():
             mod_name = "Csv"
         if mod_type == "plugin" and mod_name.lower() == "csv_writer":
             mod_name = "Csv_Writer"
-        
+
         load_success = False
         for python_module in list(self.module_collection[mod_type].keys()):
             try:
                 this_module = import_module(python_module)
                 class_ = getattr(this_module, mod_name)
                 load_success = True
-                
+
                 if mod_function == "reader":
                     try:
                         obj = class_(**kwargs)
@@ -182,11 +182,11 @@ class Terminal():
                         if self.debug_level != 0:
                             self.logger.error(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                         raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                    
+
                     run_start = datetime.now()
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
-                    
+
                     tester = 0
                     if sys.gettrace() is None:
                         tester = 1
@@ -199,7 +199,7 @@ class Terminal():
                         if self.debug_level != 0:
                             self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
                         raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
-                    
+
                     if ingest_error is not None:
                             if self.debug_level != 0:
                                 self.logger.error(f"   {ingest_error[1]}")
@@ -209,7 +209,7 @@ class Terminal():
                                 raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
                     if tester == 1:
                         sys.settrace(None) # ends trace to prevent large overhead
-                    
+
                     self.new_tables = obj.output_collector.keys()
                     for table_name, table_metadata in obj.output_collector.items():
                         if table_name.lower() == "runtable":
@@ -275,8 +275,8 @@ class Terminal():
                                 if has_runTable:
                                     self.runTable = True
                                 elif has_data and has_runTable == False and self.runTable == True:
-                                    raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends wihout a runTable.")
-                                
+                                    raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
+
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
@@ -286,12 +286,12 @@ class Terminal():
                         print(e)
                         if "runTable flag is only valid for in-situ workflows" in str(e):
                             if self.debug_level != 0:
-                                self.logger.error("runTable flag is only valid for in-situ workflows, not for populated backends wihout a runTable.")
+                                self.logger.error("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
                             raise
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                         raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                
+
                 if mod_type == "backend":
                     print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
                 else:
@@ -328,12 +328,12 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(f"Your module function was not found in VALID_MODULE_FUNCTIONS['{mod_type}']")
             raise NotImplementedError(f'Hint: Did you declare your Module Function in VALID_MODULE_FUNCTIONS["{mod_type}"]?')
-        
+
         indices = []
         for i, mod in enumerate(self.active_modules[mod_function]):
             if mod.__class__.__name__ == mod_name:
                 indices.append(i)
-        
+
         if len(indices) > 0:
             last_loaded = indices[-1]
             if mod_type == 'backend':
@@ -354,7 +354,7 @@ class Terminal():
 
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
-        Adds an external, meaning not from the DSI repo, Python module to the module_collection. 
+        Adds an external, meaning not from the DSI repo, Python module to the module_collection.
         Afterwards, load_module can be used to load a DSI module from the added Python module.
 
         Note: mod_type is needed because each Python module only implements plugins or backends.
@@ -391,15 +391,15 @@ class Terminal():
             if sys.gettrace() is None:
                 tester = 1
                 sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
-            
+
             writer_error = None
             try:
                 writer_error = obj.get_rows(self.active_metadata, **kwargs)
             except:
-                if self.debug_level != 0: 
+                if self.debug_level != 0:
                     self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
                 raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
-            
+
             if writer_error is not None:
                 if writer_error[0] == "Warning":
                     print("WARNING:", writer_error[1])
@@ -428,7 +428,7 @@ class Terminal():
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
         Interact with loaded DSI backends by ingesting or retrieving data from them.
-        
+
         `interaction_type` : str
             Specifies the type of action to perform. Accepted values:
 
@@ -442,10 +442,10 @@ class Terminal():
         `query` : str, optional
             Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
 
-        kwargs : 
-            Additional keyword arguments passed to underlying backend functions. 
+        kwargs :
+            Additional keyword arguments passed to underlying backend functions.
             View relevant functions in the DSI backend file to understand other arguments to pass in.
-        
+
         `return`: only when `interaction_type` = 'query'
             By default stores query result as a Pandas.DataFrame. If specified, returns it as an OrderedDict
 
@@ -459,7 +459,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before performing an action on it')
             raise NotImplementedError('Need to load a valid backend before performing an action on it')
-        
+
         operation_success = False
         backread_active = False
         if interaction_type in ['ingest', 'put']:
@@ -478,11 +478,11 @@ class Terminal():
                     backup_end = datetime.now()
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
-                
+
                 tester = 0
                 if sys.gettrace() is None:
                     tester = 1
-                    sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned 
+                    sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned
                 if interaction_type == "ingest":
                     errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 elif interaction_type == "put":
@@ -590,7 +590,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
-    
+
     def get_table(self, table_name, dict_return = False):
         """
         Returns all data from a specified table in the first loaded backend.
@@ -622,7 +622,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(f"Get_Table() Error: {output[1]}")
             raise output[0](output[1])
-        
+
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
@@ -657,13 +657,13 @@ class Terminal():
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
-        
+
         return output
 
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
-       
+
         `query_object` : any
             The object to search for in the backend. Can be of any type, including str, float, or int.
 
@@ -689,11 +689,11 @@ class Terminal():
         start = datetime.now()
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
-    
+
     def find_table(self, query_object):
         """
         Find all tables whose name matches `query_object` in the first loaded backend.
-       
+
         `query_object` : str
             The object to search for in the backend. HAS TO BE A str.
 
@@ -719,15 +719,15 @@ class Terminal():
         start = datetime.now()
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
-    
+
     def find_column(self, query_object, range = False):
         """
         Find all columns whose name matches `query_object` in the first loaded backend.
-       
+
         `query_object` : str
             The object to search for in the backend. HAS TO BE A str.
 
-        `range`: bool, optional, default False. 
+        `range`: bool, optional, default False.
             If True, then data-range of all numerical columns which match `query_object` is included in return
 
             If False, then data for each column that matches `query_object` is included in return
@@ -758,7 +758,7 @@ class Terminal():
     def find_cell(self, query_object, row = False):
         """
         Find all cells that match the `query_object` in the first loaded backend.
-       
+
         `query_object` : any
             The object to search for in the backend. Can be of any type, including str, float, or int.
 
@@ -794,7 +794,7 @@ class Terminal():
     def find_helper(self, query_object, return_object, start, find_type):
         """
         **Users should not call this. Used internally.**
-        
+
         Helper function to print/log information for all core find functions: find(), find_table(), find_column(), find_cell()
         """
         val = f"'{query_object}'" if isinstance(query_object, str) else query_object
@@ -812,12 +812,12 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
-    
+
     def find_relation(self, query_object):
         """
         Finds all rows in the first table of the first loaded backend that satisfy a column-level condition.
         `query_object` must include a column, operator, and value to define a valid relational condition.
-       
+
         `query_object` : str
             A relational expression combining column, operator, and value.
             Ex: "age > 4", "age < 4", "age >= 4", "age <= 4", "age = 4", "age == 4", "age != 4", "age (4, 8)", "age ~ 4", "age ~~ 4".
@@ -868,7 +868,7 @@ class Terminal():
             raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], {extra}")
         elif len(result) == 3 and result[2].startswith('"') and result[2].endswith('"'):
             raise ValueError(f"The value in the relational find() cannot be enclosed in double quotes")
-        
+
         column_name = result[0]
         relation = result[1] + result[2]
         if "'" in column_name:
@@ -883,7 +883,7 @@ class Terminal():
                 raise ValueError(f"{start_msg} it must end with closing parenthesis.")
             elif (result[2][result[2].rfind("'"):] if "'" in result[2] else result[2]).count(')') > 1:
                 raise ValueError("Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~].")
-        
+
             values = result[2][:-1].strip()
             if values[0] == '"' or values[-1] == '"':
                 raise ValueError("Neither value in the range-based find can be enclosed in double quotes. Only single quotes")
@@ -939,7 +939,7 @@ class Terminal():
         `collection` : pandas.DataFrame  or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
-        
+
         `backup` : bool, optional, default False.
             - If True, creates a backup file for the DSI backend before updating its data.
             - If False, (default), only updates the data.
@@ -995,11 +995,11 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error(f"Overwrite_table() error: {errorStmt[1]}")
             raise errorStmt[0](errorStmt[1])
-        
+
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
-    
+
     def list(self, collection = False):
         """
         Prints/Returns a list of all tables and their dimensions from the first loaded backend
@@ -1022,7 +1022,7 @@ class Terminal():
                 self.logger.error("First loaded backend needs to have data to be able to list its data")
             raise RuntimeError("First loaded backend needs to have data to be able to list its datd")
         start = datetime.now()
-        
+
         table_list = backend.list()
 
         end = datetime.now()
@@ -1046,7 +1046,7 @@ class Terminal():
             If specified, only the numerical metadata for that table will be returned/printed.
 
             If None (default), metadata for all available tables is returned/printed.
-        
+
         `collection` : bool, optional, default False.
             - If True, returns either a list of DataFrames (table_name = None), or a single DataFrame of metadata
             - If False (default), prints metadata from all tables (table_name = None), or just a single table
@@ -1078,7 +1078,7 @@ class Terminal():
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
-        
+
         if collection == True and table_name is None:
             return output[1:]
         elif collection == True and table_name is not None:
@@ -1092,7 +1092,7 @@ class Terminal():
             for t_name, data in zip(output[0], output[1:]):
                 print(f"\nTable: {t_name}")
                 headers = data.columns.tolist()
-                rows = data.values.tolist() 
+                rows = data.values.tolist()
                 self.table_print_helper(headers, rows, len(rows), 100)
         else:
             raise ValueError("Returned object from the first loaded backend's summary() is incorrectly structured")
@@ -1125,15 +1125,15 @@ class Terminal():
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Prints data from a specified table in the first loaded backend.
-        
+
         `table_name` : str
             Name of the table to display.
-         
+
         `num_rows` : int, optional, default=25
             Number of rows to print. If the table contains fewer rows, only those are shown.
 
         `display_cols` : list of str, optional
-            List of specific column names to display from the table. 
+            List of specific column names to display from the table.
 
             If None (default), all columns are displayed.
         """
@@ -1168,7 +1168,7 @@ class Terminal():
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
-        
+
         if isinstance(output, pd.DataFrame):
             max_rows = output.attrs["max_rows"]
             print(f"\nTable: {table_name}")
@@ -1176,7 +1176,7 @@ class Terminal():
             rows = output.values.tolist()
             self.table_print_helper(headers, rows, max_rows, num_rows)
             print()
-    
+
     def get_table_names(self, query):
         """
         Extracts and returns all table names referenced in a given query.
@@ -1199,14 +1199,14 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.info(f"Error getting table names {output[1]}")
             raise output[0](output[1])
-        
+
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
         if output is not None and isinstance(output, list):
             return output
-    
+
     def get_current_abstraction(self, table_name = None):
         """
         Returns the current DSI abstraction as a nested Ordered Dict.
@@ -1222,7 +1222,7 @@ class Terminal():
 
         `return` : OrderedDict
             If `table_name` is None: returns a nested OrderedDict of all tables.
-            
+
             If `table_name` is provided: returns a single OrderedDict for that table.
         """
         if self.debug_level != 0:
@@ -1243,7 +1243,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
             return self.active_metadata
-        
+
     def update_abstraction(self, table_name, table_data):
         """
         Updates the DSI abstraction, by creating/overwriting the specified table_name with the input table_data
@@ -1272,7 +1272,7 @@ class Terminal():
             self.active_metadata[table_name] = table_data
         elif isinstance(table_data, pd.DataFrame):
             self.active_metadata[table_name] = OrderedDict(table_data.to_dict(orient='list'))
-    
+
     def close(self):
         """
         Immediately closes all active modules: backends, plugin writers, plugin readers
@@ -1285,7 +1285,7 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info("Closing and clearing out all objects in this Terminal object")
-            
+
             self.logger.info("Cleared out the abstraction layer")
         self.active_metadata = OrderedDict()
 
@@ -1302,12 +1302,12 @@ class Terminal():
         for func in self.active_modules:
             self.active_modules[func] = []
             self.loaded_backends = []
-    
+
     # Internal function to identify if an input file is a DSI-compatible backend
     def identify_backend(self, filename):
         if not os.path.exists(filename) or not os.path.isfile(filename):
             return None
-        
+
         try:
             with open(filename, 'rb') as f:
                 #Sqlite check
@@ -1423,7 +1423,7 @@ class Terminal():
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
         return valid
-    
+
     # Internal function that returns if a user can create a file/db in a specified location
     def can_create_file_here(self, dir = "."):
         dir_path = Path(dir)
@@ -1441,7 +1441,7 @@ class Sync():
     """
     A class defined to assist in data management activities for DSI
 
-    Sync is where data movement functions such as copy (to remote location) and 
+    Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
     def __init__(self, project_name="test"):
@@ -1473,7 +1473,7 @@ class Sync():
             create_bool = self.t.can_create_file_here()
         if create_bool is False:
             raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
-    
+
         backend_name = self.t.identify_backend(f)
         if backend_name is None:
             raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
@@ -1491,7 +1491,7 @@ class Sync():
         if process.returncode != 0:
             raise RuntimeError(f"{cmd_name} failed: {stderr}")
         return stdout
-    
+
     def reindex(self, local_loc, remote_loc, isVerbose = False):
         """
         Helper function that allows users to index their data again by dropping existing fileystem information.
@@ -1501,7 +1501,7 @@ class Sync():
         #   remove filesystem pass through in query_artifacts if not dropping table
         self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
         self.index(local_loc, remote_loc, isVerbose)
-    
+
     def index(self, local_loc, remote_loc, isVerbose=False):
         """
         Helper function to gather filesystem information, local and remote locations
@@ -1515,11 +1515,11 @@ class Sync():
             if isVerbose:
                 print("Warning: filesystem table already exists! DSI Index skipped.")
             return
-        
+
         # Relative paths (..) will not work
         if ".." in local_loc:
             raise ValueError("Error: Please use absolute paths instead of relative")
-        
+
         if isVerbose:
             print("loc: "+local_loc+ " rem: "+remote_loc)
 
@@ -1606,7 +1606,7 @@ class Sync():
                     print(f"The directory '{remote}' has been created remotely.")
             except Exception as err:
                 raise RuntimeError(f"Error creating remote directory: {err}")
-                
+
         if isVerbose:
             print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
@@ -1629,7 +1629,7 @@ class Sync():
         """
         if any(x is None for x in (self.remote_location, self.local_location, self.file_list, self.rfile_list)):
             raise RuntimeError("Must run successful DSI Index right before Copy")
-        
+
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             fs_t = self.t.get_table("filesystem")
@@ -1651,23 +1651,23 @@ class Sync():
                         path.mkdir(parents=True)
                     except Exception:
                         raise RuntimeError(f"Unable to create folder {abspath}. Check your access rights")
-            
+
                 if isVerbose:
                     print(" cp " + file + " " + file_remote)
                 shutil.copy2(file , file_remote)
-                
+
             # Database movement
             if isVerbose:
                 print(" cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
             shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
 
             print(" Data Copy Complete!")
-        
+
         elif tool == "scp":
             #  Data movement via SCP
             remote_user = os.getlogin()
             remote_host = "myremote"
-        
+
         elif tool == "conduit":
             import signal
 
@@ -1679,7 +1679,7 @@ class Sync():
             if "No credentials" in stdout:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
-            
+
             # Test Conduit status
             def alarm_handler(signum, frame):
                 raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
@@ -1691,14 +1691,14 @@ class Sync():
                     print("Testing Conduit: conduit get")
                 cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
-                
+
                 if "TRANSFER_ID" in stdout and isVerbose:
                     print(" Conduit is authenticated.")
                 elif "TRANSFER_ID" not in stdout:
                     raise RuntimeError("Conduit Error: " + str(stdout))
             finally:
                 signal.alarm(0)
-            
+
             try:
                 base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
                 # File Movement
@@ -1717,13 +1717,13 @@ class Sync():
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, that is fine.")
-                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error ouput.")
+                print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error output.")
 
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
 
 
-        elif tool == "pfcp":           
+        elif tool == "pfcp":
             try:
                 # File Movement
                 if isVerbose:
@@ -1740,7 +1740,7 @@ class Sync():
                 print(" DSI submitted pfcp database movement job.")
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
-        
+
         elif tool == "ftp":
             True
         elif tool == "git":
@@ -1758,7 +1758,7 @@ class Sync():
         `return`: returns crawled file-list
         """
         start_time = time.perf_counter()
-        
+
         file_list = []
         for root, dirs, files in os.walk(filepath):
             #if os.path.basename(filepath) != 'tmp': # Lets skip some files
@@ -1769,16 +1769,16 @@ class Sync():
 
             for f in files: # Appent root-level files
                 file_list.append(os.path.join(root, f))
-            
+
         elapsed = time.perf_counter() - start_time
 
         if verbose:
             print(f"\nFinished crawling: {filepath}")
             print(f"Total files found: {len(file_list)}")
             print(f"Runtime: {elapsed:.2f} seconds")
-    
+
         return file_list
- 
+
     def dircrawl2(self, filepath: str, verbose: bool = False) -> Iterator[str]:
         start = time.perf_counter()
 
@@ -1814,7 +1814,7 @@ class Sync():
     def gen_uuid(self, st):
         '''
         Generates a unique file identifier using the os.stat data object as the input
-        
+
         '''
         inode=st.st_ino
         ctime=st.st_ctime
@@ -1832,14 +1832,14 @@ class TarFile():
     self.local_tmp_dir = local_tmp_dir
     self.local_files = local_files
     self.create_tar(self.local_files)
-      
+
   def create_tar(self, local_files=[]):
     """
     Creates a tar file and returns the index
-      
+
     tar_name: name of the tar file to create with .tar.gz as the extension
     local_files: a list of files with full paths to include
-    
+
     The tar file will be created in the local_tmp_dir directory
     """
 
@@ -1848,7 +1848,7 @@ class TarFile():
             os.mkdir(self.local_tmp_dir)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
-    
+
     self.tar_path = self.local_tmp_dir + "/" + self.tar_name
     tar = tarfile.open(self.tar_path, "w:gz")
     for f in local_files:
@@ -1872,18 +1872,18 @@ class TarFile():
 
   def get_name(self):
       return self.tar_name
-  
+
 class HPSSSync():
     """
     A class defined to assist in HPSS data management activities for DSI
 
-    Sync is where data movement functions such as copy (to HPSS) and 
+    Sync is where data movement functions such as copy (to HPSS) and
     sync (local filesystem with remote) exist.
     """
     remote_dir = None
     local_files = []
     tar_files = []
-    
+
     def __init__(self, project_name="test"):
         # Helper function to get parent module names.
 
@@ -1891,16 +1891,16 @@ class HPSSSync():
 
     def index(self, local_files, remote_dir, tar_name, isVerbose=False):
         """
-        Helper function to gather local file information and to create a tar that should 
+        Helper function to gather local file information and to create a tar that should
         be in remote_dir or will be copied to the remote directory
 
         local_files: a list of files or directories to add to a tar
         remote_dir: a directory on HPSS that has or will have the tar file
         """
-        
+
         if isVerbose:
             print("loc: "+ str(local_files) + " hpss remote: "+remote_dir)
-        
+
         # Tar the local_files list
         tar_file = TarFile(tar_name, local_files)
         self.local_files = local_files
@@ -1955,7 +1955,7 @@ class HPSSSync():
             with redirect_stdout(fnull):
                 t.load_module('backend','Sqlite','back-read', filename=f)
         except Exception:
-            print(f"Databaase {f} not found")
+            print(f"Database {f} not found")
             raise
 
         # See if filesystem exists
@@ -1978,11 +1978,11 @@ class HPSSSync():
                 writer = csv.DictWriter(csvfile, fieldnames=st_dict.keys())
                 writer.writeheader()
                 writer.writerows(rows)
-            
+
             # Add filesystem table
             t.load_module('plugin', 'Csv', 'reader', filenames=".fs.csv", table_name="filesystem_hpss")
             t.artifact_handler(interaction_type='ingest')
-        
+
         t.close()
 
     def move(self, tool="copy", isVerbose=False, **kwargs):
@@ -1990,7 +1990,7 @@ class HPSSSync():
 
     def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
-        Helper function to perform the 
+        Helper function to perform the
         data copy over using a preferred API
         """
         # See if FS table has been created
@@ -2015,9 +2015,9 @@ class HPSSSync():
             print( " Filesystem table not found. Try running Index first.")
             print( " Data copy failed. ")
             return
-        
+
         t.close()
-      
+
         hpss_files = {}
         for f in self.tar_files:
             hpss_files[self.remote_dir + "/" + f.get_name()] = f.get_full_path()

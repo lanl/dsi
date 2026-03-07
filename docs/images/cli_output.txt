@@ -1,14 +1,14 @@
 (mydsi) viyer@pn2405703 examples % dsi
-    _____           ___                          
-   /  /  \         /  /\         ___     
-  /  / /\ \       /  / /_       /  /\    
- /  / /  \ \     /  / / /\     /  / /    
-/__/ / \__\ |   /  / / /  \   /__/  \    
-\  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+    _____           ___
+   /  /  \         /  /\         ___
+  /  / /\ \       /  / /_       /  /\
+ /  / /  \ \     /  / / /\     /  / /
+/__/ / \__\ |   /  / / /  \   /__/  \
+\  \ \ /  / /  /__/ / / /\ \  \__\/\ \__
  \  \ \  / /   \  \ \/ / / /     \  \ \/\
   \  \ \/ /     \  \  / / /       \__\  /
-   \  \  /       \__\/ / /        /__/ / 
-    \__\/          /__/ /         \__\/  
+   \  \  /       \__\/ / /        /__/ /
+    \__\/          /__/ /         \__\/
                    \__\/                   v1.1.1
 
 Created a temporary sqlite DSI backend
@@ -89,7 +89,7 @@ Table: yosemite5
 dsi> query "SELECT * FROM physics" -e physics_output.csv
 Printing the result from input SQL query: SELECT * FROM physics
 
-specification | n    | o       | p   | q       | r  | s      
+specification | n    | o       | p   | q       | r  | s
 -------------------------------------------------------------
 !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
 !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
@@ -100,7 +100,7 @@ dsi> display math -e math_output.csv
 
 Table: math
 
-specification | a | b | c     | d | e    | f     
+specification | a | b | c     | d | e    | f
 -------------------------------------------------
 !jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
 !jack1        | 2 | 3 | 45.98 | 3 | 44.8 | 0.0099
@@ -117,19 +117,19 @@ dsi> summary -t physics
 
 Table: physics
 
-column        | type    | min     | max     | avg     | std_dev              
+column        | type    | min     | max     | avg     | std_dev
 -----------------------------------------------------------------------------
-specification | VARCHAR | None    | None    | None    | None                 
-n             | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
-o             | VARCHAR | None    | None    | None    | None                 
-p             | INTEGER | 23      | 233     | 128.0   | 105.0                
-q             | VARCHAR | None    | None    | None    | None                 
-r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
+specification | VARCHAR | None    | None    | None    | None
+n             | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0
+o             | VARCHAR | None    | None    | None    | None
+p             | INTEGER | 23      | 233     | 128.0   | 105.0
+q             | VARCHAR | None    | None    | None    | None
+r             | INTEGER | 1       | 12      | 6.5     | 5.5
 s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
 
 dsi> write dsi_output.db
-Sucessfully wrote all data to dsi_output.db
+Successfully wrote all data to dsi_output.db
 
 dsi> exit
 Exiting...
-(mydsi) viyer@pn2405703 examples % 
+(mydsi) viyer@pn2405703 examples %
