@@ -1,5 +1,5 @@
 import shlex
-import readline 
+import readline
 import glob
 import argparse
 import os
@@ -19,12 +19,12 @@ def autofill_path(text, state):
     """ Completes file and directory paths for the current input """
     line = readline.get_line_buffer()
     parts = shlex.split(line[:readline.get_endidx()], posix=True)
-    
+
     if line and line[-1].isspace():
         parts.append('')
-    
+
     curr = parts[-1] if parts else ''
-    
+
     matches = glob.glob(os.path.expanduser(curr) + '*')
     matches = [m + '/' if os.path.isdir(m) else m for m in matches]
     matches = [m[m[:-1].rfind('/')+1:] if '/' in m[:-1] else m for m in matches]
@@ -51,13 +51,13 @@ class DSI_cli:
         self.name = None
         self.start_dir = os.getcwd() + "/"
         return
-    
+
     def viewers_check(self):
         available_viewers = []
         all_viewers = ["ml"]
 
         # ml checker
-        try: 
+        try:
             import streamlit
             import sklearn
             available_viewers.append("ml")
@@ -65,15 +65,15 @@ class DSI_cli:
             pass
 
         # # jupyter checker
-        # try: 
+        # try:
         #     import ipykernel
         #     import nbformat
         #     available_viewers.append("jupyter")
         # except ModuleNotFoundError:
         #     pass
-        
+
         return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
-    
+
     def startup(self, backend="sqlite"):
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
@@ -87,7 +87,7 @@ class DSI_cli:
             print("Cannot start the DSI CLI due to write permissions in this directory. Please try elsewhere.")
             with redirect_stdout(fnull):
                 self.exit_cli([])
-        
+
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
@@ -109,7 +109,7 @@ class DSI_cli:
 
     def help_fn(self, args):
         commands = {
-            'display' :("<table_name> [-n num_rows] [-e filename]", 
+            'display' :("<table_name> [-n num_rows] [-e filename]",
                 "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
@@ -161,7 +161,7 @@ class DSI_cli:
         '''
         os.system('cls' if os.name == 'nt' else 'clear')
 
-    
+
     def get_display_parser(self):
         parser = argparse.ArgumentParser(prog='display')
         parser.add_argument('table_name', help='Table to display')
@@ -172,7 +172,7 @@ class DSI_cli:
     def display(self, args):
         '''
         Displays the contents of a table
-        '''     
+        '''
         table_name = args.table_name
         num_rows = 25
         if args.num_rows != None:
@@ -183,7 +183,7 @@ class DSI_cli:
         except Exception as e:
             print(f"display ERROR: {e}")
             return
-        
+
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
             if file_extension.lower() not in ["csv", "pq", "parquet"]:
@@ -194,13 +194,13 @@ class DSI_cli:
             if error != 1:
                 print(f"Exported {table_name} to {filename}")
             print()
-    
-    
+
+
     def get_draw_parser(self):
         parser = argparse.ArgumentParser(prog='draw')
         parser.add_argument('-f', '--filename', type=str, required=False, help='ER Diagram filename')
         return parser
-    
+
     def draw_schema(self, args):
         '''
         Generates an ER diagram from all data loaded in
@@ -208,7 +208,7 @@ class DSI_cli:
         erd_name = "er_diagram.png"
         if args.filename != None:
             erd_name = args.filename
-        
+
         error = self.export_table("dsi_erd_gen", erd_name)
         if error != 1:
             print(f"Successfully drew an ER Diagram in {erd_name}")
@@ -231,7 +231,7 @@ class DSI_cli:
         Exports to a csv/parquet file
         '''
         if table_name != "temp_query":
-            try:        
+            try:
                 self.t.artifact_handler(interaction_type='process')
             except Exception as e:
                 self.t.active_metadata = OrderedDict()
@@ -261,7 +261,7 @@ class DSI_cli:
             self.t.active_metadata = OrderedDict()
             print(f"export ERROR: {e}")
             return 1
-        
+
         if success_load == True:
             try:
                 self.t.transload()
@@ -270,10 +270,10 @@ class DSI_cli:
                 self.t.active_metadata = OrderedDict()
                 print(f"export ERROR: {e}")
                 return 1
-        
+
         self.t.active_metadata = OrderedDict()
-    
-    
+
+
     def find(self, args):
         '''
         Global find to see where the condition is met
@@ -305,7 +305,7 @@ class DSI_cli:
             e = str(e).replace("query_object", "condition")
             print(f"find ERROR: {e}")
             return
-        
+
         if output and "WARNING" in output:
             warn_msg = output[output.find("WARNING"):]
             if "artifact_handler" in warn_msg:
@@ -330,12 +330,12 @@ class DSI_cli:
                 output_df = pd.DataFrame([val.value], columns=val.c_name)
             else:
                 output_df.loc[len(output_df)] = val.value
-        
+
         print(f'\nTable: {table_name}')
         output_df.insert(0, "row_index", row_list)
         self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
         print()
-    
+
 
     def list_tables(self, args):
         '''
@@ -386,7 +386,7 @@ class DSI_cli:
         parser.add_argument('table_name', help='Table to plot')
         parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Table plot filename')
         return parser
-    
+
     def plot_table(self, args):
         '''
         Plot a table's numerical data and store in an image
@@ -395,7 +395,7 @@ class DSI_cli:
         filename = f"{table_name}_plot.png"
         if args.filename != "":
             filename = args.filename
-        
+
         error = self.export_table("dsi_tb_" + table_name, filename)
         if error != 1:
             print(f"Successfully plotted {table_name} in {filename}")
@@ -428,11 +428,11 @@ class DSI_cli:
         if data.empty:
             print()
             return
-        
+
         headers = data.columns.tolist()
         rows = data.values.tolist()
         self.t.table_print_helper(headers, rows, len(rows), num_rows)
-        
+
         if args.export != None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
             if file_extension.lower() not in ["csv", "pq", "parquet"]:
@@ -452,13 +452,13 @@ class DSI_cli:
         parser.add_argument('filename', help='File to read into DSI')
         parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name to store data into')
         return parser
-    
+
     def read(self, args):
         '''
         Reads data file or a database into DSI
 
         Args:
-            dbfile (obj): name of the file or database to read 
+            dbfile (obj): name of the file or database to read
             table_name (str): name of the table to read the data into
         '''
         table_name = ""
@@ -470,7 +470,7 @@ class DSI_cli:
         dbfile = args.filename
         if self.__is_url(dbfile): # if it's a url, do fetch
             url = dbfile
-            output_path = url.split('/')[-1]    
+            output_path = url.split('/')[-1]
 
             try:
                 import ssl
@@ -525,7 +525,7 @@ class DSI_cli:
                 print(f"read ERROR: {e}")
                 self.t.active_metadata = OrderedDict()
                 return
-            
+
             table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
             if len(table_keys) > 1:
                 print(f"Loaded {dbfile} into tables: {', '.join(table_keys)}")
@@ -548,7 +548,7 @@ class DSI_cli:
             print("   - duckdb (extension: .duckdb, .db)\n")
             return
 
-        
+
     def search(self, args):
         '''
         Global search to see where that value exists
@@ -571,7 +571,7 @@ class DSI_cli:
         except Exception as e:
             print(f"search ERROR: {e}")
             return
-        
+
         if find_data is None:
             print(f"WARNING: {val} was not found in this backend\n")
             return
@@ -582,13 +582,13 @@ class DSI_cli:
             print(f"  - Row Number: {val.row_num}")
             print(f"  - Data: {val.value}")
         print()
-    
+
 
     def get_summary_parser(self):
         parser = argparse.ArgumentParser(prog='summary')
         parser.add_argument('-t', '--table', type=str, required=False, help='Show only this table')
         return parser
-    
+
     def summary(self, args):
         '''
         Get the summary of a table or database
@@ -596,7 +596,7 @@ class DSI_cli:
         table_name = None
         if args.table != None:
             table_name = args.table
-        
+
         try:
             self.t.summary(table_name)
         except Exception as e:
@@ -628,7 +628,7 @@ class DSI_cli:
         if len(args) > 1:
             print("view ERROR: can only use one DSI viewer at a time")
             return
-        
+
         viewer = args[0]
         if viewer not in self.all_viewers:
             print("view ERROR: This viewer does not exist.")
@@ -653,7 +653,7 @@ class DSI_cli:
             cmd += ["--server.headless=true"]
 
             #ISSUE ON ROCI COULD BE DUE TO start_new_session=True
-            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
+            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True,
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
                 try:
                     for idx, line in enumerate(proc.stdout):
@@ -666,7 +666,7 @@ class DSI_cli:
                     print("\nClosing ML Emulator.")
                     proc.terminate()
                     proc.wait()
-            
+
         else:
             print("view ERROR: input viewer was invalid. Please try again.")
             return
@@ -676,7 +676,7 @@ class DSI_cli:
         parser = argparse.ArgumentParser(prog='write')
         parser.add_argument('filename', help='file DSI data will be written to')
         return parser
-    
+
     def write_to_file(self, args):
         '''
         Writes the database to file
@@ -699,12 +699,12 @@ class DSI_cli:
             else:
                 shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name) + ".duckdb")
                 final_name = new_name + ".duckdb"
-        print(f"Sucessfully wrote all data to {final_name}\n")
-    
+        print(f"Successfully wrote all data to {final_name}\n")
+
     def __is_url(self, s):
         '''
         Checks if the string is a url link
-        
+
         Args:
             s (str): string to check
         '''
@@ -726,14 +726,14 @@ COMMANDS = {
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
-    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),    
+    'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
     'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
     'summary' : (cli.get_summary_parser, cli.summary),
     'viewers' : (None, cli.viewers),
     'view' : (None, cli.view),
-    'write' : (cli.get_write_parser, cli.write_to_file),    
+    'write' : (cli.get_write_parser, cli.write_to_file),
     'ls' : (None, cli.ls),
     'cd' : (None, cli.cd)
 }
@@ -751,16 +751,16 @@ def main():
         print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb")
         exit(1)
     print("   ", textwrap.dedent(fr"""
-         _____           ___                          
-        /  /  \         /  /\         ___     
-       /  / /\ \       /  / /_       /  /\    
-      /  / /  \ \     /  / / /\     /  / /    
-     /__/ / \__\ |   /  / / /  \   /__/  \    
-     \  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+         _____           ___
+        /  /  \         /  /\         ___
+       /  / /\ \       /  / /_       /  /\
+      /  / /  \ \     /  / / /\     /  / /
+     /__/ / \__\ |   /  / / /  \   /__/  \
+     \  \ \ /  / /  /__/ / / /\ \  \__\/\ \__
       \  \ \  / /   \  \ \/ / / /     \  \ \/\
        \  \ \/ /     \  \  / / /       \__\  /
-        \  \  /       \__\/ / /        /__/ / 
-         \__\/          /__/ /         \__\/  
+        \  \  /       \__\/ / /        /__/ /
+         \__\/          /__/ /         \__\/
                         \__\/                   v{cli.version()}
     """).strip())
     print()
@@ -775,11 +775,11 @@ def main():
                 continue
 
             command, *args = tokens
-            
+
             if command not in COMMANDS:
                 print(f"Unknown command. Type \"help\" to see valid commands.\n")
                 continue
-                
+
             parser_factory, handler = COMMANDS[command]
 
             if parser_factory:
@@ -791,7 +791,7 @@ def main():
                     pass # argparse tries to exit on error — suppress that in shell
             else:
                 handler(args)
-            
+
         except KeyboardInterrupt:
             cli.exit_cli([])
         except EOFError:

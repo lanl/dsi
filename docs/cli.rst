@@ -3,7 +3,7 @@
 Command Line Interface API
 ==========================
 
-Users can interact with DSI Readers, Writers and Backends even easier with DSI's Command Line Interace (CLI).
+Users can interact with DSI Readers, Writers and Backends even easier with DSI's Command Line Interface (CLI).
 While slightly more restrictive than the Python API, the CLI allows users to interact with DSI without any knowledge of Python.
 
 Users can store several files in DSI, and query/find/export loaded data to other formats.
@@ -14,9 +14,9 @@ The CLI actions and example workflows are shown below.
 CLI Setup and Actions
 ---------------------
 Once a user has successfully installed DSI, they can active the CLI environment by entering ``dsi`` in their command line.
-This automatically creates a hidden Sqlite database that users can interact with. 
+This automatically creates a hidden Sqlite database that users can interact with.
 
-However, if a user wants to use DuckDB instead, they should activate the CLI with ``dsi -b duckdb`` in their command line. 
+However, if a user wants to use DuckDB instead, they should activate the CLI with ``dsi -b duckdb`` in their command line.
 From here on out, all actions will be using a hidden DuckDB database.
 
 To view all available CLI actions without launching the CLI, users can enter ``dsi help`` in their command line.
@@ -42,20 +42,20 @@ exit
     Exits the CLI and closes all active DSI modules.
 
 find <condition>
-    Finds all rows of a table that match the condition in the format: [column] [operator] [value]. 
+    Finds all rows of a table that match the condition in the format: [column] [operator] [value].
     Ex: find 'age = 6'
 
     Valid operators:
 
-        - age > 4 
-        - age < 4 
-        - age >= 4 
-        - age <= 4 
-        - age = 4 
+        - age > 4
+        - age < 4
+        - age >= 4
+        - age <= 4
+        - age = 4
         - age == 4
         - age ~ 4    --> column age contains the number 4
         - age ~~ 4   --> column age contains the number 4
-        - age != 4 
+        - age != 4
         - age (4, 8) --> all values in 'age' between 4 and 8 (inclusive)
 
 list
@@ -76,9 +76,9 @@ query <SQL query> [-n num rows] [-e filename]
 
 read <filename> [-t table name]
     Reads specified data into DSI
-    
-    - `filename` is a mandatory input of data to ingest. Accepted formats: 
-    
+
+    - `filename` is a mandatory input of data to ingest. Accepted formats:
+
         - CSV, JSON, TOML, YAML, Parquet, SQLite databases, DuckDB databases
         - URL pointing to data stored in one of the above formats
 

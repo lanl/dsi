@@ -11,7 +11,7 @@ It contains mesh data structures and a few
 physics algorithms from radiation hydrodynamics and serves as an example of
 typical memory access patterns for an HPC simulation code.
 
-This DSI PENNANT example is used to show a common use case: create and query a set of metadata derived from an ensemble of simulation runs. 
+This DSI PENNANT example is used to show a common use case: create and query a set of metadata derived from an ensemble of simulation runs.
 The example GitHub directory includes 10 PENNANT runs using the PENNANT *Leblanc* test problem.
 
 In the first step, a python script is used to parse the slurm output files and create a CSV (comma separated value) file with the output metadata.
@@ -42,15 +42,15 @@ Resulting in the output of the query:
 Wildfire Dataset
 ----------------
 
-This example highlights the use of the DSI framework with QUIC-Fire simulation data and resulting images. 
-QUIC-Fire is a fire-atmosphere modeling framework for prescribed fire burn analysis. 
-It is light-weight (able to run on a laptop), allowing scientists to generate ensembles of thousands of simulations in weeks. 
+This example highlights the use of the DSI framework with QUIC-Fire simulation data and resulting images.
+QUIC-Fire is a fire-atmosphere modeling framework for prescribed fire burn analysis.
+It is light-weight (able to run on a laptop), allowing scientists to generate ensembles of thousands of simulations in weeks.
 This QUIC-fire dataset is an ensemble of prescribed fire burns for the Wawona region of Yosemite National Park.
 
-The original file, wildfire.csv, lists 1889 runs of a wildfire simulation. Each row is a unique run with input and output values and associated image url. 
-The columns list the various parameters of interest. 
-The input columns are: wild_speed, wdir (wind direction), smois (surface moisture), fuels, ignition, safe_unsafe_ignition_pattern, 
-safe_unsafe_fire_behavior, does_fire_meet_objectives, and rationale_if_unsafe. 
+The original file, wildfire.csv, lists 1889 runs of a wildfire simulation. Each row is a unique run with input and output values and associated image url.
+The columns list the various parameters of interest.
+The input columns are: wild_speed, wdir (wind direction), smois (surface moisture), fuels, ignition, safe_unsafe_ignition_pattern,
+safe_unsafe_fire_behavior, does_fire_meet_objectives, and rationale_if_unsafe.
 The output of the simulation (and post-processing steps) include the burned_area and the url to the wildfire images stored on the San Diego Super Computer.
 
 After loading dsi, run this example within the ``dsi/examples/wildfire/`` folder as all filepaths are relative to that location:
@@ -90,12 +90,12 @@ where ``examples/test/example_schema.json`` is:
    {
       "simulation": {
          "primary_key": "sim_id"
-      }, 
+      },
       "input": {
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"]
          }
-      }, 
+      },
       "output": {
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"]
@@ -107,19 +107,19 @@ where ``examples/test/example_schema.json`` is:
          }
       }
    }
-   
+
 and the generated ER diagram is:
 
 ..  figure:: images/schema_erd.png
     :scale: 35%
     :align: center
 
-    Entity Relationship Diagram of Cloverleaf data. 
+    Entity Relationship Diagram of Cloverleaf data.
     Displays relations between the simulation, input, output, and viz_files tables.
 
 This section explains how to define primary and foreign key relationships in a JSON file for ``schema()``, such as ``examples/test/example_schema.json``
 
-For futher clarity, each schema file must be structured as a dictionary where:
+For further clarity, each schema file must be structured as a dictionary where:
 
    - Each table with a relation is a key whose value is a nested dictionary storing primary and foreign key information
 
@@ -142,13 +142,13 @@ For example, if we update the Cloverleaf schema by adding a new primary and fore
    {
       "simulation": {
          "primary_key": "sim_id"
-      }, 
+      },
       "input": {
          "primary_key": "input_id",                  // <--- new primary key
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"]
          }
-      }, 
+      },
       "output": {
          "foreign_key": {
                "sim_id": ["simulation", "sim_id"],
@@ -167,5 +167,5 @@ our new ER diagram would be:
 ..  figure:: images/schema_erd_added.png
     :scale: 35%
     :align: center
-   
+
     ER Diagram of same data. However, there is now an additional primary/foreign key relation from "input" to "output"
