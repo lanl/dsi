@@ -46,7 +46,7 @@ class Terminal():
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
-    VALID_ARTIFACT_INTERACTION_TYPES = ['put', 'get', 'inspect', 'read', 'ingest', 'query', 'notebook', 'process']
+    VALID_ARTIFACT_INTERACTION_TYPES = ['ingest', 'query', 'notebook', 'process']
 
     def __init__(self, debug = 0, backup_db = False, runTable = False):
         """
@@ -427,15 +427,15 @@ class Terminal():
         `interaction_type` : str
             Specifies the type of action to perform. Accepted values:
 
-                - 'ingest' or 'put': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
+                - 'ingest': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
 
                     - if backup_db flag = True in Core instance, a backup is created prior to ingesting data
-                - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
-                - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
-                - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+                - 'query': retrieves data from first loaded backend based on a specified 'query'
+                - 'notebook': generates an interactive Python notebook with all data from first loaded backend
+                - 'process': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
         `query` : str, optional
-            Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
+            Required only when `interaction_type` is 'query'.
 
         kwargs :
             Additional keyword arguments passed to underlying backend functions.
@@ -457,7 +457,7 @@ class Terminal():
 
         operation_success = False
         backread_active = False
-        if interaction_type in ['ingest', 'put']:
+        if interaction_type in ['ingest']:
             for obj in self.active_modules['back-write']:
                 if self.debug_level != 0:
                     self.logger.info("-------------------------------------")
@@ -479,10 +479,7 @@ class Terminal():
                     tester = 1
                     sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned
                 try:
-                    if interaction_type == "ingest":
-                        obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
-                    elif interaction_type == "put":
-                        obj.put_artifacts(collection = self.active_metadata, **kwargs)
+                    obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 except Exception as e:
                     if self.debug_level != 0:
                         self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e)}")
@@ -497,17 +494,17 @@ class Terminal():
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
-        if interaction_type in ['ingest', 'put'] and len(self.active_modules['back-read']) > 0:
+        if interaction_type in ['ingest'] and len(self.active_modules['back-read']) > 0:
             backread_active = True
 
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
-        if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', "process"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
-        if interaction_type in ['query', 'get']:
+        if interaction_type in ['query']:
             # TODO query all backends together
             if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
@@ -518,10 +515,7 @@ class Terminal():
                     tester = 1
                     sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
                 try:
-                    if interaction_type == "get":
-                        query_data = first_backend.get_artifacts(**kwargs)
-                    elif interaction_type == "query":
-                        query_data = first_backend.query_artifacts(**kwargs)
+                    query_data = first_backend.query_artifacts(**kwargs)
                 except Exception as e:
                     if self.debug_level != 0:
                         self.logger.error((str(e)))
@@ -536,24 +530,21 @@ class Terminal():
                     self.logger.error("Need to ingest data into first loaded backend before querying data from it")
                 raise RuntimeError("Need to ingest data into first loaded backend before querying data from it")
 
-        elif interaction_type in ['notebook', 'inspect']:
+        elif interaction_type in ['notebook']:
             if self.valid_backend(first_backend, parent_backend):
                 try:
-                    if interaction_type == "inspect":
-                        first_backend.inspect_artifacts(**kwargs)
-                    elif interaction_type == "notebook":
-                        first_backend.notebook(**kwargs)
+                    first_backend.notebook(**kwargs)
                 except:
                     raise RuntimeError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
-            else: #backend is empty - cannot inspect
+            else: #backend is empty - cannot create notebook
                 if self.debug_level != 0:
                     self.logger.error("Need to ingest data into first loaded backend before generating a Python notebook")
                 raise RuntimeError("Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
         # only processes data from first backend for now - TODO process data from all active backends later
-        elif interaction_type in ["process", "read"]:
+        elif interaction_type in ["process"]:
             if len(self.loaded_backends) > 1:
                 if parent_backend == "Filesystem" and ".temp_dsi.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
@@ -561,10 +552,7 @@ class Terminal():
             if self.valid_backend(first_backend, parent_backend):
                 if self.debug_level != 0:
                     self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
-                if interaction_type == "process":
-                    self.active_metadata = first_backend.process_artifacts()
-                elif interaction_type == "read":
-                    self.active_metadata = first_backend.read_to_artifact()
+                self.active_metadata = first_backend.process_artifacts()
                 operation_success = True
             else: #backend is empty - cannot process data
                 if self.debug_level != 0:
@@ -575,12 +563,12 @@ class Terminal():
             end = datetime.now()
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
-            if interaction_type in ['query', 'get'] and query_data is not None:
+            if interaction_type in ['query'] and query_data is not None:
                 return query_data
         else:
             not_run_msg = None
             if backread_active:
-                not_run_msg = 'Remember that back-READ backends cannot ingest/put data'
+                not_run_msg = 'Remember that back-READ backends cannot ingest data'
             else:
                 not_run_msg = 'Is your interaction implemented in the specified backend?'
             if self.debug_level != 0:

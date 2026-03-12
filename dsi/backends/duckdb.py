@@ -200,9 +200,6 @@ class DuckDB(Filesystem):
                 raise duckdb.Error(e)
             self.types = types
 
-    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifacts(self, collection, isVerbose=False):
-        return self.ingest_artifacts(collection, isVerbose)
     
     def ingest_artifacts(self, collection, isVerbose=False):    
         """
@@ -380,10 +377,6 @@ class DuckDB(Filesystem):
             self.cur.execute("FORCE CHECKPOINT")
             raise duckdb.Error(e)
 
-
-    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def get_artifacts(self, query, isVerbose=False, dict_return = False):
-        return self.query_artifacts(query, isVerbose, dict_return)
     
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
@@ -485,16 +478,10 @@ class DuckDB(Filesystem):
         schema_stmts = self.query_artifacts(query="SELECT sql FROM duckdb_tables where sql NOT NULL ")
         return schema_stmts["sql"].str.cat(sep="\n")
     
-    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def inspect_artifacts(self, interactive=False):
-        return self.notebook(interactive)
     
     def notebook(self, interactive=False):
         pass
 
-    # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def read_to_artifact(self):
-        return self.process_artifacts()
     
     def process_artifacts(self, only_units_relations = False):
         """

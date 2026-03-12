@@ -153,9 +153,6 @@ class Sqlite(Filesystem):
                 raise sqlite3.Error(e)
             self.types = types
 
-    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifacts(self, collection, isVerbose=False):
-        return self.ingest_artifacts(collection, isVerbose)
     
     def ingest_artifacts(self, collection, isVerbose=False):    
         """
@@ -345,9 +342,6 @@ class Sqlite(Filesystem):
             self.con.rollback()
             raise sqlite3.Error(e)
 
-    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def get_artifacts(self, query, isVerbose=False, dict_return = False):
-        return self.query_artifacts(query, isVerbose, dict_return)
     
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
@@ -448,9 +442,6 @@ class Sqlite(Filesystem):
         schema_stmts = self.query_artifacts(query="SELECT sql FROM sqlite_master where sql NOT NULL ORDER BY type, name")
         return schema_stmts["sql"].str.cat(sep="\n")
 
-    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def inspect_artifacts(self, interactive=False):
-        return self.notebook(interactive)
 
     def notebook(self, interactive=False):
         """
@@ -564,9 +555,6 @@ class Sqlite(Filesystem):
             with open(html_filename, 'w', encoding='utf-8') as fh:
                 fh.write(html_content)
 
-    # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def read_to_artifact(self, only_units_relations = False):
-        return self.process_artifacts(only_units_relations)
     
     def process_artifacts(self, only_units_relations = False):
         """
