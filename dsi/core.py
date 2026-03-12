@@ -1675,7 +1675,7 @@ class Sync():
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
             except ValueError:
-                raise ValueError("Remote location must be in the format user@host:/absolute/path")
+                raise ValueError("Remote path must be in the format user@host:/absolute/path")
 
             if not path_part.startswith("/"):
                 raise ValueError("Remote path must be absolute (starting with /)")
@@ -1684,14 +1684,23 @@ class Sync():
             cmd = ["ssh", host_part, f'mkdir -p {os.path.join(path_part, self.project_name)}']
             print("Creating remote directory if it doesn't exist yet")
             self.execute_cmd(cmd, "Creating remote dir")
-            
-            cmd = ["scp", "-r", self.local_location, os.path.join(self.remote_location, self.project_name)]
+
+            #remove username from file_remote column in filesystem table
+            username, host = host_part.split("@")
+            filesystem_df = self.t.get_table("filesystem")
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
+            cmd = ["scp", "-rp", self.local_location, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
             print(" DSI submitted SCP data movement job.")
 
-            cmd = ["scp", full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
+            cmd = ["scp", "-p", full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
             if isVerbose:
                 print(*cmd)
             self.execute_cmd(cmd, "scp database")
@@ -1705,6 +1714,18 @@ class Sync():
 
             if not path_part.startswith("/"):
                 raise ValueError("Remote path must be absolute (starting with /)")
+            
+            #remove username from file_remote column in filesystem table
+            try:
+                username, host = host_part.split("@")
+            except:
+                raise ValueError("Remote path's hostname must be in the format user@server") from None
+            filesystem_df = self.t.get_table("filesystem")
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
             
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
             cmd = ["rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
