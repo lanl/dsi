@@ -37,7 +37,7 @@ to build the documents.  When complete, push the changes to the repo.
 
    make gh-pages
 
-.. 6. And update the official documentation on Github (this may take a few minutes to propogate):
+.. 6. And update the official documentation on Github (this may take a few minutes to propagate):
 
 .. .. code-block:: unixconfig
 
@@ -64,4 +64,4 @@ We suggest creating a python environment:
    source mydsi/bin/activate
 
 4. Proceed with the pip installation in the `How to build documentation`_ section.
-5. When you've completed work, deativate the environment with ``deactivate`` .
+5. When you've completed work, deactivate the environment with ``deactivate`` .
