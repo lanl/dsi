@@ -140,7 +140,7 @@ class DSI():
         Prints a list of valid readers that can be used in the `reader_name` argument in `read()`
         """
         print("\nValid Readers for `reader_name` in read():\n" + "-"*50)
-        print("Collection           : Loads data from an Ordered Dict. If multiple tables, each table must be a nested OrderedDict.")
+        print("Collection           : Loads data from a dictionary or pandas DataFrame. For multiple tables, each table must be a nested dictionary.")
         print("CSV                  : Loads data from CSV files (one table per call)")
         print("Parquet              : Loads data from Parquet - a columnar storage format for Apache Hadoop (one table per call)")
         print("YAML                 : Loads data from standard YAML files that contain one table per file")
@@ -166,7 +166,7 @@ class DSI():
             Either file path(s) to the data file(s) or an in-memory data object.
 
             The expected input type depends on the selected `reader_name`:
-                - "Collection"           → Ordered Dictionary of table(s)
+                - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
                 - "YAML"                 → .yaml or .yml
@@ -194,7 +194,7 @@ class DSI():
         `table_name` : str, optional
             Name to assign to the loaded table.
 
-            Required when using the `Collection` reader to load an Ordered Dictionary representing only one table.
+            Required when using the `Collection` reader to load an dictionary or pandas DataFrame representing only one table.
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
@@ -283,12 +283,15 @@ class DSI():
                         self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name=table_name)
                     elif reader_name.lower() == "cloverleaf":
                         self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames)
-                    elif reader_name.lower() == "collection":
+                    elif reader_name.lower() == "collection" and isinstance(filenames, dict):
                         self.t.load_module('plugin', 'Dict', 'reader', collection=filenames, table_name=table_name)
                         if isinstance(filenames, OrderedDict):
                             filenames = "the Ordered Dict"
                         else:
                             filenames = "the dictionary"
+                    elif reader_name.lower() == "collection" and isinstance(filenames, pd.DataFrame):
+                        self.t.load_module('plugin', 'Dataframe', 'reader', collection=filenames, table_name=table_name)
+                        filenames = "the pandas DataFrame"
                     else:
                         correct_reader = False
             except Exception as e:

@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from pandas import DataFrame
 from dsi.plugins.metadata import StructuredMetadata
 
 class CollectionReader(StructuredMetadata):
@@ -8,10 +9,7 @@ class CollectionReader(StructuredMetadata):
     """
     def __init__(self, collections, **kwargs):
         super().__init__(**kwargs)
-        if isinstance(collections, dict):
-            self.input_dict = collections
-        else:
-            return (TypeError, "Input must be a Python dictionary or an Ordered Dictionary")
+        self.input_dict = collections
 
 class Dict(CollectionReader):
     """
@@ -23,6 +21,8 @@ class Dict(CollectionReader):
     """
     def __init__(self, collection, table_name = None, **kwargs) -> None:
         super().__init__(collection, **kwargs)
+        if not isinstance(self.input_dict, dict):
+            raise TypeError("Input must be a Python dictionary or an Ordered Dictionary")
         self.table_name = table_name
 
     def add_rows(self) -> None:
@@ -37,6 +37,17 @@ class Dict(CollectionReader):
             if not isinstance(self.input_dict, OrderedDict) and isinstance(self.input_dict, dict):
                 self.input_dict = OrderedDict(self.input_dict)
             self.set_schema_2(OrderedDict([(self.table_name, self.input_dict)]))
+
+        elif not any(isinstance(val, dict) for val in self.input_dict.values()): # checking if single dict with single values (no nested dicts)
+            if self.table_name is None:
+                raise ValueError("table_name argument must be specified to name this single table of data.")
+            temp_dict = OrderedDict()
+            for k, v in self.input_dict.items():
+                if k not in temp_dict.keys():
+                    temp_dict[k] = [v]
+                else:
+                    temp_dict[k].append(v)
+            self.set_schema_2(OrderedDict([(self.table_name, temp_dict)]))
 
         elif all(isinstance(val, dict) for val in self.input_dict.values()):
             for nested_dict in self.input_dict.values():
@@ -53,3 +64,19 @@ class Dict(CollectionReader):
             self.set_schema_2(self.input_dict)
         else:
             return (ValueError, "Input dictionary must either represent one table of data or multiple tables (use nested Ordered Dicts).")
+
+class Dataframe(CollectionReader):
+    """A Plugin to capture data from a Pandas DataFrame that must represent a single table."""
+    def __init__(self, collection, table_name, **kwargs) -> None:
+        super().__init__(collection, **kwargs)
+        if not isinstance(self.input_dict, DataFrame):
+            raise TypeError("Input must be a pandas DataFrame")
+        self.table_name = table_name
+
+    def add_rows(self) -> None:
+        """Reads the input Pandas DataFrame and stores it as one table."""
+        try:
+            ordered_df = OrderedDict((col, self.input_dict[col].tolist()) for col in self.input_dict.columns)
+            self.set_schema_2(OrderedDict([(self.table_name, ordered_df)]))
+        except:
+            raise ValueError("Error reading in the pandas DataFrame into DSI.")
