@@ -167,8 +167,6 @@ class DSI():
             Either file path(s) to the data file(s) or an in-memory data object.
 
             The expected input type depends on the selected `reader_name`:
-                - "CKAN"                 → resource_id or dataset_id string
-                - "CKAN_Search"          → dict with search params OR search string
                 - "Collection"           → Ordered Dictionary of table(s)
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
@@ -183,16 +181,6 @@ class DSI():
                 - "GoogleDatacard"       → .yaml or .yml
                 - "Oceans11Datacard"     → .yaml or .yml
                 - "GenesisDatacard"      → .csv
-        
-            For CKAN_Search, `filenames` should be a dict with these optional keys:
-                - keywords: str - Search terms
-                - organization: str - Organization name filter
-                - formats: list - File format filters (e.g., ["CSV", "JSON"])
-                - tags: list - Tag filters
-                - limit: int - Max results (default: 10)
-                - verbose: bool - Show full metadata (default: False)
-            
-            Or `filenames` can be a simple search string like "climate CSV"
 
         `reader_name` : str
             Name of the DSI Reader to use for loading the data. 
@@ -209,111 +197,6 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
-        # ==== CKAN SEARCH SECTION (NEW) ====
-        if reader_name.lower() == "ckan_search":
-            from .ckan_discovery import CKANClient
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            
-            # Parse search parameters
-            search_params = {
-                'keywords': None,
-                'organization': None,
-                'formats': None,
-                'tags': None,
-                'limit': 2,
-                'verbose': False
-            }
-            
-            if isinstance(filenames, dict):
-                search_params.update(filenames)
-            elif isinstance(filenames, str):
-                words = filenames.split()
-                format_options = ['CSV', 'JSON', 'XML', 'PARQUET', 'XLS', 'XLSX', 'PDF']
-                formats_found = [w.upper() for w in words if w.upper() in format_options]
-                keywords = ' '.join([w for w in words if w.upper() not in format_options])
-                
-                search_params['keywords'] = keywords if keywords else None
-                search_params['formats'] = formats_found if formats_found else None
-            else:
-                sys.exit("read() ERROR: For CKAN_Search, filenames must be a dict or string")
-            
-            # Perform CKAN search
-            CKAN_BASE_URL = "https://nationaldataplatform.org/catalog"
-            client = CKANClient(base_url=CKAN_BASE_URL, verify_ssl=False)
-            
-            print(f"\n{'='*70}")
-            print("SEARCHING CKAN CATALOG")
-            print(f"{'='*70}")
-            
-            datasets = client.search_datasets(
-                keywords=search_params['keywords'],
-                organization=search_params['organization'],
-                tags=search_params['tags'],
-                formats=search_params['formats'],
-                limit=search_params['limit']
-            )
-            
-            if not datasets:
-                print("\nNo datasets found matching your criteria.")
-                return
-            
-            # Display results
-            client.display_datasets(datasets, detailed=True, verbose=search_params['verbose'])
-            
-            # Extract metadata
-            metadata = client.extract_metadata(datasets)
-            
-            if not metadata['datasets']:
-                print("\nNo metadata extracted.")
-                return
-            
-            # Convert to proper multi-table OrderedDict format
-            print("\n" + "="*70)
-            print("LOADING METADATA INTO BACKEND")
-            print("="*70)
-            
-            # Create multi-table structure: OrderedDict of OrderedDicts
-            tables_dict = OrderedDict()
-            
-            # Add datasets table
-            datasets_df = pd.DataFrame(metadata['datasets'])
-            tables_dict['ckan_datasets'] = OrderedDict(datasets_df.to_dict('list'))
-            
-            # Add resources table (if exists)
-            if metadata['resources']:
-                resources_df = pd.DataFrame(metadata['resources'])
-                tables_dict['ckan_resources'] = OrderedDict(resources_df.to_dict('list'))
-            
-            # Load using the Dict plugin (same as Collection reader)
-            fnull = open(os.devnull, 'w')
-            try:
-                with redirect_stdout(fnull):
-                    # Pass the multi-table OrderedDict WITHOUT table_name parameter
-                    self.t.load_module('plugin', 'Dict', 'reader', collection=tables_dict)
-                filenames = "CKAN search results"  # For the success message at the end
-            except Exception as e:
-                sys.exit(f"read() ERROR loading CKAN metadata: {e}")
-            
-            # Handle artifact ingestion (same as bottom of read() function)
-            table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
-            
-            try:
-                self.t.artifact_handler(interaction_type='ingest')
-            except Exception as e:
-                sys.exit(f"read() ERROR: {e}")
-            
-            self.t.active_metadata = OrderedDict()
-            
-            # Print success message
-            if len(table_keys) == 1:
-                print(f"Loaded CKAN search results into the table {table_keys[0]}")
-            else:
-                print(f"Loaded CKAN search results into tables: {', '.join(table_keys)}")
-            
-            return  # Exit early - don't fall through to file validation
-
-
         
         # only DSI-repo readers require filename input. Custom readers do not.
         if isinstance(filenames, str) and not os.path.exists(filenames) and not reader_name.endswith(".py"):
