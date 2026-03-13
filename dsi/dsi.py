@@ -60,7 +60,7 @@ class DSI():
         try:
             if backend_name.lower() == 'sqlite':
                 with redirect_stdout(fnull):
-                    self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
+                    self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs=kwargs)
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','DuckDB','back-write', filename=filename)
@@ -68,10 +68,10 @@ class DSI():
             elif backend_name.lower() == 'ckan':
                 with redirect_stdout(fnull):
                     # Pass CKAN-specific kwargs like base_url, api_key, verify_ssl
-                    self.t.load_module('backend','CKAN','back-write', **kwargs)
+                    self.t.load_module('backend','CKAN','back-read', **kwargs)
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
-                print(f"Eligible backend_names are: Sqlite, DuckDB")
+                print(f"Eligible backend_names are: Sqlite, DuckDB, CKAN")
         except Exception as e:
             sys.exit(f"backend ERROR: {e}")
 
