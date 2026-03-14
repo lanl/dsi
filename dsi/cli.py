@@ -680,11 +680,11 @@ class DSI_cli:
                             if idx == 3:
                                 print(" (Leave the new terminal running while using the Dashboard)")
                                 print("\nView the Dashboard at", line[:-1])
-                                print("\nTo exit, press [Ctrl + C] here")
+                                print("To exit, press [Ctrl + C] here")
                         else:
                             if idx == 4:
                                 print("\nView the Dashboard at", line[line.index("http"):-1])
-                                print("\nTo exit, press [Ctrl + C] here")
+                                print("To exit, press [Ctrl + C] here")
                             elif idx>12:
                                 print(line[:-1])
                 except KeyboardInterrupt:
@@ -720,11 +720,11 @@ class DSI_cli:
                             if idx == 3:
                                 print(" (Leave the new terminal running while using the Emulator)")
                                 print("\nView the ML emulator at", line[:-1])
-                                print("\nTo exit, press [Ctrl + C] here")
+                                print("To exit, press [Ctrl + C] here")
                         else:
                             if idx == 4:
                                 print("\nView the ML emulator at", line[line.index("http"):-1])
-                                print("\nTo exit, press [Ctrl + C] here")
+                                print("To exit, press [Ctrl + C] here")
                             elif idx>12:
                                 print(line[:-1])
                 except KeyboardInterrupt:
