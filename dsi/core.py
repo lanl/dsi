@@ -33,7 +33,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML1', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS

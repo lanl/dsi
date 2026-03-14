@@ -7,7 +7,8 @@ from math import isnan
 from pandas import DataFrame, read_csv, concat, read_excel
 import re
 import yaml
-import ruamel.yaml 
+try: import ruamel.yaml
+except ModuleNotFoundError: ruamel = None
 try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
 import os
@@ -154,8 +155,7 @@ class JSON(FileReader):
             If multiple files are provided, all data must all correspond to the same table
 
         `table_name` : str, optional
-            Name to assign to the loaded table. If not provided, DSI defaults to using "JSON" 
-            as the table name.
+            Name to assign to the loaded table. If not provided, DSI defaults to using "JSON" as the table name.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -245,28 +245,20 @@ class Schema(FileReader):
             
             self.set_schema_2(self.schema_data)
 
-class YAML1(FileReader):
+class YAML(FileReader):
     """
-    DSI Reader that reads in an individual or a set of YAML files
-
-    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    DSI Reader that reads in an individual or a set of standardized YAML files
     """
-    def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ',yaml_version: str = "1.1", **kwargs):
+    def __init__(self, filenames, table_name = None, yaml_version: str = "1.1", **kwargs):
         """
-        Initializes the YAML1 reader with the specified YAML file(s)
+        Initializes the YAML reader with the specified YAML file(s)
 
         `filenames` : str or list of str
-            One YAML file or a list of YAML files to be loaded into DSI.
+            One standardized YAML file or a list of standardized YAML files to be loaded into DSI.
+        
+        `table_name`: str
+            Name to assign to the loaded YAML data. If not provided, DSI defaults to using "YAML" as the table name.
 
-        `target_table_prefix`: str, optional
-            A prefix to be added to each table name created from the YAML data.
-            Useful for distinguishing between tables from other data sources.
-
-
-
-        `yamlSpace` : str, default='  '
-            The indentation used in the input YAML files. 
-            Defaults to two spaces, but can be customized to match the formatting in certain files.
         `yaml_version: str, default = "1.1" 
             Major and minor version of YAML specification.   
         """
@@ -275,16 +267,20 @@ class YAML1(FileReader):
             self.yaml_files = [filenames]
         else:
             self.yaml_files = filenames
-        self.yamlSpace = yamlSpace
-        self.yaml_version = yaml_version
+
+        if ruamel is None and yaml_version == "1.2":
+            raise RuntimeError("To use YAML version 1.2, first execute requirements.extras.txt")
+        
         self.yaml_data = OrderedDict()
-        self.target_table_prefix = target_table_prefix
+        self.table_name = table_name
+        self.yaml_version = yaml_version
         self.ruamel_yaml_safe_loader = None
 
-    def _get_ruamel_yaml_safe_loader(self)->ruamel.yaml.YAML:
+    def _get_ruamel_yaml_safe_loader(self)-> Any:
         if self.ruamel_yaml_safe_loader is None:
             self.ruamel_yaml_safe_loader = ruamel.yaml.YAML(typ = "safe")
-        return self.ruamel_yaml_safe_loader  
+        return self.ruamel_yaml_safe_loader
+
     def _safe_load(self,data: Any)-> Any:
         match self.yaml_version:
             case "1"|"1.0"|"1.1":
@@ -304,6 +300,84 @@ class YAML1(FileReader):
             case _:
                 raise ValueError(f"Invalid YAML version {self.yaml_version}. Did you only provide major/minor versions (e.g., '1.1')?")
         return return_value
+    
+    def recursive_yaml(self, d, parent_key=""):
+        items = {}
+        for k, v in d.items():
+            # change amount of _ to separate parent and child key
+            new_key = f"{parent_key}_{k}" if parent_key else k
+
+            if isinstance(v, dict):
+                items.update(self.recursive_yaml(v, new_key))
+            else:
+                items[new_key] = v
+        return items
+    
+    def add_rows(self) -> None:
+        """
+        Parses YAML data for one table and constructs a nested OrderedDict to load into DSI. 
+
+        The resulting structure has:
+
+            - One top-level key -- user input table name
+            - Its value is an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
+        """
+        if self.table_name is None:
+            raise ValueError("The base YAML reader requires an input table name")
+        
+        file_counter = 0
+        self.yaml_data = OrderedDict()
+        for file in self.yaml_files:
+            try:
+                with open(file, 'r') as yaml_file:
+                    yaml_load_data = list(self._safe_load_all(yaml_file))
+            except:
+                raise ValueError(f"Error opening YAML file: {file}")
+            if len(yaml_load_data) != 1:
+                raise ValueError("The base YAML reader can only read one table per file")
+            
+            file_dict = self.recursive_yaml(yaml_load_data[0])
+            for k, v in file_dict.items():
+                if k not in self.yaml_data.keys():
+                    self.yaml_data[k] = [None] * (file_counter)
+                self.yaml_data[k].append(v)
+            
+            file_counter += 1
+        self.set_schema_2(OrderedDict([(self.table_name, self.yaml_data)]))
+
+class YAML1(FileReader):
+    """
+    DSI Reader that reads in an individual or a set of YAML files
+
+    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    """
+    def __init__(self, filenames, target_table_prefix = None, yamlSpace = '  ', **kwargs):
+        """
+        Initializes the YAML1 reader with the specified YAML file(s)
+
+        `filenames` : str or list of str
+            One YAML file or a list of YAML files to be loaded into DSI.
+
+        `target_table_prefix`: str, optional
+            A prefix to be added to each table name created from the YAML data.
+            Useful for distinguishing between tables from other data sources.
+
+        `yamlSpace` : str, default='  '
+            The indentation used in the input YAML files. 
+            Defaults to two spaces, but can be customized to match the formatting in certain files.
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.yaml_files = [filenames]
+        else:
+            self.yaml_files = filenames
+        self.yamlSpace = yamlSpace
+        self.yaml_data = OrderedDict()
+        self.target_table_prefix = target_table_prefix
+
     def add_rows(self) -> None:
         """
         Parses YAML data and constructs a nested OrderedDict to load into DSI.
@@ -315,9 +389,6 @@ class YAML1(FileReader):
 
                 - Keys are column names.
                 - Values are lists representing column data.
-        
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_counter = 0        
         for filename in self.yaml_files:
@@ -325,7 +396,7 @@ class YAML1(FileReader):
                 editedString = yaml_file.read()
                 editedString = re.sub('specification', f'columns:\n{self.yamlSpace}specification', editedString)
                 editedString = re.sub(r'(!.+)\n', r"'\1'\n", editedString)
-                yaml_load_data = list(self._safe_load_all(editedString))
+                yaml_load_data = list(yaml.safe_load_all(editedString))
 
                 if "dsi_units" not in self.yaml_data.keys():
                     self.yaml_data["dsi_units"] = OrderedDict()
@@ -384,6 +455,129 @@ class YAML1(FileReader):
         #     if len(value) < max_length:
         #         # Pad the list with None (or any other value)
         #         self.bueno_data[key] = value + [None] * (max_length - len(value))
+
+class TOML(FileReader):
+    """
+    DSI Reader that reads in an individual or a set of TOML files
+
+    Table names are the keys for the main ordered dictionary and column names are the keys for each table's nested ordered dictionary
+    """
+    def __init__(self, filenames, table_name = None, **kwargs):
+        """
+        `filenames` : str or list of str
+            One TOML file or a list of TOML files to be loaded into DSI.
+
+        `table_name`: str
+            If only one table in input file(s), this name is assigned to the loaded TOML data in a DSI database. 
+            If not provided, DSI defaults to using "TOML" as the table name.
+        """
+        super().__init__(filenames, **kwargs)
+        if isinstance(filenames, str):
+            self.toml_files = [filenames]
+        else:
+            self.toml_files = filenames
+        self.toml_data = OrderedDict()
+        self.table_name = table_name
+    
+    def has_table_headers(self, toml_text) -> bool:
+        _TABLE_HEADER_RE = re.compile(r"^\s*\[(\[[^\]]+\]|[^\]]+)\]\s*(#.*)?$")
+        for line in toml_text.splitlines():
+            s = line.strip()
+            if s and not s.startswith("#") and _TABLE_HEADER_RE.match(line):
+                return True
+        return False
+
+    def recursive_toml(self, d, parent_key=""):
+        items = {}
+        for k, v in d.items():
+            # change amount of _ to separate parent and child key
+            new_key = f"{parent_key}_{k}" if parent_key else k
+
+            if isinstance(v, dict):
+                items.update(self.recursive_toml(v, new_key))
+            else:
+                items[new_key] = v
+        return items
+
+    def columnize(self, rows) -> dict:
+        all_keys = set()
+        for row in rows:
+            all_keys.update(row.keys())
+        return { key: [row.get(key, None) for row in rows] for key in sorted(all_keys) }
+
+    def normalize_toml(self, path) -> tuple[dict, bool]:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+            data = tomllib.loads(text)
+        except:
+            raise ValueError(f"Error opening TOML file: {path}")
+
+        if self.has_table_headers(text):
+            bad_keys = [ k for k, v in data.items()
+                if not (isinstance(v, dict) or (isinstance(v, list) and all(isinstance(item, dict) for item in v)))
+            ]
+            if bad_keys:
+                raise ValueError("TOML file cannot have loose top-level fields if there are defined tables.")
+
+            out = {}
+            for table_name, value in data.items():
+                if isinstance(value, dict):
+                    rows = [self.recursive_toml(value)]
+                else:
+                    rows = [self.recursive_toml(row) for row in value]
+                out[table_name] = self.columnize(rows)
+
+            return out, True
+
+        flat = self.recursive_toml(data)
+        return {key: [value] for key, value in flat.items()}, False
+
+    def add_rows(self) -> None:
+        """
+        Parses TOML data and constructs a nested OrderedDict to load into DSI.
+
+        The resulting structure has:
+
+            - Top-level keys as table names.
+            - Each value is an OrderedDict where:
+
+                - Keys are column names.
+                - Values are lists representing column data.
+        """
+        file_counter = 0
+        self.toml_data = OrderedDict()
+        for filename in self.toml_files:
+            toml_dict, has_tables = self.normalize_toml(filename)
+
+            if has_tables:
+                for k,v in toml_dict.items():
+                    if k not in self.toml_data.keys():
+                        self.toml_data[k] = OrderedDict()
+                    for v_key, v_val in v.items(): # v guaranteed to be nested dict
+                        if v_key not in self.toml_data[k].keys():
+                            self.toml_data[k][v_key] = [None] * (file_counter) #top padding for column
+                        #v_val guaranteed to be a list
+                        self.toml_data[k][v_key].extend(v_val)
+                    
+                    # after table is stored, pad bottom of col list in case inconsistent length
+                    max_len = max(len(x) for x in self.toml_data[k].values())
+                    for k1, v1 in self.toml_data[k].items():
+                        self.toml_data[k][k1] = v1 + [None] * (max_len - len(v1))
+                
+                self.set_schema_2(self.toml_data)
+            else:
+                if self.table_name is None:
+                    raise ValueError(f"TOML file, {filename}, has one table which requires an input table name")
+                
+                for k,v in toml_dict.items():
+                    if k not in self.toml_data.keys():
+                        self.toml_data[k] = [None] * (file_counter)
+                    self.toml_data[k].append(v)
+                
+                self.set_schema_2(OrderedDict([(self.table_name, self.toml_data)]))
+
+            file_counter += 1
 
 class TOML1(FileReader):
     """
@@ -744,7 +938,7 @@ class Cloverleaf(FileReader):
         self.cloverleaf_data["viz_files"] = viz_dict
         self.set_schema_2(self.cloverleaf_data)
     
-class Oceans11Datacard(YAML1):
+class Oceans11Datacard(YAML):
     """
     DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
     Input datacard should follow template in `examples/test/template_dc_oceans11.yml`
@@ -904,7 +1098,7 @@ class SchemaOrgDatacard(FileReader):
         self.datacard_data["schema_org_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
-class GoogleDatacard(YAML1):
+class GoogleDatacard(YAML):
     """
     DSI Reader that stores a dataset's data card as a row in the `google_datacard` table.
     Input datacard should follow template in `examples/test/template_dc_google.yml`
