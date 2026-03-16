@@ -143,7 +143,9 @@ class DSI():
         print("Collection           : Loads data from an Ordered Dict. If multiple tables, each table must be a nested OrderedDict.")
         print("CSV                  : Loads data from CSV files (one table per call)")
         print("Parquet              : Loads data from Parquet - a columnar storage format for Apache Hadoop (one table per call)")
+        print("YAML                 : Loads data from standard YAML files that contain one table per file")
         print("YAML1                : Loads data from YAML files of a certain structure")
+        print("TOML                 : Loads data from standard TOML files that can have one or multiple tables per file")
         print("TOML1                : Loads data from TOML files of a certain structure")
         print("JSON                 : Loads single-table data from JSON files")
         print("Ensemble             : Loads a CSV file where each row is a simulation run; creates a simulation table")
@@ -167,7 +169,9 @@ class DSI():
                 - "Collection"           → Ordered Dictionary of table(s)
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
+                - "YAML"                 → .yaml or .yml
                 - "YAML1"                → .yaml or .yml
+                - "TOML"                 → .toml
                 - "TOML1"                → .toml
                 - "JSON"                 → .json
                 - "Ensemble"             → .csv
@@ -265,8 +269,12 @@ class DSI():
                         self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name=table_name)
                     elif reader_name.lower() == "parquet":
                         self.t.load_module('plugin', 'Parquet', 'reader', filenames=filenames, table_name=table_name)
+                    elif reader_name.lower() == "yaml":
+                        self.t.load_module('plugin', 'YAML', 'reader', filenames=filenames, table_name = table_name)
                     elif reader_name.lower() == "yaml1":
                         self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
+                    elif reader_name.lower() == "toml":
+                        self.t.load_module('plugin', 'TOML', 'reader', filenames=filenames, table_name = table_name)
                     elif reader_name.lower() == "toml1":
                         self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
                     elif reader_name.lower() == "ensemble":
@@ -288,8 +296,7 @@ class DSI():
 
             if correct_reader == False:
                 print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                elg = "Collection, CSV, Parquet, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
-                sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard, GenesisDatacard")
+                sys.exit("View eligible readers in the output of `list_readers()`")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
@@ -317,7 +324,7 @@ class DSI():
         if len(table_keys) == 1:
             print(f"Loaded {filenames} into the table {table_keys[0]}")
         else:
-            print(f"Loaded {filenames} into tables: {', '.join(table_keys)}")
+            print(f"Loaded {filenames} into the tables: {', '.join(table_keys)}")
 
     def query(self, statement, collection = False, update = False):
         """
