@@ -276,7 +276,7 @@ class Terminal():
                                     self.runTable = True
                                 elif has_data and has_runTable == False and self.runTable == True:
                                     raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
-
+                                
                             class_.runTable = self.runTable
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
@@ -1446,19 +1446,23 @@ class Sync():
     """
     def __init__(self, project_name="test"):
         self.project_name = project_name
-        extension = ""
+        self.extension = ""
         for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
             if project_name.lower().endswith(ext):
                 self.project_name = project_name[:-len(ext)]
-                extension = ext
+                self.extension = ext
                 break
-        if extension != "":
-            f = self.project_name + extension
+        if self.extension != "":
+            f = self.project_name + self.extension
         else:
-            f = self.project_name+".db"
-            for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
+            proj_db_found = False
+            for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
                 if os.path.exists(self.project_name + ext):
+                    if proj_db_found:
+                        raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
                     f = self.project_name + ext
+                    self.extension = ext
+                    proj_db_found = True
 
         self.remote_location = None
         self.local_location = None
@@ -1591,28 +1595,7 @@ class Sync():
 
         if isVerbose:
             print(f"] Collection object created with {len(st_list)} entries.")
-<<<<<<< HEAD
-
-        # Test remote location validity, try to check access
-        # Future: iterate through remote/server list here, for now:::
-        remote_list = [ os.path.join(remote_loc,self.project_name) ]
-        for remote in remote_list:
-            if isVerbose:
-                print(f"Testing access to '{remote}' directory.")
-            try: # Try for file permissions
-                if os.path.exists(remote): # Check if exists
-                    print(f"The directory '{remote}' already exists remotely.")
-                else:
-                    path = Path(remote)
-                    path.mkdir(parents=True, exist_ok=True)
-                    # os.makedirs(remote) # Create it
-                    print(f"The directory '{remote}' has been created remotely.")
-            except Exception as err:
-                raise RuntimeError(f"Error creating remote directory: {err}")
-
-=======
                 
->>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
         if isVerbose:
             print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
@@ -1662,6 +1645,7 @@ class Sync():
                 except Exception as err:
                     raise RuntimeError(f"Error creating remote directory: {err}")
 
+        full_db_name = self.project_name + self.extension
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
         if tool.lower() == "copy":
             # Data movement via Unix Copy
@@ -1682,17 +1666,12 @@ class Sync():
 
             # Database movement
             if isVerbose:
-                print(" cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
-            shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
+                print(" cp " + full_db_name + " " + os.path.join(self.remote_location, self.project_name, full_db_name))
+            shutil.copy2(full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name))
 
             print(" Data Copy Complete!")
-<<<<<<< HEAD
-
-        elif tool == "scp":
-=======
         
         elif tool.lower() == "scp":
->>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
             except ValueError:
@@ -1711,8 +1690,8 @@ class Sync():
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
             print(" DSI submitted SCP data movement job.")
-            
-            cmd = ["scp", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+
+            cmd = ["scp", full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
             if isVerbose:
                 print(*cmd)
             self.execute_cmd(cmd, "scp database")
@@ -1735,7 +1714,7 @@ class Sync():
             self.execute_cmd(cmd, "rsync data")
             print(" DSI submitted the Rsync data movement job.")
             
-            cmd = ["rsync", "-avz", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name)]
+            cmd = ["rsync", "-avz", full_db_name, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
                 print(*cmd)
             self.execute_cmd(cmd, "rsync database")
@@ -1783,8 +1762,8 @@ class Sync():
 
                 # Database Movement
                 if isVerbose:
-                    print("conduit cp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
-                cmd = base_cmd + [str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+                    print("conduit cp " + full_db_name + " " + os.path.join(self.remote_location, self.project_name, full_db_name))
+                cmd = base_cmd + [full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
                 self.execute_cmd(cmd, "Conduit copy database")
                 print(" DSI submitted Conduit database movement job.")
 
@@ -1796,11 +1775,7 @@ class Sync():
                 raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
 
 
-<<<<<<< HEAD
-        elif tool == "pfcp":
-=======
         elif tool.lower() == "pfcp":           
->>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
             try:
                 # File Movement
                 if isVerbose:
@@ -1811,19 +1786,14 @@ class Sync():
 
                 # Database Movement
                 if isVerbose:
-                    print("pfcp " + str(self.project_name+".db") + " " + os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
-                cmd = ['pfcp', str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+                    print("pfcp " + full_db_name + " " + os.path.join(self.remote_location, self.project_name, full_db_name))
+                cmd = ['pfcp', full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
                 self.execute_cmd(cmd, "pfcp move database")
                 print(" DSI submitted pfcp database movement job.")
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
-<<<<<<< HEAD
-
-        elif tool == "ftp":
-=======
         
         elif tool.lower() == "ftp":
->>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
             True
         elif tool.lower() == "git":
             True
