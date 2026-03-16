@@ -1489,7 +1489,9 @@ class Sync():
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
         stdout, stderr = process.communicate()
         if process.returncode != 0:
-            raise RuntimeError(f"{cmd_name} failed: {stderr}")
+            if "too many authentication failures" in str(stderr).lower():
+                raise RuntimeError(f"{cmd_name} failed due to mulitple incorrect password attempts. Check the password and remote path.")
+            raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
         return stdout
 
     def reindex(self, local_loc, remote_loc, isVerbose = False):
@@ -1664,10 +1666,46 @@ class Sync():
             print(" Data Copy Complete!")
 
         elif tool == "scp":
-            #  Data movement via SCP
-            remote_user = os.getlogin()
-            remote_host = "myremote"
+            try:
+                host_part, path_part = self.remote_location.split(":", 1)
+            except ValueError:
+                raise ValueError("Remote location must be in the format user@host:/absolute/path")
 
+            if not path_part.startswith("/"):
+                raise ValueError("Remote path must be absolute (starting with /)")
+            
+            # making remote dir
+            cmd = ["ssh", host_part, f'mkdir -p {os.path.join(path_part, self.project_name)}']
+            print("Creating remote directory if it doesn't exist yet")
+            self.execute_cmd(cmd, "Creating remote dir")
+            
+            cmd = ["scp", "-r", self.local_location, os.path.join(self.remote_location, self.project_name)]
+            self.execute_cmd(cmd, "scp data")
+            print(" DSI submitted SCP data movement job.")
+            
+            cmd = ["scp", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
+            self.execute_cmd(cmd, "scp database")
+            print(" DSI submitted SCP database movement job.")
+        
+        elif tool == "rsync":
+            try:
+                host_part, path_part = self.remote_location.split(":", 1)
+            except ValueError:
+                raise ValueError("Remote location must be in the format user@host:/absolute/path")
+
+            if not path_part.startswith("/"):
+                raise ValueError("Remote path must be absolute (starting with /)")
+            
+            self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
+            cmd = ["rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
+                   self.local_location, os.path.join(self.remote_location, self.project_name)]
+            self.execute_cmd(cmd, "rsync data")
+            print(" DSI submitted the Rsync data movement job.")
+            
+            cmd = ["rsync", "-avz", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name)]
+            self.execute_cmd(cmd, "rsync database")
+            print(" DSI submitted the Rsync database movement job.")
+        
         elif tool == "conduit":
             import signal
 
