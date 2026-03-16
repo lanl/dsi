@@ -336,6 +336,8 @@ class YAML(FileReader):
                     yaml_load_data = list(self._safe_load_all(yaml_file))
             except:
                 raise ValueError(f"Error opening YAML file: {file}")
+            
+            # cannot read in multiple tables per YAML file without multiple input table names
             if len(yaml_load_data) != 1:
                 raise ValueError("The base YAML reader can only read one table per file")
             
