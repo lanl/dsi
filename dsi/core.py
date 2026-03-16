@@ -1591,6 +1591,7 @@ class Sync():
 
         if isVerbose:
             print(f"] Collection object created with {len(st_list)} entries.")
+<<<<<<< HEAD
 
         # Test remote location validity, try to check access
         # Future: iterate through remote/server list here, for now:::
@@ -1609,6 +1610,9 @@ class Sync():
             except Exception as err:
                 raise RuntimeError(f"Error creating remote directory: {err}")
 
+=======
+                
+>>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
         if isVerbose:
             print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
@@ -1639,9 +1643,27 @@ class Sync():
             print(" filesystem table not found. Must run Index first.")
             print(" Data copy failed.")
             return
+        
+        # Test remote location validity and try creating folders
+        # Future: iterate through remote/server list here, for now:
+        if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
+            remote_list = [ os.path.join(self.remote_location,self.project_name) ]
+            for remote in remote_list:
+                if isVerbose:
+                    print(f"Testing access to '{remote}' directory.")
+                try: # Try for file permissions
+                    if os.path.exists(remote): # Check if exists
+                        print(f"The directory '{remote}' already exists remotely.")
+                    else:
+                        path = Path(remote)
+                        path.mkdir(parents=True, exist_ok=True)
+                        # os.makedirs(remote) # Create it
+                        print(f"The directory '{remote}' has been created remotely.")
+                except Exception as err:
+                    raise RuntimeError(f"Error creating remote directory: {err}")
 
         # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
-        if tool == "copy":
+        if tool.lower() == "copy":
             # Data movement via Unix Copy
             for file,file_remote in zip(self.file_list,self.rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
@@ -1664,8 +1686,13 @@ class Sync():
             shutil.copy2(str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
 
             print(" Data Copy Complete!")
+<<<<<<< HEAD
 
         elif tool == "scp":
+=======
+        
+        elif tool.lower() == "scp":
+>>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
             except ValueError:
@@ -1679,15 +1706,19 @@ class Sync():
             print("Creating remote directory if it doesn't exist yet")
             self.execute_cmd(cmd, "Creating remote dir")
             
+            if isVerbose:
+                print("scp", "-r", self.local_location, os.path.join(self.remote_location, self.project_name))
             cmd = ["scp", "-r", self.local_location, os.path.join(self.remote_location, self.project_name)]
             self.execute_cmd(cmd, "scp data")
             print(" DSI submitted SCP data movement job.")
             
+            if isVerbose:
+                print("scp", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db"))
             cmd = ["scp", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name, self.project_name+".db")]
             self.execute_cmd(cmd, "scp database")
             print(" DSI submitted SCP database movement job.")
         
-        elif tool == "rsync":
+        elif tool.lower() == "rsync":
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
             except ValueError:
@@ -1697,16 +1728,21 @@ class Sync():
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
+            if isVerbose:
+                print("rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
+                      self.local_location, os.path.join(self.remote_location, self.project_name))
             cmd = ["rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
                    self.local_location, os.path.join(self.remote_location, self.project_name)]
             self.execute_cmd(cmd, "rsync data")
             print(" DSI submitted the Rsync data movement job.")
             
+            if isVerbose:
+                print("rsync", "-avz", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name))
             cmd = ["rsync", "-avz", str(self.project_name+".db"), os.path.join(self.remote_location, self.project_name)]
             self.execute_cmd(cmd, "rsync database")
             print(" DSI submitted the Rsync database movement job.")
         
-        elif tool == "conduit":
+        elif tool.lower() == "conduit":
             import signal
 
             # Test Kerberos
@@ -1761,7 +1797,11 @@ class Sync():
                 raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
 
 
+<<<<<<< HEAD
         elif tool == "pfcp":
+=======
+        elif tool.lower() == "pfcp":           
+>>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
             try:
                 # File Movement
                 if isVerbose:
@@ -1778,10 +1818,15 @@ class Sync():
                 print(" DSI submitted pfcp database movement job.")
             except subprocess.CalledProcessError as e:
                 print(f"Command failed with error: {e.stderr} ")
+<<<<<<< HEAD
 
         elif tool == "ftp":
+=======
+        
+        elif tool.lower() == "ftp":
+>>>>>>> 16db2de (moved remote dir check to copy() as scp/rsync to it differently)
             True
-        elif tool == "git":
+        elif tool.lower() == "git":
             True
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
