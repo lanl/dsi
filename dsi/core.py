@@ -33,7 +33,7 @@ class Terminal():
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'MetadataReader1', 'Ensemble', 'Cloverleaf', 'Dict', 'Dataframe']
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
@@ -1446,22 +1446,21 @@ class Sync():
     """
     def __init__(self, project_name="test"):
         self.project_name = project_name
-        self.extension = ""
+        extension = ""
         for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
             if project_name.lower().endswith(ext):
                 self.project_name = project_name[:-len(ext)]
-                self.extension = ext
+                extension = ext
                 break
-        if self.extension != "":
-            f = self.project_name + self.extension
+        if extension != "":
+            self.full_db_name = self.project_name + extension
         else:
             proj_db_found = False
             for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
                 if os.path.exists(self.project_name + ext):
                     if proj_db_found:
                         raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
-                    f = self.project_name + ext
-                    self.extension = ext
+                    self.full_db_name = self.project_name + ext
                     proj_db_found = True
 
         self.remote_location = None
@@ -1477,38 +1476,29 @@ class Sync():
             create_bool = self.t.can_create_file_here()
         if create_bool is False:
             raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
-
-        backend_name = self.t.identify_backend(f)
+    
+        backend_name = self.t.identify_backend(self.full_db_name)
         if backend_name is None:
             raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            self.t.load_module('backend', backend_name, 'back-write', filename=f)
+            self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
 
         if not self.t.valid_backend(self.t.loaded_backends[0], self.t.loaded_backends[0].__class__.__bases__[0].__name__):
             raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
-
-    def execute_cmd(self, cmd, cmd_name):
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-        stdout, stderr = process.communicate()
-        if process.returncode != 0:
-            if "too many authentication failures" in str(stderr).lower():
-                raise RuntimeError(f"{cmd_name} failed due to mulitple incorrect password attempts. Check the password and remote path.")
-            raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
-        return stdout
 
     def reindex(self, local_loc, remote_loc, isVerbose = False):
         """
         Helper function that allows users to index their data again by dropping existing fileystem information.
         """
-        # drop filesystem table and call index()
-        # future -- use existing db to "reindex" by updating the filepath cols, not dropping table.
+        # current -- drop filesystem table and call index()
+        # future --- use existing db to "reindex" by updating the filepath cols, not dropping table.
         #   remove filesystem pass through in query_artifacts if not dropping table
         self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
         self.index(local_loc, remote_loc, isVerbose)
-
-    def index(self, local_loc, remote_loc, isVerbose=False):
+    
+    def index(self, local_loc, remote_loc, isVerbose=False, no_parent = False):
         """
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
@@ -1523,7 +1513,7 @@ class Sync():
             return
 
         # Relative paths (..) will not work
-        if ".." in local_loc:
+        if "../" in local_loc or "../" in remote_loc:
             raise ValueError("Error: Please use absolute paths instead of relative")
 
         if isVerbose:
@@ -1536,7 +1526,9 @@ class Sync():
             file_list, tmp = itertools.tee(file_list)
             file_len=sum(1 for _ in tmp)
             print("Crawled "+str(file_len)+" files.")
-
+        
+        file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
+        
         self.remote_location = remote_loc
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
@@ -1566,11 +1558,15 @@ class Sync():
             last = -10
 
         for file in file_list:
+            parent_rel_file = Path(file).relative_to(Path(local_loc).parent)
             rel_file = os.path.relpath(file,local_loc) #rel path
             filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
-            rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
+            if no_parent: # exclude parent dir of every file in remote location
+                rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
+            else:
+                rfilepath = os.path.join(remote_loc,self.project_name, parent_rel_file)
             rfile_list.append(rfilepath)
             st_dict['file_origin'].append(rel_file)
             st_dict['size'].append(st.st_size)
@@ -1612,6 +1608,46 @@ class Sync():
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
 
+    def execute_cmd(self, cmd, cmd_name, timer = False):
+        """Internal helper for Sync to call executable actions"""
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+
+        if timer:
+            start = time.time()
+            while process.poll() is None:
+                elapsed = int(time.time() - start)
+                print(f"\rRunning... {elapsed}s elapsed", end="", flush=True)
+                time.sleep(10)
+
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            if "too many authentication failures" in str(stderr).lower():
+                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
+            raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
+        return stdout
+    
+    def change_group(self, local_loc, user_group):
+        """Change group permissions for data and db. Only works for OS with Unix (not Windows)"""
+        try:
+            cmd = ["chgrp", "-R", user_group, local_loc]
+            self.execute_cmd(cmd, "changing user group for data", True)
+
+            cmd = ["chgrp", user_group, self.full_db_name]
+            self.execute_cmd(cmd, "changing user group for database")
+        except Exception as e:
+            print("Warning:", str(e))
+
+    def change_permissions(self, local_loc):
+        """Change read permissions for data and db. Only works for OS with Unix (not Windows)"""
+        try:
+            cmd = ["chmod", "-R", "750", local_loc] # 770 to make read/write to all. 750 to make read to all
+            self.execute_cmd(cmd, "changing read permissions for data", True)
+
+            cmd = ["chmod", "750", self.full_db_name]
+            self.execute_cmd(cmd, "changing read permissions for database")
+        except Exception as e:
+            print("Warning:", str(e))
+    
     def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
@@ -1644,9 +1680,8 @@ class Sync():
                         print(f"The directory '{remote}' has been created remotely.")
                 except Exception as err:
                     raise RuntimeError(f"Error creating remote directory: {err}")
-
-        full_db_name = self.project_name + self.extension
-        # Future: have movement service handle type (cp,scp,ftp,rsync,etc.)
+        
+        # Future: have movement service handle type without user input (cp,scp,ftp,rsync,etc.)
         if tool.lower() == "copy":
             # Data movement via Unix Copy
             for file,file_remote in zip(self.file_list,self.rfile_list):
@@ -1666,8 +1701,8 @@ class Sync():
 
             # Database movement
             if isVerbose:
-                print(" cp " + full_db_name + " " + os.path.join(self.remote_location, self.project_name, full_db_name))
-            shutil.copy2(full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name))
+                print(" cp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
+            shutil.copy2(self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name))
 
             print(" Data Copy Complete!")
         
@@ -1682,7 +1717,7 @@ class Sync():
             
             # making remote dir
             cmd = ["ssh", host_part, f'mkdir -p {os.path.join(path_part, self.project_name)}']
-            print("Creating remote directory if it doesn't exist yet")
+            print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
 
             #remove username from file_remote column in filesystem table
@@ -1696,12 +1731,14 @@ class Sync():
 
             cmd = ["scp", "-rp", self.local_location, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
+                print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
             print(" DSI submitted SCP data movement job.")
 
-            cmd = ["scp", "-p", full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
+            cmd = ["scp", "-p", self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
             if isVerbose:
+                print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp database")
             print(" DSI submitted SCP database movement job.")
@@ -1728,15 +1765,16 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
             
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
-            cmd = ["rsync", "-avz", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
+            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
                    self.local_location, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
                 print(*cmd)
             self.execute_cmd(cmd, "rsync data")
             print(" DSI submitted the Rsync data movement job.")
             
-            cmd = ["rsync", "-avz", full_db_name, os.path.join(self.remote_location, self.project_name)]
+            cmd = ["rsync", "-av", self.full_db_name, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
+                print()
                 print(*cmd)
             self.execute_cmd(cmd, "rsync database")
             print(" DSI submitted the Rsync database movement job.")
@@ -1783,8 +1821,8 @@ class Sync():
 
                 # Database Movement
                 if isVerbose:
-                    print("conduit cp " + full_db_name + " " + os.path.join(self.remote_location, self.project_name, full_db_name))
-                cmd = base_cmd + [full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
+                    print("conduit cp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
+                cmd = base_cmd + [self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
                 self.execute_cmd(cmd, "Conduit copy database")
                 print(" DSI submitted Conduit database movement job.")
 
@@ -1792,9 +1830,8 @@ class Sync():
                 print("  If 'WaitingForLease' status, that is fine.")
                 print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error output.")
 
-            except subprocess.CalledProcessError as e:
-                raise RuntimeError(f"Conduit failed with error: {e.stderr} ")
-
+            except Exception as e:
+                raise RuntimeError(f"Conduit failed with error: {str(e)} ")
 
         elif tool.lower() == "pfcp":           
             try:
@@ -1807,12 +1844,12 @@ class Sync():
 
                 # Database Movement
                 if isVerbose:
-                    print("pfcp " + full_db_name + " " + os.path.join(self.remote_location, self.project_name, full_db_name))
-                cmd = ['pfcp', full_db_name, os.path.join(self.remote_location, self.project_name, full_db_name)]
+                    print("pfcp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
+                cmd = ['pfcp', self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
                 self.execute_cmd(cmd, "pfcp move database")
                 print(" DSI submitted pfcp database movement job.")
-            except subprocess.CalledProcessError as e:
-                print(f"Command failed with error: {e.stderr} ")
+            except Exception as e:
+                raise RuntimeError(f"pfcp failed with error: {str(e)} ")
         
         elif tool.lower() == "ftp":
             True
