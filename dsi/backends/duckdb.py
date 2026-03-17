@@ -411,7 +411,7 @@ class DuckDB(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                raise duckdb.Error("Incorrect query on the data. Please try again")
+                raise
         elif "filesystem" in query: #remove fileystem passthrough in future
             try:
                 self.con.execute(query)
@@ -422,7 +422,7 @@ class DuckDB(Filesystem):
                     table_name = message[message.find("Table"):message.find("Did you mean")-2]
                     print(f"WARNING: {table_name} in this database")
                     return
-                raise duckdb.Error("Incorrect query on the data. Please try again")
+                raise
         else:
             raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
         

@@ -292,11 +292,12 @@ class Terminal():
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                         raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-
-                if mod_type == "backend":
-                    print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
-                else:
-                    print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
+                
+                if not self.user_wrapper:
+                    if mod_type == "backend":
+                        print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
+                    else:
+                        print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()
                 if self.debug_level != 0:
                     self.logger.info(f"{mod_name} {mod_function} {mod_type} loaded successfully.")

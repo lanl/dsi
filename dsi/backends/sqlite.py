@@ -376,7 +376,7 @@ class Sqlite(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                raise sqlite3.Error("Incorrect query on the data. Please try again")
+                raise
         elif "filesystem" in query: #remove fileystem passthrough in future
             try:
                 self.cur.execute(query)
@@ -387,7 +387,7 @@ class Sqlite(Filesystem):
                     table_name = message[message.rfind(":")+2:]
                     print(f"WARNING: '{table_name}' does not exist in this database")
                     return
-                raise sqlite3.Error("Incorrect query on the data. Please try again")
+                raise
         else:
             raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
         
