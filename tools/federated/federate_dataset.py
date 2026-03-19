@@ -99,7 +99,6 @@ def main():
                 continue
 
 
-
             # Confirm for sizes abouve a limit
             if filesize > data["download_limit"]:
                 print(f"File size {human_readable_size(filesize)} bytes exceeds the download limit of {human_readable_size(data['download_limit'])} bytes.")
