@@ -1712,13 +1712,16 @@ class Sync():
             except ValueError:
                 raise ValueError("Remote path must be in the format user@host:/absolute/path")
 
-            if not path_part.startswith("/"):
+            if not path_part.startswith("/") and "nt" not in os.name:
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # making remote dir
-            cmd = ["ssh", host_part, f'mkdir -p {os.path.join(path_part, self.project_name)}']
+            if isVerbose:
+                print(" ssh "+ str(host_part) + " \"mkdir -p " + str(os.path.join(path_part, self.project_name)) + "\"" )
+            cmd = ["ssh", host_part, f'mkdir -p \"{os.path.join(path_part, self.project_name)}\"']
             print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
+
 
             #remove username from file_remote column in filesystem table
             username, host = host_part.split("@")
@@ -1734,14 +1737,14 @@ class Sync():
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
-            print(" DSI submitted SCP data movement job.")
+            print(" DSI SCP data movement complete.")
 
             cmd = ["scp", "-p", self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
             if isVerbose:
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp database")
-            print(" DSI submitted SCP database movement job.")
+            print(" DSI SCP database movement complete.")
         
         elif tool.lower() == "rsync":
             try:
@@ -1770,14 +1773,14 @@ class Sync():
             if isVerbose:
                 print(*cmd)
             self.execute_cmd(cmd, "rsync data")
-            print(" DSI submitted the Rsync data movement job.")
+            print(" DSI Rsync data movement complete.")
             
             cmd = ["rsync", "-av", self.full_db_name, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "rsync database")
-            print(" DSI submitted the Rsync database movement job.")
+            print(" DSI Rsync database movement comlpete.")
         
         elif tool.lower() == "conduit":
             import signal
@@ -1827,7 +1830,7 @@ class Sync():
                 print(" DSI submitted Conduit database movement job.")
 
                 print("Type 'conduit get' to track status of both jobs.")
-                print("  If 'WaitingForLease' status, that is fine.")
+                print("  If 'WaitingForLease' status, data move is in queue.")
                 print("  If 'Error' status, type 'conduit error <TRANSFER_ID>' to view detailed error output.")
 
             except Exception as e:
