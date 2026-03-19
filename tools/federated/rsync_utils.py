@@ -7,7 +7,6 @@ def rsync_download_interactive(
     remote: str,                 # e.g. "user@host"
     remote_path: str,            # e.g. "/data/file.bin"
     local_path: str | Path,      # file or directory destination
-    *,
     port: int | None = None,
     identity_file: str | None = None,
     progress: bool = True,
@@ -58,7 +57,6 @@ def rsync_download_interactive(
 def rsync_remote_size_bytes_interactive(
     remote: str,
     remote_path: str,
-    *,
     port: int | None = None,
     identity_file: str | None = None,
     timeout: int | None = None,
@@ -108,13 +106,3 @@ def rsync_remote_size_bytes_interactive(
         raise RuntimeError(f"Could not parse size from rsync output.\nOutput:\n{p.stdout}")
 
     return int(m.group(1).replace(",", ""))
-
-
-
-# Example:
-# rsync_download_interactive(
-#     remote="user@myserver",
-#     remote_path="/data/bigfile.dat",
-#     local_path="downloads/bigfile.dat",
-#     port=22
-# )
