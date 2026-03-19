@@ -19,6 +19,7 @@ def create_folder_from_path(s: str, base_dir: str) -> str:
 
     Returns:
         str: A unique folder name derived from the last part of the path or URL.
+        str: The full path to the created folder.
     """
     name = PurePosixPath(urlparse(s).path).name
     folder_name = hashlib.sha256(name.encode("utf-8")).hexdigest()[:16]
@@ -26,7 +27,8 @@ def create_folder_from_path(s: str, base_dir: str) -> str:
     out_dir = Path(base_dir) / folder_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    return folder_name
+
+    return folder_name, out_dir
 
 
 
