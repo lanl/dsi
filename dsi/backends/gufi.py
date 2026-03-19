@@ -96,6 +96,10 @@ class Gufi(Filesystem):
 
         self._run_gufi_dsi_tag_tool()
         metadata = []
+<<<<<<< Updated upstream
+=======
+        print("sql query")
+>>>>>>> Stashed changes
         with sqlite3.connect(":memory:") as con:
             con.enable_load_extension(True)
 
@@ -142,9 +146,17 @@ class Gufi(Filesystem):
         for idx, f in enumerate(local_files):
             if f is None:
                 continue
+<<<<<<< Updated upstream
             if self.files_with_uuids['UUID'][idx] is None:
                 continue
             
+=======
+            print(idx, f)
+            if self.files_with_uuids['UUID'][idx] is None:
+                continue
+            
+#            print(self.dsi_db, self.gufi_dsi_tag_tool_path, self.collection_name, self.files_with_uuids)
+>>>>>>> Stashed changes
             # Run the GUFI query command
             result = subprocess.run([self.gufi_dsi_tag_tool_path, "set", f, "--collection-id", self.collection_name,
                                      "--db-path", self.dsi_db, "--file-uuid", self.files_with_uuids['UUID'][idx]],
