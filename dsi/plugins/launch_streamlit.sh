@@ -6,41 +6,35 @@
 
 set -euo pipefail
 
-if [ $# -lt 2 ]; then
-  echo "Usage: $0 <port> <app.py>"
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <app.py>"
   exit 1
 fi
 
 PORT=8501
-APP="$2"
-shift 2
-
-if [ ! -f "$APP" ]; then
-  echo "ERROR: file not found: $APP"
-  exit 2
-fi
+APP="$1"
+shift 1
 
 REMOTE_HOST="$(hostname -f 2>/dev/null || hostname)"
 REMOTE_USER="$(whoami)"
 
-cat <<EOF
+if [[ -n "${SSH_CONNECTION-}" || -n "${SSH_CLIENT-}" || -n "${SSH_TTY-}" ]]; then
+  echo "remote"
+  echo "On your laptop, run: ssh -L ${PORT}:localhost:${PORT} ${REMOTE_USER}@${REMOTE_HOST}"
+  echo "Open: http://localhost:${PORT}"
+  echo "Leave that SSH command running while you use the app."
 
-On your LAPTOP, run:
-  ssh -L ${PORT}:localhost:${PORT} ${REMOTE_USER}@${REMOTE_HOST}
+  exec streamlit run "$APP" \
+    --server.port="$PORT" \
+    --server.address=127.0.0.1 \
+    --server.headless=true \
+    --browser.gatherUsageStats=false \
+    -- "$@"
 
-Then open:
-  http://localhost:${PORT}
-
-(Leave that SSH command running while you use the app.)
-
-EOF
-
-echo "Starting Streamlit on remote: $APP (port $PORT)"
-echo "Press Ctrl+C here to stop Streamlit."
-
-# Best practice: bind to localhost on remote because you'll access via SSH tunnel
-exec streamlit run "$APP" \
-  --server.port="$PORT" \
-  --server.address=127.0.0.1 \
-  --browser.gatherUsageStats=false \
-  -- "$@"
+else
+  echo "local"
+  exec streamlit run "$APP" \
+    --server.headless=true \
+    --browser.gatherUsageStats=false \
+    -- "$@"
+fi

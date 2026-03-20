@@ -38,7 +38,7 @@ with redirect_stdout(f1):
 output = f1.getvalue()
 
 pattern = re.compile(r"Table:\s*(?P<table>\w+).*?- num of rows:\s*(?P<rows>\d+)", re.DOTALL)
-tables = [m.group("table") for m in pattern.finditer(output) if int(m.group("rows")) > 5]
+tables = [m.group("table") for m in pattern.finditer(output) if int(m.group("rows")) >= 5]
 
 if len(tables) == 0:
     st.warning("Emulator requires tables with at least 5 rows. Please try again with a larger dataset.")

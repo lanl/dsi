@@ -632,16 +632,20 @@ class DSI_cli:
         if not args:
             print("view ERROR: need to specify which DSI viewer to use")
             return
-        if len(args) > 1 and len(set(args[1:]) & set(self.all_viewers)) > 1:
-            print("view ERROR: can only use one DSI viewer at a time")
-            return
-
+        
         viewer = args[0]
         if viewer not in self.all_viewers:
             print("view ERROR: This viewer does not exist.")
             return
+        if len(args) > 1 and len(set(args[1:]) & set(self.all_viewers)) > 1:
+            print("view ERROR: can only use one viewer at a time")
+            return
         if viewer not in self.valid_viewers:
-            print("view ERROR: To load this viewer, install requirements.extras.txt.")
+            # personal print for specified viewer due to missing packages
+            if viewer.lower() == "dashboard":
+                print("view ERROR: To load the dashboard viewer, pip install streamlit")
+            elif viewer.lower() == "ml":
+                print("view ERROR: To load the ML viewer, pip install streamlit scikit-learn")
             return
         
         bash_script_filepath = f"{os.path.dirname(__file__)}/plugins/launch_streamlit.sh"
@@ -681,33 +685,35 @@ class DSI_cli:
         elif viewer.lower() == "ml":
             #check if current db is empty
             if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
-                print("view ERROR: need to read in data files or an existing database to use a viewer.")
+                print("view ERROR: the ml viewer requires data to run models.")
                 return
             
             env = dict(os.environ)
             ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
             
             subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
-
-            subprocess.run([f"./{bash_script_filepath}", ml_code_filepath, self.db_path, self.name], check=True)
-
-            # cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath]
-            # cmd += ["--browser.gatherUsageStats=false", "--server.headless=true", "--", self.db_path, self.name]
-
+            
             # POSSIBLE ISSUE ON HPC DUE TO start_new_session=True
-            # with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
-            #                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-            #     try:
-            #         for idx, line in enumerate(proc.stdout):
-            #             if idx == 3:
-            #                 print("\nView the ML emulator at", line[line.index("http"):-1])
-            #                 print("To exit the emulator, enter [Ctrl + C] here")
-            #             elif idx>10:
-            #                 print(line)
-            #     except KeyboardInterrupt:
-            #         print("\nClosing ML Emulator.")
-            #         proc.terminate()
-            #         proc.wait()
+            bash_command = [bash_script_filepath, ml_code_filepath, self.db_path, self.name]
+            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
+                try:
+                    is_remote = False
+                    for idx, line in enumerate(proc.stdout):
+                        if idx == 0 and line == "remote\n":
+                            is_remote = True
+                        if is_remote:
+                            print(idx, line[:-1])
+                        else:
+                            if idx == 4:
+                                print("\nView the ML emulator at", line[line.index("http"):-1])
+                                print("\nTo exit, press [Ctrl + C] here")
+                            elif idx>12:
+                                print(idx, line[:-1])
+                except KeyboardInterrupt:
+                    print("\n Closing ML Emulator.")
+                    proc.terminate()
+                    proc.wait()
             
         else:
             print("view ERROR: input viewer was invalid. Please try again.")
