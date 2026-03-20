@@ -114,30 +114,15 @@ class HPSS(Backend):
             
       return hash
   
-   # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-   def put_artifacts(self, collection, isVerbose=False):
-      return self.ingest_artifacts(collection, isVerbose)
 
    def ingest_artifacts(self, collection, isVerbose=False):
       for f in self.hpss_info.keys():
           self.put(self.hpss_info[f]['local_path'], f)
 
-    # DEPRECATING IN FUTURE DSI RELEASE. USE query_artifacts()
-   def get_artifacts(self, query, kwargs):
-      pass
-
    def query_artifacts(self, query, kwargs):
       pass
 
-    # DEPRECATING IN FUTURE DSI RELEASE. USE notebook()
-   def inspect_artifacts(self, kwargs):
-      pass
-
    def notebook(self, kwargs):
-      pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE process_artifacts()
-   def read_to_artifacts(self, kwargs):
       pass
 
    def process_artifacts(self, kwargs):

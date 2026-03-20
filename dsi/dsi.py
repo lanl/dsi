@@ -62,14 +62,11 @@ class DSI():
                 filename += ".db"
         self.database_name = filename
 
-        fnull = open(os.devnull, 'w')
         try:
             if backend_name.lower() == 'sqlite':
-                with redirect_stdout(fnull):
-                    self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
+                self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
             elif backend_name.lower() == 'duckdb':
-                with redirect_stdout(fnull):
-                    self.t.load_module('backend','DuckDB','back-write', filename=filename)
+                self.t.load_module('backend','DuckDB','back-write', filename=filename)
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print(f"Eligible backend_names are: Sqlite, DuckDB")
@@ -108,9 +105,7 @@ class DSI():
             if "dsi_relations" in self.t.active_metadata:
                 sys.exit("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
 
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+            self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
 
             pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
             fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] != None)
@@ -158,14 +153,14 @@ class DSI():
         print("GenesisDatacard      : Loads dataset metadata for LANL Genesis data standard (CSV)")
         print()
 
-    def read(self, filenames, reader_name, table_name = None):
+    def read(self, filenames, reader_name, table_name = None, **kwargs):
         """
         Loads data into DSI using the specified parameter `reader_name`
 
-        `filenames` : str or list of str or data object
-            Either file path(s) to the data file(s) or an in-memory data object.
+        `filenames` : str, list of str, or data object
+            File path(s) to the data files or an in-memory data object.
 
-            The expected input type depends on the selected `reader_name`:
+            The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
                 - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
@@ -240,66 +235,58 @@ class DSI():
                 if "table" in param.lower():
                     updated[param] = table_name
             
-            fnull = open(os.devnull, 'w')
             try:
-                with redirect_stdout(fnull):
-                    self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
-                    self.t.load_module('plugin', class_name, 'reader', **updated)
+                self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
+                self.t.load_module('plugin', class_name, 'reader', **updated, **kwargs)
             except Exception as e:
                 sys.exit(f"read() ERROR: {e}")
 
         else:
-            correct_reader = True
-            fnull = open(os.devnull, 'w')
             try:
-                with redirect_stdout(fnull):
-                    if reader_name.lower() == "oceans11datacard":
-                        self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "dublincoredatacard":
-                        self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "schemaorgdatacard":
-                        self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "googledatacard":
-                        self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "genesisdatacard":
-                        self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "bueno":
-                        self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "csv":
-                        self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name=table_name)
-                    elif reader_name.lower() == "parquet":
-                        self.t.load_module('plugin', 'Parquet', 'reader', filenames=filenames, table_name=table_name)
-                    elif reader_name.lower() == "yaml":
-                        self.t.load_module('plugin', 'YAML', 'reader', filenames=filenames, table_name = table_name)
-                    elif reader_name.lower() == "yaml1":
-                        self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "toml":
-                        self.t.load_module('plugin', 'TOML', 'reader', filenames=filenames, table_name = table_name)
-                    elif reader_name.lower() == "toml1":
-                        self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames)
-                    elif reader_name.lower() == "ensemble":
-                        self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name=table_name)
-                    elif reader_name.lower() == "json":
-                        self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name=table_name)
-                    elif reader_name.lower() == "cloverleaf":
-                        self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames)
-                    elif reader_name.lower() == "collection" and isinstance(filenames, dict):
-                        self.t.load_module('plugin', 'Dict', 'reader', collection=filenames, table_name=table_name)
-                        if isinstance(filenames, OrderedDict):
-                            filenames = "the Ordered Dict"
-                        else:
-                            filenames = "the dictionary"
-                    elif reader_name.lower() == "collection" and isinstance(filenames, pd.DataFrame):
-                        self.t.load_module('plugin', 'Dataframe', 'reader', collection=filenames, table_name=table_name)
-                        filenames = "the pandas DataFrame"
+                if reader_name.lower() == "oceans11datacard":
+                    self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "dublincoredatacard":
+                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "schemaorgdatacard":
+                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "googledatacard":
+                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "genesisdatacard":
+                    self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "bueno":
+                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "csv":
+                    self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "parquet":
+                    self.t.load_module('plugin', 'Parquet', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "yaml":
+                    self.t.load_module('plugin', 'YAML', 'reader', filenames=filenames, table_name = table_name, **kwargs)
+                elif reader_name.lower() == "yaml1":
+                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "toml":
+                    self.t.load_module('plugin', 'TOML', 'reader', filenames=filenames, table_name = table_name, **kwargs)
+                elif reader_name.lower() == "toml1":
+                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames, **kwargs)
+                elif reader_name.lower() == "ensemble":
+                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "json":
+                    self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "cloverleaf":
+                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames, **kwargs)
+                elif reader_name.lower() == "collection" and isinstance(filenames, dict):
+                    self.t.load_module('plugin', 'Dict', 'reader', collection=filenames, table_name=table_name, **kwargs)
+                    if isinstance(filenames, OrderedDict):
+                        filenames = "the Ordered Dict"
                     else:
-                        correct_reader = False
+                        filenames = "the dictionary"
+                elif reader_name.lower() == "collection" and isinstance(filenames, pd.DataFrame):
+                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=filenames, table_name=table_name, **kwargs)
+                    filenames = "the pandas DataFrame"
+                else:
+                    print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
+                    sys.exit("View eligible readers in the output of `list_readers()`")
             except Exception as e:
                 sys.exit(f"read() ERROR: {e}")
-
-            if correct_reader == False:
-                print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                sys.exit("View eligible readers in the output of `list_readers()`")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
@@ -360,7 +347,7 @@ class DSI():
                 df = self.t.artifact_handler(interaction_type='query', query=statement)
             output = f.getvalue()
         except Exception as e:
-            raise RuntimeError(f"query() ERROR: {e}")
+            raise RuntimeError(f"query() ERROR: {e}") from None
    
         if df.empty:
             if output:
@@ -695,14 +682,14 @@ class DSI():
         print("Parquet     : Exports the data of a specified table to a Parquet file.")
         print()
 
-    def write(self, filename, writer_name, table_name = None):
+    def write(self, filename, writer_name, table_name = None, **kwargs):
         """
         Exports data from the active backend using the specified `writer_name`.
 
         `filename` : str
             Name of the output file to write.
 
-            Expected file extensions based on `writer_name`:
+            Expected file extensions based on `writer_name` (if a DSI-supported Writer):
                 - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
                 - "Table_Plot"   → .png, .jpg, .jpeg
                 - "Csv"          → .csv
@@ -765,28 +752,24 @@ class DSI():
                 if "table" in param.lower():
                     updated[param] = table_name
             
-            fnull = open(os.devnull, 'w')
             try:
-                with redirect_stdout(fnull):
-                    self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
-                    self.t.load_module('plugin', class_name, 'writer', **updated)
+                self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
+                self.t.load_module('plugin', class_name, 'writer', **updated, **kwargs)
             except Exception as e:
                 sys.exit(f"write() ERROR: {e}")
         else:
             correct_writer = True
-            fnull = open(os.devnull, 'w')
             try:
-                with redirect_stdout(fnull):
-                    if writer_name.lower() in ["er_diagram", "er diagram"]:
-                        self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename)
-                    elif writer_name.lower() in ["table_plot", "table plot"]:
-                        self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name)
-                    elif writer_name.lower() in ["csv", "csv writer", "csv_writer"]:
-                        self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name)
-                    elif writer_name.lower() in ["parquet", "parquet writer", "parquet_writer"]:
-                        self.t.load_module('plugin', 'Parquet_Writer', 'writer', filename=filename, table_name = table_name)
-                    else:
-                        correct_writer = False
+                if writer_name.lower() in ["er_diagram", "er diagram"]:
+                    self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename, **kwargs)
+                elif writer_name.lower() in ["table_plot", "table plot"]:
+                    self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name, **kwargs)
+                elif writer_name.lower() in ["csv", "csv writer", "csv_writer"]:
+                    self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name, **kwargs)
+                elif writer_name.lower() in ["parquet", "parquet writer", "parquet_writer"]:
+                    self.t.load_module('plugin', 'Parquet_Writer', 'writer', filename=filename, table_name = table_name, **kwargs)
+                else:
+                    correct_writer = False
             except Exception as e:
                 sys.exit(f"write() ERROR: {e}")
             

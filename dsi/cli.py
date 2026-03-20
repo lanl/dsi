@@ -11,6 +11,8 @@ from contextlib import redirect_stdout
 import sys
 import io
 import subprocess
+import signal
+import importlib.util
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -53,24 +55,29 @@ class DSI_cli:
         return
 
     def viewers_check(self):
+        '''
+        Checks which viewers are available depending on the user's environment.
+
+        To register a new viewer, add it to all_viewers with the viewer name as the key and its required PyPI packages as the value.
+        Also include a checker to test if those packages can be installed (using import name. ex: sklearn for the scikit-learn)
+        '''
+        # both objects must be include only lowercase strings
         available_viewers = []
-        all_viewers = ["ml"]
+        all_viewers = {"dashboard" : ["streamlit"], 
+                       "ml" : ["streamlit", "scikit-learn"] #pypi package names
+                      }
+
+        # dashboard checker
+        if importlib.util.find_spec("streamlit") is not None:
+            available_viewers.append("dashboard")
 
         # ml checker
-        try:
-            import streamlit
-            import sklearn
+        if all(importlib.util.find_spec(pkg) is not None for pkg in ["streamlit", "sklearn"]):
             available_viewers.append("ml")
-        except ModuleNotFoundError:
-            pass
 
         # # jupyter checker
-        # try:
-        #     import ipykernel
-        #     import nbformat
+        # if all(importlib.util.find_spec(pkg) is not None for pkg in ["ipykernel", "nbformat"]):
         #     available_viewers.append("jupyter")
-        # except ModuleNotFoundError:
-        #     pass
 
         return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
 
@@ -104,7 +111,7 @@ class DSI_cli:
             print(f"backend ERROR: {e}")
             with redirect_stdout(fnull):
                 self.exit_cli([])
-        print(f"Created a temporary {backend} DSI backend")
+        print(f"Created a temporary {backend.capitalize()} DSI backend")
 
 
     def help_fn(self, args):
@@ -211,7 +218,7 @@ class DSI_cli:
 
         error = self.export_table("dsi_erd_gen", erd_name)
         if error != 1:
-            print(f"Successfully drew an ER Diagram in {erd_name}")
+            print(f"Saved an ER Diagram at {erd_name}")
         print()
 
 
@@ -219,7 +226,7 @@ class DSI_cli:
         '''
         Exits the CLI
         '''
-        print("Exiting...")
+        print("\nExiting...")
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.close()
@@ -398,7 +405,7 @@ class DSI_cli:
 
         error = self.export_table("dsi_tb_" + table_name, filename)
         if error != 1:
-            print(f"Successfully plotted {table_name} in {filename}")
+            print(f"Saved a plot of the {table_name} table in {filename}")
         print()
 
 
@@ -613,60 +620,120 @@ class DSI_cli:
 
     def viewers(self, args):
         if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            print("There are no available viewers. Install requirements.heavy.txt to access them.")
+            for v, p in self.all_viewers.items():
+                print(f"  {v:<12}: pip install {" ".join(p)}")
+            print()
             return
-        print(f'Available viewers are: {", ".join(self.valid_viewers)}')
+        print(f'Available viewers are: {", ".join(self.valid_viewers)}\n')
 
 
     def view(self, args):
-        if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.extras.txt to access them.")
-            return
         if not args:
-            print("view ERROR: need to specify which DSI viewer to use")
+            if self.valid_viewers is not None:
+                print(f"view ERROR: need to specify a DSI viewer to use. Available: {", ".join(self.valid_viewers)}")
+            else:
+                print("view ERROR: need to specify a DSI viewer to use")
             return
-        if len(args) > 1:
-            print("view ERROR: can only use one DSI viewer at a time")
-            return
-
-        viewer = args[0]
-        if viewer not in self.all_viewers:
+        
+        viewer = str(args[0]).lower()
+        if viewer not in self.all_viewers.keys():
             print("view ERROR: This viewer does not exist.")
             return
+        if len(set(args) & set(self.all_viewers.keys())) > 1:
+            print("view ERROR: can only use one viewer at a time")
+            return
         if viewer not in self.valid_viewers:
-            print("view ERROR: To load this viewer, install requirements.extras.txt.")
+            print(f"view ERROR: To load the {viewer} viewer, pip install {" ".join(self.all_viewers[viewer])}")
             return
+        
+        bash_script_filepath = f"{os.path.dirname(os.path.dirname(__file__))}/tools/streamlit/launch_streamlit.sh"
 
-        #check if current db is empty
-        if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
-            print("view ERROR: need to read in data files or an existing database to use a viewer.")
-            return
+        if viewer == "dashboard":
+            # user must specify at least one directory
+            if len(args) == 1:
+                print("view ERROR: dashboard viewer requires at least one input directory.")
+                return
+            # check if other inputs are valid folder paths
+            for f in args[1:]:
+                if not os.path.isdir(f):
+                    print(f"view ERROR: dashboard viewer has an invalid input directory: {f}")
+                    return
+                
+            subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
 
-        if viewer.lower() == "ml":
-            # print("\nUsers can view the ML emulator at http://localhost:8501.")
-            # print("Users must enter [Ctrl + C] to exit.")
             env = dict(os.environ)
-            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
-            cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath, "--", self.db_path, self.name]
-            cmd += ["--browser.gatherUsageStats=false"]
-            # Optional: add "--server.headless=true" to suppress auto browser and first-time user prompt
-            cmd += ["--server.headless=true"]
-
-            #ISSUE ON ROCI COULD BE DUE TO start_new_session=True
-            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True,
+            dashboard_code_filepath = f"{os.path.dirname(__file__)}/plugins/dashboard.py"
+            bash_command = [bash_script_filepath, dashboard_code_filepath] + args[1:]
+            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
                 try:
+                    is_remote = False
                     for idx, line in enumerate(proc.stdout):
-                        if idx == 3:
-                            print("\nView the ML emulator at", line[line.index("http"):-1])
-                            print("To exit the emulator, enter [Ctrl + C]")
-                        elif idx>10:
-                            print(line)
+                        if idx == 0 and line == "remote\n":
+                            is_remote = True
+                        if is_remote:
+                            if idx in [1, 2] or idx > 9:
+                                print(line[:-1])
+                            if idx == 3:
+                                print(" (Leave the new terminal running while using the Dashboard)")
+                                print("\nView the Dashboard at", line[:-1])
+                                print("To exit, press [Ctrl + C] here")
+                        else:
+                            if idx == 4:
+                                print("\nView the Dashboard at", line[line.index("http"):-1])
+                                print("To exit, press [Ctrl + C] here")
+                            elif idx>12:
+                                print(line[:-1])
                 except KeyboardInterrupt:
-                    print("\nClosing ML Emulator.")
-                    proc.terminate()
-                    proc.wait()
+                    print("\nClosing Dashboard.\n")
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait()
 
+        elif viewer == "ml":
+            #check if current db is empty
+            if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
+                print("view ERROR: the ML viewer requires data to run models.")
+                return
+            
+            subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
+            
+            env = dict(os.environ)
+            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
+            bash_command = [bash_script_filepath, ml_code_filepath, self.db_path, self.name]
+            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
+                try:
+                    is_remote = False
+                    for idx, line in enumerate(proc.stdout):
+                        if idx == 0 and line == "remote\n":
+                            is_remote = True
+                        if is_remote:
+                            if idx in [1, 2] or idx > 9:
+                                print(line[:-1])
+                            if idx == 3:
+                                print(" (Leave the new terminal running while using the Emulator)")
+                                print("\nView the ML emulator at", line[:-1])
+                                print("To exit, press [Ctrl + C] here")
+                        else:
+                            if idx == 4:
+                                print("\nView the ML emulator at", line[line.index("http"):-1])
+                                print("To exit, press [Ctrl + C] here")
+                            elif idx>12:
+                                print(line[:-1])
+                except KeyboardInterrupt:
+                    print("\n Closing ML Emulator.\n")
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait()
+            
         else:
             print("view ERROR: input viewer was invalid. Please try again.")
             return
@@ -700,7 +767,7 @@ class DSI_cli:
                 shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name) + ".duckdb")
                 final_name = new_name + ".duckdb"
         print(f"Successfully wrote all data to {final_name}\n")
-
+    
     def __is_url(self, s):
         '''
         Checks if the string is a url link
