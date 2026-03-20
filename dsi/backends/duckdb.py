@@ -412,7 +412,7 @@ class DuckDB(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
-        elif "filesystem" in query: #remove fileystem passthrough in future
+        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove fileystem passthrough in future
             try:
                 self.con.execute(query)
                 self.con.commit()

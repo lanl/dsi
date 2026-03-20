@@ -161,7 +161,7 @@ class DSI():
             File path(s) to the data files or an in-memory data object.
 
             The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
-                - "Collection"           → Ordered Dictionary of table(s)
+                - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
                 - "YAML"                 → .yaml or .yml
