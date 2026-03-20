@@ -54,8 +54,15 @@ class DSI_cli:
 
     def viewers_check(self):
         available_viewers = []
-        all_viewers = ["ml"]
+        all_viewers = ["dashboard", "ml"]
 
+        # dashboard checker
+        try:
+            import streamlit
+            available_viewers.append("dashboard")
+        except ModuleNotFoundError:
+            pass
+        
         # ml checker
         try:
             import streamlit
@@ -625,7 +632,7 @@ class DSI_cli:
         if not args:
             print("view ERROR: need to specify which DSI viewer to use")
             return
-        if len(args) > 1:
+        if len(args) > 1 and len(set(args[1:]) & set(self.all_viewers)) > 1:
             print("view ERROR: can only use one DSI viewer at a time")
             return
 
@@ -636,37 +643,72 @@ class DSI_cli:
         if viewer not in self.valid_viewers:
             print("view ERROR: To load this viewer, install requirements.extras.txt.")
             return
+        
+        bash_script_filepath = f"{os.path.dirname(__file__)}/plugins/launch_streamlit.sh"
 
-        #check if current db is empty
-        if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
-            print("view ERROR: need to read in data files or an existing database to use a viewer.")
-            return
-
-        if viewer.lower() == "ml":
-            # print("\nUsers can view the ML emulator at http://localhost:8501.")
-            # print("Users must enter [Ctrl + C] to exit.")
+        if viewer.lower() == "dashboard":
             env = dict(os.environ)
-            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
-            cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath, "--", self.db_path, self.name]
-            cmd += ["--browser.gatherUsageStats=false"]
-            # Optional: add "--server.headless=true" to suppress auto browser and first-time user prompt
-            cmd += ["--server.headless=true"]
-
-            #ISSUE ON ROCI COULD BE DUE TO start_new_session=True
-            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True,
+            # user must specify at least one directory
+            if len(args) == 1:
+                print("view ERROR: must specify at least one input directory for the dashboard viewer.")
+                return
+            # check if other inputs are valid folder paths
+            for f in args[1:]:
+                if not os.path.isdir(f):
+                    print(f"dashboard view ERROR: '{f}' must be a valid folder path to display the dashboard.")
+                    return
+            dashboard_code_filepath = f"{os.path.dirname(__file__)}/plugins/dashboard.py"
+            cmd = [sys.executable, "-m", "streamlit", "run", dashboard_code_filepath]
+            cmd += ["--browser.gatherUsageStats=false", "--server.headless=true", "--"]
+            for i in args[1:]:
+                cmd += [i]
+            
+            # POSSIBLE ISSUE ON HPC DUE TO start_new_session=True
+            with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
                 try:
                     for idx, line in enumerate(proc.stdout):
                         if idx == 3:
-                            print("\nView the ML emulator at", line[line.index("http"):-1])
-                            print("To exit the emulator, enter [Ctrl + C]")
+                            print("\nView the Dashboard at", line[line.index("http"):-1])
+                            print("To exit the Dashboard, enter [Ctrl + C] here")
                         elif idx>10:
                             print(line)
                 except KeyboardInterrupt:
-                    print("\nClosing ML Emulator.")
+                    print("\nClosing Dashboard.")
                     proc.terminate()
                     proc.wait()
 
+        elif viewer.lower() == "ml":
+            #check if current db is empty
+            if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
+                print("view ERROR: need to read in data files or an existing database to use a viewer.")
+                return
+            
+            env = dict(os.environ)
+            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
+            
+            subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
+
+            subprocess.run([f"./{bash_script_filepath}", ml_code_filepath, self.db_path, self.name], check=True)
+
+            # cmd = [sys.executable, "-m", "streamlit", "run", ml_code_filepath]
+            # cmd += ["--browser.gatherUsageStats=false", "--server.headless=true", "--", self.db_path, self.name]
+
+            # POSSIBLE ISSUE ON HPC DUE TO start_new_session=True
+            # with subprocess.Popen(cmd, env=env, start_new_session=True, text=True, 
+            #                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
+            #     try:
+            #         for idx, line in enumerate(proc.stdout):
+            #             if idx == 3:
+            #                 print("\nView the ML emulator at", line[line.index("http"):-1])
+            #                 print("To exit the emulator, enter [Ctrl + C] here")
+            #             elif idx>10:
+            #                 print(line)
+            #     except KeyboardInterrupt:
+            #         print("\nClosing ML Emulator.")
+            #         proc.terminate()
+            #         proc.wait()
+            
         else:
             print("view ERROR: input viewer was invalid. Please try again.")
             return
