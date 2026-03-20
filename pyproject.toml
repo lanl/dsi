@@ -37,4 +37,4 @@ include = ["dsi*"]
 exclude = ["clover3d"]
 
 [tool.setuptools.package-data]
-dsi = ["plugins/launch_streamlit.sh"]
+dsi = ["tools/streamlit/launch_streamlit.sh"]

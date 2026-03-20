@@ -621,14 +621,14 @@ class DSI_cli:
 
     def viewers(self, args):
         if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.extras.txt to access them.\n")
+            print("There are no available viewers. Install requirements.heavy.txt to access them.\n")
             return
         print(f'Available viewers are: {", ".join(self.valid_viewers)}\n')
 
 
     def view(self, args):
         if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            print("There are no available viewers. Install requirements.heavy.txt to access them.")
             return
         if not args:
             print("view ERROR: need to specify which DSI viewer to use")
@@ -649,7 +649,7 @@ class DSI_cli:
                 print("view ERROR: To load the ML viewer, pip install streamlit scikit-learn")
             return
         
-        bash_script_filepath = f"{os.path.dirname(__file__)}/plugins/launch_streamlit.sh"
+        bash_script_filepath = f"{os.path.dirname(os.path.dirname(__file__))}/tools/streamlit/launch_streamlit.sh"
 
         if viewer.lower() == "dashboard":
             # user must specify at least one directory
@@ -769,7 +769,7 @@ class DSI_cli:
                 shutil.copyfile(dsi_db_path, os.path.join(self.start_dir, new_name) + ".duckdb")
                 final_name = new_name + ".duckdb"
         print(f"Successfully wrote all data to {final_name}\n")
-
+    
     def __is_url(self, s):
         '''
         Checks if the string is a url link
