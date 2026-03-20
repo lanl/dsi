@@ -12,6 +12,7 @@ import sys
 import io
 import subprocess
 import signal
+import importlib.util
 
 from dsi.core import Terminal
 from ._version import __version__
@@ -54,31 +55,29 @@ class DSI_cli:
         return
 
     def viewers_check(self):
+        '''
+        Checks which viewers are available depending on the user's environment.
+
+        To register a new viewer, add it to all_viewers with the viewer name as the key and its required PyPI packages as the value.
+        Also include a checker to test if those packages can be installed (using import name. ex: sklearn for the scikit-learn)
+        '''
+        # both objects must be include only lowercase strings
         available_viewers = []
-        all_viewers = ["dashboard", "ml"]
+        all_viewers = {"dashboard" : ["streamlit"], 
+                       "ml" : ["streamlit", "scikit-learn"] #pypi package names
+                      }
 
         # dashboard checker
-        try:
-            import streamlit
+        if importlib.util.find_spec("streamlit") is not None:
             available_viewers.append("dashboard")
-        except ModuleNotFoundError:
-            pass
-        
+
         # ml checker
-        try:
-            import streamlit
-            import sklearn
+        if all(importlib.util.find_spec(pkg) is not None for pkg in ["streamlit", "sklearn"]):
             available_viewers.append("ml")
-        except ModuleNotFoundError:
-            pass
 
         # # jupyter checker
-        # try:
-        #     import ipykernel
-        #     import nbformat
+        # if all(importlib.util.find_spec(pkg) is not None for pkg in ["ipykernel", "nbformat"]):
         #     available_viewers.append("jupyter")
-        # except ModuleNotFoundError:
-        #     pass
 
         return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
 
@@ -621,37 +620,36 @@ class DSI_cli:
 
     def viewers(self, args):
         if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.heavy.txt to access them.\n")
+            print("There are no available viewers. Install requirements.heavy.txt to access them.")
+            for v, p in self.all_viewers.items():
+                print(f"  {v:<12}: pip install {" ".join(p)}")
+            print()
             return
         print(f'Available viewers are: {", ".join(self.valid_viewers)}\n')
 
 
     def view(self, args):
-        if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.heavy.txt to access them.")
-            return
         if not args:
-            print("view ERROR: need to specify which DSI viewer to use")
+            if self.valid_viewers is not None:
+                print(f"view ERROR: need to specify a DSI viewer to use. Available: {", ".join(self.valid_viewers)}")
+            else:
+                print("view ERROR: need to specify a DSI viewer to use")
             return
         
-        viewer = args[0]
-        if viewer not in self.all_viewers:
+        viewer = str(args[0]).lower()
+        if viewer not in self.all_viewers.keys():
             print("view ERROR: This viewer does not exist.")
             return
-        if len(args) > 1 and len(set(args[1:]) & set(self.all_viewers)) > 1:
+        if len(set(args) & set(self.all_viewers.keys())) > 1:
             print("view ERROR: can only use one viewer at a time")
             return
         if viewer not in self.valid_viewers:
-            # personal print for specified viewer due to missing packages
-            if viewer.lower() == "dashboard":
-                print("view ERROR: To load the dashboard viewer, pip install streamlit")
-            elif viewer.lower() == "ml":
-                print("view ERROR: To load the ML viewer, pip install streamlit scikit-learn")
+            print(f"view ERROR: To load the {viewer} viewer, pip install {" ".join(self.all_viewers[viewer])}")
             return
         
         bash_script_filepath = f"{os.path.dirname(os.path.dirname(__file__))}/tools/streamlit/launch_streamlit.sh"
 
-        if viewer.lower() == "dashboard":
+        if viewer == "dashboard":
             # user must specify at least one directory
             if len(args) == 1:
                 print("view ERROR: dashboard viewer requires at least one input directory.")
@@ -696,10 +694,10 @@ class DSI_cli:
                         os.killpg(proc.pid, signal.SIGKILL)
                         proc.wait()
 
-        elif viewer.lower() == "ml":
+        elif viewer == "ml":
             #check if current db is empty
             if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
-                print("view ERROR: the ml viewer requires data to run models.")
+                print("view ERROR: the ML viewer requires data to run models.")
                 return
             
             subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
