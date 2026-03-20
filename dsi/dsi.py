@@ -157,11 +157,11 @@ class DSI():
         """
         Loads data into DSI using the specified parameter `reader_name`
 
-        `filenames` : str or list of str or data object
-            Either file path(s) to the data file(s) or an in-memory data object.
+        `filenames` : str, list of str, or data object
+            File path(s) to the data files or an in-memory data object.
 
-            The expected input type depends on the selected `reader_name`:
-                - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
+            The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
+                - "Collection"           → Ordered Dictionary of table(s)
                 - "CSV"                  → .csv
                 - "Parquet"              → .pq
                 - "YAML"                 → .yaml or .yml
@@ -242,7 +242,6 @@ class DSI():
                 sys.exit(f"read() ERROR: {e}")
 
         else:
-            correct_reader = True
             try:
                 if reader_name.lower() == "oceans11datacard":
                     self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames, **kwargs)
@@ -284,13 +283,10 @@ class DSI():
                     self.t.load_module('plugin', 'Dataframe', 'reader', collection=filenames, table_name=table_name, **kwargs)
                     filenames = "the pandas DataFrame"
                 else:
-                    correct_reader = False
+                    print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
+                    sys.exit("View eligible readers in the output of `list_readers()`")
             except Exception as e:
                 sys.exit(f"read() ERROR: {e}")
-
-            if correct_reader == False:
-                print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                sys.exit("View eligible readers in the output of `list_readers()`")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read == True:
@@ -693,7 +689,7 @@ class DSI():
         `filename` : str
             Name of the output file to write.
 
-            Expected file extensions based on `writer_name`:
+            Expected file extensions based on `writer_name` (if a DSI-supported Writer):
                 - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
                 - "Table_Plot"   → .png, .jpg, .jpeg
                 - "Csv"          → .csv

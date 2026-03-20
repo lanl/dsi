@@ -210,8 +210,8 @@ def collect_data(dirs: list[str]) -> tuple[pd.DataFrame, dict[str, dict[str, int
     return df, du_map
 
 
-st.set_page_config(page_title="Diana Dashboard", layout="wide")
-st.title("Diana Dashboard")
+st.set_page_config(page_title="DSI Dashboard", layout="wide")
+st.title("DSI Dashboard")
 
 df_table, du_map = collect_data(DIRECTORIES)
 
