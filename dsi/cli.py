@@ -219,7 +219,7 @@ class DSI_cli:
 
         error = self.export_table("dsi_erd_gen", erd_name)
         if error != 1:
-            print(f"Successfully drew an ER Diagram in {erd_name}")
+            print(f"Saved an ER Diagram at {erd_name}")
         print()
 
 
@@ -406,7 +406,7 @@ class DSI_cli:
 
         error = self.export_table("dsi_tb_" + table_name, filename)
         if error != 1:
-            print(f"Successfully plotted {table_name} in {filename}")
+            print(f"Saved a plot of the {table_name} table in {filename}")
         print()
 
 
@@ -621,9 +621,9 @@ class DSI_cli:
 
     def viewers(self, args):
         if self.valid_viewers is None:
-            print("There are no available viewers. Install requirements.extras.txt to access them.")
+            print("There are no available viewers. Install requirements.extras.txt to access them.\n")
             return
-        print(f'Available viewers are: {", ".join(self.valid_viewers)}')
+        print(f'Available viewers are: {", ".join(self.valid_viewers)}\n')
 
 
     def view(self, args):
@@ -688,7 +688,7 @@ class DSI_cli:
                             elif idx>12:
                                 print(line[:-1])
                 except KeyboardInterrupt:
-                    print("\nClosing Dashboard.")
+                    print("\nClosing Dashboard.\n")
                     os.killpg(proc.pid, signal.SIGTERM)
                     try:
                         proc.wait(timeout=3)
@@ -728,7 +728,7 @@ class DSI_cli:
                             elif idx>12:
                                 print(line[:-1])
                 except KeyboardInterrupt:
-                    print("\n Closing ML Emulator.")
+                    print("\n Closing ML Emulator.\n")
                     os.killpg(proc.pid, signal.SIGTERM)
                     try:
                         proc.wait(timeout=3)
