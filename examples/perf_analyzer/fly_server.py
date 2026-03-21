@@ -1,22 +1,16 @@
 # #!/usr/bin/env python3
 
 import argparse
-import sys
 from dash import Dash, html, dcc, Input, Output, dash_table, callback, State, callback_context, no_update
-from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 import plotly.graph_objects as go
-import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
 import numpy as np
-import random
 import pandas as pd
 import re
 # import git
 from github import Github
-import requests
-import datetime
 import diskcache
 import os
 import git
@@ -43,7 +37,7 @@ class PerfRunner():
     
     def updateGitRepo(self):
         self.git_repo = None
-        if os.path.exists(self.current_git_directory) == False:
+        if not os.path.exists(self.current_git_directory):
             os.mkdir(self.current_git_directory)
         try:
             self.git_repo = git.Repo(self.current_git_directory)
@@ -187,7 +181,7 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
     merged_df = git_nodes_df
     if sorted_df is not None:
         merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
-    combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
+    combined_all_df = merged_df[merged_df.cname is not None].sort_values(by=['date'], ascending=True)
     combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
     sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
 
@@ -359,7 +353,7 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
     merged_df = git_nodes_df
     if sorted_df is not None:
         merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
-    combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
+    combined_all_df = merged_df[merged_df.cname is not None].sort_values(by=['date'], ascending=True)
     combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
     sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
 
@@ -472,7 +466,7 @@ def main(perf_data, git_nodes):
                     html.Br(),
                     html.Span("PerfAnalyzer")
                 ]),
-                # html.P("Analyze performance accross commit")
+                # html.P("Analyze performance across commit")
             ], style={"verticalAlignment": "top"}),
             
 

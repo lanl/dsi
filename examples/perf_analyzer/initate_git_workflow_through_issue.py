@@ -1,8 +1,5 @@
 
 import argparse
-import sys
-import numpy as np
-import pandas as pd
 from github import Github
 
 
