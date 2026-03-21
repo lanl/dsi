@@ -182,7 +182,7 @@ class DSI_cli:
         '''
         table_name = args.table_name
         num_rows = 25
-        if args.num_rows != None:
+        if args.num_rows is not None:
             num_rows = args.num_rows
 
         try:
@@ -191,7 +191,7 @@ class DSI_cli:
             print(f"display ERROR: {e}")
             return
 
-        if args.export != None:
+        if args.export is not None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
             if file_extension.lower() not in ["csv", "pq", "parquet"]:
                 filename = args.export + ".csv"
@@ -213,7 +213,7 @@ class DSI_cli:
         Generates an ER diagram from all data loaded in
         '''
         erd_name = "er_diagram.png"
-        if args.filename != None:
+        if args.filename is not None:
             erd_name = args.filename
 
         error = self.export_table("dsi_erd_gen", erd_name)
@@ -269,7 +269,7 @@ class DSI_cli:
             print(f"export ERROR: {e}")
             return 1
 
-        if success_load == True:
+        if success_load:
             try:
                 self.t.transload()
             except Exception as e:
@@ -422,7 +422,7 @@ class DSI_cli:
         '''
         sql_query = args.sql_query
         num_rows = 25
-        if args.num_rows != None:
+        if args.num_rows is not None:
             num_rows = args.num_rows
 
         print(f"Printing the result from input SQL query: {sql_query}")
@@ -440,7 +440,7 @@ class DSI_cli:
         rows = data.values.tolist()
         self.t.table_print_helper(headers, rows, len(rows), num_rows)
 
-        if args.export != None:
+        if args.export is not None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
             if file_extension.lower() not in ["csv", "pq", "parquet"]:
                 filename = args.export + ".csv"
@@ -601,7 +601,7 @@ class DSI_cli:
         Get the summary of a table or database
         '''
         table_name = None
-        if args.table != None:
+        if args.table is not None:
             table_name = args.table
 
         try:
@@ -844,7 +844,7 @@ def main():
             command, *args = tokens
 
             if command not in COMMANDS:
-                print(f"Unknown command. Type \"help\" to see valid commands.\n")
+                print("Unknown command. Type \"help\" to see valid commands.\n")
                 continue
 
             parser_factory, handler = COMMANDS[command]

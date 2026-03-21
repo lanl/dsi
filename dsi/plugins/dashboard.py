@@ -247,7 +247,7 @@ edited = st.data_editor(
 
 selected_dir = None
 try:
-    selected_rows = edited[edited["select"] == True]
+    selected_rows = edited[edited["select"]]
     if not selected_rows.empty:
         selected_dir = selected_rows.iloc[0]["directory"]
 except Exception:

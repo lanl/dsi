@@ -33,13 +33,13 @@ class ValueObject:
     value = None # value stored from that match. Ex: table data, col data, cell data etc.
     type = "" #type of match, {table, column, range, cell, row}
 
-    # implement this later once filesystem table incoroporated into dsi
+    # implement this later once filesystem table incorporated into dsi
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with DuckDB
 class DuckDB(Filesystem):
     """
-    DuckDB Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term
+    DuckDB Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurrences of a search term
     """
     runTable = False
 
@@ -184,7 +184,7 @@ class DuckDB(Filesystem):
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
             if self.runTable:
                 str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INTEGER, {}".format(str(types.name), sql_cols)            
-            if foreign_query != None:
+            if foreign_query is not None:
                 str_query += foreign_query
             if self.runTable:
                 str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
@@ -228,7 +228,7 @@ class DuckDB(Filesystem):
             pk_list = artifacts["dsi_relations"]["primary_key"]
             fk_list = artifacts["dsi_relations"]["foreign_key"]
             pk_tables = set(t[0] for t in pk_list)
-            fk_tables = set(t[0] for t in fk_list if t[0] != None)
+            fk_tables = set(t[0] for t in fk_list if t[0] is not None)
             all_schema_tables = pk_tables.union(fk_tables)
             db_tables = [t[0] for t in self.list() if t[0] != "dsi_units"]
 
@@ -236,13 +236,13 @@ class DuckDB(Filesystem):
             if all_schema_tables.issubset(set(db_tables)):
                 circ, _ = self.check_table_relations(all_schema_tables, artifacts["dsi_relations"])
                 if circ:
-                    raise ValueError(f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
+                    raise ValueError("A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
 
                 drop_order = all_schema_tables
                 collect = self.process_artifacts()
                 if "dsi_relations" in collect.keys():
                     curr_pk_tables = set(t[0] for t in collect["dsi_relations"]["primary_key"])
-                    curr_fk_tables = set(t[0] for t in collect["dsi_relations"]["foreign_key"] if t[0] != None)
+                    curr_fk_tables = set(t[0] for t in collect["dsi_relations"]["foreign_key"] if t[0] is not None)
                     curr_schema_tables = curr_pk_tables.union(curr_fk_tables)
 
                     # need to drop and reingest all tables in old schema and new schema
@@ -277,7 +277,7 @@ class DuckDB(Filesystem):
             circular, ordered_tables = self.check_table_relations(artifacts.keys(), artifacts["dsi_relations"])
 
             if circular:
-                raise ValueError(f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
+                raise ValueError("A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
             else:
                 table_order = list(reversed(ordered_tables)) # ingest primary key tables first then children
 
@@ -412,7 +412,7 @@ class DuckDB(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
-        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove fileystem passthrough in future
+        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove filesystem passthrough in future
             try:
                 self.con.execute(query)
                 self.con.commit()
@@ -504,7 +504,7 @@ class DuckDB(Filesystem):
                                      WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
                                      """).fetchall()
 
-        if only_units_relations == False:
+        if not only_units_relations:
             for item in tableList:
                 tableName = self.duckdb_compatible_name(item[0])
 
@@ -521,7 +521,7 @@ class DuckDB(Filesystem):
                 artifact[tableName] = colDict
 
         pk_list = []
-        fkData = self.cur.execute(f"""
+        fkData = self.cur.execute("""
                                   SELECT table_name, constraint_column_names, referenced_table, referenced_column_names
                                   FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'""").fetchall()
         for row in fkData:
@@ -530,7 +530,7 @@ class DuckDB(Filesystem):
             artifact["dsi_relations"]["foreign_key"].append((self.duckdb_compatible_name(row[0]), self.duckdb_compatible_name(row[1][0])))
             pk_list.append(curr_pk)
         
-        pkData = self.cur.execute(f"""SELECT table_name, constraint_column_names FROM duckdb_constraints() 
+        pkData = self.cur.execute("""SELECT table_name, constraint_column_names FROM duckdb_constraints() 
                                   WHERE constraint_type = 'PRIMARY KEY'""").fetchall()
         for pk_table, pk_col in pkData:
             curr_pk = (self.duckdb_compatible_name(pk_table), self.duckdb_compatible_name(pk_col[0]))
@@ -660,12 +660,12 @@ class DuckDB(Filesystem):
                         val = ValueObject()
                         val.t_name = table
                         val.c_name = [col_name]
-                        if range == True and not not_numeric:
+                        if range and not not_numeric:
                             numeric_col = [0 if item is None else item for item in colData]
                             val.value = [min(numeric_col), max(numeric_col)]
                             val.type = "range"
                             col_return_list.append(val)
-                        elif range == False:
+                        elif not range:
                             val.value = colData
                             val.type = "column"
                             col_return_list.append(val)
@@ -890,13 +890,13 @@ class DuckDB(Filesystem):
         if self.cur.execute(f"""SELECT COUNT(*) FROM information_schema.tables 
                                 WHERE table_name = '{duckdb_table_name}'""").fetchone()[0] == 0:
             raise ValueError(f"'{table_name}' does not exist in this DuckDB database")
-        if display_cols == None:
+        if display_cols is None:
             df = self.cur.execute(f"SELECT * FROM {table_name} LIMIT {num_rows};").fetchdf()
         else:
             sql_list = ", ".join(display_cols)
             try:
                 df = self.cur.execute(f"SELECT {sql_list} FROM {table_name} LIMIT {num_rows};").fetchdf()
-            except Exception as e:
+            except Exception:
                 raise duckdb.Error("'display_cols' was incorrect. It must be a list of column names in the table")
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
         df = df.astype(object).where(df.notna(), None)
@@ -965,7 +965,7 @@ class DuckDB(Filesystem):
             else:
                 min_val = max_val = avg_val = std_dev = None
             
-            if avg_val != None and std_dev == None:
+            if avg_val is not None and std_dev is None:
                 std_dev = 0
             rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
@@ -1042,7 +1042,7 @@ class DuckDB(Filesystem):
         if "dsi_relations" in temp_data.keys():
             circular, ordered_tables = self.check_table_relations(temp_data.keys(), temp_data["dsi_relations"])
             if circular:
-                raise ValueError(f"A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
+                raise ValueError("A complex schema with a circular dependency cannot be ingested into a DuckDB backend.")
 
         for table_name in ordered_tables:
             temp_name = table_name[1:-1] if table_name[0] == '"' and table_name[-1] == '"' else table_name
@@ -1057,7 +1057,7 @@ class DuckDB(Filesystem):
             e.args = (f"Error updating data in {self.filename} due to {str(e)}",)
             raise
 
-        if temp_runTable_bool == True:
+        if temp_runTable_bool:
             self.runTable = True
         
     def check_table_relations(self, tables, relation_dict):

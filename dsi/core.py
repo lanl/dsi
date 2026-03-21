@@ -78,7 +78,7 @@ class Terminal():
             try:
                 imported = import_module(module)
                 self.module_collection['backend'][module] = imported
-            except ImportError as e:
+            except ImportError:
                 continue
 
         plugin_modules = static_munge(self.PLUGIN_PREFIX, self.PLUGIN_IMPLEMENTATIONS)
@@ -143,7 +143,7 @@ class Terminal():
         Therefore, a user does not have to activate it separately with transload() (only used by plugin writers) or call unload_module()
         """
         if self.debug_level != 0:
-            self.logger.info(f"-------------------------------------")
+            self.logger.info("-------------------------------------")
             self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
         start = datetime.now()
         if mod_type not in ["plugin", "backend"]:
@@ -183,7 +183,7 @@ class Terminal():
                 if mod_function == "reader":
                     try:
                         obj = class_(**kwargs)
-                    except:
+                    except Exception:
                         if self.debug_level != 0:
                             self.logger.error(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                         raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
@@ -227,10 +227,10 @@ class Terminal():
                                     table_metadata[colName] = str_list
                         if table_name == "dsi_units":
                             incorrect_cols = set(["table_name", "column_name", "unit"]).issubset(table_metadata.keys())
-                            if len(table_metadata.keys()) != 3 or incorrect_cols == False:
+                            if len(table_metadata.keys()) != 3 or not incorrect_cols:
                                 if self.debug_level != 0:
-                                    self.logger.error(f"   'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")
-                                raise TypeError(f"'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")
+                                    self.logger.error("   'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")
+                                raise TypeError("'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")
                         if table_name not in self.active_metadata.keys():
                             self.active_metadata[table_name] = table_metadata
                         else:
@@ -276,7 +276,7 @@ class Terminal():
                                         has_runTable = True
                                 if has_runTable:
                                     self.runTable = True
-                                elif has_data and has_runTable == False and self.runTable == True:
+                                elif has_data and not has_runTable and self.runTable:
                                     raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
                                 
                             class_.runTable = self.runTable
@@ -318,7 +318,7 @@ class Terminal():
         Primarily used when unloading backends, as plugin readers and writers are automatically unloaded elsewhere.
         """
         if self.debug_level != 0:
-            self.logger.info(f"-------------------------------------")
+            self.logger.info("-------------------------------------")
             self.logger.info(f"Unloading {mod_name} {mod_function} {mod_type}")
         start = datetime.now()
 
@@ -465,7 +465,7 @@ class Terminal():
                     self.logger.info(f"{obj.__class__.__name__} backend - {interaction_type.upper()} the data")
                 start = datetime.now()
                 parent_class = obj.__class__.__bases__[0].__name__
-                if self.backup_db == True and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
+                if self.backup_db and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
                     if self.debug_level != 0:
                         self.logger.info(f"   Creating backup file before ingesting data into the {obj.__class__.__name__} backend")
                     backup_start = datetime.now()
@@ -535,7 +535,7 @@ class Terminal():
             if self.valid_backend(first_backend, parent_backend):
                 try:
                     first_backend.notebook(**kwargs)
-                except:
+                except Exception:
                     raise RuntimeError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
@@ -625,7 +625,7 @@ class Terminal():
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
-            self.logger.error(f'Getting the structural schema of the first loaded backend')
+            self.logger.error('Getting the structural schema of the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend to be able to get its structural schema')
@@ -849,7 +849,7 @@ class Terminal():
             extra = "or partial match [~,~~]. If matching value has an operator in it, make sure to wrap all in single quotes."
             raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], {extra}")
         elif len(result) == 3 and result[2].startswith('"') and result[2].endswith('"'):
-            raise ValueError(f"The value in the relational find() cannot be enclosed in double quotes")
+            raise ValueError("The value in the relational find() cannot be enclosed in double quotes")
 
         column_name = result[0]
         relation = result[1] + result[2]
@@ -943,7 +943,7 @@ class Terminal():
         start = datetime.now()
 
         list_names = isinstance(table_name, list) and all(isinstance(name, str) for name in table_name)
-        if not isinstance(table_name, str) and list_names == False:
+        if not isinstance(table_name, str) and not list_names:
             if self.debug_level != 0:
                 self.logger.error("Input 'table_name' must be either a single table name or a list of table names")
             raise RuntimeError("Input 'table_name' must be either a single table name or a list of table names")
@@ -957,12 +957,12 @@ class Terminal():
             raise RuntimeError("Input list of 'table_name' cannot include a DSI-reserved table name. Try again.")
 
         list_dfs = isinstance(collection, list) and all(isinstance(df, pd.DataFrame) for df in collection)
-        if not isinstance(collection, pd.DataFrame) and list_dfs == False:
+        if not isinstance(collection, pd.DataFrame) and not list_dfs:
             if self.debug_level != 0:
                 self.logger.error("Input 'collection' must be either a single DataFrame or a list of DataFrames")
             raise RuntimeError("Input 'collection' must be either a single DataFrame or a list of DataFrames")
 
-        if backup == True:
+        if backup:
             if self.debug_level != 0:
                 self.logger.info(f"   Creating backup file before overwriting data in the {backend.__class__.__name__} backend")
             backup_start = datetime.now()
@@ -994,7 +994,7 @@ class Terminal():
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
-            self.logger.error(f'Listing data of all tables and their dimensions in the first loaded backend')
+            self.logger.error('Listing data of all tables and their dimensions in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before listing all tables in it')
@@ -1035,12 +1035,12 @@ class Terminal():
             - If True, returns either a list of DataFrames (table_name = None), or a single DataFrame of metadata
             - If False (default), prints metadata from all tables (table_name = None), or just a single table
         """
-        if self.debug_level != 0 and table_name == None:
+        if self.debug_level != 0 and table_name is None:
             self.logger.info("-------------------------------------")
-            self.logger.error(f'Summarizing numerical data of all tables in the first loaded backend')
-        elif self.debug_level != 0 and table_name != None:
+            self.logger.error('Summarizing numerical data of all tables in the first loaded backend')
+        elif self.debug_level != 0 and table_name is not None:
             self.logger.info("-------------------------------------")
-            self.logger.error(f'Summarizing numerical data of the table: {table_name} in the first loaded backend')
+            self.logger.error('Summarizing numerical data of the table: {table_name} in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before printing table info from it')
@@ -1064,9 +1064,9 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
-        if collection == True and table_name is None:
+        if collection and table_name is None:
             return output[1:]
-        elif collection == True and table_name is not None:
+        elif collection and table_name is not None:
             return output
         elif table_name is not None and isinstance(output, pd.DataFrame):
             print(f"\nTable: {table_name}")
@@ -1088,7 +1088,7 @@ class Terminal():
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
-            self.logger.error(f'Printing number of tables in the first loaded backend')
+            self.logger.error('Printing number of tables in the first loaded backend')
         if len(self.loaded_backends) == 0:
             if self.debug_level != 0:
                 self.logger.error('Need to load a valid backend before listing all tables in it')
@@ -1214,7 +1214,7 @@ class Terminal():
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
-            self.logger.info(f"Returning current abstraction")
+            self.logger.info("Returning current abstraction")
         start = datetime.now()
         if table_name is not None and table_name not in self.active_metadata.keys():
             if self.debug_level != 0:
@@ -1477,7 +1477,7 @@ class Sync():
 
     def reindex(self, local_loc, remote_loc, isVerbose = False):
         """
-        Helper function that allows users to index their data again by dropping existing fileystem information.
+        Helper function that allows users to index their data again by dropping existing filesystem information.
         """
         # current -- drop filesystem table and call index()
         # future --- use existing db to "reindex" by updating the filepath cols, not dropping table.
@@ -1736,7 +1736,7 @@ class Sync():
         elif tool.lower() == "rsync":
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
-            except ValueError:
+            except Exception:
                 raise ValueError("Remote location must be in the format user@host:/absolute/path")
 
             if not path_part.startswith("/"):
@@ -1745,7 +1745,7 @@ class Sync():
             #remove username from file_remote column in filesystem table
             try:
                 username, host = host_part.split("@")
-            except:
+            except Exception:
                 raise ValueError("Remote path's hostname must be in the format user@server") from None
             filesystem_df = self.t.get_table("filesystem")
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
@@ -1867,7 +1867,7 @@ class Sync():
                 print(f"Crawling directory: {root}")
                 print(f"  Found {len(files)} files, {len(dirs)} subdirectories")
 
-            for f in files: # Appent root-level files
+            for f in files: # Append root-level files
                 file_list.append(os.path.join(root, f))
 
         elapsed = time.perf_counter() - start_time
@@ -2105,7 +2105,7 @@ class HPSSSync():
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 t.load_module('backend','Sqlite','back-read', filename=f)
-        except Exception as err:
+        except Exception:
             print(f"Database {f} not found")
             raise
 

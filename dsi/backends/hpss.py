@@ -145,7 +145,7 @@ class HPSS(Backend):
 
    def run_hsi(self, subcmd, arg_list):
       """
-      Runs hsi wth the supplied subcmd and arguments
+      Runs hsi with the supplied subcmd and arguments
       """
 
       command = ["hsi", subcmd]

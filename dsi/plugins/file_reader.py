@@ -25,9 +25,9 @@ class FileReader(StructuredMetadata):
 
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
-        if type(filenames) == str:
+        if isinstance(filenames, str):
             self.filenames = [filenames]
-        elif type(filenames) == list:
+        elif isinstance(filenames, list):
             self.filenames = filenames
         else:
             raise TypeError
@@ -88,12 +88,12 @@ class Csv(FileReader):
             temp_df = read_csv(filename)
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
-            except:
+            except Exception:
                 raise TypeError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
 
         table_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in table_data.items():  # replace NaNs with None
-            table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            table_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         if self.table_name is not None:
             self.csv_data[self.table_name] = table_data
@@ -123,7 +123,6 @@ class Bueno(FileReader):
         """
         Parses Bueno data and adds a list containing 1 or more rows.
         """
-        file_counter = 0
         total_df = DataFrame()
         for filename in self.filenames:
             with open(filename, 'r') as fh:
@@ -133,7 +132,7 @@ class Bueno(FileReader):
 
         self.bueno_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in self.bueno_data.items():  # replace NaNs with None
-            self.bueno_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            self.bueno_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         self.set_schema_2(self.bueno_data)
 
@@ -179,7 +178,7 @@ class JSON(FileReader):
                         temp_dict[key] = []
                     temp_dict[key].append(val)
 
-        if self.table_name == None:
+        if self.table_name is None:
             self.base_dict["JSON"] = temp_dict
         else:
             self.base_dict[self.table_name] = temp_dict
@@ -259,7 +258,7 @@ class YAML(FileReader):
         `table_name`: str
             Name to assign to the loaded YAML data. If not provided, DSI defaults to using "YAML" as the table name.
 
-        `yaml_version: str, default = "1.1" 
+        `yaml_version`: str, default = "1.1" 
             Major and minor version of YAML specification.   
         """
         super().__init__(filenames, **kwargs)
@@ -334,7 +333,7 @@ class YAML(FileReader):
             try:
                 with open(file, 'r') as yaml_file:
                     yaml_load_data = list(self._safe_load_all(yaml_file))
-            except:
+            except Exception:
                 raise ValueError(f"Error opening YAML file: {file}")
             
             # cannot read in multiple tables per YAML file without multiple input table names
@@ -512,7 +511,7 @@ class TOML(FileReader):
             with open(path, "r", encoding="utf-8") as f:
                 text = f.read()
             data = tomllib.loads(text)
-        except:
+        except Exception:
             raise ValueError(f"Error opening TOML file: {path}")
 
         if self.has_table_headers(text):
@@ -716,12 +715,12 @@ class Parquet(FileReader):
             table = pq.read_table(filename).to_pandas()
             try:
                 total_df = concat([total_df, table], axis=0, ignore_index=True)
-            except:
+            except Exception:
                 raise TypeError(f"Error in adding {filename} to the existing Parquet data. Please recheck column names and data structure")
 
         table_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in table_data.items():  # replace NaNs with None
-            table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            table_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
 
         if self.table_name is not None:
             self.parquet_data[self.table_name] = table_data
@@ -783,7 +782,7 @@ class Ensemble(FileReader):
             temp_df = read_csv(filename)
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
-            except:
+            except Exception:
                 raise ValueError(f"Error in adding {filename} to existing Ensemble data. Please column names and data structure again.")
         
         if self.sim_table:
@@ -792,7 +791,7 @@ class Ensemble(FileReader):
 
         total_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in total_data.items():  # replace NaNs with None
-            total_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            total_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         self.csv_data[self.table_name] = total_data
         
@@ -1175,7 +1174,7 @@ class GenesisDatacard(FileReader):
         for filename in self.datacard_files:
             try:
                 temp_df = read_excel(filename, sheet_name = 0)
-            except:
+            except Exception:
                 raise ValueError(f"Error reading in {filename} for the Genesis data card reader")
 
             required_columns = ["Metadata Element", "Supporting Element", "Requirement Level", "LANL Input Example"]
@@ -1184,12 +1183,12 @@ class GenesisDatacard(FileReader):
             
             for _, row in temp_df.iterrows():
                 if row['Requirement Level'].lower() == "mandatory":
-                    if type(row['Metadata Element']) == str and row['Metadata Element'].strip() not in ["", None]:
+                    if isinstance(row['Metadata Element'], str) and row['Metadata Element'].strip() not in ["", None]:
                         if row["Metadata Element"] in temp_data.keys():
                             temp_data[row["Metadata Element"]].append(row["LANL Input Example"])
                         else:
                             temp_data[row["Metadata Element"]] = [row["LANL Input Example"]]
-                    elif type(row['Supporting Element']) == str and row['Supporting Element'].strip() not in ["", None]:
+                    elif isinstance(row['Supporting Element'], str) and row['Supporting Element'].strip() not in ["", None]:
                         if row["Supporting Element"] in temp_data.keys():
                             temp_data[row["Supporting Element"]].append(row["LANL Input Example"])
                         else:
@@ -1220,7 +1219,6 @@ class MetadataReader1(FileReader):
         """
         Parses metadata json files and creates an ordered dict whose keys are file names and values are an ordered dict of that file's data
         """
-        file_counter = 0
         for filename in self.metadata_files:
             json_data = OrderedDict()
             with open(filename, 'r') as meta_file:

@@ -1,4 +1,3 @@
-from dsi.core import Terminal
 from collections import OrderedDict
 
 from dsi.plugins.collection_reader import Dict
@@ -16,7 +15,7 @@ def test_ordered_dict_reader():
     plug = Dict(collection=my_dict)
     plug.add_rows()
     assert len(plug.output_collector) == 5
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
     for inner_dict, val in plug.output_collector.items():
         if inner_dict == '"2"':
             assert len(val) == 7
@@ -43,7 +42,7 @@ def test_dict_reader():
     plug = Dict(collection=my_dict)
     plug.add_rows()
     assert len(plug.output_collector) == 5
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
     for inner_dict, val in plug.output_collector.items():
         if inner_dict == '"2"':
             assert len(val) == 7

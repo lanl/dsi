@@ -19,7 +19,7 @@ def test_sqlite_backend():
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
-    test = DSI(filename=dbpath, backend_name= "Sqlite")
+    DSI(filename=dbpath, backend_name= "Sqlite")
     assert True
 
 def test_error_filename():
@@ -923,7 +923,7 @@ def test_duckdb_backend():
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
-    test = DSI(filename=dbpath, backend_name= "DuckDB")
+    DSI(filename=dbpath, backend_name= "DuckDB")
     assert True
 
 def test_read_duckdb_backend():
@@ -1765,7 +1765,7 @@ def test_overwrite_schema_duckdb_backend():
     test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
-    #loophole to assign new schema since there isnt another schema file that can be used with yaml data (circular wont work here)
+    #loophole to assign new schema since there isn't another schema file that can be used with yaml data (circular won't work here)
     new_schema = OrderedDict({'primary_key': [('address', 'i'), ('math', 'specification')], 'foreign_key': [('math', 'b'), (None, None)]})
     test.read(filenames=new_schema, reader_name="Collection", table_name="dsi_relations") #loophole to assign new schema since
     test.write(filename="new_erd.png", writer_name="ER_Diagram")

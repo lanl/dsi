@@ -23,6 +23,7 @@ A subset of DSI's Readers and Writers are:
     :alt: Figure depicting the current Reader/Writer class hierarchy.
     :class: with-shadow
     :scale: 70%
+    :align: center
 
     Figure depicting the current DSI Reader/Writer class hierarchy.
 

@@ -78,5 +78,5 @@ class Dataframe(CollectionReader):
         try:
             ordered_df = OrderedDict((col, self.input_dict[col].tolist()) for col in self.input_dict.columns)
             self.set_schema_2(OrderedDict([(self.table_name, ordered_df)]))
-        except:
+        except Exception:
             raise ValueError("Error reading in the pandas DataFrame into DSI.")
