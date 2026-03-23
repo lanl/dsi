@@ -7,12 +7,10 @@ Parses the output from CloverLeaf runs and creates a csv file
 import argparse
 import sys
 import re
-import glob
 import git
 import pandas as pd
 from dsi.plugins.collection_reader import Dict
 from dsi.backends.sqlite import Sqlite, DataType
-import json
 
 def get_repo_and_name_from_url(url: str):
     last_colon_index = url.rfind(":")

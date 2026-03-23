@@ -25,9 +25,9 @@ class FileReader(StructuredMetadata):
 
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
-        if type(filenames) == str:
+        if isinstance(filenames, str):
             self.filenames = [filenames]
-        elif type(filenames) == list:
+        elif isinstance(filenames, list):
             self.filenames = filenames
         else:
             raise TypeError
@@ -88,12 +88,12 @@ class Csv(FileReader):
             temp_df = read_csv(filename)
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
-            except:
+            except Exception:
                 raise TypeError(f"Error in adding {filename} to the existing csv data. Please recheck column names and data structure")
 
         table_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in table_data.items():  # replace NaNs with None
-            table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            table_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         if self.table_name is not None:
             self.csv_data[self.table_name] = table_data
@@ -123,7 +123,6 @@ class Bueno(FileReader):
         """
         Parses Bueno data and adds a list containing 1 or more rows.
         """
-        file_counter = 0
         total_df = DataFrame()
         for filename in self.filenames:
             with open(filename, 'r') as fh:
@@ -133,7 +132,7 @@ class Bueno(FileReader):
 
         self.bueno_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in self.bueno_data.items():  # replace NaNs with None
-            self.bueno_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            self.bueno_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         self.set_schema_2(self.bueno_data)
 
@@ -174,12 +173,12 @@ class JSON(FileReader):
                 file_content = json.load(fh)
                 for key, val in file_content.items():
                     if not isinstance(val, (str, float, int)):
-                        return (TypeError, "General JSON reader cannot handle nested data, only flat JSON values.")
+                        raise TypeError("Generic JSON reader cannot handle nested data, only flat JSON values.")
                     if key not in temp_dict:
                         temp_dict[key] = []
                     temp_dict[key].append(val)
 
-        if self.table_name == None:
+        if self.table_name is None:
             self.base_dict["JSON"] = temp_dict
         else:
             self.base_dict[self.table_name] = temp_dict
@@ -259,7 +258,7 @@ class YAML(FileReader):
         `table_name`: str
             Name to assign to the loaded YAML data. If not provided, DSI defaults to using "YAML" as the table name.
 
-        `yaml_version: str, default = "1.1" 
+        `yaml_version`: str, default = "1.1" 
             Major and minor version of YAML specification.   
         """
         super().__init__(filenames, **kwargs)
@@ -334,7 +333,7 @@ class YAML(FileReader):
             try:
                 with open(file, 'r') as yaml_file:
                     yaml_load_data = list(self._safe_load_all(yaml_file))
-            except:
+            except Exception:
                 raise ValueError(f"Error opening YAML file: {file}")
             
             # cannot read in multiple tables per YAML file without multiple input table names
@@ -426,7 +425,7 @@ class YAML1(FileReader):
                             overlap_cols = set(self.yaml_data["dsi_units"][tableName].keys()) & set(unitsDict)
                             for col in overlap_cols:
                                 if self.yaml_data["dsi_units"][tableName][col] != unitsDict[col]:
-                                    return (TypeError, f"Cannot have a different set of units for column {col} in {tableName}")
+                                    raise TypeError(f"Cannot have a different set of units for column {col} in {tableName}")
                             self.yaml_data["dsi_units"][tableName].update(unitsDict)
 
                     max_length = max(len(lst) for lst in self.yaml_data[tableName].values())
@@ -512,7 +511,7 @@ class TOML(FileReader):
             with open(path, "r", encoding="utf-8") as f:
                 text = f.read()
             data = tomllib.loads(text)
-        except:
+        except Exception:
             raise ValueError(f"Error opening TOML file: {path}")
 
         if self.has_table_headers(text):
@@ -615,9 +614,6 @@ class TOML1(FileReader):
 
                 - Keys are column names.
                 - Values are lists representing column data.
-        
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_counter = 0
         for filename in self.toml_files:
@@ -663,7 +659,7 @@ class TOML1(FileReader):
                             overlap_cols = set(self.toml_data["dsi_units"][tableName].keys()) & set(unitsDict)
                             for col in overlap_cols:
                                 if self.toml_data["dsi_units"][tableName][col] != unitsDict[col]:
-                                    return (TypeError, f"Cannot have a different set of units for column {col} in {tableName}")
+                                    raise TypeError(f"Cannot have a different set of units for column {col} in {tableName}")
                             self.toml_data["dsi_units"][tableName].update(unitsDict)
 
                 max_length = max(len(lst) for lst in self.toml_data[tableName].values())
@@ -719,12 +715,12 @@ class Parquet(FileReader):
             table = pq.read_table(filename).to_pandas()
             try:
                 total_df = concat([total_df, table], axis=0, ignore_index=True)
-            except:
+            except Exception:
                 raise TypeError(f"Error in adding {filename} to the existing Parquet data. Please recheck column names and data structure")
 
         table_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in table_data.items():  # replace NaNs with None
-            table_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            table_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
 
         if self.table_name is not None:
             self.parquet_data[self.table_name] = table_data
@@ -777,9 +773,6 @@ class Ensemble(FileReader):
 
         When sim_table = True, a sim_table Ordered Dict is created alongside the Ensemble data table OrderedDict.
         Both tables are nested within a larger OrderedDict.
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name is None:
             self.table_name = "Ensemble"
@@ -789,8 +782,8 @@ class Ensemble(FileReader):
             temp_df = read_csv(filename)
             try:
                 total_df = concat([total_df, temp_df], axis=0, ignore_index=True)
-            except:
-                return (ValueError, f"Error in adding {filename} to the existing Ensemble data. Please recheck column names and data structure")
+            except Exception:
+                raise ValueError(f"Error in adding {filename} to existing Ensemble data. Please column names and data structure again.")
         
         if self.sim_table:
             total_df['sim_id'] = range(1, len(total_df) + 1)
@@ -798,7 +791,7 @@ class Ensemble(FileReader):
 
         total_data = OrderedDict(total_df.to_dict(orient='list'))
         for col, coldata in total_data.items():  # replace NaNs with None
-            total_data[col] = [None if type(item) == float and isnan(item) else item for item in coldata]
+            total_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         self.csv_data[self.table_name] = total_data
         
@@ -835,9 +828,6 @@ class Cloverleaf(FileReader):
         Flattens data from each simulation's input file as a row in the `input` table.
         Flattens data from each simulation's output file as a row in the `output` table.
         Creates a simulation table which is stores each simulation's number and execution datetime.
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         input_dict = OrderedDict({'sim_id': []})
         output_dict = OrderedDict({'sim_id': []})
@@ -961,9 +951,6 @@ class Oceans11Datacard(YAML):
     def add_rows(self) -> None:
         """
         Flattens data in the input data card as a row in the `oceans11_datacard` table
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
@@ -993,7 +980,7 @@ class Oceans11Datacard(YAML):
             if sorted(field_names) != sorted(["title", "description", "keywords", "instructions_of_use", "authors", 
                                               "release_date", "la_ur", "funding", "rights", "file_types", 
                                               "file_size", "num_files", "dataset_size", "version", "doi"]):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
+                raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Oceans11 template")
 
         self.datacard_data["oceans11_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
@@ -1019,9 +1006,6 @@ class DublinCoreDatacard(FileReader):
     def add_rows(self) -> None:
         """
         Flattens data in the input data card as a row in the `dublin_core_datacard` table
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         import xmltodict
         temp_data = OrderedDict()
@@ -1042,7 +1026,7 @@ class DublinCoreDatacard(FileReader):
             if sorted(field_names) != sorted(['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 
                                               'Language', 'Format', 'Subject', 'Description', 'Identifier', 
                                               'Relation', 'Source', 'Type', 'Coverage', 'Rights']):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
+                raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Dublin Core template")
 
         self.datacard_data["dublin_core_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
@@ -1068,9 +1052,6 @@ class SchemaOrgDatacard(FileReader):
     def add_rows(self) -> None:
         """
         Flattens data in the input data card as a row in the `schema_org_datacard` table
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
@@ -1083,7 +1064,7 @@ class SchemaOrgDatacard(FileReader):
                     field_names.append(element)
                     continue
                 elif element == "@type" and val.lower() != "dataset":
-                    return (KeyError, f"{filename} must have key '@type' with value of 'Dataset' to match schema.org requirements")
+                    raise KeyError(f"{filename} must have key '@type' with value of 'Dataset' to match Schema.org requirements")
                 if element not in temp_data.keys():
                     temp_data[element] = [val]
                 else:
@@ -1095,7 +1076,7 @@ class SchemaOrgDatacard(FileReader):
                                               "datePublished", "countryOfOrigin", "locationCreated", "sourceOrganization", 
                                               "url", "version", "creditText", "license", "citation", "copyrightHolder", 
                                               "copyrightNotice", "copyrightYear"]):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
+                raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Schema.org template")
 
         self.datacard_data["schema_org_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
@@ -1121,9 +1102,6 @@ class GoogleDatacard(YAML):
     def add_rows(self) -> None:
         """
         Flattens data in the input data card as a row in the `google_datacard` table
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
 
@@ -1132,7 +1110,7 @@ class GoogleDatacard(YAML):
                 data = self._safe_load(yaml_file)
                 
             if not set(data.keys()).issubset(["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]):
-                return (KeyError, f"Error in reading {filename} data card. Please ensure section names in this data card match the names in the template")
+                raise KeyError(f"Error in reading {filename} data card. Please ensure section names match the ones in the Google template")
             
             field_names = []
             sampling_fields = []
@@ -1159,14 +1137,14 @@ class GoogleDatacard(YAML):
                                               'last_updated', 'release_date', 'motivation', 'dataset_uses', 'citation_guidelines', 
                                               'citation_bibtex', 'collection_methods_used', 'source', 'platform', 'dates_of_collection',
                                               'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
-                return (ValueError, f"Error in reading {filename} data card. Please ensure all fields included match the template")
+                raise ValueError(f"Error in reading {filename} data card. Ensure all fields match the Google dc template")
             
             if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
-                return (KeyError, f"Error in reading {filename} data card. Please ensure all fields in 'sampling_methods' match the template")
+                raise KeyError(f"Error in reading {filename} data card. Ensure all fields in 'sampling_methods' match the Google dc template")
             
             if not set(ml_fields).issubset(['ml_applications', 'ml_model_name', 'evaluation_accuracy', 'evaluation_precision', 
                                                   'evaluation_recall', 'evaluation_performance_metric']):
-                return (KeyError, f"Error reading {filename} data card. Please ensure all fields in 'known_applications_and_benchmarks' match the template")
+                raise KeyError(f"Error reading {filename} data card. Ensure all fields in 'known_applications_and_benchmarks' match the Google dc template")
         self.datacard_data["google_datacard"] = temp_data
         self.set_schema_2(self.datacard_data)
 
@@ -1191,15 +1169,12 @@ class GenesisDatacard(FileReader):
     def add_rows(self) -> None:
         """
         Flattens data in the input data card as a row in the `genesis_datacard` table
-
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         temp_data = OrderedDict()
         for filename in self.datacard_files:
             try:
                 temp_df = read_excel(filename, sheet_name = 0)
-            except:
+            except Exception:
                 raise ValueError(f"Error reading in {filename} for the Genesis data card reader")
 
             required_columns = ["Metadata Element", "Supporting Element", "Requirement Level", "LANL Input Example"]
@@ -1208,12 +1183,12 @@ class GenesisDatacard(FileReader):
             
             for _, row in temp_df.iterrows():
                 if row['Requirement Level'].lower() == "mandatory":
-                    if type(row['Metadata Element']) == str and row['Metadata Element'].strip() not in ["", None]:
+                    if isinstance(row['Metadata Element'], str) and row['Metadata Element'].strip() not in ["", None]:
                         if row["Metadata Element"] in temp_data.keys():
                             temp_data[row["Metadata Element"]].append(row["LANL Input Example"])
                         else:
                             temp_data[row["Metadata Element"]] = [row["LANL Input Example"]]
-                    elif type(row['Supporting Element']) == str and row['Supporting Element'].strip() not in ["", None]:
+                    elif isinstance(row['Supporting Element'], str) and row['Supporting Element'].strip() not in ["", None]:
                         if row["Supporting Element"] in temp_data.keys():
                             temp_data[row["Supporting Element"]].append(row["LANL Input Example"])
                         else:
@@ -1244,7 +1219,6 @@ class MetadataReader1(FileReader):
         """
         Parses metadata json files and creates an ordered dict whose keys are file names and values are an ordered dict of that file's data
         """
-        file_counter = 0
         for filename in self.metadata_files:
             json_data = OrderedDict()
             with open(filename, 'r') as meta_file:

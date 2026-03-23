@@ -5,7 +5,7 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-exec(open("../dsi/_version.py").read())
+from dsi._version import __version__
 
 project = 'DSI'
 copyright = '2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248'
@@ -30,3 +30,4 @@ rst_prolog = f".. |version_num| replace:: {__version__}"
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+html_css_files = ['custom.css']

@@ -5,8 +5,6 @@ This script reads in the csv file created from parse_slurm_output.py.
 Then it creates a DSI db from the csv file and performs a query.
 """
 
-import argparse
-import sys
 from dsi.backends.sqlite import Sqlite, DataType
 from dsi.plugins.collection_reader import Dict
 isVerbose = True
@@ -56,7 +54,6 @@ def test_artifact_query(test_name):
     data_type.name = "rundata"
     query = "SELECT * FROM " + str(data_type.name) + " WHERE Viscosity > 0.1"
     print("Running Query", query)
-    result = store.sqlquery(query)
     store.export_csv_query(query, "clover_query.csv")
     store.close()
 

@@ -71,8 +71,8 @@ Contributing Your Reader
 If your Reader is helpful and acceptable for public use, you should consider making a pull request (PR) into DSI.
 
 Please note that any accepted PRs into DSI should satisfy the following:
- - Passes all tests in ``dsi/plugins/tests``
- - Has no ``pylama`` errors/warnings (see `dsi/.githooks <https://github.com/lanl/dsi/tree/main/.githooks>`_)
+ - Pass all tests in ``dsi/plugins/tests``
+ - Pass the Github linting CI checks
 
 Examples
 ----------

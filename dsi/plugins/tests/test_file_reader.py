@@ -15,7 +15,7 @@ def test_bueno_plugin_type():
     path = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
     plug = Bueno(filenames=path)
     plug.add_rows()
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
 
 
 def test_bueno_plugin_adds_rows():
@@ -46,7 +46,7 @@ def test_csv_plugin_type():
     path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
 
 def test_csv_plugin_adds_rows():
     path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])

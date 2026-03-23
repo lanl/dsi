@@ -178,7 +178,7 @@ def process_schema_run_table_sqlite_backend():
     dbpath = 'data.db'
     a.load_module('backend','Sqlite','back-read', filename=dbpath)
     a.artifact_handler(interaction_type="process")
-    assert a.runTable == True
+    assert a.runTable
 
     assert len(a.active_metadata.keys()) == 6 # 4 tables - math, address, physics, dsi_units, dsi_relations, runTable
     for name, tableData in a.active_metadata.items():
@@ -621,7 +621,7 @@ def process_schema_run_table_duckdb_backend():
     dbpath = 'data.db'
     a.load_module('backend','DuckDB','back-read', filename=dbpath)
     a.artifact_handler(interaction_type="process")
-    assert a.runTable == True
+    assert a.runTable
 
     assert len(a.active_metadata.keys()) == 6 # 4 tables - math, address, physics, dsi_units, dsi_relations, runTable
     for name, tableData in a.active_metadata.items():

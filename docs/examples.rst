@@ -35,6 +35,8 @@ Resulting in the output of the query:
 ..  figure:: images/example-pennant-output.png
     :alt: Screenshot of computer program output.
     :class: with-shadow
+    :scale: 80%
+    :align: center
 
     The output of the PENNANT example.
 

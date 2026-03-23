@@ -1,6 +1,6 @@
 #from asyncio.windows_events import NULL
 import os
-import urllib.request
+# import urllib.request
 import sys
 
 #scp jesus@192.168.0.102:D:\Data\wildfire\wildfire.db .
@@ -9,12 +9,11 @@ import sys
 # Temporary until DSI becomes a module
 # Path to root dsi folder
 sys.path.insert(1, '../')
-from dsi.backends.sqlite import Sqlite, DataType
+from dsi.backends.sqlite import Sqlite
 from dsi.backends.filesystem import Filesystem as fs
 
 # Analysis
 import matplotlib.pyplot as plt
-import numpy as np
 
 #
 #  Main Test

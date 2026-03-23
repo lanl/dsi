@@ -1,9 +1,7 @@
 from dsi.core import Terminal
-from collections import OrderedDict
 import git
 
 # import dsi.plugins.file_writer as wCSV
-from dsi.backends.sqlite import Sqlite
 import cv2
 import numpy as np
 import os
@@ -13,11 +11,16 @@ def get_git_root(path):
     git_root = git_repo.git.rev_parse("--show-toplevel")
     return (git_root)
 
-def test_csv_plugin_type():
-    path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.sqlite_db'])
-    back = Sqlite(filename=path)
+def test_csv_writer():
+    a=Terminal()
+    a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_circular_schema.json" , target_table_prefix = "student")
+    a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
+    a.load_module('plugin', 'TOML1', 'reader', filenames=["examples/test/results.toml"], target_table_prefix = "results")
+    a.load_module('plugin', 'Csv_Writer', 'writer', filename = 'physics.csv', table_name = "student__physics")
+    a.transload()
     
-    #assert type(plug.output_collector) == OrderedDict
+    assert os.path.exists("physics.csv")
+    os.remove("physics.csv")
 
 def test_er_diagram():
     a=Terminal()

@@ -1,8 +1,4 @@
-import git
-from collections import OrderedDict
-
 from dsi.backends.hpss import HPSS
-import os
 
 def test_hpss():
     files = { 'wildfiredata.csv': {'local_path': '/home/user/dsi/examples/data/wildfiredata.csv', 'local_sha1': '', 'hpss_hash': ''} }

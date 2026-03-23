@@ -35,6 +35,8 @@ Resulting in the output of the query:
 ..  figure:: images/example-pennant-output.png
     :alt: Screenshot of computer program output.
     :class: with-shadow
+    :scale: 80%
+    :align: center
 
     The output of the PENNANT example.
 
@@ -90,6 +92,7 @@ and navigate to ``wildfire_plotly.ipynb``.  Run the cells to visualize the resul
     :alt: User interface showing the visualization code to load the CSV file and resultant parallel coordinates plot.
     :class: with-shadow
     :scale: 50%
+    :align: center
 
     Screenshot of the JupyterLab workflow.
     The CSV file is loaded and used to generate a parallel coordinates plot showing the parameters of interest from the simulation.
@@ -106,6 +109,7 @@ To open a pycinema viewer, first install pycinema and then run the example scrip
 ..  figure:: images/example-wildfire-pycinema.png
     :class: with-shadow
     :scale: 40%
+    :align: center
 
     Screenshot of the Pycinema user interface showing the minimal set of components.
     Left: the nodeview showing the various pycinema components in the visualization pipeline;
