@@ -249,7 +249,7 @@ def main():
     testname = "test"
     gitdir = "/Users/ssakin/projects/CloverLeaf/CloverLeaf_ref/tauProfiles"
     # data = parse_clover_output_file(testname, args.gitdir)
-    data = parse_tau_output_file(testname, gitdir)
+    parse_tau_output_file(testname, gitdir)
     # print(data)
     # add_output_to_csv_file(data, testname)
     # add_output_to_dsi(data, testname)

@@ -14,7 +14,6 @@ def testGitIsssue():
     repo = getGitRepo(user_repo)
     repo.create_issue(title="This is a new issue")
     issue = repo.get_issue(number=1)
-    ic = issue.get_comments()
     issue.create_comment("This")
     print(issue.title)
 

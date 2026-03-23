@@ -54,7 +54,6 @@ def test_artifact_query(test_name):
     data_type.name = "rundata"
     query = "SELECT * FROM " + str(data_type.name) + " WHERE Viscosity > 0.1"
     print("Running Query", query)
-    result = store.sqlquery(query)
     store.export_csv_query(query, "clover_query.csv")
     store.close()
 

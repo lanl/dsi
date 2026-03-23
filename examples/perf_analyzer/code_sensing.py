@@ -4,7 +4,6 @@ import argparse
 import sys
 import glob
 import re
-import git
 
 def recursive_c_directive_match(re_list, search_file_list, cur_dir):
     """ The data is parsed from all of the files in the current directory """
@@ -68,7 +67,6 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    git_hash = git.Repo(git_repo).head.object.hexsha
     re_list = ["pragma", "define"]
     search_file_list = [r"\.c", r"\.cc"]
     # occ = recursive_c_directive_match(re_list, search_file_list, git_repo)

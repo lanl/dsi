@@ -98,7 +98,6 @@ def getGitGraph(user_repo, selected_branches):
                     continue
                 if top_here["depth"] > git_graph_max_depth:
                     continue
-                c_branch = top_here["branch"]
                 visited_commit_hash.append(c_commit.commit.sha)
                 
                 for each_parent in c_commit.commit.parents:
@@ -147,9 +146,9 @@ def add(idx, X, F):
 def point_query(idx, F):
     return sum(idx, F)
 
-def range_update(l, r, X, F):
+def range_update(idx, r, X, F):
     # Add X to the element at index l
-    add(l, X, F)
+    add(idx, X, F)
     # Subtract X from the element at index (r + 1)
     add(r + 1, -X, F)
 # =================================
@@ -241,7 +240,6 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
     cd = []
     edges = list()
     XY_ind = 0
-    Xe2 = []
     for ind in git_nodes_df.index:
         if ind % 2 == 1:
             # le = getNodeWidth(git_nodes_df['sha'][ind-1], git_nodes_df['depth'][ind-1])
@@ -294,7 +292,6 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
         global local_cached_data
         cached_data = local_cached_data['code_sensing']
         all_var_list = list()
-        f_lines = cached_data[mk_data['hash']][mk_data['ev']][mk_data['var_name']][mk_data['file_name']]
         for each_hash in cached_data:
 
             if mk_data['ev'] in cached_data[each_hash] and \
@@ -355,8 +352,6 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
         merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
     combined_all_df = merged_df[merged_df.cname is not None].sort_values(by=['date'], ascending=True)
     combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
-    sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
-
 
     combined_all_df = combined_all_df.dropna(subset=perf_filter.extend(["date"])).reset_index(drop=True)
 
@@ -692,7 +687,6 @@ def update_var_result_table(n_clicks, search_var, filtered_files):
     Input('selected-second-commits-table', "derived_virtual_selected_rows"),
     prevent_initial_call=True)
 def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commits_row, derived_selected_commits_list):
-    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
     blank_markdown = dcc.Markdown("", id='actual-source-block')
     
     mk_data = None
@@ -910,9 +904,9 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
             
             if parse_output_analyzer.test_artifact_query(perf_runner.testname, perf_runner.current_working_directory, candidate_commit_hash):
                 try:
-                    result = subprocess.run('cd ' + perf_runner.current_git_directory + ' && git checkout -f ' + candidate_commit_hash, shell=True)
+                    subprocess.run('cd ' + perf_runner.current_git_directory + ' && git checkout -f ' + candidate_commit_hash, shell=True)
                 except subprocess.CalledProcessError as cpe:
-                    result = cpe.output
+                    print(cpe.output)
                 finally:
                     print("checkout done")
             # perf_runner.git_repo.git.checkout(force=True,hash=candidate_commit_hash)
@@ -923,9 +917,9 @@ def update_branch_selection_output(repo_name, value, selectedData, n_clicks, sea
                 # my_env["PATH"] = f"/Users/ssakin/Softwares/anaconda3/envs/cdsi/bin:{my_env['PATH']}"
                 try:
                     command = ['cd /Users/ssakin/projects/dsi/tools/perf_analyzer && source runner_script.sh']
-                    result = subprocess.run(command, env=my_env, shell=True)
+                    subprocess.run(command, env=my_env, shell=True)
                 except subprocess.CalledProcessError as cpe:
-                    result = cpe.output
+                    print(cpe.output)
                 finally:
                     print("final done")
                     
