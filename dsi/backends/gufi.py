@@ -50,10 +50,6 @@ class Gufi(Filesystem):
         self.column = column
 
         self.isVerbose = verbose
-
-    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def get_artifacts(self, query):
-        return self.query_artifacts(query)
     
     # Query GUFI and DSI db
     def query_artifacts(self, query):
@@ -67,10 +63,6 @@ class Gufi(Filesystem):
             print(resout)
 
         return resout
-
-    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifacts(self, query):
-        return self.ingest_artifacts(query)
     
     def ingest_artifacts(self, query):
         pass

@@ -29,11 +29,11 @@ class Dict(CollectionReader):
         """Reads the input Dictionary/Ordered Dictionary and stores it as either one table or multiple tables in the DSI Abstraction"""
 
         if not all(isinstance(key, str) for key in self.input_dict.keys()):
-            return (TypeError, "Keys in the input dictionary must all be strings. Either table or column names.")
+            raise TypeError("Keys in the input dictionary must all be strings. Either table or column names.")
 
         if all(isinstance(val, list) for val in self.input_dict.values()):
             if self.table_name is None:
-                return (ValueError, "table_name argument must be specified to name this single table of data.")
+                raise ValueError("table_name argument must be specified to name this single table of data.")
             if not isinstance(self.input_dict, OrderedDict) and isinstance(self.input_dict, dict):
                 self.input_dict = OrderedDict(self.input_dict)
             self.set_schema_2(OrderedDict([(self.table_name, self.input_dict)]))
@@ -52,7 +52,7 @@ class Dict(CollectionReader):
         elif all(isinstance(val, dict) for val in self.input_dict.values()):
             for nested_dict in self.input_dict.values():
                 if not all(isinstance(v1, list) for v1 in nested_dict.values()):
-                    return (ValueError, "Each value in a nested dictionary / Ordered Dict must be a list.")
+                    raise ValueError("Each value in a nested dictionary / Ordered Dict must be a list.")
             if not isinstance(self.input_dict, OrderedDict) and isinstance(self.input_dict, dict):
                 new_input = OrderedDict()
                 for k, v in self.input_dict.items():
@@ -63,7 +63,7 @@ class Dict(CollectionReader):
                 self.input_dict = new_input
             self.set_schema_2(self.input_dict)
         else:
-            return (ValueError, "Input dictionary must either represent one table of data or multiple tables (use nested Ordered Dicts).")
+            raise ValueError("Input dictionary must either represent one table of data or multiple tables (use nested Ordered Dicts).")
 
 class Dataframe(CollectionReader):
     """A Plugin to capture data from a Pandas DataFrame that must represent a single table."""

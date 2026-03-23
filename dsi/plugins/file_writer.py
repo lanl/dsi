@@ -58,9 +58,6 @@ class ER_Diagram(FileWriter):
             The internal DSI abstraction. This is a nested OrderedDict where:
                 - Top-level keys are table names.
                 - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
-        
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         file_type = ".png"
         if len(self.output_filename) > 4 and self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
@@ -70,10 +67,10 @@ class ER_Diagram(FileWriter):
             file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
         elif len(self.output_filename) > 4 and self.output_filename[-4:] == ".svg":
-            return (RuntimeError, "ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
+            raise RuntimeError("ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
-            return (ValueError, "Your input for target_table_prefix does not exist in memory. Please enter a valid prefix for table names.")
+            raise ValueError(f"The target_table_prefix '{self.target_table_prefix}' does not exist. Please enter a valid prefix for table names.")
         
         manual_dot = False
         try: from graphviz import Digraph
@@ -118,7 +115,7 @@ class ER_Diagram(FileWriter):
 
                     if rel_cols:
                         if len(rel_cols) > self.max_cols:
-                            return (ValueError, "'max_cols' must be >= to the number of primary/foreign key columns.")
+                            raise ValueError("max_cols input must be >= to the number of primary/foreign key columns.")
                         other_cols = [col for col in col_list if col not in rel_cols]
                         combined = list(rel_cols) + other_cols[:self.max_cols - len(rel_cols)]
                         col_list = [k for k in col_list if k in combined]
@@ -167,7 +164,7 @@ class ER_Diagram(FileWriter):
             try:
                 dot.render(self.output_filename, cleanup=True)
             except:
-                return (EnvironmentError, "Graphviz executable must be downloaded to global environment using sudo or homebrew.")
+                raise EnvironmentError("Graphviz executable must be downloaded to global environment using sudo or homebrew.")
 
 class Csv_Writer(FileWriter):
     """
@@ -203,14 +200,11 @@ class Csv_Writer(FileWriter):
             The internal DSI abstraction. This is a nested OrderedDict where:
                 - Top-level keys are table names.
                 - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
-        
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (KeyError, f"{self.table_name} does not exist in memory")
+            raise KeyError(f"{self.table_name} does not exist in memory")
         if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
-            return (ValueError, f"Inputted list of column names to plot for {self.table_name} is incorrect")
+            raise ValueError(f"Input list of column names to plot for {self.table_name} is invalid")
         
         df = pd.DataFrame(collection[self.table_name])
         
@@ -218,7 +212,7 @@ class Csv_Writer(FileWriter):
             try:
                 df = df[self.export_cols]
             except:
-                return (ValueError, f"Could not export to csv as the specified column input {self.export_cols} is incorrect")
+                raise ValueError(f"Could not export to CSV as the specified column input {self.export_cols} is incorrect")
         df.to_csv(self.csv_file_name, index=False)
 
 class Table_Plot(FileWriter):
@@ -254,16 +248,13 @@ class Table_Plot(FileWriter):
             The internal DSI abstraction. This is a nested OrderedDict where:
                 - Top-level keys are table names.
                 - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
-        
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (KeyError, f"{self.table_name} does not exist in memory")
+            raise KeyError(f"{self.table_name} does not exist in memory")
         if self.table_name in ["dsi_units", "dsi_relations", "sqlite_sequence"]:
-            return (RuntimeError, f"Cannot plot the units or relations table")
+            raise RuntimeError(f"Cannot plot the units or relations table")
         if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
-            return (ValueError, f"Inputted list of columns to plot for {self.table_name} is incorrect")
+            raise ValueError(f"Input list of columns to plot for {self.table_name} is invalid")
         
         numeric_cols = []
         not_plot_cols = []
@@ -317,9 +308,9 @@ class Table_Plot(FileWriter):
         plt.close('all')
 
         if len(not_plot_cols) > 1:
-            return ("Warning", f"Even though {not_plot_cols} are in display_cols, they are not numeric and cannot be plotted")
+            print(f"WARNING: Cannot plot {not_plot_cols} as they are non-numeric")
         elif len(not_plot_cols) == 1:
-            return ("Warning", f"Even though '{not_plot_cols[0]}' is in display_cols, it is not numeric and cannot be plotted")
+            print(f"WARNING: Cannot plot {not_plot_cols} as it is non-numeric")
 
 class Parquet_Writer(FileWriter):
     """
@@ -358,14 +349,11 @@ class Parquet_Writer(FileWriter):
             The internal DSI abstraction. This is a nested OrderedDict where:
                 - Top-level keys are table names.
                 - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
-        
-        `return`: None. 
-            If an error occurs, a tuple in the format - (ErrorType, "error message") - is returned to and printed by the core
         """
         if self.table_name not in collection.keys():
-            return (KeyError, f"{self.table_name} does not exist in memory")
+            raise KeyError(f"{self.table_name} does not exist in memory")
         if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
-            return (ValueError, f"Inputted list of column names to plot for {self.table_name} is incorrect")
+            raise ValueError(f"Input list of column names to plot for {self.table_name} is invalid")
 
         df = pd.DataFrame(collection[self.table_name])
         
@@ -373,7 +361,7 @@ class Parquet_Writer(FileWriter):
             try:
                 df = df[self.export_cols]
             except:
-                return (ValueError, f"Could not export to Parquet as the specified column input {self.export_cols} is incorrect")
+                raise ValueError(f"Could not export to Parquet as the specified column input {self.export_cols} is incorrect")
 
         table = pa.Table.from_pandas(df)
         pq.write_table(table, self.parquet_file_name, compression="snappy")

@@ -19,6 +19,11 @@ import itertools
 from typing import Iterator
 from contextlib import redirect_stdout
 import tempfile
+from packaging import version
+
+# temporary check since pandas 3.0+ has unstable releases
+if version.parse(pd.__version__) >= version.parse("3.0.0"):
+    raise ImportError("Pandas 3.0+ is not compatible with DSI due to unstable releases.")
 
 class Terminal():
     """
@@ -41,7 +46,7 @@ class Terminal():
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
-    VALID_ARTIFACT_INTERACTION_TYPES = ['put', 'get', 'inspect', 'read', 'ingest', 'query', 'notebook', 'process']
+    VALID_ARTIFACT_INTERACTION_TYPES = ['ingest', 'query', 'notebook', 'process']
 
     def __init__(self, debug = 0, backup_db = False, runTable = False):
         """
@@ -61,8 +66,8 @@ class Terminal():
             - If True, a 'runTable' is created, and timestamped each time new data/metadata is ingested.
               Recommended for in-situ use-cases.
         """
-        sys.tracebacklimit = 0
-
+        # sys.tracebacklimit = 0
+        
         def static_munge(prefix, implementations):
             return (['.'.join(i) for i in product(prefix, implementations)])
 
@@ -192,21 +197,18 @@ class Terminal():
                         tester = 1
                         sys.settrace(self.trace_function) # starts a short trace to get line number where plugin reader returned
 
-                    ingest_error = None
                     try:
-                        ingest_error = obj.add_rows()
-                    except:
+                        obj.add_rows()
+                    except Exception as e:
                         if self.debug_level != 0:
-                            self.logger.error(f'   Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
-                        raise RuntimeError(f'Data structure error in add_rows() of {mod_name} plugin. Check to ensure data was stored correctly')
-
-                    if ingest_error is not None:
-                            if self.debug_level != 0:
-                                self.logger.error(f"   {ingest_error[1]}")
-                            if self.user_wrapper:
-                                raise ingest_error[0](ingest_error[1])
+                            self.logger.error(f'   {obj.__class__.__name__} reader error: {str(e)}')
+                        if not self.user_wrapper:
+                            if e.args:
+                                e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
                             else:
-                                raise ingest_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + ingest_error[1])
+                                e.args = (f'Error in {original_file} @ line {return_line_number}',)
+                        raise
+
                     if tester == 1:
                         sys.settrace(None) # ends trace to prevent large overhead
 
@@ -283,19 +285,19 @@ class Terminal():
                         if mod_type == "backend":
                             self.loaded_backends.append(class_object)
                     except Exception as e:
-                        print(e)
-                        if "runTable flag is only valid for in-situ workflows" in str(e):
+                        if "runTable flag is only valid" in str(e):
                             if self.debug_level != 0:
-                                self.logger.error("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
+                                self.logger.error(str(e))
                             raise
                         if self.debug_level != 0:
                             self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
                         raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-
-                if mod_type == "backend":
-                    print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
-                else:
-                    print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
+                
+                if not self.user_wrapper:
+                    if mod_type == "backend":
+                        print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
+                    else:
+                        print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
                 end = datetime.now()
                 if self.debug_level != 0:
                     self.logger.info(f"{mod_name} {mod_function} {mod_type} loaded successfully.")
@@ -391,25 +393,19 @@ class Terminal():
             if sys.gettrace() is None:
                 tester = 1
                 sys.settrace(self.trace_function) # starts a short trace to get line number where writer plugin returned
-
-            writer_error = None
+            
             try:
-                writer_error = obj.get_rows(self.active_metadata, **kwargs)
-            except:
+                obj.get_rows(self.active_metadata, **kwargs)
+            except Exception as e:
                 if self.debug_level != 0:
-                    self.logger.error(f'   Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
-                raise RuntimeError(f'Data structure error in get_rows() of {obj.__class__.__name__} plugin. Ensure data was handled correctly')
-
-            if writer_error is not None:
-                if writer_error[0] == "Warning":
-                    print("WARNING:", writer_error[1])
-                else:
-                    if self.debug_level != 0:
-                        self.logger.error(writer_error[1])
-                    if self.user_wrapper:
-                        raise writer_error[0](writer_error[1])
+                    self.logger.error(f'   {obj.__class__.__name__} writer error: {str(e)}')
+                if not self.user_wrapper:
+                    if e.args:
+                        e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
                     else:
-                        raise writer_error[0](f"Caught error in {original_file} @ line {return_line_number}: " + writer_error[1])
+                        e.args = (f'Error in {original_file} @ line {return_line_number}',)
+                raise
+
             if tester == 1:
                 sys.settrace(None) # ends trace to prevent large overhead
 
@@ -421,7 +417,7 @@ class Terminal():
             self.active_modules["writer"] = unused_writers
             if self.debug_level != 0:
                 self.logger.warning(f"Not all writers were successfully transloaded. These were not transloaded: {unused_writers}")
-            print(f"WARNING: Not all writers were successfully transloaded. These were not transloaded: {unused_writers}")
+            print(f"WARNING: These writers were not transloaded: {unused_writers}")
         else:
             self.active_modules["writer"] = []
 
@@ -432,15 +428,15 @@ class Terminal():
         `interaction_type` : str
             Specifies the type of action to perform. Accepted values:
 
-                - 'ingest' or 'put': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
+                - 'ingest': ingests active DSI abstraction into all loaded BACK-WRITE backends (BACK-READ backends ignored)
 
                     - if backup_db flag = True in Core instance, a backup is created prior to ingesting data
-                - 'query' or 'get': retrieves data from first loaded backend based on a specified 'query'
-                - 'notebook' or 'inspect': generates an interactive Python notebook with all data from first loaded backend
-                - 'process' or 'read': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
+                - 'query': retrieves data from first loaded backend based on a specified 'query'
+                - 'notebook': generates an interactive Python notebook with all data from first loaded backend
+                - 'process': overwrites current DSI abstraction with all data from first loaded BACK-READ backend
 
         `query` : str, optional
-            Required only when `interaction_type` is 'query' or 'get', and it is an input to a backend's `query_artifact()` method.
+            Required only when `interaction_type` is 'query'.
 
         kwargs :
             Additional keyword arguments passed to underlying backend functions.
@@ -462,7 +458,7 @@ class Terminal():
 
         operation_success = False
         backread_active = False
-        if interaction_type in ['ingest', 'put']:
+        if interaction_type in ['ingest']:
             for obj in self.active_modules['back-write']:
                 if self.debug_level != 0:
                     self.logger.info("-------------------------------------")
@@ -483,35 +479,33 @@ class Terminal():
                 if sys.gettrace() is None:
                     tester = 1
                     sys.settrace(self.trace_function) # starts a short trace to get line number where ingest_artifacts() returned
-                if interaction_type == "ingest":
-                    errorMessage = obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
-                elif interaction_type == "put":
-                    errorMessage = obj.put_artifacts(collection = self.active_metadata, **kwargs)
-                if errorMessage is not None:
+                try:
+                    obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
+                except Exception as e:
                     if self.debug_level != 0:
-                        self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                        self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e)}")
                     if self.user_wrapper:
-                        if isinstance(errorMessage[1], str) and errorMessage[1].startswith("A complex schema"):
-                            raise errorMessage[0](errorMessage[1])
-                        raise errorMessage[0](f"Error ingesting data due to {errorMessage[1]}")
+                        if not (isinstance(e.args[0], str) and str(e.args[0]).startswith("A complex schema")):
+                            e.args = (f"Error ingesting data - {str(e.args[0])}",  *e.args[1:])
                     else:
-                        raise errorMessage[0](f"Error ingesting data in {original_file} @ line {return_line_number} due to {errorMessage[1]}")
+                        e.args = (f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e.args[0])}",  *e.args[1:])
+                    raise
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
                 end = datetime.now()
                 self.logger.info(f"Runtime: {end-start}")
-        if interaction_type in ['ingest', 'put'] and len(self.active_modules['back-read']) > 0:
+        if interaction_type in ['ingest'] and len(self.active_modules['back-read']) > 0:
             backread_active = True
 
         query_data = None
         first_backend = self.loaded_backends[0]
         parent_backend = first_backend.__class__.__bases__[0].__name__
-        if interaction_type not in ['ingest', 'put', "process", "read"] and self.debug_level != 0:
+        if interaction_type not in ['ingest', "process"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
         start = datetime.now()
-        if interaction_type in ['query', 'get']:
+        if interaction_type in ['query']:
             # TODO query all backends together
             if self.valid_backend(first_backend, parent_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
@@ -521,17 +515,14 @@ class Terminal():
                 if sys.gettrace() is None:
                     tester = 1
                     sys.settrace(self.trace_function) # starts a short trace to get line number where query_artifacts() returned
-                if interaction_type == "get":
-                    query_data = first_backend.get_artifacts(**kwargs)
-                elif interaction_type == "query":
+                try:
                     query_data = first_backend.query_artifacts(**kwargs)
-                if isinstance(query_data, tuple):
+                except Exception as e:
                     if self.debug_level != 0:
-                        self.logger.error(query_data[1])
-                    if self.user_wrapper:
-                        raise query_data[0](query_data[1])
-                    else:
-                        raise query_data[0](f"Caught error in {original_file} @ line {return_line_number}: " + query_data[1])
+                        self.logger.error((str(e)))
+                    if not self.user_wrapper:
+                        e.args = (f"Caught error in {original_file} @ line {return_line_number}: " + e.args[0], *e.args[1:])
+                    raise
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
@@ -540,24 +531,21 @@ class Terminal():
                     self.logger.error("Need to ingest data into first loaded backend before querying data from it")
                 raise RuntimeError("Need to ingest data into first loaded backend before querying data from it")
 
-        elif interaction_type in ['notebook', 'inspect']:
+        elif interaction_type in ['notebook']:
             if self.valid_backend(first_backend, parent_backend):
                 try:
-                    if interaction_type == "inspect":
-                        first_backend.inspect_artifacts(**kwargs)
-                    elif interaction_type == "notebook":
-                        first_backend.notebook(**kwargs)
+                    first_backend.notebook(**kwargs)
                 except:
                     raise RuntimeError("Error in generating notebook. Please ensure data in the actual backend is stable")
             elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
                 pass
-            else: #backend is empty - cannot inspect
+            else: #backend is empty - cannot create notebook
                 if self.debug_level != 0:
                     self.logger.error("Need to ingest data into first loaded backend before generating a Python notebook")
                 raise RuntimeError("Need to ingest data into first loaded backend before generating a Python notebook")
             operation_success = True
         # only processes data from first backend for now - TODO process data from all active backends later
-        elif interaction_type in ["process", "read"]:
+        elif interaction_type in ["process"]:
             if len(self.loaded_backends) > 1:
                 if parent_backend == "Filesystem" and ".temp_dsi.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
@@ -565,10 +553,7 @@ class Terminal():
             if self.valid_backend(first_backend, parent_backend):
                 if self.debug_level != 0:
                     self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
-                if interaction_type == "process":
-                    self.active_metadata = first_backend.process_artifacts()
-                elif interaction_type == "read":
-                    self.active_metadata = first_backend.read_to_artifact()
+                self.active_metadata = first_backend.process_artifacts()
                 operation_success = True
             else: #backend is empty - cannot process data
                 if self.debug_level != 0:
@@ -579,14 +564,14 @@ class Terminal():
             end = datetime.now()
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
-            if interaction_type in ['query', 'get'] and query_data is not None:
+            if interaction_type in ['query'] and query_data is not None:
                 return query_data
         else:
             not_run_msg = None
             if backread_active:
-                not_run_msg = 'Remember that back-READ backends cannot ingest/put data'
+                not_run_msg = 'Remember that back-READ backends cannot ingest data'
             else:
-                not_run_msg = 'Is your artifact interaction implemented in your specified backend?'
+                not_run_msg = 'Is your interaction implemented in the specified backend?'
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
@@ -616,13 +601,14 @@ class Terminal():
                 self.logger.error("First loaded backend needs to have data to be able to get a table")
             raise RuntimeError("First loaded backend needs to have data to be able to get a table")
         start = datetime.now()
-
-        output = backend.get_table(table_name, dict_return)
-        if output is not None and isinstance(output, tuple):
+        
+        try:
+            output = backend.get_table(table_name, dict_return)
+        except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Get_Table() Error: {output[1]}")
-            raise output[0](output[1])
-
+                self.logger.error(f"Get_Table() Error: {str(e)}")
+            raise
+        
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
@@ -804,10 +790,6 @@ class Terminal():
                 self.logger.warning(return_object)
             print("WARNING:", return_object)
             return_object = None
-        elif isinstance(return_object, tuple):
-            if self.debug_level != 0:
-                self.logger.error(f"Error finding data due to {return_object[1]}")
-            raise return_object[0](return_object[1])
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
@@ -899,17 +881,18 @@ class Terminal():
                raise ValueError(f"Invalid input range: '{relation}'. The lower value must come first.")
         else:
             relation = f"{result[1]} {wrap_in_quotes(result[2])}"
-
-        return_object = backend.find_relation(column_name, relation)
+        
+        try:
+            return_object = backend.find_relation(column_name, relation)
+        except Exception as e:
+            if self.debug_level != 0:
+                self.logger.error(f"Error finding data with this condition due to {str(e)}")
+            raise
         if isinstance(return_object, str):
             if self.debug_level != 0:
                 self.logger.warning(return_object)
             print("WARNING:", return_object)
             return_object = None
-        elif isinstance(return_object, tuple):
-            if self.debug_level != 0:
-                self.logger.error(f"Error finding rows due to {return_object[1]}")
-            raise return_object[0](return_object[1])
         elif isinstance(return_object, list) and isinstance(return_object[0], str):
             err_msg = f"'{column_name}' appeared in more than one table. Can only find if '{column_name}' is in one table"
             if self.debug_level != 0:
@@ -990,12 +973,13 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.info(f"   Backup file creation runtime: {backup_end-backup_start}")
 
-        errorStmt = backend.overwrite_table(table_name, collection)
-        if errorStmt is not None and isinstance(errorStmt, tuple):
+        try:
+            backend.overwrite_table(table_name, collection)
+        except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Overwrite_table() error: {errorStmt[1]}")
-            raise errorStmt[0](errorStmt[1])
-
+                self.logger.error(f"Overwrite_table() error: {str(e)}")
+            raise
+        
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
@@ -1069,11 +1053,12 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
         start = datetime.now()
 
-        output = backend.summary(table_name)
-        if output is not None and isinstance(output, tuple):
+        try:
+            output = backend.summary(table_name)
+        except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Summary error: {output[1]}")
-            raise output[0](output[1])
+                self.logger.error(f"Summary error: {str(e)}")
+            raise
 
         end = datetime.now()
         if self.debug_level != 0:
@@ -1158,12 +1143,13 @@ class Terminal():
             raise TypeError("Input 'num_rows' must be a integer")
         if display_cols is not None and not isinstance(display_cols, list):
             raise TypeError("Input 'display_cols' must be a list of string column names")
-
-        output = backend.display(table_name, num_rows, display_cols)
-        if output is not None and isinstance(output, tuple):
+        
+        try:
+            output = backend.display(table_name, num_rows, display_cols)
+        except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Display error: {output[1]}")
-            raise output[0](output[1])
+                self.logger.error(f"Display error: {str(e)}")
+            raise
 
         end = datetime.now()
         if self.debug_level != 0:
@@ -1194,12 +1180,13 @@ class Terminal():
         backend = self.loaded_backends[0]
         start = datetime.now()
 
-        output = backend.get_table_names(query)
-        if output is not None and isinstance(output, tuple):
+        try:
+            output = backend.get_table_names(query)
+        except Exception as e:
             if self.debug_level != 0:
-                self.logger.info(f"Error getting table names {output[1]}")
-            raise output[0](output[1])
-
+                self.logger.info(f"Error getting table names {str(e)}")
+            raise
+        
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
