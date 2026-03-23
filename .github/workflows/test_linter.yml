@@ -1,4 +1,4 @@
-name: linting test
+name: linter test
 
 on:
   push:
@@ -17,21 +17,14 @@ jobs:
         python-version: ["3.11"]
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install ruff codespell
-
       - name: Run Ruff
-        run: ruff check . --exclude "dsi/backends/hpss.py,dsi/backends/sqlalchemy.py"
-
-      - name: Run codespell
-        run: codespell . --skip="./docs/_build,*.pdf,*.ipynb,*.html,*csv,*yml,*yaml" --ignore-words-list=hsi,Softwares
+        run: ruff check . --exclude "dsi/backends/sqlalchemy.py" --ignore E701

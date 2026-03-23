@@ -24,6 +24,10 @@ html:
 #	git add ../coverage.svg
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+	@echo
+
+	codespell ../ --skip="../docs/_build,*.ipynb,*.pdf,*.html,*.csv,*.yml,*.yaml" --ignore-words-list=hsi,Softwares
+
 
 # This creates a git repository and commits generated html docs.
 # It them pushes the new branch into THIS repository as gh-pages.

@@ -14,6 +14,7 @@ How to build documentation
    pip install sphinx sphinx_rtd_theme pytest-cov coverage-badge gitpython .
    pip install pyarrow nbconvert pydantic pandas pydot .
    pip install graphviz .
+   pip install codespell
 
 Note that if graphviz does not install, you may need to install via homebrew or manually build.
 
