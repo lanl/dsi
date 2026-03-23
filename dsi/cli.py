@@ -622,7 +622,7 @@ class DSI_cli:
         if self.valid_viewers is None:
             print("There are no available viewers. Install requirements.heavy.txt to access them.")
             for v, p in self.all_viewers.items():
-                print(f"  {v:<12}: pip install {" ".join(p)}")
+                print(f"  {v:<12}: pip install {' '.join(p)}")
             print()
             return
         print(f'Available viewers are: {", ".join(self.valid_viewers)}\n')
@@ -631,7 +631,7 @@ class DSI_cli:
     def view(self, args):
         if not args:
             if self.valid_viewers is not None:
-                print(f"view ERROR: need to specify a DSI viewer to use. Available: {", ".join(self.valid_viewers)}")
+                print(f"view ERROR: need to specify a DSI viewer to use. Available: {', '.join(self.valid_viewers)}")
             else:
                 print("view ERROR: need to specify a DSI viewer to use")
             return
@@ -644,7 +644,7 @@ class DSI_cli:
             print("view ERROR: can only use one viewer at a time")
             return
         if viewer not in self.valid_viewers:
-            print(f"view ERROR: To load the {viewer} viewer, pip install {" ".join(self.all_viewers[viewer])}")
+            print(f"view ERROR: To load the {viewer} viewer, pip install {' '.join(self.all_viewers[viewer])}")
             return
         
         bash_script_filepath = f"{os.path.dirname(os.path.dirname(__file__))}/tools/streamlit/launch_streamlit.sh"
