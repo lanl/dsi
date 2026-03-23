@@ -647,7 +647,10 @@ class DSI_cli:
             print(f"view ERROR: To load the {viewer} viewer, pip install {' '.join(self.all_viewers[viewer])}")
             return
         
-        bash_script_filepath = f"{os.path.dirname(os.path.dirname(__file__))}/tools/streamlit/launch_streamlit.sh"
+        if os.name != 'nt':
+            bash_script_filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)),"tools","streamlit","launch_streamlit.sh")
+        else:
+            bash_script_filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)),"tools","streamlit","launch_streamlit.bat")
 
         if viewer == "dashboard":
             # user must specify at least one directory
@@ -660,10 +663,11 @@ class DSI_cli:
                     print(f"view ERROR: dashboard viewer has an invalid input directory: {f}")
                     return
                 
-            subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
+            if os.name != 'nt':    
+                subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
 
             env = dict(os.environ)
-            dashboard_code_filepath = f"{os.path.dirname(__file__)}/plugins/dashboard.py"
+            dashboard_code_filepath = os.path.join(os.path.dirname(__file__),"plugins","dashboard.py")
             bash_command = [bash_script_filepath, dashboard_code_filepath] + args[1:]
             with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
@@ -700,10 +704,11 @@ class DSI_cli:
                 print("view ERROR: the ML viewer requires data to run models.")
                 return
             
-            subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
+            if os.name != 'nt':
+                subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
             
             env = dict(os.environ)
-            ml_code_filepath = f"{os.path.dirname(__file__)}/plugins/ml_emulator.py"
+            ml_code_filepath = os.path.join(os.path.dirname(__file__),"plugins","ml_emulator.py")
             bash_command = [bash_script_filepath, ml_code_filepath, self.db_path, self.name]
             with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
