@@ -3,7 +3,6 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import os
-import sys
 from contextlib import redirect_stdout
 import io
 
@@ -71,7 +70,7 @@ class DSI():
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print("Eligible backend_names are: Sqlite, DuckDB")
         except Exception as e:
-            sys.exit(f"backend ERROR: {e}")
+            raise RuntimeError(f"backend ERROR: {e}")
 
         self.main_backend_obj = self.t.loaded_backends[0]
         if filename != ".temp_dsi.db":
@@ -101,9 +100,9 @@ class DSI():
         """
         if filename:
             if not os.path.exists(filename):
-                sys.exit("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+                raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
             if "dsi_relations" in self.t.active_metadata:
-                sys.exit("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
+                raise RuntimeError("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
 
             self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
 
@@ -116,7 +115,7 @@ class DSI():
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
-                    sys.exit(f"schema() ERROR: {e}")
+                    raise RuntimeError(f"schema() ERROR: {e}")
                 self.t.active_metadata = OrderedDict()
                 self.schema_read = False
                 self.schema_tables = set()
@@ -153,11 +152,12 @@ class DSI():
         print("GenesisDatacard      : Loads dataset metadata for LANL Genesis data standard (CSV)")
         print()
 
-    def read(self, filenames, reader_name, table_name = None, **kwargs):
+    # in future release, make data_source and reader_name mandatory again
+    def read(self, data_source: str | dict | pd.DataFrame | None = None, reader_name: str | None = None, table_name = None, **kwargs):
         """
         Loads data into DSI using the specified parameter `reader_name`
 
-        `filenames` : str, list of str, or data object
+        `data_source` : str, list of str, or data object
             File path(s) to the data files or an in-memory data object.
 
             The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
@@ -193,15 +193,24 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
-        # only DSI-repo readers require filename input. Custom readers do not.
-        if isinstance(filenames, str) and not os.path.exists(filenames) and not reader_name.endswith(".py"):
-            sys.exit("read() ERROR: The input file must be a valid filepath. Please check again.")
-        if isinstance(filenames, list) and not all(os.path.exists(f) for f in filenames) and not reader_name.endswith(".py"):
-            sys.exit("read() ERROR: All input files must have a valid filepath. Please check again.")
+        # only DSI-repo readers require data_source input. Custom readers do not.
+        if isinstance(data_source, str) and not os.path.exists(data_source) and not reader_name.endswith(".py"):
+            raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
+        if isinstance(data_source, list) and not all(os.path.exists(f) for f in data_source) and not reader_name.endswith(".py"):
+            raise RuntimeError("read() ERROR: All input files must have a valid filepath. Please check again.")
         
+        if "filenames" in kwargs and data_source is None:
+            data_source = kwargs["filenames"]
+            del kwargs["filenames"]
+        elif "filename" in kwargs and data_source is None:
+            data_source = kwargs["filename"]
+            del kwargs["filename"]
+        if ("filename" in kwargs or "filenames" in kwargs) and data_source is not None:
+            raise RuntimeError("To pass in a data filename, ONLY use the data_source arg. Cannot specify data_source and extra filename")
+
         if reader_name.endswith(".py"):
             if not os.path.exists(reader_name):
-                sys.exit("read() ERROR: `reader_name` must be a valid filepath to the custom Reader. Please check again.")
+                raise RuntimeError("read() ERROR: `reader_name` must be a valid filepath to the custom Reader. Please check again.")
 
             import ast
             parsed_data = None
@@ -209,7 +218,7 @@ class DSI():
                 with open(reader_name, "r", encoding="utf-8") as external_reader:
                     parsed_data = ast.parse(external_reader.read(), filename=reader_name)
             except Exception:
-                sys.exit("read() Error: Could not read the Python file with the custom Reader.")
+                raise RuntimeError("read() Error: Could not read the Python file with the custom Reader.")
 
             class_name = None
             init_params = []
@@ -226,12 +235,12 @@ class DSI():
                         init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
 
             if class_name is None:
-                sys.exit("read() Error: The custom Reader must be structured as a Class in the Python script.")
+                raise RuntimeError("read() Error: The custom Reader must be structured as a Class in the Python script.")
             
             updated = {}
             for param in init_params:
                 if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
-                    updated[param] = filenames
+                    updated[param] = data_source
                 if "table" in param.lower():
                     updated[param] = table_name
             
@@ -239,67 +248,67 @@ class DSI():
                 self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
                 self.t.load_module('plugin', class_name, 'reader', **updated, **kwargs)
             except Exception as e:
-                sys.exit(f"read() ERROR: {e}")
+                raise RuntimeError(f"read() ERROR: {e}")
 
         else:
             try:
                 if reader_name.lower() == "oceans11datacard":
-                    self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "dublincoredatacard":
-                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "schemaorgdatacard":
-                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "googledatacard":
-                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "genesisdatacard":
-                    self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "bueno":
-                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "csv":
-                    self.t.load_module('plugin', 'Csv', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Csv', 'reader', filenames=data_source, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "parquet":
-                    self.t.load_module('plugin', 'Parquet', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Parquet', 'reader', filenames=data_source, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "yaml":
-                    self.t.load_module('plugin', 'YAML', 'reader', filenames=filenames, table_name = table_name, **kwargs)
+                    self.t.load_module('plugin', 'YAML', 'reader', filenames=data_source, table_name = table_name, **kwargs)
                 elif reader_name.lower() == "yaml1":
-                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "toml":
-                    self.t.load_module('plugin', 'TOML', 'reader', filenames=filenames, table_name = table_name, **kwargs)
+                    self.t.load_module('plugin', 'TOML', 'reader', filenames=data_source, table_name = table_name, **kwargs)
                 elif reader_name.lower() == "toml1":
-                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=filenames, **kwargs)
+                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=data_source, **kwargs)
                 elif reader_name.lower() == "ensemble":
-                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_source, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "json":
-                    self.t.load_module('plugin', 'JSON', 'reader', filenames=filenames, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'JSON', 'reader', filenames=data_source, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "cloverleaf":
-                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=filenames, **kwargs)
-                elif reader_name.lower() == "collection" and isinstance(filenames, dict):
-                    self.t.load_module('plugin', 'Dict', 'reader', collection=filenames, table_name=table_name, **kwargs)
-                    if isinstance(filenames, OrderedDict):
-                        filenames = "the Ordered Dict"
+                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_source, **kwargs)
+                elif reader_name.lower() == "collection" and isinstance(data_source, dict):
+                    self.t.load_module('plugin', 'Dict', 'reader', collection=data_source, table_name=table_name, **kwargs)
+                    if isinstance(data_source, OrderedDict):
+                        data_source = "the Ordered Dict"
                     else:
-                        filenames = "the dictionary"
-                elif reader_name.lower() == "collection" and isinstance(filenames, pd.DataFrame):
-                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=filenames, table_name=table_name, **kwargs)
-                    filenames = "the pandas DataFrame"
+                        data_source = "the dictionary"
+                elif reader_name.lower() == "collection" and isinstance(data_source, pd.DataFrame):
+                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_source, table_name=table_name, **kwargs)
+                    data_source = "the pandas DataFrame"
                 else:
                     print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                    sys.exit("View eligible readers in the output of `list_readers()`")
+                    raise RuntimeError("View eligible readers in the output of `list_readers()`")
             except Exception as e:
-                sys.exit(f"read() ERROR: {e}")
+                raise RuntimeError(f"read() ERROR: {e}")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read:
             overlap_tables = self.schema_tables & set(self.t.active_metadata.keys())
             if not overlap_tables: # at least one table from schema in the first read()
-                sys.exit("read() ERROR: Users must load all associated data for a schema after loading a complex schema.")
+                raise RuntimeError("read() ERROR: Users must load all associated data for a schema after loading a complex schema.")
             self.loaded_tables.update(overlap_tables)
 
             if self.loaded_tables == self.schema_tables:
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
-                    sys.exit(f"read() ERROR: {e}")
+                    raise RuntimeError(f"read() ERROR: {e}")
                 self.t.active_metadata = OrderedDict()
                 self.schema_read = False
                 self.schema_tables = set()
@@ -308,13 +317,13 @@ class DSI():
             try:
                 self.t.artifact_handler(interaction_type='ingest')
             except Exception as e:
-                sys.exit(f"read() ERROR: {e}")
+                raise RuntimeError(f"read() ERROR: {e}")
             self.t.active_metadata = OrderedDict()
 
         if len(table_keys) == 1:
-            print(f"Loaded {filenames} into the table {table_keys[0]}")
+            print(f"Loaded {data_source} into the table {table_keys[0]}")
         else:
-            print(f"Loaded {filenames} into the tables: {', '.join(table_keys)}")
+            print(f"Loaded {data_source} into the tables: {', '.join(table_keys)}")
 
     def query(self, statement, collection = False, update = False):
         """
@@ -336,9 +345,9 @@ class DSI():
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot query() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         
         output = None
         try:
@@ -390,14 +399,14 @@ class DSI():
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         
         try:
             df = self.t.get_table(table_name)
         except Exception as e:
-            sys.exit(f"get_table() ERROR: {e}")
+            raise RuntimeError(f"get_table() ERROR: {e}")
         if df.empty:
             return
         if not collection:
@@ -445,17 +454,17 @@ class DSI():
         `return` : If there are no matches found, then nothing is returned or printed
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot find() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot find() until all associated data is loaded after a complex schema")
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         if not isinstance(query, str):
-            sys.exit("find() ERROR: Input must be a string.")
+            raise RuntimeError("find() ERROR: Input must be a string.")
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if not any(op in query for op in operators):
-            sys.exit("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
+            raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
         
         print(f"Finding all rows where '{query}' in the active backend")
         output = None
@@ -466,7 +475,7 @@ class DSI():
             output = f.getvalue()
         except Exception as e:
             e = str(e).replace("query_object", "query")
-            sys.exit(f"find() ERROR: {e}")
+            raise RuntimeError(f"find() ERROR: {e}")
         
         if output and "WARNING" in output:
             warn_msg = output[output.find("WARNING"):]
@@ -518,9 +527,9 @@ class DSI():
             If False (default), prints the matches to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot search() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot search() until all associated data is loaded after a complex schema")
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
@@ -534,7 +543,7 @@ class DSI():
                 find_table = self.t.find_table(query)
                 find_col = self.t.find_column(query)
         except Exception as e:
-            sys.exit(f"search() ERROR: {e}")
+            raise RuntimeError(f"search() ERROR: {e}")
         
         if find_cell is None and find_col is None and find_table is None:
             print(f"WARNING: {val} was not found in this backend\n")
@@ -589,40 +598,40 @@ class DSI():
         - NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot update() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
         print("Updating the active backend with the input collection of data")
 
         if not isinstance(collection, pd.DataFrame):
-            sys.exit("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
+            raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
-            sys.exit("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
+            raise RuntimeError("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
         elif 'dsi_table_name' not in collection.columns:
             t_col = collection['dsi_table_name']
             if not isinstance(t_col[0], str):
-                sys.exit("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
+                raise RuntimeError("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
             if any(t_val not in (t_col[0], '') for t_val in t_col):
-                sys.exit("update() ERROR: 'dsi_table_name' column must be unchanged table name. Extra rows must be empty strings.")
+                raise RuntimeError("update() ERROR: 'dsi_table_name' column must be unchanged table name. Extra rows must be empty strings.")
             if t_col.replace('', pd.NA).dropna().nunique() > 1:
-                sys.exit("update() ERROR: The 'dsi_table_name' column should not be modified.")
+                raise RuntimeError("update() ERROR: The 'dsi_table_name' column should not be modified.")
         
         table_name = collection['dsi_table_name'][0]
         actual_df = None
         if table_name.lower() in self.t.dsi_tables:
-            sys.exit(f"update() ERROR: '{table_name}' is a DSI-read-only table. Cannot update it.")
+            raise RuntimeError(f"update() ERROR: '{table_name}' is a DSI-read-only table. Cannot update it.")
         if 'dsi_row_index' in collection.columns:
             table_df = collection.copy()
 
             if any(not (isinstance(row_ind, int) or row_ind == '') for row_ind in table_df['dsi_row_index']):
-                sys.exit("update() ERROR: 'dsi_row_index' column must be unchanged row indexes. Extra rows must be empty strings.")
+                raise RuntimeError("update() ERROR: 'dsi_row_index' column must be unchanged row indexes. Extra rows must be empty strings.")
             match = table_df['dsi_row_index'].apply(lambda x: isinstance(x, int)) & (table_df['dsi_table_name'] != table_name)
             empty_match = (table_df['dsi_row_index'] == '') & (table_df['dsi_table_name'] != '')
             if match.any() or empty_match.any():
-                sys.exit(f"update() ERROR: Rows in 'dsi_table_name' and 'dsi_row_index' must be '{table_name}' and row index or both be empty.")
+                raise RuntimeError(f"update() ERROR: Rows in 'dsi_table_name' and 'dsi_row_index' must be '{table_name}' and row index or both be empty.")
             numeric_rows = [int(val) for val in table_df['dsi_row_index'] if val != '']
             if numeric_rows != sorted(numeric_rows) or len(numeric_rows) != len(set(numeric_rows)):
-                sys.exit("update() ERROR: 'dsi_row_index' must be unchanged and in increasing order.")
+                raise RuntimeError("update() ERROR: 'dsi_row_index' must be unchanged and in increasing order.")
 
             row_num_list = numeric_rows
             table_df = table_df.drop(columns='dsi_table_name')
@@ -636,11 +645,11 @@ class DSI():
                 return
             
             if len(row_num_list) > len(actual_df) or any(ind > len(actual_df) for ind in row_num_list):
-                sys.exit("update() ERROR: 'dsi_row_index' was modified. When adding new rows, values for 'dsi_row_index' must be empty.")
+                raise RuntimeError("update() ERROR: 'dsi_row_index' was modified. When adding new rows, values for 'dsi_row_index' must be empty.")
             
             # currently prevents users from dropping columns from the original table
             if not set(actual_df.columns).issubset(set(table_df.columns)):
-                sys.exit(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
+                raise RuntimeError(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
             new_cols = list(set(table_df.columns) - set(actual_df.columns))
             if new_cols:
                 for col in new_cols:
@@ -669,7 +678,7 @@ class DSI():
                 print(f"Created backup '{backup_file}' before updating the data.")
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
-            sys.exit(f"update() ERROR: {e}")
+            raise RuntimeError(f"update() ERROR: {e}")
 
     def list_writers(self):
         """
@@ -707,18 +716,18 @@ class DSI():
             Required when using "Table_Plot", "Csv" or "Parquet" to specify which table to export.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot write() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot write() until all associated data is loaded after a complex schema")
 
         try:        
             self.t.artifact_handler(interaction_type='process')
         except Exception as e:
-            sys.exit(f"write() ERROR: {e}")
+            raise RuntimeError(f"write() ERROR: {e}")
 
         if writer_name.endswith(".py"):
             if not os.path.exists(writer_name):
-                sys.exit("write() ERROR: `writer_name` must be a valid filepath to the custom Writer. Please check again.")
+                raise RuntimeError("write() ERROR: `writer_name` must be a valid filepath to the custom Writer. Please check again.")
 
             import ast
             parsed_data = None
@@ -726,7 +735,7 @@ class DSI():
                 with open(writer_name, "r", encoding="utf-8") as external_reader:
                     parsed_data = ast.parse(external_reader.read(), filename=writer_name)
             except Exception:
-                sys.exit("write() Error: Could not read the Python file with the custom Writer.")
+                raise RuntimeError("write() Error: Could not read the Python file with the custom Writer.")
 
             class_name = None
             init_params = []
@@ -743,7 +752,7 @@ class DSI():
                         init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
 
             if class_name is None:
-                sys.exit("write() Error: The custom Writer must be structured as a Class in the Python script.")
+                raise RuntimeError("write() Error: The custom Writer must be structured as a Class in the Python script.")
             
             updated = {}
             for param in init_params:
@@ -756,7 +765,7 @@ class DSI():
                 self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
                 self.t.load_module('plugin', class_name, 'writer', **updated, **kwargs)
             except Exception as e:
-                sys.exit(f"write() ERROR: {e}")
+                raise RuntimeError(f"write() ERROR: {e}")
         else:
             correct_writer = True
             try:
@@ -771,7 +780,7 @@ class DSI():
                 else:
                     correct_writer = False
             except Exception as e:
-                sys.exit(f"write() ERROR: {e}")
+                raise RuntimeError(f"write() ERROR: {e}")
             
             if not correct_writer:
                 print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
@@ -781,7 +790,7 @@ class DSI():
         try:
             self.t.transload()
         except Exception as e:
-            sys.exit(f"write() ERROR: {e}")
+            raise RuntimeError(f"write() ERROR: {e}")
 
         self.t.active_metadata = OrderedDict()
         print(f"Successfully wrote to the output file {filename}")
@@ -796,9 +805,9 @@ class DSI():
             If False (default), prints each table's name and dimensions to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
 
         output = None
         try:
@@ -832,9 +841,9 @@ class DSI():
             If False (default), prints each table's name and dimensions to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
         
         output = None
         try:
@@ -843,7 +852,7 @@ class DSI():
                 summary_df = self.t.summary(table_name, collection)
             output = f.getvalue()
         except Exception as e:
-            sys.exit(f"summary() ERROR: {e}")
+            raise RuntimeError(f"summary() ERROR: {e}")
 
         if collection:
             return summary_df
@@ -855,9 +864,9 @@ class DSI():
         Prints the number of tables in the active backend.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
         try:
             self.t.num_tables()
         except Exception as e:
@@ -879,16 +888,16 @@ class DSI():
             If None (default), all columns are displayed.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            sys.exit("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
+            raise RuntimeError("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
-            sys.exit("ERROR: Cannot display() until all associated data is loaded after a complex schema")
+            raise RuntimeError("ERROR: Cannot display() until all associated data is loaded after a complex schema")
         if isinstance(num_rows, list):
             display_cols = num_rows
             num_rows = 25
         try:
             self.t.display(table_name, num_rows, display_cols)
         except Exception as e:
-            sys.exit(f"display() ERROR: {e}")
+            raise RuntimeError(f"display() ERROR: {e}")
 
     def close(self):
         """

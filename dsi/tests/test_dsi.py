@@ -29,7 +29,7 @@ def test_error_filename():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     try:
-        test.read(filenames=["examples/test/WRONG_FILENAME_1.yml", "examples/test/WRONG_FILENAME_2.yml"], reader_name='YAML1')
+        test.read(data_sources=["examples/test/WRONG_FILENAME_1.yml", "examples/test/WRONG_FILENAME_2.yml"], reader_name='YAML1')
         assert False
     except SystemExit as e:
         expected = "read() ERROR: All input files must have a valid filepath. Please check again."
@@ -42,16 +42,16 @@ def test_read_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
-    test.read(filenames="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
-    test.read(filenames="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
-    test.read(filenames=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
+    test.read(data_sources="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
+    test.read(data_sources="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
+    test.read(data_sources=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
 
-    test.read(filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
-    test.read(filenames="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
-    test.read(filenames="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
-    test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
+    test.read(data_sources=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
+    test.read(data_sources="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
     assert True
 
 def test_write_sqlite_backend():
@@ -100,7 +100,7 @@ def test_query_update_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     query_df = test.query("SELECT * FROM address", collection=True, update=True)  # return output
     query_df['i'] = 123
     query_df["new_col"] = "test1"
@@ -141,7 +141,7 @@ def test_search_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -288,9 +288,9 @@ def test_find_inequality_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -364,9 +364,9 @@ def test_find_equality_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -433,9 +433,9 @@ def test_find_range_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -531,9 +531,9 @@ def test_find_partial_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -615,9 +615,9 @@ def test_find_relation_error_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
         test.find(query=2, collection=True, update=True)
@@ -838,7 +838,7 @@ def test_schema_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
 
 def test_error_schema_sqlite_backend():
@@ -849,7 +849,7 @@ def test_error_schema_sqlite_backend():
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     try:
         test.schema(filename="examples/test/yaml1_schema.json")
-        test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
+        test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
         assert False
     except SystemExit as e:
         expected = "read() ERROR: Users must load all associated data for a schema after loading a complex schema."
@@ -869,7 +869,7 @@ def test_query_update_schema_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     
     query_df = test.query("SELECT * FROM address", collection=True, update=True)  # return output
     query_df['i'] = [123, 234]
@@ -894,7 +894,7 @@ def test_overwrite_schema_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
     test.schema(filename="examples/test/yaml1_circular_schema.json")
@@ -933,16 +933,16 @@ def test_read_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
-    test.read(filenames="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
-    test.read(filenames="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
-    test.read(filenames=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
+    test.read(data_sources="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
+    test.read(data_sources="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
+    test.read(data_sources=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
 
-    test.read(filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
-    test.read(filenames="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
-    test.read(filenames="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
-    test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
+    test.read(data_sources=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
+    test.read(data_sources="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
     assert True
 
 def test_write_duckdb_backend():
@@ -990,7 +990,7 @@ def test_query_update_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     query_df = test.query("SELECT * FROM address", collection=True, update=True)  # return output
     query_df['i'] = 123
     query_df["new_col"] = "test1"
@@ -1031,7 +1031,7 @@ def test_search_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1178,9 +1178,9 @@ def test_find_inequality_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1254,9 +1254,9 @@ def test_find_equality_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1323,9 +1323,9 @@ def test_find_range_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1421,9 +1421,9 @@ def test_find_partial_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1505,9 +1505,9 @@ def test_find_relation_error_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
         test.find(query=2, collection=True, update=True)
@@ -1728,7 +1728,7 @@ def test_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
 
 def test_query_update_schema_duckdb_backend():
@@ -1738,7 +1738,7 @@ def test_query_update_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     
     query_df = test.query("SELECT * FROM math", collection=True, update=True)  # return output
     query_df['specification'] = [123, 234]
@@ -1762,12 +1762,12 @@ def test_overwrite_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
     #loophole to assign new schema since there isn't another schema file that can be used with yaml data (circular won't work here)
     new_schema = OrderedDict({'primary_key': [('address', 'i'), ('math', 'specification')], 'foreign_key': [('math', 'b'), (None, None)]})
-    test.read(filenames=new_schema, reader_name="Collection", table_name="dsi_relations") #loophole to assign new schema since
+    test.read(data_sources=new_schema, reader_name="Collection", table_name="dsi_relations") #loophole to assign new schema since
     test.write(filename="new_erd.png", writer_name="ER_Diagram")
 
     def file_hash(path):
@@ -1788,7 +1788,7 @@ def test_fail_overwrite_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
     try:
