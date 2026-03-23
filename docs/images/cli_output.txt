@@ -29,7 +29,7 @@ plot_table <table_name> [-f filename]            Plots numerical data from a tab
                                                   optional file name argument
 query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes). Optionally 
                                                   limit printed rows or export to CSV/Parquet
-read <filename> [-t table_name]                  Reads a file or URL into the DSI database. 
+read <data_source> [-t table_name]               Reads a file or URL into the DSI database. 
                                                   Optionally set table name.
 search <value>                                   Searches for a string or number across DSI.
 summary [-t table_name]                          Summary of the database or a specific table.

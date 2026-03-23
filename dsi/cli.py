@@ -126,7 +126,7 @@ class DSI_cli:
             'plot_table' : ("<table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
             'query' : ("<SQL_query> [-n num_rows] [-e filename]",
                 "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
-            'read' : ("<filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            'read' : ("<data_source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
             'search' : ("<value>", "Searches for a string or number across DSI."),
             'summary' : ("[-t table_name]", "Summary of the database or a specific table."),
             'viewers' : ("", "Prints the available viewers for the user."),
@@ -456,7 +456,7 @@ class DSI_cli:
 
     def get_read_parser(self):
         parser = argparse.ArgumentParser(prog='read')
-        parser.add_argument('filename', help='File to read into DSI')
+        parser.add_argument('data_source', help='Data to read into DSI. Either a filename or a URL to the data')
         parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name to store data into')
         return parser
 
@@ -472,9 +472,9 @@ class DSI_cli:
         if args.table_name != "":
             table_name = args.table_name
         else:
-            table_name = os.path.splitext(os.path.basename(args.filename))[0]
+            table_name = os.path.splitext(os.path.basename(args.data_source))[0]
 
-        dbfile = args.filename
+        dbfile = args.data_source
         if self.__is_url(dbfile): # if it's a url, do fetch
             url = dbfile
             output_path = url.split('/')[-1]
