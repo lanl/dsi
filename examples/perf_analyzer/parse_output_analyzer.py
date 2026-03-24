@@ -6,9 +6,9 @@ Parses the output from CloverLeaf runs and creates a csv file
 
 import re
 import git
-import pandas as pd
-from dsi.plugins.collection_reader import Dict
-from dsi.backends.sqlite import Sqlite, DataType
+# import pandas as pd
+# from dsi.plugins.collection_reader import Dict
+# from dsi.backends.sqlite import Sqlite, DataType
 from dsi.dsi import DSI
 
 def get_repo_and_name_from_url(url: str):
