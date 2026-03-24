@@ -6,7 +6,7 @@ Then it creates a DSI db from the csv file and performs a query.
 """
 
 # from dsi.backends.sqlite import Sqlite, DataType
-from dsi.plugins.collection_reader import Dict
+# from dsi.plugins.collection_reader import Dict
 
 from dsi.dsi import DSI
 isVerbose = True
