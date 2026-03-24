@@ -19,9 +19,9 @@ cp ../clover.in .
 
 make clean;
 make COMPILER=GNU;
-echo "================================ Compile Done ================================ "l
-    
-echo "============================= Running CloverLeaf ============================= "j
+echo "================================ Compile Done ================================ "
+
+echo "============================= Running CloverLeaf ============================= "
 mpirun -np 2 tau_exec $SOURCE_BASE_DIRECTORY/clover_leaf
 pprof > tau_results
 cd -
