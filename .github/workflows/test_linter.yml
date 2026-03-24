@@ -27,4 +27,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff codespell
       - name: Run Ruff
-        run: ruff check . --exclude "dsi/backends/sqlalchemy.py" --ignore E701
+        run: ruff check . --ignore E701
