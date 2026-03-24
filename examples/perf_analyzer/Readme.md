@@ -1,6 +1,6 @@
 ## PerfAnalyzer
 
-A tool to analze software performance along with code history. This is built on top of DSI SQLite plugin.
+A tool to analze software performance along with code history. This is built on top of a DSI SQLite backend.
 
 Run `fly_server.py` file. Then the dashboard can be accessed through `http://127.0.0.1:8050/`.
 
