@@ -14,19 +14,19 @@ test = DSI("data.db")
 test.schema(filename="yaml1_schema.json") # must be loaded first
 # test.schema(filename="example_schema.json") # must be loaded first
 
-test.read(data_source=["student_test1.yml", "student_test2.yml"], reader_name='YAML1')
-# test.read(data_source=["results.toml", "results1.toml"], reader_name='TOML1')
-# test.read(data_source="yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
-# test.read(data_source="wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
-# test.read(data_source=['bueno1.data', 'bueno2.data'], reader_name='Bueno')
-# test.read(data_source="../clover3d/", reader_name='Cloverleaf')
-# test.read(data_source="test.txt", reader_name="text_file_reader.py")
-# test.read(data_source="wildfiredata.pq", reader_name="Parquet", table_name="Wildfire_parquet")
+test.read(data_sources=["student_test1.yml", "student_test2.yml"], reader_name='YAML1')
+# test.read(data_sources=["results.toml", "results1.toml"], reader_name='TOML1')
+# test.read(data_sources="yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
+# test.read(data_sources="wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
+# test.read(data_sources=['bueno1.data', 'bueno2.data'], reader_name='Bueno')
+# test.read(data_sources="../clover3d/", reader_name='Cloverleaf')
+# test.read(data_sources="test.txt", reader_name="text_file_reader.py")
+# test.read(data_sources="wildfiredata.pq", reader_name="Parquet", table_name="Wildfire_parquet")
 
-# test.read(data_source=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
-# test.read(data_source="../wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
-# test.read(data_source="../wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
-# test.read(data_source="../wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
+# test.read(data_sources=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
+# test.read(data_sources="../wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
+# test.read(data_sources="../wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
+# test.read(data_sources="../wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
 
 
 ''' Example uses of loading DSI writers '''

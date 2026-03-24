@@ -152,12 +152,12 @@ class DSI():
         print("GenesisDatacard      : Loads dataset metadata for LANL Genesis data standard (CSV)")
         print()
 
-    # in future release, make data_source and reader_name mandatory again
-    def read(self, data_source: str | dict | pd.DataFrame | None = None, reader_name: str | None = None, table_name = None, **kwargs):
+    # in future release, make data_sources and reader_name mandatory again
+    def read(self, data_sources: str | list[str] | dict | pd.DataFrame | None = None, reader_name: str | None = None, table_name = None, **kwargs):
         """
         Loads data into DSI using the specified parameter `reader_name`
 
-        `data_source` : str, list of str, or data object
+        `data_sources` : str, list of str, or data object (dict or pandas DataFrame)
             File path(s) to the data files or an in-memory data object.
 
             The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
@@ -193,20 +193,20 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
-        # only DSI-repo readers require data_source input. Custom readers do not.
-        if isinstance(data_source, str) and not os.path.exists(data_source) and not reader_name.endswith(".py"):
+        # only DSI-repo readers require data_sources input. Custom readers do not.
+        if isinstance(data_sources, str) and not os.path.exists(data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
-        if isinstance(data_source, list) and not all(os.path.exists(f) for f in data_source) and not reader_name.endswith(".py"):
+        if isinstance(data_sources, list) and not all(os.path.exists(f) for f in data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: All input files must have a valid filepath. Please check again.")
         
-        if "filenames" in kwargs and data_source is None:
-            data_source = kwargs["filenames"]
+        if "filenames" in kwargs and data_sources is None:
+            data_sources = kwargs["filenames"]
             del kwargs["filenames"]
-        elif "filename" in kwargs and data_source is None:
-            data_source = kwargs["filename"]
+        elif "filename" in kwargs and data_sources is None:
+            data_sources = kwargs["filename"]
             del kwargs["filename"]
-        if ("filename" in kwargs or "filenames" in kwargs) and data_source is not None:
-            raise RuntimeError("To pass in a data filename, ONLY use the data_source arg. Cannot specify data_source and extra filename")
+        if ("filename" in kwargs or "filenames" in kwargs) and data_sources is not None:
+            raise RuntimeError("To pass in a data filename, ONLY use the data_sources arg. Cannot specify data_sources and extra filename")
 
         if reader_name.endswith(".py"):
             if not os.path.exists(reader_name):
@@ -240,7 +240,7 @@ class DSI():
             updated = {}
             for param in init_params:
                 if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
-                    updated[param] = data_source
+                    updated[param] = data_sources
                 if "table" in param.lower():
                     updated[param] = table_name
             
@@ -253,44 +253,44 @@ class DSI():
         else:
             try:
                 if reader_name.lower() == "oceans11datacard":
-                    self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "dublincoredatacard":
-                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "schemaorgdatacard":
-                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "googledatacard":
-                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "genesisdatacard":
-                    self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "bueno":
-                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "csv":
-                    self.t.load_module('plugin', 'Csv', 'reader', filenames=data_source, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Csv', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "parquet":
-                    self.t.load_module('plugin', 'Parquet', 'reader', filenames=data_source, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Parquet', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "yaml":
-                    self.t.load_module('plugin', 'YAML', 'reader', filenames=data_source, table_name = table_name, **kwargs)
+                    self.t.load_module('plugin', 'YAML', 'reader', filenames=data_sources, table_name = table_name, **kwargs)
                 elif reader_name.lower() == "yaml1":
-                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "toml":
-                    self.t.load_module('plugin', 'TOML', 'reader', filenames=data_source, table_name = table_name, **kwargs)
+                    self.t.load_module('plugin', 'TOML', 'reader', filenames=data_sources, table_name = table_name, **kwargs)
                 elif reader_name.lower() == "toml1":
-                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=data_source, **kwargs)
+                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=data_sources, **kwargs)
                 elif reader_name.lower() == "ensemble":
-                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_source, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "json":
-                    self.t.load_module('plugin', 'JSON', 'reader', filenames=data_source, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'JSON', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "cloverleaf":
-                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_source, **kwargs)
-                elif reader_name.lower() == "collection" and isinstance(data_source, dict):
-                    self.t.load_module('plugin', 'Dict', 'reader', collection=data_source, table_name=table_name, **kwargs)
-                    if isinstance(data_source, OrderedDict):
-                        data_source = "the Ordered Dict"
+                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
+                elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
+                    self.t.load_module('plugin', 'Dict', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                    if isinstance(data_sources, OrderedDict):
+                        data_sources = "the Ordered Dict"
                     else:
-                        data_source = "the dictionary"
-                elif reader_name.lower() == "collection" and isinstance(data_source, pd.DataFrame):
-                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_source, table_name=table_name, **kwargs)
-                    data_source = "the pandas DataFrame"
+                        data_sources = "the dictionary"
+                elif reader_name.lower() == "collection" and isinstance(data_sources, pd.DataFrame):
+                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                    data_sources = "the pandas DataFrame"
                 else:
                     print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
                     raise RuntimeError("View eligible readers in the output of `list_readers()`")
@@ -321,9 +321,9 @@ class DSI():
             self.t.active_metadata = OrderedDict()
 
         if len(table_keys) == 1:
-            print(f"Loaded {data_source} into the table {table_keys[0]}")
+            print(f"Loaded {data_sources} into the table {table_keys[0]}")
         else:
-            print(f"Loaded {data_source} into the tables: {', '.join(table_keys)}")
+            print(f"Loaded {data_sources} into the tables: {', '.join(table_keys)}")
 
     def query(self, statement, collection = False, update = False):
         """
