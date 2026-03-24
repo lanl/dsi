@@ -31,7 +31,7 @@ def test_error_filename():
     try:
         test.read(data_sources=["examples/test/WRONG_FILENAME_1.yml", "examples/test/WRONG_FILENAME_2.yml"], reader_name='YAML1')
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "read() ERROR: All input files must have a valid filepath. Please check again."
         assert str(e) == expected
 
@@ -622,49 +622,49 @@ def test_find_relation_error_sqlite_backend():
     try:
         test.find(query=2, collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must be a string."
     
     try:
         test.find(query="a", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='"a" > "14"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: The value in the relational find() cannot be enclosed in double quotes"
 
     try:
         test.find(query="'a' > 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Cannot have a single quote as part of a column name"
 
     try:
         test.find(query="'a' 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
     try:
         test.find(query="a 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='a ">1"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: The value in the relational find() cannot be enclosed in double quotes'
     
     f = io.StringIO()
@@ -694,45 +694,45 @@ def test_find_relation_error_sqlite_backend():
     try:
         test.find(query="a > '<4')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a > <4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a (1,2))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="a (')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), values must be separated by a comma."
 
     try:
         test.find(query="a (,", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), it must end with closing parenthesis."
 
     try:
         test.find(query="a (,')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: There needs to be two values for the range find. Ex: (1,2)'
 
     try:
         test.find(query="g !=there's", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s"
 
     f = io.StringIO()
@@ -747,73 +747,73 @@ def test_find_relation_error_sqlite_backend():
     try:
         test.find(query="g (there is, a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     try:
         test.find(query="g ('there is', a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
 
     try:
         test.find(query="g ('there is', 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Invalid input range: '('there is','a place')'. The lower value must come first."
     
     try:
         test.find(query="g ('there is' 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), values must be separated by a comma."
     
     try:
         test.find(query="g ('there is', 'a place'", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place)'", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place'))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (3,4))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (,4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: There needs to be two values for the range find. Ex: (1,2)"
     
     try:
         test.find(query='a ("hello",6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello")', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello", 6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     f = io.StringIO()
@@ -851,14 +851,14 @@ def test_error_schema_sqlite_backend():
         test.schema(filename="examples/test/yaml1_schema.json")
         test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "read() ERROR: Users must load all associated data for a schema after loading a complex schema."
         assert str(e) == expected
 
     try:
         test.schema(filename="examples/test/yaml1_schema.json")
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "schema() ERROR: There is already a complex schema in memory. First load all its associated files."
         assert str(e) == expected
 
@@ -1512,49 +1512,49 @@ def test_find_relation_error_duckdb_backend():
     try:
         test.find(query=2, collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must be a string."
     
     try:
         test.find(query="a", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='"a" > "14"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: The value in the relational find() cannot be enclosed in double quotes"
 
     try:
         test.find(query="'a' > 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Cannot have a single quote as part of a column name"
 
     try:
         test.find(query="'a' 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
     try:
         test.find(query="a 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='a ">1"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: The value in the relational find() cannot be enclosed in double quotes'
     
     f = io.StringIO()
@@ -1584,45 +1584,45 @@ def test_find_relation_error_duckdb_backend():
     try:
         test.find(query="a > '<4')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a > <4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a (1,2))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="a (')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), values must be separated by a comma."
 
     try:
         test.find(query="a (,", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), it must end with closing parenthesis."
 
     try:
         test.find(query="a (,')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: There needs to be two values for the range find. Ex: (1,2)'
 
     try:
         test.find(query="g !=there's", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s"
 
     f = io.StringIO()
@@ -1637,73 +1637,73 @@ def test_find_relation_error_duckdb_backend():
     try:
         test.find(query="g (there is, a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     try:
         test.find(query="g ('there is', a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
 
     try:
         test.find(query="g ('there is', 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Invalid input range: '('there is','a place')'. The lower value must come first."
     
     try:
         test.find(query="g ('there is' 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), values must be separated by a comma."
     
     try:
         test.find(query="g ('there is', 'a place'", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place)'", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place'))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (3,4))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (,4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: There needs to be two values for the range find. Ex: (1,2)"
     
     try:
         test.find(query='a ("hello",6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello")', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello", 6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     f = io.StringIO()
@@ -1794,6 +1794,6 @@ def test_fail_overwrite_schema_duckdb_backend():
     try:
         test.schema(filename="examples/test/yaml1_circular_schema.json") # should not allow circular dependency overwrite
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
         assert str(e) == expected
