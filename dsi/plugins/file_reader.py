@@ -29,12 +29,53 @@ class FileReader(StructuredMetadata):
             self.filenames = [filenames]
         elif isinstance(filenames, list):
             self.filenames = filenames
+        elif isinstance(filenames, (dict, DataFrame)):
+            self.filenames = filename
         else:
             raise TypeError
         self.file_info = {}
         for filename in self.filenames:
             sha = sha1(open(filename, 'rb').read())
             self.file_info[abspath(filename)] = sha.hexdigest()
+    
+    def store_dict(self, reader_name: str, data_dict: dict, expected_columns: list[str]) -> OrderedDict:
+        if all(isinstance(val, list) for val in data_dict.values()):
+            extra = set(data_dict.keys()) - set(expected_columns)
+            if extra:
+                raise ValueError(f"Input dictionary for {reader_name} data card reader has extra columns: {", ".join(extra)}")
+            
+            reordered_dict = OrderedDict((k, data_dict[k]) for k in expected_columns if k in data_dict)
+            max_len = max(len(values) for values in reordered_dict.values())
+            for value in reordered_dict.values():
+                value.extend([None] * (max_len - len(value)))
+
+            return reordered_dict
+        elif not any(isinstance(val, (dict,list)) for val in data_dict.values()): # checking if single dict with scalar values (no nested dicts or lists)
+            extra = set(data_dict.keys()) - set(expected_columns)
+            if extra:
+                raise ValueError(f"Input dictionary for {reader_name} data card reader has extra columns: {", ".join(extra)}")
+            
+            reordered_dict = OrderedDict((k, [data_dict[k]]) for k in expected_columns if k in data_dict) # make each value a list not scalar value
+            return reordered_dict
+        else:
+            raise ValueError("Input dictionary must represent one table of data.")
+
+    def store_dataframe(self, reader_name: str, data_df: DataFrame, expected_columns: list[str]) -> OrderedDict:
+        df_cols = set(data_df.columns)
+        extra = df_cols - set(expected_columns)
+        if extra:
+            raise ValueError(f"Input DataFrame for {reader_name} data card reader has extra columns: {", ".join(extra)}")
+        
+        result = OrderedDict(
+            (col, data_df[col].tolist() if col in df_cols else [])
+            for col in expected_columns
+        )
+
+        max_len = max(len(values) for values in result.values())
+        for value in result.values():
+            value.extend([None] * (max_len - len(value)))
+        
+        return result
 
     def check_type(self, text):
         """
@@ -937,9 +978,9 @@ class Oceans11Datacard(YAML):
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames` : str or list of str
+        `filenames` : str, list of str, or data object (dict or pandas DataFrame)
             File name(s) of YAML data card files to ingest. Each file must adhere to the
-            Oceans 11 LANL Data Server metadata standard.
+            Oceans 11 Server metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
@@ -952,39 +993,48 @@ class Oceans11Datacard(YAML):
         """
         Flattens data in the input data card as a row in the `oceans11_datacard` table
         """
-        temp_data = OrderedDict()
-        for filename in self.datacard_files:
-            with open(filename, 'r') as yaml_file:
-                data = self._safe_load(yaml_file)
-                
-            field_names = []
-            for element, val in data.items():
-                if element not in ['authorship', 'data']:
-                    if isinstance(val, list):
-                        val = ",, ".join(val)
-                    if element not in temp_data.keys():
-                        temp_data[element] = [val]
-                    else:
-                        temp_data[element].append(val)
-                    field_names.append(element)
-                else:
-                    for field, val2 in val.items():
-                        if isinstance(val2, list):
-                            val2 = ",, ".join(val2)
-                        if field not in temp_data.keys():
-                            temp_data[field] = [val2]
+        expected_columns = ["title", "description", "keywords", "instructions_of_use", "authors", "release_date", "la_ur", 
+                            "funding", "rights", "file_types", "file_size", "num_files", "dataset_size", "version", "doi"]
+        if isinstance(self.datacard_files, dict):
+            self.set_schema_2(OrderedDict([("oceans11_datacard", self.store_dict("Oceans11", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, DataFrame):
+            self.set_schema_2(OrderedDict([("oceans11_datacard", self.store_dataframe("Oceans11", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, list):
+
+            temp_data = OrderedDict()
+            for filename in self.datacard_files:
+                with open(filename, 'r') as yaml_file:
+                    data = self._safe_load(yaml_file)
+                    
+                field_names = []
+                for element, val in data.items():
+                    if element not in ['authorship', 'data']:
+                        if isinstance(val, list):
+                            val = ",, ".join(val)
+                        if element not in temp_data.keys():
+                            temp_data[element] = [val]
                         else:
-                            temp_data[field].append(val2)
-                        field_names.append(field)
+                            temp_data[element].append(val)
+                        field_names.append(element)
+                    else:
+                        for field, val2 in val.items():
+                            if isinstance(val2, list):
+                                val2 = ",, ".join(val2)
+                            if field not in temp_data.keys():
+                                temp_data[field] = [val2]
+                            else:
+                                temp_data[field].append(val2)
+                            field_names.append(field)
 
-            if sorted(field_names) != sorted(["title", "description", "keywords", "instructions_of_use", "authors", 
-                                              "release_date", "la_ur", "funding", "rights", "file_types", 
-                                              "file_size", "num_files", "dataset_size", "version", "doi"]):
-                raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Oceans11 template")
+                if sorted(field_names) != sorted(["title", "description", "keywords", "instructions_of_use", "authors", 
+                                                "release_date", "la_ur", "funding", "rights", "file_types", 
+                                                "file_size", "num_files", "dataset_size", "version", "doi"]):
+                    raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Oceans11 template")
 
-        self.datacard_data["oceans11_datacard"] = temp_data
-        self.set_schema_2(self.datacard_data)
-
+            self.datacard_data["oceans11_datacard"] = temp_data
+            self.set_schema_2(self.datacard_data)
+        else:
+            raise ValueError("Input for the Oceans11Datacard reader must be a YAML file, dictionary or pandas DataFrame")
 class DublinCoreDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `dublin_core_datacard` table.
@@ -992,7 +1042,7 @@ class DublinCoreDatacard(FileReader):
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames` : str or list of str
+        `filenames` : str, list of str, or data object (dict or pandas DataFrame)
             File name(s) of XML data card files to ingest. Each file must adhere to the
             Dublin Core metadata standard.
         """
@@ -1007,29 +1057,35 @@ class DublinCoreDatacard(FileReader):
         """
         Flattens data in the input data card as a row in the `dublin_core_datacard` table
         """
-        import xmltodict
-        temp_data = OrderedDict()
-        for filename in self.datacard_files:
-            with open(filename, 'r', encoding="utf-8") as xml_file:
-                xml_data = xml_file.read()
-                data = xmltodict.parse(xml_data)
-                
-            field_names = []
-            for element, val in next(iter(data.values())).items():
-                if val is None:
-                    val = ""
-                if element not in temp_data.keys():
-                    temp_data[element] = [val]
-                else:
-                    temp_data[element].append(val)
-                field_names.append(element)
-            if sorted(field_names) != sorted(['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 
-                                              'Language', 'Format', 'Subject', 'Description', 'Identifier', 
-                                              'Relation', 'Source', 'Type', 'Coverage', 'Rights']):
-                raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Dublin Core template")
+        expected_columns = ['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 'Language', 'Format', 'Subject', 
+                            'Description', 'Identifier', 'Relation', 'Source', 'Type', 'Coverage', 'Rights']
+        if isinstance(self.datacard_files, dict):
+            self.set_schema_2(OrderedDict([("dublin_core_datacard", self.store_dict("Dublin Core", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, DataFrame):
+            self.set_schema_2(OrderedDict([("dublin_core_datacard", self.store_dataframe("Dublin Core", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, list):
 
-        self.datacard_data["dublin_core_datacard"] = temp_data
-        self.set_schema_2(self.datacard_data)
+            import xmltodict
+            temp_data = OrderedDict()
+            for filename in self.datacard_files:
+                with open(filename, 'r', encoding="utf-8") as xml_file:
+                    xml_data = xml_file.read()
+                    data = xmltodict.parse(xml_data)
+                    
+                field_names = []
+                for element, val in next(iter(data.values())).items():
+                    if val is None:
+                        val = ""
+                    if element not in temp_data.keys():
+                        temp_data[element] = [val]
+                    else:
+                        temp_data[element].append(val)
+                    field_names.append(element)
+                if sorted(field_names) != sorted(expected_columns):
+                    raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Dublin Core template")
+
+            self.datacard_data["dublin_core_datacard"] = temp_data
+            self.set_schema_2(self.datacard_data)
 
 class SchemaOrgDatacard(FileReader):
     """
@@ -1038,7 +1094,7 @@ class SchemaOrgDatacard(FileReader):
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames` : str or list of str
+        `filenames` : str, list of str, or data object (dict or pandas DataFrame)
             File name(s) of JSON data card files to ingest. Each file must adhere to the
             Schema.org metadata standard.
         """
@@ -1053,33 +1109,38 @@ class SchemaOrgDatacard(FileReader):
         """
         Flattens data in the input data card as a row in the `schema_org_datacard` table
         """
-        temp_data = OrderedDict()
-        for filename in self.datacard_files:
-            with open(filename, 'r') as schema_file:
-                data = json.load(schema_file)
-                
-            field_names = []
-            for element, val in data.items():
-                if element == "@type" and val.lower() == "dataset":
-                    field_names.append(element)
-                    continue
-                elif element == "@type" and val.lower() != "dataset":
-                    raise KeyError(f"{filename} must have key '@type' with value of 'Dataset' to match Schema.org requirements")
-                if element not in temp_data.keys():
-                    temp_data[element] = [val]
-                else:
-                    temp_data[element].append(val)
-                field_names.append(element)
-            if sorted(field_names) != sorted(["@type", "name", "description", "keywords", "creator", "audience", 
-                                              "expires",  "isBasedOn", "isPartOf", "accountablePerson", "publisher", 
-                                              "editor", "funder", "funding", "dateCreated", "dateModified", 
-                                              "datePublished", "countryOfOrigin", "locationCreated", "sourceOrganization", 
-                                              "url", "version", "creditText", "license", "citation", "copyrightHolder", 
-                                              "copyrightNotice", "copyrightYear"]):
-                raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Schema.org template")
+        expected_columns = ["@type", "name", "description", "keywords", "creator", "audience",  "expires",  "isBasedOn", "isPartOf", 
+                            "accountablePerson", "publisher", "editor", "funder", "funding", "dateCreated", "dateModified", 
+                            "datePublished", "countryOfOrigin", "locationCreated", "sourceOrganization", "url", "version", 
+                            "creditText", "license", "citation", "copyrightHolder", "copyrightNotice", "copyrightYear"]
+        if isinstance(self.datacard_files, dict):
+            self.set_schema_2(OrderedDict([("schema_org_datacard", self.store_dict("Schema.org", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, DataFrame):
+            self.set_schema_2(OrderedDict([("schema_org_datacard", self.store_dataframe("Schema.org", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, list):
 
-        self.datacard_data["schema_org_datacard"] = temp_data
-        self.set_schema_2(self.datacard_data)
+            temp_data = OrderedDict()
+            for filename in self.datacard_files:
+                with open(filename, 'r') as schema_file:
+                    data = json.load(schema_file)
+                    
+                field_names = []
+                for element, val in data.items():
+                    if element == "@type" and val.lower() == "dataset":
+                        field_names.append(element)
+                        continue
+                    elif element == "@type" and val.lower() != "dataset":
+                        raise KeyError(f"{filename} must have key '@type' with value of 'Dataset' to match Schema.org requirements")
+                    if element not in temp_data.keys():
+                        temp_data[element] = [val]
+                    else:
+                        temp_data[element].append(val)
+                    field_names.append(element)
+                if sorted(field_names) != sorted(expected_columns):
+                    raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Schema.org template")
+
+            self.datacard_data["schema_org_datacard"] = temp_data
+            self.set_schema_2(self.datacard_data)
 
 class GoogleDatacard(YAML):
     """
@@ -1088,7 +1149,7 @@ class GoogleDatacard(YAML):
     """
     def __init__(self, filenames, **kwargs):
         """
-        `filenames` : str or list of str
+        `filenames` : str, list of str, or data object (dict or pandas DataFrame)
             File name(s) of YAML data card files to ingest. 
             Each file must adhere to the Google Data Cards Playbook metadata standard.
         """
@@ -1103,50 +1164,57 @@ class GoogleDatacard(YAML):
         """
         Flattens data in the input data card as a row in the `google_datacard` table
         """
-        temp_data = OrderedDict()
+        expected_columns = ['dataset_name', 'summary', 'dataset_link', 'documentation_link', 'datacard_author1', 'datacard_author2', 
+                            'datacard_author3', 'publishing_organization', 'publishing_POC', 'publishing_POC_affiliation', 
+                            'publishing_POC_contact', 'dataset_owner1', 'dataset_owner2', 'dataset_owner3', 'dataset_owners_affiliation', 
+                            'dataset_owners_contact', 'funding_institution', 'funding_summary', 'data_subjects', 'data_sensitivity', 
+                            'version', 'maintenance_status', 'last_updated', 'release_date', 'motivation', 'dataset_uses', 
+                            'citation_guidelines', 'citation_bibtex', 'collection_methods_used', 'source', 'platform', 
+                            'dates_of_collection', 'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']
+        if isinstance(self.datacard_files, dict):
+            self.set_schema_2(OrderedDict([("google_datacard", self.store_dict("Google", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, DataFrame):
+            self.set_schema_2(OrderedDict([("google_datacard", self.store_dataframe("Google", self.datacard_files, expected_columns))]))
+        elif isinstance(self.datacard_files, list):
 
-        for filename in self.datacard_files:
-            with open(filename, 'r') as yaml_file:
-                data = self._safe_load(yaml_file)
+            temp_data = OrderedDict()
+
+            for filename in self.datacard_files:
+                with open(filename, 'r') as yaml_file:
+                    data = self._safe_load(yaml_file)
                 
-            if not set(data.keys()).issubset(["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]):
-                raise KeyError(f"Error in reading {filename} data card. Please ensure section names match the ones in the Google template")
-            
-            field_names = []
-            sampling_fields = []
-            ml_fields = []
-            for element, val in data.items():
-                for inner_key, inner_val in val.items():
-                    if inner_key not in temp_data.keys():
-                        temp_data[inner_key] = [inner_val]
-                    else:
-                        temp_data[inner_key].append(inner_val)
-                        
-                    if element == "sampling_methods":
-                        sampling_fields.append(inner_key)
-                    elif element == "known_applications_and_benchmarks":
-                        ml_fields.append(inner_key)
-                    else:
-                        field_names.append(inner_key)
+                section_headers = ["summary", "authorship", "overview", "provenance", "sampling_methods", "known_applications_and_benchmarks"]
+                if not set(data.keys()).issubset(section_headers):
+                    raise KeyError(f"Error in reading {filename} data card. Please ensure section names match the ones in the Google template")
+                
+                field_names = []
+                sampling_fields = []
+                ml_fields = []
+                for element, val in data.items():
+                    for inner_key, inner_val in val.items():
+                        if inner_key not in temp_data.keys():
+                            temp_data[inner_key] = [inner_val]
+                        else:
+                            temp_data[inner_key].append(inner_val)
+                            
+                        if element == "sampling_methods":
+                            sampling_fields.append(inner_key)
+                        elif element == "known_applications_and_benchmarks":
+                            ml_fields.append(inner_key)
+                        else:
+                            field_names.append(inner_key)
 
-            if not set(field_names).issubset(['dataset_name', 'summary', 'dataset_link', 'documentation_link', 'datacard_author1', 
-                                              'datacard_author2', 'datacard_author3', 'publishing_organization', 'publishing_POC', 
-                                              'publishing_POC_affiliation', 'publishing_POC_contact', 'dataset_owner1', 'dataset_owner2', 
-                                              'dataset_owner3', 'dataset_owners_affiliation', 'dataset_owners_contact', 'funding_institution', 
-                                              'funding_summary', 'data_subjects', 'data_sensitivity', 'version', 'maintenance_status', 
-                                              'last_updated', 'release_date', 'motivation', 'dataset_uses', 'citation_guidelines', 
-                                              'citation_bibtex', 'collection_methods_used', 'source', 'platform', 'dates_of_collection',
-                                              'type_of_data', 'data_selection', 'data_inclusion', 'data_exclusion']):
-                raise ValueError(f"Error in reading {filename} data card. Ensure all fields match the Google dc template")
-            
-            if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
-                raise KeyError(f"Error in reading {filename} data card. Ensure all fields in 'sampling_methods' match the Google dc template")
-            
-            if not set(ml_fields).issubset(['ml_applications', 'ml_model_name', 'evaluation_accuracy', 'evaluation_precision', 
-                                                  'evaluation_recall', 'evaluation_performance_metric']):
-                raise KeyError(f"Error reading {filename} data card. Ensure all fields in 'known_applications_and_benchmarks' match the Google dc template")
-        self.datacard_data["google_datacard"] = temp_data
-        self.set_schema_2(self.datacard_data)
+                if not set(field_names).issubset(expected_columns):
+                    raise ValueError(f"Error in reading {filename} data card. Ensure all fields match the Google dc template")
+                
+                if not set(sampling_fields).issubset(['sampling_method_used', 'sampling_criteria1', 'sampling_criteria2', 'sampling_criteria3']):
+                    raise KeyError(f"Error in reading {filename} data card. Ensure all fields in 'sampling_methods' match the Google dc template")
+                
+                if not set(ml_fields).issubset(['ml_applications', 'ml_model_name', 'evaluation_accuracy', 'evaluation_precision', 
+                                                    'evaluation_recall', 'evaluation_performance_metric']):
+                    raise KeyError(f"Error reading {filename}. Ensure all fields in 'known_applications_and_benchmarks' match the Google dc template")
+            self.datacard_data["google_datacard"] = temp_data
+            self.set_schema_2(self.datacard_data)
 
 class GenesisDatacard(FileReader):
     """

@@ -50,18 +50,19 @@ class Dict(CollectionReader):
             self.set_schema_2(OrderedDict([(self.table_name, temp_dict)]))
 
         elif all(isinstance(val, dict) for val in self.input_dict.values()):
-            for nested_dict in self.input_dict.values():
-                if not all(isinstance(v1, list) for v1 in nested_dict.values()):
-                    raise ValueError("Each value in a nested dictionary / Ordered Dict must be a list.")
-            if not isinstance(self.input_dict, OrderedDict) and isinstance(self.input_dict, dict):
-                new_input = OrderedDict()
-                for k, v in self.input_dict.items():
-                    if not isinstance(v, OrderedDict) and isinstance(v, dict):
-                        new_input[k] = OrderedDict(v)
+            result = OrderedDict()
+            for table_name, nested_dict in self.input_dict.items():
+                if all(isinstance(v1, list) for v1 in nested_dict.values()):
+                    if not isinstance(self.input_dict[table_name], OrderedDict) and isinstance(self.input_dict[table_name], dict):
+                        result[table_name] = OrderedDict(self.input_dict[table_name])
                     else:
-                        new_input[k] = v
-                self.input_dict = new_input
-            self.set_schema_2(self.input_dict)
+                        result[table_name] = self.input_dict[table_name]
+                else: # values are a mix of scalars, lists, dicts --> treat all values as just one row in the table
+                    temp_dict = OrderedDict()
+                    for k, v in nested_dict.items():
+                        temp_dict[k] = [v]
+                    result[table_name] = temp_dict
+            self.set_schema_2(result)
         else:
             raise ValueError("Input dictionary must either represent one table of data or multiple tables (use nested Ordered Dicts).")
 
