@@ -513,11 +513,11 @@ class DSI_cli:
                 elif file_extension.lower() == 'csv':
                     self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() == 'toml':
-                    self.t.load_module('plugin', "TOML1", "reader", filenames = dbfile)
+                    self.t.load_module('plugin', "TOML", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() in ['yaml', 'yml']:
-                    self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
+                    self.t.load_module('plugin', "YAML", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() == 'json':
-                    self.t.load_module('plugin', "JSON", "reader", filenames = dbfile)
+                    self.t.load_module('plugin', "JSON", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() in ['pq', 'parquet']:
                     self.t.load_module('plugin', "Parquet", "reader", filenames = dbfile, table_name = table_name)
         except Exception as e:
