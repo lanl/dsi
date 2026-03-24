@@ -70,7 +70,9 @@ class DSI():
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
                 print("Eligible backend_names are: Sqlite, DuckDB")
         except Exception as e:
-            raise RuntimeError(f"backend ERROR: {e}")
+            if e.args:
+                e.args = (f'backend ERROR: {str(e.args[0])}',)
+            raise
 
         self.main_backend_obj = self.t.loaded_backends[0]
         if filename != ".temp_dsi.db":
@@ -115,7 +117,9 @@ class DSI():
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
-                    raise RuntimeError(f"schema() ERROR: {e}")
+                    if e.args:
+                        e.args = (f'schema() ERROR: {str(e.args[0])}',)
+                    raise
                 self.t.active_metadata = OrderedDict()
                 self.schema_read = False
                 self.schema_tables = set()
@@ -248,7 +252,9 @@ class DSI():
                 self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
                 self.t.load_module('plugin', class_name, 'reader', **updated, **kwargs)
             except Exception as e:
-                raise RuntimeError(f"read() ERROR: {e}")
+                if e.args:
+                    e.args = (f'read() ERROR: {str(e.args[0])}',)
+                raise
 
         else:
             try:
@@ -295,7 +301,9 @@ class DSI():
                     print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
                     raise RuntimeError("View eligible readers in the output of `list_readers()`")
             except Exception as e:
-                raise RuntimeError(f"read() ERROR: {e}")
+                if e.args:
+                    e.args = (f'read() ERROR: {str(e.args[0])}',)
+                raise
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
         if self.schema_read:
@@ -308,7 +316,9 @@ class DSI():
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
-                    raise RuntimeError(f"read() ERROR: {e}")
+                    if e.args:
+                        e.args = (f'read() ERROR: {str(e.args[0])}',)
+                    raise
                 self.t.active_metadata = OrderedDict()
                 self.schema_read = False
                 self.schema_tables = set()
@@ -317,7 +327,9 @@ class DSI():
             try:
                 self.t.artifact_handler(interaction_type='ingest')
             except Exception as e:
-                raise RuntimeError(f"read() ERROR: {e}")
+                if e.args:
+                    e.args = (f'read() ERROR: {str(e.args[0])}',)
+                raise
             self.t.active_metadata = OrderedDict()
 
         if len(table_keys) == 1:
@@ -356,7 +368,8 @@ class DSI():
                 df = self.t.artifact_handler(interaction_type='query', query=statement)
             output = f.getvalue()
         except Exception as e:
-            raise RuntimeError(f"query() ERROR: {e}") from None
+            new_args = (f"query() ERROR: {e}",) + e.args[1:]
+            raise type(e)(*new_args) from None
    
         if df.empty:
             if output:
@@ -406,7 +419,10 @@ class DSI():
         try:
             df = self.t.get_table(table_name)
         except Exception as e:
-            raise RuntimeError(f"get_table() ERROR: {e}")
+            if e.args:
+                e.args = (f'get_table() ERROR: {str(e.args[0])}',)
+            raise
+
         if df.empty:
             return
         if not collection:
@@ -474,8 +490,9 @@ class DSI():
                 find_data = self.t.find_relation(query)
             output = f.getvalue()
         except Exception as e:
-            e = str(e).replace("query_object", "query")
-            raise RuntimeError(f"find() ERROR: {e}")
+            if e.args:
+                e.args = (f'find() ERROR: {str(e.args[0]).replace("query_object", "query")}',)
+            raise 
         
         if output and "WARNING" in output:
             warn_msg = output[output.find("WARNING"):]
@@ -543,7 +560,9 @@ class DSI():
                 find_table = self.t.find_table(query)
                 find_col = self.t.find_column(query)
         except Exception as e:
-            raise RuntimeError(f"search() ERROR: {e}")
+            if e.args:
+                e.args = (f'search() ERROR: {str(e.args[0])}',)
+            raise
         
         if find_cell is None and find_col is None and find_table is None:
             print(f"WARNING: {val} was not found in this backend\n")
@@ -678,7 +697,9 @@ class DSI():
                 print(f"Created backup '{backup_file}' before updating the data.")
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
-            raise RuntimeError(f"update() ERROR: {e}")
+            if e.args:
+                e.args = (f'update() ERROR: {str(e.args[0])}',)
+            raise
 
     def list_writers(self):
         """
@@ -723,7 +744,9 @@ class DSI():
         try:        
             self.t.artifact_handler(interaction_type='process')
         except Exception as e:
-            raise RuntimeError(f"write() ERROR: {e}")
+            if e.args:
+                e.args = (f'write() ERROR: {str(e.args[0])}',)
+            raise
 
         if writer_name.endswith(".py"):
             if not os.path.exists(writer_name):
@@ -765,7 +788,9 @@ class DSI():
                 self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
                 self.t.load_module('plugin', class_name, 'writer', **updated, **kwargs)
             except Exception as e:
-                raise RuntimeError(f"write() ERROR: {e}")
+                if e.args:
+                    e.args = (f'write() ERROR: {str(e.args[0])}',)
+                raise
         else:
             correct_writer = True
             try:
@@ -780,7 +805,9 @@ class DSI():
                 else:
                     correct_writer = False
             except Exception as e:
-                raise RuntimeError(f"write() ERROR: {e}")
+                if e.args:
+                    e.args = (f'write() ERROR: {str(e.args[0])}',)
+                raise
             
             if not correct_writer:
                 print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
@@ -790,7 +817,9 @@ class DSI():
         try:
             self.t.transload()
         except Exception as e:
-            raise RuntimeError(f"write() ERROR: {e}")
+            if e.args:
+                e.args = (f'write() ERROR: {str(e.args[0])}',)
+            raise
 
         self.t.active_metadata = OrderedDict()
         print(f"Successfully wrote to the output file {filename}")
@@ -816,7 +845,9 @@ class DSI():
                 table_list = self.t.list(collection)
             output = f.getvalue()
         except Exception as e:
-            raise RuntimeError(f"list() ERROR: {e}")
+            if e.args:
+                e.args = (f'list() ERROR: {str(e.args[0])}',)
+            raise
 
         
         if collection:
@@ -852,7 +883,9 @@ class DSI():
                 summary_df = self.t.summary(table_name, collection)
             output = f.getvalue()
         except Exception as e:
-            raise RuntimeError(f"summary() ERROR: {e}")
+            if e.args:
+                e.args = (f'summary() ERROR: {str(e.args[0])}',)
+            raise
 
         if collection:
             return summary_df
@@ -870,7 +903,9 @@ class DSI():
         try:
             self.t.num_tables()
         except Exception as e:
-            raise RuntimeError(f"query() ERROR: {e}")       
+            if e.args:
+                e.args = (f'num_tables() ERROR: {str(e.args[0])}',)
+            raise
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
@@ -897,7 +932,9 @@ class DSI():
         try:
             self.t.display(table_name, num_rows, display_cols)
         except Exception as e:
-            raise RuntimeError(f"display() ERROR: {e}")
+            if e.args:
+                e.args = (f'display() ERROR: {str(e.args[0])}',)
+            raise
 
     def close(self):
         """
