@@ -136,6 +136,7 @@ def compute_md5(file_path:str, chunk_size:int = 8192) -> str:
     return md5.hexdigest()
 
 
+
 def is_file(path_provided: str)-> int:
     """Checks if the provided path is a file, a directory, or does not exist.
     
@@ -155,6 +156,7 @@ def is_file(path_provided: str)-> int:
         return 0
 
 
+
 def csv_to_list_of_dicts(path: str) -> list[dict[str, str]]:
     """
     Reads a CSV file and returns a list of dictionaries, where each dictionary represents a row in the CSV file with column headers as keys.
@@ -167,6 +169,7 @@ def csv_to_list_of_dicts(path: str) -> list[dict[str, str]]:
     """
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
 
 
 def create_directory(dir_name: str = "temp", exist_ok=True):
@@ -185,7 +188,8 @@ def create_directory(dir_name: str = "temp", exist_ok=True):
     print("Created:", dir_path)
 
 
-def run(cmd: str, cwd: str | None = None) -> None:
+
+def run_shell_cmd(cmd: str, cwd: str | None = None) -> None:
     """
     Runs a shell command and raises an error if it fails.
 
@@ -198,6 +202,7 @@ def run(cmd: str, cwd: str | None = None) -> None:
     if p.returncode != 0:
         raise RuntimeError(f"Command failed: {cmd}\nstdout:\n{p.stdout}\nstderr:\n{p.stderr}")
     
+
 
 def create_index_db(index_path:str, catalogue_name: str = "metadata_catalogue.db"):
     """
