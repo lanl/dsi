@@ -30,7 +30,7 @@ class FileReader(StructuredMetadata):
         elif isinstance(filenames, list):
             self.filenames = filenames
         elif isinstance(filenames, (dict, DataFrame)):
-            self.filenames = filename
+            self.filenames = filenames
         else:
             raise TypeError
         self.file_info = {}
@@ -42,7 +42,7 @@ class FileReader(StructuredMetadata):
         if all(isinstance(val, list) for val in data_dict.values()):
             extra = set(data_dict.keys()) - set(expected_columns)
             if extra:
-                raise ValueError(f"Input dictionary for {reader_name} data card reader has extra columns: {", ".join(extra)}")
+                raise ValueError(f"Input dictionary for {reader_name} data card reader has extra columns: {', '.join(extra)}")
             
             reordered_dict = OrderedDict((k, data_dict[k]) for k in expected_columns if k in data_dict)
             max_len = max(len(values) for values in reordered_dict.values())
@@ -53,7 +53,7 @@ class FileReader(StructuredMetadata):
         elif not any(isinstance(val, (dict,list)) for val in data_dict.values()): # checking if single dict with scalar values (no nested dicts or lists)
             extra = set(data_dict.keys()) - set(expected_columns)
             if extra:
-                raise ValueError(f"Input dictionary for {reader_name} data card reader has extra columns: {", ".join(extra)}")
+                raise ValueError(f"Input dictionary for {reader_name} data card reader has extra columns: {', '.join(extra)}")
             
             reordered_dict = OrderedDict((k, [data_dict[k]]) for k in expected_columns if k in data_dict) # make each value a list not scalar value
             return reordered_dict
@@ -64,7 +64,7 @@ class FileReader(StructuredMetadata):
         df_cols = set(data_df.columns)
         extra = df_cols - set(expected_columns)
         if extra:
-            raise ValueError(f"Input DataFrame for {reader_name} data card reader has extra columns: {", ".join(extra)}")
+            raise ValueError(f"Input DataFrame for {reader_name} data card reader has extra columns: {', '.join(extra)}")
         
         result = OrderedDict(
             (col, data_df[col].tolist() if col in df_cols else [])
@@ -96,6 +96,7 @@ class FileReader(StructuredMetadata):
                 return float(text)
             except ValueError:
                 return text
+
 
 class Csv(FileReader):
     """
@@ -143,6 +144,7 @@ class Csv(FileReader):
         
         self.set_schema_2(self.csv_data)
 
+
 class Bueno(FileReader):
     """
     A DSI Reader that captures performance data from Bueno (github.com/lanl/bueno)
@@ -176,6 +178,7 @@ class Bueno(FileReader):
             self.bueno_data[col] = [None if isinstance(item, float) and isnan(item) else item for item in coldata]
         
         self.set_schema_2(self.bueno_data)
+
 
 class JSON(FileReader):
     """
@@ -285,6 +288,7 @@ class Schema(FileReader):
             
             self.set_schema_2(self.schema_data)
 
+
 class YAML(FileReader):
     """
     DSI Reader that reads in an individual or a set of standardized YAML files
@@ -389,6 +393,7 @@ class YAML(FileReader):
             
             file_counter += 1
         self.set_schema_2(OrderedDict([(self.table_name, self.yaml_data)]))
+
 
 class YAML1(FileReader):
     """
@@ -497,6 +502,7 @@ class YAML1(FileReader):
         #     if len(value) < max_length:
         #         # Pad the list with None (or any other value)
         #         self.bueno_data[key] = value + [None] * (max_length - len(value))
+
 
 class TOML(FileReader):
     """
@@ -621,6 +627,7 @@ class TOML(FileReader):
 
             file_counter += 1
 
+
 class TOML1(FileReader):
     """
     DSI Reader that reads in an individual or a set of TOML files
@@ -724,6 +731,7 @@ class TOML1(FileReader):
 
         self.set_schema_2(self.toml_data)
 
+
 class Parquet(FileReader):
     """
     DSI Reader that loads data stored in a Parquet file as a table. Users can choose to specify the table name upon reading too.
@@ -769,7 +777,8 @@ class Parquet(FileReader):
             self.parquet_data = table_data
         
         self.set_schema_2(self.parquet_data)
-        
+
+
 class Ensemble(FileReader):
     """
     DSI Reader that loads ensemble simulation data stored in a CSV file.
@@ -847,6 +856,7 @@ class Ensemble(FileReader):
             self.csv_data["dsi_relations"] = relation_dict
        
         self.set_schema_2(self.csv_data)
+
 
 class Cloverleaf(FileReader):
     """
@@ -970,7 +980,8 @@ class Cloverleaf(FileReader):
         self.cloverleaf_data["simulation"] = simulation_dict
         self.cloverleaf_data["viz_files"] = viz_dict
         self.set_schema_2(self.cloverleaf_data)
-    
+
+
 class Oceans11Datacard(YAML):
     """
     DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
@@ -1035,6 +1046,8 @@ class Oceans11Datacard(YAML):
             self.set_schema_2(self.datacard_data)
         else:
             raise ValueError("Input for the Oceans11Datacard reader must be a YAML file, dictionary or pandas DataFrame")
+
+
 class DublinCoreDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `dublin_core_datacard` table.
@@ -1086,6 +1099,9 @@ class DublinCoreDatacard(FileReader):
 
             self.datacard_data["dublin_core_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
+        else:
+            raise ValueError("Input for the DublinCoreDatacard reader must be an XML file, dictionary or pandas DataFrame")
+
 
 class SchemaOrgDatacard(FileReader):
     """
@@ -1141,6 +1157,9 @@ class SchemaOrgDatacard(FileReader):
 
             self.datacard_data["schema_org_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
+        else:
+            raise ValueError("Input for the SchemaOrgDatacard reader must be an JSON file, dictionary or pandas DataFrame")
+
 
 class GoogleDatacard(YAML):
     """
@@ -1215,6 +1234,9 @@ class GoogleDatacard(YAML):
                     raise KeyError(f"Error reading {filename}. Ensure all fields in 'known_applications_and_benchmarks' match the Google dc template")
             self.datacard_data["google_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
+        else:
+            raise ValueError("Input for the GoogleDatacard reader must be an YAML file, dictionary or pandas DataFrame")
+
 
 class GenesisDatacard(FileReader):
     """
