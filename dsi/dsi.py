@@ -5,6 +5,7 @@ import pandas as pd
 import os
 from contextlib import redirect_stdout
 import io
+import math
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -381,7 +382,11 @@ class DSI():
             print(f"Printing the result of the SQL query: {statement}")
             headers = df.columns.tolist()
             rows = df.values.tolist()
-            self.t.table_print_helper(headers, rows, len(rows))
+            clean_rows = [
+                [None if isinstance(x, float) and math.isnan(x) else x for x in row]
+                for row in rows
+            ]
+            self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
             print(f"Storing the result of the SQL query: {statement} as a collection")
@@ -429,7 +434,11 @@ class DSI():
             print(f"Printing all data from the table: {table_name}")
             headers = df.columns.tolist()
             rows = df.values.tolist()
-            self.t.table_print_helper(headers, rows, len(rows))
+            clean_rows = [
+                [None if isinstance(x, float) and math.isnan(x) else x for x in row]
+                for row in rows
+            ]
+            self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
             print(f"Storing all data for the table: {table_name} as a collection")
