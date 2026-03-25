@@ -1,4 +1,4 @@
-
+import json
 import os
 import pandas as pd
 import sqlite3
@@ -6,6 +6,8 @@ import sqlite3
 from contextlib import closing
 from pandasql import sqldf
 from pathlib import Path
+
+from streamlit import rerun
 
 from dsi.dsi import DSI
 
@@ -154,32 +156,41 @@ def detect_valid_db_with_data(path: str) -> tuple[str | None, bool, str]:
 
 
 class f_dsi:
-    def __init__(self, folder_name:str):
-        self.folder_name = folder_name
-        folder = Path(folder_name)
-        print("folder:", folder)
+    """A class for federated querying of DSI databases. It loads metadata about the databases and 
+    their tables from a specified folder, and provides methods to summarize, query, search, and find data across the federated databases."""
 
-        print("\n")
-        db_path_list = []
-        for p in folder.rglob("*"):
-            if p.is_file():
-                db_path_list.append(p)
-                print(p)
+    def __init__(self, federated_folder_path:str):
+        """Initializes the f_dsi class by loading metadata about the federated databases and their tables from a specified folder.
+        
+        Args:
+            federated_folder_path (str): The file path to the folder containing the metadata about the federated databases. The folder should contain a JSON file named "dsi_database_list.json" with the metadata information.
+        """
 
-        print("\n")
+        self.federated_folder_path = federated_folder_path
+        
+        try:
+            _federated_folder_path = Path(federated_folder_path)
+            with open( f"{_federated_folder_path}/dsi_database_list.json", "r", encoding="utf-8") as f:
+                dsi_databases_list = json.load(f)
+                
+        except Exception as e:
+            print(f"Error {e}, could not read the database at {_federated_folder_path}/dsi_database_list.json")
+            return
+        
+
         databases = []
-        print(db_path_list)
-        for d_id, db_path in enumerate(db_path_list):
+        # print(db_path_list)
+        for d_id, dsi_db_info in enumerate(dsi_databases_list):
             db_info = {}
 
-            print("db_path:",db_path)
-            database_name, valid_db = detect_valid_db_with_data(db_path)
+            db_path = Path(dsi_db_info['local_path'])
+            database_type, valid_db = detect_valid_db_with_data(db_path)
 
             if valid_db:
-                _temp = DSI(str(db_path), backend_name=database_name, silence_messages="True")
+                _temp = DSI(str(db_path), backend_name=database_type, silence_messages="True")
                 db_info['id'] = d_id
                 db_info['path'] = str(db_path)
-                db_info['name'] = (str(db_path)).split('/')[-1]
+                db_info['name'] = dsi_db_info['name']
                 _tbls = _temp.list(True)
                 db_info['num_tables'] = len(_tbls)
                 db_info['tables'] = _tbls
@@ -188,87 +199,129 @@ class f_dsi:
                 databases.append(db_info)
             else:
                 print(f"!!!!Error opening database at {db_path}!!!!")
+        
+        self.df = pd.DataFrame(databases)   # what is exposed to the user
+        self.df_exp = self.df.explode("tables").rename(columns={"tables": "table"})  # what is used internally
+        
 
-                # delete the file
-                # file_path = Path(db_path)
-                # file_path.unlink()
 
+    def __find_db_path(self, table: str, db: str) -> str:
+        """Finds the file path of a database containing a specified table and database name within the federated system.
         
-        print("\nDatabases:")
-        print(databases)
+        Args:
+            table (str): The name of the table to find.
+            db (str): The name of the database containing the table.
+
+        Returns:
+            The file path of the database containing the specified table and database name.
+        """
+        q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"        
+        out = sqldf(q, {"df_exp": self.df_exp})
+        path_str = out.loc[0, "path"]
+        return path_str
+    
         
-        self.df = pd.DataFrame(databases)
-        self.df_exp = self.df.explode("tables").rename(columns={"tables": "table"})
+
+    def get_db_path(self, db_name: str) -> list[str]:
+        """Returns a list of file paths for databases with the specified name within the federated system.
         
-        
+        Args:
+            db_name (str): The name of the database to find.
+
+        Returns:            
+            A list of file paths for databases with the specified name.
+        """
+
+        q = f"SELECT path FROM df_exp WHERE name = '{db_name}'"        
+        out = sqldf(q, {"df_exp": self.df_exp})
+        path_list = out["path"].tolist()
+        return path_list
+    
+
+
+
     def f_get_databases(self):
-        """Returns a DataFrame with one row per table in each database, containing columns: id, path, name, num_tables, table."""
+        """Returns a DataFrame containing information about the federated databases, including their paths, names, and tables."""
         return self.df
     
 
-    def f_summarize(self, table, db):
-        """Returns a summary of the specified table in the specified database.
+
+    def f_summarize(self, table: str, db: str):
+        """Summarizes the contents of a specified table in a specified database within the federated system.
         
         Args:
-            table: The name of the table to summarize.
-            db: The name of the database containing the table.
+            table (str): The name of the table to summarize.
+            db (str): The name of the database containing the table.
+        
+        Returns:
+            The summary of the specified table.
         """
 
-        q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
-        print(q)
-        
-        out = sqldf(q, {"df_exp": self.df_exp})
-        path_str = out.loc[0, "path"]
-        print(path_str)
+        # Find the path of the database to query
+        db_path_str = self.__find_db_path(table, db)
     
-        _temp = DSI(path_str, silence_messages="True")
+        _temp = DSI(db_path_str, silence_messages="True")
         l = _temp.summary(collection=True)
         return l
 
 
-    def f_query(self, table, db, query):
-        """Returns the result of executing the specified SQL query on the specified table in the specified database.
 
-        """
-        q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
-        print(q)
+    def f_query(self, table: str, db: str, query: str):
+        """Executes a query on a specified table in a specified database within the federated system.
         
-        out = sqldf(q, {"df_exp": self.df_exp})
-        path_str = out.loc[0, "path"]
+        Args:
+            table (str): The name of the table to query.
+            db (str): The name of the database containing the table.
+            query (str): The query to execute on the specified table.   
+
+        Returns:
+            The result of the query execution.
+        """
+        
+        # Find the path of the database to query
+        db_path_str = self.__find_db_path(table, db)
     
-        _temp = DSI(path_str, silence_messages="True")
+        _temp = DSI(db_path_str, silence_messages="True")
         l = _temp.query(query, collection=True)
         return l
 
 
-    def f_search(self, table, db, query):
-        q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
-        print(q)
+    def f_search(self, table: str, db: str, query: str):
+        """Searches for a specified query in a specified table in a specified database within the federated system.
         
-        out = sqldf(q, {"df_exp": self.df_exp})
-        path_str = out.loc[0, "path"]
+        Args:
+            table (str): The name of the table to search.
+            db (str): The name of the database containing the table.
+            query (str): The query to search for in the specified table.    
+        """
+
+        # Find the path of the database to query
+        db_path_str = self.__find_db_path(table, db)
     
-        _temp = DSI(path_str, silence_messages="True")
+        # Use DSI to run the query on the specified database and table
+        _temp = DSI(db_path_str, silence_messages="True")
         l = _temp.search(query, collection=True)
         return l
 
 
-    def f_find(self, table, db, query):
-        """Returns the list of rows in the specified table and database that match the specified query, where the query is a natural language description of the desired data.
+
+    def f_find(self, table: str, db: str, query: str):
+        """Finds a specified query in a specified table in a specified database within the federated system.
         
         Args:
-            table: The name of the table to search.
-            db: The name of the database containing the table.
-            query: A natural language description of the desired data, e.g. "all rows where age > 30".
+            table (str): The name of the table to find.
+            db (str): The name of the database containing the table.
+            query (str): The query to find in the specified table.
 
-        
+        Returns:
+            The result of the find operation.
         """
-        q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
-        print(q)
-        
-        out = sqldf(q, {"df_exp": self.df_exp})
-        path_str = out.loc[0, "path"]
+
+        # Find the path of the database to query
+        db_path_str = self.__find_db_path(table, db)
     
-        _temp = DSI(path_str, silence_messages="True")
+
+        # Use DSI to run the find operation on the specified database and table
+        _temp = DSI(db_path_str, silence_messages="True")
         l = _temp.find(query, collection=True)
         return l
