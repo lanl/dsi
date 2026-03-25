@@ -16,24 +16,24 @@ def get_url_file_size(url: str) -> int:
 
 
 
-def download_web_file(url: str, output_path: str):
+def download_web_file(url: str, output_path: str | Path):
     """Download a file from a given URL to a specified output path.
     
     Args:
         url: The URL of the file to download.
         output_path: The local path where the downloaded file should be saved.
     """ 
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)  # ensure folder exists
+    output_dir = Path(output_path)  # FIX: use output_path
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     filename = url.split("/")[-1] or "downloaded_file"
-    output_path = output_dir / filename
+    output_file = output_dir / filename
 
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
-        with open(output_path, "wb") as f:
+        with open(output_file, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
 
-    print(f"Downloaded to {output_path}")
+    print(f"Downloaded to {output_file}")
