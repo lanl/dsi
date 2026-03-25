@@ -7,67 +7,104 @@ from pathlib import Path
 from git_utils import download_github_file, get_github_remote_file_size
 from rsync_utils import rsync_download_interactive, rsync_remote_size_bytes_interactive
 from web_utils import download_web_file, get_url_file_size
-from federation_utils import compute_md5, create_directory, create_folder_from_path, csv_to_list_of_dicts, get_last_part, human_readable_size, run_shell_cmd, should_download, upsert_records
+from federation_utils import compute_md5, create_directory, create_folder_from_path, csv_to_list_of_dicts, deduplicate_keep_latest, get_last_part, human_readable_size, run_shell_cmd, should_download, upsert_records
 
 
-def main():
-    # Make sure that we have a file
-    if len(sys.argv) not in (2, 3):
-        print(f"Usage: {Path(sys.argv[0]).name} <input.yaml> [dsi_datasets_folder]")
-        sys.exit(1)
+def confirm_large_download(filesize: int, download_limit: int) -> bool:
+    """Prompts the user to confirm the download of a file if its size exceeds a specified limit. The function displays the file size in a human-readable format and asks the user for confirmation before proceeding with the download.
+    
+    Args:        
+        filesize (int): The size of the file in bytes.
+        download_limit (int): The download limit in bytes. If the file size exceeds this limit, the user will be prompted for confirmation.
+
+    Returns:
+        bool: True if the user confirms the download, False otherwise.
+    """
+
+    if filesize <= download_limit:
+        return True
+
+    print(
+        f"File size {human_readable_size(filesize)} exceeds the "
+        f"download limit of {human_readable_size(download_limit)}."
+    )
+    choice = input(" -- Please confirm that you want to download this file (y/n): ").strip().lower()
+    return choice == "y"
 
 
-    # Read configuration from YAML file
-    try:
-        yaml_path = Path(sys.argv[1])
-        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        print(f"Error: Could not find YAML file {yaml_path}")
-        sys.exit(1)
+
+def make_db_info(location_type:str, path:str, local_path:str, db_name:str) -> dict:
+    """Creates a dictionary containing information about a database, including its original location type, original path, local path, and name.
+    
+    Args:
+     location_type (str): The type of the original location (e.g., "github", "HPC", "URL", "local").
+        path (str): The original path to the database.
+        local_path (str): The local path where the database is stored after downloading or copying.
+        db_name (str): The name of the database.
+
+    Returns:
+        dict: A dictionary containing the database information with keys "original_location_type", "original_path", "local_path", and "name".
+    
+    """
+    return {
+        "original_location_type": location_type,
+        "original_path": path,
+        "local_path": str(local_path),
+        "name": db_name,
+    }
 
 
 
-    # Create a folder for the databases if it doesn't exist, or use the provided one
-    if len(sys.argv) == 3:
-        workspace_folder = sys.argv[2]
-    else:
-        _workspace_folder = data.get("workspace_folder", "")
-        workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+def federate_datasets(workspace_folder: str, config_data: dict) -> None:
+    """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
+      It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
+      The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
 
+    Args:
+        workspace_folder (str): The local folder where the datasets will be stored.
+        config_data (dict): A dictionary containing configuration data, including repository paths and download limits.
+    """
+
+    # Create the workspace folder if it doesn't exist
     abs_path_workspace_folder = str(Path(workspace_folder).resolve()) 
     create_directory(abs_path_workspace_folder)  
     print(f"Databases will be synchronized to: {abs_path_workspace_folder}")
 
 
-
     # Get the list of repos
-    catalogue_list = []
+    db_catalogue_list = []
 
     # local repo by yaml
-    if "local_repo_path" in data:
-        local_repo_path = data["local_repo_path"]
+    if "local_repo_path" in config_data:
+        _local_repo_path = config_data["local_repo_path"]
 
-        _temp_local_catalogues = csv_to_list_of_dicts(local_repo_path)
-        catalogue_list.extend(_temp_local_catalogues)
+        try:
+            _temp_local_catalogues = csv_to_list_of_dicts(_local_repo_path)
+            db_catalogue_list.extend(_temp_local_catalogues)
+        except Exception as e:
+            print(f"Error reading local repository: {e}")
 
     # clone the repo pointed to by the yaml file
-    if "remote_repo_path" in data:
-        repo_path = data["remote_repo_path"]
+    if "remote_repo_path" in config_data:
+        repo_path = config_data["remote_repo_path"]
 
         tmp_folder = f"_tmp_{uuid.uuid4().hex[:8]}"
         try:
             run_shell_cmd(f"git clone {repo_path} {tmp_folder}")
 
-            # Get the list of databases
-            catalogue_index = f"{tmp_folder}/index_db.csv"
+            _remote_repo_path = f"{tmp_folder}/index_db.csv"
 
-            _temp_git_catalogues = csv_to_list_of_dicts(catalogue_index)
-            catalogue_list.extend(_temp_git_catalogues)
+            _temp_git_catalogues = csv_to_list_of_dicts(_remote_repo_path)
+            db_catalogue_list.extend(_temp_git_catalogues)
         except RuntimeError as e:
             print(f"Error cloning repository: {e}")
 
-    print("Number of repos found: ", len(catalogue_list))
     
+    # Remove duplicates while keeping the latest entry for each unique path
+    # TODO: Allow the user to choose which one to keep instead of just keeping the 
+    # latest one or specify a resolution mode in the yaml file or allow user to keep both and rename them or ...
+    cleaned_db_catalogue_list = deduplicate_keep_latest(db_catalogue_list)
+    print("Number of repos found: ", len(cleaned_db_catalogue_list))
 
 
     # Create/open the list of hostnames and usernames
@@ -81,18 +118,23 @@ def main():
     # information about each database
     database_info = []
 
+    
     # Gather the databases and create the index database
-    for counter, db in enumerate(catalogue_list):
+    success_counter = 0
+    for db in cleaned_db_catalogue_list:
+        #TODO: add retries and timeouts for all downloads
+
         location_type = db['location_type']
         location = db['location']
         path = db['path']
         filename = get_last_part(path)
 
         # Create folder for data        
-        db_name, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
+        _, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
 
         # Get the absolute path to the file to be downloaded
         file_path = Path(abs_path_db_folder) / filename
+
 
         # Compute the MD5 hash of the existing file if it exists
         md5_file_hash = ""
@@ -114,25 +156,18 @@ def main():
 
 
             # Confirm for sizes above a limit
-            if filesize > data["download_limit"]:
-                print(f"File size {human_readable_size(filesize)} bytes exceeds the download limit of {human_readable_size(data['download_limit'])} bytes.")
-                print(f" -- Please confirm that you want to download this file (y/n): ", end="")
-                choice = input().lower()
-                if choice != 'y':
-                    print(" -- Skipping this database.")
-                    continue
+            if not confirm_large_download(filesize, config_data["download_limit"]):
+                print(" -- Skipping this database.")
+                continue
+
 
             # Download the file
             try:
                 download_github_file(url=path, out_path=abs_path_db_folder)
 
-                db_info = {
-                    "original_location_type": location_type,
-                    "original_path": path,
-                    "local_path": abs_path_db_folder + "/" + db_name,
-                    "name": db_name,
-                }
+                db_info = make_db_info(location, path, file_path, filename)
                 database_info.append(db_info)
+                success_counter += 1
                 
             except Exception as e:
                 print(f" -- Error downloading file from GitHub: {e}")
@@ -143,8 +178,12 @@ def main():
         elif location_type == "HPC":
 
             # Ask for username if we don't have it for this host yet
-            if location not in host_username:                
-                username = input(f" -- Enter the username for {location}: ")
+            if location not in host_username:
+                try:
+                    username = input(f" -- Enter the username for {location}: ")
+                except KeyboardInterrupt:
+                    print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+                    continue
                 host_username[location] = username
             else:
                 username = host_username[location]
@@ -191,13 +230,9 @@ def main():
 
 
             # Confirm for sizes above a limit
-            if filesize > data["download_limit"]:
-                print(f"File size {human_readable_size(filesize)} bytes exceeds the download limit of {human_readable_size(data['download_limit'])} bytes.")
-                print(f" -- Please confirm that you want to download this file (y/n): ", end="")
-                choice = input().lower()
-                if choice != 'y':
-                    print(" -- Skipping this database.")
-                    continue
+            if not confirm_large_download(filesize, config_data["download_limit"]):
+                print(" -- Skipping this database.")
+                continue
 
 
             # Download the file
@@ -208,24 +243,20 @@ def main():
                     local_path=abs_path_db_folder
                 )
 
-                db_info = {
-                    "original_location_type": location_type,
-                    "original_path": path,
-                    "local_path": abs_path_db_folder + "/" + db_name,
-                    "name": db_name,
-                }
+                db_info = make_db_info(location, path, file_path, filename)
                 database_info.append(db_info)
+                success_counter += 1
 
             except KeyboardInterrupt:
                 print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
                 continue
             except Exception as e:
-                print(f" -- Error downloading file from HPC: {e}")
+                print(f" -- Error {e} downloading file from HPC. Skipping this database.")
                 continue
             
 
 
-        elif location_type == "URL":
+        elif location_type == "url":
 
             filesize = 0
             try:
@@ -236,28 +267,21 @@ def main():
 
 
             # Confirm for sizes above a limit
-            if filesize > data["download_limit"]:
-                print(f"File size {human_readable_size(filesize)} bytes exceeds the download limit of {human_readable_size(data['download_limit'])} bytes.")
-                print(f" -- Please confirm that you want to download this file (y/n): ", end="")
-                choice = input().lower()
-                if choice != 'y':
-                    print(" -- Skipping this database.")
-                    continue
+            if not confirm_large_download(filesize, config_data["download_limit"]):
+                print(" -- Skipping this database.")
+                continue
 
 
             # Download the file
             try:
                 download_web_file(url=path, output_path=abs_path_db_folder)
-                db_info = {
-                    "original_location_type": location_type,
-                    "original_path": path,
-                    "local_path": abs_path_db_folder + "/" + db_name,
-                    "name": db_name,
-                }
+
+                db_info = make_db_info(location, path, file_path, filename)
                 database_info.append(db_info)
+                success_counter += 1
 
             except Exception as e:
-                print(f" -- Error downloading file from GitHub: {e}")
+                print(f" -- Error {e} downloading file at {path}. Skipping this database.")
                 continue
         
 
@@ -273,14 +297,9 @@ def main():
                 print(f" -- Local path {path} is not a file. Skipping this database.")
                 continue
 
-
-            db_info = {
-                "original_location_type": location_type,
-                "original_path": path,
-                "local_path": path,
-                "name": db_name,
-            }
+            db_info = make_db_info(location, path, path, filename)
             database_info.append(db_info)
+            success_counter += 1
 
 
         else:
@@ -294,11 +313,43 @@ def main():
             yaml.safe_dump(host_username, f)
 
     # Save databases information to a JSON file
-    upsert_records(f"{abs_path_workspace_folder}/host_usernames.json", database_info, key="original_path")
+    upsert_records(f"{abs_path_workspace_folder}/dsi_database_list.json", database_info, key="original_path")
 
 
-    print(f"\nFinished gathering databases. Successfully downloaded {counter} databases to {abs_path_workspace_folder}.")
+    print(f"\nFinished gathering databases. Successfully downloaded {success_counter} databases to {abs_path_workspace_folder}.")
+
+
+
+def main():
+    # Make sure that we have a file
+    if len(sys.argv) not in (2, 3):
+        print(f"Usage: {Path(sys.argv[0]).name} <input.yaml> [dsi_datasets_folder]")
+        sys.exit(1)
+
+    # Read configuration from YAML file
+    try:
+        yaml_path = Path(sys.argv[1])
+        config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"Error: Could not find YAML file {yaml_path}")
+        sys.exit(1)
+
+    
+    # Create a folder for the databases if it doesn't exist, or use the provided one
+    if len(sys.argv) == 3:
+        workspace_folder = sys.argv[2]
+    else:
+        _workspace_folder = config_data.get("workspace_folder", "")
+        workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+
+
+    federate_datasets(workspace_folder, config_data)
+
+    
 
 
 if __name__=="__main__":
     main()
+
+
+# Run as: python tools/federated/federate_dataset.py tools/federated/input.yaml

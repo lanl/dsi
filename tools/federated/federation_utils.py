@@ -1,15 +1,64 @@
 import csv
 import hashlib
+import json
+import json
 import shlex
 import subprocess
 
 from dsi.dsi import DSI
+
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 
+def parse_timestamp(ts: str) -> datetime:
+    """Parses a timestamp string in the format "YYYY-MM-DD--HH:MM:SS" and returns a datetime object. 
+    The function also handles an optional trailing 's' character.
 
-def create_folder_from_path(s: str, base_dir: str) -> str:
+    Args:
+        ts (str): The timestamp string to parse.
+    """
+    
+    # normalize your slightly inconsistent format
+    ts = ts.rstrip("s")  # remove trailing 's' if present
+    return datetime.strptime(ts, "%Y-%m-%d--%H:%M:%S")
+
+
+def deduplicate_keep_latest(records: list[dict]) -> list[dict]:
+    """Deduplicates a list of records by keeping only the latest record for each unique combination of location_type, location, and path. 
+    The function uses the timestamp field to determine which record is the latest.
+    
+    Arg:
+        records: A list of dictionaries, where each dictionary represents a record with at least the following keys: "location_type", "location", "path", and "timsestamp".
+
+    Returns:
+        A deduplicated list of records, where only the latest record for each unique combination of location_type, location, and path is kept.
+    """
+    best = {}
+
+    for record in records:
+        key = (
+            record.get("location_type"),
+            record.get("location"),
+            record.get("path"),
+        )
+
+        current_ts = parse_timestamp(record.get("timsestamp", ""))
+
+        if key not in best:
+            best[key] = record
+        else:
+            existing_ts = parse_timestamp(best[key].get("timsestamp", ""))
+
+            if current_ts > existing_ts:
+                best[key] = record
+
+    return list(best.values())
+
+
+
+def create_folder_from_path(s: str, base_dir: str) -> tuple[str, str]:
     """Generates a folder name from a given path or URL by taking the last part of the path and hashing it to create a unique identifier.
     
     Arg:
@@ -28,7 +77,7 @@ def create_folder_from_path(s: str, base_dir: str) -> str:
     out_dir.mkdir(parents=True, exist_ok=True)
 
 
-    return folder_name, out_dir
+    return folder_name, str(out_dir)
 
 
 
@@ -218,3 +267,36 @@ def create_index_db(index_path:str, catalogue_name: str = "metadata_catalogue.db
     dsi_catalogue.read(index_path, reader_name="CSV", table_name="catalogue")
     dsi_catalogue.close()
     print(f"Database is accessible at: {catalogue_name}")
+
+
+
+def upsert_records(file_path: str, new_records: list[dict], key: str) -> None:
+    """Upserts records into a JSON file by using a specified key to determine uniqueness. If a record with the same key already exists, it will be updated; otherwise, the new record will be inserted.
+
+    Args:
+        file_path (str): The path to the JSON file where the records are stored.
+        new_records (list[dict]): A list of dictionaries representing the new records to upsert.
+        key (str): The key in the dictionaries that should be used to determine uniqueness for upserting.
+
+    """
+    # Load existing data
+    _file_path = Path(file_path)
+    if _file_path.exists():
+        with open(_file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    # Index existing records by key
+    indexed = {item[key]: item for item in data}
+
+    # Insert or update
+    for record in new_records:
+        indexed[record[key]] = record
+
+    # Convert back to list
+    updated_data = list(indexed.values())
+
+    # Save back to file
+    with open(_file_path, "w", encoding="utf-8") as f:
+        json.dump(updated_data, f, indent=2)
