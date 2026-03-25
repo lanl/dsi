@@ -1,7 +1,10 @@
+import os
+
 from pyarrow import csv, json
 import yaml
 import sys
 import uuid
+import shutil
 from pathlib import Path
 
 from git_utils import download_github_file, get_github_remote_file_size
@@ -96,6 +99,8 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
 
             _temp_git_catalogues = csv_to_list_of_dicts(_remote_repo_path)
             db_catalogue_list.extend(_temp_git_catalogues)
+
+            shutil.rmtree(Path(tmp_folder))
         except RuntimeError as e:
             print(f"Error cloning repository: {e}")
 
@@ -297,7 +302,8 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
                 print(f" -- Local path {path} is not a file. Skipping this database.")
                 continue
 
-            db_info = make_db_info(location, path, path, filename)
+            _abs_path = str(Path(path).resolve())
+            db_info = make_db_info(location, _abs_path, _abs_path, filename)
             database_info.append(db_info)
             success_counter += 1
 

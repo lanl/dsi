@@ -1,4 +1,4 @@
 remote_repo_path: "ssh://git@lisdi-git.lanl.gov:10022/personal/test_dsi_federated.git"
 local_repo_path: "tools/federated/local_dsi_sources.csv"
-workspace_folder: "dsi_databases_07"
+workspace_folder: "dsi_databases_01"
 download_limit: 10485760 # 10 MB
