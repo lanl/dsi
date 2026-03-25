@@ -3,7 +3,7 @@
 The allows users to pull database from many different locations and provide a centralized view of the databases. To run, from the DSI folder
 
 ```bash
-python python tools/federated/federate_dataset.py tools/federated/input.yaml
+python tools/federated/federate_dataset.py tools/federated/input.yaml
 ```
 
 input.yaml contains the paths from which data can be pulled:
