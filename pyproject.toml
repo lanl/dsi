@@ -25,7 +25,6 @@ dependencies = {file = ["requirements.txt"]}
 version = {attr = "dsi._version.__version__"}
 
 [tool.setuptools]
-py-modules = ["dsi"]
 include-package-data = true
 
 [project.scripts]
@@ -35,6 +34,3 @@ dsi = "dsi.cli:main"
 where = ["."]
 include = ["dsi*"]
 exclude = ["clover3d"]
-
-[tool.setuptools.package-data]
-dsi = ["../tools/streamlit/launch_streamlit.sh","../tools/streamlit/launch_streamlit.bat"]
