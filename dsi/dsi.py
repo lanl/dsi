@@ -154,7 +154,7 @@ class DSI():
         print("SchemaOrgDatacard    : Loads dataset metadata adhering to schema.org (JSON)")
         print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
         print("Oceans11Datacard     : Loads dataset metadata for Oceans11 DSI data server (oceans11.lanl.gov) (YAML)")
-        print("GenesisDatacard      : Loads dataset metadata for LANL Genesis data standard (CSV)")
+        print("GenesisDatacard      : Loads dataset metadata for Genesis data standard (Markdown with YAML frontmatter)")
         print()
 
     # in future release, make data_sources and reader_name mandatory again
@@ -163,7 +163,7 @@ class DSI():
         Loads data into DSI using the specified parameter `reader_name`
 
         `data_sources` : str, list of str, or data object (dict or pandas DataFrame)
-            File path(s) to the data files or an in-memory data object.
+            File path(s) to the data, or an in-memory data object.
 
             The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
                 - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
@@ -181,7 +181,7 @@ class DSI():
                 - "SchemaOrgDatacard"    → .json
                 - "GoogleDatacard"       → .yaml or .yml
                 - "Oceans11Datacard"     → .yaml or .yml
-                - "GenesisDatacard"      → .csv
+                - "GenesisDatacard"      → .md
 
         `reader_name` : str
             Name of the DSI Reader to use for loading the data. 
@@ -299,8 +299,8 @@ class DSI():
                     self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
                     data_sources = "the pandas DataFrame"
                 else:
-                    print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                    raise RuntimeError("View eligible readers in the output of `list_readers()`")
+                    raise RuntimeError("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n"
+                                       "View eligible readers in the output of `list_readers()`")
             except Exception as e:
                 if e.args:
                     e.args = (f'read() ERROR: {str(e.args[0])}',)
@@ -750,12 +750,37 @@ class DSI():
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot write() until all associated data is loaded after a complex schema")
 
-        try:        
-            self.t.artifact_handler(interaction_type='process')
-        except Exception as e:
-            if e.args:
-                e.args = (f'write() ERROR: {str(e.args[0])}',)
-            raise
+        collection = None
+        if "collection" in kwargs:
+            collection = kwargs["collection"]
+            if table_name is None:
+                table_name = "object_writer"
+            if isinstance(collection, dict):
+                if all(isinstance(val, list) for val in collection.values()):
+                    self.t.active_metadata = OrderedDict([(table_name, collection)])
+                elif not any(isinstance(val, dict) for val in collection.values()): # single dict with one value per key (no nested dicts)
+                    temp_dict = OrderedDict()
+                    for k, v in self.input_dict.items():
+                        temp_dict[k] = [v]
+                    self.t.active_metadata = OrderedDict([(table_name, temp_dict)])
+                else:
+                    raise ValueError("write() ERROR: 'collection' cannot have nested dictionaries as values.")
+            elif isinstance(collection, pd.DataFrame):
+                try:
+                    ordered_df = OrderedDict((col, collection[col].tolist()) for col in collection.columns)
+                    self.t.active_metadata = OrderedDict([(table_name, ordered_df)])
+                except Exception:
+                    raise ValueError("write() ERROR: Could not open the 'collections' DataFrame.")
+            else:
+                raise ValueError("write() ERROR: Input 'collection' arg has to be a dictionary or pandas DataFrame")
+
+        else:
+            try:        
+                self.t.artifact_handler(interaction_type='process')
+            except Exception as e:
+                if e.args:
+                    e.args = (f'write() ERROR: {str(e.args[0])}',)
+                raise
 
         if writer_name.endswith(".py"):
             if not os.path.exists(writer_name):
@@ -801,7 +826,6 @@ class DSI():
                     e.args = (f'write() ERROR: {str(e.args[0])}',)
                 raise
         else:
-            correct_writer = True
             try:
                 if writer_name.lower() in ["er_diagram", "er diagram"]:
                     self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename, **kwargs)
@@ -812,16 +836,12 @@ class DSI():
                 elif writer_name.lower() in ["parquet", "parquet writer", "parquet_writer"]:
                     self.t.load_module('plugin', 'Parquet_Writer', 'writer', filename=filename, table_name = table_name, **kwargs)
                 else:
-                    correct_writer = False
+                    raise RuntimeError("write() ERROR: Please check your spelling of the 'writer_name' argument as it does not exist in DSI\n"
+                                       "View eligible readers in the output of `list_writers()`")
             except Exception as e:
                 if e.args:
                     e.args = (f'write() ERROR: {str(e.args[0])}',)
                 raise
-            
-            if not correct_writer:
-                print("Please check your spelling of the 'writer_name' argument as it does not exist in DSI")
-                print(f"Eligible writers are: {self.list_writers()}")
-                return
         
         try:
             self.t.transload()
