@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name="dsi-workflow"
-license={text = "BSD-3-Clause"}
+license= "BSD-3-Clause"
 description="A Data Science Infrastructure Project"
 readme = "README.rst"
 authors=[
