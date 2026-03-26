@@ -204,6 +204,13 @@ class DSI():
         if isinstance(data_sources, list) and not all(os.path.exists(f) for f in data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: All input files must have a valid filepath. Please check again.")
         
+        # Eventually when deprecating filename/filenames, dont allow them to be passed in as kwargs
+        # expected_data_arg = ["file", "folder", "path", "filename"]
+        # if any(any(p in key.lower() for p in expected_data_arg) for key in kwargs):
+        #     raise ValueError("read() ERROR: Use the 'data_sources' argument to pass in an input file/folder/URL/data object")
+        # if any("table" in key.lower() for key in kwargs):
+        #     raise ValueError("read() ERROR: Use the in-built 'table_name' argument to pass in an input table name")
+        
         if "filenames" in kwargs and data_sources is None:
             data_sources = kwargs["filenames"]
             del kwargs["filenames"]
@@ -211,7 +218,7 @@ class DSI():
             data_sources = kwargs["filename"]
             del kwargs["filename"]
         if ("filename" in kwargs or "filenames" in kwargs) and data_sources is not None:
-            raise RuntimeError("To pass in a data filename, ONLY use the data_sources arg. Cannot specify data_sources and extra filename")
+            raise RuntimeError("read() ERROR: ONLY use the 'data_sources' arg to pass in an input file. Cannot specify data_sources and extra filename")
 
         if reader_name.endswith(".py"):
             if not os.path.exists(reader_name):
@@ -299,8 +306,8 @@ class DSI():
                     self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
                     data_sources = "the pandas DataFrame"
                 else:
-                    raise RuntimeError("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n"
-                                       "View eligible readers in the output of `list_readers()`")
+                    raise RuntimeError("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n"
+                                       "                            View eligible readers in the output of `list_readers()`")
             except Exception as e:
                 if e.args:
                     e.args = (f'read() ERROR: {str(e.args[0])}',)
@@ -760,7 +767,7 @@ class DSI():
                     self.t.active_metadata = OrderedDict([(table_name, collection)])
                 elif not any(isinstance(val, dict) for val in collection.values()): # single dict with one value per key (no nested dicts)
                     temp_dict = OrderedDict()
-                    for k, v in self.input_dict.items():
+                    for k, v in collection.items():
                         temp_dict[k] = [v]
                     self.t.active_metadata = OrderedDict([(table_name, temp_dict)])
                 else:
@@ -836,8 +843,8 @@ class DSI():
                 elif writer_name.lower() in ["parquet", "parquet writer", "parquet_writer"]:
                     self.t.load_module('plugin', 'Parquet_Writer', 'writer', filename=filename, table_name = table_name, **kwargs)
                 else:
-                    raise RuntimeError("write() ERROR: Please check your spelling of the 'writer_name' argument as it does not exist in DSI\n"
-                                       "View eligible readers in the output of `list_writers()`")
+                    raise RuntimeError("Please check your spelling of the 'writer_name' argument as it does not exist in DSI\n"
+                                       "                             View eligible readers in the output of `list_writers()`")
             except Exception as e:
                 if e.args:
                     e.args = (f'write() ERROR: {str(e.args[0])}',)

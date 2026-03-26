@@ -34,14 +34,14 @@ class Dictionary(CollectionReader):
 
         if all(isinstance(val, list) for val in self.input_dict.values()):
             if self.table_name is None:
-                raise ValueError("table_name argument must be specified to name this single table of data.")
+                raise ValueError("table_name argument must be specified for the single table of data.")
             if not isinstance(self.input_dict, OrderedDict) and isinstance(self.input_dict, dict):
                 self.input_dict = OrderedDict(self.input_dict)
             self.set_schema_2(OrderedDict([(self.table_name, self.input_dict)]))
 
         elif not any(isinstance(val, dict) for val in self.input_dict.values()): # checking if single dict with single values (no nested dicts)
             if self.table_name is None:
-                raise ValueError("table_name argument must be specified to name this single table of data.")
+                raise ValueError("table_name argument must be specified for the single table of data.")
             temp_dict = OrderedDict()
             for k, v in self.input_dict.items():
                 if k not in temp_dict.keys():

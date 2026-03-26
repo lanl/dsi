@@ -269,7 +269,7 @@ class DuckDB(Filesystem):
                 artifacts = collect
 
             else:
-                print("WARNING: Complex schemas can only be ingested if all referenced data tables are loaded into DSI.")
+                print("WARNING: Complex schemas can only be ingested after all referenced data tables are loaded into a database.")
             
 
         table_order = artifacts.keys()

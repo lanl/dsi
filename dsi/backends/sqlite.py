@@ -249,7 +249,7 @@ class Sqlite(Filesystem):
             
                 return #early return so dont make any other changes to db
             else:
-                print("WARNING: Complex schemas can only be ingested if all referenced data tables are loaded into DSI.")
+                print("WARNING: Complex schemas can only be ingested after all referenced data tables are loaded into a database.")
             
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
