@@ -180,7 +180,7 @@ def generateGitChart(sorted_df, git_nodes, mk_data=None, perf_filter=list()):
     merged_df = git_nodes_df
     if sorted_df is not None:
         merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
-    combined_all_df = merged_df[merged_df.cname is not None].sort_values(by=['date'], ascending=True)
+    combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
     combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
     sorted_git_nodes_df = git_nodes_df.sort_values(by=['date'], ascending=True)
 
@@ -350,7 +350,7 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
     merged_df = git_nodes_df
     if sorted_df is not None:
         merged_df = pd.merge(sorted_df, git_nodes_df, left_on="git_hash", right_on="sha", how="outer")
-    combined_all_df = merged_df[merged_df.cname is not None].sort_values(by=['date'], ascending=True)
+    combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
     combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
 
     combined_all_df = combined_all_df.dropna(subset=perf_filter.extend(["date"])).reset_index(drop=True)
@@ -401,7 +401,6 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
                             colorscale = 'Electric',
                             showscale = False,
                             colorbar = dict(x=-0.15, showticklabels=False),
-                            width = 3,
                             cmin = parCordValues[0]['range'][0],
                             cmax = parCordValues[0]['range'][1]),
                     dimensions = parCordValues,
