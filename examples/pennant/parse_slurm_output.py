@@ -4,8 +4,6 @@
 Parses the slurm output from PENNANT runs and creates a csv file
 """
 
-import argparse
-import sys
 import re
 import glob
 

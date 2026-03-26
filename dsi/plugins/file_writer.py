@@ -14,9 +14,9 @@ class FileWriter(StructuredMetadata):
     """
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
-        if type(filenames) == str:
+        if isinstance(filenames, str):
             self.filenames = [filenames]
-        elif type(filenames) == list:
+        elif isinstance(filenames, list):
             self.filenames = filenames
         else:
             raise TypeError
@@ -163,7 +163,7 @@ class ER_Diagram(FileWriter):
         else:
             try:
                 dot.render(self.output_filename, cleanup=True)
-            except:
+            except Exception:
                 raise EnvironmentError("Graphviz executable must be downloaded to global environment using sudo or homebrew.")
 
 class Csv_Writer(FileWriter):
@@ -211,8 +211,8 @@ class Csv_Writer(FileWriter):
         if self.export_cols is not None:
             try:
                 df = df[self.export_cols]
-            except:
-                raise ValueError(f"Could not export to CSV as the specified column input {self.export_cols} is incorrect")
+            except Exception:
+                raise ValueError(f"Could not export to CSV as the specified columns {self.export_cols} are incorrect")
         df.to_csv(self.csv_file_name, index=False)
 
 class Table_Plot(FileWriter):
@@ -252,7 +252,7 @@ class Table_Plot(FileWriter):
         if self.table_name not in collection.keys():
             raise KeyError(f"{self.table_name} does not exist in memory")
         if self.table_name in ["dsi_units", "dsi_relations", "sqlite_sequence"]:
-            raise RuntimeError(f"Cannot plot the units or relations table")
+            raise RuntimeError("Cannot plot the units or relations table")
         if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
             raise ValueError(f"Input list of columns to plot for {self.table_name} is invalid")
         
@@ -275,7 +275,7 @@ class Table_Plot(FileWriter):
                             continue
                 continue
 
-            if col_len == None:
+            if col_len is None:
                 col_len = len(colData)
             if not any(isinstance(item, str) for item in colData):
                 all_num_col = [0 if item is None else item for item in colData]
@@ -360,7 +360,7 @@ class Parquet_Writer(FileWriter):
         if self.export_cols is not None:
             try:
                 df = df[self.export_cols]
-            except:
+            except Exception:
                 raise ValueError(f"Could not export to Parquet as the specified column input {self.export_cols} is incorrect")
 
         table = pa.Table.from_pandas(df)

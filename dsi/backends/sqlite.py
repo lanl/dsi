@@ -35,13 +35,13 @@ class ValueObject:
     value = None # value stored from that match. Ex: table data, col data, cell data etc.
     type = "" #type of match, {table, column, range, cell, row}
 
-    # implement this later once filesystem table incoroporated into dsi
+    # implement this later once filesystem table filesystem into dsi
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
     """
-    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term
+    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurrences of a search term
     """
     runTable = False
 
@@ -138,7 +138,7 @@ class Sqlite(Filesystem):
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
             if self.runTable:
                 str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INTEGER, {}".format(str(types.name), sql_cols)            
-            if foreign_query != None:
+            if foreign_query is not None:
                 str_query += foreign_query
             if self.runTable:
                 str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
@@ -182,7 +182,7 @@ class Sqlite(Filesystem):
             pk_list = artifacts["dsi_relations"]["primary_key"]
             fk_list = artifacts["dsi_relations"]["foreign_key"]
             pk_tables = set(t[0] for t in pk_list)
-            fk_tables = set(t[0] for t in fk_list if t[0] != None)
+            fk_tables = set(t[0] for t in fk_list if t[0] is not None)
             all_schema_tables = pk_tables.union(fk_tables)
             db_tables = [t[0] for t in self.list() if t[0] != "dsi_units"]
             # check if tables from dsi_relations are all in the db
@@ -235,7 +235,7 @@ class Sqlite(Filesystem):
                             raise sqlite3.Error(e)
                         all_schema_tables.add(table)
 
-                # reaching here means no errors with new schema --- SQLITE doesnt care about order of tables deleted
+                # reaching here means no errors with new schema --- SQLITE doesn't care about order of tables deleted
                 # drop all tables in schema and rename temp tables to original names
                 for table in all_schema_tables:
                     self.cur.execute(f'DROP TABLE IF EXISTS "{table}";')
@@ -249,7 +249,7 @@ class Sqlite(Filesystem):
             
                 return #early return so dont make any other changes to db
             else:
-                print("WARNING: Complex schemas can only be ingested if all referenced data tables are loaded into DSI.")
+                print("WARNING: Complex schemas can only be ingested after all referenced data tables are loaded into a database.")
             
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
@@ -314,9 +314,9 @@ class Sqlite(Filesystem):
                 
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
-        dsi_units_data = self.cur.execute(f"PRAGMA table_info(dsi_units)").fetchall()
+        dsi_units_data = self.cur.execute("PRAGMA table_info(dsi_units)").fetchall()
         if len(dsi_units_data) == 3 and dsi_units_data[1][1] == "column": # old dsi_units table exists
-            self.cur.execute(f'ALTER TABLE dsi_units RENAME COLUMN column TO column_name;') # only commited in later try/catch clause
+            self.cur.execute('ALTER TABLE dsi_units RENAME COLUMN column TO column_name;') # only committed in later try/catch clause
             
         if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
@@ -377,7 +377,7 @@ class Sqlite(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
-        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove fileystem passthrough in future
+        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove filesystem passthrough in future
             try:
                 self.cur.execute(query)
                 self.con.commit()
@@ -587,7 +587,7 @@ class Sqlite(Filesystem):
                 if colInfo[5] == 1:
                     pkList.append((tableName, col_name))
 
-            if only_units_relations == False:
+            if not only_units_relations:
                 data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
                 for row in data:
                     for colName, val in zip(colDict.keys(), row):
@@ -726,12 +726,12 @@ class Sqlite(Filesystem):
                         val = ValueObject()
                         val.t_name = table
                         val.c_name = [col_name]
-                        if range == True and not not_numeric:
+                        if range and not not_numeric:
                             numeric_col = [0 if item is None else item for item in colData]
                             val.value = [min(numeric_col), max(numeric_col)]
                             val.type = "range"
                             col_return_list.append(val)
-                        elif range == False:
+                        elif not range:
                             val.value = colData
                             val.type = "column"
                             col_return_list.append(val)
@@ -938,13 +938,13 @@ class Sqlite(Filesystem):
         table_name = self.sqlite_compatible_name(table_name.replace(' ', '_'))
         if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
             raise ValueError(f"'{table_name}' does not exist in this SQLite database")
-        if display_cols == None:
+        if display_cols is None:
             df = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT {num_rows};", self.con) 
         else:
             sql_list = ", ".join(display_cols)
             try:
                 df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name} LIMIT {num_rows};", self.con)
-            except Exception as e:
+            except Exception:
                 raise sqlite3.Error("'display_cols' was incorrect. It must be a list of column names in the table")
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
         df = df.astype(object).where(df.notna(), None)
@@ -997,7 +997,7 @@ class Sqlite(Filesystem):
 
             try:
                 self.cur.execute("SELECT sqrt(4);")
-            except Exception as e:
+            except Exception:
                 import math
                 self.con.create_function('sqrt', 1, math.sqrt)
 
@@ -1023,7 +1023,7 @@ class Sqlite(Filesystem):
             else:
                 min_val = max_val = avg_val = std_dev = None
             
-            if avg_val != None and std_dev == None:
+            if avg_val is not None and std_dev is None:
                 std_dev = 0
             rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
@@ -1104,7 +1104,7 @@ class Sqlite(Filesystem):
             e.args = (f"Error updating data in {self.filename} due to {str(e)}",)
             raise
 
-        if temp_runTable_bool == True:
+        if temp_runTable_bool:
             self.runTable = True
             
     # Closes connection to server

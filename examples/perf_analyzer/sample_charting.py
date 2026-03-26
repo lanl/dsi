@@ -1,7 +1,6 @@
 import git
-from github import Github
-import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
+from matplotlib.backend_bases import MouseButton
 import pandas as pd
 
 def main():

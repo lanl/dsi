@@ -1,14 +1,7 @@
-import sqlite3
 import re
 import subprocess
-from datetime import datetime
-import textwrap
 import os
-import textwrap
-import base64
-import random
 
-from hashlib import sha1
 from dsi.backends.filesystem import Backend
 from collections import OrderedDict
 
@@ -56,17 +49,17 @@ class HPSS(Backend):
       new_dir = None
       file_to_put = local_file
       if '/' in local_file:
-        new_dir = '/'.join(local_file.split('/')[:-1])
-        os.chdir(new_dir)
-        file_to_put = local_file.split('/')[-1]
+         new_dir = '/'.join(local_file.split('/')[:-1])
+         os.chdir(new_dir)
+         file_to_put = local_file.split('/')[-1]
 
       stdout, stderr, returncode = self.run_hsi("put", [file_to_put])
       if new_dir is not None:
-        os.chdir(cwd)
+         os.chdir(cwd)
 
       if returncode == 0:
-          hash = create_hpss_hash(file_to_put)
-          return True
+         self.create_hpss_hash(file_to_put)
+         return True
       
       return False
 
@@ -77,14 +70,14 @@ class HPSS(Backend):
       cwd = os.getcwd()
       try:
          os.chdir(tmp_dir)
-      except:
+      except Exception:
          print("Error changing to temp dir: %s" % tmp_dir)
          return False
 
-      stdout, stderr, returncode = self.run_hsi("get", local_file)
+      stdout, stderr, returncode = self.run_hsi("get", hpss_file)
       try:
-        os.chdir(cwd)
-      except:
+         os.chdir(cwd)
+      except Exception:
          print("Error changing to dir: %s" % cwd)
         
       if returncode == 0:
@@ -145,7 +138,7 @@ class HPSS(Backend):
 
    def run_hsi(self, subcmd, arg_list):
       """
-      Runs hsi wth the supplied subcmd and arguments
+      Runs hsi with the supplied subcmd and arguments
       """
 
       command = ["hsi", subcmd]

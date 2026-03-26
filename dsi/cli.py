@@ -126,7 +126,7 @@ class DSI_cli:
             'plot_table' : ("<table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
             'query' : ("<SQL_query> [-n num_rows] [-e filename]",
                 "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
-            'read' : ("<filename> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            'read' : ("<data_source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
             'search' : ("<value>", "Searches for a string or number across DSI."),
             'summary' : ("[-t table_name]", "Summary of the database or a specific table."),
             'viewers' : ("", "Prints the available viewers for the user."),
@@ -182,7 +182,7 @@ class DSI_cli:
         '''
         table_name = args.table_name
         num_rows = 25
-        if args.num_rows != None:
+        if args.num_rows is not None:
             num_rows = args.num_rows
 
         try:
@@ -191,7 +191,7 @@ class DSI_cli:
             print(f"display ERROR: {e}")
             return
 
-        if args.export != None:
+        if args.export is not None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
             if file_extension.lower() not in ["csv", "pq", "parquet"]:
                 filename = args.export + ".csv"
@@ -213,7 +213,7 @@ class DSI_cli:
         Generates an ER diagram from all data loaded in
         '''
         erd_name = "er_diagram.png"
-        if args.filename != None:
+        if args.filename is not None:
             erd_name = args.filename
 
         error = self.export_table("dsi_erd_gen", erd_name)
@@ -269,7 +269,7 @@ class DSI_cli:
             print(f"export ERROR: {e}")
             return 1
 
-        if success_load == True:
+        if success_load:
             try:
                 self.t.transload()
             except Exception as e:
@@ -422,7 +422,7 @@ class DSI_cli:
         '''
         sql_query = args.sql_query
         num_rows = 25
-        if args.num_rows != None:
+        if args.num_rows is not None:
             num_rows = args.num_rows
 
         print(f"Printing the result from input SQL query: {sql_query}")
@@ -440,7 +440,7 @@ class DSI_cli:
         rows = data.values.tolist()
         self.t.table_print_helper(headers, rows, len(rows), num_rows)
 
-        if args.export != None:
+        if args.export is not None:
             file_extension = args.export.rsplit(".", 1)[-1] if '.' in args.export else ''
             if file_extension.lower() not in ["csv", "pq", "parquet"]:
                 filename = args.export + ".csv"
@@ -456,7 +456,7 @@ class DSI_cli:
 
     def get_read_parser(self):
         parser = argparse.ArgumentParser(prog='read')
-        parser.add_argument('filename', help='File to read into DSI')
+        parser.add_argument('data_source', help='Data to read into DSI. Either a filename or a URL to the data')
         parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name to store data into')
         return parser
 
@@ -472,9 +472,9 @@ class DSI_cli:
         if args.table_name != "":
             table_name = args.table_name
         else:
-            table_name = os.path.splitext(os.path.basename(args.filename))[0]
+            table_name = os.path.splitext(os.path.basename(args.data_source))[0]
 
-        dbfile = args.filename
+        dbfile = args.data_source
         if self.__is_url(dbfile): # if it's a url, do fetch
             url = dbfile
             output_path = url.split('/')[-1]
@@ -513,11 +513,11 @@ class DSI_cli:
                 elif file_extension.lower() == 'csv':
                     self.t.load_module('plugin', "Csv", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() == 'toml':
-                    self.t.load_module('plugin', "TOML1", "reader", filenames = dbfile)
+                    self.t.load_module('plugin', "TOML", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() in ['yaml', 'yml']:
-                    self.t.load_module('plugin', "YAML1", "reader", filenames = dbfile)
+                    self.t.load_module('plugin', "YAML", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() == 'json':
-                    self.t.load_module('plugin', "JSON", "reader", filenames = dbfile)
+                    self.t.load_module('plugin', "JSON", "reader", filenames = dbfile, table_name = table_name)
                 elif file_extension.lower() in ['pq', 'parquet']:
                     self.t.load_module('plugin', "Parquet", "reader", filenames = dbfile, table_name = table_name)
         except Exception as e:
@@ -535,7 +535,7 @@ class DSI_cli:
 
             table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
             if len(table_keys) > 1:
-                print(f"Loaded {dbfile} into tables: {', '.join(table_keys)}")
+                print(f"Loaded {dbfile} into the tables: {', '.join(table_keys)}")
             else:
                 print(f"Loaded {dbfile} into the table {table_keys[0]}")
 
@@ -601,7 +601,7 @@ class DSI_cli:
         Get the summary of a table or database
         '''
         table_name = None
-        if args.table != None:
+        if args.table is not None:
             table_name = args.table
 
         try:
@@ -648,9 +648,9 @@ class DSI_cli:
             return
         
         if os.name != 'nt':
-            bash_script_filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)),"tools","streamlit","launch_streamlit.sh")
+            bash_script_filepath = os.path.join(os.path.dirname(__file__),"tools","launch_streamlit.sh")
         else:
-            bash_script_filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)),"tools","streamlit","launch_streamlit.bat")
+            bash_script_filepath = os.path.join(os.path.dirname(__file__),"tools","launch_streamlit.bat")
 
         if viewer == "dashboard":
             # user must specify at least one directory
@@ -849,7 +849,7 @@ def main():
             command, *args = tokens
 
             if command not in COMMANDS:
-                print(f"Unknown command. Type \"help\" to see valid commands.\n")
+                print("Unknown command. Type \"help\" to see valid commands.\n")
                 continue
 
             parser_factory, handler = COMMANDS[command]

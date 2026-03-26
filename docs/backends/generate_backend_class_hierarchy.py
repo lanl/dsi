@@ -3,7 +3,6 @@ from dsi.backends.filesystem import Backend
 import os
 import sys
 import graphviz
-import sqlalchemy
 
 # This is a hacky way to import all modules in a given directory
 sys.path.insert(0, sys.argv[1])
@@ -11,7 +10,10 @@ modules = []
 for module in os.listdir(sys.argv[1]):
     if module[-3:] == ".py":
         modules.append(module[:-3])
-        __import__(module[:-3], locals(), globals())
+        try:
+            __import__(module[:-3], locals(), globals())
+        except Exception:
+            pass
 print("Imported the following modules to find class hierarchy:",
       ", ".join(modules))
 

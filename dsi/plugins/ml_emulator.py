@@ -14,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.model_selection import GridSearchCV #, StratifiedKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              mean_squared_error, root_mean_squared_error, mean_absolute_error, r2_score)
 

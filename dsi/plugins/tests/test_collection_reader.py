@@ -1,7 +1,6 @@
-from dsi.core import Terminal
 from collections import OrderedDict
 
-from dsi.plugins.collection_reader import Dict
+from dsi.plugins.collection_reader import Dictionary
 
 def test_ordered_dict_reader():
     my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
@@ -13,10 +12,10 @@ def test_ordered_dict_reader():
                                          'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}), 
                     'address': OrderedDict({'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
                                             'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
-    plug = Dict(collection=my_dict)
+    plug = Dictionary(collection=my_dict)
     plug.add_rows()
     assert len(plug.output_collector) == 5
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
     for inner_dict, val in plug.output_collector.items():
         if inner_dict == '"2"':
             assert len(val) == 7
@@ -40,10 +39,10 @@ def test_dict_reader():
                                         'd': [None, 3], 'e': [None, 44.8], 'f': [None, 0.0099]}, 
                     'address': {'specification': [None, '!sam1'], 'fileLoc': [None, '/home/sam/lib/data'], 'g': [None, 'good memories'], 
                                         'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]}}
-    plug = Dict(collection=my_dict)
+    plug = Dictionary(collection=my_dict)
     plug.add_rows()
     assert len(plug.output_collector) == 5
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
     for inner_dict, val in plug.output_collector.items():
         if inner_dict == '"2"':
             assert len(val) == 7

@@ -15,7 +15,7 @@ class StructuredMetadata(Plugin):
         self.validation_model = None  # optional pydantic Model
         # Check for strict_mode option
         if 'strict_mode' in kwargs:
-            if type(kwargs['strict_mode']) == bool:
+            if isinstance(kwargs['strict_mode'], bool):
                 self.strict_mode = kwargs['strict_mode']
             else:
                 print('strict_mode must be bool type.')
@@ -113,7 +113,7 @@ class StructuredMetadata(Plugin):
             If None, the function identifies which plugin called it and assigns tableName for that data
         """        
         # Finds file_reader class that called add_to_output and assigns that as table_name for this data
-        if tableName == None:
+        if tableName is None:
             caller_frame = inspect.stack()[1]
             tableName = caller_frame.frame.f_locals.get('self', None).__class__.__name__
 

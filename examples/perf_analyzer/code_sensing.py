@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
-import pickle
 import sys
 import glob
 import re
-import git
 
 def recursive_c_directive_match(re_list, search_file_list, cur_dir):
     """ The data is parsed from all of the files in the current directory """
-    occurance = dict()
+    occurrence = dict()
     for code_files in glob.iglob('**', root_dir=cur_dir, recursive=True):
         for f_type in search_file_list:
             if re.search(f_type + '$', code_files):
@@ -24,18 +22,18 @@ def recursive_c_directive_match(re_list, search_file_list, cur_dir):
                                 if second_part is not None and len(second_part) > 0:
                                     c_line = c_line + " " + line_match.group(2)
                                 c_line = c_line.rstrip()
-                                occurance[c_line] = occurance.get(c_line, dict())
-                                # occurance[line]["first"] = line_match.group(1)
-                                # occurance[line]["second"] = line_match.group(2)
-                                occurance[c_line][code_files] = occurance[c_line].get(code_files, list())
-                                occurance[c_line][code_files].append(line_number)
+                                occurrence[c_line] = occurrence.get(c_line, dict())
+                                # occurrence[line]["first"] = line_match.group(1)
+                                # occurrence[line]["second"] = line_match.group(2)
+                                occurrence[c_line][code_files] = occurrence[c_line].get(code_files, list())
+                                occurrence[c_line][code_files].append(line_number)
                         line_number = line_number + 1
     print("matching done")
-    return occurance
+    return occurrence
 
 def recursive_customized_match(re_list, search_file_list, cur_dir):
     """ The data is parsed from all of the files in the current directory """
-    occurance = dict()
+    occurrence = dict()
     for code_files in glob.iglob('**', root_dir=cur_dir, recursive=True):
         for f_type in search_file_list:
             if re.search(f_type + '$', code_files):
@@ -47,14 +45,14 @@ def recursive_customized_match(re_list, search_file_list, cur_dir):
                             if line_match is not None:
                                 # c_line = line_match.group(1)
                                 c_line = line.rstrip()
-                                occurance[c_line] = occurance.get(c_line, dict())
-                                # occurance[line]["first"] = line_match.group(1)
-                                # occurance[line]["second"] = line_match.group(2)
-                                occurance[c_line][code_files] = occurance[c_line].get(code_files, list())
-                                occurance[c_line][code_files].append(line_number)
+                                occurrence[c_line] = occurrence.get(c_line, dict())
+                                # occurrence[line]["first"] = line_match.group(1)
+                                # occurrence[line]["second"] = line_match.group(2)
+                                occurrence[c_line][code_files] = occurrence[c_line].get(code_files, list())
+                                occurrence[c_line][code_files].append(line_number)
                         line_number = line_number + 1
     print("matching done")
-    return occurance
+    return occurrence
 
 def main():
     """ A testname argument is required """
@@ -69,7 +67,6 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    git_hash = git.Repo(git_repo).head.object.hexsha
     re_list = ["pragma", "define"]
     search_file_list = [r"\.c", r"\.cc"]
     # occ = recursive_c_directive_match(re_list, search_file_list, git_repo)
