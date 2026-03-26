@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Any, Iterator
+from typing import Any, Iterator, List, Optional, Dict
 from os.path import abspath
 from hashlib import sha1
 import json
@@ -13,6 +13,7 @@ try: import tomllib
 except ModuleNotFoundError: import pip._vendor.tomli as tomllib
 import os
 from pyarrow import parquet as pq
+from pydantic import BaseModel, Field
 # import ast
 
 from dsi.plugins.metadata import StructuredMetadata
@@ -1241,48 +1242,354 @@ class GoogleDatacard(YAML):
 class GenesisDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `genesis_datacard` table.
-    Input datacard should follow template in `examples/test/template_dc_genesis.xlsx`
+    Input datacard should follow distributed template model card.
     """
     def __init__(self, filenames, **kwargs):
         """
         `filenames` : str or list of str
-            File name(s) of Excel data card files to ingest. Each file must adhere to the
-            LANL Gensis metadata standard. The Excel file must only have one sheet.
+            File name(s) of Markdown files to ingest. Each file must adhere to the
+            Genesis metadata standard.
         """
         super().__init__(filenames, **kwargs)
         if isinstance(filenames, str):
-            self.datacard_files = [filenames]
+            self.markdown_files = [filenames]
         else:
-            self.datacard_files = filenames
-        self.genesis_data = OrderedDict()
+            self.markdown_files = filenames
+        self.genesis_datacard_data = OrderedDict()
+
+    def extract_yaml_block(self, content: str) -> Optional[str]:
+        """
+        Extract YAML frontmatter from markdown content.
+        Expects YAML between '---' delimiters.
+        
+        Args:
+            content: Markdown content string
+            
+        Returns:
+            YAML text or None if not found
+        """
+        # Pattern to match YAML frontmatter between --- delimiters
+        pattern = r'^---\s*\n(.*?)\n---\s*\n'
+        match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
+        
+        if match:
+            return match.group(1), content[match.end():]
+        return None, None
+    
+    def get_value_by_partial_key(self, d, query):
+        for k, v in d.items():
+            if query in k:
+                return k, v
+        return None, None
+
+    def protect_headers_in_code_blocks(self, text: str) -> str:
+        code_block_pattern = re.compile(r'(^```[^\n]*\n)(.*?)(^```[ \t]*$)', re.MULTILINE | re.DOTALL)
+
+        def rewrite_code_block(match: re.Match) -> str:
+            opening = match.group(1)
+            body = match.group(2)
+            closing = match.group(3)
+
+            body = re.sub(r'^(#{2,3}\s)', r' \1', body, flags=re.MULTILINE)
+            return opening + body + closing
+
+        return code_block_pattern.sub(rewrite_code_block, text)
+
+    def parse_markdown_sections(self, text: str) -> dict[str, str]:
+        # Match lines that are exactly "## header" or "### header"
+        header_pattern = re.compile(r'^(#{2,3})\s+(.+?)\s*$', re.MULTILINE)
+
+        matches = list(header_pattern.finditer(text))
+        result = {}
+
+        for i, match in enumerate(matches):
+            header = match.group(2)
+
+            value_start = match.end()
+            if i + 1 < len(matches):
+                value_end = matches[i + 1].start()
+            else:
+                # For the last header, stop at a line containing only ---
+                end_match = re.search(r'^---\s*$', text[value_start:], re.MULTILINE)
+                value_end = value_start + end_match.start() if end_match else len(text)
+
+            value = text[value_start:value_end]
+            if value.startswith('\n'):
+                value = value[1:]
+            value = value.rstrip()
+            if not value.strip():
+                value = ''
+            result[header.lower()] = value
+
+        return result
+
+    def get_tag_value(self, tags: list, item: str) -> str:
+        """Extract tag value from tags"""
+        for tag in tags:
+            if tag.startswith(item):
+                return tag.split(':')[1]
+        return ""
+    
+    class DataCardSchema(BaseModel):
+        """
+        Complete schema for scientific dataset datacards.
+        Matches YAML frontmatter structure from datacard_template.md.
+        """
+        
+        # Core identification and metadata
+        language: List[str] = Field(default_factory=list, description="Languages used in dataset/documentation")
+        datacard_version: str = Field(..., description="Version of the datacard schema")
+        dataset_id: str = Field(..., description="Source-prefixed ID: OSTI:1234567, SNL-DS-2024-XXXXX, LANL:LAUR-XX-XXXXX, etc.")
+        name: str = Field(..., description="Human-readable dataset name")
+        project_tag: str = Field(default="", description="Project name that must be included on ALL Genesis datasets")
+        type_tag: str = Field(default="", description="Type of project (e.g., dataset, agent, eval, framework, model, etc.)")
+        science_tag: str = Field(default="", description="The science this is used for (e.g., materials, biology, lightsource, fusion, climate, etc.)")
+        risk_tag: str = Field(default="", description="Indicates level of risk review {general, reviewed, restricted}")
+
+        # Licensing
+        license: str = Field(default="", description="SPDX license identifier (e.g., CC-BY-4.0)")
+        license_name: str = Field(default="", description="Full license name")
+        license_link: str = Field(default="", description="URL to license text or LICENSE file")
+        
+        # Authors and contact
+        authors: List[Dict[str, Any]] = Field(default_factory=list, description="Dataset authors with name, affiliation, orcid, email")
+
+        contact_name: Optional[str] = Field("", description="Primary contact name")
+        contact_email: Optional[str] = Field("", description="Primary contact email")
+        sponsor_orgs: List[str] = Field(default_factory=list, description="Organizations sponsoring/funding the collection of data")
+        research_orgs: List[str] = Field(default_factory=list, description="Research organizations affiliated with this data")
+        
+        # Dataset characteristics
+        dataset_type: Optional[str] = Field("", description="Type of dataset: experimental, simulation, observational, etc.")
+        description: Optional[str] = Field("", description="Comprehensive dataset description")
+        issue_date: Optional[str] = Field("", description="Date this data was published. Publication date in YYYY-MM-DD format")
+        report_number: Optional[str] = Field("", description="Lab release number (SAND for Sandia, LAUR for LANL, etc.). Report number for only this data card")
+        doi: Optional[str] = Field("", description="Digital Object Identifier for the dataset")
+        
+        # Data access and location
+        access_url: Optional[str] = Field("", description="Primary URL to access/download the data")
+        download_url: Optional[str] = Field("", description="Direct download URL for dataset files")
+        landing_page: Optional[str] = Field("", description="Human-readable landing page URL")
+        repository: Optional[str] = Field("", description="Repository or archive name (e.g., OSTI, PDS, Zenodo)")
+        repository_url: Optional[str] = Field("", description="URL to repository record")
+        data_location: Optional[str] = Field("", description="Internal storage location (path, bucket, filesystem)")
+        access_protocol: Optional[str] = Field("", description="Access protocol (https, ftp, s3, lustre, nfs, etc.)")
+        access_restrictions: Optional[str] = Field("", description="Access restrictions or requirements")
+        file_format: Optional[str] = Field(default="", description="Primary file format(s)")
+        data_size: Optional[str] = Field("", description="Total dataset size")
+        checksum_algorithm: Optional[str] = Field("", description="Checksum algorithm (md5, sha256, etc.)")
+        checksum_value: Optional[str] = Field("", description="Checksum value for verification")
+        
+        # Security classification and sensitivity (REQUIRED for national lab datasets)
+        classification: Optional[str] = Field("", description="Security classification (U, CUI, C, S, TS)")
+        marking: Optional[str] = Field("", description="Classification marking (UUR, CUI, CUI//SP-PRVCY, etc.)")
+        distribution_statement: Optional[str] = Field("", description="Distribution limitation statement")
+        export_control: Optional[str] = Field("", description="Export control status (none, EAR, ITAR)")
+        export_control_number: Optional[str] = Field("", description="ECCN or USML category if applicable")
+        sensitivity_level: Optional[str] = Field("", description="Data sensitivity (public, internal, confidential, restricted)")
+        data_rights: Optional[str] = Field("", description="Data rights and ownership information")
+        classification_reason: Optional[str] = Field("", description="Reason for classification")
+        declassification_date: Optional[str] = Field("", description="Date when data will be declassified")
+        
+        # API access information (optional)
+        api_endpoint: Optional[str] = Field("", description="Base URL for API access")
+        api_documentation: Optional[str] = Field("", description="URL to API documentation")
+        api_authentication: Optional[str] = Field("", description="Authentication method (none, api_key, oauth2, certificate)")
+        api_version: Optional[str] = Field("", description="API version")
+        api_rate_limit: Optional[str] = Field("", description="Rate limiting information")
+        
+
+        overview: str = Field(default="", description="Detailed overview of the dataset, including its scientific context and significance")
+
+        # part of data structure section
+        file_organization: Optional[str] = Field(default="", description="")
+        data_format: Optional[str] = Field(default="", description="")
+
+        variables: Optional[str] = Field(default="", description="")
+
+        # part of api access section
+        api_endpoint_info: Optional[str] = Field(default="", description="")
+        api_authentication_info: Optional[str] = Field(default="", description="")
+        api_rate_limit_info: Optional[str] = Field(default="", description="")
+        api_example_usage: Optional[str] = Field(default="", description="")
+        api_available_endpoints: Optional[str] = Field(default="", description="")
+
+        # part of usage guidelines section
+        access_citation: Optional[str] = Field(default="", description="")
+        licensing_terms: Optional[str] = Field(default="", description="")
+        usage_example_code: Optional[str] = Field(default="", description="")
+
+        provenance: Optional[str] = Field(default="", description="")
+        
+        #part of dataseheet for dataset section
+        dataset_motivation: Optional[str] = Field(default="", description="")
+        dataset_composition: Optional[str] = Field(default="", description="")
+        dataset_collection: Optional[str] = Field(default="", description="")
+        dataset_preprocessing: Optional[str] = Field(default="", description="")
+        dataset_uses: Optional[str] = Field(default="", description="")
+        dataset_distribution: Optional[str] = Field(default="", description="")
+        dataset_maintenance: Optional[str] = Field(default="", description="")
+        dataset_resources: Optional[str] = Field(default="", description="")
+        dataset_contact_info: Optional[str] = Field(default="", description="")
+
+        # part of compliance section
+        osti_requirements: Optional[str] = Field(default="", description="")
+
+        # remaining unexpected headers
+        free_form_content: Optional[str] = Field(default="", description="Remaining free form markdown excluding expected headers")
+
+    def parse_datacard(self, content: str) -> Optional[DataCardSchema]:
+        """
+        Parse markdown content into a DataCardSchema object.
+        
+        Args:
+            content: Complete markdown content with YAML frontmatter
+            
+        Returns:
+            DataCardSchema object or None if parsing fails
+        """
+        yaml_text, free_form_text = self.extract_yaml_block(content)
+        
+        if yaml_text:
+            try:
+                data = yaml.safe_load(yaml_text)
+                if isinstance(data, dict):
+                    datacard = self.DataCardSchema(
+                        language=data.get('language', []),
+                        datacard_version=data.get('datacard_version', ''),
+                        dataset_id=data.get('dataset_id', ''),
+                        name=data.get('name', ''),
+
+                        license=data.get('license', ''),
+                        license_name=data.get('license_name', ''),
+                        license_link=data.get('license_link', ''),
+
+                        authors=data.get('authors', []),
+                        contact_name=data.get('contact_name', ''),
+                        contact_email=data.get('contact_email', ''),
+                        sponsor_orgs=data.get('sponsor_orgs', []),
+                        research_orgs=data.get('research_orgs', []),
+
+                        dataset_type=data.get('dataset_type', ''),
+                        description=data.get('description', ''),
+                        issue_date=data.get('issue_date', ''),
+                        report_number=data.get('report_number', ''),
+                        doi=data.get('doi', ''),
+
+                        access_url=data.get('access_url', ''),
+                        download_url=data.get('download_url', ''),
+                        landing_page=data.get('landing_page', ''),
+                        repository=data.get('repository', ''),
+                        repository_url=data.get('repository_url', ''),
+                        data_location=data.get('data_location', ''),
+                        access_protocol=data.get('access_protocol', ''),
+                        access_restrictions=data.get('access_restrictions', ''),
+                        file_format=data.get('file_format', ''),
+                        data_size=data.get('data_size', ''),
+                        checksum_algorithm=data.get('checksum_algorithm', ''),
+                        checksum_value=data.get('checksum_value', ''),
+
+                        classification=data.get('classification', ''),
+                        marking=data.get('marking', ''),
+                        distribution_statement=data.get('distribution_statement', ''),
+                        export_control=data.get('export_control', ''),
+                        export_control_number=data.get('export_control_number', ''),
+                        sensitivity_level=data.get('sensitivity_level', ''),
+                        data_rights=data.get('data_rights', ''),
+                        classification_reason=data.get('classification_reason', ''),
+                        declassification_date=data.get('declassification_date', ''),
+
+                        api_endpoint=data.get('api_endpoint', ''),
+                        api_documentation=data.get('api_documentation', ''),
+                        api_authentication=data.get('api_authentication', ''),
+                        api_version=data.get('api_version', ''),
+                        api_rate_limit=data.get('api_rate_limit', '')
+                    )
+                    # tags formatting
+                    tags=data.get('tags', [])
+                    datacard.project_tag = self.get_tag_value(tags, "project:")
+                    datacard.type_tag = self.get_tag_value(tags, "type:")
+                    datacard.science_tag = self.get_tag_value(tags, "science:")
+                    datacard.risk_tag = self.get_tag_value(tags, "risk:")
+
+                    # free form text formatting
+                    safe_text = self.protect_headers_in_code_blocks(free_form_text)
+                    free_form_dict = self.parse_markdown_sections(safe_text)
+
+                    field_map = {
+                        "overview": "overview",
+                        "file organization": "file_organization",
+                        "data format": "data_format",
+                        "variables": "variables",
+                        "endpoint information": "api_endpoint_info",
+                        "authentication": "api_authentication_info",
+                        "rate limits": "api_rate_limit_info",
+                        "example usage": "api_example_usage",
+                        "available endpoints": "api_available_endpoints",
+                        "access and citation": "access_citation",
+                        "licensing terms": "licensing_terms",
+                        "example code": "usage_example_code",
+                        "provenance": "provenance",
+                        "motivation": "dataset_motivation",
+                        "composition": "dataset_composition",
+                        "collection process": "dataset_collection",
+                        "preprocessing": "dataset_preprocessing",
+                        "cleaning": "dataset_preprocessing",
+                        "labeling": "dataset_preprocessing",
+                        "uses": "dataset_uses",
+                        "distribution": "dataset_distribution",
+                        "maintenance": "dataset_maintenance",
+                        "related resources": "dataset_resources",
+                        "contact information": "dataset_contact_info",
+                        "osti requirements": "osti_requirements",
+                    }
+
+                    for query, attr in field_map.items():
+                        actual_key, actual_val = self.get_value_by_partial_key(free_form_dict, query)
+                        if actual_key is not None:
+                            current = getattr(datacard, attr, "")
+                            if current:
+                                new_value = current + "\n" + actual_val
+                            else:
+                                new_value = actual_val
+
+                            setattr(datacard, attr, new_value)
+                            del free_form_dict[actual_key]    
+
+                    # remove expected unused headers
+                    expected_unused_headers = ['data structure', 'api access', 'usage guidelines', 'datasheet for dataset', 'compliance']
+                    for header in expected_unused_headers:
+                        actual_key, _ = self.get_value_by_partial_key(free_form_dict, header)
+                        if actual_key is not None:
+                            del free_form_dict[actual_key]
+                    
+                    datacard.free_form_content= "\n\n".join( f"## {key}\n{value}" for key, value in free_form_dict.items())
+
+                    return datacard
+            except yaml.YAMLError as e:
+                print(f"YAML parsing error: {e}")
+                return None
+            except Exception as e:
+                print(f"Validation error: {e}")
+                return None
+        
+        return None
 
     def add_rows(self) -> None:
         """
         Flattens data in the input data card as a row in the `genesis_datacard` table
         """
-        temp_data = OrderedDict()
-        for filename in self.datacard_files:
-            try:
-                temp_df = read_excel(filename, sheet_name = 0)
-            except Exception:
-                raise ValueError(f"Error reading in {filename} for the Genesis data card reader")
-
-            required_columns = ["Metadata Element", "Supporting Element", "Requirement Level", "LANL Input Example"]
-            if not set(required_columns).issubset(temp_df.columns.tolist()):
-                raise ValueError(f"The required metadata columns are {', '.join(required_columns)}")
+        for filename in self.markdown_files:
+            with open(filename, 'r', encoding='utf-8') as f:
+                content = f.read()
             
-            for _, row in temp_df.iterrows():
-                if row['Requirement Level'].lower() == "mandatory":
-                    if isinstance(row['Metadata Element'], str) and row['Metadata Element'].strip() not in ["", None]:
-                        if row["Metadata Element"] in temp_data.keys():
-                            temp_data[row["Metadata Element"]].append(row["LANL Input Example"])
-                        else:
-                            temp_data[row["Metadata Element"]] = [row["LANL Input Example"]]
-                    elif isinstance(row['Supporting Element'], str) and row['Supporting Element'].strip() not in ["", None]:
-                        if row["Supporting Element"] in temp_data.keys():
-                            temp_data[row["Supporting Element"]].append(row["LANL Input Example"])
-                        else:
-                            temp_data[row["Supporting Element"]] = [row["LANL Input Example"]]
-
-        self.genesis_data["genesis_datacard"] = temp_data
-        self.set_schema_2(self.genesis_data)
+            datacard = self.parse_datacard(content)
+            if datacard:
+                for name, value in vars(datacard).items():
+                    if name not in self.genesis_datacard_data.keys():
+                        self.genesis_datacard_data[name] = []
+                    self.genesis_datacard_data[name].append(value)
+            else:
+                raise ValueError(f"Failed to parse datacard from {filename}")
+        
+        self.set_schema_2(OrderedDict([("genesis_datacard", self.genesis_datacard_data)]))
