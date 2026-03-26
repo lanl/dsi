@@ -21,7 +21,7 @@ def test_unload_module():
     assert len(a.list_loaded_modules()['writer']) == 0
 
 # SQLITE TESTS
-def ingest_sqlite_backend():
+def test_ingest_sqlite_backend():
     a = Terminal()
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
     assert len(a.active_metadata) > 0
@@ -35,8 +35,8 @@ def ingest_sqlite_backend():
     assert os.path.getsize(dbpath) > 100
     a.close()
 
-def process_sqlite_backend():
-    ingest_sqlite_backend()
+def test_process_sqlite_backend():
+    test_ingest_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -52,8 +52,8 @@ def process_sqlite_backend():
         assert all(len(colData) == numRows for colData in tableData.values())
     a.close()
 
-def table_info_sqlite_backend():
-    ingest_sqlite_backend()
+def test_table_info_sqlite_backend():
+    test_ingest_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -94,8 +94,8 @@ def table_info_sqlite_backend():
     assert num_t == expected_num
     a.close()
 
-def overwrite_sqlite_backend():
-    ingest_sqlite_backend()
+def test_overwrite_sqlite_backend():
+    test_ingest_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -107,7 +107,7 @@ def overwrite_sqlite_backend():
     assert a.active_metadata["physics"]["n"] == [2000, 2000]
     a.close()
 
-def ingest_schema_sqlite_backend():
+def test_ingest_schema_sqlite_backend():
     a = Terminal()
     a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_schema.json")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
@@ -122,8 +122,8 @@ def ingest_schema_sqlite_backend():
     assert os.path.getsize(dbpath) > 100
     a.close()
 
-def process_schema_sqlite_backend():
-    ingest_schema_sqlite_backend()
+def test_process_schema_sqlite_backend():
+    test_ingest_schema_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -143,8 +143,8 @@ def process_schema_sqlite_backend():
         assert all(len(colData) == numRows for colData in tableData.values())
     a.close()
 
-def overwrite_schema_sqlite_backend():
-    ingest_schema_sqlite_backend()
+def test_overwrite_schema_sqlite_backend():
+    test_ingest_schema_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -156,7 +156,7 @@ def overwrite_schema_sqlite_backend():
     assert a.active_metadata["physics"]["p"] == [2000, 2000]
     a.close()
 
-def ingest_schema_run_table_sqlite_backend():
+def test_ingest_schema_run_table_sqlite_backend():
     a = Terminal(runTable=True)
     a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_schema.json")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
@@ -171,8 +171,8 @@ def ingest_schema_run_table_sqlite_backend():
     assert os.path.getsize(dbpath) > 100
     a.close()
 
-def process_schema_run_table_sqlite_backend():
-    ingest_schema_run_table_sqlite_backend()
+def test_process_schema_run_table_sqlite_backend():
+    test_ingest_schema_run_table_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -196,8 +196,8 @@ def process_schema_run_table_sqlite_backend():
         assert all(len(colData) == numRows for colData in tableData.values())
     a.close()
 
-def query_schema_run_table_sqlite_backend():
-    ingest_schema_run_table_sqlite_backend()
+def test_query_schema_run_table_sqlite_backend():
+    test_ingest_schema_run_table_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -207,8 +207,8 @@ def query_schema_run_table_sqlite_backend():
     assert query_data["run_id"].tolist() == [1]
     a.close()
 
-def table_info_run_table_sqlite_backend():
-    ingest_schema_run_table_sqlite_backend()
+def test_table_info_run_table_sqlite_backend():
+    test_ingest_schema_run_table_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -253,8 +253,8 @@ def table_info_run_table_sqlite_backend():
     assert num_t == expected_num
     a.close()
 
-def summary_run_table_sqlite_backend():
-    ingest_schema_run_table_sqlite_backend()
+def test_summary_run_table_sqlite_backend():
+    test_ingest_schema_run_table_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -385,8 +385,8 @@ def summary_run_table_sqlite_backend():
     assert name_rows_output == name_rows_expected_output
     a.close()
 
-def display_run_table_sqlite_backend():
-    ingest_schema_run_table_sqlite_backend()
+def test_display_run_table_sqlite_backend():
+    test_ingest_schema_run_table_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -442,8 +442,8 @@ def display_run_table_sqlite_backend():
     assert num_display_output == num_display_expected_output
     a.close()
 
-def get_table_sqlite_backend():
-    ingest_schema_run_table_sqlite_backend()
+def test_get_table_sqlite_backend():
+    test_ingest_schema_run_table_sqlite_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -459,7 +459,7 @@ def get_table_sqlite_backend():
     a.close()
 
 # DUCKDB
-def ingest_duckdb_backend():
+def test_ingest_duckdb_backend():
     a = Terminal()
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
     assert len(a.active_metadata) > 0
@@ -473,8 +473,8 @@ def ingest_duckdb_backend():
     assert os.path.getsize(dbpath) > 100
     a.close()
 
-def process_duckdb_backend():
-    ingest_duckdb_backend()
+def test_process_duckdb_backend():
+    test_ingest_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -490,8 +490,8 @@ def process_duckdb_backend():
         assert all(len(colData) == numRows for colData in tableData.values())
     a.close()
 
-def table_info_duckdb_backend():
-    ingest_duckdb_backend()
+def test_table_info_duckdb_backend():
+    test_ingest_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -532,8 +532,8 @@ def table_info_duckdb_backend():
     assert num_t == expected_num
     a.close()
 
-def overwrite_duckdb_backend():
-    ingest_duckdb_backend()
+def test_overwrite_duckdb_backend():
+    test_ingest_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -545,7 +545,7 @@ def overwrite_duckdb_backend():
     assert a.active_metadata["physics"]["n"] == [2000, 2000]
     a.close()
 
-def ingest_schema_duckdb_backend():
+def test_ingest_schema_duckdb_backend():
     a = Terminal()
     a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_schema.json")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
@@ -560,8 +560,8 @@ def ingest_schema_duckdb_backend():
     assert os.path.getsize(dbpath) > 100
     a.close()
 
-def process_schema_duckdb_backend():
-    ingest_schema_duckdb_backend()
+def test_process_schema_duckdb_backend():
+    test_ingest_schema_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -581,7 +581,7 @@ def process_schema_duckdb_backend():
         assert all(len(colData) == numRows for colData in tableData.values())
     a.close()
 
-def overwrite_schema_duckdb_backend():
+def test_overwrite_schema_duckdb_backend():
     a = Terminal()
     a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_schema.json")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
@@ -599,7 +599,7 @@ def overwrite_schema_duckdb_backend():
     assert a.active_metadata["physics"]["p"] == [2000, 2000]
     a.close()
 
-def ingest_schema_run_table_duckdb_backend():
+def test_ingest_schema_run_table_duckdb_backend():
     a = Terminal(runTable=True)
     a.load_module('plugin', 'Schema', 'reader', filename="examples/test/yaml1_schema.json")
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"])
@@ -614,8 +614,8 @@ def ingest_schema_run_table_duckdb_backend():
     assert os.path.getsize(dbpath) > 100
     a.close()
 
-def process_schema_run_table_duckdb_backend():
-    ingest_schema_run_table_duckdb_backend()
+def test_process_schema_run_table_duckdb_backend():
+    test_ingest_schema_run_table_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -639,8 +639,8 @@ def process_schema_run_table_duckdb_backend():
         assert all(len(colData) == numRows for colData in tableData.values())
     a.close()
 
-def query_schema_run_table_duckdb_backend():
-    ingest_schema_run_table_duckdb_backend()
+def test_query_schema_run_table_duckdb_backend():
+    test_ingest_schema_run_table_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -650,8 +650,8 @@ def query_schema_run_table_duckdb_backend():
     assert query_data["run_id"].tolist() == [1]
     a.close()
 
-def table_info_run_table_duckdb_backend():
-    ingest_schema_run_table_duckdb_backend()
+def test_table_info_run_table_duckdb_backend():
+    test_ingest_schema_run_table_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -696,8 +696,8 @@ def table_info_run_table_duckdb_backend():
     assert num_t == expected_num
     a.close()
 
-def summary_run_table_duckdb_backend():
-    ingest_schema_run_table_duckdb_backend()
+def test_summary_run_table_duckdb_backend():
+    test_ingest_schema_run_table_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -828,8 +828,8 @@ def summary_run_table_duckdb_backend():
     assert name_rows_output == name_rows_expected_output
     a.close()
 
-def display_run_table_duckdb_backend():
-    ingest_schema_run_table_duckdb_backend()
+def test_display_run_table_duckdb_backend():
+    test_ingest_schema_run_table_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -884,8 +884,8 @@ def display_run_table_duckdb_backend():
     assert num_display_output == num_display_expected_output
     a.close()
 
-def get_table_duckdb_backend():
-    ingest_schema_run_table_duckdb_backend()
+def test_get_table_duckdb_backend():
+    test_ingest_schema_run_table_duckdb_backend()
 
     a = Terminal()
     dbpath = 'data.db'
@@ -900,7 +900,7 @@ def get_table_duckdb_backend():
     assert physics_query.equals(physics_get)
     a.close()
 
-def test_sanitize_input():
+def test_test_sanitize_input():
     my_dict = OrderedDict({'"2"': OrderedDict({'specification': ['!jack'], 'a': [1], 'b': [2], 'c': [45.98], 'd': [2], 'e': [34.8], 'f': [0.0089]}), 
                     'all': OrderedDict({'specification': ['!sam'], 'fileLoc': ['/home/sam/lib/data'], 'G': ['good memories'], 
                                         'all': [9.8], 'i': [2], 'j': [3], 'k': [4], 'l': [1.0], 'm': [99]}), 
@@ -912,7 +912,7 @@ def test_sanitize_input():
                                             'h': [None, 91.8], 'i': [None, 3], 'j': [None, 4], 'k': [None, 5], 'l': [None, 11.0], 'm': [None, 999]})})
     
     a = Terminal()
-    a.load_module('plugin', 'Dict', 'reader', collection=my_dict)
+    a.load_module('plugin', 'Dictionary', 'reader', collection=my_dict)
     
     dbpath = 'data.db'
     if os.path.exists(dbpath):
