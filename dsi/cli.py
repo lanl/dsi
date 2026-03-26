@@ -535,7 +535,7 @@ class DSI_cli:
 
             table_keys = [k for k in self.t.active_metadata if k not in ("dsi_relations", "dsi_units")]
             if len(table_keys) > 1:
-                print(f"Loaded {dbfile} into tables: {', '.join(table_keys)}")
+                print(f"Loaded {dbfile} into the tables: {', '.join(table_keys)}")
             else:
                 print(f"Loaded {dbfile} into the table {table_keys[0]}")
 

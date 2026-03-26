@@ -43,91 +43,91 @@ ls                                               Lists all files in the current 
 cd <path>                                        Changes the working directory within the CLI 
                                                   environment.
 
-dsi> cd test/
-Changed directory to /Users/my_user/dsi/examples/test
+dsi> read wildfire/wildfire_oceans11.yml -t oceans_data
+Loaded wildfire/wildfire_oceans11.yml into the table oceans_data
+Database now has 1 table
 
-dsi> read student_test1.yml
-Loaded student_test1.yml into tables: math, address, physics
+dsi> read pennant/pennant_oceans11.yml -t oceans_data
+Loaded pennant/pennant_oceans11.yml into the table oceans_data
+Database now has 1 table
+
+dsi> read test/example.toml
+Loaded test/example.toml into the table nodes
+Database now has 2 tables
+
+dsi> read test/results.toml
+Loaded test/results.toml into the table people
+Database now has 3 tables
+
+dsi> read test/yosemite5.csv
+Loaded test/yosemite5.csv into the table yosemite5
 Database now has 4 tables
-
-dsi> read student_test1.yml
-Loaded student_test1.yml into tables: math, address, physics
-Database now has 4 tables
-
-dsi> read results.toml
-Loaded results.toml into the table people
-Database now has 5 tables
-
-dsi> read yosemite5.csv
-Loaded yosemite5.csv into the table yosemite5
-Database now has 6 tables
 
 dsi> list
 
-Table: math
-  - num of columns: 7
+Table: oceans_data
+  - num of columns: 15
   - num of rows: 2
 
-Table: address
-  - num of columns: 9
+Table: nodes
+  - num of columns: 2
   - num of rows: 2
-
-Table: physics
-  - num of columns: 7
-  - num of rows: 2
-
-Table: dsi_units
-  - num of columns: 3
-  - num of rows: 8
 
 Table: people
-  - num of columns: 3
+  - num of columns: 6
   - num of rows: 1
 
 Table: yosemite5
   - num of columns: 9
   - num of rows: 4
 
-dsi> query "SELECT * FROM physics" -e physics_output.csv
-Printing the result from input SQL query: SELECT * FROM physics
+dsi> query "SELECT * FROM nodes" -e nodes.csv
+Printing the result from input SQL query: SELECT * FROM nodes
 
-specification | n   | o       | p  | q       | r | s      
-----------------------------------------------------------
-!amy          | 9.8 | gravity | 23 | home 23 | 1 | -0.0012
-!amy          | 9.8 | gravity | 23 | home 23 | 1 | -0.0012
+name  | resources_gpu
+---------------------
+node1 | 4            
+node2 | 2            
 
-Exported the query result to physics_output.csv
+Exported the query result to nodes.csv
 
-dsi> display math -e math_output.csv
+dsi> display people -e people_output.csv
 
-Table: math
+Table: people
 
-specification | a | b | c     | d | e    | f
--------------------------------------------------
-!jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
-!jack         | 1 | 2 | 45.98 | 2 | 34.8 | 0.0089
+avg_height_units | avg_height_value | median_speed_units | median_speed_value | std_gravity_units | std_gravity_value
+---------------------------------------------------------------------------------------------------------------------
+m                | 5.5              | s                  | 6.95               | m/s/s             | 9.83             
 
-Exported math to math_output.csv
+Exported people to people_output.csv
 
 dsi> draw -f dsi_er_diagram.png
 Saved an ER Diagram at dsi_er_diagram.png
 
-dsi> plot_table physics -f physics_plot.png
-Saved a plot of the physics table in physics_plot.png
+dsi> plot_table people -f people_plot.png
+Saved a plot of the people table in people_plot.png
 
-dsi> summary -t physics
+dsi> summary -t oceans_data
 
-Table: physics
+Table: oceans_data
 
-column        | type    | unique | min     | max     | avg     | std_dev
-------------------------------------------------------------------------
-specification | VARCHAR | 1      | None    | None    | None    | None   
-n             | FLOAT   | 1      | 9.8     | 9.8     | 9.8     | 0.0    
-o             | VARCHAR | 1      | None    | None    | None    | None   
-p             | INTEGER | 1      | 23      | 23      | 23.0    | 0.0    
-q             | VARCHAR | 1      | None    | None    | None    | None   
-r             | INTEGER | 1      | 1       | 1       | 1.0     | 0.0    
-s             | FLOAT   | 1      | -0.0012 | -0.0012 | -0.0012 | 0.0    
+column                  | type    | unique | min  | max  | avg  | std_dev            
+-------------------------------------------------------------------------------------
+title                   | VARCHAR | 2      | None | None | None | None               
+description             | VARCHAR | 2      | None | None | None | None               
+keywords                | VARCHAR | 2      | None | None | None | None               
+instructions_of_use     | VARCHAR | 2      | None | None | None | None               
+authorship_authors      | VARCHAR | 2      | None | None | None | None               
+authorship_release_date | VARCHAR | 2      | None | None | None | None               
+authorship_la_ur        | VARCHAR | 2      | None | None | None | None               
+authorship_funding      | VARCHAR | 1      | None | None | None | None               
+authorship_rights       | VARCHAR | 2      | None | None | None | None               
+data_file_types         | VARCHAR | 2      | None | None | None | None               
+data_file_size          | VARCHAR | 2      | None | None | None | None               
+data_num_files          | INTEGER | 2      | 10   | 75   | 42.5 | 32.5               
+data_dataset_size       | VARCHAR | 2      | None | None | None | None               
+data_version            | FLOAT   | 2      | 0.9  | 1.0  | 0.95 | 0.04999999999999999
+data_doi                | VARCHAR | 1      | None | None | None | None  
 
 dsi> viewers
 Available viewers are: dashboard, ml
