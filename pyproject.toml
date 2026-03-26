@@ -34,3 +34,6 @@ dsi = "dsi.cli:main"
 where = ["."]
 include = ["dsi*"]
 exclude = ["clover3d"]
+
+[tool.setuptools.package-data]
+dsi = ["tools/launch_streamlit.sh","tools/launch_streamlit.bat"]
