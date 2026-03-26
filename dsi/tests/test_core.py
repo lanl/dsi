@@ -81,7 +81,6 @@ def test_table_info_sqlite_backend():
       - num of columns: 3
       - num of rows: 5
 
-
     """)
     assert output == expected_output
 
@@ -240,7 +239,6 @@ def test_table_info_run_table_sqlite_backend():
       - num of columns: 3
       - num of rows: 5
     
-    
     """)
     assert output == expected_output
 
@@ -268,69 +266,59 @@ def test_summary_run_table_sqlite_backend():
     expected_output = textwrap.dedent("""
     Table: runTable
 
-    column        | type    | min  | max  | avg  | std_dev
-    ------------------------------------------------------
-    run_id*       | INTEGER | 1    | 1    | 1.0  | None   
-    run_timestamp | TEXT    | None | None | None | None   
-      - num of rows: 1
-
+    column        | type    | unique | min  | max  | avg  | std_dev
+    ---------------------------------------------------------------
+    run_id*       | INTEGER | 1      | 1    | 1    | 1.0  | 0      
+    run_timestamp | TEXT    | 1      | None | None | None | None   
 
     Table: math
 
-    column         | type    | min    | max    | avg    | std_dev              
-    ---------------------------------------------------------------------------
-    run_id         | INTEGER | 1      | 1      | 1.0    | 0.0                  
-    specification* | VARCHAR | None   | None   | None   | None                 
-    a              | INTEGER | 1      | 2      | 1.5    | 0.5                  
-    b              | INTEGER | 2      | 3      | 2.5    | 0.5                  
-    c              | FLOAT   | 45.98  | 45.98  | 45.98  | 0.0                  
-    d              | INTEGER | 2      | 3      | 2.5    | 0.5                  
-    e              | FLOAT   | 34.8   | 44.8   | 39.8   | 5.0                  
-    f              | FLOAT   | 0.0089 | 0.0099 | 0.0094 | 0.0005000000000000004
-      - num of rows: 2
-
+    column         | type    | unique | min    | max    | avg    | std_dev              
+    ------------------------------------------------------------------------------------
+    run_id         | INTEGER | 1      | 1      | 1      | 1.0    | 0.0                  
+    specification* | VARCHAR | 2      | None   | None   | None   | None                 
+    a              | INTEGER | 2      | 1      | 2      | 1.5    | 0.5                  
+    b              | INTEGER | 2      | 2      | 3      | 2.5    | 0.5                  
+    c              | FLOAT   | 1      | 45.98  | 45.98  | 45.98  | 0.0                  
+    d              | INTEGER | 2      | 2      | 3      | 2.5    | 0.5                  
+    e              | FLOAT   | 2      | 34.8   | 44.8   | 39.8   | 5.0                  
+    f              | FLOAT   | 2      | 0.0089 | 0.0099 | 0.0094 | 0.0005000000000000004
 
     Table: address
 
-    column        | type    | min  | max  | avg   | std_dev
-    -------------------------------------------------------
-    run_id        | INTEGER | 1    | 1    | 1.0   | 0.0    
-    specification | VARCHAR | None | None | None  | None   
-    fileLoc       | VARCHAR | None | None | None  | None   
-    g             | VARCHAR | None | None | None  | None   
-    h             | FLOAT   | 9.8  | 91.8 | 50.8  | 41.0   
-    i*            | INTEGER | 2    | 3    | 2.5   | 0.5    
-    j             | INTEGER | 3    | 4    | 3.5   | 0.5    
-    k             | INTEGER | 4    | 5    | 4.5   | 0.5    
-    l             | FLOAT   | 1.0  | 11.0 | 6.0   | 5.0    
-    m             | INTEGER | 99   | 999  | 549.0 | 450.0  
-      - num of rows: 2
-
+    column        | type    | unique | min  | max  | avg   | std_dev
+    ----------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1    | 1    | 1.0   | 0.0    
+    specification | VARCHAR | 2      | None | None | None  | None   
+    fileLoc       | VARCHAR | 1      | None | None | None  | None   
+    g             | VARCHAR | 1      | None | None | None  | None   
+    h             | FLOAT   | 2      | 9.8  | 91.8 | 50.8  | 41.0   
+    i*            | INTEGER | 2      | 2    | 3    | 2.5   | 0.5    
+    j             | INTEGER | 2      | 3    | 4    | 3.5   | 0.5    
+    k             | INTEGER | 2      | 4    | 5    | 4.5   | 0.5    
+    l             | FLOAT   | 2      | 1.0  | 11.0 | 6.0   | 5.0    
+    m             | INTEGER | 2      | 99   | 999  | 549.0 | 450.0  
 
     Table: physics
 
-    column        | type    | min     | max     | avg     | std_dev              
-    -----------------------------------------------------------------------------
-    run_id        | INTEGER | 1       | 1       | 1.0     | 0.0                  
-    specification | VARCHAR | None    | None    | None    | None                 
-    n*            | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
-    o             | VARCHAR | None    | None    | None    | None                 
-    p             | INTEGER | 23      | 233     | 128.0   | 105.0                
-    q             | VARCHAR | None    | None    | None    | None                 
-    r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
-    s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
-      - num of rows: 2
-
+    column        | type    | unique | min     | max     | avg     | std_dev              
+    --------------------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1       | 1       | 1.0     | 0.0                  
+    specification | VARCHAR | 2      | None    | None    | None    | None                 
+    n*            | FLOAT   | 2      | 9.8     | 91.8    | 50.8    | 41.0                 
+    o             | VARCHAR | 1      | None    | None    | None    | None                 
+    p             | INTEGER | 2      | 23      | 233     | 128.0   | 105.0                
+    q             | VARCHAR | 1      | None    | None    | None    | None                 
+    r             | INTEGER | 2      | 1       | 12      | 6.5     | 5.5                  
+    s             | FLOAT   | 2      | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
 
     Table: dsi_units
 
-    column      | type | min  | max  | avg  | std_dev
-    -------------------------------------------------
-    table_name  | TEXT | None | None | None | None   
-    column_name | TEXT | None | None | None | None   
-    unit        | TEXT | None | None | None | None   
-      - num of rows: 5
-    
+    column      | type | unique | min  | max  | avg  | std_dev
+    ----------------------------------------------------------
+    table_name  | TEXT | 3      | None | None | None | None   
+    column_name | TEXT | 5      | None | None | None | None   
+    unit        | TEXT | 4      | None | None | None | None   
     """)
     assert output == expected_output
 
@@ -342,45 +330,37 @@ def test_summary_run_table_sqlite_backend():
     name_expected_output = textwrap.dedent("""
     Table: physics
 
-    column        | type    | min     | max     | avg     | std_dev              
-    -----------------------------------------------------------------------------
-    run_id        | INTEGER | 1       | 1       | 1.0     | 0.0                  
-    specification | VARCHAR | None    | None    | None    | None                 
-    n*            | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
-    o             | VARCHAR | None    | None    | None    | None                 
-    p             | INTEGER | 23      | 233     | 128.0   | 105.0                
-    q             | VARCHAR | None    | None    | None    | None                 
-    r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
-    s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
-      - num of rows: 2
-    
+    column        | type    | unique | min     | max     | avg     | std_dev              
+    --------------------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1       | 1       | 1.0     | 0.0                  
+    specification | VARCHAR | 2      | None    | None    | None    | None                 
+    n*            | FLOAT   | 2      | 9.8     | 91.8    | 50.8    | 41.0                 
+    o             | VARCHAR | 1      | None    | None    | None    | None                 
+    p             | INTEGER | 2      | 23      | 233     | 128.0   | 105.0                
+    q             | VARCHAR | 1      | None    | None    | None    | None                 
+    r             | INTEGER | 2      | 1       | 12      | 6.5     | 5.5                  
+    s             | FLOAT   | 2      | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
     """)
     assert name_output == name_expected_output
 
     name_rows_f = io.StringIO()
     with redirect_stdout(name_rows_f):
-        a.summary(table_name='physics', num_rows = 3)
+        a.summary(table_name='physics')
     name_rows_output = name_rows_f.getvalue()
 
     name_rows_expected_output = textwrap.dedent("""
     Table: physics
 
-    column        | type    | min     | max     | avg     | std_dev              
-    -----------------------------------------------------------------------------
-    run_id        | INTEGER | 1       | 1       | 1.0     | 0.0                  
-    specification | VARCHAR | None    | None    | None    | None                 
-    n*            | FLOAT   | 9.8     | 91.8    | 50.8    | 41.0                 
-    o             | VARCHAR | None    | None    | None    | None                 
-    p             | INTEGER | 23      | 233     | 128.0   | 105.0                
-    q             | VARCHAR | None    | None    | None    | None                 
-    r             | INTEGER | 1       | 12      | 6.5     | 5.5                  
-    s             | FLOAT   | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
-
-    run_id | specification | n    | o       | p   | q       | r  | s      
-    ----------------------------------------------------------------------
-    1      | !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
-    1      | !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
-    
+    column        | type    | unique | min     | max     | avg     | std_dev              
+    --------------------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1       | 1       | 1.0     | 0.0                  
+    specification | VARCHAR | 2      | None    | None    | None    | None                 
+    n*            | FLOAT   | 2      | 9.8     | 91.8    | 50.8    | 41.0                 
+    o             | VARCHAR | 1      | None    | None    | None    | None                 
+    p             | INTEGER | 2      | 23      | 233     | 128.0   | 105.0                
+    q             | VARCHAR | 1      | None    | None    | None    | None                 
+    r             | INTEGER | 2      | 1       | 12      | 6.5     | 5.5                  
+    s             | FLOAT   | 2      | -0.0122 | -0.0012 | -0.0067 | 0.0055000000000000005
     """)
     assert name_rows_output == name_rows_expected_output
     a.close()
@@ -404,7 +384,7 @@ def test_display_run_table_sqlite_backend():
     ----------------------------------------------------------------------
     1      | !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
     1      | !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
-    
+
     """)
 
     assert output == expected_output
@@ -417,9 +397,9 @@ def test_display_run_table_sqlite_backend():
     num_expected_output = textwrap.dedent("""
     Table: physics
 
-    run_id | specification | n    | o       | p   | q       | r  | s      
-    ----------------------------------------------------------------------
-    1      | !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+    run_id | specification | n   | o       | p  | q       | r | s      
+    -------------------------------------------------------------------
+    1      | !amy          | 9.8 | gravity | 23 | home 23 | 1 | -0.0012
       ... showing 1 of 2 rows
     
     """)
@@ -433,9 +413,9 @@ def test_display_run_table_sqlite_backend():
     num_display_expected_output = textwrap.dedent("""
     Table: physics
 
-    run_id | n    | p     | s      
-    -------------------------------
-    1.0    | 9.8  | 23.0  | -0.0012
+    run_id | n   | p  | s      
+    ---------------------------
+    1      | 9.8 | 23 | -0.0012
       ... showing 1 of 2 rows
     
     """)
@@ -519,7 +499,6 @@ def test_table_info_duckdb_backend():
       - num of columns: 7
       - num of rows: 2
 
-    
     """)
     assert output == expected_output
 
@@ -683,7 +662,6 @@ def test_table_info_run_table_duckdb_backend():
       - num of columns: 2
       - num of rows: 1
     
-    
     """)
     assert output == expected_output
 
@@ -711,69 +689,59 @@ def test_summary_run_table_duckdb_backend():
     expected_output = textwrap.dedent("""
     Table: address
 
-    column        | type    | min               | max               | avg               | std_dev           
-    --------------------------------------------------------------------------------------------------------
-    run_id        | INTEGER | 1                 | 1                 | 1.0               | 0.0               
-    specification | VARCHAR | None              | None              | None              | None              
-    fileLoc       | VARCHAR | None              | None              | None              | None              
-    g             | VARCHAR | None              | None              | None              | None              
-    h             | FLOAT   | 9.800000190734863 | 91.80000305175781 | 50.80000162124634 | 57.982758080345626
-    i*            | INTEGER | 2                 | 3                 | 2.5               | 0.7071067811865476
-    j             | INTEGER | 3                 | 4                 | 3.5               | 0.7071067811865476
-    k             | INTEGER | 4                 | 5                 | 4.5               | 0.7071067811865476
-    l             | FLOAT   | 1.0               | 11.0              | 6.0               | 7.0710678118654755
-    m             | INTEGER | 99                | 999               | 549.0             | 636.3961030678928 
-      - num of rows: 2
-
+    column        | type    | unique | min  | max  | avg   | std_dev           
+    ---------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1    | 1    | 1.0   | 0.0               
+    specification | VARCHAR | 2      | None | None | None  | None              
+    fileLoc       | VARCHAR | 1      | None | None | None  | None              
+    g             | VARCHAR | 1      | None | None | None  | None              
+    h             | DOUBLE  | 2      | 9.8  | 91.8 | 50.8  | 57.982756057296896
+    i*            | INTEGER | 2      | 2    | 3    | 2.5   | 0.7071067811865476
+    j             | INTEGER | 2      | 3    | 4    | 3.5   | 0.7071067811865476
+    k             | INTEGER | 2      | 4    | 5    | 4.5   | 0.7071067811865476
+    l             | DOUBLE  | 2      | 1.0  | 11.0 | 6.0   | 7.0710678118654755
+    m             | INTEGER | 2      | 99   | 999  | 549.0 | 636.3961030678928 
 
     Table: dsi_units
 
-    column      | type    | min  | max  | avg  | std_dev
-    ----------------------------------------------------
-    table_name  | VARCHAR | None | None | None | None   
-    column_name | VARCHAR | None | None | None | None   
-    unit        | VARCHAR | None | None | None | None   
-      - num of rows: 5
-
+    column      | type    | unique | min  | max  | avg  | std_dev
+    -------------------------------------------------------------
+    table_name  | VARCHAR | 3      | None | None | None | None   
+    column_name | VARCHAR | 5      | None | None | None | None   
+    unit        | VARCHAR | 4      | None | None | None | None   
 
     Table: math
 
-    column         | type    | min                  | max                 | avg                  | std_dev              
-    --------------------------------------------------------------------------------------------------------------------
-    run_id         | INTEGER | 1                    | 1                   | 1.0                  | 0.0                  
-    specification* | VARCHAR | None                 | None                | None                 | None                 
-    a              | INTEGER | 1                    | 2                   | 1.5                  | 0.7071067811865476   
-    b              | INTEGER | 2                    | 3                   | 2.5                  | 0.7071067811865476   
-    c              | FLOAT   | 45.97999954223633    | 45.97999954223633   | 45.97999954223633    | 0.0                  
-    d              | INTEGER | 2                    | 3                   | 2.5                  | 0.7071067811865476   
-    e              | FLOAT   | 34.79999923706055    | 44.79999923706055   | 39.79999923706055    | 7.0710678118654755   
-    f              | FLOAT   | 0.008899999782443047 | 0.00989999994635582 | 0.009399999864399433 | 0.0007071068970903809
-      - num of rows: 2
-
+    column         | type    | unique | min    | max    | avg    | std_dev              
+    ------------------------------------------------------------------------------------
+    run_id         | INTEGER | 1      | 1      | 1      | 1.0    | 0.0                  
+    specification* | VARCHAR | 2      | None   | None   | None   | None                 
+    a              | INTEGER | 2      | 1      | 2      | 1.5    | 0.7071067811865476   
+    b              | INTEGER | 2      | 2      | 3      | 2.5    | 0.7071067811865476   
+    c              | DOUBLE  | 1      | 45.98  | 45.98  | 45.98  | 0.0                  
+    d              | INTEGER | 2      | 2      | 3      | 2.5    | 0.7071067811865476   
+    e              | DOUBLE  | 2      | 34.8   | 44.8   | 39.8   | 7.0710678118654755   
+    f              | DOUBLE  | 2      | 0.0089 | 0.0099 | 0.0094 | 0.0007071067811865482
 
     Table: physics
 
-    column        | type    | min                   | max                    | avg                   | std_dev             
-    -----------------------------------------------------------------------------------------------------------------------
-    run_id        | INTEGER | 1                     | 1                      | 1.0                   | 0.0                 
-    specification | VARCHAR | None                  | None                   | None                  | None                
-    n*            | FLOAT   | 9.800000190734863     | 91.80000305175781      | 50.80000162124634     | 57.982758080345626  
-    o             | VARCHAR | None                  | None                   | None                  | None                
-    p             | INTEGER | 23                    | 233                    | 128.0                 | 148.49242404917499  
-    q             | VARCHAR | None                  | None                   | None                  | None                
-    r             | INTEGER | 1                     | 12                     | 6.5                   | 7.7781745930520225  
-    s             | FLOAT   | -0.012199999764561653 | -0.0012000000569969416 | -0.006699999910779297 | 0.007778174386269048
-      - num of rows: 2
-
+    column        | type    | unique | min     | max     | avg     | std_dev             
+    -------------------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1       | 1       | 1.0     | 0.0                 
+    specification | VARCHAR | 2      | None    | None    | None    | None                
+    n*            | DOUBLE  | 2      | 9.8     | 91.8    | 50.8    | 57.982756057296896  
+    o             | VARCHAR | 1      | None    | None    | None    | None                
+    p             | INTEGER | 2      | 23      | 233     | 128.0   | 148.49242404917499  
+    q             | VARCHAR | 1      | None    | None    | None    | None                
+    r             | INTEGER | 2      | 1       | 12      | 6.5     | 7.7781745930520225  
+    s             | DOUBLE  | 2      | -0.0122 | -0.0012 | -0.0067 | 0.007778174593052024
 
     Table: runTable
 
-    column        | type    | min  | max  | avg  | std_dev
-    ------------------------------------------------------
-    run_id*       | INTEGER | 1    | 1    | 1.0  | None   
-    run_timestamp | VARCHAR | None | None | None | None   
-      - num of rows: 1
-    
+    column        | type    | unique | min  | max  | avg  | std_dev
+    ---------------------------------------------------------------
+    run_id*       | INTEGER | 1      | 1    | 1    | 1.0  | 0      
+    run_timestamp | VARCHAR | 1      | None | None | None | None   
     """)
     assert output == expected_output
 
@@ -785,45 +753,37 @@ def test_summary_run_table_duckdb_backend():
     name_expected_output = textwrap.dedent("""
     Table: physics
 
-    column        | type    | min                   | max                    | avg                   | std_dev             
-    -----------------------------------------------------------------------------------------------------------------------
-    run_id        | INTEGER | 1                     | 1                      | 1.0                   | 0.0                 
-    specification | VARCHAR | None                  | None                   | None                  | None                
-    n*            | FLOAT   | 9.800000190734863     | 91.80000305175781      | 50.80000162124634     | 57.982758080345626  
-    o             | VARCHAR | None                  | None                   | None                  | None                
-    p             | INTEGER | 23                    | 233                    | 128.0                 | 148.49242404917499  
-    q             | VARCHAR | None                  | None                   | None                  | None                
-    r             | INTEGER | 1                     | 12                     | 6.5                   | 7.7781745930520225  
-    s             | FLOAT   | -0.012199999764561653 | -0.0012000000569969416 | -0.006699999910779297 | 0.007778174386269048
-      - num of rows: 2
-    
+    column        | type    | unique | min     | max     | avg     | std_dev             
+    -------------------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1       | 1       | 1.0     | 0.0                 
+    specification | VARCHAR | 2      | None    | None    | None    | None                
+    n*            | DOUBLE  | 2      | 9.8     | 91.8    | 50.8    | 57.982756057296896  
+    o             | VARCHAR | 1      | None    | None    | None    | None                
+    p             | INTEGER | 2      | 23      | 233     | 128.0   | 148.49242404917499  
+    q             | VARCHAR | 1      | None    | None    | None    | None                
+    r             | INTEGER | 2      | 1       | 12      | 6.5     | 7.7781745930520225  
+    s             | DOUBLE  | 2      | -0.0122 | -0.0012 | -0.0067 | 0.007778174593052024
     """)
     assert name_output == name_expected_output
 
     name_rows_f = io.StringIO()
     with redirect_stdout(name_rows_f):
-        a.summary(table_name='physics', num_rows = 3)
+        a.summary(table_name='physics')
     name_rows_output = name_rows_f.getvalue()
 
     name_rows_expected_output = textwrap.dedent("""
     Table: physics
 
-    column        | type    | min                   | max                    | avg                   | std_dev             
-    -----------------------------------------------------------------------------------------------------------------------
-    run_id        | INTEGER | 1                     | 1                      | 1.0                   | 0.0                 
-    specification | VARCHAR | None                  | None                   | None                  | None                
-    n*            | FLOAT   | 9.800000190734863     | 91.80000305175781      | 50.80000162124634     | 57.982758080345626  
-    o             | VARCHAR | None                  | None                   | None                  | None                
-    p             | INTEGER | 23                    | 233                    | 128.0                 | 148.49242404917499  
-    q             | VARCHAR | None                  | None                   | None                  | None                
-    r             | INTEGER | 1                     | 12                     | 6.5                   | 7.7781745930520225  
-    s             | FLOAT   | -0.012199999764561653 | -0.0012000000569969416 | -0.006699999910779297 | 0.007778174386269048
-
-    run_id | specification | n                 | o       | p   | q       | r  | s                     
-    --------------------------------------------------------------------------------------------------
-    1      | !amy          | 9.800000190734863 | gravity | 23  | home 23 | 1  | -0.0012000000569969416
-    1      | !amy1         | 91.80000305175781 | gravity | 233 | home 23 | 12 | -0.012199999764561653 
-    
+    column        | type    | unique | min     | max     | avg     | std_dev             
+    -------------------------------------------------------------------------------------
+    run_id        | INTEGER | 1      | 1       | 1       | 1.0     | 0.0                 
+    specification | VARCHAR | 2      | None    | None    | None    | None                
+    n*            | DOUBLE  | 2      | 9.8     | 91.8    | 50.8    | 57.982756057296896  
+    o             | VARCHAR | 1      | None    | None    | None    | None                
+    p             | INTEGER | 2      | 23      | 233     | 128.0   | 148.49242404917499  
+    q             | VARCHAR | 1      | None    | None    | None    | None                
+    r             | INTEGER | 2      | 1       | 12      | 6.5     | 7.7781745930520225  
+    s             | DOUBLE  | 2      | -0.0122 | -0.0012 | -0.0067 | 0.007778174593052024
     """)
     assert name_rows_output == name_rows_expected_output
     a.close()
@@ -843,10 +803,10 @@ def test_display_run_table_duckdb_backend():
     expected_output = textwrap.dedent("""
     Table: physics
 
-    run_id | specification | n                 | o       | p   | q       | r  | s                     
-    --------------------------------------------------------------------------------------------------
-    1      | !amy          | 9.800000190734863 | gravity | 23  | home 23 | 1  | -0.0012000000569969416
-    1      | !amy1         | 91.80000305175781 | gravity | 233 | home 23 | 12 | -0.012199999764561653 
+    run_id | specification | n    | o       | p   | q       | r  | s      
+    ----------------------------------------------------------------------
+    1      | !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
+    1      | !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     
     """)
     assert output == expected_output
@@ -859,11 +819,11 @@ def test_display_run_table_duckdb_backend():
     num_expected_output = textwrap.dedent("""
     Table: physics
 
-    run_id | specification | n                 | o       | p   | q       | r  | s                     
-    --------------------------------------------------------------------------------------------------
-    1      | !amy          | 9.800000190734863 | gravity | 23  | home 23 | 1  | -0.0012000000569969416
+    run_id | specification | n   | o       | p  | q       | r | s      
+    -------------------------------------------------------------------
+    1      | !amy          | 9.8 | gravity | 23 | home 23 | 1 | -0.0012
       ... showing 1 of 2 rows
-    
+
     """)
     assert num_output == num_expected_output
 
@@ -875,9 +835,9 @@ def test_display_run_table_duckdb_backend():
     num_display_expected_output = textwrap.dedent("""
     Table: physics
 
-    run_id | n                 | p     | s                     
-    -----------------------------------------------------------
-    1.0    | 9.800000190734863 | 23.0  | -0.0012000000569969416
+    run_id | n   | p  | s      
+    ---------------------------
+    1      | 9.8 | 23 | -0.0012
       ... showing 1 of 2 rows
     
     """)
