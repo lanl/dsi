@@ -4,7 +4,7 @@ from os.path import abspath
 from hashlib import sha1
 import json
 from math import isnan
-from pandas import DataFrame, read_csv, concat, read_excel
+from pandas import DataFrame, read_csv, concat
 import re
 import yaml
 try: import ruamel.yaml
