@@ -290,7 +290,7 @@ class DSI():
                 elif reader_name.lower() == "cloverleaf":
                     self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
                 elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
-                    self.t.load_module('plugin', 'Dict', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                    self.t.load_module('plugin', 'Dictionary', 'reader', collection=data_sources, table_name=table_name, **kwargs)
                     if isinstance(data_sources, OrderedDict):
                         data_sources = "the Ordered Dict"
                     else:

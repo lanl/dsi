@@ -11,7 +11,7 @@ class CollectionReader(StructuredMetadata):
         super().__init__(**kwargs)
         self.input_dict = collections
 
-class Dict(CollectionReader):
+class Dictionary(CollectionReader):
     """
     A Plugin to capture data from a Dictionary/ Ordered Dictionary
 
@@ -21,6 +21,7 @@ class Dict(CollectionReader):
     """
     def __init__(self, collection, table_name = None, **kwargs) -> None:
         super().__init__(collection, **kwargs)
+        print(type(self.input_dict))
         if not isinstance(self.input_dict, dict):
             raise TypeError("Input must be a Python dictionary or an Ordered Dictionary")
         self.table_name = table_name
