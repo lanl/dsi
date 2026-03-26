@@ -1435,8 +1435,6 @@ class GenesisDatacard(FileReader):
         # part of compliance section
         osti_requirements: Optional[str] = Field(default="", description="")
 
-        # remaining unexpected headers
-        free_form_content: Optional[str] = Field(default="", description="Remaining free form markdown excluding expected headers")
 
     def parse_datacard(self, content: str) -> Optional[DataCardSchema]:
         """
@@ -1563,17 +1561,18 @@ class GenesisDatacard(FileReader):
                         if actual_key is not None:
                             del free_form_dict[actual_key]
                     
-                    datacard.free_form_content= "\n\n".join( f"## {key}\n{value}" for key, value in free_form_dict.items())
 
-                    return datacard
+                    return datacard, free_form_dict
             except yaml.YAMLError as e:
-                print(f"YAML parsing error: {e}")
-                return None
+                if e.args:
+                    e.args = (f'YAML parsing error: {str(e.args[0])}',)
+                raise
             except Exception as e:
-                print(f"Validation error: {e}")
-                return None
+                if e.args:
+                    e.args = (f'Validation error: {str(e.args[0])}',)
+                raise
         
-        return None
+        return None, None
 
     def add_rows(self) -> None:
         """
@@ -1583,7 +1582,7 @@ class GenesisDatacard(FileReader):
             with open(filename, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            datacard = self.parse_datacard(content)
+            datacard, remaining_dict = self.parse_datacard(content)
             if datacard:
                 for name, value in vars(datacard).items():
                     if name not in self.genesis_datacard_data.keys():
@@ -1591,5 +1590,12 @@ class GenesisDatacard(FileReader):
                     self.genesis_datacard_data[name].append(value)
             else:
                 raise ValueError(f"Failed to parse datacard from {filename}")
+            
+            if remaining_dict:
+                max_len = max(len(v) for v in self.genesis_datacard_data.values()) - 1 # -1 so don't include newest additions
+                for name, value in remaining_dict.items():
+                    if name not in self.genesis_datacard_data.keys():
+                        self.genesis_datacard_data[name] = [None] * max_len # padding this with None at top
+                    self.genesis_datacard_data[name].append(value)
         
         self.set_schema_2(OrderedDict([("genesis_datacard", self.genesis_datacard_data)]))
