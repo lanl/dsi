@@ -20,6 +20,10 @@ class Backend(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def get_table(self, table_name, kwargs):
+        pass
+
+    @abstractmethod
     def notebook(self, kwargs):
         pass
 
@@ -44,7 +48,27 @@ class Backend(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def close(self):
+    def find_relation(self, column_name, relation, kwargs):
+        pass
+
+    @abstractmethod
+    def list(self, kwargs):
+        pass
+
+    @abstractmethod
+    def num_tables(self, kwargs):
+        pass
+
+    @abstractmethod
+    def display(self, table_name, kwargs):
+        pass
+
+    @abstractmethod
+    def summary(self, table_name, kwargs):
+        pass
+
+    @abstractmethod
+    def overwrite_table(self, table_name, collection, kwargs):
         pass
 
 class Filesystem(Backend):
@@ -73,6 +97,9 @@ class Filesystem(Backend):
     def query_artifacts(self, query, kwargs):
         pass
 
+    def get_table(self, table_name, kwargs):
+        pass
+
     def notebook(self, kwargs):
         pass
 
@@ -92,4 +119,22 @@ class Filesystem(Backend):
         pass
 
     def close(self):
+        pass
+
+    def find_relation(self, column_name, relation, kwargs):
+        pass
+
+    def list(self, kwargs):
+        pass
+
+    def num_tables(self, kwargs):
+        pass
+
+    def display(self, table_name, kwargs):
+        pass
+
+    def summary(self, table_name, kwargs):
+        pass
+
+    def overwrite_table(self, table_name, collection, kwargs):
         pass
