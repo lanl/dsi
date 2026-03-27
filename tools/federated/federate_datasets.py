@@ -1,16 +1,23 @@
-import os
-
-from pyarrow import csv, json
-import yaml
 import sys
 import uuid
-import shutil
+import yaml
 from pathlib import Path
 
+from federation_utils import (
+    compute_md5, 
+    create_directory, 
+    create_folder_from_path, 
+    csv_to_list_of_dicts, 
+    deduplicate_keep_latest, 
+    get_last_part, 
+    human_readable_size, 
+    should_download, 
+    upsert_records
+)
+
 from git_utils import download_github_file, get_github_remote_file_size
-from rsync_utils import rsync_download_interactive, rsync_remote_size_bytes_interactive
+from rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
 from web_utils import download_web_file, get_url_file_size
-from federation_utils import compute_md5, create_directory, create_folder_from_path, csv_to_list_of_dicts, deduplicate_keep_latest, get_last_part, human_readable_size, run_shell_cmd, should_download, upsert_records
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:
@@ -77,37 +84,22 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
     # Get the list of repos
     db_catalogue_list = []
 
-    # local repo by yaml
-    if "local_repo_path" in config_data:
-        _local_repo_path = config_data["local_repo_path"]
+    for repo in config_data.get("repo_paths", []):
+        if repo.endswith(".csv"):
+            try:
+                _temp_catalogues = csv_to_list_of_dicts(repo)
+                db_catalogue_list.extend(_temp_catalogues)
+            except Exception as e:
+                print(f"Error reading local repository {repo}: {e}")
+        else:
+            print(f"Unsupported repository type for {repo}. Only CSV files are supported for local repositories. Skipping this repo.")
 
-        try:
-            _temp_local_catalogues = csv_to_list_of_dicts(_local_repo_path)
-            db_catalogue_list.extend(_temp_local_catalogues)
-        except Exception as e:
-            print(f"Error reading local repository: {e}")
 
-    # clone the repo pointed to by the yaml file
-    if "remote_repo_path" in config_data:
-        repo_path = config_data["remote_repo_path"]
-
-        tmp_folder = f"_tmp_{uuid.uuid4().hex[:8]}"
-        try:
-            run_shell_cmd(f"git clone {repo_path} {tmp_folder}")
-
-            _remote_repo_path = f"{tmp_folder}/index_db.csv"
-
-            _temp_git_catalogues = csv_to_list_of_dicts(_remote_repo_path)
-            db_catalogue_list.extend(_temp_git_catalogues)
-
-            shutil.rmtree(Path(tmp_folder))
-        except RuntimeError as e:
-            print(f"Error cloning repository: {e}")
 
     
     # Remove duplicates while keeping the latest entry for each unique path
-    # TODO: Allow the user to choose which one to keep instead of just keeping the 
-    # latest one or specify a resolution mode in the yaml file or allow user to keep both and rename them or ...
+        # TODO: Allow the user to choose which one to keep instead of just keeping the 
+        # latest one or specify a resolution mode in the yaml file or allow user to keep both and rename them or ...
     cleaned_db_catalogue_list = deduplicate_keep_latest(db_catalogue_list)
     print("Number of repos found: ", len(cleaned_db_catalogue_list))
 
@@ -130,6 +122,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
         #TODO: add retries and timeouts for all downloads
 
         location_type = db['location_type']
+        cleaned_location_type = location_type.strip().lower()
         location = db['location']
         path = db['path']
         filename = get_last_part(path)
@@ -146,10 +139,10 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
         if file_path.exists():
             md5_file_hash = compute_md5(str(file_path))
 
-        print(f"\n - Processing database at {location_type}:{location}:{path}")
+        print(f"\n\n - Processing database at {location_type}:{location}:{path}:{cleaned_location_type}")
 
 
-        if location_type == "github":
+        if cleaned_location_type == "github":
             
             # Check if the file exists and get its size
             filesize = 0
@@ -180,7 +173,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
             
 
 
-        elif location_type == "HPC":
+        elif cleaned_location_type == "hpc":
 
             # Ask for username if we don't have it for this host yet
             if location not in host_username:
@@ -197,7 +190,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
             # Check if the file exists and get its size
             filesize = 0
             try:
-                filesize = rsync_remote_size_bytes_interactive(
+                filesize = ssh_remote_size_bytes_interactive(
                     remote=f"{username}@{location}",
                     remote_path=path
                 )
@@ -205,10 +198,10 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
                 print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
                 continue
             except FileNotFoundError as e:
-                print(f" -- Could not access the file at {location}:{path}. Skipping this database.")
+                print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
                 continue
             except Exception as e:
-                print(f" -- Could not access the file at {location}:{path}. Skipping this database.")
+                print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
                 continue
 
 
@@ -227,10 +220,10 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
                     continue
                 except Exception as e:
                     print(f" -- Failed to get remote hash for {location}:{path}: {e}")
-                    print(f" -- Will proceed to download the file to ensure we have the correct version.")
+                    print(" -- Will proceed to download the file to ensure we have the correct version.")
 
                 if not need_redownload:
-                    print(f" -- Local file is up to date with the remote file. Skipping download.")
+                    print(" -- Local file is up to date with the remote file. Skipping download.")
                     continue
 
 
@@ -261,7 +254,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
             
 
 
-        elif location_type == "url":
+        elif cleaned_location_type == "url":
 
             filesize = 0
             try:
@@ -291,7 +284,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
         
 
 
-        elif location_type == "local":
+        elif cleaned_location_type == "local":
             # Check if the file exists
             if not Path(path).exists():
                 print(f" -- Local file {path} does not exist. Skipping this database.")

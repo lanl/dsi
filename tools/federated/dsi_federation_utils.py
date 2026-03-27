@@ -7,9 +7,8 @@ from contextlib import closing
 from pandasql import sqldf
 from pathlib import Path
 
-from streamlit import rerun
-
 from dsi.dsi import DSI
+
 
 
 def is_valid_sqlite_with_data(path: str) -> tuple[bool, str]:
@@ -75,7 +74,6 @@ def is_valid_sqlite_with_data(path: str) -> tuple[bool, str]:
     except Exception as e:
         return False, f"unexpected error: {e}"
     
-
 
 
 def is_valid_duckdb_with_data(path: str) -> tuple[bool, str]:
@@ -239,7 +237,6 @@ class f_dsi:
     
 
 
-
     def f_get_databases(self):
         """Returns a DataFrame containing information about the federated databases, including their paths, names, and tables."""
         return self.df
@@ -261,8 +258,8 @@ class f_dsi:
         db_path_str = self.__find_db_path(table, db)
     
         _temp = DSI(db_path_str, silence_messages="True")
-        l = _temp.summary(collection=True)
-        return l
+        result = _temp.summary(collection=True)
+        return result
 
 
 
@@ -282,8 +279,9 @@ class f_dsi:
         db_path_str = self.__find_db_path(table, db)
     
         _temp = DSI(db_path_str, silence_messages="True")
-        l = _temp.query(query, collection=True)
-        return l
+        result = _temp.query(query, collection=True)
+        return result
+
 
 
     def f_search(self, table: str, db: str, query: str):
@@ -300,8 +298,8 @@ class f_dsi:
     
         # Use DSI to run the query on the specified database and table
         _temp = DSI(db_path_str, silence_messages="True")
-        l = _temp.search(query, collection=True)
-        return l
+        result = _temp.search(query, collection=True)
+        return result
 
 
 
@@ -323,5 +321,5 @@ class f_dsi:
 
         # Use DSI to run the find operation on the specified database and table
         _temp = DSI(db_path_str, silence_messages="True")
-        l = _temp.find(query, collection=True)
-        return l
+        result = _temp.find(query, collection=True)
+        return result
