@@ -60,10 +60,6 @@ class Backend(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def list(self, kwargs):
-        pass
-
-    @abstractmethod
     def display(self, table_name, kwargs):
         pass
 
@@ -132,9 +128,6 @@ class Filesystem(Backend):
         pass
 
     def num_tables(self, kwargs):
-        pass
-
-    def list(self, kwargs):
         pass
 
     def display(self, table_name, kwargs):
