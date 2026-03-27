@@ -92,39 +92,6 @@ def get_github_remote_file_size(url: str, timeout: int = 20, github_token: str |
 
 
 
-def download_github_file(url: str, out_path: str | Path, github_token: str | None = None, timeout: int = 30) -> Path:
-    """
-    Download a file from GitHub, supporting both blob/tree URLs and raw URLs.
-    If the output path is a directory, the filename will be inferred from the URL.
-
-    Args:
-        url: The GitHub URL of the file to download (can be a blob/tree URL or raw URL)
-        out_path: The local output path (file or directory)
-        github_token: Optional GitHub token for authenticated requests
-        timeout: Timeout in seconds for network requests    
-
-    Returns:
-        The path to the downloaded file.        
-    """
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    raw_url = github_blob_to_raw(url)
-    headers = {}
-    if github_token:
-        headers["Authorization"] = f"Bearer {github_token}"
-
-    with requests.get(raw_url, headers=headers, stream=True, timeout=timeout) as r:
-        r.raise_for_status()
-        with open(out_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
-                if chunk:
-                    f.write(chunk)
-
-    return out_path
-
-
-
 def github_to_raw(url: str) -> str:
     """
     Convert GitHub web URLs to raw file URLs:

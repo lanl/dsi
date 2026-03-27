@@ -1,15 +1,14 @@
 import csv
 import hashlib
 import json
-import json
 import shlex
 import subprocess
-
-from dsi.dsi import DSI
 
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
+
+from dsi.dsi import DSI
 
 
 def parse_timestamp(ts: str) -> datetime:
@@ -238,21 +237,6 @@ def create_directory(dir_name: str = "temp", exist_ok=True):
 
 
 
-def run_shell_cmd(cmd: str, cwd: str | None = None) -> None:
-    """
-    Runs a shell command and raises an error if it fails.
-
-    Args:
-        cmd (str): The command to run.  
-        cwd (str | None): The working directory to run the command in. If None, it will run in the current directory. Default is None.  
-    """
-
-    p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, shell=True)
-    if p.returncode != 0:
-        raise RuntimeError(f"Command failed: {cmd}\nstdout:\n{p.stdout}\nstderr:\n{p.stderr}")
-    
-
-
 def create_index_db(index_path:str, catalogue_name: str = "metadata_catalogue.db"):
     """
     Creates an index database from a CSV file containing metadata about databases.
@@ -300,3 +284,4 @@ def upsert_records(file_path: str, new_records: list[dict], key: str) -> None:
     # Save back to file
     with open(_file_path, "w", encoding="utf-8") as f:
         json.dump(updated_data, f, indent=2)
+        
