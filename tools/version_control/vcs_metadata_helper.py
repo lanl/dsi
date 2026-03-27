@@ -87,6 +87,8 @@ def set_acl(path: str, acl_string: str) -> Optional[str]:
     acl_list = acl_string.split(";")
     for acl_entry in acl_list:
         try:
+            if len(acl_entry) == 0:
+                continue
             acls = acl_entry.split()
             acl_perm = "user:" + acls[0] + " allow " + acls[2]
             print(acl_perm)
