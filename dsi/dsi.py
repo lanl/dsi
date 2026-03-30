@@ -150,7 +150,6 @@ class DSI():
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
-        # NEW CKAN
         print("CKAN   : Data catalog backend for discovering and accessing open data resources.\n")
 
         print()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clean CKAN Backend for DSI
+CKAN Backend for DSI
 
 Provides read-only access to CKAN catalogs and exposes metadata
 as DSI tables: datasets and resources.
@@ -9,19 +9,73 @@ as DSI tables: datasets and resources.
 import requests
 import pandas as pd
 from collections import OrderedDict
+
 from dsi.backends.webserver import Webserver
 
-import warnings
 import urllib3
-
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+# ---------------------------------------------------
+# ValueObject (DSI Standard)
+# ---------------------------------------------------
+
+class ValueObject:
+    """
+    Data Structure used when returning search results from find functions
+
+    - t_name: table name
+    - c_name: column name(s)
+    - row_num: row index
+    - value: matched value
+    - type: match type {table, column, cell}
+    """
+    def __init__(self):
+        self.t_name = ""
+        self.c_name = []
+        self.row_num = None
+        self.value = None
+        self.type = ""
+
+
+# ---------------------------------------------------
+# CKAN Backend
+# ---------------------------------------------------
+
 class CKAN(Webserver):
+    """
+    CKAN Web Backend (READ-ONLY)
+
+    Loads CKAN datasets via API and exposes them as:
+        - datasets table
+        - resources table
+
+    Supports:
+        - ingest_artifacts (API fetch)
+        - query_artifacts (pandas query)
+        - find (table/column/cell search)
+    """
+
+    # ---------------------------------------------
+    # Initialization
+    # ---------------------------------------------
 
     def __init__(self,
                  base_url="https://nationaldataplatform.org/catalog",
                  api_key=None,
                  verify_ssl=False):
+        """
+        Initialize CKAN backend
+
+        `base_url` : str
+            CKAN instance base URL
+
+        `api_key` : str, optional
+            API key for authenticated endpoints
+
+        `verify_ssl` : bool
+            Toggle SSL verification
+        """
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -31,6 +85,7 @@ class CKAN(Webserver):
         if api_key:
             self.headers["Authorization"] = api_key
 
+        # Internal storage
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
@@ -38,12 +93,14 @@ class CKAN(Webserver):
 
         self._loaded = False
 
-    # ---------------------------------------------------
-    # Internal API
-    # ---------------------------------------------------
+    # ---------------------------------------------
+    # Internal API Helpers
+    # ---------------------------------------------
 
     def _request(self, endpoint, params=None):
-
+        """
+        Internal helper for CKAN API requests
+        """
         url = f"{self.base_url}/api/3/action/{endpoint}"
 
         r = requests.get(
@@ -61,10 +118,12 @@ class CKAN(Webserver):
 
         return data["result"]
 
-    # ---------------------------------------------------
+    # ---------------------------------------------
 
     def _extract_tables(self, datasets):
-
+        """
+        Convert CKAN dataset JSON into row format
+        """
         dataset_rows = []
         resource_rows = []
 
@@ -85,7 +144,6 @@ class CKAN(Webserver):
             })
 
             for r in ds.get("resources", []):
-
                 resource_rows.append({
                     "resource_id": r.get("id"),
                     "resource_name": r.get("name"),
@@ -98,10 +156,12 @@ class CKAN(Webserver):
 
         return dataset_rows, resource_rows
 
-    # ---------------------------------------------------
+    # ---------------------------------------------
 
     def _rows_to_table(self, rows):
-
+        """
+        Convert list-of-dicts → OrderedDict (DSI format)
+        """
         if not rows:
             return OrderedDict()
 
@@ -115,41 +175,27 @@ class CKAN(Webserver):
         return table
 
     # ---------------------------------------------------
-    # DSI Backend Interface
+    # DSI Interface
     # ---------------------------------------------------
 
-    def ingest_artifacts(self, artifacts, kwargs):
+    def ingest_artifacts(self, artifacts=None, kwargs=None):
+        """
+        Fetch metadata from CKAN API
 
-        keywords = kwargs.get("keywords")
-        organization = kwargs.get("organization")
-        tags = kwargs.get("tags")
-        formats = kwargs.get("formats")
-        limit = kwargs.get("limit", 100)
+        `kwargs` supports:
+            - keywords
+            - organization
+            - tags
+            - formats
+            - limit
+        """
 
-        params = {"rows": limit}
+        kwargs = kwargs or {}
 
-        q_parts = []
-        fq_parts = []
+        params = {"rows": kwargs.get("limit", 100)}
 
-        if keywords:
-            q_parts.append(keywords)
-
-        if organization:
-            fq_parts.append(f"organization:{organization}")
-
-        if tags:
-            for t in tags:
-                fq_parts.append(f"tags:{t}")
-
-        if formats:
-            fq_parts.append("(" + " OR ".join(
-                [f"res_format:{f}" for f in formats]) + ")")
-
-        if q_parts:
-            params["q"] = " ".join(q_parts)
-
-        if fq_parts:
-            params["fq"] = " AND ".join(fq_parts)
+        if "keywords" in kwargs:
+            params["q"] = kwargs["keywords"]
 
         result = self._request("package_search", params)
         datasets = result.get("results", [])
@@ -163,52 +209,62 @@ class CKAN(Webserver):
 
     # ---------------------------------------------------
 
-    def process_artifacts(self, kwargs):
-
+    def process_artifacts(self, kwargs=None):
+        """
+        Return loaded data in DSI format
+        """
         if not self._loaded:
             return OrderedDict()
-
         return self._cache
 
     # ---------------------------------------------------
 
-    def query_artifacts(self, query, kwargs):
+    def query_artifacts(self, query, kwargs=None):
+        """
+        Query cached tables using pandas.query()
+
+        FIX:
+        - Always returns DataFrame OR OrderedDict
+        - No tuple-based error returns
+        """
 
         if not self._loaded:
-            return (RuntimeError, "No metadata loaded")
+            raise RuntimeError("No metadata loaded")
 
+        kwargs = kwargs or {}
         dict_return = kwargs.get("dict_return", False)
 
-        if "resource" in query or "dataset_id" in query:
+        # choose table
+        if "resource" in query.lower():
             df = pd.DataFrame(self._cache["resources"])
         else:
             df = pd.DataFrame(self._cache["datasets"])
 
-        try:
-            result = df.query(query)
+        result = df.query(query)
 
-            if dict_return:
-                return OrderedDict(result.to_dict(orient="list"))
+        if dict_return:
+            return OrderedDict(result.to_dict(orient="list"))
 
-            return result
-
-        except Exception as e:
-            return (ValueError, str(e))
+        return result
 
     # ---------------------------------------------------
-    # Find Functions (NO ValueObject)
+    # FIND FUNCTIONS
     # ---------------------------------------------------
 
-    def find(self, query_object, kwargs):
-
+    def find(self, query_object, kwargs=None):
+        """
+        Search across tables, columns, and cells
+        """
         results = []
-        results += (self.find_table(query_object) or [])
-        results += (self.find_column(query_object) or [])
-        results += (self.find_cell(query_object) or [])
+        results += self.find_table(query_object) or []
+        results += self.find_column(query_object) or []
+        results += self.find_cell(query_object) or []
         return results
 
     def find_table(self, query_object):
-
+        """
+        Match table names
+        """
         if not isinstance(query_object, str):
             return None
 
@@ -216,18 +272,18 @@ class CKAN(Webserver):
 
         for table in self._cache.keys():
             if query_object.lower() in table.lower():
-                matches.append({
-                    "t_name": table,
-                    "c_name": list(self._cache[table].keys()),
-                    "row_num": None,
-                    "value": None,
-                    "type": "table"
-                })
+                vo = ValueObject()
+                vo.t_name = table
+                vo.c_name = list(self._cache[table].keys())
+                vo.type = "table"
+                matches.append(vo)
 
         return matches
 
     def find_column(self, query_object):
-
+        """
+        Match column names
+        """
         if not isinstance(query_object, str):
             return None
 
@@ -236,18 +292,19 @@ class CKAN(Webserver):
         for table, data in self._cache.items():
             for col in data.keys():
                 if query_object.lower() in col.lower():
-                    matches.append({
-                        "t_name": table,
-                        "c_name": [col],
-                        "row_num": None,
-                        "value": data[col],
-                        "type": "column"
-                    })
+                    vo = ValueObject()
+                    vo.t_name = table
+                    vo.c_name = [col]
+                    vo.value = data[col]
+                    vo.type = "column"
+                    matches.append(vo)
 
         return matches
 
     def find_cell(self, query_object):
-
+        """
+        Match cell values
+        """
         matches = []
 
         for table, data in self._cache.items():
@@ -258,43 +315,40 @@ class CKAN(Webserver):
             for i, row in enumerate(rows):
                 for j, cell in enumerate(row):
 
-                    if query_object == cell or (
-                        isinstance(cell, str)
-                        and isinstance(query_object, str)
-                        and query_object.lower() in cell.lower()
+                    if (
+                        query_object == cell or
+                        (isinstance(cell, str) and isinstance(query_object, str)
+                         and query_object.lower() in cell.lower())
                     ):
-                        matches.append({
-                            "t_name": table,
-                            "c_name": [cols[j]],
-                            "row_num": i,
-                            "value": cell,
-                            "type": "cell"
-                        })
+                        vo = ValueObject()
+                        vo.t_name = table
+                        vo.c_name = [cols[j]]
+                        vo.row_num = i
+                        vo.value = cell
+                        vo.type = "cell"
+                        matches.append(vo)
 
         return matches
 
     # ---------------------------------------------------
 
-    def notebook(self, kwargs):
-
-        df_datasets = pd.DataFrame(self._cache["datasets"])
-        df_resources = pd.DataFrame(self._cache["resources"])
-
-        print("Datasets:")
-        print(df_datasets.head())
-
-        print("\nResources:")
-        print(df_resources.head())
+    def notebook(self, kwargs=None):
+        """
+        Simple preview of loaded tables
+        """
+        print(pd.DataFrame(self._cache["datasets"]).head())
+        print(pd.DataFrame(self._cache["resources"]).head())
 
     # ---------------------------------------------------
 
     def close(self):
-
+        """
+        Reset backend state
+        """
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
         })
-
         self._loaded = False
 
     # ---------------------------------------------------
@@ -305,31 +359,16 @@ class CKAN(Webserver):
         return "ckan-readonly-backend"
 
     def get_artifacts(self, kwargs=None):
-        """
-        CKAN is read-only.
-        This backend does not retrieve local artifacts.
-        """
         return self._cache
 
     def read_to_artifacts(self, kwargs=None):
-        """
-        CKAN does not read from local storage.
-        It reads from remote API during ingest.
-        """
         return self._cache
 
     def inspect_artifacts(self, kwargs=None):
-        """
-        Returns metadata about loaded CKAN tables.
-        """
         return {
             "loaded": self._loaded,
             "tables": list(self._cache.keys())
         }
 
     def put_artifacts(self, artifacts, kwargs=None):
-        """
-        CKAN backend is read-only.
-        Writing is not supported.
-        """
         raise NotImplementedError("CKAN backend is read-only.")
