@@ -1,19 +1,18 @@
 # examples/ckan/3.query.py
 from dsi.core import Terminal
 
-def test_query_artifacts():
-    t = Terminal()
-    t.load_module("backend", "CKAN", "back-read")
-    backend = t.active_modules["back-read"][0]
+verbose = True
 
-    backend.ingest_artifacts(artifacts=None, kwargs={"keywords": "climate", "limit": 5})
+t = Terminal()
+t.load_module("backend", "CKAN", "back-read")
+backend = t.active_modules["back-read"][0]
 
-    # Query datasets with num_resources > 0
-    result = backend.query_artifacts("`num_resources` > 0", kwargs={"dict_return": True})
-    assert isinstance(result, dict), "Query result should be a dict when dict_return=True"
-    assert "id" in result, "Query result should contain 'id' column"
+backend.ingest_artifacts(None, {"keywords": "energy", "limit": 20})
 
-    print("3.query.py passed")
+# Query datasets with at least one resource
+result = backend.query_artifacts("`num_resources` > 10", {"table": "datasets", "dict_return": True})
 
-if __name__ == "__main__":
-    test_query_artifacts()
+if verbose:
+    print("Query results (num_resources > 10):")
+    for table_name, table_data in result.items():
+        print(table_name, list(table_data))

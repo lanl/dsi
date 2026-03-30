@@ -1,17 +1,18 @@
 # examples/ckan/2.process.py
 from dsi.core import Terminal
 
-def test_process_artifacts():
-    t = Terminal()
-    t.load_module("backend", "CKAN", "back-read")
-    backend = t.active_modules["back-read"][0]
+verbose = False
 
-    backend.ingest_artifacts(artifacts=None, kwargs={"keywords": "climate", "limit": 5})
-    
-    processed = backend.process_artifacts(kwargs={})
-    assert processed == backend._cache, "Processed artifacts should match _cache"
+t = Terminal()
+t.load_module("backend", "CKAN", "back-read")
+backend = t.active_modules["back-read"][0]
 
-    print("2.process.py passed")
+backend.ingest_artifacts(None, {"keywords": "science", "limit": 5})
+tables = backend.process_artifacts()
 
-if __name__ == "__main__":
-    test_process_artifacts()
+if verbose:
+    print("Processed artifacts preview:")
+    for table_name, table_data in tables.items():
+        print(table_name)
+        for col in table_data:
+            print(f"  {col}: {table_data[col]}")
