@@ -64,7 +64,6 @@ class DSI():
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','DuckDB','back-write', filename=filename)
-            # NEW CKAN
             elif backend_name.lower() == 'ckan':
                 with redirect_stdout(fnull):
                     # Pass CKAN-specific kwargs like base_url, api_key, verify_ssl
@@ -88,7 +87,6 @@ class DSI():
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
-        # NEW CKAN
         print("CKAN   : Data catalog backend for discovering and accessing open data resources.\n")
 
         print()
@@ -142,7 +140,6 @@ class DSI():
         Prints a list of valid readers that can be used in the `reader_name` argument in `read()`
         """
         print("\nValid Readers for `reader_name` in read():\n" + "-"*50)
-        print("CKAN                 : Downloads and loads data from CKAN catalog (resource_id or dataset_id)")
         print("Collection           : Loads data from an Ordered Dict. If multiple tables, each table must be a nested OrderedDict.")
         print("CSV                  : Loads data from CSV files (one table per call)")
         print("Parquet              : Loads data from Parquet - a columnar storage format for Apache Hadoop (one table per call)")
@@ -292,7 +289,7 @@ class DSI():
 
             if correct_reader == False:
                 print("read() ERROR: Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n")
-                elg = "CKAN, Collection, CSV, Parquet, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
+                elg = "Collection, CSV, Parquet, YAML1, TOML1, JSON, Ensemble, Cloverleaf, Bueno, DublinCoreDatacard, SchemaOrgDatacard"
                 sys.exit(f"Eligible readers are: {elg}, GoogleDatacard, Oceans11Datacard, GenesisDatacard")
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
