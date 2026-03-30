@@ -1,6 +1,6 @@
 # test_terminal_with_ckan.py
 from dsi.core import Terminal
-from dsi.backends.ckan import CKAN
+from DSI.dsi.backends.ckan_v1 import CKAN
 
 # Create Terminal directly
 terminal = Terminal()
