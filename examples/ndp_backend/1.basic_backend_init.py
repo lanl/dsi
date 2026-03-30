@@ -20,7 +20,7 @@ from collections import OrderedDict
 # Add parent directory to path if running directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from dsi.backends.ckan import CKAN
+from DSI.dsi.backends.ckan_v1 import CKAN
 
 # ============================================================================
 # Test 1: Basic Backend Initialization and Search

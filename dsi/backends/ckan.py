@@ -1,14 +1,16 @@
-#!/usr/bin/env python3
 """
-CKAN Backend for DSI
+CKAN Webserver Backend for DSI
 
-Provides read-only access to CKAN catalogs and exposes metadata
-as DSI tables: datasets and resources.
+Provides read-only access to CKAN catalogs via API and exposes metadata
+as DSI-compatible tables: datasets and resources.
+
+This backend DOES NOT write data — it only queries remote CKAN instances.
 """
 
 import requests
 import pandas as pd
 from collections import OrderedDict
+from urllib.parse import urlparse
 
 from dsi.backends.webserver import Webserver
 
@@ -16,19 +18,20 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# ---------------------------------------------------
-# ValueObject (DSI Standard)
-# ---------------------------------------------------
-
+# ---------------------------------------------------------
+# ValueObject
+# ---------------------------------------------------------
 class ValueObject:
     """
-    Data Structure used when returning search results from find functions
+    Data structure used when returning search results from:
+    find(), find_table(), find_column(), find_cell()
 
-    - t_name: table name
-    - c_name: column name(s)
-    - row_num: row index
-    - value: matched value
-    - type: match type {table, column, cell}
+    Attributes:
+        t_name  : table name
+        c_name  : list of column names
+        row_num : row index (if applicable)
+        value   : matched value or data
+        type    : {table, column, cell}
     """
     def __init__(self):
         self.t_name = ""
@@ -38,49 +41,42 @@ class ValueObject:
         self.type = ""
 
 
-# ---------------------------------------------------
+# ---------------------------------------------------------
 # CKAN Backend
-# ---------------------------------------------------
-
+# ---------------------------------------------------------
 class CKAN(Webserver):
     """
-    CKAN Web Backend (READ-ONLY)
+    CKAN Web Backend for DSI
 
-    Loads CKAN datasets via API and exposes them as:
-        - datasets table
-        - resources table
-
-    Supports:
-        - ingest_artifacts (API fetch)
-        - query_artifacts (pandas query)
-        - find (table/column/cell search)
+    Converts CKAN API responses into in-memory tabular format
+    compatible with DSI (OrderedDict of columns).
     """
 
-    # ---------------------------------------------
-    # Initialization
-    # ---------------------------------------------
-
+    # ----------------------------
+    # Constructor
+    # ----------------------------
     def __init__(self,
                  base_url="https://nationaldataplatform.org/catalog",
                  api_key=None,
                  verify_ssl=False):
         """
-        Initialize CKAN backend
+        Initialize CKAN backend connection settings
 
-        `base_url` : str
-            CKAN instance base URL
-
-        `api_key` : str, optional
-            API key for authenticated endpoints
-
-        `verify_ssl` : bool
-            Toggle SSL verification
+        Parameters:
+            base_url   : CKAN instance base URL
+            api_key    : optional API key
+            verify_ssl : SSL verification flag
         """
+
+        parsed = urlparse(base_url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("Invalid CKAN base_url")
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.verify_ssl = verify_ssl
 
+        # HTTP headers
         self.headers = {}
         if api_key:
             self.headers["Authorization"] = api_key
@@ -93,14 +89,20 @@ class CKAN(Webserver):
 
         self._loaded = False
 
-    # ---------------------------------------------
+    # ---------------------------------------------------
     # Internal API Helpers
-    # ---------------------------------------------
+    # ---------------------------------------------------
 
     def _request(self, endpoint, params=None):
         """
-        Internal helper for CKAN API requests
+        **Internal use only**
+
+        Sends GET request to CKAN API and returns JSON result
+
+        Raises:
+            RuntimeError if API response is unsuccessful
         """
+
         url = f"{self.base_url}/api/3/action/{endpoint}"
 
         r = requests.get(
@@ -118,17 +120,21 @@ class CKAN(Webserver):
 
         return data["result"]
 
-    # ---------------------------------------------
+    # ---------------------------------------------------
 
     def _extract_tables(self, datasets):
         """
-        Convert CKAN dataset JSON into row format
+        Convert CKAN dataset JSON into flat row structures
+
+        Returns:
+            dataset_rows  : list of dataset dicts
+            resource_rows : list of resource dicts
         """
+
         dataset_rows = []
         resource_rows = []
 
         for ds in datasets:
-
             dataset_rows.append({
                 "id": ds.get("id"),
                 "name": ds.get("name"),
@@ -156,12 +162,14 @@ class CKAN(Webserver):
 
         return dataset_rows, resource_rows
 
-    # ---------------------------------------------
+    # ---------------------------------------------------
 
     def _rows_to_table(self, rows):
         """
-        Convert list-of-dicts → OrderedDict (DSI format)
+        Convert list-of-dicts into column-oriented OrderedDict
+        (DSI standard format)
         """
+
         if not rows:
             return OrderedDict()
 
@@ -175,31 +183,49 @@ class CKAN(Webserver):
         return table
 
     # ---------------------------------------------------
-    # DSI Interface
+    # DSI Backend Interface
     # ---------------------------------------------------
 
     def ingest_artifacts(self, artifacts=None, kwargs=None):
         """
-        Fetch metadata from CKAN API
+        Fetch metadata from CKAN and store internally
 
-        `kwargs` supports:
-            - keywords
-            - organization
-            - tags
-            - formats
-            - limit
+        kwargs options:
+            keywords, organization, tags, formats, limit
         """
 
         kwargs = kwargs or {}
 
         params = {"rows": kwargs.get("limit", 100)}
 
-        if "keywords" in kwargs:
-            params["q"] = kwargs["keywords"]
+        # Build query filters
+        q_parts = []
+        fq_parts = []
 
+        if kwargs.get("keywords"):
+            q_parts.append(kwargs["keywords"])
+
+        if kwargs.get("organization"):
+            fq_parts.append(f"organization:{kwargs['organization']}")
+
+        if kwargs.get("tags"):
+            fq_parts += [f"tags:{t}" for t in kwargs["tags"]]
+
+        if kwargs.get("formats"):
+            fq_parts.append("(" + " OR ".join(
+                [f"res_format:{f}" for f in kwargs["formats"]]) + ")")
+
+        if q_parts:
+            params["q"] = " ".join(q_parts)
+
+        if fq_parts:
+            params["fq"] = " AND ".join(fq_parts)
+
+        # API call
         result = self._request("package_search", params)
         datasets = result.get("results", [])
 
+        # Transform
         ds_rows, rs_rows = self._extract_tables(datasets)
 
         self._cache["datasets"] = self._rows_to_table(ds_rows)
@@ -211,104 +237,139 @@ class CKAN(Webserver):
 
     def process_artifacts(self, kwargs=None):
         """
-        Return loaded data in DSI format
+        Return cached data in DSI format
         """
-        if not self._loaded:
-            return OrderedDict()
-        return self._cache
+        return self._cache if self._loaded else OrderedDict()
 
     # ---------------------------------------------------
 
     def query_artifacts(self, query, kwargs=None):
         """
-        Query cached tables using pandas.query()
-
-        FIX:
-        - Always returns DataFrame OR OrderedDict
-        - No tuple-based error returns
+        Query cached data using pandas.query()
         """
 
-        if not self._loaded:
-            raise RuntimeError("No metadata loaded")
-
         kwargs = kwargs or {}
+
+        if not self._loaded:
+            return (RuntimeError, "No metadata loaded")
+
         dict_return = kwargs.get("dict_return", False)
 
-        # choose table
-        if "resource" in query.lower():
-            df = pd.DataFrame(self._cache["resources"])
-        else:
-            df = pd.DataFrame(self._cache["datasets"])
+        # Select table
+        df = pd.DataFrame(
+            self._cache["resources"]
+            if "resource" in query.lower()
+            else self._cache["datasets"]
+        )
 
-        result = df.query(query)
+        try:
+            result = df.query(query)
 
-        if dict_return:
-            return OrderedDict(result.to_dict(orient="list"))
+            return (
+                OrderedDict(result.to_dict(orient="list"))
+                if dict_return
+                else result
+            )
 
-        return result
+        except Exception as e:
+            return (ValueError, str(e))
 
     # ---------------------------------------------------
-    # FIND FUNCTIONS
+    # URL Validation
+    # ---------------------------------------------------
+
+    def validate_urls(self):
+        """
+        Check each resource URL in the 'resources' table and
+        add a column 'url_valid' indicating whether the URL can be reached.
+
+        Updates:
+            self._cache["resources"]["url_valid"] : list of bool
+        """
+        resources = self._cache.get("resources", {})
+        urls = resources.get("url", [])
+        valid_list = []
+
+        for url in urls:
+            try:
+                r = requests.head(url, allow_redirects=True, timeout=5)
+                valid_list.append(r.status_code == 200)
+            except:
+                valid_list.append(False)
+
+        resources["url_valid"] = valid_list
+
+    # ---------------------------------------------------
+    # Find Functions
     # ---------------------------------------------------
 
     def find(self, query_object, kwargs=None):
         """
         Search across tables, columns, and cells
         """
-        results = []
-        results += self.find_table(query_object) or []
-        results += self.find_column(query_object) or []
-        results += self.find_cell(query_object) or []
-        return results
+        return (
+            (self.find_table(query_object) or []) +
+            (self.find_column(query_object) or []) +
+            (self.find_cell(query_object) or [])
+        )
+
+    # ---------------------------------------------------
 
     def find_table(self, query_object):
         """
         Match table names
         """
+
         if not isinstance(query_object, str):
             return None
 
         matches = []
 
-        for table in self._cache.keys():
+        for table in self._cache:
             if query_object.lower() in table.lower():
-                vo = ValueObject()
-                vo.t_name = table
-                vo.c_name = list(self._cache[table].keys())
-                vo.type = "table"
-                matches.append(vo)
+                val = ValueObject()
+                val.t_name = table
+                val.c_name = list(self._cache[table].keys())
+                val.value = self._cache[table]
+                val.type = "table"
+                matches.append(val)
 
-        return matches
+        return matches or None
+
+    # ---------------------------------------------------
 
     def find_column(self, query_object):
         """
         Match column names
         """
+
         if not isinstance(query_object, str):
             return None
 
         matches = []
 
         for table, data in self._cache.items():
-            for col in data.keys():
+            for col in data:
                 if query_object.lower() in col.lower():
-                    vo = ValueObject()
-                    vo.t_name = table
-                    vo.c_name = [col]
-                    vo.value = data[col]
-                    vo.type = "column"
-                    matches.append(vo)
+                    val = ValueObject()
+                    val.t_name = table
+                    val.c_name = [col]
+                    val.value = data[col]
+                    val.type = "column"
+                    matches.append(val)
 
-        return matches
+        return matches or None
+
+    # ---------------------------------------------------
 
     def find_cell(self, query_object):
         """
         Match cell values
         """
+
         matches = []
 
         for table, data in self._cache.items():
-
             cols = list(data.keys())
             rows = list(zip(*data.values()))
 
@@ -317,38 +378,49 @@ class CKAN(Webserver):
 
                     if (
                         query_object == cell or
-                        (isinstance(cell, str) and isinstance(query_object, str)
-                         and query_object.lower() in cell.lower())
+                        (isinstance(cell, str) and
+                         isinstance(query_object, str) and
+                         query_object.lower() in cell.lower())
                     ):
-                        vo = ValueObject()
-                        vo.t_name = table
-                        vo.c_name = [cols[j]]
-                        vo.row_num = i
-                        vo.value = cell
-                        vo.type = "cell"
-                        matches.append(vo)
+                        val = ValueObject()
+                        val.t_name = table
+                        val.c_name = [cols[j]]
+                        val.row_num = i
+                        val.value = cell
+                        val.type = "cell"
+                        matches.append(val)
 
-        return matches
+        return matches or None
 
+    # ---------------------------------------------------
+    # Notebook / Inspection
     # ---------------------------------------------------
 
     def notebook(self, kwargs=None):
         """
-        Simple preview of loaded tables
+        Simple preview of loaded data
         """
+
+        print("\nDatasets:")
         print(pd.DataFrame(self._cache["datasets"]).head())
+
+        print("\nResources:")
         print(pd.DataFrame(self._cache["resources"]).head())
 
+    # ---------------------------------------------------
+    # Lifecycle
     # ---------------------------------------------------
 
     def close(self):
         """
         Reset backend state
         """
+
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
         })
+
         self._loaded = False
 
     # ---------------------------------------------------

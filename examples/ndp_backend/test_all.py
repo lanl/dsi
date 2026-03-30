@@ -5,7 +5,7 @@ DSI-CKAN Backend Integration Tests
 Tests using DSI methods with CKAN backend
 """
 from dsi.dsi import DSI
-from dsi.backends.ckan import CKAN
+from DSI.dsi.backends.ckan_v1 import CKAN
 import pandas as pd
 
 # ============================================================================
