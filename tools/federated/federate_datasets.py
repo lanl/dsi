@@ -139,7 +139,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
         if file_path.exists():
             md5_file_hash = compute_md5(str(file_path))
 
-        print(f"\n\n - Processing database at {location_type}:{location}:{path}:{cleaned_location_type}")
+        print(f"\n\n - Processing database at {location_type}:{location}:{path}")
 
 
         if cleaned_location_type == "github":
@@ -272,7 +272,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
 
             # Download the file
             try:
-                download_web_file(url=path, output_path=abs_path_db_folder)
+                download_web_file(url=path, output_dir=abs_path_db_folder)
 
                 db_info = make_db_info(location, path, file_path, filename)
                 database_info.append(db_info)

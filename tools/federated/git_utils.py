@@ -1,8 +1,60 @@
 from __future__ import annotations
+
+import json
 import re
-import requests
+import ssl
+import time
 from pathlib import Path
 from urllib.parse import urlparse, unquote
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+
+
+# Disable SSL certificate verification
+SSL_CONTEXT = ssl._create_unverified_context()
+
+# Retry only transient HTTP errors
+RETRYABLE_HTTP_CODES = {500, 502, 503, 504}
+
+
+def _open(
+    url: str,
+    method: str = "GET",
+    headers: dict[str, str] | None = None,
+    timeout: float = 20.0,
+    retries: int = 3,
+):
+    """
+    Open a URL with timeout and retry support.
+
+    Args:
+        url: URL to open.
+        method: HTTP method.
+        headers: Optional request headers.
+        timeout: Timeout in seconds for each attempt.
+        retries: Number of attempts.
+
+    Returns:
+        A urllib response object.
+
+    Raises:
+        HTTPError, URLError: If all attempts fail or a non-retryable error occurs.
+    """
+    req = Request(url, headers=headers or {}, method=method)
+
+    for attempt in range(retries):
+        try:
+            return urlopen(req, context=SSL_CONTEXT, timeout=timeout)
+
+        except HTTPError as exc:
+            if exc.code not in RETRYABLE_HTTP_CODES or attempt == retries - 1:
+                raise
+
+        except URLError:
+            if attempt == retries - 1:
+                raise
+
+        time.sleep(2 ** attempt)  # exponential backoff
 
 
 def github_to_api_contents(url: str) -> str | None:
@@ -15,6 +67,9 @@ def github_to_api_contents(url: str) -> str | None:
 
     Args:
         url: The GitHub URL to convert.
+
+    Returns:
+        The corresponding GitHub contents API URL, or None if the URL is not recognized.
     """
     m = re.match(r"^https://github\.com/([^/]+)/([^/]+)/(?:blob|tree)/([^/]+)/(.*)$", url)
     if not m:
@@ -23,98 +78,148 @@ def github_to_api_contents(url: str) -> str | None:
     return f"https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={ref}"
 
 
-
 def github_blob_to_raw(url: str) -> str:
     """
-    Convert GitHub web URLs to raw file URLs when needed.
+    Convert GitHub web blob URLs to raw file URLs when needed.
+
     Supports:
       - https://github.com/<owner>/<repo>/blob/<ref>/<path>
-      - https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path> (already raw)
+      - https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
 
     Args:
         url: The GitHub URL to convert.
+
+    Returns:
+        A raw GitHub URL if conversion is possible, otherwise the original URL.
     """
     if url.startswith("https://raw.githubusercontent.com/"):
         return url
     if url.startswith("https://github.com/") and "/blob/" in url:
-        return url.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/")
-    return url  # assume user already provided a direct download URL
+        return (
+            url.replace("https://github.com/", "https://raw.githubusercontent.com/")
+            .replace("/blob/", "/")
+        )
+    return url
 
 
-def get_github_remote_file_size(url: str, timeout: int = 20, github_token: str | None = None) -> int:
+def get_github_remote_file_size(
+    url: str,
+    timeout: float = 20.0,
+    retries: int = 3,
+    github_token: str | None = None,
+) -> int:
     """
-    Get the size of a remote file on GitHub in bytes without downloading it.
-    Tries multiple methods for robustness:
+    Get the size of a remote GitHub file in bytes without downloading it.
+
+    Tries, in order:
+      1. GitHub contents API
+      2. HEAD request on raw URL
+      3. Range GET fallback on raw URL
 
     Args:
-        url: The GitHub URL of the file (can be a blob/tree URL or raw URL)
-        timeout: Timeout in seconds for network requests
-        github_token: Optional GitHub token for authenticated requests (can help with rate limits)
+        url: GitHub file URL (blob/tree/raw/direct).
+        timeout: Timeout in seconds for each request attempt.
+        retries: Number of attempts for each network operation.
+        github_token: Optional GitHub token.
 
     Returns:
-        The size of the remote file in bytes.
+        The file size in bytes, or 0 if it cannot be determined.
     """
-    # 1) Prefer GitHub API if it looks like a GitHub blob/tree link
     api_url = github_to_api_contents(url)
     if api_url:
-        headers = {"Accept": "application/vnd.github+json"}
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "python-urllib",
+        }
         if github_token:
             headers["Authorization"] = f"Bearer {github_token}"
-        r = requests.get(api_url, headers=headers, timeout=timeout)
-        if r.ok:
-            js = r.json()
-            if isinstance(js, dict) and js.get("type") == "file" and "size" in js:
-                return int(js["size"])
-        # If API fails, try raw URL next
 
-    # 2) If it's a GitHub blob URL, switch to raw for HTTP size checks
-    raw_url = github_blob_to_raw(url) or url
+        try:
+            with _open(
+                api_url,
+                method="GET",
+                headers=headers,
+                timeout=timeout,
+                retries=retries,
+            ) as response:
+                if 200 <= response.status < 300:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    if (
+                        isinstance(payload, dict)
+                        and payload.get("type") == "file"
+                        and "size" in payload
+                    ):
+                        return int(payload["size"])
+        except (URLError, HTTPError, ValueError, json.JSONDecodeError):
+            pass
 
-    # 3) HEAD
-    r = requests.head(raw_url, allow_redirects=True, timeout=timeout)
-    cl = r.headers.get("Content-Length")
-    if r.ok and cl and cl.isdigit():
-        return int(cl)
+    raw_url = github_blob_to_raw(url)
+    headers = {"User-Agent": "python-urllib"}
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
 
-    # 4) Range GET fallback
-    r = requests.get(raw_url, headers={"Range": "bytes=0-0"}, allow_redirects=True, timeout=timeout)
-    cr = (r.headers.get("Content-Range") or "").strip()
-    if "/" in cr:
-        total = cr.split("/")[-1].strip()
-        if total.isdigit():
-            return int(total)
+    try:
+        with _open(
+            raw_url,
+            method="HEAD",
+            headers=headers,
+            timeout=timeout,
+            retries=retries,
+        ) as response:
+            cl = response.headers.get("Content-Length")
+            if 200 <= response.status < 300 and cl and cl.isdigit():
+                return int(cl)
+    except (URLError, HTTPError):
+        pass
 
-    cl = r.headers.get("Content-Length")
-    if cl and cl.isdigit():
-        return int(cl)
+    range_headers = dict(headers)
+    range_headers["Range"] = "bytes=0-0"
 
-    return 0  # Could not determine size, return 0 as a fallback
+    try:
+        with _open(
+            raw_url,
+            method="GET",
+            headers=range_headers,
+            timeout=timeout,
+            retries=retries,
+        ) as response:
+            content_range = (response.headers.get("Content-Range") or "").strip()
+            if "/" in content_range:
+                total = content_range.split("/")[-1].strip()
+                if total.isdigit():
+                    return int(total)
 
+            cl = response.headers.get("Content-Length")
+            if cl and cl.isdigit():
+                return int(cl)
+    except (URLError, HTTPError):
+        pass
+
+    return 0
 
 
 def github_to_raw(url: str) -> str:
     """
-    Convert GitHub web URLs to raw file URLs:
-      - https://github.com/<owner>/<repo>/blob/<ref>/<path>
-      - https://github.com/<owner>/<repo>/tree/<ref>/<path>   (user sometimes links files this way)
-    -> https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
+    Convert GitHub web URLs to raw file URLs.
 
-    Args:        
+    Supports:
+      - https://github.com/<owner>/<repo>/blob/<ref>/<path>
+      - https://github.com/<owner>/<repo>/tree/<ref>/<path>
+
+    Args:
         url: The GitHub URL to convert.
 
     Returns:
-        str: The raw.githubusercontent.com URL if it was a recognized GitHub URL, otherwise returns the original URL.
-
+        The raw.githubusercontent.com URL if recognized, otherwise the original URL.
     """
     if url.startswith("https://raw.githubusercontent.com/"):
         return url
 
     m = re.match(r"^https://github\.com/([^/]+)/([^/]+)/(?:blob|tree)/([^/]+)/(.*)$", url)
     if not m:
-        return url  # assume already a direct download URL
+        return url
     owner, repo, ref, path = m.groups()
     return f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}"
-
 
 
 def filename_from_url(url: str) -> str:
@@ -122,53 +227,67 @@ def filename_from_url(url: str) -> str:
     Extract the filename from a URL.
 
     Args:
-        url: The URL to extract the filename from.
+        url: The URL to inspect.
 
     Returns:
-        The filename extracted from the URL, or "downloaded_file" if it cannot be determined
+        The filename, or 'downloaded_file' if none is found.
     """
     path = urlparse(url).path
     return Path(unquote(path)).name or "downloaded_file"
 
 
-
-def download_github_file(url: str, out_path: str | Path, github_token: str | None = None, timeout: int = 30) -> Path:
+def download_github_file(
+    url: str,
+    out_path: str | Path,
+    github_token: str | None = None,
+    timeout: float = 30.0,
+    retries: int = 3,
+) -> Path:
     """
-    Download a file from GitHub, supporting both blob/tree URLs and raw URLs.
-    If the output path is a directory, the filename will be inferred from the URL.
+    Download a file from GitHub, supporting blob/tree/raw URLs.
+
+    If out_path is a directory, the filename is inferred from the URL.
 
     Args:
-        url: The GitHub URL of the file to download (can be a blob/tree URL or raw URL)
-        out_path: The local output path (file or directory)
-        github_token: Optional GitHub token for authenticated requests
-        timeout: Timeout in seconds for network requests
-
+        url: GitHub file URL.
+        out_path: Output file path or directory.
+        github_token: Optional GitHub token.
+        timeout: Timeout in seconds for each request attempt.
+        retries: Number of attempts.
     Returns:
-        The path to the downloaded file.
+        Path to the downloaded file.
     """
     out_path = Path(out_path)
     raw_url = github_to_raw(url)
 
-    # If user passed a directory, append filename
     if out_path.exists() and out_path.is_dir():
         out_file = out_path / filename_from_url(raw_url)
     elif str(out_path).endswith(("/", "\\")) or out_path.suffix == "":
-        # Treat paths with no suffix as directories to be safe
         out_path.mkdir(parents=True, exist_ok=True)
         out_file = out_path / filename_from_url(raw_url)
     else:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_file = out_path
 
-    headers = {}
+    headers = {"User-Agent": "python-urllib"}
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
 
-    with requests.get(raw_url, headers=headers, stream=True, timeout=timeout) as r:
-        r.raise_for_status()
+    with _open(
+        raw_url,
+        method="GET",
+        headers=headers,
+        timeout=timeout,
+        retries=retries,
+    ) as response:
+        if not (200 <= response.status < 300):
+            raise HTTPError(raw_url, response.status, "Download failed", response.headers, None)
+
         with open(out_file, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
-                if chunk:
-                    f.write(chunk)
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
 
     return out_file
