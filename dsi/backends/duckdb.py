@@ -43,12 +43,12 @@ class DuckDB(Filesystem):
     """
     runTable = False
 
-    def __init__(self, filename):
+    def __init__(self, filename, **kwargs):
         """
         Initializes a DuckDB backend with a user inputted filename, and creates other internal variables
         """
         self.filename = filename
-        self.con = duckdb.connect(filename)
+        self.con = duckdb.connect(filename, **kwargs)
         self.cur = self.con.cursor()
         self.runTable = DuckDB.runTable
         
