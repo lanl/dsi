@@ -7,9 +7,6 @@ class Webserver(Backend):
     FLOAT = "FLOAT"
     INT = "INT"
 
-    # Declare store types
-    NDP_STORE = "ndp"
-
     def __init__(self) -> None:
         # Need to define webserver generic-all input
         pass
