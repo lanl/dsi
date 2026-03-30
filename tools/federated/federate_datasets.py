@@ -1,5 +1,6 @@
 import sys
 import uuid
+from git import db
 import yaml
 from pathlib import Path
 
@@ -65,6 +66,199 @@ def make_db_info(location_type:str, path:str, local_path:str, db_name:str) -> di
 
 
 
+def pull_data(location_type: str, 
+              location: str, 
+              path: str, 
+              abs_path_workspace_folder: str, 
+              host_username: dict,
+              download_limit: int) -> dict | None:
+    """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "URL", "local"). 
+    The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
+    It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
+
+    Args:
+        location_type (str): The type of the original location (e.g., "github", "HPC", "URL", "local").
+        location (str): The location of the database (e.g., hostname for HPC, URL for web).
+        path (str): The path to the database at the original location.
+        abs_path_workspace_folder (str): The absolute path to the workspace folder where the database will be stored.
+        host_username (dict): A dictionary mapping hostnames to usernames for HPC access.
+        download_limit (int): The maximum size of a file that can be downloaded without confirmation.
+    Returns:
+        dict | None: A dictionary containing the database information if the data was successfully pulled, or None if there was an error or if the user chose to skip the download.
+    """
+
+    cleaned_location_type = location_type.strip().lower()
+    filename = get_last_part(path)
+
+    # Create folder for data        
+    _, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
+
+    # Get the absolute path to the file to be downloaded
+    file_path = Path(abs_path_db_folder) / filename
+
+
+    # Compute the MD5 hash of the existing file if it exists
+    md5_file_hash = ""
+    if file_path.exists():
+        md5_file_hash = compute_md5(str(file_path))
+
+    print(f"\n\n - Processing database at {location_type}:{location}:{path}")
+
+
+    if cleaned_location_type == "github":
+        
+        # Check if the file exists and get its size
+        filesize = 0
+        try:
+            filesize = get_github_remote_file_size(path)
+        except Exception:
+            print(f" -- Could not access the file at {path}. Skipping this database.")
+            return None
+
+        # Confirm for sizes above a limit
+        if not confirm_large_download(filesize, download_limit):
+            print(" -- Skipping this database.")
+            return None
+
+        # Download the file
+        try:
+            download_github_file(url=path, out_path=abs_path_db_folder)
+
+            db_info = make_db_info(location, path, file_path, filename)
+            return db_info
+            
+        except Exception as e:
+            print(f" -- Error downloading file from GitHub: {e}. Skipping this database.")
+            return None
+        
+
+    elif cleaned_location_type == "hpc":
+
+        # Ask for username if we don't have it for this host yet
+        if location not in host_username:
+            try:
+                username = input(f" -- Enter the username for {location}: ")
+                host_username[location] = username
+            except KeyboardInterrupt:
+                print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+                return None
+        else:
+            username = host_username[location]
+
+        
+        # Check if the file exists and get its size
+        filesize = 0
+        try:
+            filesize = ssh_remote_size_bytes_interactive(
+                remote=f"{username}@{location}",
+                remote_path=path
+            )
+        except KeyboardInterrupt:
+            print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+            return None
+        except FileNotFoundError as e:
+            print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+            return None
+        except Exception as e:
+            print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+            return None
+
+
+        # Check if the file already exists and has the same hash as the remote file
+        if md5_file_hash != "":
+
+            need_redownload = True
+            try:
+                need_redownload = should_download(
+                    remote=f"{username}@{location}",
+                    remote_path=path,
+                    stored_md5=md5_file_hash
+                )
+            except KeyboardInterrupt:
+                print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+                return None
+            except Exception as e:
+                print(f" -- Failed to get remote hash for {location}:{path}: {e}")
+                print(" -- Will proceed to download the file to ensure we have the correct version.")
+            if not need_redownload:
+                print(" -- Local file is up to date with the remote file. Skipping download.")
+                return None
+
+        # Confirm for sizes above a limit
+        if not confirm_large_download(filesize, download_limit):
+            print(" -- Skipping this database.")
+            return None
+
+        # Download the file
+        try:
+            rsync_download_interactive(
+                remote=f"{username}@{location}",
+                remote_path=path,
+                local_path=abs_path_db_folder
+            )
+
+            db_info = make_db_info(location, path, file_path, filename)
+            return db_info
+
+        except KeyboardInterrupt:
+            print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+            return None
+        except Exception as e:
+            print(f" -- Error {e} downloading file from HPC. Skipping this database.")
+            return None
+        
+
+    elif cleaned_location_type == "url":
+
+        filesize = 0
+        try:
+            filesize = get_url_file_size(path)
+        except Exception:
+            print(f" -- Could not access the file at {path}. Skipping this database.")
+            return None
+
+        # Confirm for sizes above a limit
+        if not confirm_large_download(filesize, download_limit):
+            print(" -- Skipping this database.")
+            return None
+
+        # Download the file
+        try:
+            download_web_file(url=path, output_dir=abs_path_db_folder)
+
+            db_info = make_db_info(location, path, file_path, filename)
+            return db_info
+
+        except Exception as e:
+            print(f" -- Error {e} downloading file at {path}. Skipping this database.")
+            return None
+    
+
+    elif cleaned_location_type == "local":
+        # Check if the file exists
+        if not Path(path).exists():
+            print(f" -- Local file {path} does not exist. Skipping this database.")
+            return None
+
+        # Check if it's a file
+        if not Path(path).is_file():
+            print(f" -- Local path {path} is not a file. Skipping this database.")
+            return None
+
+
+        _abs_path = str(Path(path).resolve())
+        db_info = make_db_info(location, _abs_path, _abs_path, filename)
+        return db_info
+
+
+    else:
+        print(f"Location type {location_type} for database {db} is unsupported. Skipping.")
+
+    return None
+
+    
+
+
 def federate_datasets(workspace_folder: str, config_data: dict) -> None:
     """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
       It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
@@ -94,8 +288,6 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
         else:
             print(f"Unsupported repository type for {repo}. Only CSV files are supported for local repositories. Skipping this repo.")
 
-
-
     
     # Remove duplicates while keeping the latest entry for each unique path
         # TODO: Allow the user to choose which one to keep instead of just keeping the 
@@ -119,192 +311,19 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
     # Gather the databases and create the index database
     success_counter = 0
     for db in cleaned_db_catalogue_list:
-        #TODO: add retries and timeouts for all downloads
 
-        location_type = db['location_type']
-        cleaned_location_type = location_type.strip().lower()
-        location = db['location']
-        path = db['path']
-        filename = get_last_part(path)
+        db_info = pull_data(
+            location_type=db['location_type'],
+            location=db['location'],
+            path=db['path'],
+            abs_path_workspace_folder=abs_path_workspace_folder,
+            host_username=host_username,
+            download_limit=config_data["download_limit"]
+        )
 
-        # Create folder for data        
-        _, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
-
-        # Get the absolute path to the file to be downloaded
-        file_path = Path(abs_path_db_folder) / filename
-
-
-        # Compute the MD5 hash of the existing file if it exists
-        md5_file_hash = ""
-        if file_path.exists():
-            md5_file_hash = compute_md5(str(file_path))
-
-        print(f"\n\n - Processing database at {location_type}:{location}:{path}")
-
-
-        if cleaned_location_type == "github":
-            
-            # Check if the file exists and get its size
-            filesize = 0
-            try:
-                filesize = get_github_remote_file_size(path)
-            except Exception:
-                print(f" -- Could not access the file at {path}. Skipping this database.")
-                continue
-
-
-            # Confirm for sizes above a limit
-            if not confirm_large_download(filesize, config_data["download_limit"]):
-                print(" -- Skipping this database.")
-                continue
-
-
-            # Download the file
-            try:
-                download_github_file(url=path, out_path=abs_path_db_folder)
-
-                db_info = make_db_info(location, path, file_path, filename)
-                database_info.append(db_info)
-                success_counter += 1
-                
-            except Exception as e:
-                print(f" -- Error downloading file from GitHub: {e}")
-                continue
-            
-
-
-        elif cleaned_location_type == "hpc":
-
-            # Ask for username if we don't have it for this host yet
-            if location not in host_username:
-                try:
-                    username = input(f" -- Enter the username for {location}: ")
-                except KeyboardInterrupt:
-                    print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
-                    continue
-                host_username[location] = username
-            else:
-                username = host_username[location]
-
-            
-            # Check if the file exists and get its size
-            filesize = 0
-            try:
-                filesize = ssh_remote_size_bytes_interactive(
-                    remote=f"{username}@{location}",
-                    remote_path=path
-                )
-            except KeyboardInterrupt:
-                print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-                continue
-            except FileNotFoundError as e:
-                print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-                continue
-            except Exception as e:
-                print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-                continue
-
-
-            # Check if the file already exists and has the same hash as the remote file
-            if md5_file_hash != "":
-
-                need_redownload = True
-                try:
-                    need_redownload = should_download(
-                        remote=f"{username}@{location}",
-                        remote_path=path,
-                        stored_md5=md5_file_hash
-                    )
-                except KeyboardInterrupt:
-                    print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-                    continue
-                except Exception as e:
-                    print(f" -- Failed to get remote hash for {location}:{path}: {e}")
-                    print(" -- Will proceed to download the file to ensure we have the correct version.")
-
-                if not need_redownload:
-                    print(" -- Local file is up to date with the remote file. Skipping download.")
-                    continue
-
-
-            # Confirm for sizes above a limit
-            if not confirm_large_download(filesize, config_data["download_limit"]):
-                print(" -- Skipping this database.")
-                continue
-
-
-            # Download the file
-            try:
-                rsync_download_interactive(
-                    remote=f"{username}@{location}",
-                    remote_path=path,
-                    local_path=abs_path_db_folder
-                )
-
-                db_info = make_db_info(location, path, file_path, filename)
-                database_info.append(db_info)
-                success_counter += 1
-
-            except KeyboardInterrupt:
-                print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-                continue
-            except Exception as e:
-                print(f" -- Error {e} downloading file from HPC. Skipping this database.")
-                continue
-            
-
-
-        elif cleaned_location_type == "url":
-
-            filesize = 0
-            try:
-                filesize = get_url_file_size(path)
-            except Exception:
-                print(f" -- Could not access the file at {path}. Skipping this database.")
-                continue
-
-
-            # Confirm for sizes above a limit
-            if not confirm_large_download(filesize, config_data["download_limit"]):
-                print(" -- Skipping this database.")
-                continue
-
-
-            # Download the file
-            try:
-                download_web_file(url=path, output_dir=abs_path_db_folder)
-
-                db_info = make_db_info(location, path, file_path, filename)
-                database_info.append(db_info)
-                success_counter += 1
-
-            except Exception as e:
-                print(f" -- Error {e} downloading file at {path}. Skipping this database.")
-                continue
-        
-
-
-        elif cleaned_location_type == "local":
-            # Check if the file exists
-            if not Path(path).exists():
-                print(f" -- Local file {path} does not exist. Skipping this database.")
-                continue
-
-            # Check if it's a file
-            if not Path(path).is_file():
-                print(f" -- Local path {path} is not a file. Skipping this database.")
-                continue
-
-            _abs_path = str(Path(path).resolve())
-            db_info = make_db_info(location, _abs_path, _abs_path, filename)
+        if db_info is not None:
             database_info.append(db_info)
             success_counter += 1
-
-
-        else:
-            print(f"Location type {location_type} for database {db} is unsupported. Skipping.")
-            continue
-
 
 
     # Save host_usernames to a file for future runs
