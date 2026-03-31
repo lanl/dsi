@@ -50,10 +50,7 @@ class Sqlite(Filesystem):
         Initializes a SQLite backend with a user inputted filename, and creates other internal variables
         """
         self.filename = filename
-        if 'kwargs' in kwargs:
-            self.con = sqlite3.connect(filename, **kwargs['kwargs'])
-        else:
-            self.con = sqlite3.connect(filename)
+        self.con = sqlite3.connect(filename, **kwargs)
         self.cur = self.con.cursor()
         self.runTable = Sqlite.runTable
         self.sqlite_keywords = ["ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE", "AND", "AS", "ASC", "ATTACH", 

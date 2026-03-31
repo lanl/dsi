@@ -6,6 +6,7 @@ import os
 from contextlib import redirect_stdout
 import io
 import math
+import ast
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -21,20 +22,22 @@ class DSI():
         """
         Initializes DSI by activating a backend for data operations; default is a Sqlite backend for temporary data analysis.
         If users specify `filename`, data is saved to a permanent backend file.
-        Can now call read(), find(), update(), query(), write() or any backend printing operations
 
-        `filename` : str, optional
+        `filename` : str, optional, default is ".temp_dsi.db"
             If not specified, a temporary, hidden backend file is created for users to analyze their data.
             If specified and backend file already exists, it is activated for a user to explore its data.
             If specified and backend file does not exist, a file with this name is created.
             
-            Accepted file extensions:
+            Accepted file extensions for DSI-compatible backends:
                 - If backend_name = "Sqlite" → .db, .sqlite, .sqlite3
                 - If backend_name = "DuckDB" → .duckdb, .db
             
-        `backend_name` : str, optional
-            Name of the backend to activate. Must be either "Sqlite" or "DuckDB".
-            Default is "Sqlite".
+        `backend_name` : str, optional, default is "Sqlite".
+            Name of the backend to activate. 
+            
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB".
+            
+            If using an external backend, provide the relative path to the Python module with the backend. 
         """
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
@@ -52,28 +55,73 @@ class DSI():
         if filename == ".temp_dsi.db" and os.path.exists(filename):
             os.remove(filename)
 
-        if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
-            file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-            if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
-                filename += ".db"
-        elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
-            file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-            if file_extension.lower() not in ["db", "duckdb"]:
-                filename += ".db"
-        self.database_name = filename
+        if backend_name.endswith(".py"):
+            if not os.path.exists(backend_name):
+                raise RuntimeError("backend() ERROR: `backend_name` must be a valid filepath to the custom backend. Please check again.")
+            
+            self.database_name = filename
 
-        try:
-            if backend_name.lower() == 'sqlite':
-                self.t.load_module('backend','Sqlite','back-write', filename=filename, kwargs = kwargs)
-            elif backend_name.lower() == 'duckdb':
-                self.t.load_module('backend','DuckDB','back-write', filename=filename)
-            else:
-                print("Please check the 'backend_name' argument as that one is not supported by DSI")
-                print("Eligible backend_names are: Sqlite, DuckDB")
-        except Exception as e:
-            if e.args:
-                e.args = (f'backend ERROR: {str(e.args[0])}',)
-            raise
+            parsed_data = None
+            try:
+                with open(backend_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=backend_name)
+            except Exception:
+                raise RuntimeError("backend() Error: Could not read the Python file with the external backend.")
+            
+            class_name = None
+            init_params = []
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    if "__init__" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name is None:
+                raise RuntimeError("backend() Error: The external backend must be structured as a Class in the Python script.")
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = filename
+
+            try:
+                external_backend_name = os.path.splitext(os.path.basename(backend_name))[0]
+                self.t.add_external_python_module('backend', external_backend_name, backend_name)
+                self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
+            except Exception as e:
+                if e.args:
+                    e.args = (f'backend() ERROR: {str(e.args[0])}',)
+                raise
+
+        else:
+            if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
+                    filename += ".db"
+            elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
+                file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                if file_extension.lower() not in ["db", "duckdb"]:
+                    filename += ".db"
+            self.database_name = filename
+
+            try:
+                if backend_name.lower() == 'sqlite':
+                    self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                elif backend_name.lower() == 'duckdb':
+                    self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                else:
+                    print("Please check the 'backend_name' argument as that one is not supported by DSI")
+                    print("Eligible backend_names are: Sqlite, DuckDB")
+            except Exception as e:
+                if e.args:
+                    e.args = (f'backend ERROR: {str(e.args[0])}',)
+                raise
 
         self.main_backend_obj = self.t.loaded_backends[0]
         if filename != ".temp_dsi.db":
@@ -224,7 +272,6 @@ class DSI():
             if not os.path.exists(reader_name):
                 raise RuntimeError("read() ERROR: `reader_name` must be a valid filepath to the custom Reader. Please check again.")
 
-            import ast
             parsed_data = None
             try:
                 with open(reader_name, "r", encoding="utf-8") as external_reader:
