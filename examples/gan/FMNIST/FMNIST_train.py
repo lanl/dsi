@@ -14,6 +14,7 @@ def FMNIST_train(pathToGenerator, pathToDiscriminator, pathToDB, columnsofIntere
         imageDF = dataframe.drop(dataframe.columns[0], axis = 1)
         imgData = imageDF.values # extract array of values from df
         width = height = 28
+        
         images = gWorkflow.shape_images(imgData, width, height)
         images = gWorkflow.format_images(images)
 

@@ -1,13 +1,15 @@
 import os
 import pandas as pd 
 import numpy as np
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+import tensorflow as tf
 
 from enum import Enum
 from PIL import Image
 from scipy.linalg import sqrtm
 
-from tensorflow.keras.optimizers import *
-from tensorflow.keras.losses import *
+# from tensorflow.keras.optimizers import *
+# from tensorflow.keras.losses import *
 
 from dsi.backends.sqlite import Sqlite, DataType
 
@@ -289,15 +291,15 @@ class GAN:
         for epoch in range(epochs):
             print("Epoch ", epoch)
 
-            iter = 0
-            for imageBatch in trainDataset:
-                print("batch", iter)
+            # iter = 0
+            for batch_idx, imageBatch in enumerate(trainDataset):
+                print("batch", batch_idx)
                 dLoss, gLoss, realOutput, fakeOutput = train_step(imageBatch)
                 self.dLosses.append(dLoss)
                 self.gLosses.append(gLoss)
                 dAccuracy = (realOutput + (1.0 - fakeOutput) / 2.0)
                 self.dAccuracies.append(dAccuracy)
-                iter = iter + 1
+                # iter = iter + 1
 
             self.epochsTrained = epoch
 
