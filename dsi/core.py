@@ -1016,11 +1016,16 @@ class Terminal():
         if collection:
             return [t[0] for t in table_list]
         else:
-            for table in table_list:
-                print(f"\nTable: {table[0]}")
-                print(f"  - num of columns: {table[1]}")
-                print(f"  - num of rows: {table[2]}")
-            print()
+            if all(isinstance(t, tuple) for t in table_list):
+                for table in table_list:
+                    print(f"\nTable: {table[0]}")
+                    print(f"  - num of columns: {table[1]}")
+                    print(f"  - num of rows: {table[2]}")
+                print()
+            else:
+                for table in table_list:
+                    print(f"\nTable: {table}")
+                print()
 
     def summary(self, table_name = None, collection = False):
         """
@@ -1409,6 +1414,8 @@ class Terminal():
                 valid = True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 valid = True
+        elif parent_name == "Webserver":
+            valid = True # NEED TO UPDATE THIS CHECK WHEN WE HAVE A WEB SERVER BACKEND
         return valid
 
     # Internal function that returns if a user can create a file/db in a specified location
