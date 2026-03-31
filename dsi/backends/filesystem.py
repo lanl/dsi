@@ -48,6 +48,10 @@ class Backend(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def close(self):
+        pass
+
+    @abstractmethod
     def find_relation(self, column_name, relation, kwargs):
         pass
 
