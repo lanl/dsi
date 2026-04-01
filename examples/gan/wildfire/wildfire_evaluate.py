@@ -17,8 +17,8 @@ def wildfire_evaluate(pathToGenerator, pathToDB, dataColumnsofInterest, imagesCo
         # # extract label columns. not used here, can be used with conditional GANS
         # label_dataframe = gWorkflow.extract_DB_columns(dataColumnsofInterest, dbName) 
         
-        # extract images from column of urls
-        imageArray = gWorkflow.extract_images_from_url(imagesColumnOfInterest, dbName, pathPrefix)
+        # extract images from column of paths
+        imageArray = gWorkflow.extract_images_from_path(imagesColumnOfInterest, dbName, pathPrefix)
         width = height = 64
         images = gWorkflow.shape_images(imageArray, width, height)
         images = gWorkflow.format_images(images)
