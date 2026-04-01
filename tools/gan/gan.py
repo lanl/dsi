@@ -68,9 +68,8 @@ class GAN:
                     
                     self.imageArray = np.array(images)
                 else:
-                    # CHECK: is it supposed to be all columns, or all except the first one (label)?
-                    # CHECK: is it supposed to be all columns, or all except the first one (label)?
                     table_df = store.get_table(dbName, True)
+                    # column 0 corresponds to the labels so drop it
                     imageDF = table_df.drop(table_df.columns[0], axis = 1)
                     self.imageArray = imageDF.values # extract array of values from df
             except Exception as e:
