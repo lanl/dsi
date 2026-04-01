@@ -96,7 +96,7 @@ class DSI():
                 self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
             except Exception as e:
                 if e.args:
-                    e.args = (f'backend() ERROR: {str(e.args[0])}',)
+                    e.args = (f'backend() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
         else:
@@ -120,7 +120,7 @@ class DSI():
                     print("Eligible backend_names are: Sqlite, DuckDB")
             except Exception as e:
                 if e.args:
-                    e.args = (f'backend ERROR: {str(e.args[0])}',)
+                    e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
         self.main_backend_obj = self.t.loaded_backends[0]
@@ -167,7 +167,7 @@ class DSI():
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
                     if e.args:
-                        e.args = (f'schema() ERROR: {str(e.args[0])}',)
+                        e.args = (f'schema() ERROR: {str(e.args[0])}',) + e.args[1:]
                     raise
                 self.t.active_metadata = OrderedDict()
                 self.schema_read = False
@@ -308,7 +308,7 @@ class DSI():
                 self.t.load_module('plugin', class_name, 'reader', **updated, **kwargs)
             except Exception as e:
                 if e.args:
-                    e.args = (f'read() ERROR: {str(e.args[0])}',)
+                    e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
         else:
@@ -357,7 +357,7 @@ class DSI():
                                        "                            View eligible readers in the output of `list_readers()`")
             except Exception as e:
                 if e.args:
-                    e.args = (f'read() ERROR: {str(e.args[0])}',)
+                    e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
         table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
@@ -372,7 +372,7 @@ class DSI():
                     self.t.artifact_handler(interaction_type='ingest')
                 except Exception as e:
                     if e.args:
-                        e.args = (f'read() ERROR: {str(e.args[0])}',)
+                        e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
                     raise
                 self.t.active_metadata = OrderedDict()
                 self.schema_read = False
@@ -383,7 +383,7 @@ class DSI():
                 self.t.artifact_handler(interaction_type='ingest')
             except Exception as e:
                 if e.args:
-                    e.args = (f'read() ERROR: {str(e.args[0])}',)
+                    e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
             self.t.active_metadata = OrderedDict()
 
@@ -479,7 +479,7 @@ class DSI():
             df = self.t.get_table(table_name)
         except Exception as e:
             if e.args:
-                e.args = (f'get_table() ERROR: {str(e.args[0])}',)
+                e.args = (f'get_table() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
         if df.empty:
@@ -554,7 +554,7 @@ class DSI():
             output = f.getvalue()
         except Exception as e:
             if e.args:
-                e.args = (f'find() ERROR: {str(e.args[0]).replace("query_object", "query")}',)
+                e.args = (f'find() ERROR: {str(e.args[0]).replace("query_object", "query")}',) + e.args[1:]
             raise 
         
         if output and "WARNING" in output:
@@ -624,7 +624,7 @@ class DSI():
                 find_col = self.t.find_column(query)
         except Exception as e:
             if e.args:
-                e.args = (f'search() ERROR: {str(e.args[0])}',)
+                e.args = (f'search() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
         
         if find_cell is None and find_col is None and find_table is None:
@@ -761,7 +761,7 @@ class DSI():
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             if e.args:
-                e.args = (f'update() ERROR: {str(e.args[0])}',)
+                e.args = (f'update() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
     def list_writers(self):
@@ -833,7 +833,7 @@ class DSI():
                 self.t.artifact_handler(interaction_type='process')
             except Exception as e:
                 if e.args:
-                    e.args = (f'write() ERROR: {str(e.args[0])}',)
+                    e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
         if writer_name.endswith(".py"):
@@ -877,7 +877,7 @@ class DSI():
                 self.t.load_module('plugin', class_name, 'writer', **updated, **kwargs)
             except Exception as e:
                 if e.args:
-                    e.args = (f'write() ERROR: {str(e.args[0])}',)
+                    e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
         else:
             try:
@@ -894,14 +894,14 @@ class DSI():
                                        "                             View eligible readers in the output of `list_writers()`")
             except Exception as e:
                 if e.args:
-                    e.args = (f'write() ERROR: {str(e.args[0])}',)
+                    e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
         
         try:
             self.t.transload()
         except Exception as e:
             if e.args:
-                e.args = (f'write() ERROR: {str(e.args[0])}',)
+                e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
         self.t.active_metadata = OrderedDict()
@@ -929,7 +929,7 @@ class DSI():
             output = f.getvalue()
         except Exception as e:
             if e.args:
-                e.args = (f'list() ERROR: {str(e.args[0])}',)
+                e.args = (f'list() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
         
@@ -967,7 +967,7 @@ class DSI():
             output = f.getvalue()
         except Exception as e:
             if e.args:
-                e.args = (f'summary() ERROR: {str(e.args[0])}',)
+                e.args = (f'summary() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
         if collection:
@@ -987,7 +987,7 @@ class DSI():
             self.t.num_tables()
         except Exception as e:
             if e.args:
-                e.args = (f'num_tables() ERROR: {str(e.args[0])}',)
+                e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
     def display(self, table_name, num_rows = 25, display_cols = None):
@@ -1016,7 +1016,7 @@ class DSI():
             self.t.display(table_name, num_rows, display_cols)
         except Exception as e:
             if e.args:
-                e.args = (f'display() ERROR: {str(e.args[0])}',)
+                e.args = (f'display() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
     def close(self):
