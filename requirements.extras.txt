@@ -9,3 +9,5 @@ graphviz>=0.20.3
 duckdb>=1.2.0
 xmltodict>=0.14.2
 ruamel.yaml>=0.18.0
+pillow>=10.4.0
+scipy>=1.13.1

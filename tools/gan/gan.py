@@ -112,9 +112,9 @@ class GAN:
         if not model_dir: #if the directory is empty
             raise ValueError(f"Directory input empty")
         if not (Path(self.dataset_name) / model_dir).is_dir():
-            raise ValueError(f"Error: Model path is not a directory within {self.dataset_name}:", model_dir)
+            raise ValueError(f"Model path is not a directory within {self.dataset_name}:", model_dir)
         if modelType not in self.ModelType:
-            raise ValueError(f"Error: Invalid model type. Must be either ModelType.generator or ModelType.discriminator'")
+            raise ValueError(f"Invalid model type. Must be either ModelType.generator or ModelType.discriminator'")
         
         model_dir_path = Path(self.dataset_name) / model_dir
         modelPath = None
@@ -129,7 +129,7 @@ class GAN:
                 modelPath = str(match)
         
         if modelPath is None:
-            raise ValueError(f"Error: No model found in '{model_dir}' for the '{modelType.name}' type.")
+            raise ValueError(f"No model found in '{model_dir}' for the '{modelType.name}' type.")
         
         try:
             model = tf.keras.models.load_model(modelPath)
