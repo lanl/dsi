@@ -5,3 +5,9 @@
 sqlalchemy>=2.0.35
 scikit-learn>=1.7.0
 streamlit>=1.48.0
+
+# gan additions --> remove comment before merge
+keras>=3.4.1
+tensorflow>=2.16.2
+pillow>=10.4.0
+scipy>=1.13.1

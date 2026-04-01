@@ -8,10 +8,7 @@ from enum import Enum
 from PIL import Image
 from scipy.linalg import sqrtm
 
-# from tensorflow.keras.optimizers import *
-# from tensorflow.keras.losses import *
-
-from dsi.backends.sqlite import Sqlite, DataType
+from dsi.dsi import DSI
 
 class GAN:
 
@@ -27,11 +24,37 @@ class GAN:
         generator = 0
         discriminator = 1
 
-    def __init__(self):
+    def __init__(self, db_path: str, image_col: str = None, path_prefix: str = None):
         '''
         Constructor to create object for GAN functinality
         '''
-        pass
+        store = DSI(db_path, backend_name="SQLite")
+        tableNames = store.list(True)
+        dbName = tableNames[0]
+
+        try:
+            if image_col is not None:
+                if not isinstance(image_col, str):
+                    raise ValueError("Image Column input must be a string")
+                
+                all_paths = store.query(f"SELECT {image_col} FROM {dbName}", True)
+
+                images = []
+                for path in all_paths[image_col]:
+                    image_path = path
+                    image_path = os.path.join(path_prefix, path)
+                    if os.path.exists(image_path):
+                        images.append(Image.open(image_path).convert('L'))
+                    else:
+                        print("Warning: Image path does not exist:", image_path)
+                
+                self.imageArray = np.array(images)
+            else:
+                table_df = store.get_table(dbName, True)
+                imageDF = table_df.drop(table_df.columns[0], axis = 1)
+                self.imageArray = imageDF.values # extract array of values from df
+        except Exception as e:
+            raise ValueError("Error loading database:", str(e))
 
     def load_model(self, modelPath, modelType):
         '''
@@ -51,15 +74,12 @@ class GAN:
         try:
             model = tf.keras.models.load_model(modelPath)
         except:
-            print("Unable to open ML model")
-            return 0
+            raise ValueError(f"Unable to open ML model: {modelPath}")
 
         if modelType == self.ModelType.generator:
             self.generatorModel = model
         if modelType == self.ModelType.discriminator:
             self.discriminatorModel = model
-            
-        return 1
         
     # # check if there's a need for this    
     # def set_model(self, model):
@@ -81,13 +101,6 @@ class GAN:
         Model names are subscripted by 
         the number of epochs trained
         '''
-        # check folder path
-        if not folder: #if the path is empty
-            print("Error: Path to folder empty/not defined")
-            return 0
-        if not os.path.exists(folder): # if the path is incorrect
-            print("Folder does not exist, generated.", folder)
-            os.makedirs(folder)
 
         # save models to file if they are defined
         if self.generatorModel:
@@ -97,117 +110,7 @@ class GAN:
         if self.discriminatorModel:
             self.discriminatorModel.save(folder + "/dis_"+str(self.epochsTrained)+".keras")
         else:
-            print("Discriminator model not defined")            
-
-    def load_database(self, dbPath):
-        '''
-        Load DSI Sqlite database
-        Must be of type DSI Sqlite (for now)
-        '''
-        if not dbPath: #if the path is empty
-            print("Error: Path to database empty")
-            return 0
-        if not os.path.exists(dbPath): # if the path is incorrect
-            print("Error: Path does not exist:", dbPath)
-            return 0
-        if not dbPath.endswith('.db'): # if not a db file
-            print("Error: not of type DSI Sqlite DB")
-            return 0
-        try:
-            database = Sqlite(dbPath)
-        except:
-            print("Unable to open DSI Sqlite Database")
-            return 0
-        
-        self.database = database
-        return 1
-        
-    def get_database(self):
-        '''
-        Return DSI Sqlite database
-        Must be of type DSI Sqlite (for now)
-        '''        
-        if self.database:
-            return self.database
-
-    def close_database(self):
-        self.database.close()
-
-    def get_DB_names(self):
-        '''
-        Return DSI Sqlite database table names
-        Must be of type DSI Sqlite (for now)
-        '''
-        result = self.database.get_artifact_list()
-        dbNames =[name[0] for name in result]
-        # dbName = dbName[0]
-        return dbNames
-    
-    def extract_DB_columns(self, columnIndices, dbName):
-        '''
-        Return columns of interest (by column index)
-        as a Pandas dataframe
-        '''        
-        dataType = DataType()
-        dataType.name = dbName
-
-        # get all headers and then select those needed by index
-        query = "SELECT name FROM PRAGMA_TABLE_INFO('" + str(dataType.name) + "')"
-        headerResult = self.database.sqlquery(query)
-        columnNames = list(map(headerResult.__getitem__, columnIndices))
-
-        names = ""
-        for name in columnNames:
-            name = name[0]
-            names += name + ","
-        names = names[:-1]
-        # get the data from the needed columns and combine into a pandas dataframe
-        query = "SELECT " + names  + " FROM " + str(dataType.name) + ";"
-        result = self.database.sqlquery(query)
-        columnHeaders = [column[0] for column in columnNames]
-        dataframe = pd.DataFrame(result, columns=columnHeaders)
-       
-        return dataframe
-
-    def extract_images_from_url(self, imgColumnId, dbName, pathPrefix='./'):
-        '''
-        Given an integer that corresponds to the column with image url
-        Return np array of images following that url to image location
-        Optional path prefix allows to add relative path to those in url
-        '''
-        if not isinstance(imgColumnId, int):
-            print("Error: Column Id is not of type integer")
-            return 0
-        if not os.path.exists(pathPrefix):
-            print("Error: Path Prefix does not exist:", pathPrefix)
-            return 0
-        dataType = DataType()
-        dataType.name = dbName
-
-        # get all headers and then select those needed by index
-        query = "SELECT name FROM PRAGMA_TABLE_INFO('" + str(dataType.name) + "')"
-        headerResult = self.database.sqlquery(query)
-        columnNames = list(map(headerResult.__getitem__, [imgColumnId]))
-
-        name = columnNames[0][0]
-        # names = ""
-        # for name in columnNames:
-        #     name = name[0]
-        #     names += name + ","
-        # names = names[:-1]
-
-        # get the url data from the needed column
-        query = "SELECT " + name  + " FROM " + str(dataType.name) + ";"
-        result = self.database.sqlquery(query)
-
-        # extract the image data from the path
-        images = []
-        for url in result:
-            path = pathPrefix + url[0]
-            img = Image.open(path).convert('L') #future work: color img
-            images.append(img)
-
-        return np.array(images)
+            print("Discriminator model not defined")
 
 
     def shape_images(self, data, width, height):
@@ -242,6 +145,9 @@ class GAN:
     
     def get_discriminator_accuracies(self):
         return self.dAccuracies
+
+
+
 
     def train(self, trainData, epochs, batchSize, noiseDim):
         # format input data
@@ -303,22 +209,26 @@ class GAN:
 
             self.epochsTrained = epoch
 
+
+
+
     def predict(self, numImages, noiseDim):
-        if self.generatorModel:
+        try:
             seed = tf.random.normal([numImages, noiseDim])
             predictions = self.generatorModel(seed, training=False)
             return predictions
-        else:
-            print("Generator model is not set")
-            return None
-    
+        except Exception:
+            raise ValueError("Error generating images. Check if generator model is defined and trained.")
+
+
+
     def calculate_mse(self, imageA, imageB):
          '''
-    #     Mean Squared Error measure the difference between pixel intensisties of two images. 
-    #     In this implementation MSE measure the difference between the synthetic vs 
-    #     generated images using the GAN
-    #     Lower the error, better the MSE score.
-    #     '''
+        Mean Squared Error measure the difference between pixel intensisties of two images. 
+        In this implementation MSE measure the difference between the synthetic vs 
+        generated images using the GAN
+        Lower the error, better the MSE score.
+        '''
          if isinstance(imageA, tf.Tensor): # if images are tensor value, convert to numpy
              imageA = imageA.numpy()
          if isinstance(imageB, tf.Tensor): # if images are tensor value, convert to numpy
@@ -329,10 +239,10 @@ class GAN:
     
     def calculate_inception_score(self, images):
          '''
-    #     Inception Score measures the image quality of the generated images 
-    #     incorporating the difference of probabilities using KL Divergence
-    #     Images must be numpy aray of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples
-    #     '''
+        Inception Score measures the image quality of the generated images 
+        incorporating the difference of probabilities using KL Divergence
+        Images must be numpy aray of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples
+        '''
          images = images.reshape(images.shape[0], -1) # Flatten images
          images = images.astype('float32') / 255.0 # Normalize between [0,1]
     
@@ -350,9 +260,9 @@ class GAN:
     
     def calculate_fid(self, realImages, generatedImages):
         '''
-    #    Frechet Inception Distance measures the feature distance between the real and generated images
-    #    realImages and generatedImages must be numpy array of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples of images
-    #    '''
+       Frechet Inception Distance measures the feature distance between the real and generated images
+       realImages and generatedImages must be numpy array of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples of images
+       '''
         if isinstance(realImages, tf.Tensor): # if images are tensor value, convert to numpy
              realImages = realImages.numpy()
         if isinstance(generatedImages, tf.Tensor): # if images are tensor value, convert to numpy
