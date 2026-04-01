@@ -1,5 +1,4 @@
 import os
-import pandas as pd 
 import numpy as np
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -7,27 +6,34 @@ import tensorflow as tf
 from enum import Enum
 from PIL import Image
 from scipy.linalg import sqrtm
+import matplotlib.pyplot as plt
 
 from dsi.dsi import DSI
 
 class GAN:
-
-    generatorModel = None
-    discriminatorModel = None
-    database = None
-    epochsTrained = 0
-    dLosses = []
-    gLosses = []
-    dAccuracies = []
-
     class ModelType(Enum):
         generator = 0
         discriminator = 1
 
-    def __init__(self, db_path: str, image_col: str = None, path_prefix: str = None):
+    def __init__(self, db_path: str, image_col: str = None):
         '''
-        Constructor to create object for GAN functinality
+        GAN Constructor that loads and formats the image data from a database.
+        Image data is stored in self.imageArray - a numpy array of shape (N, HEIGHT, WIDTH, CHANNEL)
+
+        db_path: 
+            path to database file
+
+        image_col: 
+            Name of column in database that contains the image paths. 
+            If None, assumes all columns except the first one are pixel values of the images.        
         '''
+        self.generatorModel = None
+        self.discriminatorModel = None
+        self.epochsTrained = 0
+        self.dLosses = []
+        self.gLosses = []
+        self.dAccuracies = []
+
         store = DSI(db_path, backend_name="SQLite")
         tableNames = store.list(True)
         dbName = tableNames[0]
@@ -41,15 +47,15 @@ class GAN:
 
                 images = []
                 for path in all_paths[image_col]:
-                    image_path = path
-                    image_path = os.path.join(path_prefix, path)
-                    if os.path.exists(image_path):
-                        images.append(Image.open(image_path).convert('L'))
+                    if os.path.exists(path):
+                        images.append(Image.open(path).convert('L'))
                     else:
-                        print("Warning: Image path does not exist:", image_path)
+                        print("Warning: Image path does not exist:", path)
                 
                 self.imageArray = np.array(images)
             else:
+                # CHECK: is it supposed to be all columns, or all except the first one (label)?
+                # CHECK: is it supposed to be all columns, or all except the first one (label)?
                 table_df = store.get_table(dbName, True)
                 imageDF = table_df.drop(table_df.columns[0], axis = 1)
                 self.imageArray = imageDF.values # extract array of values from df
@@ -86,33 +92,14 @@ class GAN:
     #     check if model type if correct
     #     then self.model = model
 
-    def get_models(self):
-        '''
-        Return GAN models as 
-        a list: [generator, discriminator]
-        Models are of type '.keras' or None
-        '''        
-        return [self.generatorModel, self.discriminatorModel]
+    # def get_models(self):
+    #     '''
+    #     Return GAN models as 
+    #     a list: [generator, discriminator]
+    #     Models are of type '.keras' or None
+    #     '''        
+    #     return [self.generatorModel, self.discriminatorModel]
         
-    def save_models_to_file(self, folder):
-        '''
-        Save GAN models to file
-        Models are of type '.keras'
-        Model names are subscripted by 
-        the number of epochs trained
-        '''
-
-        # save models to file if they are defined
-        if self.generatorModel:
-            self.generatorModel.save(folder + "/gen_"+str(self.epochsTrained)+".keras")
-        else:
-            print("Generator model not defined")
-        if self.discriminatorModel:
-            self.discriminatorModel.save(folder + "/dis_"+str(self.epochsTrained)+".keras")
-        else:
-            print("Discriminator model not defined")
-
-
     def shape_images(self, data, width, height):
         '''
         From a numpy array, shape images from pixel columns
@@ -134,22 +121,10 @@ class GAN:
         # images = images * 2 - 1.
         return images
     
-    def get_epochs_trained(self):
-        return self.epochsTrained
+    # def get_epochs_trained(self):
+    #     return self.epochsTrained
 
-    def get_discriminator_losses(self):
-        return self.dLosses
-    
-    def get_generator_losses(self):
-        return self.gLosses
-    
-    def get_discriminator_accuracies(self):
-        return self.dAccuracies
-
-
-
-
-    def train(self, trainData, epochs, batchSize, noiseDim):
+    def train(self, trainData: np.ndarray, epochs: int, batchSize: int, noiseDim: int):
         # format input data
         trainDataset = tf.data.Dataset.from_tensor_slices(trainData).shuffle(trainData.shape[0]).batch(batchSize)
         # define crossEntropy
@@ -209,60 +184,102 @@ class GAN:
 
             self.epochsTrained = epoch
 
+    def save_models_to_file(self, folder):
+        '''
+        Save GAN models to file
+        Models are of type '.keras' and are subscripted by the number of epochs trained
+        '''
+        if self.generatorModel:
+            self.generatorModel.save(folder + "/gen_"+str(self.epochsTrained)+".keras")
+        else:
+            print("Generator model not defined")
+        if self.discriminatorModel:
+            self.discriminatorModel.save(folder + "/dis_"+str(self.epochsTrained)+".keras")
+        else:
+            print("Discriminator model not defined")
+    
+    def plot_training_metrics(self, save_path):
+        '''
+        Plot the training metrics of the GAN model:
+            - discriminator losses
+            - generator losses
+            - discriminator accuracies
+        '''
+        if any(len(metric) == 0 for metric in [self.dLosses, self.gLosses, self.dAccuracies]):
+            print("Error: No training metrics to plot")
+            return
+
+        plt.plot(self.dLosses, label = "D Loss")
+        plt.plot(self.gLosses, label = "G Loss")
+        plt.plot(self.dAccuracies, label = "D Accuracies")
+
+        plt.title("GAN Training Metrics")
+        plt.xlabel("All batches for all epochs")
+        plt.ylabel("Value")
+        plt.legend()
+        plt.savefig(save_path)
 
 
-
-    def predict(self, numImages, noiseDim):
+    def predict(self, numImages, noiseDim, prediction_path = None):
         try:
             seed = tf.random.normal([numImages, noiseDim])
             predictions = self.generatorModel(seed, training=False)
-            return predictions
         except Exception:
             raise ValueError("Error generating images. Check if generator model is defined and trained.")
+        
+        if prediction_path:
+            fig = plt.figure(figsize=(4, 4))
+            for i in range(predictions.shape[0]):
+                plt.subplot(4, 4, i+1)
+                plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
+                plt.axis('off')
 
-
+            plt.savefig(prediction_path)
+        else:
+            return predictions
+    
 
     def calculate_mse(self, imageA, imageB):
-         '''
+        '''
         Mean Squared Error measure the difference between pixel intensisties of two images. 
         In this implementation MSE measure the difference between the synthetic vs 
         generated images using the GAN
         Lower the error, better the MSE score.
         '''
-         if isinstance(imageA, tf.Tensor): # if images are tensor value, convert to numpy
-             imageA = imageA.numpy()
-         if isinstance(imageB, tf.Tensor): # if images are tensor value, convert to numpy
-             imageB = imageB.numpy()
-         err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2) #Images to be of same dimension
-         err /= float(imageA.shape[0] * imageA.shape[1])
-         return err
+        if isinstance(imageA, tf.Tensor): # if images are tensor value, convert to numpy
+            imageA = imageA.numpy()
+        if isinstance(imageB, tf.Tensor): # if images are tensor value, convert to numpy
+            imageB = imageB.numpy()
+        err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2) #Images to be of same dimension
+        err /= float(imageA.shape[0] * imageA.shape[1])
+        return err
     
     def calculate_inception_score(self, images):
-         '''
+        '''
         Inception Score measures the image quality of the generated images 
         incorporating the difference of probabilities using KL Divergence
         Images must be numpy aray of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples
         '''
-         images = images.reshape(images.shape[0], -1) # Flatten images
-         images = images.astype('float32') / 255.0 # Normalize between [0,1]
-    
-         pYx = np.exp(images) / np.exp(images).sum(axis=1, keepdims=True) # Conditional porbability of class for generated_images
-         pY = np.mean(pYx, axis=0, keepdims=True) # Marginal distribution
+        images = images.reshape(images.shape[0], -1) # Flatten images
+        images = images.astype('float32') / 255.0 # Normalize between [0,1]
 
-         entropyConditional = -np.sum(pYx * np.log(pYx + 1e-8), axis=1)  
-         entropyMarginal = -np.sum(pY * np.log(pY + 1e-8)) 
+        pYx = np.exp(images) / np.exp(images).sum(axis=1, keepdims=True) # Conditional porbability of class for generated_images
+        pY = np.mean(pYx, axis=0, keepdims=True) # Marginal distribution
+
+        entropyConditional = -np.sum(pYx * np.log(pYx + 1e-8), axis=1)  
+        entropyMarginal = -np.sum(pY * np.log(pY + 1e-8)) 
+
+        klDivergence = entropyConditional - entropyMarginal # KL divergence between condtional and marginal distribution
+        avgKLDivergence = np.mean(klDivergence)
     
-         klDivergence = entropyConditional - entropyMarginal # KL divergence between condtional and marginal distribution
-         avgKLDivergence = np.mean(klDivergence)
-        
-         score = np.exp(avgKLDivergence) # Inception Score is exponential calculation of mean KL divergence
-         return score
+        score = np.exp(avgKLDivergence) # Inception Score is exponential calculation of mean KL divergence
+        return score
     
     def calculate_fid(self, realImages, generatedImages):
         '''
-       Frechet Inception Distance measures the feature distance between the real and generated images
-       realImages and generatedImages must be numpy array of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples of images
-       '''
+        Frechet Inception Distance measures the feature distance between the real and generated images
+        realImages and generatedImages must be numpy array of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples of images
+        '''
         if isinstance(realImages, tf.Tensor): # if images are tensor value, convert to numpy
              realImages = realImages.numpy()
         if isinstance(generatedImages, tf.Tensor): # if images are tensor value, convert to numpy
@@ -282,3 +299,62 @@ class GAN:
 
         fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean) # Calculate score
         return fid
+    
+    def generate_scatterplot(self, metrics, titles, num_images, save_path):
+        '''
+        Generate scatter plot for the given metrics
+        '''
+        x_labels = [f'Image {i}' for i in range(num_images)]
+        x = np.arange(num_images)
+
+        fig, axes = plt.subplots(len(metrics), 1, figsize=(12, 8), squeeze=False)
+        axes = axes.flatten()
+        for ax, y_values, title in zip(axes, metrics, titles):
+            ax.scatter(x, y_values, marker="o")
+            ax.set_title(f"{title} Scatter Plot")
+            ax.set_xlabel('Image')
+            ax.set_ylabel(f'{title} Value')
+            ax.set_xticks(x)
+            ax.set_xticklabels(x_labels, rotation=45, ha='right')
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
+    
+
+    def generate_heatmaps(self, realImages, generatedImages, num_samples, save_path):
+        '''
+        Generate heatmap visualization for real vs generated images by generator model
+        '''
+        realImages = realImages[:num_samples]
+        generatedImages = generatedImages[:num_samples]
+        num_real = len(realImages)
+        num_gen = len(generatedImages)
+
+        fig, axes = plt.subplots(num_real, num_gen, figsize=(num_gen * 4, num_real * 4), squeeze=False)
+
+        for i in range(num_real):
+            for j in range(num_gen):
+                    diff = np.abs(realImages[i] - generatedImages[j])
+                    diff_min = np.min(diff)
+                    diff_max = np.max(diff)
+
+                    if diff_max > diff_min:
+                        norm_diff = (diff - diff_min) / (diff_max - diff_min)
+                    else:
+                        norm_diff = np.zeros_like(diff)
+                    
+                    if norm_diff.ndim == 3:
+                        norm_diff = np.mean(norm_diff, axis=2)
+
+                    ax = axes[i, j]
+                    im = ax.imshow(norm_diff, cmap="viridis", aspect="auto")
+                    # ax.imshow(norm_diff, cmap='viridis', aspect="auto")
+                    ax.set_title(f"Real {i+1} vs Generated {j+1}")
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                    # ax.axis('off')
+                    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label='Pixel Difference')
+
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
