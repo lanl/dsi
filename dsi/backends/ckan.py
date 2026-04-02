@@ -246,33 +246,44 @@ class CKAN(Webserver):
     def query_artifacts(self, query, kwargs=None):
         """
         Query cached data using pandas.query()
-        """
 
+        kwargs:
+            table       : "datasets" or "resources"
+            dict_return : always return OrderedDict if True
+        """
         kwargs = kwargs or {}
 
         if not self._loaded:
-            return (RuntimeError, "No metadata loaded")
+            return OrderedDict()
 
-        dict_return = kwargs.get("dict_return", False)
+        table_name = kwargs.get("table", "datasets")
+        dict_return = kwargs.get("dict_return", True)
 
-        # Select table
-        df = pd.DataFrame(
-            self._cache["resources"]
-            if "resource" in query.lower()
-            else self._cache["datasets"]
-        )
+        # normalize table to column-oriented OrderedDict
+        rows = self._cache.get(table_name, [])
+
+        if isinstance(rows, list):
+            # convert list-of-dicts to column-oriented OrderedDict
+            if rows:
+                cols = rows[0].keys()
+                table_od = OrderedDict({c: [] for c in cols})
+                for r in rows:
+                    for c in cols:
+                        table_od[c].append(r.get(c))
+            else:
+                table_od = OrderedDict()
+        elif isinstance(rows, dict) or isinstance(rows, OrderedDict):
+            table_od = OrderedDict(rows)
+        else:
+            table_od = OrderedDict()
+
+        df = pd.DataFrame(table_od)
 
         try:
-            result = df.query(query)
-
-            return (
-                OrderedDict(result.to_dict(orient="list"))
-                if dict_return
-                else result
-            )
-
+            result_df = df.query(query, engine="python")
+            return OrderedDict(result_df.to_dict(orient="list")) if dict_return else result_df.to_dict(orient="list")
         except Exception as e:
-            return (ValueError, str(e))
+            raise ValueError(f"Query error: {e}")
 
     # ---------------------------------------------------
     # URL Validation
@@ -321,7 +332,7 @@ class CKAN(Webserver):
         """
 
         if not isinstance(query_object, str):
-            return None
+            return []
 
         matches = []
 
@@ -334,7 +345,7 @@ class CKAN(Webserver):
                 val.type = "table"
                 matches.append(val)
 
-        return matches or None
+        return matches
 
     # ---------------------------------------------------
 
