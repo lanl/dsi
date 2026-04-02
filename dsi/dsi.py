@@ -1069,8 +1069,14 @@ class DSI():
             print("Closing this instance of DSI()")
     
     #help, edge-finding (find this/that)
-    def get(self, dbname):
+    def get(self, dbname=None):
+        #if not dbname:
+        #    s = Sync(dbname)
+        #else:
+        #    s = Sync("workspace.db")
         pass
+
+        
     
     def move(self, filepath):
         pass

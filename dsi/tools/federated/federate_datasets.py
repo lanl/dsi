@@ -370,4 +370,4 @@ if __name__=="__main__":
     main()
 
 
-# Run as: python tools/federated/federate_dataset.py tools/federated/input.yaml
+# Run as: python dsi/tools/federated/federate_dataset.py examples/federated/input.yaml
