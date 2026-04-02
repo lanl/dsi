@@ -109,11 +109,11 @@ class GAN:
         modelType is either ModelType.generator or ModelType.discriminator
         '''
         if not model_dir: #if the directory is empty
-            raise ValueError(f"Directory input empty")
+            raise ValueError("Directory input empty")
         if not (Path(self.dataset_name) / model_dir).is_dir():
             raise ValueError(f"Model path is not a directory within {self.dataset_name}:", model_dir)
         if modelType not in self.ModelType:
-            raise ValueError(f"Invalid model type. Must be either ModelType.generator or ModelType.discriminator'")
+            raise ValueError("Invalid model type. Must be either ModelType.generator or ModelType.discriminator'")
         
         model_dir_path = Path(self.dataset_name) / model_dir
         modelPath = None
@@ -132,7 +132,7 @@ class GAN:
         
         try:
             model = tf.keras.models.load_model(modelPath)
-        except:
+        except Exception:
             raise ValueError(f"Unable to open ML model: {modelPath}")
 
         if modelType == self.ModelType.generator:
@@ -283,7 +283,7 @@ class GAN:
             raise ValueError("Error generating images. Check if generator model is defined and trained.")
         
         if prediction_path:
-            fig = plt.figure(figsize=(4, 4))
+            plt.figure(figsize=(4, 4))
             for i in range(predictions.shape[0]):
                 plt.subplot(4, 4, i+1)
                 plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
@@ -313,18 +313,18 @@ class GAN:
         '''
         Inception Score measures the image quality of the generated images 
         incorporating the difference of probabilities using KL Divergence
-        Images must be numpy aray of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples
+        Images must be numpy array of shape (N, HEIGHT, WIDTH, CHANNEL) where N is number of samples
         '''
         images = images.reshape(images.shape[0], -1) # Flatten images
         images = images.astype('float32') / 255.0 # Normalize between [0,1]
 
-        pYx = np.exp(images) / np.exp(images).sum(axis=1, keepdims=True) # Conditional porbability of class for generated_images
+        pYx = np.exp(images) / np.exp(images).sum(axis=1, keepdims=True) # Conditional probability of class for generated_images
         pY = np.mean(pYx, axis=0, keepdims=True) # Marginal distribution
 
         entropyConditional = -np.sum(pYx * np.log(pYx + 1e-8), axis=1)  
         entropyMarginal = -np.sum(pY * np.log(pY + 1e-8)) 
 
-        klDivergence = entropyConditional - entropyMarginal # KL divergence between condtional and marginal distribution
+        klDivergence = entropyConditional - entropyMarginal # KL divergence between conditional and marginal distribution
         avgKLDivergence = np.mean(klDivergence)
     
         score = np.exp(avgKLDivergence) # Inception Score is exponential calculation of mean KL divergence
