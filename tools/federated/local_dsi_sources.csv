@@ -1,7 +1,0 @@
-location_type,location,path,type,submitter_name,submitter_email,timsestamp
-local,local,tools/federated/database/ocean_11_datasets.db,data,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:40:00s
-HPC,ch-fe.lanl.gov,/lustre/scratch5/pascalgrosset/test_db/nif.db,data,pascal grosset,pascalgrosset@lanl.gov,2026-3-10--16:38:00
-url,url,https://www.timestored.com/data/sample/sakila.db,data,unknown,unknown,2026-3-10--16:38:00
-HPC,darwin-fe.lanl.gov,/users/pulido/modelcard2.db,model,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:42:00
-github,github,https://github.com/lanl/dsi/tree/ai_dev/tools/ai_search/data/oceans_11/ocean_11_datasets.db,data,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:30:00
-HPC,darwin-fe.lanl.gov,/vast/projects/exasky/pascal/genesis_model_cards/modelcard.db,model,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:40:00s
