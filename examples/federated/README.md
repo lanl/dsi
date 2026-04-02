@@ -4,7 +4,7 @@ The allows users to pull database from many different locations and provide a ce
 
 To run:
 ```bash
-python tools/federated/federate_datasets.py tools/federated/input.yaml
+python dsi/tools/federated/federate_datasets.py examples/federated/input.yaml
 ```
 where input.yaml is a config file
 
