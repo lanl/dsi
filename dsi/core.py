@@ -9,15 +9,7 @@ import logging
 from datetime import datetime
 import sys
 import pandas as pd
-import csv
 import re
-import tarfile
-import subprocess
-import uuid
-import time
-import itertools
-from typing import Iterator
-from contextlib import redirect_stdout
 import tempfile
 from packaging import version
 
