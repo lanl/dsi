@@ -17,7 +17,7 @@ class GAN:
         generator = 0
         discriminator = 1
 
-    def __init__(self, dataset_name: str, image_col: str = None):
+    def __init__(self, dataset_name: str, image_col: str):
         '''
         GAN Constructor that loads and formats the image data from a database.
         Image data is stored in self.imageArray - a numpy array of shape (N, HEIGHT, WIDTH, CHANNEL)
@@ -26,8 +26,7 @@ class GAN:
             Name of the dataset and the directory where the database and models are stored.
 
         image_col: 
-            Name of column in database that contains the image paths. 
-            If None, assumes all columns except the first one are pixel values of the images.        
+            Name of column in database that contains the image paths.  
         '''
         self.dataset_name = dataset_name
 
@@ -36,7 +35,7 @@ class GAN:
         
         db_path = self.check_directory(dataset_name)
         if not db_path:
-            raise ValueError("Dataset directory must have a database file, untrained_models/ and pretrained_models/ directories:")
+            raise ValueError("Dataset directory must have a database file, untrained_models/ and pretrained_models/ directories")
 
         self.generatorModel = None
         self.discriminatorModel = None
@@ -52,26 +51,20 @@ class GAN:
             dbName = tableNames[0]
 
             try:
-                if image_col is not None:
-                    if not isinstance(image_col, str):
-                        raise ValueError("Image Column input must be a string")
-                    
-                    all_paths = store.query(f"SELECT {image_col} FROM {dbName}", True)
+                if not isinstance(image_col, str):
+                    raise ValueError("Image Column input must be a string")
+                
+                all_paths = store.query(f"SELECT {image_col} FROM {dbName}", True)
 
-                    images = []
-                    for path in all_paths[image_col]:
-                        image_path = str(Path(self.dataset_name) / path)
-                        if os.path.exists(image_path):
-                            images.append(Image.open(image_path).convert('L'))
-                        else:
-                            print("Warning: Image path does not exist:", image_path)
-                    
-                    self.imageArray = np.array(images)
-                else:
-                    table_df = store.get_table(dbName, True)
-                    # column 0 corresponds to the labels so drop it
-                    imageDF = table_df.drop(table_df.columns[0], axis = 1)
-                    self.imageArray = imageDF.values # extract array of values from df
+                images = []
+                for path in all_paths[image_col]:
+                    image_path = str(Path(self.dataset_name) / path)
+                    if os.path.exists(image_path):
+                        images.append(Image.open(image_path).convert('L'))
+                    else:
+                        print("Warning: Image path does not exist:", image_path)
+                
+                self.imageArray = np.array(images)
             except Exception as e:
                 raise ValueError("Error loading database:", str(e))
 
