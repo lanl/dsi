@@ -932,19 +932,9 @@ class DSI():
         """
   
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-<<<<<<< HEAD
             raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
-=======
-            raise ValueError("Cannot list() tables of an empty backend. Please ensure there is data in it.")
-            #sys.exit("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
-    
-        if self.schema_read:
-            #sys.exit("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
-            raise RuntimeError("Cannot call list() until all associated data is loaded after a complex schema")
-
->>>>>>> f8637a1 (added federation exploration)
 
         output = None
         try:
@@ -953,13 +943,9 @@ class DSI():
                 table_list = self.t.list(collection)
             output = f.getvalue()
         except Exception as e:
-<<<<<<< HEAD
             if e.args:
                 e.args = (f'list() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-=======
-            raise RuntimeError(f"list() ERROR: {e}") from e
->>>>>>> f8637a1 (added federation exploration)
 
         
         if collection:
@@ -1018,15 +1004,9 @@ class DSI():
         try:
             self.t.num_tables()
         except Exception as e:
-<<<<<<< HEAD
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-=======
-            raise RuntimeError(f"num_tables() ERROR: {e}") from e
-        
-
->>>>>>> f8637a1 (added federation exploration)
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
