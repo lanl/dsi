@@ -1,6 +1,5 @@
 import sys
 import uuid
-from git import db
 import yaml
 from pathlib import Path
 
@@ -252,7 +251,7 @@ def pull_data(location_type: str,
 
 
     else:
-        print(f"Location type {location_type} for database {db} is unsupported. Skipping.")
+        print(f"Location type {location_type} for database {path} is unsupported. Skipping.")
 
     return None
 
