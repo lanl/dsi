@@ -1,0 +1,6 @@
+repo_paths: # list of repositories to federate from, can be git urls or local csv files
+  - "tools/federated/index_db.csv"  # cloned from https://git.lanl.gov/personal/test_dsi_federated.git
+  - "tools/federated/local_dsi_sources.csv"
+workspace_folder: "dsi_databases_001_05"     # your workspace folder where the federated dataset will be stored
+download_limit: 10485760 # 10 MB        # size limit
+conflict_resolution: "keep_latest"      # only keep_latest is supported for now, but could be extended in the future to allow user to choose which one to keep or keep both and rename them or ...
