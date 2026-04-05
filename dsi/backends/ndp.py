@@ -1,10 +1,10 @@
 """
-CKAN Webserver Backend for DSI
+NDP-CKAN Webserver Backend for DSI
 
-Provides read-only access to CKAN catalogs via API and exposes metadata
+Provides read-only access to NDP (CKAN-based) catalogs via API and exposes metadata
 as DSI-compatible tables: datasets and resources.
 
-This backend DOES NOT write data — it only queries remote CKAN instances.
+This backend DOES NOT write data — it only queries remote NDP-CKAN instances.
 """
 
 import requests
@@ -42,13 +42,13 @@ class ValueObject:
 
 
 # ---------------------------------------------------------
-# CKAN Backend
+# NDP-CKAN Backend
 # ---------------------------------------------------------
-class CKAN(Webserver):
+class NDP(Webserver):
     """
-    CKAN Web Backend for DSI
+    NDP-CKAN Web Backend for DSI
 
-    Converts CKAN API responses into in-memory tabular format
+    Converts NDP (CKAN-based) API responses into in-memory tabular format
     compatible with DSI (OrderedDict of columns).
     """
 
@@ -60,17 +60,17 @@ class CKAN(Webserver):
                  api_key=None,
                  verify_ssl=False):
         """
-        Initialize CKAN backend connection settings
+        Initialize NDP-CKAN backend connection settings
 
         Parameters:
-            base_url   : CKAN instance base URL
+            base_url   : NDP-CKAN instance base URL
             api_key    : optional API key
             verify_ssl : SSL verification flag
         """
 
         parsed = urlparse(base_url)
         if not parsed.scheme or not parsed.netloc:
-            raise ValueError("Invalid CKAN base_url")
+            raise ValueError("Invalid NDP-CKAN base_url")
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -90,14 +90,14 @@ class CKAN(Webserver):
         self._loaded = False
 
     # ---------------------------------------------------
-    # Internal API Helpers
+    # NDP-CKAN API Helpers
     # ---------------------------------------------------
 
     def _request(self, endpoint, params=None):
         """
         **Internal use only**
 
-        Sends GET request to CKAN API and returns JSON result
+        Sends GET request to NDP-CKAN API and returns JSON result
 
         Raises:
             RuntimeError if API response is unsuccessful
@@ -116,7 +116,7 @@ class CKAN(Webserver):
         data = r.json()
 
         if not data.get("success"):
-            raise RuntimeError(f"CKAN API error: {data}")
+            raise RuntimeError(f"NDP-CKAN API error: {data}")
 
         return data["result"]
 
@@ -124,7 +124,7 @@ class CKAN(Webserver):
 
     def _extract_tables(self, datasets):
         """
-        Convert CKAN dataset JSON into flat row structures
+        Convert NDP-CKAN dataset JSON into flat row structures
 
         Returns:
             dataset_rows  : list of dataset dicts
@@ -186,9 +186,9 @@ class CKAN(Webserver):
     # DSI Backend Interface
     # ---------------------------------------------------
 
-    def ingest_artifacts(self, artifacts=None, kwargs=None):
+    def query_artifacts(self, query=None, kwargs=None):
         """
-        Fetch metadata from CKAN and store internally
+        Fetch metadata from NDP-CKAN and store internally
 
         kwargs options:
             keywords, organization, tags, formats, limit
@@ -243,9 +243,9 @@ class CKAN(Webserver):
 
     # ---------------------------------------------------
 
-    def query_artifacts(self, query, kwargs=None):
+    def query_in_memory(self, query, kwargs=None):
         """
-        Query cached data using pandas.query()
+        Query in-memory cached data using pandas.query()
 
         kwargs:
             table       : "datasets" or "resources"
@@ -439,7 +439,7 @@ class CKAN(Webserver):
     # ---------------------------------------------------
 
     def git_commit_sha(self, kwargs=None):
-        return "ckan-readonly-backend"
+        return "ndp-ckan-readonly-backend"
 
     def get_artifacts(self, kwargs=None):
         return self._cache
@@ -452,6 +452,9 @@ class CKAN(Webserver):
             "loaded": self._loaded,
             "tables": list(self._cache.keys())
         }
-
+    
+    def ingest_artifacts(self, artifacts, kwargs=None):
+        raise NotImplementedError("NDP-CKAN backend is read-only.")
+    
     def put_artifacts(self, artifacts, kwargs=None):
-        raise NotImplementedError("CKAN backend is read-only.")
+        raise NotImplementedError("NDP-CKAN backend is read-only.")
