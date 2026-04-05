@@ -290,22 +290,23 @@ class NDP(Webserver):
     # ---------------------------------------------------
 
     def validate_urls(self):
-        """
-        Check each resource URL in the 'resources' table and
-        add a column 'url_valid' indicating whether the URL can be reached.
+        import requests
 
-        Updates:
-            self._cache["resources"]["url_valid"] : list of bool
-        """
         resources = self._cache.get("resources", {})
         urls = resources.get("url", [])
         valid_list = []
 
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; NDP-Validator/1.0)"}
+
         for url in urls:
             try:
-                r = requests.head(url, allow_redirects=True, timeout=5)
-                valid_list.append(r.status_code == 200)
-            except:
+                # First try HEAD
+                r = requests.head(url, allow_redirects=True, headers=headers, timeout=10, verify=self.verify_ssl)
+                # Some servers reject HEAD
+                if r.status_code == 405:
+                    r = requests.get(url, stream=True, headers=headers, timeout=10, verify=self.verify_ssl)
+                valid_list.append(200 <= r.status_code < 400)
+            except Exception:
                 valid_list.append(False)
 
         resources["url_valid"] = valid_list
