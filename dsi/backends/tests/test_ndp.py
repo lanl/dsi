@@ -1,7 +1,7 @@
 import os
 from collections import OrderedDict
 from dsi.backends.webserver import Webserver
-from dsi.backends.ckan import CKAN  # adjust import to your CKAN class
+from DSI.dsi.backends.ndp import CKAN  # adjust import to your CKAN class
 
 def test_ckan_ingest():
     backend = CKAN()
