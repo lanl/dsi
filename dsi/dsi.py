@@ -64,13 +64,13 @@ class DSI():
             elif backend_name.lower() == 'duckdb':
                 with redirect_stdout(fnull):
                     self.t.load_module('backend','DuckDB','back-write', filename=filename)
-            elif backend_name.lower() == 'ckan':
+            elif backend_name.lower() == 'ndp':
                 with redirect_stdout(fnull):
-                    # Pass CKAN-specific kwargs like base_url, api_key, verify_ssl
-                    self.t.load_module('backend','CKAN','back-read', **kwargs)
+                    # Pass NDP-specific kwargs like base_url, api_key, verify_ssl
+                    self.t.load_module('backend','NDP','back-read', **kwargs)
             else:
                 print("Please check the 'backend_name' argument as that one is not supported by DSI")
-                print(f"Eligible backend_names are: Sqlite, DuckDB, CKAN")
+                print(f"Eligible backend_names are: Sqlite, DuckDB, NDP")
         except Exception as e:
             sys.exit(f"backend ERROR: {e}")
 
@@ -87,7 +87,7 @@ class DSI():
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
-        print("CKAN   : Data catalog backend for discovering and accessing open data resources.\n")
+        print("NDP-CKAN : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.\n")
 
         print()
 
