@@ -100,7 +100,7 @@ def demo_ndp(verbose=True):
         ds_id = selected["id"]
         ds_title = selected["title"]
 
-        print(f"Selected dataset:")
+        print("Selected dataset:")
         print(f"  ID: {ds_id}")
         print(f"  Title: {ds_title}")
 
