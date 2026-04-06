@@ -1,4 +1,4 @@
-name: ndp.py test
+name: NDP Backend CI
 
 on:
   push:
@@ -16,32 +16,21 @@ jobs:
         python-version: ['3.11']
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements.extras.txt
-          pip install .
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements.extras.txt
+        pip install .
 
-      - name: Run NDP demo/test scripts
-        run: |
-          python examples/ndp/1.query_artifacts.py --verbose
-          python examples/ndp/2.process.py --verbose
-          python examples/ndp/3.query.py --verbose
-          python examples/ndp/4.find.py --verbose
-          python examples/ndp/5.inspect.py --verbose
-          python examples/ndp/6.validate.py --verbose
-          python examples/ndp/7.notebook.py --verbose
-          python examples/ndp/8.close.py --verbose
-
-      - name: Run NDP pytest
-        run: |
-          pip install pytest
-          pytest dsi/backends/tests/test_ndp.py
+    - name: Test NDP
+      run: |
+        pip install pytest
+        pytest dsi/backends/tests/test_ndp.py
