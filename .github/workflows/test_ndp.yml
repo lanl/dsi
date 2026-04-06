@@ -1,4 +1,4 @@
-name: CKAN Backend CI
+name: NDP Backend CI
 
 on:
   push:
@@ -28,10 +28,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run CKAN demo/test scripts
+      - name: Run NDP demo/test scripts
         run: |
-          python examples/ckan/1.ingest.py
-          python examples/ckan/2.process.py
-          python examples/ckan/3.query.py
-          python examples/ckan/4.find.py
-          python examples/ckan/5.inspect.py
+          python examples/ndp/1.query_artifacts.py
+          python examples/ndp/2.process.py
+          python examples/ndp/3.query.py
+          python examples/ndp/4.find.py
+          python examples/ndp/5.inspect.py
+          python examples/ndp/6.validate.py
+          python examples/ndp/7.notebook.py
+          python examples/ndp/8.close.py
