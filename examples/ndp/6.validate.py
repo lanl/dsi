@@ -1,32 +1,35 @@
 # examples/ndp/6.validate.py
-
+import argparse
 from dsi.core import Terminal
 
-# Initialize terminal and load NDP backend
-t = Terminal()
-t.load_module("backend", "NDP", "back-read")
-backend = t.active_modules["back-read"][0]
+def main(verbose=False):
+    t = Terminal()
+    t.load_module("backend", "NDP", "back-read")
+    backend = t.active_modules["back-read"][0]
 
-# Fetch artifacts
-backend.query_artifacts(
-    query=None,
-    kwargs={"keywords": "wildfire", "limit": 8}  # adjust limit if needed
-)
+    backend.query_artifacts(query=None, kwargs={"keywords": "wildfire", "limit": 8})
+    artifacts = backend.process_artifacts()
 
-artifacts = backend.process_artifacts()
-print("Datasets loaded:", artifacts["datasets"].keys())
-print("Resources loaded:", artifacts["resources"].keys())
+    if verbose:
+        print("Datasets loaded:", list(artifacts["datasets"].keys()))
+        print("Resources loaded:", list(artifacts["resources"].keys()))
 
-# Validate URLs
-backend.validate_urls()
+    backend.validate_urls()
 
-# Get resources table
-resources = backend.process_artifacts().get("resources", {})
-
-if not resources or not resources.get("url"):
-    print("No resources found. Try increasing 'limit' or check your query.")
-else:
-    urls = resources["url"]
+    resources = artifacts.get("resources", {})
+    urls = resources.get("url", [])
     url_valid = resources.get("url_valid", [])
-    for i, (u, v) in enumerate(zip(urls[:5], url_valid[:5])):
-        print(f"{i+1}. {u} -> {'Valid' if v else 'Invalid'}")
+
+    if urls:
+        for i, (u, v) in enumerate(zip(urls, url_valid)):
+            if verbose or i < 5:
+                print(f"{i+1}. {u} -> {'Valid' if v else 'Invalid'}")
+    else:
+        if verbose:
+            print("No resources found. Try increasing 'limit' or check your query.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="NDP URL validation example")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed output")
+    args = parser.parse_args()
+    main(verbose=args.verbose)
