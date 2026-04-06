@@ -1,83 +1,82 @@
-## CKAN Backend for DSI
+## NDP Backend for DSI
 
-A read-only backend to access CKAN catalogs via API and expose metadata as DSI-compatible tables (`datasets` and `resources`).
+A read-only backend for accessing **NDP (CKAN-based) catalogs** via API and exposing metadata as DSI-compatible tables: `datasets` and `resources`.
 
-**Note:** This backend does **not** write data — it only queries remote CKAN instances.
+**Note:** This backend is **read-only** — it only queries remote NDP instances.
 
-### Quick Start
+---
 
-1. Import and initialize the backend:
+## Quick Start
 
 ```python
 from dsi.core import Terminal
 
 t = Terminal()
-t.load_module("backend", "CKAN", "back-read")
+t.load_module("backend", "NDP", "back-read")
 backend = t.active_modules["back-read"][0]
-```
 
-2. Ingest metadata from a CKAN instance:
+# Fetch metadata
+backend.query_artifacts(None, {"keywords": "energy", "limit": 10})
 
-```python
-backend.ingest_artifacts(None, {"keywords": "energy", "limit": 10})
-```
-
-3. Access processed artifacts:
-
-```python
+# Access tables
 tables = backend.process_artifacts()
 print(tables["datasets"].keys())
 ```
 
-### Features
+---
 
-The CKAN backend provides multiple ways to inspect and query CKAN data:
+## Features
 
-* **Ingest and process metadata**
+* **Fetch & transform metadata**
 
-  * Fetch datasets and resources from a CKAN instance.
-  * Apply filters: keywords, organization, tags, formats, limit.
-  * Transform CKAN JSON into DSI-compatible tables (column-oriented `OrderedDict`).
+  * Query datasets/resources from NDP
+  * Filters: `keywords`, `organization`, `tags`, `formats`, `limit`
+  * Returns column-oriented `OrderedDict` tables
 
-* **Query artifacts**
+* **In-memory querying**
 
-  * Use `pandas.query()` on `datasets` or `resources` tables.
-  * Example: fetch datasets with more than 10 resources:
+  ```python
+  backend.query_in_memory("num_resources > 5", {"table": "datasets"})
+  ```
 
-    ```python
-    result = backend.query_artifacts("`num_resources` > 10", {"table": "datasets"})
-    ```
+* **Search utilities**
 
-* **Search tables, columns, and cells**
-
-  * `find_table(query)`, `find_column(query)`, `find_cell(query)` return matching results as `ValueObject`s.
-  * Supports string or regex matching in table names, columns, and cell values.
+  * `find_table()`, `find_column()`, `find_cell()`
 
 * **URL validation**
 
-  * Check all resource URLs in the `resources` table.
-  * Adds a `url_valid` column indicating reachability.
+  * `validate_urls()` adds a `url_valid` column to `resources`
 
-* **Notebook / inspection**
+* **Inspection**
 
-  * Preview loaded datasets and resources:
+  * `notebook()` preview
+  * `inspect_artifacts()` metadata summary
 
-    ```python
-    backend.notebook()
-    ```
+* **Lifecycle**
 
-* **Lifecycle management**
+  * `query_artifacts()` **overwrites cache**
+  * `close()` resets state
 
-  * `close()` resets internal state.
-  * `inspect_artifacts()` returns metadata about loaded tables.
+---
 
-### Examples
+## Examples
 
-Run the following scripts to see backend usage in action:
+Run the NDP examples:
 
-1. **Ingest artifacts** – `examples/ckan/1.ingest.py`
-2. **Process artifacts** – `examples/ckan/2.process.py`
-3. **Query artifacts** – `examples/ckan/3.query.py`
-4. **Find tables/columns/cells** – `examples/ckan/4.find.py`
-5. **Inspect artifacts** – `examples/ckan/5.inspect.py`
-6. **Run all examples** – `examples/ckan/run_all.py`
+1. `examples/ndp/1.ingest.py`
+2. `examples/ndp/2.process.py`
+3. `examples/ndp/3.query.py`
+4. `examples/ndp/4.find.py`
+5. `examples/ndp/5.inspect.py`
+6. `examples/ndp/6.validate.py`
+7. `examples/ndp/7.notebook.py`
+8. `examples/ndp/8.close.py`
+9. `examples/ndp/run_all.py`
+
+---
+
+## Notes
+
+* `query_artifacts()` replaces previously loaded data (no append)
+* `organization` is typically more reliable than `author` in CKAN metadata
+* URL validation may depend on server behavior (some endpoints block requests)
