@@ -35,13 +35,13 @@ class ValueObject:
     value = None # value stored from that match. Ex: table data, col data, cell data etc.
     type = "" #type of match, {table, column, range, cell, row}
 
-    # implement this later once filesystem table incoroporated into dsi
+    # implement this later once filesystem table filesystem into dsi
     # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
     """
-    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurences of a search term
+    SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurrences of a search term
     """
     runTable = False
 
@@ -50,10 +50,7 @@ class Sqlite(Filesystem):
         Initializes a SQLite backend with a user inputted filename, and creates other internal variables
         """
         self.filename = filename
-        if 'kwargs' in kwargs:
-            self.con = sqlite3.connect(filename, **kwargs['kwargs'])
-        else:
-            self.con = sqlite3.connect(filename)
+        self.con = sqlite3.connect(filename, **kwargs)
         self.cur = self.con.cursor()
         self.runTable = Sqlite.runTable
         self.sqlite_keywords = ["ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE", "AND", "AS", "ASC", "ATTACH", 
@@ -88,11 +85,11 @@ class Sqlite(Filesystem):
 
         if all(isinstance(x, int) for x in input_list if x is not None):
             if any(x < SQLITE_INT_MIN or x > SQLITE_INT_MAX for x in input_list if x is not None):
-                return " FLOAT"
-            return " INTEGER"
+                return " FLOAT", [float(x) if x is not None else x for x in input_list]
+            return " INTEGER", input_list
         elif all(isinstance(x, float) for x in input_list if x is not None):
-            return " FLOAT"
-        return " VARCHAR"
+            return " FLOAT", input_list
+        return " VARCHAR", [str(x) if x is not None else x for x in input_list]
     
     def sqlite_compatible_name(self, name):
         if (name.startswith('"') and name.endswith('"')) or (name.upper() not in self.sqlite_keywords and name.isidentifier()):
@@ -126,19 +123,19 @@ class Sqlite(Filesystem):
             if len(diff_cols) > 0:
                 for col in diff_cols:
                     if col.lower() in [c.lower() for c in query_cols]:
-                        return (ValueError, "Cannot have duplicate column names")
-                    temp_name = col + self.sql_type(types.properties[col])
+                        raise ValueError("Cannot have duplicate column names")
+                    temp_name = col + self.sql_type(types.properties[col])[0]
                     try:
                         self.cur.execute(f"ALTER TABLE {types.name} ADD COLUMN {temp_name};")
                     except sqlite3.Error as e:
                         self.con.rollback()
-                        return (sqlite3.Error, e)
+                        raise sqlite3.Error(e)
         else:
             sql_cols = ', '.join(types.unit_keys)
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
             if self.runTable:
                 str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INTEGER, {}".format(str(types.name), sql_cols)            
-            if foreign_query != None:
+            if foreign_query is not None:
                 str_query += foreign_query
             if self.runTable:
                 str_query += ", FOREIGN KEY (run_id) REFERENCES runTable (run_id)"
@@ -150,12 +147,9 @@ class Sqlite(Filesystem):
                 self.cur.execute(str_query)
             except sqlite3.Error as e:
                 self.con.rollback()
-                return (sqlite3.Error, e)
+                raise sqlite3.Error(e)
             self.types = types
 
-    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifacts(self, collection, isVerbose=False):
-        return self.ingest_artifacts(collection, isVerbose)
     
     def ingest_artifacts(self, collection, isVerbose=False):    
         """
@@ -173,9 +167,6 @@ class Sqlite(Filesystem):
 
         `isVerbose` : bool, optional, default=False
             If True, prints all SQL insert statements during the ingest process for debugging or inspection purposes.
-
-        `return`: None on successful ingestion. If an error occurs, returns a tuple in the format of: (ErrorType, error message). 
-        Ex: (ValueError, "this is an error")
         """
         artifacts = collection
 
@@ -188,7 +179,7 @@ class Sqlite(Filesystem):
             pk_list = artifacts["dsi_relations"]["primary_key"]
             fk_list = artifacts["dsi_relations"]["foreign_key"]
             pk_tables = set(t[0] for t in pk_list)
-            fk_tables = set(t[0] for t in fk_list if t[0] != None)
+            fk_tables = set(t[0] for t in fk_list if t[0] is not None)
             all_schema_tables = pk_tables.union(fk_tables)
             db_tables = [t[0] for t in self.list() if t[0] != "dsi_units"]
             # check if tables from dsi_relations are all in the db
@@ -223,7 +214,7 @@ class Sqlite(Filesystem):
                         self.cur.execute(f"INSERT INTO {table}_dsi_temp SELECT * FROM {table};")
                     except sqlite3.Error as e:
                         self.con.rollback()
-                        return (sqlite3.Error, e)
+                        raise sqlite3.Error(e)
                 
                 # check if other non-schema tables have constraints -- if yes, make temp table, move data, and drop old table with schema tables
                 other_tables = list(set(db_tables) - all_schema_tables)
@@ -238,10 +229,10 @@ class Sqlite(Filesystem):
                             self.cur.execute(f"INSERT INTO {table}_dsi_temp SELECT * FROM {table};")
                         except sqlite3.Error as e:
                             self.con.rollback()
-                            return (sqlite3.Error, e)
+                            raise sqlite3.Error(e)
                         all_schema_tables.add(table)
 
-                # reaching here means no errors with new schema --- SQLITE doesnt care about order of tables deleted
+                # reaching here means no errors with new schema --- SQLITE doesn't care about order of tables deleted
                 # drop all tables in schema and rename temp tables to original names
                 for table in all_schema_tables:
                     self.cur.execute(f'DROP TABLE IF EXISTS "{table}";')
@@ -251,11 +242,11 @@ class Sqlite(Filesystem):
                     self.con.commit()
                 except Exception as e:
                     self.con.rollback()
-                    return (sqlite3.Error, e)
+                    raise sqlite3.Error(e)
             
                 return #early return so dont make any other changes to db
             else:
-                print("WARNING: Complex schemas can only be ingested if all referenced data tables are loaded into DSI.")
+                print("WARNING: Complex schemas can only be ingested after all referenced data tables are loaded into a database.")
             
         if self.runTable:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
@@ -289,16 +280,15 @@ class Sqlite(Filesystem):
                     primary_col = self.sqlite_compatible_name(re.sub(r'[\r\n]+', ' ', primaryTuple[1].replace('-', '_')))
                     foreign_query += f", FOREIGN KEY ({sql_key}) REFERENCES {primary_table} ({primary_col})"
                 
-                types.properties[sql_key] = tableData[key]
-                
+                col_type, col_list = self.sql_type(tableData[key])
+                types.properties[sql_key] = col_list
+
                 if dsi_name in artifacts.keys() and comboTuple in artifacts[dsi_name]["primary_key"]:
-                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]) + " PRIMARY KEY")
+                    types.unit_keys.append(sql_key + col_type + " PRIMARY KEY")
                 else:
-                    types.unit_keys.append(sql_key + self.sql_type(tableData[key]))
+                    types.unit_keys.append(sql_key + col_type)
             
-            error = self.ingest_table_helper(types, foreign_query)
-            if error is not None:
-                return error
+            self.ingest_table_helper(types, foreign_query)
             
             col_names = ', '.join(types.properties.keys())
             placeholders = ', '.join('?' * len(types.properties))
@@ -317,13 +307,13 @@ class Sqlite(Filesystem):
                 self.cur.executemany(str_query,rows)
             except sqlite3.Error as e:
                 self.con.rollback()
-                return (sqlite3.Error, e)
+                raise sqlite3.Error(e)
                 
             self.types = types #This will only copy the last table from artifacts (collections input)            
 
-        dsi_units_data = self.cur.execute(f"PRAGMA table_info(dsi_units)").fetchall()
+        dsi_units_data = self.cur.execute("PRAGMA table_info(dsi_units)").fetchall()
         if len(dsi_units_data) == 3 and dsi_units_data[1][1] == "column": # old dsi_units table exists
-            self.cur.execute(f'ALTER TABLE dsi_units RENAME COLUMN column TO column_name;') # only commited in later try/catch clause
+            self.cur.execute('ALTER TABLE dsi_units RENAME COLUMN column TO column_name;') # only committed in later try/catch clause
             
         if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
@@ -335,23 +325,20 @@ class Sqlite(Filesystem):
                                                 WHERE table_name = '{table_val}' AND column_name = '{col_val}';""").fetchone()
                 if unit_result and unit_result[0] != unit_val: #checks if unit for same table and col exists in db and if units match
                     self.con.rollback()
-                    return (TypeError, f"Cannot ingest different units for the column {col_val} in {table_val}")
+                    raise TypeError(f"Cannot ingest different units for the column {col_val} in {table_val}")
                 elif not unit_result:
                     try:
                         self.cur.execute(str_query)
                     except sqlite3.Error as e:
                         self.con.rollback()
-                        return (sqlite3.Error, e)
+                        raise sqlite3.Error(e)
                             
         try:
             self.con.commit()
         except Exception as e:
             self.con.rollback()
-            return (sqlite3.Error, e)
+            raise sqlite3.Error(e)
 
-    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def get_artifacts(self, query, isVerbose=False, dict_return = False):
-        return self.query_artifacts(query, isVerbose, dict_return)
     
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
@@ -368,11 +355,11 @@ class Sqlite(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
         
-        `return` : pandas.DataFrame or OrderedDict or tuple
-            - If query is valid and `dict_return` is False: returns a DataFrame.
-            - If query is valid and `dict_return` is True: returns an OrderedDict.
-            - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
+        `return` : pandas.DataFrame or OrderedDict
+            - If `dict_return` is False: returns a DataFrame
+            - If `dict_return` is True: returns an OrderedDict
         """
+        data = None
         if query[:6].lower() == "select" or query[:6].lower() == "pragma":
             try:
                 data = pd.read_sql_query(query, self.con) 
@@ -386,15 +373,25 @@ class Sqlite(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                return (sqlite3.Error, "Error in query_artifacts/get_artifacts: Incorrect query on the data. Please try again")
+                raise
+        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove filesystem passthrough in future
+            try:
+                self.cur.execute(query)
+                self.con.commit()
+            except Exception as e:
+                message = str(e)
+                if "no such table" in message:
+                    table_name = message[message.rfind(":")+2:]
+                    print(f"WARNING: '{table_name}' does not exist in this database")
+                    return
+                raise
         else:
-            return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only run SELECT or PRAGMA queries on the data")
+            raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
         
         if dict_return:
             tables = self.get_table_names(query)
             if len(tables) > 1:
-                return (RuntimeError, "Error in query_artifacts/get_artifacts: Can only return ordered dictionary if query with one table")
-            
+                raise RuntimeError("Can only return ordered dictionary if querying one table")
             return OrderedDict(data.to_dict(orient='list'))
         else:
             return data
@@ -412,10 +409,9 @@ class Sqlite(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
 
-        `return` : pandas.DataFrame or OrderedDict or tuple
-            - If query is valid and `dict_return` is False: returns a DataFrame.
-            - If query is valid and `dict_return` is True: returns an OrderedDict.
-            - If query is invalid: returns a tuple (ErrorType, "error message"). Ex: (ValueError, "this is an error")
+        `return` : pandas.DataFrame or OrderedDict
+            - If `dict_return` is False: returns a DataFrame
+            - If `dict_return` is True: returns an OrderedDict
         """
         return self.query_artifacts(query=f"SELECT * FROM {table_name}", dict_return=dict_return)
     
@@ -443,9 +439,6 @@ class Sqlite(Filesystem):
         schema_stmts = self.query_artifacts(query="SELECT sql FROM sqlite_master where sql NOT NULL ORDER BY type, name")
         return schema_stmts["sql"].str.cat(sep="\n")
 
-    # OLD NAME OF notebook(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def inspect_artifacts(self, interactive=False):
-        return self.notebook(interactive)
 
     def notebook(self, interactive=False):
         """
@@ -457,8 +450,6 @@ class Sqlite(Filesystem):
         If database has a units table, each table's units are stored in its corresponding dataframe `attrs` variable
 
         `interactive`: default is False. When set to True, creates an interactive Jupyter notebook, otherwise creates an HTML file.
-
-        `return`: None
         """
         import nbconvert as nbc
         import nbformat as nbf
@@ -561,9 +552,6 @@ class Sqlite(Filesystem):
             with open(html_filename, 'w', encoding='utf-8') as fh:
                 fh.write(html_content)
 
-    # OLD NAME OF process_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def read_to_artifact(self, only_units_relations = False):
-        return self.process_artifacts(only_units_relations)
     
     def process_artifacts(self, only_units_relations = False):
         """
@@ -596,7 +584,7 @@ class Sqlite(Filesystem):
                 if colInfo[5] == 1:
                     pkList.append((tableName, col_name))
 
-            if only_units_relations == False:
+            if not only_units_relations:
                 data = self.cur.execute(f"SELECT * FROM {tableName};").fetchall()
                 for row in data:
                     for colName, val in zip(colDict.keys(), row):
@@ -632,9 +620,8 @@ class Sqlite(Filesystem):
         `query_object` : int, float, or str
             The value to search for across all tables in the backend.
 
-        `return` : list or tuple
-            A list of ValueObjects representing matches. 
-            If no matches are found, returns a tuple of an empty ValueObject and an error message.
+        `return` : list
+            A list of ValueObjects representing matches.
 
         - Note: ValueObjects may vary in structure depending on whether the match occurred at the table, column, or cell level.
         - Refer to `find_table()`, `find_column()`, and `find_cell()` for the specific structure of each ValueObject type.
@@ -736,12 +723,12 @@ class Sqlite(Filesystem):
                         val = ValueObject()
                         val.t_name = table
                         val.c_name = [col_name]
-                        if range == True and not not_numeric:
+                        if range and not not_numeric:
                             numeric_col = [0 if item is None else item for item in colData]
                             val.value = [min(numeric_col), max(numeric_col)]
                             val.type = "range"
                             col_return_list.append(val)
-                        elif range == False:
+                        elif not range:
                             val.value = colData
                             val.type = "column"
                             col_return_list.append(val)
@@ -947,16 +934,17 @@ class Sqlite(Filesystem):
         """
         table_name = self.sqlite_compatible_name(table_name.replace(' ', '_'))
         if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
-            return (ValueError, f"'{table_name}' does not exist in this SQLite database")
-        if display_cols == None:
+            raise ValueError(f"'{table_name}' does not exist in this SQLite database")
+        if display_cols is None:
             df = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT {num_rows};", self.con) 
         else:
             sql_list = ", ".join(display_cols)
             try:
                 df = pd.read_sql_query(f"SELECT {sql_list} FROM {table_name} LIMIT {num_rows};", self.con)
-            except Exception as e:
-                return (sqlite3.Error, "'display_cols' was incorrect. It must be a list of column names in the table")
+            except Exception:
+                raise sqlite3.Error("'display_cols' was incorrect. It must be a list of column names in the table")
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
+        df = df.astype(object).where(df.notna(), None)
         return df
     
     def summary(self, table_name = None):
@@ -981,7 +969,7 @@ class Sqlite(Filesystem):
         else:
             table_name = self.sqlite_compatible_name(table_name.replace(' ', '_'))
             if len(self.cur.execute(f"PRAGMA table_info({table_name})").fetchall()) == 0:
-                return (ValueError, f"'{table_name}' does not exist in this SQLite database")
+                raise ValueError(f"'{table_name}' does not exist in this SQLite database")
             headers, rows = self.summary_helper(table_name)
             return pd.DataFrame(rows, columns=headers, dtype=object)
 
@@ -1006,7 +994,7 @@ class Sqlite(Filesystem):
 
             try:
                 self.cur.execute("SELECT sqrt(4);")
-            except Exception as e:
+            except Exception:
                 import math
                 self.con.create_function('sqrt', 1, math.sqrt)
 
@@ -1032,7 +1020,7 @@ class Sqlite(Filesystem):
             else:
                 min_val = max_val = avg_val = std_dev = None
             
-            if avg_val != None and std_dev == None:
+            if avg_val is not None and std_dev is None:
                 std_dev = 0
             rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
@@ -1082,7 +1070,7 @@ class Sqlite(Filesystem):
                 table_name = [table_name]
                 collection = [collection]
         else:
-            return (TypeError, "inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
+            raise TypeError("inputs to overwrite_table() need to both be a list or (string, Pandas DataFrame).")
 
         if "dsi_relations" in temp_data.keys():
             for name, data in zip(table_name, collection):
@@ -1090,9 +1078,9 @@ class Sqlite(Filesystem):
                 if result:
                     new_data = temp_data[name][result]
                     if any(isinstance(x, str) for x in new_data) and any(isinstance(x, (int, float)) for x in new_data):
-                        return (TypeError, f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
+                        raise TypeError(f"There are mismatched data types in {name}'s primary key column, {result}. Cannot update.")
                     if len(new_data) != len(set(new_data)):
-                        return (ValueError, f"{name}'s primary key column, {result}, must have unique data")
+                        raise ValueError(f"{name}'s primary key column, {result}, must have unique data")
                     
                     rows = self.cur.execute(f"SELECT {result} FROM {name}").fetchall()
                     old_data = [row[0] for row in rows]
@@ -1107,13 +1095,14 @@ class Sqlite(Filesystem):
         temp_runTable_bool = self.runTable
         self.runTable = False
 
-        errorStmt = self.ingest_artifacts(temp_data)
+        try:
+            self.ingest_artifacts(temp_data)
+        except Exception as e:
+            e.args = (f"Error updating data in {self.filename} due to {str(e)}",)
+            raise
 
-        if temp_runTable_bool == True:
+        if temp_runTable_bool:
             self.runTable = True
-        
-        if errorStmt is not None:
-            raise errorStmt[0](f"Error updating data in {self.filename} due to {errorStmt[1]}")
             
     # Closes connection to server
     def close(self):

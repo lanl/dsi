@@ -73,6 +73,7 @@ debug.log
 !coverage.svg
 # Misc
 .vscode
+.venv
 docs/_build
 dsi.egg-info/
 *.egg-info/

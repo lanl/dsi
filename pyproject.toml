@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name="dsi-workflow"
-license={text = "BSD-3-Clause"}
+license= "BSD-3-Clause"
 description="A Data Science Infrastructure Project"
 readme = "README.rst"
 authors=[
@@ -18,17 +18,22 @@ authors=[
 	{name = 'Terece Turton', 	email = 'tlturton@lanl.gov'},
 	]
 classifiers=["Programming Language :: Python"]
-
 dynamic = ["dependencies","version"]
+
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]} 
+version = {attr = "dsi._version.__version__"}
 
 [tool.setuptools]
-py-modules = ["dsi"]
+include-package-data = true
 
 [project.scripts]
 dsi = "dsi.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["dsi*"]
 exclude = ["clover3d"]
+
+[tool.setuptools.package-data]
+dsi = ["tools/launch_streamlit.sh","tools/launch_streamlit.bat"]

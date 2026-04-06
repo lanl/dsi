@@ -3,12 +3,12 @@
 Python API
 ===========
 
-Users can interact with DSI modules using the DSI class which provides an interface for Readers, Writers, and Backends. 
+Users can interact with DSI modules using the DSI class which provides an interface for Readers, Writers, and Backends.
 This can be seen below and in ``dsi/dsi.py``. Example workflows using these functions can be seen in the following section: :ref:`user_example_section_label`
 
 Dsi: DSI
 ----------
-The DSI class is a user-level class that encapsulates the Terminal and Sync classes from DSI Core. 
+The DSI class is a user-level class that encapsulates the Terminal and Sync classes from DSI Core.
 DSI interacts with several functions within Terminal and Sync without requiring the user to differentiate them.
 The functionality has been simplified to improve user experience and reduce complexity.
 
@@ -20,7 +20,7 @@ Users should use ``read()`` to load data into DSI and ``write()`` to export data
 Their respective list functions print all valid readers/writers that can be used.
 
 The primary backend interactions are ``find()`` , ``query()``, and ``get_table()`` where users can print a search result, or retrieve the result as a collection of data.
-      
+
       - If users modify these collections, they can call ``update()`` to apply the changes to the active backend.
         Users must NOT edit any columns beginning with **`dsi_`**. Read ``update()`` below to better understand its behavior.
 
@@ -28,11 +28,11 @@ Users can also view various data/metadata of an active backend with ``list()``, 
 
 Notes for users:
       - When using a complex schema, must call ``schema()`` prior to ``read()`` to store the relations with the associated data.
-      - If input to ``update()`` is a modified output from ``query()``, the existing table will be **overwritten**. 
+      - If input to ``update()`` is a modified output from ``query()``, the existing table will be **overwritten**.
         Ensure data is secure or add `backup` flag in ``update()`` to create a backup database.
-      - Read the :ref:`datacard_section_label` section to learn which data card standards are supported and where to find templates compatible with DSI. 
+      - Read the :ref:`datacard_section_label` section to learn which data card standards are supported and where to find templates compatible with DSI.
 
-.. autoclass:: dsi.dsi.DSI 
+.. autoclass:: dsi.dsi.DSI
       :members:
       :special-members: __init__
 
@@ -61,7 +61,7 @@ The supported datacards can be read into DSI by creating an instance of DSI() an
       - ``read("file/path/to/datacard.YAML", 'GoogleDatacard')``
       - ``read("file/path/to/datacard.YAML", 'Oceans11Datacard')``
 
-Examples of each data card standard for the Wildfire dataset can be found in ``examples/wildfire/`` 
+Examples of each data card standard for the Wildfire dataset can be found in ``examples/wildfire/``
 
 
 .. _user_example_section_label:
@@ -85,7 +85,7 @@ Reading Cloverleaf data into a DSI backend, and displaying some of that data
 
 .. literalinclude:: ../examples/user/2a.read.py
 
-Example workflow of reading CSV data into a DSI backend and specifiying the table name (default is CSV)
+Example workflow of reading CSV data into a DSI backend and specifying the table name (default is CSV)
 
 .. literalinclude:: ../examples/user/2b.read_csv.py
 
@@ -97,9 +97,9 @@ Printing various data and metadata from a DSI backend - number of tables, list o
 
 Example 4: Find data
 ~~~~~~~~~~~~~~~~~~~~
-Finding data from an active DSI backend that matches an input object. 
+Finding data from an active DSI backend that matches an input object.
 
-If using ``search()``, the input can be a string or number. 
+If using ``search()``, the input can be a string or number.
 If using ``find()``, the input must be a string in the form of a condition - [column] [operator] [value].
 
 By default, all matches are printed. If ``True`` is passed as an additional argument, the matching rows are returned as a DataFrame instead.
@@ -116,7 +116,7 @@ The input can be the output of either ``find()``, ``query()``, or ``get_table()`
 
 Example 6: Query data
 ~~~~~~~~~~~~~~~~~~~~~
-Querying data from an active DSI backend. 
+Querying data from an active DSI backend.
 Users can either use ``query()`` to view specific data with a SQL statement, or ``get_table()`` to view all data from a specified table.
 
 By default, all matches are printed. If ``True`` is passed as an additional argument, the matching rows are returned as a DataFrame instead.

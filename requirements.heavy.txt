@@ -1,0 +1,7 @@
+# Baseline + Extras
+-r requirements.extras.txt
+
+# Heavy packages
+sqlalchemy>=2.0.35
+scikit-learn>=1.7.0
+streamlit>=1.48.0

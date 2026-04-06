@@ -17,18 +17,16 @@ jobs:
         python-version: ['3.11']
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements.extras.txt
-        pip install .
+        pip install . -r requirements.extras.txt
     - name: Test DuckDB
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_duckdb.py
+        pytest dsi/backends/tests/test_duckdb.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO

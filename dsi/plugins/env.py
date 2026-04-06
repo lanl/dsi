@@ -7,7 +7,7 @@ from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
-    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
+    GitInfoModel, HostnameModel, SystemKernelModel
 )
 
 
@@ -115,7 +115,7 @@ class SystemKernel(Environment):
     """
 
     def __init__(self) -> None:
-        """Initialize SystemKernel with inital provenance info."""
+        """Initialize SystemKernel with initial provenance info."""
         super().__init__()
         self.prov_info = self.get_prov_info()
         self.column_names = ["kernel_info"]

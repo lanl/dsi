@@ -14,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.model_selection import GridSearchCV #, StratifiedKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              mean_squared_error, root_mean_squared_error, mean_absolute_error, r2_score)
 
@@ -41,7 +41,7 @@ pattern = re.compile(r"Table:\s*(?P<table>\w+).*?- num of rows:\s*(?P<rows>\d+)"
 tables = [m.group("table") for m in pattern.finditer(output) if int(m.group("rows")) > 5]
 
 if len(tables) == 0:
-    st.warning("Emulator requires tables with at least 5 rows. Please try again with a larger dataset.")
+    st.warning("Emulator requires at least 1 table with more than 5 rows. Please try again with a larger dataset.")
     st.stop()
 
 sel_key = "selected_table"

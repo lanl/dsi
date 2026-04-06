@@ -2,7 +2,6 @@ import collections
 
 from dsi.plugins.env import Hostname, SystemKernel, GitInfo
 import git
-from json import loads
 
 def get_git_root(path):
     git_repo = git.Repo(path, search_parent_directories=True)
@@ -13,7 +12,7 @@ def test_hostname_plugin_type():
     a = Hostname()
     a.add_rows()
     a.add_rows()
-    assert type(a.output_collector) == collections.OrderedDict
+    assert isinstance(a.output_collector, collections.OrderedDict)
 
 def test_hostname_plugin_col_shape():
     a = Hostname()
@@ -34,7 +33,7 @@ def test_hostname_plugin_row_shape():
 # SYSTEM KERNEL FUNCTIONS ONLY WORK ON LINUX
 def test_systemkernel_plugin_type():
     plug = SystemKernel()
-    assert type(plug.output_collector) == collections.OrderedDict
+    assert isinstance(plug.output_collector, collections.OrderedDict)
 
 # def test_systemkernel_plugin_adds_rows():
 #     plug = SystemKernel()
@@ -61,7 +60,7 @@ def test_git_plugin_type():
     root = get_git_root('.')
     plug = GitInfo(git_repo_path=root)
     plug.add_rows()
-    assert type(plug.output_collector) == collections.OrderedDict
+    assert isinstance(plug.output_collector, collections.OrderedDict)
 
 def test_git_plugin_adds_rows():
     root = get_git_root('.')
@@ -80,5 +79,5 @@ def test_git_plugin_infos_are_str():
     plug = GitInfo(git_repo_path=root)
     plug.add_rows()
 
-    assert type(plug.output_collector["GitInfo"]["git_remote"][0]) == str
-    assert type(plug.output_collector["GitInfo"]["git_commit"][0]) == str
+    assert isinstance(plug.output_collector["GitInfo"]["git_remote"][0], str)
+    assert isinstance(plug.output_collector["GitInfo"]["git_commit"][0], str)

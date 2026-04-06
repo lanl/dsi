@@ -15,7 +15,7 @@ def test_bueno_plugin_type():
     path = '/'.join([get_git_root('.'), 'examples/test', 'bueno1.data'])
     plug = Bueno(filenames=path)
     plug.add_rows()
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
 
 
 def test_bueno_plugin_adds_rows():
@@ -46,7 +46,7 @@ def test_csv_plugin_type():
     path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
     plug = Csv(filenames=path)
     plug.add_rows()
-    assert type(plug.output_collector) == OrderedDict
+    assert isinstance(plug.output_collector, OrderedDict)
 
 def test_csv_plugin_adds_rows():
     path = '/'.join([get_git_root('.'), 'examples/test', 'wildfiredata.csv'])
@@ -94,8 +94,26 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
     columns = list(term.active_metadata["Csv"].values())
     assert all([len(columns[0]) == len(col)
                for col in columns])  # all same length
-    
+
 def test_yaml_reader():
+    a=Terminal()
+    a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], table_name = "oceans")
+
+    assert len(a.active_metadata.keys()) == 1 # 1 table - oceans
+    for name, tableData in a.active_metadata.items():
+        assert isinstance(tableData, OrderedDict)
+        assert len(tableData.keys()) == 15
+
+def test_yaml_reader_v1_2():
+    a=Terminal()
+    a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], table_name = "oceans", yaml_version = "1.2")
+
+    assert len(a.active_metadata.keys()) == 1 # 1 table - oceans
+    for name, tableData in a.active_metadata.items():
+        assert isinstance(tableData, OrderedDict)
+        assert len(tableData.keys()) == 15
+
+def test_yaml1_reader():
     a=Terminal()
     a.load_module('plugin', 'YAML1', 'reader', filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], target_table_prefix = "student")
 
@@ -108,6 +126,15 @@ def test_yaml_reader():
         assert all(len(colData) == numRows for colData in tableData.values())
 
 def test_toml_reader():
+    a=Terminal()
+    a.load_module('plugin', 'TOML', 'reader', filenames="examples/test/example.toml")
+
+    assert len(a.active_metadata.keys()) == 1 # 2 tables - people and dsi_units
+    for name, tableData in a.active_metadata.items():
+        assert isinstance(tableData, OrderedDict)
+        assert len(tableData.keys()) == 2
+
+def test_toml1_reader():
     a=Terminal()
     a.load_module('plugin', 'TOML1', 'reader', filenames="examples/test/results.toml", target_table_prefix = "results")
 

@@ -27,7 +27,7 @@ Quick Start: Installation
 
       git clone https://github.com/lanl/dsi.git
       cd dsi
-      pip install .
+      pip install . -r requirements.txt
 
    Supported release: Published versions on PyPI at https://pypi.org/project/dsi-workflow/. Install the latest version by:
 
@@ -35,11 +35,12 @@ Quick Start: Installation
 
       python3 -m pip install dsi-workflow
 
-#. (Optional) If using all DSI functionalities, it is necessary to install requirements.extras.txt as well:
+#. (Optional) For intermediate or full DSI functionality, install one of the additional requirement files:
 
    .. code-block:: unixconfig
 
       pip install -r requirements.extras.txt
+      pip install -r requirements.heavy.txt
 
 #. When you've completed work, deactivate the environment with:
 

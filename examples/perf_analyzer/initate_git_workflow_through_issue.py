@@ -1,8 +1,5 @@
 
 import argparse
-import sys
-import numpy as np
-import pandas as pd
 from github import Github
 
 
@@ -17,7 +14,6 @@ def testGitIsssue():
     repo = getGitRepo(user_repo)
     repo.create_issue(title="This is a new issue")
     issue = repo.get_issue(number=1)
-    ic = issue.get_comments()
     issue.create_comment("This")
     print(issue.title)
 

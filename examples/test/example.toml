@@ -1,0 +1,11 @@
+[[nodes]]
+name = "node1"
+
+[nodes.resources]
+gpu = 4
+
+[[nodes]]
+name = "node2"
+
+[nodes.resources]
+gpu = 2

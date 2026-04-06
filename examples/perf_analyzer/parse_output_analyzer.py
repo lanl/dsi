@@ -4,15 +4,12 @@
 Parses the output from CloverLeaf runs and creates a csv file
 """
 
-import argparse
-import sys
 import re
-import glob
 import git
-import pandas as pd
-from dsi.plugins.collection_reader import Dict
-from dsi.backends.sqlite import Sqlite, DataType
-import json
+# import pandas as pd
+# from dsi.plugins.collection_reader import Dict
+# from dsi.backends.sqlite import Sqlite, DataType
+from dsi.dsi import DSI
 
 def get_repo_and_name_from_url(url: str):
     last_colon_index = url.rfind(":")
@@ -49,41 +46,46 @@ def add_output_to_csv_file(data, testname):
 
         clover_out.write(row + "\n")
 
-def add_non_existing_columns(data, test_name, db_base_dir):
-    dbpath = db_base_dir + "/clover_" + test_name + ".db"
-    store = Sqlite(dbpath)
-    data_type = DataType()
-    data_type.name = "TABLENAME"
+# def add_non_existing_columns(data, test_name, db_base_dir):
+#     dbpath = db_base_dir + "/clover_" + test_name + ".db"
+#     store = Sqlite(dbpath)
+#     data_type = DataType()
+#     data_type.name = "TABLENAME"
 
-    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
-    result = store.sqlquery(query)
-    if len(result) == 0:
-        return
+#     query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
+#     result = store.sqlquery(query)
+#     if len(result) == 0:
+#         return
     
-    str_query = "PRAGMA table_info( " + data_type.name + " );"
-    result = store.sqlquery(str_query)
-    art_list = [tup[1] for tup in result]
-    for key in data:
-        if key not in art_list:
-            print("key not exist: ", key)
-            str_query = "ALTER TABLE " + data_type.name + " ADD " + key + " VARCHAR DEFAULT None"
-            result = store.sqlquery(str_query)
-            print(key, " added")
-    store.close()
+#     str_query = "PRAGMA table_info( " + data_type.name + " );"
+#     result = store.sqlquery(str_query)
+#     art_list = [tup[1] for tup in result]
+#     for key in data:
+#         if key not in art_list:
+#             print("key not exist: ", key)
+#             str_query = "ALTER TABLE " + data_type.name + " ADD " + key + " VARCHAR DEFAULT None"
+#             result = store.sqlquery(str_query)
+#             print(key, " added")
+#     store.close()
     
 
 def add_output_to_dsi(data, test_name, db_base_dir):
     dbpath = db_base_dir + '/clover_' + test_name + '.db'
-    dsi_dict = Dict(data)
-    dsi_dict.add_rows()
-    # print(dsi_dict.collections)
 
-    add_non_existing_columns(data, test_name, db_base_dir)
-
-    store = Sqlite(dbpath)
-    # store.types.name = test_name
-    store.put_artifacts(dsi_dict.collections[0], isVerbose=False)
+    store = DSI(dbpath)
+    store.read(data, "Collections", table_name="TABLENAME")
     store.close()
+
+    # dsi_dict = Dict(data)
+    # dsi_dict.add_rows()
+    # # print(dsi_dict.collections)
+
+    # add_non_existing_columns(data, test_name, db_base_dir)
+
+    # store = Sqlite(dbpath)
+    # # store.types.name = test_name
+    # store.put_artifacts(dsi_dict.collections[0], isVerbose=False)
+    # store.close()
 
 
 """
@@ -91,24 +93,40 @@ Performs a sample query on the DSI db
 """
 def test_artifact_query(test_name, db_base_dir, git_hash):
     dbpath = db_base_dir +  "/clover_" + test_name + ".db"
-    store = Sqlite(dbpath)
-    _ = store.get_artifact_list(isVerbose=False)
-    data_type = DataType()
-    data_type.name = "TABLENAME"
-    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
-    result = store.sqlquery(query)
-    if len(result) == 0:
-        return False
-    query = "SELECT count(*) as cn FROM " + str(data_type.name) + " WHERE git_hash LIKE '" + git_hash + "%'"
-    print("Running Query", query)
-    result = store.sqlquery(query)
+    table_name = "TABLENAME"
+    
+    store = DSI(dbpath)
+    result = store.query(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'", True)
+    if result.empty:
+        return
+    
+    result = store.query(f"SELECT count(*) as cn FROM {table_name} WHERE git_hash LIKE '{git_hash}%'", True)
     store.close()
-    if len(result) > 0 and result[0][0] > 0:
+    if not result.empty and result.iloc[0, 0] > 0:
         print("found")
         return True
     else:
         print("not found")
     return False
+
+    # store = Sqlite(dbpath)
+    # _ = store.get_artifact_list(isVerbose=False)
+    # data_type = DataType()
+    # data_type.name = "TABLENAME"
+    # query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
+    # result = store.sqlquery(query)
+    # if len(result) == 0:
+    #     return False
+    # query = "SELECT count(*) as cn FROM " + str(data_type.name) + " WHERE git_hash LIKE '" + git_hash + "%'"
+    # print("Running Query", query)
+    # result = store.sqlquery(query)
+    # store.close()
+    # if len(result) > 0 and result[0][0] > 0:
+    #     print("found")
+    #     return True
+    # else:
+    #     print("not found")
+    # return False
     # store.export_csv_query(query, "clover_query.csv")
 
 
@@ -117,20 +135,31 @@ Performs a sample query on the DSI db
 """
 def get_all_db_data(test_name, db_base_dir):
     dbpath = db_base_dir +  "/clover_" + test_name + ".db"
-    store = Sqlite(dbpath)
-    _ = store.get_artifact_list(isVerbose=False)
-    data_type = DataType()
-    data_type.name = "TABLENAME"
-    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
-    result = store.sqlquery(query)
-    if len(result) == 0:
-        return None
-    query = "SELECT * FROM " + str(data_type.name)
-    print("Running Query", query)
-    result = pd.read_sql(query, store.con)
-    # result = store.sqlquery(query)
+    table_name = "TABLENAME"
+
+    store = DSI(dbpath)
+    result = store.query(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'", True)
+    if result.empty:
+        return
+    
+    result = store.query(f"SELECT * FROM {table_name}", True)
     store.close()
     return result
+
+    # store = Sqlite(dbpath)
+    # _ = store.get_artifact_list(isVerbose=False)
+    # data_type = DataType()
+    # data_type.name = "TABLENAME"
+    # query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + data_type.name + "'"
+    # result = store.sqlquery(query)
+    # if len(result) == 0:
+    #     return None
+    # query = "SELECT * FROM " + str(data_type.name)
+    # print("Running Query", query)
+    # result = pd.read_sql(query, store.con)
+    # # result = store.sqlquery(query)
+    # store.close()
+    # return result
 
 
 def process_keys_for_sqlite(key):
@@ -256,7 +285,7 @@ def main():
     data = parse_tau_output_file(testname, gitdir)
     # print(data)
     # add_output_to_csv_file(data, testname)
-    # add_output_to_dsi(data, testname)
+    add_output_to_dsi(data, testname)
 
     # test_artifact_query(testname)
 

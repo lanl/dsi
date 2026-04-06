@@ -19,7 +19,7 @@ def test_sqlite_backend():
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
-    test = DSI(filename=dbpath, backend_name= "Sqlite")
+    DSI(filename=dbpath, backend_name= "Sqlite")
     assert True
 
 def test_error_filename():
@@ -29,9 +29,9 @@ def test_error_filename():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     try:
-        test.read(filenames=["examples/test/WRONG_FILENAME_1.yml", "examples/test/WRONG_FILENAME_2.yml"], reader_name='YAML1')
+        test.read(data_sources=["examples/test/WRONG_FILENAME_1.yml", "examples/test/WRONG_FILENAME_2.yml"], reader_name='YAML1')
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "read() ERROR: All input files must have a valid filepath. Please check again."
         assert str(e) == expected
 
@@ -42,16 +42,16 @@ def test_read_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
-    test.read(filenames="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
-    test.read(filenames="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
-    test.read(filenames=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
+    test.read(data_sources="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
+    test.read(data_sources="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
+    test.read(data_sources=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
 
-    test.read(filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
-    test.read(filenames="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
-    test.read(filenames="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
-    test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
+    test.read(data_sources=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
+    test.read(data_sources="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
     assert True
 
 def test_write_sqlite_backend():
@@ -77,14 +77,14 @@ def test_query_sqlite_backend():
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
 
-    excepted_output = textwrap.dedent("""
+    expected_output = textwrap.dedent("""
     specification | n    | o       | p   | q       | r  | s      
     -------------------------------------------------------------
     !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
     !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     """)
     
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     assert isinstance(query_data, DataFrame)
@@ -100,7 +100,7 @@ def test_query_update_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     query_df = test.query("SELECT * FROM address", collection=True, update=True)  # return output
     query_df['i'] = 123
     query_df["new_col"] = "test1"
@@ -125,10 +125,10 @@ def test_get_table_sqlite_backend():
     query_f = io.StringIO()
     with redirect_stdout(query_f):
         test.query("SELECT * FROM physics")
-    excepted_output = query_f.getvalue()
-    excepted_output = "\n".join(excepted_output.splitlines()[1:])
+    expected_output = query_f.getvalue()
+    expected_output = "\n".join(expected_output.splitlines()[1:])
 
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     get_data = test.get_table(table_name="physics", collection=True, update=True)
@@ -141,7 +141,7 @@ def test_search_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -248,10 +248,10 @@ def test_sanitize_inputs_sqlite():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c     | d   | e    | f     
-    --------------------------------------------------------
-    None          | nan | nan  | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | math | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 4.0  | 45.98 | 3.0  | 44.8 | 0.0099
     
     """)
     assert output == expected_output
@@ -288,9 +288,9 @@ def test_find_inequality_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -364,9 +364,9 @@ def test_find_equality_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -433,9 +433,9 @@ def test_find_range_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -531,9 +531,9 @@ def test_find_partial_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -615,56 +615,56 @@ def test_find_relation_error_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
         test.find(query=2, collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must be a string."
     
     try:
         test.find(query="a", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='"a" > "14"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: The value in the relational find() cannot be enclosed in double quotes"
 
     try:
         test.find(query="'a' > 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Cannot have a single quote as part of a column name"
 
     try:
         test.find(query="'a' 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
     try:
         test.find(query="a 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='a ">1"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: The value in the relational find() cannot be enclosed in double quotes'
     
     f = io.StringIO()
@@ -694,45 +694,45 @@ def test_find_relation_error_sqlite_backend():
     try:
         test.find(query="a > '<4')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a > <4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a (1,2))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="a (')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), values must be separated by a comma."
 
     try:
         test.find(query="a (,", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), it must end with closing parenthesis."
 
     try:
         test.find(query="a (,')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: There needs to be two values for the range find. Ex: (1,2)'
 
     try:
         test.find(query="g !=there's", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s"
 
     f = io.StringIO()
@@ -747,74 +747,73 @@ def test_find_relation_error_sqlite_backend():
     try:
         test.find(query="g (there is, a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     try:
         test.find(query="g ('there is', a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
 
     try:
         test.find(query="g ('there is', 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Invalid input range: '('there is','a place')'. The lower value must come first."
     
     try:
         test.find(query="g ('there is' 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), values must be separated by a comma."
     
     try:
         test.find(query="g ('there is', 'a place'", collection=True, update=True)
         assert False
-    except SystemExit as output:
-        print(output)
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place)'", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place'))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (3,4))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (,4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: There needs to be two values for the range find. Ex: (1,2)"
     
     try:
         test.find(query='a ("hello",6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello")', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello", 6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     f = io.StringIO()
@@ -839,7 +838,7 @@ def test_schema_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
 
 def test_error_schema_sqlite_backend():
@@ -850,16 +849,16 @@ def test_error_schema_sqlite_backend():
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     try:
         test.schema(filename="examples/test/yaml1_schema.json")
-        test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
+        test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard') # Unrelated data loaded in after schema
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "read() ERROR: Users must load all associated data for a schema after loading a complex schema."
         assert str(e) == expected
 
     try:
         test.schema(filename="examples/test/yaml1_schema.json")
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "schema() ERROR: There is already a complex schema in memory. First load all its associated files."
         assert str(e) == expected
 
@@ -870,7 +869,7 @@ def test_query_update_schema_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     
     query_df = test.query("SELECT * FROM address", collection=True, update=True)  # return output
     query_df['i'] = [123, 234]
@@ -895,7 +894,7 @@ def test_overwrite_schema_sqlite_backend():
 
     test = DSI(filename=dbpath, backend_name= "Sqlite")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
     test.schema(filename="examples/test/yaml1_circular_schema.json")
@@ -924,7 +923,7 @@ def test_duckdb_backend():
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
-    test = DSI(filename=dbpath, backend_name= "DuckDB")
+    DSI(filename=dbpath, backend_name= "DuckDB")
     assert True
 
 def test_read_duckdb_backend():
@@ -934,16 +933,16 @@ def test_read_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
-    test.read(filenames="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
-    test.read(filenames="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
-    test.read(filenames=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/results.toml", "examples/test/results1.toml"], reader_name='TOML1')
+    test.read(data_sources="examples/test/yosemite5.csv", reader_name='CSV', table_name = "yosemite") # data table is named yosemite not Csv
+    test.read(data_sources="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
+    test.read(data_sources=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
 
-    test.read(filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
-    test.read(filenames="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
-    test.read(filenames="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
-    test.read(filenames="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
+    test.read(data_sources=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
+    test.read(data_sources="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
+    test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
     assert True
 
 def test_write_duckdb_backend():
@@ -969,13 +968,13 @@ def test_query_duckdb_backend():
     output = f.getvalue()
     output = "\n".join(output.splitlines()[1:])
 
-    excepted_output = textwrap.dedent("""
+    expected_output = textwrap.dedent("""
     specification | n    | o       | p   | q       | r  | s      
     -------------------------------------------------------------
     !amy          | 9.8  | gravity | 23  | home 23 | 1  | -0.0012
     !amy1         | 91.8 | gravity | 233 | home 23 | 12 | -0.0122
     """)
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     assert isinstance(query_data, DataFrame)
@@ -991,7 +990,7 @@ def test_query_update_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     query_df = test.query("SELECT * FROM address", collection=True, update=True)  # return output
     query_df['i'] = 123
     query_df["new_col"] = "test1"
@@ -1016,10 +1015,10 @@ def test_get_table_duckdb_backend():
     query_f = io.StringIO()
     with redirect_stdout(query_f):
         test.query("SELECT * FROM physics")
-    excepted_output = query_f.getvalue()
-    excepted_output = "\n".join(excepted_output.splitlines()[1:])
+    expected_output = query_f.getvalue()
+    expected_output = "\n".join(expected_output.splitlines()[1:])
 
-    assert output == excepted_output
+    assert output == expected_output
 
     query_data = test.query("SELECT * FROM physics", collection=True, update=True)
     get_data = test.get_table(table_name="physics", collection=True, update=True)
@@ -1032,7 +1031,7 @@ def test_search_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1139,10 +1138,10 @@ def test_sanitize_inputs_duckdb():
 
     expected_output = '\nTable: math' + textwrap.dedent("""
 
-    specification | a   | math | c     | d   | e    | f     
-    --------------------------------------------------------
-    None          | nan | nan  | nan   | nan | nan  | nan   
-    !jack1        | 2.0 | 4.0  | 45.98 | 3.0 | 44.8 | 0.0099
+    specification | a    | math | c     | d    | e    | f     
+    ----------------------------------------------------------
+    None          | None | None | None  | None | None | None  
+    !jack1        | 2.0  | 4.0  | 45.98 | 3.0  | 44.8 | 0.0099
     
     """)
     assert output == expected_output
@@ -1179,9 +1178,9 @@ def test_find_inequality_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1255,9 +1254,9 @@ def test_find_equality_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1324,9 +1323,9 @@ def test_find_range_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1422,9 +1421,9 @@ def test_find_partial_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     f = io.StringIO()
     with redirect_stdout(f):
@@ -1506,56 +1505,56 @@ def test_find_relation_error_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
 
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
 
     try:
         test.find(query=2, collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must be a string."
     
     try:
         test.find(query="a", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='"a" > "14"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: The value in the relational find() cannot be enclosed in double quotes"
 
     try:
         test.find(query="'a' > 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Cannot have a single quote as part of a column name"
 
     try:
         test.find(query="'a' 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
     
     try:
         test.find(query="a 1", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Input must contain an operator. Format: [column] [operator] [value]"
 
     try:
         test.find(query='a ">1"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Could not identify the operator in `query`. The operator cannot be nested in double quotes"
 
     try:
         test.find(query='a>"2"', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: The value in the relational find() cannot be enclosed in double quotes'
     
     f = io.StringIO()
@@ -1585,45 +1584,45 @@ def test_find_relation_error_duckdb_backend():
     try:
         test.find(query="a > '<4')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a > <4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         first = "find() ERROR: Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
         assert str(output) ==  first + " If matching value has an operator in it, make sure to wrap all in single quotes."
 
     try:
         test.find(query="a (1,2))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="a (')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), values must be separated by a comma."
 
     try:
         test.find(query="a (,", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'a' using (), it must end with closing parenthesis."
 
     try:
         test.find(query="a (,')')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == 'find() ERROR: There needs to be two values for the range find. Ex: (1,2)'
 
     try:
         test.find(query="g !=there's", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Found an unmatched single quote. For apostrophes use 2 single quotes. Ex: he's -> he''s NOT he\"s"
 
     f = io.StringIO()
@@ -1638,74 +1637,73 @@ def test_find_relation_error_duckdb_backend():
     try:
         test.find(query="g (there is, a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     try:
         test.find(query="g ('there is', a place)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
 
     try:
         test.find(query="g ('there is', 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Invalid input range: '('there is','a place')'. The lower value must come first."
     
     try:
         test.find(query="g ('there is' 'a place')", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), values must be separated by a comma."
     
     try:
         test.find(query="g ('there is', 'a place'", collection=True, update=True)
         assert False
-    except SystemExit as output:
-        print(output)
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place)'", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: When applying a range-based find on 'g' using (), it must end with closing parenthesis."
     
     try:
         test.find(query="g ('there is', 'a place'))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (3,4))", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Only one operation per find. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], or partial match [~,~~]."
 
     try:
         test.find(query="g (,4)", collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: There needs to be two values for the range find. Ex: (1,2)"
     
     try:
         test.find(query='a ("hello",6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello")', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Neither value in the range-based find can be enclosed in double quotes. Only single quotes"
 
     try:
         test.find(query='a (6, "hello", 6)', collection=True, update=True)
         assert False
-    except SystemExit as output:
+    except Exception as output:
         assert str(output) == "find() ERROR: Range-based finds require multi-word values to be enclosed in single quotes"
     
     f = io.StringIO()
@@ -1730,7 +1728,7 @@ def test_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     assert True
 
 def test_query_update_schema_duckdb_backend():
@@ -1740,7 +1738,7 @@ def test_query_update_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     
     query_df = test.query("SELECT * FROM math", collection=True, update=True)  # return output
     query_df['specification'] = [123, 234]
@@ -1764,12 +1762,12 @@ def test_overwrite_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
-    #loophole to assign new schema since there isnt another schema file that can be used with yaml data (circular wont work here)
+    #loophole to assign new schema since there isn't another schema file that can be used with yaml data (circular won't work here)
     new_schema = OrderedDict({'primary_key': [('address', 'i'), ('math', 'specification')], 'foreign_key': [('math', 'b'), (None, None)]})
-    test.read(filenames=new_schema, reader_name="Collection", table_name="dsi_relations") #loophole to assign new schema since
+    test.read(data_sources=new_schema, reader_name="Collection", table_name="dsi_relations") #loophole to assign new schema since
     test.write(filename="new_erd.png", writer_name="ER_Diagram")
 
     def file_hash(path):
@@ -1790,12 +1788,12 @@ def test_fail_overwrite_schema_duckdb_backend():
 
     test = DSI(filename=dbpath, backend_name= "DuckDB")
     test.schema(filename="examples/test/yaml1_schema.json")
-    test.read(filenames=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
+    test.read(data_sources=["examples/test/student_test1.yml", "examples/test/student_test2.yml"], reader_name='YAML1')
     test.write(filename="full_erd.png", writer_name="ER_Diagram")
 
     try:
         test.schema(filename="examples/test/yaml1_circular_schema.json") # should not allow circular dependency overwrite
         assert False
-    except SystemExit as e:
+    except Exception as e:
         expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
         assert str(e) == expected
