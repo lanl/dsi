@@ -1,6 +1,4 @@
 # tests/test_ndp.py
-import pytest
-import pandas as pd
 from collections import OrderedDict
 from dsi.backends.ndp import NDP
 
