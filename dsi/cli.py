@@ -648,9 +648,9 @@ class DSI_cli:
             return
         
         if os.name != 'nt':
-            bash_script_filepath = os.path.join(os.path.dirname(__file__),"tools","launch_streamlit.sh")
+            bash_script_filepath = os.path.join(os.path.dirname(__file__),"utils","launch_streamlit.sh")
         else:
-            bash_script_filepath = os.path.join(os.path.dirname(__file__),"tools","launch_streamlit.bat")
+            bash_script_filepath = os.path.join(os.path.dirname(__file__),"utils","launch_streamlit.bat")
 
         if viewer == "dashboard":
             # user must specify at least one directory
