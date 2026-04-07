@@ -5,6 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 from dsi.dsi import DSI
+from dsi.utils.dsi_utils import detect_valid_db_with_data
 
 class DSIFederated:
     """A class for federated querying of DSI databases. It loads metadata about the databases and 
