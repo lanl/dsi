@@ -1,7 +1,7 @@
 from dsi.sync import Sync
 
 # Origin location of data
-remote_sources = "/Users/Shared/dev/dsi/examples/federated/input.yaml"
+remote_sources = "../federated/input.yaml"
 # Remote Location where database and data will be moved
 workspace = "dsi_data"
 
