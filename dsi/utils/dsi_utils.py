@@ -4,7 +4,7 @@ import pandas as pd
 import sqlite3
 
 from contextlib import closing
-from pandasql import sqldf
+#from pandasql import sqldf
 from pathlib import Path
 
 from dsi.dsi import DSI
@@ -213,42 +213,75 @@ class f_dsi:
         return self.df
 
 
-    def _find_db_path(self,  db: str, table: str="") -> list[str]:
-        """Finds the file path of a database containing a specified table and database name within the federated system.
+    # def _find_db_path(self,  db: str, table: str="") -> list[str]:
+    #     """Finds the file path of a database containing a specified table and database name within the federated system.
         
+    #     Args:
+    #         table (str): The name of the table to find.
+    #         db (str): The name of the database containing the table.
+
+    #     Returns:
+    #         The file path of the database containing the specified table and database name.
+    #     """
+    #     if table == "":
+    #         q = f"SELECT path FROM df_exp WHERE name = '{db}'"
+    #     else:
+    #         q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
+
+    #     out = sqldf(q, {"df_exp": self.df_exp})
+ 
+    #     path_str = out["path"].tolist()
+    #     return path_str
+    
+    def _find_db_path(self, db: str, table: str = "") -> list[str]:
+        """Finds the file path of a database containing a specified table and database name within the federated system.
+
         Args:
             table (str): The name of the table to find.
             db (str): The name of the database containing the table.
 
         Returns:
-            The file path of the database containing the specified table and database name.
+            list[str]: The file path(s) of the database containing the specified table and database name.
         """
-        if table == "":
-            q = f"SELECT path FROM df_exp WHERE name = '{db}'"
-        else:
-            q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
+        df = self.df_exp
 
-        out = sqldf(q, {"df_exp": self.df_exp})
- 
-        path_str = out["path"].tolist()
-        return path_str
-    
+        if table == "":
+            filtered = df[df["name"] == db]
+        else:
+            filtered = df[(df["table"] == table) & (df["name"] == db)]
+
+        return filtered["path"].tolist()
+
+    # def get_db_path(self, db_name: str) -> list[str]:
+    #     """Returns a list of file paths for databases with the specified name within the federated system.
+        
+    #     Args:
+    #         db_name (str): The name of the database to find.
+
+    #     Returns:            
+    #         A list of file paths for databases with the specified name.
+    #     """
+
+    #     q = f"SELECT path FROM df_exp WHERE name = '{db_name}'"        
+    #     out = sqldf(q, {"df_exp": self.df_exp})
+    #     path_list = out["path"].tolist()
+    #     return path_list
 
     def get_db_path(self, db_name: str) -> list[str]:
         """Returns a list of file paths for databases with the specified name within the federated system.
-        
+    
         Args:
             db_name (str): The name of the database to find.
 
         Returns:            
-            A list of file paths for databases with the specified name.
+            list[str]: A list of file paths for databases with the specified name.
         """
+        df = self.df_exp
 
-        q = f"SELECT path FROM df_exp WHERE name = '{db_name}'"        
-        out = sqldf(q, {"df_exp": self.df_exp})
-        path_list = out["path"].tolist()
-        return path_list
+        if "name" not in df.columns or "path" not in df.columns:
+            raise KeyError("DataFrame must contain 'name' and 'path' columns")
 
+        return df.loc[df["name"] == db_name, "path"].tolist()
 
 
     def f_get_databases(self) -> list[dict]:
