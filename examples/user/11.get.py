@@ -1,5 +1,5 @@
 from dsi.sync import Sync
-from dsi.utils.dsi_utils import DSIFederated
+from dsi.dsifederated import DSIFederated
 
 # Origin location of data
 remote_sources = "../federated/input.yaml"
