@@ -153,12 +153,12 @@ def detect_valid_db_with_data(path: str) -> tuple[str | None, bool, str]:
 
 
 
-class f_dsi:
+class DSIFederated:
     """A class for federated querying of DSI databases. It loads metadata about the databases and 
     their tables from a specified folder, and provides methods to summarize, query, search, and find data across the federated databases."""
 
     def __init__(self, federated_folder_path:str, operating_mode:str="console"):
-        """Initializes the f_dsi class by loading metadata about the federated databases and their tables from a specified folder.
+        """Initializes the DSIFederated class by loading metadata about the federated databases and their tables from a specified folder.
         
         Args:
             federated_folder_path (str): The file path to the folder containing the metadata about the federated databases. The folder should contain a JSON file named "dsi_database_list.json" with the metadata information.
