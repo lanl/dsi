@@ -3,6 +3,7 @@ import csv
 import tarfile
 import subprocess
 import uuid
+import yaml
 import time
 import itertools
 import shutil
@@ -12,6 +13,24 @@ from contextlib import redirect_stdout
 from collections import OrderedDict
 
 from dsi.core import Terminal
+from dsi.utils.federated import federate_datasets
+
+
+from dsi.utils.dsi_utils import (
+    compute_md5, 
+    create_directory, 
+    create_folder_from_path, 
+    csv_to_list_of_dicts, 
+    deduplicate_keep_latest, 
+    get_last_part, 
+    human_readable_size, 
+    should_download, 
+    upsert_records
+)
+
+from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
+from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
+from dsi.utils.web_utils import download_web_file, get_url_file_size
 
 class Sync():
     """
@@ -493,12 +512,28 @@ class Sync():
             print(f"\nFinished crawling: {filepath}")
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
-    def get(self, project_name = "Project"):
+    def get(self, input_yaml = None, workspace_folder= None):
         '''
-        Helper function that searches remote location based on project name, and retrieves
-        DSI database
+        Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
         '''
-        True
+
+        # Read configuration from YAML file
+        if input_yaml:
+            try:
+                yaml_path = Path(input_yaml)
+                config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                print(f"Error: Could not find YAML file {yaml_path}")
+        else:
+            True
+        
+        # Create a folder for the databases if it doesn't exist, or use the provided one
+        if not workspace_folder:
+            _workspace_folder = config_data.get("workspace_folder", "")
+            workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+
+
+        federate_datasets(workspace_folder, config_data)
 
     def gen_uuid(self, st):
         '''
