@@ -3,7 +3,7 @@ import uuid
 import yaml
 from pathlib import Path
 
-from federation_utils import (
+from dsi.utils.federation_utils import (
     compute_md5, 
     create_directory, 
     create_folder_from_path, 
@@ -15,9 +15,9 @@ from federation_utils import (
     upsert_records
 )
 
-from git_utils import download_github_file, get_github_remote_file_size
-from rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
-from web_utils import download_web_file, get_url_file_size
+from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
+from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
+from dsi.utils.web_utils import download_web_file, get_url_file_size
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:

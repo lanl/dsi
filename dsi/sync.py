@@ -16,7 +16,7 @@ from dsi.core import Terminal
 from dsi.utils.federated import federate_datasets
 
 
-from dsi.utils.dsi_utils import (
+from dsi.utils.federation_utils import (
     compute_md5, 
     create_directory, 
     create_folder_from_path, 
@@ -31,6 +31,7 @@ from dsi.utils.dsi_utils import (
 from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
 from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
 from dsi.utils.web_utils import download_web_file, get_url_file_size
+from dsi.utils.federated.federate_datasets import federate_datasets
 
 class Sync():
     """
@@ -39,49 +40,50 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name="test"):
+    def __init__(self, project_name=None):
         self.project_name = project_name
         extension = ""
-        for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
-            if project_name.lower().endswith(ext):
-                self.project_name = project_name[:-len(ext)]
-                extension = ext
-                break
-        if extension != "":
-            self.full_db_name = self.project_name + extension
-        else:
-            proj_db_found = False
-            for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
-                if os.path.exists(self.project_name + ext):
-                    if proj_db_found:
-                        raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
-                    self.full_db_name = self.project_name + ext
-                    proj_db_found = True
+        if project_name:
+            for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
+                if project_name.lower().endswith(ext):
+                    self.project_name = project_name[:-len(ext)]
+                    extension = ext
+                    break
+            if extension != "":
+                self.full_db_name = self.project_name + extension
+            else:
+                proj_db_found = False
+                for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
+                    if os.path.exists(self.project_name + ext):
+                        if proj_db_found:
+                            raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
+                        self.full_db_name = self.project_name + ext
+                        proj_db_found = True
 
-        self.remote_location = None
-        self.local_location = None
-        self.file_list = None
-        self.rfile_list = None
+            self.remote_location = None
+            self.local_location = None
+            self.file_list = None
+            self.rfile_list = None
 
-        self.t = Terminal()
-        # first check if user can create db here
-        if "/" in project_name:
-            create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
-        else:
-            create_bool = self.t.can_create_file_here()
-        if create_bool is False:
-            raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
-    
-        backend_name = self.t.identify_backend(self.full_db_name)
-        if backend_name is None:
-            raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+            self.t = Terminal()
+            # first check if user can create db here
+            if "/" in project_name:
+                create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
+            else:
+                create_bool = self.t.can_create_file_here()
+            if create_bool is False:
+                raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
+        
+            backend_name = self.t.identify_backend(self.full_db_name)
+            if backend_name is None:
+                raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
 
-        fnull = open(os.devnull, 'w')
-        with redirect_stdout(fnull):
-            self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
 
-        if not self.t.valid_backend(self.t.loaded_backends[0], self.t.loaded_backends[0].__class__.__bases__[0].__name__):
-            raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
+            if not self.t.valid_backend(self.t.loaded_backends[0], self.t.loaded_backends[0].__class__.__bases__[0].__name__):
+                raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
 
     def reindex(self, local_loc, remote_loc, isVerbose = False):
         """
