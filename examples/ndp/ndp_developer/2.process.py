@@ -1,4 +1,4 @@
-# examples/ndp/2.process.py
+# examples/ndp/ndp_developer/2.process.py
 import argparse
 from dsi.core import Terminal
 

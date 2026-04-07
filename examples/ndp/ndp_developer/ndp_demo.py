@@ -1,4 +1,4 @@
-# examples/ndp/ndp_demo.py
+# examples/ndp/ndp_developer/ndp_demo.py
 
 from dsi.core import Terminal
 import pandas as pd

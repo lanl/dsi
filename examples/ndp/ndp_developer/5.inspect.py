@@ -1,3 +1,4 @@
+# examples/ndp/ndp_developer/5.inspect.py
 import argparse
 from dsi.core import Terminal
 

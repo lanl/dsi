@@ -1,4 +1,4 @@
-# examples/ndp/run_all.py
+# examples/ndp/ndp_developer/9.run_all.py
 import subprocess
 
 test_files = [

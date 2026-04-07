@@ -1,4 +1,4 @@
-# examples/ndp/3.query.py
+# examples/ndp/ndp_developer/3.query.py
 import argparse
 from dsi.core import Terminal
 

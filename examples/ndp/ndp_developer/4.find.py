@@ -1,4 +1,4 @@
-# examples/ndp/4.find.py
+# examples/ndp/ndp_developer/4.find.py
 import argparse
 from dsi.core import Terminal
 

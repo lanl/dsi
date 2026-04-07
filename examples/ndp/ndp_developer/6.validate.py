@@ -1,4 +1,4 @@
-# examples/ndp/6.validate.py
+# examples/ndp/ndp_developer/6.validate.py
 import argparse
 from dsi.core import Terminal
 
