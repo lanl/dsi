@@ -13,24 +13,6 @@ from contextlib import redirect_stdout
 from collections import OrderedDict
 
 from dsi.core import Terminal
-from dsi.utils.federated import federate_datasets
-
-
-from dsi.utils.federation_utils import (
-    compute_md5, 
-    create_directory, 
-    create_folder_from_path, 
-    csv_to_list_of_dicts, 
-    deduplicate_keep_latest, 
-    get_last_part, 
-    human_readable_size, 
-    should_download, 
-    upsert_records
-)
-
-from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
-from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
-from dsi.utils.web_utils import download_web_file, get_url_file_size
 from dsi.utils.federated.federate_datasets import federate_datasets
 
 class Sync():
