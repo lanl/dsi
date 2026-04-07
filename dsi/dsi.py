@@ -141,7 +141,7 @@ class DSI():
         else:
             msg = "Created an instance of DSI"
         
-        logger.log(msg) if self.silence_messages else print(msg)
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
     def list_backends(self):
         """
@@ -192,7 +192,7 @@ class DSI():
                 self.schema_tables = all_schema_tables
 
             msg = f"Successfully loaded the schema file: {filename}"
-            logger.log(msg) if self.silence_messages else print(msg)
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
         else:
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
@@ -406,7 +406,7 @@ class DSI():
         msg = f"Loaded {data_sources} into the tables: {', '.join(table_keys)}"
         if len(table_keys) == 1:
             msg.replace("the tables:", "the table:")
-        logger.log(msg) if self.silence_messages else print(msg)
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
     def query(self, statement, collection = False, update = False):
         """
@@ -444,7 +444,7 @@ class DSI():
    
         if df.empty:
             msg = output if output else "WARNING: input query returned no data. Please check again."
-            logger.log(msg) if self.silence_messages else print(msg)
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return
         if not collection:
             print(f"Printing the result of the SQL query: {statement}")
@@ -458,12 +458,12 @@ class DSI():
             print()
         else:
             msg = f"Storing the result of the SQL query: {statement} as a collection"
-            logger.log(msg) if self.silence_messages else print(msg)
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
             if update:
                 df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
-                logger.log(msg2) if self.silence_messages else print(msg2)
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
     
     def get_table(self, table_name, collection = False, update = False):
@@ -513,13 +513,13 @@ class DSI():
             print()
         else:
             msg = f"Storing all data for the table: {table_name} as a collection"
-            logger.log(msg) if self.silence_messages else print(msg)
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             
             if update:
                 df.insert(0, "dsi_table_name", table_name)
 
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
-                logger.log(msg2) if self.silence_messages else print(msg2)
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
         
     def find(self, query, collection = False, update = False):
@@ -567,7 +567,7 @@ class DSI():
             raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
         
         msg = f"Finding all rows where '{query}' in the active backend"
-        logger.log(msg) if self.silence_messages else print(msg)
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         output = None
         try:
@@ -615,7 +615,7 @@ class DSI():
                 output_df.insert(0, "dsi_table_name", table_name)
                 first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
                 msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
-                logger.log(msg) if self.silence_messages else print(msg)
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return output_df
     
     def search(self, query, collection = False):
@@ -639,7 +639,7 @@ class DSI():
 
         val = f"'{query}'" if isinstance(query, str) else query
         msg = f"Searching for all instances of {val} in the active backend"
-        logger.log(msg) if self.silence_messages else print(msg)
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         fnull = open(os.devnull, 'w')
         try:
@@ -709,7 +709,7 @@ class DSI():
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
         msg = "Updating the active backend with the input collection of data"
-        logger.log(msg) if self.silence_messages else print(msg)
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         if not isinstance(collection, pd.DataFrame):
             raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
@@ -784,7 +784,7 @@ class DSI():
                 extension = self.database_name.rfind('.')
                 backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
                 msg = f"Created backup '{backup_file}' before updating the data."
-                logger.log(msg) if self.silence_messages else print(msg)
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             if e.args:
@@ -933,7 +933,7 @@ class DSI():
 
         self.t.active_metadata = OrderedDict()
         msg = f"Successfully wrote to the output file {filename}"
-        logger.log(msg) if self.silence_messages else print(msg)
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
     
 
     def list(self, collection: bool = False) -> list | None:
