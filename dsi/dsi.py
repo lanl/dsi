@@ -3,6 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import os
+import logging
 from contextlib import redirect_stdout
 import io
 import math
@@ -10,6 +11,8 @@ import ast
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+logger = logging.getLogger(__name__)
 
 class DSI():
     '''
@@ -44,6 +47,8 @@ class DSI():
         self.schema_read = False
         self.schema_tables = set()
         self.loaded_tables = set()
+
+        self.silence_messages = kwargs.pop('silence_messages', False)
 
         if "/" in filename:
             create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
@@ -95,8 +100,9 @@ class DSI():
                 self.t.add_external_python_module('backend', external_backend_name, backend_name)
                 self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
             except Exception as e:
+                logger.error(f"backend ERROR: {e}", exc_info=True)
                 if e.args:
-                    e.args = (f'backend() ERROR: {str(e.args[0])}',) + e.args[1:]
+                    e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
         else:
@@ -110,24 +116,32 @@ class DSI():
                     filename += ".db"
             self.database_name = filename
 
+            correct_backend = True
             try:
                 if backend_name.lower() == 'sqlite':
                     self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
                 elif backend_name.lower() == 'duckdb':
                     self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
                 else:
-                    print("Please check the 'backend_name' argument as that one is not supported by DSI")
-                    print("Eligible backend_names are: Sqlite, DuckDB")
+                    correct_backend = False
             except Exception as e:
+                logger.error(f"backend ERROR: {e}", exc_info=True)
                 if e.args:
                     e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
-
+            
+            if not correct_backend:
+                raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                                   "Eligible backend_names are: Sqlite, DuckDB")
+        
         self.main_backend_obj = self.t.loaded_backends[0]
+
         if filename != ".temp_dsi.db":
-            print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
+            msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
-            print("Created an instance of DSI")
+            msg = "Created an instance of DSI"
+        
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
     def list_backends(self):
         """
@@ -176,7 +190,9 @@ class DSI():
             else:
                 self.schema_read = True
                 self.schema_tables = all_schema_tables
-            print(f"Successfully loaded the schema file: {filename}")
+
+            msg = f"Successfully loaded the schema file: {filename}"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
         else:
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
@@ -387,10 +403,10 @@ class DSI():
                 raise
             self.t.active_metadata = OrderedDict()
 
+        msg = f"Loaded {data_sources} into the tables: {', '.join(table_keys)}"
         if len(table_keys) == 1:
-            print(f"Loaded {data_sources} into the table {table_keys[0]}")
-        else:
-            print(f"Loaded {data_sources} into the tables: {', '.join(table_keys)}")
+            msg.replace("the tables:", "the table:")
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
     def query(self, statement, collection = False, update = False):
         """
@@ -427,10 +443,8 @@ class DSI():
             raise type(e)(*new_args) from None
    
         if df.empty:
-            if output:
-                print(output)
-            else:
-                print("WARNING: input query returned no data. Please check again.")
+            msg = output if output else "WARNING: input query returned no data. Please check again."
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return
         if not collection:
             print(f"Printing the result of the SQL query: {statement}")
@@ -443,10 +457,13 @@ class DSI():
             self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
-            print(f"Storing the result of the SQL query: {statement} as a collection")
+            msg = f"Storing the result of the SQL query: {statement} as a collection"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
             if update:
                 df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
-                print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
+                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
     
     def get_table(self, table_name, collection = False, update = False):
@@ -495,10 +512,14 @@ class DSI():
             self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
-            print(f"Storing all data for the table: {table_name} as a collection")
+            msg = f"Storing all data for the table: {table_name} as a collection"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            
             if update:
                 df.insert(0, "dsi_table_name", table_name)
-                print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
+
+                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
         
     def find(self, query, collection = False, update = False):
@@ -545,7 +566,9 @@ class DSI():
         if not any(op in query for op in operators):
             raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
         
-        print(f"Finding all rows where '{query}' in the active backend")
+        msg = f"Finding all rows where '{query}' in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
         output = None
         try:
             f = io.StringIO()
@@ -591,7 +614,8 @@ class DSI():
                 output_df.insert(0, "dsi_row_index", row_list)
                 output_df.insert(0, "dsi_table_name", table_name)
                 first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
-                print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
+                msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return output_df
     
     def search(self, query, collection = False):
@@ -614,7 +638,8 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         val = f"'{query}'" if isinstance(query, str) else query
-        print(f"Searching for all instances of {val} in the active backend")
+        msg = f"Searching for all instances of {val} in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         fnull = open(os.devnull, 'w')
         try:
@@ -683,7 +708,8 @@ class DSI():
             raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
-        print("Updating the active backend with the input collection of data")
+        msg = "Updating the active backend with the input collection of data"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         if not isinstance(collection, pd.DataFrame):
             raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
@@ -757,7 +783,8 @@ class DSI():
             if backup:
                 extension = self.database_name.rfind('.')
                 backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
-                print(f"Created backup '{backup_file}' before updating the data.")
+                msg = f"Created backup '{backup_file}' before updating the data."
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             if e.args:
@@ -905,17 +932,25 @@ class DSI():
             raise
 
         self.t.active_metadata = OrderedDict()
-        print(f"Successfully wrote to the output file {filename}")
+        msg = f"Successfully wrote to the output file {filename}"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
     
-    def list(self, collection = False):
+
+    def list(self, collection: bool = False) -> list | None:
         """
         Gets the names and dimensions (rows x columns) of all tables in the active backend.
 
-        `collection` : bool, optional, default False. 
-            If True, returns a Python list of all the table names
-            
-            If False (default), prints each table's name and dimensions to the console.
+        Arguments:
+            collection (bool): If True, returns a Python list of all the table names else if False (default), prints each table's name and dimensions to the console.
+
+        Returns:
+            list | None : list of table names if collection is True, else None. If there are no tables in the backend, then nothing is returned or printed.
+
+        Raises:
+            ValueError: If backend is empty or invalid.
+            RuntimeError: If called before schema data is loaded or if listing fails.
         """
+  
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read:
@@ -937,6 +972,8 @@ class DSI():
             return table_list
         else:
             print(output)
+            return None
+        
 
     def summary(self, table_name = None, collection = False):
         """
@@ -974,6 +1011,7 @@ class DSI():
             return summary_df
         else:
             print(output)
+    
     
     def num_tables(self):
         """
@@ -1026,11 +1064,19 @@ class DSI():
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.close()
-        print("Closing this instance of DSI()")
+        
+        if not self.silence_messages:
+            print("Closing this instance of DSI()")
     
     #help, edge-finding (find this/that)
-    def get(self, dbname):
+    def get(self, dbname=None):
+        #if not dbname:
+        #    s = Sync(dbname)
+        #else:
+        #    s = Sync("workspace.db")
         pass
+
+        
     
     def move(self, filepath):
         pass

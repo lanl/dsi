@@ -15,6 +15,7 @@ The Data Science Infrastructure Project (DSI)
    cli
    examples
    contributors
+   federation
 
 Indices
 =======
