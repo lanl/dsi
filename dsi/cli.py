@@ -314,7 +314,7 @@ class DSI_cli:
                     data = f.read()
                 config_data = yaml.safe_load(data)
             except yaml.YAMLError as e:
-                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again.")
+                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again. Error {e}")
                 return
 
         try:
