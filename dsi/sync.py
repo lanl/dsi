@@ -440,7 +440,6 @@ class Sync():
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
 
-
     def dircrawl(self,filepath, verbose=False):
         """
         Crawls the root 'filepath' directory and returns files
@@ -496,7 +495,7 @@ class Sync():
             print(f"\nFinished crawling: {filepath}")
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
-    def get(self, input_yaml = None, workspace_folder= None):
+    def get(self, input_yaml = None, workspace_folder = None):
         '''
         Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
         '''
@@ -516,8 +515,8 @@ class Sync():
             _workspace_folder = config_data.get("workspace_folder", "")
             workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
 
-
-        federate_datasets(workspace_folder, config_data)
+        yaml_folder = Path(yaml_path).parent
+        federate_datasets(workspace_folder, config_data, str(yaml_folder))
 
     def gen_uuid(self, st):
         '''

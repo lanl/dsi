@@ -258,7 +258,7 @@ def pull_data(location_type: str,
     
 
 
-def federate_datasets(workspace_folder: str, config_data: dict) -> None:
+def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) -> None:
     """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
       It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
       The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -266,6 +266,7 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
     Args:
         workspace_folder (str): The local folder where the datasets will be stored.
         config_data (dict): A dictionary containing configuration data, including repository paths and download limits.
+        yaml_path (str): The path to the YAML configuration file, used for resolving relative paths in the configuration.
     """
 
     # Create the workspace folder if it doesn't exist
@@ -278,14 +279,21 @@ def federate_datasets(workspace_folder: str, config_data: dict) -> None:
     db_catalogue_list = []
 
     for repo in config_data.get("repo_paths", []):
-        if repo.endswith(".csv"):
+        if Path(repo).is_absolute():
+            repo_path = Path(repo)
+        else:
+            repo_path = Path(yaml_path) / repo
+
+        clean_repo_path = str(repo_path.resolve())
+
+        if clean_repo_path.endswith(".csv"):
             try:
-                _temp_catalogues = csv_to_list_of_dicts(repo)
+                _temp_catalogues = csv_to_list_of_dicts(clean_repo_path)
                 db_catalogue_list.extend(_temp_catalogues)
             except Exception as e:
-                print(f"Error reading local repository {repo}: {e}")
+                print(f"Error reading local repository {clean_repo_path}: {e}")
         else:
-            print(f"Unsupported repository type for {repo}. Only CSV files are supported for local repositories. Skipping this repo.")
+            print(f"Unsupported repository type for {clean_repo_path}. Only CSV files are supported for local repositories. Skipping this repo.")
 
     
     # Remove duplicates while keeping the latest entry for each unique path
@@ -359,8 +367,8 @@ def main():
         _workspace_folder = config_data.get("workspace_folder", "")
         workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
 
-
-    federate_datasets(workspace_folder, config_data)
+    yaml_folder = Path(yaml_path).parent
+    federate_datasets(workspace_folder, config_data, str(yaml_folder))
 
     
 

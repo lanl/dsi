@@ -14,11 +14,11 @@ input.yaml is the config file that contains the paths from which data can be pul
 ```yaml
 repo_paths: 
     - "~/remote_sources.csv"
-    - "tools/federated/local_dsi_sources.csv"
+    - "local_dsi_sources.csv"
 workspace_folder: "dsi_databases_01"
 download_limit: 10485760 # 10 MB
 ```
- - repo_paths: points to CSV files where the user can specify DSI repos
+ - repo_paths: points to CSV files where the user can specify DSI repos. The paths should be relative to the config file or absolute paths
  - workspace_folder: is where the remote federated datasets will be stored, those local to your computer will not be moved
  - download_limit: after this file limit, the user will be asked to confirm
 

@@ -217,7 +217,6 @@ class DSIFederated:
         return res
 
 
-
     def f_query(self, query: str, db: str, table: str=""):
         """Executes a query on a specified table in a specified database within the federated system.
         
@@ -243,7 +242,6 @@ class DSIFederated:
         return res
 
 
-
     def f_search(self, query: str, db: str, table: str=""):
         """Searches for a specified query in a specified table in a specified database within the federated system.
         
@@ -267,8 +265,6 @@ class DSIFederated:
 
         return res
         
-
-
 
     def f_find(self, query: str, db: str, table: str=""):
         """Finds a specified query in a specified database within the federated system.

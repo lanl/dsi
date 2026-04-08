@@ -10,11 +10,14 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
+import yaml
 import subprocess
 import signal
 import importlib.util
 
 from dsi.core import Terminal
+from dsi.sync import Sync
+
 from ._version import __version__
 
 def autofill_path(text, state):
@@ -81,6 +84,7 @@ class DSI_cli:
 
         return (None, all_viewers) if not available_viewers else (available_viewers, all_viewers)
 
+
     def startup(self, backend="sqlite"):
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
@@ -120,6 +124,7 @@ class DSI_cli:
                 "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
+            'federate' : ("[yaml config file] <workspace folder>", "Gathers data from many sources listed in the config file into the workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
             'list' : ("", "Lists all tables in the current DSI database"),
@@ -176,6 +181,7 @@ class DSI_cli:
         parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
 
+
     def display(self, args):
         '''
         Displays the contents of a table
@@ -207,6 +213,7 @@ class DSI_cli:
         parser = argparse.ArgumentParser(prog='draw')
         parser.add_argument('-f', '--filename', type=str, required=False, help='ER Diagram filename')
         return parser
+
 
     def draw_schema(self, args):
         '''
@@ -279,6 +286,57 @@ class DSI_cli:
                 return 1
 
         self.t.active_metadata = OrderedDict()
+
+
+    def federate(self, args):
+        '''
+        Federate data from multiple sources using a yaml config file
+        '''
+        workspace_folder = None
+        if not args:
+            print("federate ERROR: need to specify at least a yaml config file, see the help")
+            return
+
+        if len(args) >= 1:
+            config_file = args[0]
+
+        if len(args) >= 2:
+            workspace_folder = args[1]
+
+
+        # Check if the file exists and is a valid yaml file before trying to federate
+        if not os.path.exists(config_file):
+            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
+            return
+        else:
+            try:
+                with open(config_file, 'r') as f:
+                    data = f.read()
+                config_data = yaml.safe_load(data)
+            except yaml.YAMLError as e:
+                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again.")
+                return
+
+        try:
+            s = Sync()
+            if workspace_folder is None:
+                _workspace_folder = config_data.get("workspace_folder", "")
+                if _workspace_folder == "":
+                    workspace_folder = "dsi_data"
+                    print(f"Synchronization data from {config_file} into {workspace_folder}")
+                    s.get(config_file, workspace_folder)
+                else:
+                    print(f"Synchronization data from {config_file} into {workspace_folder}")
+                    workspace_folder = _workspace_folder
+                    s.get(config_file, workspace_folder)
+            else:
+                print(f"Synchronization data from {config_file} into {workspace_folder}")
+                s.get(config_file, workspace_folder)
+        except Exception as e:
+            print(f"federate ERROR: {e}")
+            return
+        
+
 
 
     def find(self, args):
@@ -394,6 +452,7 @@ class DSI_cli:
         parser.add_argument('-f', '--filename', type=str, required=False, default="", help='Table plot filename')
         return parser
 
+
     def plot_table(self, args):
         '''
         Plot a table's numerical data and store in an image
@@ -415,6 +474,7 @@ class DSI_cli:
         parser.add_argument('-n', '--num_rows', type=int, required=False, help='Show first n rows of the table')
         parser.add_argument('-e', '--export', type=str, required=False, help='Export to csv or parquet file')
         return parser
+
 
     def query(self, args):
         '''
@@ -459,6 +519,7 @@ class DSI_cli:
         parser.add_argument('data_source', help='Data to read into DSI. Either a filename or a URL to the data')
         parser.add_argument('-t', '--table_name', type=str, required=False, default="", help='table name to store data into')
         return parser
+
 
     def read(self, args):
         '''
@@ -595,6 +656,7 @@ class DSI_cli:
         parser = argparse.ArgumentParser(prog='summary')
         parser.add_argument('-t', '--table', type=str, required=False, help='Show only this table')
         return parser
+
 
     def summary(self, args):
         '''
@@ -749,6 +811,7 @@ class DSI_cli:
         parser.add_argument('filename', help='file DSI data will be written to')
         return parser
 
+
     def write_to_file(self, args):
         '''
         Writes the database to file
@@ -773,6 +836,7 @@ class DSI_cli:
                 final_name = new_name + ".duckdb"
         print(f"Successfully wrote all data to {final_name}\n")
     
+
     def __is_url(self, s):
         '''
         Checks if the string is a url link
@@ -795,6 +859,7 @@ COMMANDS = {
     'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
+    'federate' : (None, cli.federate),
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
