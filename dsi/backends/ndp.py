@@ -186,7 +186,7 @@ class NDP(Webserver):
     # DSI Backend Interface
     # ---------------------------------------------------
 
-    def query_artifacts(self, query=None, kwargs=None):
+    def query_artifacts_MOVE_THIS_TO_INIT(self, webargs=None):
         """
         Fetch metadata from NDP-CKAN and store internally
 
@@ -243,7 +243,7 @@ class NDP(Webserver):
 
     # ---------------------------------------------------
 
-    def query_in_memory(self, query, kwargs=None):
+    def query_artifacts(self, query, queryargs=None):
         """
         Query in-memory cached data using pandas.query()
 
@@ -251,13 +251,13 @@ class NDP(Webserver):
             table       : "datasets" or "resources"
             dict_return : always return OrderedDict if True
         """
-        kwargs = kwargs or {}
+        queryargs = queryargs or {}
 
         if not self._loaded:
             return OrderedDict()
 
-        table_name = kwargs.get("table", "datasets")
-        dict_return = kwargs.get("dict_return", True)
+        table_name = queryargs.get("table", "datasets")
+        dict_return = queryargs.get("dict_return", True)
 
         # normalize table to column-oriented OrderedDict
         rows = self._cache.get(table_name, [])
