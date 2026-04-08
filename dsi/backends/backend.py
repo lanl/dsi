@@ -6,11 +6,6 @@ class Backend(metaclass=ABCMeta):
     def __init__(self) -> None:
         pass
 
-    @property
-    @abstractmethod
-    def git_commit_sha(self):
-        pass
-
     # DEPRECATING IN FUTURE DSI RELEASE. USE ingest_artifacts()
     @abstractmethod
     def put_artifacts(self, artifacts, kwargs) -> None:

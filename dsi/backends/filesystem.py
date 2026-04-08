@@ -1,7 +1,6 @@
 from dsi.backends import Backend
 
 class Filesystem(Backend):
-    git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
     # Declare named types
     DOUBLE = "DOUBLE"
     STRING = "VARCHAR"

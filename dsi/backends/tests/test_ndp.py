@@ -124,7 +124,6 @@ def test_ndp_read_only():
 def test_ndp_metadata_methods():
     backend = NDP()
     backend.query_artifacts(None, {"keywords": "earth", "limit": 3})
-    assert backend.git_commit_sha() == "ndp-ckan-readonly-backend"
     assert isinstance(backend.get_artifacts(), dict)
     assert isinstance(backend.read_to_artifacts(), dict)
     backend.close()

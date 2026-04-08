@@ -439,9 +439,6 @@ class NDP(Webserver):
     # Required Abstract Methods
     # ---------------------------------------------------
 
-    def git_commit_sha(self, kwargs=None):
-        return "ndp-ckan-readonly-backend"
-
     def get_artifacts(self, kwargs=None):
         return self._cache
 

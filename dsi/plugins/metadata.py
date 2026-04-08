@@ -4,7 +4,6 @@ import inspect
 
 class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
-    git_commit_sha: str = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
 
     def __init__(self, **kwargs):
         """
