@@ -8,10 +8,6 @@ class Webserver(Backend, ABC):
         pass
 
     @abstractmethod
-    def __init__(self, data_source, **kwargs) -> None:
-        pass
-
-    @abstractmethod
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         pass
 
