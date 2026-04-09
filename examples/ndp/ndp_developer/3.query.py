@@ -4,8 +4,11 @@ from dsi.core import Terminal
 
 def main(verbose=False):
     t = Terminal()
-    t.load_module("backend", "NDP", "back-read", webargs=={"keywords": "energy", "limit": 5})
-    result = t.artifact_handler("query", "`num_resources` > 10", {"table": "datasets", "dict_return": True})
+    t.load_module("backend", "NDP", "back-read", webargs={"keywords": "energy", "limit": 5})
+    result = t.artifact_handler(interaction_type='query', query="`num_resources` > 10", queryargs={"table": "datasets", "dict_return": True})
+
+    # This is a filesystem example
+    #data = terminal_query.artifact_handler(interaction_type='query', query = "SELECT * FROM input;")
 
     if verbose:
         print("Query results (num_resources > 10):")
