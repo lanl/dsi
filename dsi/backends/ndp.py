@@ -1,10 +1,8 @@
 """
 NDP-CKAN Webserver Backend for DSI
 
-Provides read-only access to NDP (CKAN-based) catalogs via API and exposes metadata
-as DSI-compatible tables: datasets and resources.
-
-This backend DOES NOT write data — it only queries remote NDP-CKAN instances.
+Read-only backend that pulls metadata from CKAN-based NDP instances
+and exposes it as in-memory DSI tables: datasets and resources.
 """
 
 import requests
@@ -19,19 +17,18 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # ---------------------------------------------------------
-# ValueObject
+# Value Object (used for search results)
 # ---------------------------------------------------------
 class ValueObject:
     """
-    Data structure used when returning search results from:
-    find(), find_table(), find_column(), find_cell()
+    Container for search results returned by find* methods
 
     Attributes:
-        t_name  : table name
-        c_name  : list of column names
-        row_num : row index (if applicable)
-        value   : matched value or data
-        type    : {table, column, cell}
+        t_name   : table name
+        c_name   : column name(s)
+        row_num  : row index (if applicable)
+        value    : matched value
+        type     : {table, column, cell}
     """
     def __init__(self):
         self.t_name = ""
@@ -42,46 +39,44 @@ class ValueObject:
 
 
 # ---------------------------------------------------------
-# NDP-CKAN Backend
+# NDP Backend (Webserver - read only)
 # ---------------------------------------------------------
 class NDP(Webserver):
     """
-    NDP-CKAN Web Backend for DSI
-
-    Converts NDP (CKAN-based) API responses into in-memory tabular format
-    compatible with DSI (OrderedDict of columns).
+    CKAN-based web backend for querying NDP metadata in-memory
     """
 
     # ----------------------------
-    # Constructor
+    # Initialization
     # ----------------------------
     def __init__(self,
                  base_url="https://nationaldataplatform.org/catalog",
                  api_key=None,
-                 verify_ssl=False):
+                 verify_ssl=False,
+                 webargs=None):
         """
-        Initialize NDP-CKAN backend connection settings
+        Initialize backend and optionally load data from API
 
-        Parameters:
-            base_url   : NDP-CKAN instance base URL
-            api_key    : optional API key
-            verify_ssl : SSL verification flag
+        base_url   : CKAN instance URL
+        api_key    : optional API key
+        verify_ssl : toggle SSL verification
+        webargs    : initial query params (keywords, tags, etc.)
         """
 
         parsed = urlparse(base_url)
         if not parsed.scheme or not parsed.netloc:
-            raise ValueError("Invalid NDP-CKAN base_url")
+            raise ValueError("Invalid base_url")
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.verify_ssl = verify_ssl
 
-        # HTTP headers
+        # Request headers
         self.headers = {}
         if api_key:
             self.headers["Authorization"] = api_key
 
-        # Internal storage
+        # In-memory storage (DSI format)
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
@@ -89,18 +84,59 @@ class NDP(Webserver):
 
         self._loaded = False
 
-    # ---------------------------------------------------
-    # NDP-CKAN API Helpers
-    # ---------------------------------------------------
+        # Initial data load
+        if webargs:
+            self._load_initial_data(webargs)
 
+    # ---------------------------------------------------
+    # Initial Data Load
+    # ---------------------------------------------------
+    def _load_initial_data(self, kwargs):
+        """
+        Fetch datasets/resources from CKAN API and store in memory
+
+        kwargs:
+            keywords, organization, tags, formats, limit
+        """
+
+        params = {"rows": kwargs.get("limit", 100)}
+
+        q_parts, fq_parts = [], []
+
+        if kwargs.get("keywords"):
+            q_parts.append(kwargs["keywords"])
+
+        if kwargs.get("organization"):
+            fq_parts.append(f"organization:{kwargs['organization']}")
+
+        if kwargs.get("tags"):
+            fq_parts += [f"tags:{t}" for t in kwargs["tags"]]
+
+        if kwargs.get("formats"):
+            fq_parts.append("(" + " OR ".join(
+                [f"res_format:{f}" for f in kwargs["formats"]]) + ")")
+
+        if q_parts:
+            params["q"] = " ".join(q_parts)
+
+        if fq_parts:
+            params["fq"] = " AND ".join(fq_parts)
+
+        result = self._request("package_search", params)
+
+        ds_rows, rs_rows = self._extract_tables(result.get("results", []))
+
+        self._cache["datasets"] = self._rows_to_table(ds_rows)
+        self._cache["resources"] = self._rows_to_table(rs_rows)
+
+        self._loaded = True
+
+    # ---------------------------------------------------
+    # API Helpers
+    # ---------------------------------------------------
     def _request(self, endpoint, params=None):
         """
-        **Internal use only**
-
-        Sends GET request to NDP-CKAN API and returns JSON result
-
-        Raises:
-            RuntimeError if API response is unsuccessful
+        Execute GET request against CKAN API
         """
 
         url = f"{self.base_url}/api/3/action/{endpoint}"
@@ -116,19 +152,14 @@ class NDP(Webserver):
         data = r.json()
 
         if not data.get("success"):
-            raise RuntimeError(f"NDP-CKAN API error: {data}")
+            raise RuntimeError(f"API error: {data}")
 
         return data["result"]
 
     # ---------------------------------------------------
-
     def _extract_tables(self, datasets):
         """
-        Convert NDP-CKAN dataset JSON into flat row structures
-
-        Returns:
-            dataset_rows  : list of dataset dicts
-            resource_rows : list of resource dicts
+        Flatten CKAN dataset JSON into row format
         """
 
         dataset_rows = []
@@ -163,11 +194,9 @@ class NDP(Webserver):
         return dataset_rows, resource_rows
 
     # ---------------------------------------------------
-
     def _rows_to_table(self, rows):
         """
-        Convert list-of-dicts into column-oriented OrderedDict
-        (DSI standard format)
+        Convert list-of-dicts → column-oriented OrderedDict
         """
 
         if not rows:
@@ -183,74 +212,17 @@ class NDP(Webserver):
         return table
 
     # ---------------------------------------------------
-    # DSI Backend Interface
+    # Query Interface (in-memory)
     # ---------------------------------------------------
-
-    def query_artifacts_MOVE_THIS_TO_INIT(self, webargs=None):
-        """
-        Fetch metadata from NDP-CKAN and store internally
-
-        kwargs options:
-            keywords, organization, tags, formats, limit
-        """
-
-        kwargs = kwargs or {}
-
-        params = {"rows": kwargs.get("limit", 100)}
-
-        # Build query filters
-        q_parts = []
-        fq_parts = []
-
-        if kwargs.get("keywords"):
-            q_parts.append(kwargs["keywords"])
-
-        if kwargs.get("organization"):
-            fq_parts.append(f"organization:{kwargs['organization']}")
-
-        if kwargs.get("tags"):
-            fq_parts += [f"tags:{t}" for t in kwargs["tags"]]
-
-        if kwargs.get("formats"):
-            fq_parts.append("(" + " OR ".join(
-                [f"res_format:{f}" for f in kwargs["formats"]]) + ")")
-
-        if q_parts:
-            params["q"] = " ".join(q_parts)
-
-        if fq_parts:
-            params["fq"] = " AND ".join(fq_parts)
-
-        # API call
-        result = self._request("package_search", params)
-        datasets = result.get("results", [])
-
-        # Transform
-        ds_rows, rs_rows = self._extract_tables(datasets)
-
-        self._cache["datasets"] = self._rows_to_table(ds_rows)
-        self._cache["resources"] = self._rows_to_table(rs_rows)
-
-        self._loaded = True
-
-    # ---------------------------------------------------
-
-    def process_artifacts(self, kwargs=None):
-        """
-        Return cached data in DSI format
-        """
-        return self._cache if self._loaded else OrderedDict()
-
-    # ---------------------------------------------------
-
     def query_artifacts(self, query, queryargs=None):
         """
-        Query in-memory cached data using pandas.query()
+        Query cached tables using pandas.query()
 
-        kwargs:
-            table       : "datasets" or "resources"
-            dict_return : always return OrderedDict if True
+        queryargs:
+            table       : datasets | resources
+            dict_return : return OrderedDict or DataFrame
         """
+
         queryargs = queryargs or {}
 
         if not self._loaded:
@@ -259,200 +231,202 @@ class NDP(Webserver):
         table_name = queryargs.get("table", "datasets")
         dict_return = queryargs.get("dict_return", True)
 
-        # normalize table to column-oriented OrderedDict
-        rows = self._cache.get(table_name, [])
+        df = pd.DataFrame(self._cache.get(table_name, {}))
 
-        if isinstance(rows, list):
-            # convert list-of-dicts to column-oriented OrderedDict
-            if rows:
-                cols = rows[0].keys()
-                table_od = OrderedDict({c: [] for c in cols})
-                for r in rows:
-                    for c in cols:
-                        table_od[c].append(r.get(c))
-            else:
-                table_od = OrderedDict()
-        elif isinstance(rows, dict) or isinstance(rows, OrderedDict):
-            table_od = OrderedDict(rows)
-        else:
-            table_od = OrderedDict()
-
-        df = pd.DataFrame(table_od)
+        if df.empty:
+            return OrderedDict()
 
         try:
             result_df = df.query(query, engine="python")
-            return OrderedDict(result_df.to_dict(orient="list")) if dict_return else result_df.to_dict(orient="list")
+            result = result_df.to_dict(orient="list")
+
+            return {table_name: result} if dict_return else result_df
+
         except Exception as e:
             raise ValueError(f"Query error: {e}")
 
     # ---------------------------------------------------
     # URL Validation
     # ---------------------------------------------------
-
     def validate_urls(self):
-        import requests
+        """
+        Validate resource URLs (adds 'url_valid' column)
+        """
 
         resources = self._cache.get("resources", {})
         urls = resources.get("url", [])
-        valid_list = []
 
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; NDP-Validator/1.0)"}
+        valid_list = []
+        headers = {"User-Agent": "NDP-Validator"}
 
         for url in urls:
             try:
-                # First try HEAD
-                r = requests.head(url, allow_redirects=True, headers=headers, timeout=10, verify=self.verify_ssl)
-                # Some servers reject HEAD
+                r = requests.head(url, allow_redirects=True,
+                                  headers=headers, timeout=10,
+                                  verify=self.verify_ssl)
+
                 if r.status_code == 405:
-                    r = requests.get(url, stream=True, headers=headers, timeout=10, verify=self.verify_ssl)
+                    r = requests.get(url, stream=True,
+                                     headers=headers, timeout=10,
+                                     verify=self.verify_ssl)
+
                 valid_list.append(200 <= r.status_code < 400)
+
             except Exception:
                 valid_list.append(False)
 
         resources["url_valid"] = valid_list
 
     # ---------------------------------------------------
-    # Find Functions
+    # Find Methods
     # ---------------------------------------------------
-
     def find(self, query_object, kwargs=None):
         """
         Search across tables, columns, and cells
+
+        Returns:
+            List[ValueObject] grouped implicitly by type:
+            - table matches
+            - column matches
+            - cell matches
         """
+        if not isinstance(query_object, str):
+            return []
+
+        query_lower = query_object.lower()
+
         return (
-            (self.find_table(query_object) or []) +
-            (self.find_column(query_object) or []) +
-            (self.find_cell(query_object) or [])
+            self.find_table(query_lower) +
+            self.find_column(query_lower) +
+            self.find_cell(query_lower)
         )
 
-    # ---------------------------------------------------
 
-    def find_table(self, query_object):
-        """
-        Match table names
-        """
-
+    def find_table(self, query_object, kwargs=None):
+        """Match table names"""
         if not isinstance(query_object, str):
             return []
 
         matches = []
 
-        for table in self._cache:
-            if query_object.lower() in table.lower():
+        for table_name, table_data in self._cache.items():
+            if query_object in table_name.lower():
                 val = ValueObject()
-                val.t_name = table
-                val.c_name = list(self._cache[table].keys())
-                val.value = self._cache[table]
+                val.t_name = table_name
+                val.c_name = list(table_data.keys())
+                val.value = table_data
                 val.type = "table"
+
                 matches.append(val)
 
         return matches
 
-    # ---------------------------------------------------
 
-    def find_column(self, query_object):
-        """
-        Match column names
-        """
-
+    def find_column(self, query_object, kwargs=None):
+        """Match column names"""
         if not isinstance(query_object, str):
-            return None
+            return []
 
         matches = []
 
-        for table, data in self._cache.items():
-            for col in data:
-                if query_object.lower() in col.lower():
+        for table_name, table_data in self._cache.items():
+            for col_name, col_data in table_data.items():
+
+                if query_object in col_name.lower():
                     val = ValueObject()
-                    val.t_name = table
-                    val.c_name = [col]
-                    val.value = data[col]
+                    val.t_name = table_name
+                    val.c_name = [col_name]
+                    val.value = col_data
                     val.type = "column"
+
                     matches.append(val)
 
-        return matches or None
+        return matches
 
-    # ---------------------------------------------------
 
-    def find_cell(self, query_object):
-        """
-        Match cell values
-        """
-
+    def find_cell(self, query_object, kwargs=None):
+        """Match cell values"""
         matches = []
 
-        for table, data in self._cache.items():
-            cols = list(data.keys())
-            rows = list(zip(*data.values()))
+        is_str_query = isinstance(query_object, str)
+        query_lower = query_object.lower() if is_str_query else None
 
-            for i, row in enumerate(rows):
-                for j, cell in enumerate(row):
+        for table_name, table_data in self._cache.items():
 
-                    if (
-                        query_object == cell or
-                        (isinstance(cell, str) and
-                         isinstance(query_object, str) and
-                         query_object.lower() in cell.lower())
+            if not table_data:
+                continue
+
+            cols = list(table_data.keys())
+            rows = zip(*table_data.values())  # avoids creating full list
+
+            for row_idx, row in enumerate(rows):
+                for col_idx, cell in enumerate(row):
+
+                    match = False
+
+                    # exact match
+                    if query_object == cell:
+                        match = True
+
+                    # string partial match
+                    elif (
+                        is_str_query and
+                        isinstance(cell, str) and
+                        query_lower in cell.lower()
                     ):
+                        match = True
+
+                    if match:
                         val = ValueObject()
-                        val.t_name = table
-                        val.c_name = [cols[j]]
-                        val.row_num = i
+                        val.t_name = table_name
+                        val.c_name = [cols[col_idx]]
+                        val.row_num = row_idx
                         val.value = cell
                         val.type = "cell"
+
                         matches.append(val)
 
-        return matches or None
+        return matches
+
+
+    def find_relation(self, query_object, kwargs=None):
+        """Not applicable for NDP"""
+        return []
 
     # ---------------------------------------------------
-    # Notebook / Inspection
+    # Utility / Display
     # ---------------------------------------------------
+    def list(self, kwargs=None):
+        """List available tables"""
+        return list(self._cache.keys())
+
+    def summary(self, kwargs=None):
+        """Return basic table summary"""
+        return {
+            "loaded": self._loaded,
+            "tables": {
+                name: len(next(iter(table.values()), []))
+                for name, table in self._cache.items()
+            }
+        }
+
+    def display(self, kwargs=None):
+        """Print preview of tables"""
+        for name, table in self._cache.items():
+            print(f"\n{name}:")
+            print(pd.DataFrame(table).head())
 
     def notebook(self, kwargs=None):
-        """
-        Simple preview of loaded data
-        """
-
-        print("\nDatasets:")
-        print(pd.DataFrame(self._cache["datasets"]).head())
-
-        print("\nResources:")
-        print(pd.DataFrame(self._cache["resources"]).head())
+        """Notebook generation not supported"""
+        pass
 
     # ---------------------------------------------------
     # Lifecycle
     # ---------------------------------------------------
-
     def close(self):
-        """
-        Reset backend state
-        """
-
+        """Reset backend state"""
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
         })
-
         self._loaded = False
-
-    # ---------------------------------------------------
-    # Required Abstract Methods
-    # ---------------------------------------------------
-
-    def get_artifacts(self, kwargs=None):
-        return self._cache
-
-    def read_to_artifacts(self, kwargs=None):
-        return self._cache
-
-    def inspect_artifacts(self, kwargs=None):
-        return {
-            "loaded": self._loaded,
-            "tables": list(self._cache.keys())
-        }
-    
-    def ingest_artifacts(self, artifacts, kwargs=None):
-        raise NotImplementedError("NDP-CKAN backend is read-only.")
-    
-    def put_artifacts(self, artifacts, kwargs=None):
-        raise NotImplementedError("NDP-CKAN backend is read-only.")
