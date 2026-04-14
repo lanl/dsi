@@ -49,7 +49,7 @@ class NDP(Webserver):
     # ----------------------------
     # Initialization
     # ----------------------------
-    def __init__(self, url, **kwargs):
+    def __init__(self, url=None, **kwargs):
         """
         Initialize backend and optionally load data from CKAN API.
 
@@ -333,11 +333,11 @@ class NDP(Webserver):
             - type:     {'table', 'column', 'cell'}
         """
         
-        query_lower = str(query_object).lower()
+        query_str = str(query_object).lower()
 
         return (
-            self.find_table(query_lower) +
-            self.find_column(query_lower) +
+            self.find_table(query_str) +
+            self.find_column(query_str) +
             self.find_cell(query_object)
         )
 
