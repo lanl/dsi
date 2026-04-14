@@ -49,23 +49,26 @@ class NDP(Webserver):
     # ----------------------------
     # Initialization
     # ----------------------------
-    def __init__(self,
-                 base_url="https://nationaldataplatform.org/catalog",
-                 api_key=None,
-                 verify_ssl=False,
-                 webargs=None):
+    def __init__(self, url, **kwargs):
         """
-        Initialize backend and optionally load data from API.
+        Initialize backend and optionally load data from CKAN API.
 
-        base_url   : CKAN instance URL
-        api_key    : optional API key
-        verify_ssl : toggle SSL verification
-        webargs    : initial query params (keywords, tags, etc.)
+        url :
+            Base CKAN URL. If None, a default CKAN endpoint is used.
 
-        Initializes in-memory cache with tables:
-            - datasets
-            - resources
+        kwargs :
+            api_key    : optional API key
+            verify_ssl : toggle SSL verification (default False)
+            webargs    : initial query params
         """
+
+        DEFAULT_URL = "https://nationaldataplatform.org/catalog"
+
+        base_url = url or DEFAULT_URL
+
+        api_key = kwargs.get("api_key")
+        verify_ssl = kwargs.get("verify_ssl", False)
+        webargs = kwargs.get("webargs")
 
         parsed = urlparse(base_url)
         if not parsed.scheme or not parsed.netloc:
@@ -75,12 +78,10 @@ class NDP(Webserver):
         self.api_key = api_key
         self.verify_ssl = verify_ssl
 
-        # Request headers
         self.headers = {}
         if api_key:
             self.headers["Authorization"] = api_key
 
-        # In-memory storage (DSI format)
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
@@ -88,10 +89,10 @@ class NDP(Webserver):
 
         self._loaded = False
 
-        # Initial data load
         if webargs:
             self._load_initial_data(webargs)
-
+   
+   
     # ---------------------------------------------------
     # Initial Data Load
     # ---------------------------------------------------
@@ -135,6 +136,7 @@ class NDP(Webserver):
 
         self._loaded = True
 
+
     # ---------------------------------------------------
     # API Helpers
     # ---------------------------------------------------
@@ -159,6 +161,7 @@ class NDP(Webserver):
             raise RuntimeError(f"CKAN API failure at {endpoint}: {data}")
 
         return data["result"]
+
 
     def _extract_tables(self, datasets):
         """
@@ -196,6 +199,7 @@ class NDP(Webserver):
 
         return dataset_rows, resource_rows
 
+
     def _rows_to_table(self, rows):
         """
         Convert list-of-dicts → column-oriented OrderedDict.
@@ -212,6 +216,7 @@ class NDP(Webserver):
                 table[c].append(r.get(c))
 
         return table
+
 
     # ---------------------------------------------------
     # Query Interface (in-memory)
@@ -257,6 +262,7 @@ class NDP(Webserver):
         except Exception as e:
             raise ValueError(f"CKAN query_artifacts error at {table_name}: {e}")
 
+
     # ---------------------------------------------------
     # URL Validation
     # ---------------------------------------------------
@@ -301,6 +307,7 @@ class NDP(Webserver):
                 valid_list.append(False)
 
         resources["url_valid"] = valid_list
+
 
     # ---------------------------------------------------
     # Find Methods
@@ -489,7 +496,6 @@ class NDP(Webserver):
     # ---------------------------------------------------
     # Utility / Display
     # ---------------------------------------------------
-
     def list(self, **kwargs):
         """
         Lists all available tables in the backend.
@@ -498,36 +504,26 @@ class NDP(Webserver):
             A list of table names currently stored in memory.
         """
         return list(self._cache.keys())
+    
 
-
-    def summary(self, table_name=None, **kwargs):
+    def summary(self, table_name, **kwargs):
         """
         Returns summary information about tables in the backend.
 
-        `table_name` : str, optional
-            If provided, returns summary for a single table.
-            Otherwise, returns summary for all tables.
+        table_name :
+            Optional table name. If provided, returns summary only for that table.
 
-        `return` : dict
-            Dictionary containing:
-                - loaded:  whether data has been loaded (bool)
-                - tables:  mapping of table names to row counts
-
-            Example:
-                {
-                    "loaded": True,
-                    "tables": {
-                        "datasets": 100,
-                        "resources": 250
-                    }
-                }
+        return :
+            dict containing:
+                - loaded: bool
+                - tables: dict mapping table names to row counts
         """
 
         tables_summary = {}
 
         for name, table in self._cache.items():
 
-            if table_name and name != table_name:
+            if table_name is not None and name != table_name:
                 continue
 
             row_count = len(next(iter(table.values()), [])) if table else 0
@@ -537,26 +533,27 @@ class NDP(Webserver):
             "loaded": self._loaded,
             "tables": tables_summary
         }
+        
 
-
-    def display(self, table_name=None, limit=10, **kwargs):
+    def display(self, table_name=None, **kwargs):
         """
         Displays a preview of table data.
 
-        `table_name` : str, optional
-            If provided, displays only the specified table.
-            Otherwise, displays all tables.
+        table_name :
+            Optional table name. If provided, displays only that table.
 
-        `limit` : int, default=10
-            Number of rows to display per table.
+        kwargs :
+            limit : number of rows to display per table (default 10)
 
-        `return` : None
-            Prints table previews to stdout.
+        return :
+            None (prints DataFrame previews)
         """
+
+        limit = kwargs.get("limit", 10)
 
         for name, table in self._cache.items():
 
-            if table_name and name != table_name:
+            if table_name is not None and name != table_name:
                 continue
 
             print(f"\n{name}:")
@@ -572,10 +569,10 @@ class NDP(Webserver):
         """
         pass
 
+
     # ---------------------------------------------------
     # Lifecycle
     # ---------------------------------------------------
-
     def close(self):
         """
         Resets backend state and clears all cached data.
@@ -589,10 +586,10 @@ class NDP(Webserver):
         })
         self._loaded = False
 
+
     # ---------------------------------------------------
     # Abstract Methods
     # ---------------------------------------------------
-
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         """
         Ingest not supported for NDP backend (read-only).
