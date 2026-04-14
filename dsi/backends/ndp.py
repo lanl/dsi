@@ -39,7 +39,7 @@ class ValueObject:
 
 
 # ---------------------------------------------------------
-# NDP Backend (Webserver - read only)
+# NDP Backend (Webserver - Read only)
 # ---------------------------------------------------------
 class NDP(Webserver):
     """
@@ -55,12 +55,16 @@ class NDP(Webserver):
                  verify_ssl=False,
                  webargs=None):
         """
-        Initialize backend and optionally load data from API
+        Initialize backend and optionally load data from API.
 
         base_url   : CKAN instance URL
         api_key    : optional API key
         verify_ssl : toggle SSL verification
         webargs    : initial query params (keywords, tags, etc.)
+
+        Initializes in-memory cache with tables:
+            - datasets
+            - resources
         """
 
         parsed = urlparse(base_url)
@@ -136,7 +140,7 @@ class NDP(Webserver):
     # ---------------------------------------------------
     def _request(self, endpoint, params=None):
         """
-        Execute GET request against CKAN API
+        Execute GET request against CKAN API.
         """
 
         url = f"{self.base_url}/api/3/action/{endpoint}"
@@ -152,14 +156,13 @@ class NDP(Webserver):
         data = r.json()
 
         if not data.get("success"):
-            raise RuntimeError(f"API error: {data}")
+            raise RuntimeError(f"CKAN API failure at {endpoint}: {data}")
 
         return data["result"]
 
-    # ---------------------------------------------------
     def _extract_tables(self, datasets):
         """
-        Flatten CKAN dataset JSON into row format
+        Flatten CKAN dataset JSON into row format.
         """
 
         dataset_rows = []
@@ -176,7 +179,7 @@ class NDP(Webserver):
                 "license": ds.get("license_title"),
                 "created": ds.get("metadata_created"),
                 "modified": ds.get("metadata_modified"),
-                "tags": ",".join([t["name"] for t in ds.get("tags", [])]),
+                "tags": ",".join(t["name"] for t in ds.get("tags", [])),
                 "num_resources": ds.get("num_resources", 0)
             })
 
@@ -193,16 +196,15 @@ class NDP(Webserver):
 
         return dataset_rows, resource_rows
 
-    # ---------------------------------------------------
     def _rows_to_table(self, rows):
         """
-        Convert list-of-dicts → column-oriented OrderedDict
+        Convert list-of-dicts → column-oriented OrderedDict.
         """
 
         if not rows:
             return OrderedDict()
 
-        cols = rows[0].keys()
+        cols = list(rows[0].keys())
         table = OrderedDict({c: [] for c in cols})
 
         for r in rows:
@@ -214,16 +216,26 @@ class NDP(Webserver):
     # ---------------------------------------------------
     # Query Interface (in-memory)
     # ---------------------------------------------------
-    def query_artifacts(self, query, queryargs=None):
+    def query_artifacts(self, query, **kwargs):
         """
-        Query cached tables using pandas.query()
+        Returns filtered rows from cached tables using pandas.query().
 
-        queryargs:
-            table       : datasets | resources
-            dict_return : return OrderedDict or DataFrame
+        query :
+            Pandas query string used to filter table rows.
+
+        queryargs (kwargs):
+            table :
+                datasets | resources (default: datasets)
+
+            dict_return :
+                If True, returns dict format.
+                If False, returns pandas DataFrame.
+
+        `return` :
+            Filtered results from selected in-memory table.
         """
 
-        queryargs = queryargs or {}
+        queryargs = kwargs or {}
 
         if not self._loaded:
             return OrderedDict()
@@ -234,7 +246,7 @@ class NDP(Webserver):
         df = pd.DataFrame(self._cache.get(table_name, {}))
 
         if df.empty:
-            return OrderedDict()
+            return {table_name: {}} if dict_return else pd.DataFrame()
 
         try:
             result_df = df.query(query, engine="python")
@@ -243,17 +255,22 @@ class NDP(Webserver):
             return {table_name: result} if dict_return else result_df
 
         except Exception as e:
-            raise ValueError(f"Query error: {e}")
+            raise ValueError(f"CKAN query_artifacts error at {table_name}: {e}")
 
     # ---------------------------------------------------
     # URL Validation
     # ---------------------------------------------------
     def validate_urls(self):
         """
-        Validate resource URLs (adds 'url_valid' column)
+        Validates resource URLs and updates cache in-place.
+
+        Adds:
+            - 'url_valid' column to the resources table indicating URL reachability.
+
+        `return` : None
         """
 
-        resources = self._cache.get("resources", {})
+        resources = self._cache["resources"]
         urls = resources.get("url", [])
 
         valid_list = []
@@ -261,14 +278,22 @@ class NDP(Webserver):
 
         for url in urls:
             try:
-                r = requests.head(url, allow_redirects=True,
-                                  headers=headers, timeout=10,
-                                  verify=self.verify_ssl)
+                r = requests.head(
+                    url,
+                    allow_redirects=True,
+                    headers=headers,
+                    timeout=10,
+                    verify=self.verify_ssl
+                )
 
                 if r.status_code == 405:
-                    r = requests.get(url, stream=True,
-                                     headers=headers, timeout=10,
-                                     verify=self.verify_ssl)
+                    r = requests.get(
+                        url,
+                        stream=True,
+                        headers=headers,
+                        timeout=10,
+                        verify=self.verify_ssl
+                    )
 
                 valid_list.append(200 <= r.status_code < 400)
 
