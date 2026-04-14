@@ -151,7 +151,6 @@ class DSI():
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
         print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.\n")
-
         print()
 
     def schema(self, filename = None):
