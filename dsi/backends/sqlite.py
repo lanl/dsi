@@ -175,13 +175,13 @@ class Sqlite(Filesystem):
         #     self.con.commit()
 
         #there are tables in db, only dsi_relations to be ingested
-        if self.list() is not None and list(artifacts.keys()) == ["dsi_relations"]: 
+        if self.list(True) is not None and list(artifacts.keys()) == ["dsi_relations"]:
             pk_list = artifacts["dsi_relations"]["primary_key"]
             fk_list = artifacts["dsi_relations"]["foreign_key"]
             pk_tables = set(t[0] for t in pk_list)
             fk_tables = set(t[0] for t in fk_list if t[0] is not None)
             all_schema_tables = pk_tables.union(fk_tables)
-            db_tables = [t[0] for t in self.list() if t[0] != "dsi_units"]
+            db_tables = [t for t in self.list(True) if t != "dsi_units"]
             # check if tables from dsi_relations are all in the db
             if all_schema_tables.issubset(set(db_tables)):
                 for table in all_schema_tables:
