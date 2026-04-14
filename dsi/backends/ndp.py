@@ -672,3 +672,9 @@ class NDP(Webserver):
     #         - Include summary cell at top
     #     """
     #     pass
+    
+    def ingest_artifacts(self, artifacts, **kwargs) -> None:
+        """
+        Not supported for NDP (read-only backend)
+        """
+        raise NotImplementedError("NDP backend is read-only")
