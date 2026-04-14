@@ -409,7 +409,7 @@ class DSI():
             msg.replace("the tables:", "the table:")
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
-    def query(self, statement, collection = False, update = False):
+    def query(self, statement, collection = False, update = False, **kwargs):
         """
         Executes a SQL query on the active backend.
 
@@ -437,7 +437,7 @@ class DSI():
         try:
             f = io.StringIO()
             with redirect_stdout(f):
-                df = self.t.artifact_handler(interaction_type='query', query=statement)
+                df = self.t.artifact_handler(interaction_type='query', query=statement, **kwargs)
             output = f.getvalue()
         except Exception as e:
             new_args = (f"query() ERROR: {e}",) + e.args[1:]
@@ -448,7 +448,7 @@ class DSI():
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return
         if not collection:
-            print(f"Printing the result of the SQL query: {statement}")
+            print(f"Printing the result of the query: {statement}")
             headers = df.columns.tolist()
             rows = df.values.tolist()
             clean_rows = [
@@ -458,7 +458,7 @@ class DSI():
             self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
-            msg = f"Storing the result of the SQL query: {statement} as a collection"
+            msg = f"Storing the result of the query: {statement} as a collection"
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
             if update:
@@ -990,7 +990,7 @@ class DSI():
 
             If True, and table_name not specified, returns a list of Pandas DataFrames of the summary of all tables.
             
-            If False (default), prints each table's name and dimensions to the console.
+            If False (default), prints each table's name and numerical metadata to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             raise RuntimeError("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")

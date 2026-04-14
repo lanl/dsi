@@ -889,9 +889,13 @@ class Sqlite(Filesystem):
         
         return return_list
 
-    def list(self):
+    def list(self, collection = False):
         """
         Return a list of all tables and their dimensions from this SQLite backend
+
+        `collection` : bool, optional, default False.
+            - If True, returns the list of table names.
+            - If False (default), prints metadata of all the tables: table names and dimensions.
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         if not tableList:
@@ -905,7 +909,14 @@ class Sqlite(Filesystem):
             num_rows = self.cur.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             info_list.append((table, num_cols, num_rows))
         
-        return info_list
+        if collection:
+            return [t[0] for t in info_list]
+        else:
+            for table in info_list:
+                print(f"\nTable: {table[0]}")
+                print(f"  - num of columns: {table[1]}")
+                print(f"  - num of rows: {table[2]}")
+            print()
     
     def num_tables(self):
         """
