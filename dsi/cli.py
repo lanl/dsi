@@ -120,18 +120,19 @@ class DSI_cli:
 
     def help_fn(self, args):
         commands = {
-            'display' :("<table_name> [-n num_rows] [-e filename]",
-                "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
+            'display' :("<table name> [-n num_rows] [-e filename]",
+                        "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
-            'federate' : ("[yaml config file] <workspace folder>", "Gathers data from many sources listed in the config file into the workspace folder."),
+            'federate' : ("<config file> [-w workspace_folder]", 
+                          "Collects data from sources defined in the YAML config file, optionally saving it to a workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
             'list' : ("", "Lists all tables in the current DSI database"),
-            'plot_table' : ("<table_name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
-            'query' : ("<SQL_query> [-n num_rows] [-e filename]",
-                "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
-            'read' : ("<data_source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
+            'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            'query' : ("<SQL query> [-n num_rows] [-e filename]",
+                       "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
+            'read' : ("<data source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
             'search' : ("<value>", "Searches for a string or number across DSI."),
             'summary' : ("[-t table_name]", "Summary of the database or a specific table."),
             'viewers' : ("", "Prints the available viewers for the user."),
@@ -288,23 +289,24 @@ class DSI_cli:
         self.t.active_metadata = OrderedDict()
 
 
+    def get_federate_parser(self):
+        parser = argparse.ArgumentParser(prog='federate')
+        parser.add_argument('config_file', help='YAML config file that lists all data sources to download')
+        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded sources')
+        return parser
+
+
     def federate(self, args):
         '''
         Federate data from multiple sources using a yaml config file
         '''
+        config_file = args.config_file
+
         workspace_folder = None
-        if not args:
-            print("federate ERROR: need to specify at least a yaml config file, see the help")
-            return
+        if args.workspace_folder is not None and args.workspace_folder != "":
+            workspace_folder = args.workspace_folder
 
-        if len(args) >= 1:
-            config_file = args[0]
-
-        if len(args) >= 2:
-            workspace_folder = args[1]
-
-
-        # Check if the file exists and is a valid yaml file before trying to federate
+        # Check if the config file exists and is a valid yaml file before trying to federate
         if not os.path.exists(config_file):
             print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
             return
@@ -320,23 +322,12 @@ class DSI_cli:
         try:
             s = Sync()
             if workspace_folder is None:
-                _workspace_folder = config_data.get("workspace_folder", "")
-                if _workspace_folder == "":
-                    workspace_folder = "dsi_data"
-                    print(f"Synchronization data from {config_file} into {workspace_folder}")
-                    s.get(config_file, workspace_folder)
-                else:
-                    print(f"Synchronization data from {config_file} into {workspace_folder}")
-                    workspace_folder = _workspace_folder
-                    s.get(config_file, workspace_folder)
-            else:
-                print(f"Synchronization data from {config_file} into {workspace_folder}")
-                s.get(config_file, workspace_folder)
+                workspace_folder = config_data.get("workspace_folder", "dsi_data")
+            print(f"Synchronizing data from {config_file} into {workspace_folder}\n")
+            s.get(config_file, workspace_folder)
         except Exception as e:
             print(f"federate ERROR: {e}")
             return
-        
-
 
 
     def find(self, args):
@@ -526,8 +517,8 @@ class DSI_cli:
         Reads data file or a database into DSI
 
         Args:
-            dbfile (obj): name of the file or database to read
-            table_name (str): name of the table to read the data into
+            data_source (obj): name of the data source (file, database, URL, etc) to read
+            table_name (str): name of the table to store the data within
         '''
         table_name = ""
         if args.table_name != "":
@@ -859,7 +850,7 @@ COMMANDS = {
     'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
-    'federate' : (None, cli.federate),
+    'federate' : (cli.get_federate_parser, cli.federate),
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
