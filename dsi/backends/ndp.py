@@ -312,7 +312,7 @@ class NDP(Webserver):
     # ---------------------------------------------------
     # Find Methods
     # ---------------------------------------------------
-    def find(self, query_object, kwargs=None):
+    def find(self, query_object, **kwargs):
         """
         Searches for all instances of `query_object` across all tables at the table, column, and cell levels.
 
@@ -332,11 +332,13 @@ class NDP(Webserver):
             - value:    matched value or data
             - type:     {'table', 'column', 'cell'}
         """
+        
+        query_lower = str(query_object).lower()
 
         return (
             self.find_table(query_lower) +
             self.find_column(query_lower) +
-            self.find_cell(query_lower)
+            self.find_cell(query_object)
         )
 
 
