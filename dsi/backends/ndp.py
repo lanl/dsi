@@ -282,18 +282,24 @@ class NDP(Webserver):
     # ---------------------------------------------------
     def find(self, query_object, kwargs=None):
         """
-        Search across tables, columns, and cells
+        Searches for all instances of `query_object` across all tables at the table, column, and cell levels.
 
-        Returns:
-            List[ValueObject] grouped implicitly by type:
-            - table matches
-            - column matches
-            - cell matches
+        `query_object` : int, float, or str
+            The value to search for across all tables in the backend.
+
+        `return` : list of ValueObjects
+            A list of ValueObjects representing matches across:
+                - table names
+                - column names
+                - cell values
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   column name(s) (list)
+            - row_num:  row index (int or None)
+            - value:    matched value or data
+            - type:     {'table', 'column', 'cell'}
         """
-        if not isinstance(query_object, str):
-            return []
-
-        query_lower = query_object.lower()
 
         return (
             self.find_table(query_lower) +
@@ -302,8 +308,24 @@ class NDP(Webserver):
         )
 
 
-    def find_table(self, query_object, kwargs=None):
-        """Match table names"""
+    def find_table(self, query_object, **kwargs):
+        """
+        Finds all tables whose names contain the given `query_object` (case-insensitive).
+
+        `query_object` : str
+            The string to match against table names.
+
+        `return` : list of ValueObjects
+            One ValueObject per matching table.
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list of all columns in the table
+            - value:    full table data (dict of columns)
+            - row_num:  None
+            - type:     'table'
+        """
+
         if not isinstance(query_object, str):
             return []
 
@@ -317,13 +339,30 @@ class NDP(Webserver):
                 val.value = table_data
                 val.type = "table"
 
+
                 matches.append(val)
 
         return matches
 
 
-    def find_column(self, query_object, kwargs=None):
-        """Match column names"""
+    def find_column(self, query_object, **kwargs):
+        """
+        Finds all columns whose names contain the given `query_object` (case-insensitive).
+
+        `query_object` : str
+            The string to match against column names.
+
+        `return` : list of ValueObjects
+            One ValueObject per matching column.
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list containing the matched column name
+            - value:    full column data (list)
+            - row_num:  None
+            - type:     'column'
+        """
+
         if not isinstance(query_object, str):
             return []
 
@@ -339,13 +378,34 @@ class NDP(Webserver):
                     val.value = col_data
                     val.type = "column"
 
+
                     matches.append(val)
 
         return matches
 
 
-    def find_cell(self, query_object, kwargs=None):
-        """Match cell values"""
+    def find_cell(self, query_object, **kwargs):
+        """
+        Finds all cells that match the given `query_object`.
+
+        Matching behavior:
+            - Exact match for all data types
+            - Case-insensitive partial match for strings
+
+        `query_object` : int, float, or str
+            The value to search for within table cells.
+
+        `return` : list of ValueObjects
+            One ValueObject per matching cell.
+
+        ValueObject Structure:
+            - t_name:   table name (str)
+            - c_name:   list containing the matched column name
+            - row_num:  row index of the match (int)
+            - value:    matched cell value
+            - type:     'cell'
+        """
+
         matches = []
 
         is_str_query = isinstance(query_object, str)
@@ -364,7 +424,7 @@ class NDP(Webserver):
 
                     match = False
 
-                    # exact match
+                    # Exact match
                     if query_object == cell:
                         match = True
 
@@ -384,297 +444,134 @@ class NDP(Webserver):
                         val.value = cell
                         val.type = "cell"
 
+
                         matches.append(val)
 
         return matches
 
+    def find_relation(self, column_name, relation, **kwargs):
+        """
+        Not supported for NDP backend.
 
-    def find_relation(self, query_object, kwargs=None):
-        """Not applicable for NDP"""
+        NDP is a read-only metadata backend and does not support
+        relational queries on columns.
+
+        `return` : list
+            Always returns an empty list.
+        """
         return []
-
-
-    # # ---------------------------------------------------
-    # # Find Methods
-    # # ---------------------------------------------------
-
-    # def find(self, query_object, kwargs=None):
-    #     """
-    #     Search across tables, columns, and cells.
-
-    #     TODO:
-    #         - Consider returning a structured dict (grouped by type)
-    #         instead of a flat list for better readability.
-    #         - Optionally deduplicate results (same match may appear in multiple find_* calls).
-    #         - Consider adding a 'limit' or 'max_results' kwarg for large datasets.
-    #     """
-
-    #     return (
-    #         self.find_table(query_object) +
-    #         self.find_column(query_object) +
-    #         self.find_cell(query_object)
-    #     )
-
-
-    # def find_table(self, query_object, kwargs=None):
-    #     """
-    #     Match table names.
-
-    #     TODO:
-    #         - Consider returning match score (e.g. exact vs partial match).
-    #         - Could optionally include table metadata (row counts, column stats).
-    #         - Consider case-insensitive normalization once per call (performance improvement).
-    #     """
-
-    #     if not isinstance(query_object, str):
-    #         return []
-
-    #     matches = []
-
-    #     for table in self._cache:
-    #         if query_object.lower() in table.lower():
-    #             val = ValueObject()
-    #             val.t_name = table
-
-    #             # TODO: this includes all columns; could be expensive for large tables
-    #             val.c_name = list(self._cache[table].keys())
-
-    #             val.value = self._cache[table]
-    #             val.type = "table"
-    #             matches.append(val)
-
-    #     return matches
-
-
-    # def find_column(self, query_object, kwargs=None):
-    #     """
-    #     Match column names.
-
-    #     TODO:
-    #         - Consider returning column + sample values instead of full column (memory heavy).
-    #         - Could support regex or exact match modes via kwargs.
-    #         - Consider grouping results by table instead of flat list.
-    #     """
-
-    #     if not isinstance(query_object, str):
-    #         return []
-
-    #     matches = []
-
-    #     for table, data in self._cache.items():
-    #         for col in data:
-    #             if query_object.lower() in col.lower():
-    #                 val = ValueObject()
-    #                 val.t_name = table
-    #                 val.c_name = [col]
-
-    #                 # TODO: full column extraction may be expensive for large datasets
-    #                 val.value = data[col]
-
-    #                 val.type = "column"
-    #                 matches.append(val)
-
-    #     return matches
-
-
-    # def find_cell(self, query_object, kwargs=None):
-    #     """
-    #     Match cell values.
-
-    #     TODO:
-    #         - This is the most expensive operation (O(n²) scan).
-    #         - Consider caching inverted index for faster lookup.
-    #         - Could add 'row return mode' like your SQLite backend.
-    #         - Could support numeric tolerance / fuzzy matching.
-    #     """
-
-    #     matches = []
-
-    #     for table, data in self._cache.items():
-    #         cols = list(data.keys())
-
-    #         # NOTE: assumes all columns have equal length
-    #         # TODO: validate column length consistency on ingest
-    #         rows = list(zip(*data.values()))
-
-    #         for i, row in enumerate(rows):
-    #             for j, cell in enumerate(row):
-
-    #                 if (
-    #                     query_object == cell or
-    #                     (isinstance(cell, str) and
-    #                     isinstance(query_object, str) and
-    #                     query_object.lower() in cell.lower())
-    #                 ):
-    #                     val = ValueObject()
-    #                     val.t_name = table
-    #                     val.c_name = [cols[j]]
-    #                     val.row_num = i
-    #                     val.value = cell
-    #                     val.type = "cell"
-    #                     matches.append(val)
-
-    #     return matches
-
-
-    # def find_relation(self, query_object, kwargs=None):
-    #     """
-    #     Not applicable for NDP backend.
-
-    #     TODO:
-    #         - Could be extended in future if relationships/foreign keys
-    #         are inferred from CKAN metadata or dataset links.
-    #     """
-    #     return []
+    
     # ---------------------------------------------------
     # Utility / Display
     # ---------------------------------------------------
-    def list(self, kwargs=None):
-        """List available tables"""
+
+    def list(self, **kwargs):
+        """
+        Lists all available tables in the backend.
+
+        `return` : list of str
+            A list of table names currently stored in memory.
+        """
         return list(self._cache.keys())
 
-    def summary(self, kwargs=None):
-        """Return basic table summary"""
+
+    def summary(self, table_name=None, **kwargs):
+        """
+        Returns summary information about tables in the backend.
+
+        `table_name` : str, optional
+            If provided, returns summary for a single table.
+            Otherwise, returns summary for all tables.
+
+        `return` : dict
+            Dictionary containing:
+                - loaded:  whether data has been loaded (bool)
+                - tables:  mapping of table names to row counts
+
+            Example:
+                {
+                    "loaded": True,
+                    "tables": {
+                        "datasets": 100,
+                        "resources": 250
+                    }
+                }
+        """
+
+        tables_summary = {}
+
+        for name, table in self._cache.items():
+
+            if table_name and name != table_name:
+                continue
+
+            row_count = len(next(iter(table.values()), [])) if table else 0
+            tables_summary[name] = row_count
+
         return {
             "loaded": self._loaded,
-            "tables": {
-                name: len(next(iter(table.values()), []))
-                for name, table in self._cache.items()
-            }
+            "tables": tables_summary
         }
 
-    def display(self, kwargs=None):
-        """Print preview of tables"""
-        for name, table in self._cache.items():
-            print(f"\n{name}:")
-            print(pd.DataFrame(table).head())
 
-    def notebook(self, kwargs=None):
-        """Notebook generation not supported"""
+    def display(self, table_name=None, limit=10, **kwargs):
+        """
+        Displays a preview of table data.
+
+        `table_name` : str, optional
+            If provided, displays only the specified table.
+            Otherwise, displays all tables.
+
+        `limit` : int, default=10
+            Number of rows to display per table.
+
+        `return` : None
+            Prints table previews to stdout.
+        """
+
+        for name, table in self._cache.items():
+
+            if table_name and name != table_name:
+                continue
+
+            print(f"\n{name}:")
+            df = pd.DataFrame(table)
+            print(df.head(limit))
+
+
+    def notebook(self, **kwargs):
+        """
+        Notebook generation not supported for NDP backend.
+
+        `return` : None
+        """
         pass
 
     # ---------------------------------------------------
     # Lifecycle
     # ---------------------------------------------------
+
     def close(self):
-        """Reset backend state"""
+        """
+        Resets backend state and clears all cached data.
+
+        `return` : None
+        """
+
         self._cache = OrderedDict({
             "datasets": OrderedDict(),
             "resources": OrderedDict()
         })
         self._loaded = False
 
+    # ---------------------------------------------------
+    # Abstract Methods
+    # ---------------------------------------------------
 
-    # # ---------------------------------------------------
-    # # Utility / Display (SQLite-style refactor)
-    # # ---------------------------------------------------
-
-    # def list(self, kwargs=None):
-    #     """
-    #     List available tables in memory.
-
-    #     SQLite-style behavior:
-    #         - returns raw list of table names
-    #         - no printing / formatting
-    #     """
-
-    #     kwargs = kwargs or {}
-
-    #     # TODO: support filtering like:
-    #     # kwargs = {"pattern": "dataset"}
-    #     pattern = kwargs.get("pattern")
-
-    #     tables = list(self._cache.keys())
-
-    #     if pattern and isinstance(pattern, str):
-    #         tables = [t for t in tables if pattern.lower() in t.lower()]
-
-    #     return tables
-
-
-    # def summary(self, kwargs=None):
-    #     """
-    #     Return dataset/table summary.
-
-    #     SQLite-style behavior:
-    #         - returns structured metadata (not printed)
-    #         - safe for programmatic use
-    #     """
-
-    #     kwargs = kwargs or {}
-    #     table_filter = kwargs.get("table")
-
-    #     summary = {
-    #         "loaded": self._loaded,
-    #         "tables": {}
-    #     }
-
-    #     for name, table in self._cache.items():
-
-    #         if table_filter and table_filter != name:
-    #             continue
-
-    #         # NOTE: assumes column lengths are consistent
-    #         row_count = len(next(iter(table.values()), [])) if table else 0
-
-    #         summary["tables"][name] = {
-    #             "rows": row_count,
-    #             "columns": len(table.keys()) if table else 0
-    #         }
-
-    #     return summary
-
-
-    # def display(self, kwargs=None):
-    #     """
-    #     Display table previews.
-
-    #     SQLite-style behavior:
-    #         - returns DataFrame(s), NOT print output
-    #         - user/UI layer decides how to render
-    #     """
-
-    #     kwargs = kwargs or {}
-
-    #     table_name = kwargs.get("table")
-    #     limit = kwargs.get("limit", 5)
-
-    #     results = {}
-
-    #     for name, table in self._cache.items():
-
-    #         if table_name and name != table_name:
-    #             continue
-
-    #         df = pd.DataFrame(table)
-
-    #         # Apply preview limit (like SQLite .head())
-    #         results[name] = df.head(limit)
-
-    #     # If only one table requested, return DataFrame directly
-    #     if table_name:
-    #         return results.get(table_name, pd.DataFrame())
-
-    #     return results
-
-
-    # def notebook(self, kwargs=None):
-    #     """
-    #     Notebook generation (placeholder).
-
-    #     SQLite-style expectation:
-    #         - should eventually return a notebook object or file path
-    #         - NOT print anything
-
-    #     TODO:
-    #         - Generate Jupyter notebook (nbformat)
-    #         - Each table becomes a DataFrame cell
-    #         - Include summary cell at top
-    #     """
-    #     pass
-    
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         """
-        Not supported for NDP (read-only backend)
+        Ingest not supported for NDP backend (read-only).
+
+        `return` : None
         """
         raise NotImplementedError("NDP backend is read-only")
