@@ -20,6 +20,10 @@ class Webserver(Backend, ABC):
         pass
 
     @abstractmethod
+    def process_artifacts(self, **kwargs):
+        pass
+
+    @abstractmethod
     def find(self, query_object, **kwargs):
         pass
 
