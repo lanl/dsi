@@ -111,7 +111,7 @@ class NDP(Webserver):
         """
         Fetch datasets/resources from CKAN API and store in memory.
 
-        params:
+        `params`:
             keywords, organization, tags, formats, limit
         """
 
@@ -148,7 +148,7 @@ class NDP(Webserver):
         # Tier 2: per-dataset resource tables
         self._resource_tables = []
         for dataset_name, rows in resource_map.items():
-            table_name = f"resources_{dataset_name}"
+            table_name = dataset_name
             self._cache[table_name] = self._rows_to_table(rows)
             self._resource_tables.append(table_name)
 
@@ -183,16 +183,20 @@ class NDP(Webserver):
 
     def _extract_tables(self, datasets):
         """
-        Flatten CKAN dataset JSON into row format.
+        Flatten CKAN dataset JSON into:
+            - dataset_rows (list of dicts)
+            - resource_map (dict: dataset_name -> list of resource rows)
         """
 
         dataset_rows = []
-        resource_rows = []
+        resource_map = {}
 
         for ds in datasets:
+            dataset_name = ds.get("name") or ds.get("id")
+
             dataset_rows.append({
                 "id": ds.get("id"),
-                "name": ds.get("name"),
+                "name": dataset_name,
                 "title": ds.get("title"),
                 "notes": ds.get("notes"),
                 "organization": (ds.get("organization") or {}).get("title"),
@@ -204,8 +208,10 @@ class NDP(Webserver):
                 "num_resources": ds.get("num_resources", 0)
             })
 
+            resource_map[dataset_name] = []
+
             for r in ds.get("resources", []):
-                resource_rows.append({
+                resource_map[dataset_name].append({
                     "resource_id": r.get("id"),
                     "resource_name": r.get("name"),
                     "format": r.get("format"),
@@ -215,7 +221,7 @@ class NDP(Webserver):
                     "dataset_title": ds.get("title")
                 })
 
-        return dataset_rows, resource_rows
+        return dataset_rows, resource_map
 
 
     def _rows_to_table(self, rows):
@@ -243,7 +249,7 @@ class NDP(Webserver):
         """
         Query all tables using a pandas query string.
 
-        dict_return :
+        `dict_return` :
             If True, returns dict format (default).
             If False, returns pandas DataFrames.
         """
@@ -275,13 +281,20 @@ class NDP(Webserver):
 
 
     # ---------------------------------------------------
-    # 
+    # Artifact Processing (tiered table construction)
     # ---------------------------------------------------
     def process_artifacts(self):
         """
-        Returns all tables (datasets + per-dataset resource tables)
+        Returns all cached tables in tiered format.
 
-        Useful for writing/exporting.
+        Structure:
+            {
+                "datasets": <dataset table>,
+                "<dataset_name>": <resource table>,
+                ...
+            }
+
+        Useful for exporting or writing to external systems.
         """
 
         if not self._loaded:
@@ -295,45 +308,43 @@ class NDP(Webserver):
     # ---------------------------------------------------
     def validate_urls(self):
         """
-        Validates resource URLs and updates cache in-place.
-
-        Adds:
-            - 'url_valid' column to the resources table indicating URL reachability.
-
-        `return` : None
+        Validates resource URLs across all resource tables.
+        Adds 'url_valid' column.
         """
 
-        resources = self._cache["resources"]
-        urls = resources.get("url", [])
-
-        valid_list = []
         headers = {"User-Agent": "NDP-Validator"}
 
-        for url in urls:
-            try:
-                r = requests.head(
-                    url,
-                    allow_redirects=True,
-                    headers=headers,
-                    timeout=10,
-                    verify=self.verify_ssl
-                )
+        for table_name in self._resource_tables:
+            table = self._cache.get(table_name, {})
+            urls = table.get("url", [])
 
-                if r.status_code == 405:
-                    r = requests.get(
+            valid_list = []
+
+            for url in urls:
+                try:
+                    r = requests.head(
                         url,
-                        stream=True,
+                        allow_redirects=True,
                         headers=headers,
                         timeout=10,
                         verify=self.verify_ssl
                     )
 
-                valid_list.append(200 <= r.status_code < 400)
+                    if r.status_code == 405:
+                        r = requests.get(
+                            url,
+                            stream=True,
+                            headers=headers,
+                            timeout=10,
+                            verify=self.verify_ssl
+                        )
 
-            except Exception:
-                valid_list.append(False)
+                    valid_list.append(200 <= r.status_code < 400)
 
-        resources["url_valid"] = valid_list
+                except Exception:
+                    valid_list.append(False)
+
+            table["url_valid"] = valid_list
 
 
     # ---------------------------------------------------
@@ -522,72 +533,87 @@ class NDP(Webserver):
         """
         return []
     
+    
     # ---------------------------------------------------
     # Utility / Display
     # ---------------------------------------------------
-    def list(self, **kwargs):
+    def list(self, collection=False):
         """
-        Lists all available tables in the backend.
+        Lists tables or prints metadata.
 
-        `return` : list of str
-            A list of table names currently stored in memory.
+        collection : bool, default False
+            True  → return list of table names
+            False → print table names + dimensions
         """
-        return list(self._cache.keys())
+
+        if collection:
+            return list(self._cache.keys())
+
+        for name, table in self._cache.items():
+            df = pd.DataFrame(table)
+            print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
     
 
-    def summary(self, table_name, **kwargs):
+    def summary(self, table_name=None):
         """
-        Returns summary information about tables in the backend.
+        Returns numerical metadata for tables.
 
-        table_name :
-            Optional table name. If provided, returns summary only for that table.
-
-        return :
-            dict containing:
-                - loaded: bool
-                - tables: dict mapping table names to row counts
+        `table_name` : str, optional
+            If provided → returns a single DataFrame
+            If None     → returns list of DataFrames
         """
 
-        tables_summary = {}
+        summaries = []
 
         for name, table in self._cache.items():
-
-            if table_name is not None and name != table_name:
+            if table_name and name != table_name:
                 continue
 
-            row_count = len(next(iter(table.values()), [])) if table else 0
-            tables_summary[name] = row_count
-
-        return {
-            "loaded": self._loaded,
-            "tables": tables_summary
-        }
-        
-
-    def display(self, table_name=None, **kwargs):
-        """
-        Displays a preview of table data.
-
-        table_name :
-            Optional table name. If provided, displays only that table.
-
-        kwargs :
-            limit : number of rows to display per table (default 10)
-
-        return :
-            None (prints DataFrame previews)
-        """
-
-        limit = kwargs.get("limit", 10)
-
-        for name, table in self._cache.items():
-
-            if table_name is not None and name != table_name:
-                continue
-
-            print(f"\n{name}:")
             df = pd.DataFrame(table)
-            print(df.head(limit))
+
+            summary_df = pd.DataFrame([{
+                "table_name": name,
+                "num_rows": len(df),
+                "num_columns": len(df.columns),
+                "columns": list(df.columns)
+            }])
+
+            summaries.append(summary_df)
+
+        if table_name:
+            return summaries[0] if summaries else pd.DataFrame()
+
+        return summaries
+        
+        
+    def display(self, table_name, num_rows=25, display_cols=None):
+        """
+        Displays rows from a specified table.
+
+        `table_name` : str
+            Name of the table.
+
+        `num_rows` : int, default 25
+            Number of rows to display.
+
+        `display_cols` : list of str, optional
+            Subset of columns to display.
+
+        `return` :
+            pandas.DataFrame
+        """
+
+        table = self._cache.get(table_name)
+
+        if not table:
+            raise ValueError(f"Table '{table_name}' not found")
+
+        df = pd.DataFrame(table)
+
+        if display_cols:
+            df = df[display_cols]
+
+        return print(df.head(num_rows))
 
 
     def notebook(self, **kwargs):
@@ -605,14 +631,10 @@ class NDP(Webserver):
     def close(self):
         """
         Resets backend state and clears all cached data.
-
-        `return` : None
         """
 
-        self._cache = OrderedDict({
-            "datasets": OrderedDict(),
-            "resources": OrderedDict()
-        })
+        self._cache = OrderedDict()
+        self._resource_tables = []
         self._loaded = False
 
 
