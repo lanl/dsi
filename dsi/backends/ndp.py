@@ -273,7 +273,7 @@ class NDP(Webserver):
                         result_df.to_dict(orient="list")
                         if dict_return else result_df
                     )
-
+            # TODO: If none, throw error
             except pd.errors.UndefinedVariableError:
                 # Skip tables that don't have the queried columns
                 continue
