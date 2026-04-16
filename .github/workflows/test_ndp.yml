@@ -30,7 +30,9 @@ jobs:
         pip install -r requirements.extras.txt
         pip install .
 
-    - name: Test NDP
+    - name: Test NDP Backend
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_ndp.py
+        pytest dsi/backends/tests/test_ndp.py -v --tb=short
+      env:
+        PYTHONUNBUFFERED: 1
