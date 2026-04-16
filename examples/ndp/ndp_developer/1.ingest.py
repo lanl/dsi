@@ -1,21 +1,21 @@
-# examples/ndp/ndp_developer/1.ingest.py
-import argparse
 from dsi.core import Terminal
 
 def main(verbose=False):
-    t = Terminal()
-    t.load_module("backend", "NDP", "back-read")
-    backend = t.active_modules["back-read"][0]
+    terminal = Terminal()
 
-    backend.query_artifacts(query=None, kwargs={"keywords": "data", "limit": 5})
+    # Load NDP backend (read-only)
+    terminal.load_module("backend", "NDP", "back-read", params={"keywords": "data", "limit": 5})
+
+    backend = terminal.active_modules["back-read"][0]
 
     if verbose:
+        artifacts = backend.summary()
         print("Datasets loaded:")
-        for table_name, table_data in backend.process_artifacts().items():
-            print(table_name, list(table_data.keys()))
+        print(artifacts)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NDP ingest example")
-    parser.add_argument("--verbose", action="store_true", help="Show detailed output")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(verbose=args.verbose)
