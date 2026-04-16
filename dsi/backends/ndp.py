@@ -274,6 +274,9 @@ class NDP(Webserver):
                         if dict_return else result_df
                     )
 
+            except pd.errors.UndefinedVariableError:
+                # Skip tables that don't have the queried columns
+                continue
             except Exception as e:
                 raise ValueError(f"Query error in {t_name}: {e}")
 

@@ -1,10 +1,11 @@
+# examples/ndp/ndp_developer/1.load_basic.py
 from dsi.core import Terminal
 
 def main(verbose=False):
     terminal = Terminal()
 
     # Load NDP backend (read-only)
-    terminal.load_module("backend", "NDP", "back-read", params={"keywords": "data", "limit": 5})
+    terminal.load_module("backend", "NDP", "back-read", params={"keywords": "temperature", "limit": 5})
 
     backend = terminal.active_modules["back-read"][0]
 
