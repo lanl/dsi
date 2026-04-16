@@ -148,7 +148,7 @@ class NDP(Webserver):
         # Tier 2: per-dataset resource tables
         self._resource_tables = []
         for dataset_name, rows in resource_map.items():
-            table_name = dataset_name
+            table_name = f"resources_{dataset_name}"
             self._cache[table_name] = self._rows_to_table(rows)
             self._resource_tables.append(table_name)
 
@@ -208,7 +208,7 @@ class NDP(Webserver):
                 "num_resources": ds.get("num_resources", 0)
             })
 
-            resource_map[dataset_name] = []
+            resource_map.setdefault(dataset_name, [])
 
             for r in ds.get("resources", []):
                 resource_map[dataset_name].append({
@@ -547,7 +547,10 @@ class NDP(Webserver):
         """
 
         if collection:
-            return list(self._cache.keys())
+            return {
+                "datasets": ["datasets"],
+                "resources": self._resource_tables
+            }
 
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
@@ -559,31 +562,30 @@ class NDP(Webserver):
         Returns numerical metadata for tables.
 
         `table_name` : str, optional
-            If provided → returns a single DataFrame
-            If None     → returns list of DataFrames
+            If provided → returns summary for a single table
+            If None → returns summary for all tables as one DataFrame
         """
+
+        if not self._loaded:
+            return pd.DataFrame()
 
         summaries = []
 
         for name, table in self._cache.items():
+
             if table_name and name != table_name:
                 continue
 
             df = pd.DataFrame(table)
 
-            summary_df = pd.DataFrame([{
+            summaries.append({
                 "table_name": name,
                 "num_rows": len(df),
                 "num_columns": len(df.columns),
                 "columns": list(df.columns)
-            }])
+            })
 
-            summaries.append(summary_df)
-
-        if table_name:
-            return summaries[0] if summaries else pd.DataFrame()
-
-        return summaries
+        return pd.DataFrame(summaries)
         
         
     def display(self, table_name, num_rows=25, display_cols=None):
@@ -613,7 +615,9 @@ class NDP(Webserver):
         if display_cols:
             df = df[display_cols]
 
-        return print(df.head(num_rows))
+        result = df.head(num_rows)
+        print(result)
+        return result
 
 
     def notebook(self, **kwargs):
