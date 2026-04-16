@@ -56,85 +56,101 @@ class NDP(Webserver):
         url :
             Base CKAN URL. If None, a default CKAN endpoint is used.
 
-            # TODO: Incorporate back in
+        params :
+            Dictionary of initial query parameters used to fetch data from CKAN.
+            Supported keys:
+                - keywords
+                - organization
+                - tags
+                - formats
+                - limit
+
+        kwargs :
             api_key    : optional API key
             verify_ssl : toggle SSL verification (default False)
-            params    : initial query params
-            
-        kwargs :
         """
 
         DEFAULT_URL = "https://nationaldataplatform.org/catalog"
 
         base_url = url or DEFAULT_URL
 
-        api_key = kwargs.get("api_key")
-        verify_ssl = kwargs.get("verify_ssl", False)
-        webargs = params
+        # ----------------------------
+        # Auth / connection config
+        # ----------------------------
+        self.api_key = kwargs.get("api_key")
+        self.verify_ssl = kwargs.get("verify_ssl", False)
 
         parsed = urlparse(base_url)
         if not parsed.scheme or not parsed.netloc:
             raise ValueError("Invalid base_url")
 
         self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
-        self.verify_ssl = verify_ssl
 
         self.headers = {}
-        if api_key:
-            self.headers["Authorization"] = api_key
+        if self.api_key:
+            self.headers["Authorization"] = self.api_key
 
-        self._cache = OrderedDict({
-            "datasets": OrderedDict(),
-            "resources": OrderedDict()
-        })
+        # Data storage (tiered structure)
+        # Tier 1: datasets
+        # Tier 2: per-dataset resource tables
+        self._cache = OrderedDict()
+        self._resource_tables = []
 
         self._loaded = False
+        self.params = params or {}
 
-        if webargs:
-            self._load_initial_data(webargs)
+        # Initial data load
+        if self.params:
+            self._load_initial_data(self.params)
    
    
     # ---------------------------------------------------
     # Initial Data Load
     # ---------------------------------------------------
-    def _load_initial_data(self, kwargs):
+    def _load_initial_data(self, params):
         """
-        Fetch datasets/resources from CKAN API and store in memory
+        Fetch datasets/resources from CKAN API and store in memory.
 
-        kwargs:
+        params:
             keywords, organization, tags, formats, limit
         """
 
-        params = {"rows": kwargs.get("limit", 100)}
+        query_params = {"rows": params.get("limit", 100)}
 
         q_parts, fq_parts = [], []
 
-        if kwargs.get("keywords"):
-            q_parts.append(kwargs["keywords"])
+        if params.get("keywords"):
+            q_parts.append(params["keywords"])
 
-        if kwargs.get("organization"):
-            fq_parts.append(f"organization:{kwargs['organization']}")
+        if params.get("organization"):
+            fq_parts.append(f"organization:{params['organization']}")
 
-        if kwargs.get("tags"):
-            fq_parts += [f"tags:{t}" for t in kwargs["tags"]]
+        if params.get("tags"):
+            fq_parts += [f"tags:{t}" for t in params["tags"]]
 
-        if kwargs.get("formats"):
+        if params.get("formats"):
             fq_parts.append("(" + " OR ".join(
-                [f"res_format:{f}" for f in kwargs["formats"]]) + ")")
+                [f"res_format:{f}" for f in params["formats"]]) + ")")
 
         if q_parts:
-            params["q"] = " ".join(q_parts)
+            query_params["q"] = " ".join(q_parts)
 
         if fq_parts:
-            params["fq"] = " AND ".join(fq_parts)
+            query_params["fq"] = " AND ".join(fq_parts)
 
-        result = self._request("package_search", params)
+        result = self._request("package_search", query_params)
 
-        ds_rows, rs_rows = self._extract_tables(result.get("results", []))
+        dataset_rows, resource_map = self._extract_tables(result.get("results", []))
 
-        self._cache["datasets"] = self._rows_to_table(ds_rows)
-        self._cache["resources"] = self._rows_to_table(rs_rows)
+        # Tier 1: datasets
+        self._cache["datasets"] = self._rows_to_table(dataset_rows)
+
+        # Tier 2: per-dataset resource tables
+        self._resource_tables = []
+        for dataset_name, rows in resource_map.items():
+            table_name = f"resources_{dataset_name}"
+            self._cache[table_name] = self._rows_to_table(rows)
+            self._resource_tables.append(table_name)
 
         self._loaded = True
 
@@ -223,46 +239,55 @@ class NDP(Webserver):
     # ---------------------------------------------------
     # Query Interface (in-memory)
     # ---------------------------------------------------
-    def query_artifacts(self, query, table_name, dict_return, **kwargs):
+    def query_artifacts(self, query, dict_return=True, **kwargs):
         """
-        Returns filtered rows from cached tables using pandas.query().
+        Query all tables using a pandas query string.
 
-        query :
-            Pandas query string used to filter table rows.
-
-        queryargs (kwargs):
-            table :
-                datasets | resources (default: datasets)
-
-            dict_return :
-                If True, returns dict format.
-                If False, returns pandas DataFrame.
-
-        `return` :
-            Filtered results from selected in-memory table.
+        dict_return :
+            If True, returns dict format (default).
+            If False, returns pandas DataFrames.
         """
-
-        queryargs = queryargs or {}
 
         if not self._loaded:
-            return OrderedDict()
+            return {}
 
-        table_name = queryargs.get("table", "datasets")
-        dict_return = queryargs.get("dict_return", True)
+        results = {}
 
-        df = pd.DataFrame(self._cache.get(table_name, {}))
+        for t_name, table in self._cache.items():
+            df = pd.DataFrame(table)
 
-        if df.empty:
-            return {table_name: {}} if dict_return else pd.DataFrame()
+            if df.empty:
+                continue
 
-        try:
-            result_df = df.query(query, engine="python")
-            result = result_df.to_dict(orient="list")
+            try:
+                result_df = df.query(query, engine="python")
 
-            return {table_name: result} if dict_return else result_df
+                if not result_df.empty:
+                    results[t_name] = (
+                        result_df.to_dict(orient="list")
+                        if dict_return else result_df
+                    )
 
-        except Exception as e:
-            raise ValueError(f"CKAN query_artifacts error at {table_name}: {e}")
+            except Exception as e:
+                raise ValueError(f"Query error in {t_name}: {e}")
+
+        return results
+
+
+    # ---------------------------------------------------
+    # 
+    # ---------------------------------------------------
+    def process_artifacts(self):
+        """
+        Returns all tables (datasets + per-dataset resource tables)
+
+        Useful for writing/exporting.
+        """
+
+        if not self._loaded:
+            return {}
+
+        return self._cache
 
 
     # ---------------------------------------------------
