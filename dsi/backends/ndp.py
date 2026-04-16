@@ -148,7 +148,7 @@ class NDP(Webserver):
         # Tier 2: per-dataset resource tables
         self._resource_tables = []
         for dataset_name, rows in resource_map.items():
-            table_name = f"resources_{dataset_name}"
+            table_name = dataset_name
             self._cache[table_name] = self._rows_to_table(rows)
             self._resource_tables.append(table_name)
 
@@ -314,7 +314,6 @@ class NDP(Webserver):
         Validates resource URLs across all resource tables.
         Adds 'url_valid' column.
         """
-
         headers = {"User-Agent": "NDP-Validator"}
 
         for table_name in self._resource_tables:

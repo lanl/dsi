@@ -1397,6 +1397,7 @@ class Terminal():
                 return True
         elif parent_name == "Webserver":
             if backend.__class__.__name__ == "NDP":
+                # TODO: Use URL validation to see if NDP goes down, then let it pass
                 return True
         return False
 
