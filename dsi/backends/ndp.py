@@ -549,10 +549,7 @@ class NDP(Webserver):
         """
 
         if collection:
-            return {
-                "datasets": ["datasets"],
-                "resources": self._resource_tables
-            }
+            return self._cache.keys()
 
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
