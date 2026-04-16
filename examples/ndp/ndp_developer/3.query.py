@@ -1,30 +1,38 @@
-# examples/ndp/ndp_developer/3.query.py
 import argparse
 from dsi.core import Terminal
 
 def main(verbose=False):
-    t = Terminal()
-    
-    # Called by ndp __init__
-    t.load_module("backend", "NDP", "back-read", webargs={"keywords": "energy", "limit": 10})
-    
-    # Called by ndp's query_artifact
-    result = t.artifact_handler(interaction_type='query', query="`num_resources` > 10", queryargs={"table": "datasets", "dict_return": True})
+    terminal = Terminal()
 
-    # This is a filesystem example
-    #data = terminal_query.artifact_handler(interaction_type='query', query = "SELECT * FROM input;")
+    # 1. Load NDP backend (ingest step)
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={"keywords": "energy", "limit": 10}
+    )
 
+    backend = terminal.active_modules["back-read"][0]
+
+    # 2. Query step
+    result = backend.query_artifacts(
+        query="`num_resources` > 10",
+        dict_return=True
+    )
+
+    # 3. OUTPUT STEP
     if verbose:
-        print("Query results (num_resources > 10):" + str(len(result)))
+        print("\nQuery results (num_resources > 10):")
+        print(f"Tables returned: {len(result)}")
 
         for table_name, table_data in result.items():
-            print(f"\n{table_name}")
+            print(f"\n[{table_name}]")
 
             for col, values in table_data.items():
-                print(f"{col}: {values}")
+                print(f"  {col}: {values}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NDP query example")
-    parser.add_argument("--verbose", action="store_true", help="Show detailed output")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(verbose=args.verbose)

@@ -23,3 +23,4 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")
     args = parser.parse_args()
     main(verbose=args.verbose)
+    
