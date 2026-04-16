@@ -49,17 +49,19 @@ class NDP(Webserver):
     # ----------------------------
     # Initialization
     # ----------------------------
-    def __init__(self, url=None, **kwargs):
+    def __init__(self, url=None, params=None, **kwargs):
         """
         Initialize backend and optionally load data from CKAN API.
 
         url :
             Base CKAN URL. If None, a default CKAN endpoint is used.
 
-        kwargs :
+            # TODO: Incorporate back in
             api_key    : optional API key
             verify_ssl : toggle SSL verification (default False)
-            webargs    : initial query params
+            params    : initial query params
+            
+        kwargs :
         """
 
         DEFAULT_URL = "https://nationaldataplatform.org/catalog"
@@ -68,7 +70,7 @@ class NDP(Webserver):
 
         api_key = kwargs.get("api_key")
         verify_ssl = kwargs.get("verify_ssl", False)
-        webargs = kwargs.get("webargs")
+        webargs = params
 
         parsed = urlparse(base_url)
         if not parsed.scheme or not parsed.netloc:
@@ -221,7 +223,7 @@ class NDP(Webserver):
     # ---------------------------------------------------
     # Query Interface (in-memory)
     # ---------------------------------------------------
-    def query_artifacts(self, query, **kwargs):
+    def query_artifacts(self, query, table_name, dict_return, **kwargs):
         """
         Returns filtered rows from cached tables using pandas.query().
 
@@ -240,7 +242,7 @@ class NDP(Webserver):
             Filtered results from selected in-memory table.
         """
 
-        queryargs = kwargs or {}
+        queryargs = queryargs or {}
 
         if not self._loaded:
             return OrderedDict()

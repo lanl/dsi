@@ -24,3 +24,27 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")
     args = parser.parse_args()
     main(verbose=args.verbose)
+    
+# from dsi.core import DSI
+
+# # 1) Initialize DSI with the NDP backend
+# dsi = DSI(backend_name="NDP")
+
+# # 2) Load a dataset into the backend (example: CSV via standard reader)
+# dsi.read(
+#     data_sources="traffic_data.csv",
+#     reader_name="CSV",
+#     table_name="traffic"
+# )
+
+# # 3) Run a SQL query on the NDP-backed dataset
+# result = dsi.query("""
+# SELECT road,
+#        AVG(speed) AS avg_speed,
+#        COUNT(*) AS observations
+# FROM traffic
+# GROUP BY road
+# ORDER BY avg_speed DESC
+# """, collection=True)
+
+# print(result)
