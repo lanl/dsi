@@ -165,7 +165,7 @@ class DSI():
         self.main_backend_obj = self.t.loaded_backends[0]
 
         if backend_name.lower() == "ndp":
-            msg = f"Created an instance of DSI with the NDP read-only backend"
+            msg = "Created an instance of DSI with the NDP read-only backend"
         elif filename != ".temp_dsi.db":
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
