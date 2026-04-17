@@ -223,6 +223,56 @@ class DSIFederated:
 
         return [row["path"] for row in found_dbs]
 
+    def f_federate(self, config_file: str, workspace_folder: str = ""):
+        """Federates databases based on a specified configuration file containing the criteria for federating the databases.
+        
+        Args:
+            config_path (str): The file path to the configuration file containing the criteria for federating the databases. The configuration file should be in JSON format and contain the necessary information for federating the databases.
+        """
+        # Check if the file exists and is a valid yaml file before trying to federate
+        if not os.path.exists(config_file):
+            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
+            return
+        else:
+            try:
+                with open(config_file, 'r') as f:
+                    data = f.read()
+                config_data = yaml.safe_load(data)
+            except yaml.YAMLError as e:
+                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again.")
+                return
+            
+        try:
+            s = Sync()
+            if workspace_folder == "":
+                _workspace_folder = config_data.get("workspace_folder", "")
+                if _workspace_folder == "":
+                    workspace_folder = "dsi_data"
+                    print(f"Synchronization data from {config_file} into {workspace_folder}")
+                    s.get(config_file, workspace_folder)
+                else:
+                    print(f"Synchronization data from {config_file} into {workspace_folder}")
+                    workspace_folder = _workspace_folder
+                    s.get(config_file, workspace_folder)
+            else:
+                print(f"Synchronization data from {config_file} into {workspace_folder}")
+                s.get(config_file, workspace_folder)
+        except Exception as e:
+            print(f"federate ERROR: {e}")
+            return
+        
+
+        try:
+            _federated_folder_path = Path(self.federated_folder_path)
+            with open( f"{_federated_folder_path}/dsi_database_list.json", "r", encoding="utf-8") as f:
+                dsi_databases_list = json.load(f)
+
+            self.init_federated(dsi_databases_list)
+                
+        except Exception as e:
+            print(f"Error {e}, could not read the database at {self.federated_folder_path}/dsi_database_list.json")
+            return
+    
 
     def f_summary(self, 
                   db: str | None = None, 
