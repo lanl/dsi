@@ -170,7 +170,7 @@ class NDP(Webserver):
                 )
             
             return True
-        except:
+        except: # noqa: E722
             # Need to silent exit to continue external workflows
             return False
         
