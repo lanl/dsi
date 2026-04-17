@@ -1,9 +1,11 @@
 from dsi.core import Terminal #, Sync
+from dsi.backends.ndp import NDP
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import os
 import logging
+import importlib.util
 from contextlib import redirect_stdout
 import io
 import math
@@ -179,8 +181,11 @@ class DSI():
         """
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
-        print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
-        print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.\n")
+        if importlib.util.find_spec("duckdb") is not None:
+            print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
+        n = NDP()
+        if n.validate_connection():
+            print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.\n")
         print()
 
     def schema(self, filename = None):
