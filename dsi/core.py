@@ -730,7 +730,7 @@ class Terminal():
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
-        return_object = backend.find_column(query_object, range)
+        return_object = backend.find_column(query_object, range=range)
         return self.find_helper(query_object, return_object, start, "column ")
 
     def find_cell(self, query_object, row = False):

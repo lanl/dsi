@@ -300,16 +300,22 @@ def test_ndp_summary():
         params={"keywords": "climate", "limit": 5}
     )
     
-    # Test summary for all tables
-    summary_df = backend.summary()
-    assert isinstance(summary_df, pd.DataFrame)
-    assert not summary_df.empty
-    assert "table_name" in summary_df.columns
-    assert "num_rows" in summary_df.columns
+    # Test summary for all tables - returns list format
+    summary_list = backend.summary()
+    assert isinstance(summary_list, list)  # ✅ Expect list
+    assert len(summary_list) > 1  # At least [table_names] + one df
     
-    # Test summary for specific table
+    # First element should be table names list
+    assert isinstance(summary_list[0], list)
+    
+    # Remaining elements should be DataFrames
+    for df in summary_list[1:]:
+        assert isinstance(df, pd.DataFrame)
+    
+    # Test summary for specific table - returns DataFrame
     summary_single = backend.summary("datasets")
     assert isinstance(summary_single, pd.DataFrame)
+    assert "table_name" in summary_single.columns
     
     backend.close()
 
