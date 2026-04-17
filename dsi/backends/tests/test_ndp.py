@@ -2,6 +2,7 @@
 from collections import OrderedDict
 from dsi.core import Terminal
 import pytest
+import pandas as pd
 
 # ----------------------------
 # 1) Test loading NDP backend with specific parameters
@@ -33,7 +34,32 @@ def test_ndp_load_and_query():
 
 
 # ----------------------------
-# 2) Test process_artifacts structure
+# 2) Test validate_connection
+# ----------------------------
+def test_ndp_validate_connection():
+    """Test connection validation to CKAN API."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    # Should not raise an exception
+    assert backend.validate_connection() is True
+    
+    terminal.close()
+
+
+# ----------------------------
+# 3) Test process_artifacts structure
 # ----------------------------
 def test_ndp_process_structure():
     """Test that processed artifacts have correct tiered structure."""
@@ -67,7 +93,41 @@ def test_ndp_process_structure():
 
 
 # ----------------------------
-# 3) Test query_artifacts with pandas query
+# 4) Test table name resolution (dataset_id vs dataset_title)
+# ----------------------------
+def test_ndp_table_name_resolution():
+    """Test that both dataset_id and dataset_title can be used to access tables."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate data",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    # Should have some resource tables
+    if backend._resource_tables:
+        # Get first resource table
+        dataset_title = backend._resource_tables[0]
+        dataset_id = backend._dataset_title_map.get(dataset_title)
+        
+        if dataset_id:
+            # Both should resolve to same table
+            resolved_by_title = backend._resolve_table_name(dataset_title)
+            resolved_by_id = backend._resolve_table_name(dataset_id)
+            assert resolved_by_title == resolved_by_id == dataset_title
+    
+    terminal.close()
+
+
+# ----------------------------
+# 5) Test query_artifacts with pandas query
 # ----------------------------
 def test_ndp_query_with_pandas():
     """Test querying loaded data with pandas query string."""
@@ -91,13 +151,13 @@ def test_ndp_query_with_pandas():
     assert isinstance(result, dict)
     # Should have results if any datasets have resources
     if result:
-        assert "datasets" in result or any("resources_" in key for key in result.keys())
+        assert any(key in result for key in backend._cache.keys())
     
     terminal.close()
 
 
 # ----------------------------
-# 4) Test invalid pandas query raises error
+# 6) Test invalid pandas query raises error
 # ----------------------------
 def test_ndp_query_invalid():
     """Test that invalid pandas queries raise appropriate errors."""
@@ -122,7 +182,7 @@ def test_ndp_query_invalid():
 
 
 # ----------------------------
-# 5) Test find methods
+# 7) Test find methods
 # ----------------------------
 def test_ndp_find_operations():
     """Test find operations across tables, columns, and cells."""
@@ -159,7 +219,7 @@ def test_ndp_find_operations():
 
 
 # ----------------------------
-# 6) Test combined find()
+# 8) Test combined find()
 # ----------------------------
 def test_ndp_find_combined():
     """Test the general find() method that searches everywhere."""
@@ -184,7 +244,33 @@ def test_ndp_find_combined():
 
 
 # ----------------------------
-# 7) Test URL validation on resource tables
+# 9) Test find_relation (should return empty list)
+# ----------------------------
+def test_ndp_find_relation():
+    """Test that find_relation returns empty list (not supported)."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    result = backend.find_relation("column_name", "= 'value'")
+    assert isinstance(result, list)
+    assert len(result) == 0
+    
+    terminal.close()
+
+
+# ----------------------------
+# 10) Test URL validation on resource tables
 # ----------------------------
 def test_ndp_validate_urls():
     """Test URL validation for dataset resources."""
@@ -217,10 +303,10 @@ def test_ndp_validate_urls():
 
 
 # ----------------------------
-# 8) Test list and summary methods
+# 11) Test list method
 # ----------------------------
-def test_ndp_list_and_summary():
-    """Test metadata retrieval methods."""
+def test_ndp_list():
+    """Test list method returns table names."""
     terminal = Terminal()
     
     terminal.load_module(
@@ -236,23 +322,105 @@ def test_ndp_list_and_summary():
     backend = terminal.active_modules["back-read"][0]
     
     # Test list with collection=True
-    table_info = backend.list(collection=True)
-    assert isinstance(table_info, dict)
-    assert "datasets" in table_info
-    assert "resources" in table_info
-    assert isinstance(table_info["resources"], list)
-    
-    # Test summary
-    summary_df = backend.summary()
-    assert not summary_df.empty
-    assert "table_name" in summary_df.columns
-    assert "num_rows" in summary_df.columns
+    table_names = backend.list(collection=True)
+    assert isinstance(table_names, (dict_keys, list))
+    assert "datasets" in table_names
     
     terminal.close()
 
 
 # ----------------------------
-# 9) Test read-only enforcement
+# 12) Test summary method
+# ----------------------------
+def test_ndp_summary():
+    """Test summary returns DataFrame with table metadata."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    # Test summary for all tables
+    summary_df = backend.summary()
+    assert isinstance(summary_df, pd.DataFrame)
+    assert not summary_df.empty
+    assert "table_name" in summary_df.columns
+    assert "num_rows" in summary_df.columns
+    
+    # Test summary for specific table
+    summary_single = backend.summary("datasets")
+    assert isinstance(summary_single, pd.DataFrame)
+    
+    terminal.close()
+
+
+# ----------------------------
+# 13) Test get_table method
+# ----------------------------
+def test_ndp_get_table():
+    """Test getting table data as DataFrame or OrderedDict."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    # Get as DataFrame
+    df = backend.get_table("datasets", dict_return=False)
+    assert isinstance(df, pd.DataFrame)
+    
+    # Get as OrderedDict
+    dict_data = backend.get_table("datasets", dict_return=True)
+    assert isinstance(dict_data, OrderedDict)
+    
+    terminal.close()
+
+
+# ----------------------------
+# 14) Test get_schema method
+# ----------------------------
+def test_ndp_get_schema():
+    """Test that get_schema returns informative message."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    schema = backend.get_schema()
+    assert isinstance(schema, str)
+    assert "NDP" in schema
+    assert "read-only" in schema
+    
+    terminal.close()
+
+
+# ----------------------------
+# 15) Test read-only enforcement
 # ----------------------------
 def test_ndp_read_only():
     """Test that NDP backend is properly read-only."""
@@ -277,7 +445,7 @@ def test_ndp_read_only():
 
 
 # ----------------------------
-# 10) Test display method
+# 16) Test display method
 # ----------------------------
 def test_ndp_display():
     """Test display method for tables."""
@@ -297,14 +465,14 @@ def test_ndp_display():
     
     # Display datasets table
     result = backend.display("datasets", num_rows=10)
-    assert result is not None
+    assert isinstance(result, pd.DataFrame)
     assert len(result) <= 10
     
     terminal.close()
 
 
 # ----------------------------
-# 11) Test with different organizations
+# 17) Test with different organizations
 # ----------------------------
 def test_ndp_organization_filtering():
     """Test querying with organization filter."""
@@ -331,7 +499,7 @@ def test_ndp_organization_filtering():
 
 
 # ----------------------------
-# 12) Test with tags filter
+# 18) Test with tags filter
 # ----------------------------
 def test_ndp_tags_filtering():
     """Test querying with tags filter."""
@@ -358,7 +526,7 @@ def test_ndp_tags_filtering():
 
 
 # ----------------------------
-# 13) Test with format filter
+# 19) Test with format filter
 # ----------------------------
 def test_ndp_format_filtering():
     """Test querying with resource format filter."""
@@ -383,7 +551,7 @@ def test_ndp_format_filtering():
 
 
 # ----------------------------
-# 14) Test close method
+# 20) Test close method
 # ----------------------------
 def test_ndp_close():
     """Test that close() properly resets backend state."""
@@ -408,5 +576,30 @@ def test_ndp_close():
     assert backend._loaded is False
     assert len(backend._cache) == 0
     assert len(backend._resource_tables) == 0
+    
+    terminal.close()
+
+
+# ----------------------------
+# 21) Test overwrite_table raises NotImplementedError
+# ----------------------------
+def test_ndp_overwrite_table():
+    """Test that overwrite_table raises NotImplementedError."""
+    terminal = Terminal()
+    
+    terminal.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "limit": 5
+        }
+    )
+    
+    backend = terminal.active_modules["back-read"][0]
+    
+    with pytest.raises(NotImplementedError):
+        backend.overwrite_table("datasets", pd.DataFrame())
     
     terminal.close()
