@@ -158,7 +158,7 @@ class NDP(Webserver):
                 test_url,
                 headers=self.headers,
                 verify=self.verify_ssl,
-                timeout=10
+                timeout=2
             )
             
             response.raise_for_status()
@@ -170,34 +170,37 @@ class NDP(Webserver):
                 )
             
             return True
-            
-        except requests.exceptions.Timeout:
-            raise ConnectionError(
-                f"Connection timeout: Unable to reach {self.base_url} within 10 seconds"
-            )
-        except requests.exceptions.ConnectionError:
-            raise ConnectionError(
-                f"Connection failed: Unable to connect to {self.base_url}. "
-                "Check the URL and your network connection."
-            )
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                raise RuntimeError(
-                    f"CKAN API not found at {self.base_url}. "
-                    "Verify this is a valid CKAN endpoint."
-                )
-            else:
-                raise RuntimeError(
-                    f"HTTP {e.response.status_code} Error: {str(e)}"
-                )
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(
-                f"Failed to validate connection to {self.base_url}: {str(e)}"
-            )
-        except ValueError as e:
-            raise RuntimeError(
-                f"Invalid JSON response from {self.base_url}: {str(e)}"
-            )
+        except:
+            # Need to silent exit to continue external workflows
+            return False
+        
+        # except requests.exceptions.Timeout:
+        #     raise ConnectionError(
+        #         f"Connection timeout: Unable to reach {self.base_url} within 10 seconds"
+        #     )
+        # except requests.exceptions.ConnectionError:
+        #     raise ConnectionError(
+        #         f"Connection failed: Unable to connect to {self.base_url}. "
+        #         "Check the URL and your network connection."
+        #     )
+        # except requests.exceptions.HTTPError as e:
+        #     if e.response.status_code == 404:
+        #         raise RuntimeError(
+        #             f"CKAN API not found at {self.base_url}. "
+        #             "Verify this is a valid CKAN endpoint."
+        #         )
+        #     else:
+        #         raise RuntimeError(
+        #             f"HTTP {e.response.status_code} Error: {str(e)}"
+        #         )
+        # except requests.exceptions.RequestException as e:
+        #     raise ConnectionError(
+        #         f"Failed to validate connection to {self.base_url}: {str(e)}"
+        #     )
+        # except ValueError as e:
+        #     raise RuntimeError(
+        #         f"Invalid JSON response from {self.base_url}: {str(e)}"
+        #     )
 
 
     # ----------------------------------------------------------------------
