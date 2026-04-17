@@ -2,23 +2,18 @@
 from dsi.dsi import DSI
 
 def main(verbose=False):
-    dsi_instance = DSI(
+    # Initialize NDP backend with search parameters
+    dsi = DSI(
         backend_name="NDP",
-        keywords="temperature",
-        limit=5
+        keywords="temperature",  # Search term
+        limit=5                  # Maximum datasets to retrieve
     )
-    
-    # ADD THESE DEBUG LINES:
-    print(f"\nDEBUG: Backend object: {dsi_instance.main_backend_obj}")
-    print(f"DEBUG: Backend loaded status: {dsi_instance.main_backend_obj._loaded}")
-    print(f"DEBUG: Cache keys: {list(dsi_instance.main_backend_obj._cache.keys())}")
-    print(f"DEBUG: Params used: {dsi_instance.main_backend_obj.params}")
     
     if verbose:
         print("\nAvailable tables:")
-        dsi_instance.list()
+        dsi.list()
     
-    dsi_instance.close()
+    dsi.close()
 
 if __name__ == "__main__":
     import argparse
