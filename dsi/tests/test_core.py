@@ -5,6 +5,7 @@ import io
 from contextlib import redirect_stdout
 import textwrap
 import pandas as pd
+import pytest
 
 def test_terminal_module_getter():
     a = Terminal()

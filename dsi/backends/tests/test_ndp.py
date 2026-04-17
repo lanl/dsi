@@ -397,9 +397,6 @@ def test_ndp_organization_filter():
     
     # Check we got data (number of rows)
     if data["datasets"]:
-        first_col = next(iter(data["datasets"].values()))
-        num_rows = len(first_col)
-        
         # Verify organization column
         assert "organization" in data["datasets"]
         
