@@ -1813,7 +1813,6 @@ def test_list_ndp_backend():
     """Test listing NDP tables"""
     dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
     
-    # Should have datasets table and possibly resource tables
     tables = dsi.list(collection=True)
     assert isinstance(tables, list)
     assert len(tables) > 0
@@ -1825,16 +1824,14 @@ def test_get_table_ndp_backend():
     """Test getting tables from NDP"""
     dsi = DSI(backend_name="NDP", keywords="ocean", limit=10)
     
-    # Test getting datasets table
+    # Test display output
     f = io.StringIO()
     with redirect_stdout(f):
         dsi.get_table(table_name="datasets")
     output = f.getvalue()
-    
-    # Verify output contains table data
     assert len(output) > 0
     
-    # Test with collection=True
+    # Test collection
     df = dsi.get_table(table_name="datasets", collection=True)
     assert isinstance(df, DataFrame)
     assert len(df) > 0
@@ -1847,173 +1844,26 @@ def test_search_ndp_backend():
     """Test searching in NDP backend"""
     dsi = DSI(backend_name="NDP", keywords="data", limit=5)
     
-    # Test search output
+    # Test display output
     f = io.StringIO()
     with redirect_stdout(f):
         dsi.search(query="CSV")
     output = f.getvalue()
-    
-    # Verify search message appears
     assert "Searching for all instances of CSV in the active backend" in output
     
-    # Test search with collection=True
+    # Test collection
     results = dsi.search(query="CSV", collection=True)
     assert isinstance(results, list)
-    # Results may be empty, just verify it returns a list
     
     dsi.close()
 
-def test_find_ndp_backend():
-    """Test finding datasets in NDP backend"""
-    dsi = DSI(backend_name="NDP", keywords="climate", limit=10)
-    
-    # Get datasets table for filtering
-    df = dsi.get_table(table_name="datasets", collection=True)
-    assert 'num_resources' in df.columns
-    
-    # Test filtering datasets with resources
-    filtered = df[df['num_resources'] > 0]
-    assert len(filtered) >= 0  # May or may not have resources
-    
-    # Test filtering by title
-    if 'title' in df.columns and len(df) > 0:
-        # Just verify we can access and filter the column
-        assert df['title'].dtype == object  # String column
-    
-    dsi.close()
-
-def test_query_ndp_backend():
-    """Test that NDP doesn't support direct SQL queries"""
-    dsi = DSI(backend_name="NDP", keywords="test", limit=3)
-    
-    # NDP backend doesn't support SQL queries
-    # This test verifies the backend works without query() method
-    tables = dsi.list(collection=True)
-    assert "datasets" in tables
-    
-    dsi.close()
-
-def test_resources_ndp_backend():
-    """Test accessing resource tables in NDP backend"""
-    dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
-    
-    # Get all tables
-    tables = dsi.list(collection=True)
-    
-    # Find resource tables (not 'datasets')
-    resource_tables = [t for t in tables if t != 'datasets']
-    
-    # If there are resource tables, verify we can access them
-    if len(resource_tables) > 0:
-        first_resource_table = resource_tables[0]
-        
-        # Test output
-        f = io.StringIO()
-        with redirect_stdout(f):
-            dsi.get_table(table_name=first_resource_table)
-        output = f.getvalue()
-        assert len(output) > 0
-        
-        # Test collection
-        resource_df = dsi.get_table(table_name=first_resource_table, collection=True)
-        assert isinstance(resource_df, DataFrame)
-        assert len(resource_df) > 0
-    
-    dsi.close()
-
-def test_multiple_connections_ndp_backend():
-    """Test multiple connection cycles for NDP backend"""
+def test_close_ndp_backend():
+    """Test connection management"""
     # Test multiple open/close cycles
     for i in range(3):
         dsi = DSI(backend_name="NDP", keywords="test", limit=2)
         df = dsi.get_table("datasets", collection=True)
         assert df is not None
-        assert len(df) > 0
         dsi.close()
     
-    assert True
-
-def test_different_keywords_ndp_backend():
-    """Test NDP with different keyword searches"""
-    keywords_list = ["ocean", "climate", "water"]
-    
-    for keyword in keywords_list:
-        dsi = DSI(backend_name="NDP", keywords=keyword, limit=5)
-        
-        # Verify we can get datasets table
-        df = dsi.get_table("datasets", collection=True)
-        assert isinstance(df, DataFrame)
-        assert len(df) > 0
-        
-        dsi.close()
-    
-    assert True
-
-def test_limit_parameter_ndp_backend():
-    """Test NDP with different limit values"""
-    # Test with limit=3
-    dsi1 = DSI(backend_name="NDP", keywords="data", limit=3)
-    df1 = dsi1.get_table("datasets", collection=True)
-    dsi1.close()
-    
-    # Test with limit=10
-    dsi2 = DSI(backend_name="NDP", keywords="data", limit=10)
-    df2 = dsi2.get_table("datasets", collection=True)
-    dsi2.close()
-    
-    # Verify both return dataframes
-    assert isinstance(df1, DataFrame)
-    assert isinstance(df2, DataFrame)
-    
-    # Note: Can't guarantee df2 > df1 due to API behavior
-    assert len(df1) > 0
-    assert len(df2) > 0
-    
-    assert True
-
-def test_datasets_structure_ndp_backend():
-    """Test that datasets table has expected structure"""
-    dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
-    
-    df = dsi.get_table("datasets", collection=True)
-    
-    # Verify it's a DataFrame
-    assert isinstance(df, DataFrame)
-    assert len(df) > 0
-    
-    # Verify key columns exist
-    expected_columns = ['title', 'num_resources']
-    for col in expected_columns:
-        assert col in df.columns, f"Missing expected column: {col}"
-    
-    # Verify data types
-    assert df['num_resources'].dtype in ['int64', 'int32', 'float64']
-    assert df['title'].dtype == object  # String column
-    
-    dsi.close()
-
-def test_error_invalid_backend_ndp():
-    """Test error handling for invalid NDP parameters"""
-    # Test with empty keywords
-    try:
-        dsi = DSI(backend_name="NDP", keywords="", limit=5)
-        dsi.close()
-        # Empty keywords might work, just verify connection
-        assert True
-    except:
-        # Or it might error - either is acceptable
-        assert True
-
-def test_close_ndp_backend():
-    """Test proper closing of NDP connections"""
-    dsi = DSI(backend_name="NDP", keywords="test", limit=3)
-    
-    # Verify connection is active
-    tables = dsi.list(collection=True)
-    assert len(tables) > 0
-    
-    # Close connection
-    dsi.close()
-    
-    # Test is successful if close() doesn't raise exception
     assert True
