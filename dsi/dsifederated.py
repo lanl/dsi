@@ -1,10 +1,13 @@
 import json
+import os
+import yaml
 import pandas as pd
 
 #from pandasql import sqldf
 from pathlib import Path
 
 from dsi.dsi import DSI
+from dsi.sync import Sync
 from dsi.utils.dsi_utils import detect_valid_db_with_data
 
 class DSIFederated:
@@ -23,15 +26,25 @@ class DSIFederated:
         self.operating_mode = operating_mode
 
         try:
-            _federated_folder_path = Path(federated_folder_path)
+            _federated_folder_path = Path(self.federated_folder_path)
             with open( f"{_federated_folder_path}/dsi_database_list.json", "r", encoding="utf-8") as f:
                 dsi_databases_list = json.load(f)
+
+            self.init_federated(dsi_databases_list)
                 
         except Exception as e:
-            print(f"Error {e}, could not read the database at {_federated_folder_path}/dsi_database_list.json")
+            print(f"Error {e}, could not read the database at {self.federated_folder_path}/dsi_database_list.json")
             return
-        
 
+    
+    def init_federated(self, dsi_databases_list: list[dict]):
+        """Initializes the federated system by loading metadata about the federated databases and their tables from a specified folder.
+          This method is called during the initialization of the DSIFederated class.
+          
+        Args:
+            dsi_databases_list (list[dict]): A list of dictionaries containing information about each federated database.
+        """
+        
         databases = []
         # print(db_path_list)
         for d_id, dsi_db_info in enumerate(dsi_databases_list):
@@ -66,26 +79,6 @@ class DSIFederated:
 
         return self.df
 
-
-    # def _find_db_path(self,  db: str, table: str="") -> list[str]:
-    #     """Finds the file path of a database containing a specified table and database name within the federated system.
-        
-    #     Args:
-    #         table (str): The name of the table to find.
-    #         db (str): The name of the database containing the table.
-
-    #     Returns:
-    #         The file path of the database containing the specified table and database name.
-    #     """
-    #     if table == "":
-    #         q = f"SELECT path FROM df_exp WHERE name = '{db}'"
-    #     else:
-    #         q = f"SELECT path FROM df_exp WHERE \"table\" = '{table}' AND name = '{db}'"
-
-    #     out = sqldf(q, {"df_exp": self.df_exp})
- 
-    #     path_str = out["path"].tolist()
-    #     return path_str
     
     def _find_db_path(self, db: str, table: str = "") -> list[str]:
         """Finds the file path of a database containing a specified table and database name within the federated system.
@@ -106,20 +99,6 @@ class DSIFederated:
 
         return filtered["path"].tolist()
 
-    # def get_db_path(self, db_name: str) -> list[str]:
-    #     """Returns a list of file paths for databases with the specified name within the federated system.
-        
-    #     Args:
-    #         db_name (str): The name of the database to find.
-
-    #     Returns:            
-    #         A list of file paths for databases with the specified name.
-    #     """
-
-    #     q = f"SELECT path FROM df_exp WHERE name = '{db_name}'"        
-    #     out = sqldf(q, {"df_exp": self.df_exp})
-    #     path_list = out["path"].tolist()
-    #     return path_list
 
     def get_db_path(self, db_name: str) -> list[str]:
         """Returns a list of file paths for databases with the specified name within the federated system.
@@ -136,7 +115,58 @@ class DSIFederated:
             raise KeyError("DataFrame must contain 'name' and 'path' columns")
 
         return df.loc[df["name"] == db_name, "path"].tolist()
+    
 
+    def f_federate(self, config_file: str, workspace_folder: str = ""):
+        """Federates databases based on a specified configuration file containing the criteria for federating the databases.
+        
+        Args:
+            config_path (str): The file path to the configuration file containing the criteria for federating the databases. The configuration file should be in JSON format and contain the necessary information for federating the databases.
+        """
+        # Check if the file exists and is a valid yaml file before trying to federate
+        if not os.path.exists(config_file):
+            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
+            return
+        else:
+            try:
+                with open(config_file, 'r') as f:
+                    data = f.read()
+                config_data = yaml.safe_load(data)
+            except yaml.YAMLError as e:
+                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again.")
+                return
+            
+        try:
+            s = Sync()
+            if workspace_folder == "":
+                _workspace_folder = config_data.get("workspace_folder", "")
+                if _workspace_folder == "":
+                    workspace_folder = "dsi_data"
+                    print(f"Synchronization data from {config_file} into {workspace_folder}")
+                    s.get(config_file, workspace_folder)
+                else:
+                    print(f"Synchronization data from {config_file} into {workspace_folder}")
+                    workspace_folder = _workspace_folder
+                    s.get(config_file, workspace_folder)
+            else:
+                print(f"Synchronization data from {config_file} into {workspace_folder}")
+                s.get(config_file, workspace_folder)
+        except Exception as e:
+            print(f"federate ERROR: {e}")
+            return
+        
+
+        try:
+            _federated_folder_path = Path(self.federated_folder_path)
+            with open( f"{_federated_folder_path}/dsi_database_list.json", "r", encoding="utf-8") as f:
+                dsi_databases_list = json.load(f)
+
+            self.init_federated(dsi_databases_list)
+                
+        except Exception as e:
+            print(f"Error {e}, could not read the database at {self.federated_folder_path}/dsi_database_list.json")
+            return
+    
 
     def f_get_databases(self) -> list[dict]:
         """Returns a list of dictionaries containing information about the federated databases, including their paths, names, and tables.
