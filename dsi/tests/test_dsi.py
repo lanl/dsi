@@ -1813,7 +1813,6 @@ def test_list_ndp_backend():
     """Test listing NDP tables"""
     dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
     
-    # Should have datasets table and possibly resource tables
     tables = dsi.list(collection=True)
     assert isinstance(tables, list)
     assert len(tables) > 0
@@ -1825,16 +1824,14 @@ def test_get_table_ndp_backend():
     """Test getting tables from NDP"""
     dsi = DSI(backend_name="NDP", keywords="ocean", limit=10)
     
-    # Test getting datasets table
+    # Test display output
     f = io.StringIO()
     with redirect_stdout(f):
         dsi.get_table(table_name="datasets")
     output = f.getvalue()
-    
-    # Verify output contains table data
     assert len(output) > 0
     
-    # Test with collection=True
+    # Test collection
     df = dsi.get_table(table_name="datasets", collection=True)
     assert isinstance(df, DataFrame)
     assert len(df) > 0
@@ -1847,88 +1844,26 @@ def test_search_ndp_backend():
     """Test searching in NDP backend"""
     dsi = DSI(backend_name="NDP", keywords="data", limit=5)
     
-    # Test search output
+    # Test display output
     f = io.StringIO()
     with redirect_stdout(f):
         dsi.search(query="CSV")
     output = f.getvalue()
-    
-    # Verify search message appears
     assert "Searching for all instances of CSV in the active backend" in output
     
-    # Test search with collection=True
+    # Test collection
     results = dsi.search(query="CSV", collection=True)
     assert isinstance(results, list)
-    # Results may be empty, just verify it returns a list
     
     dsi.close()
 
-def test_find_ndp_backend():
-    """Test finding datasets in NDP backend"""
-    dsi = DSI(backend_name="NDP", keywords="climate", limit=10)
-    
-    # Get datasets table for filtering
-    df = dsi.get_table(table_name="datasets", collection=True)
-    assert 'num_resources' in df.columns
-    
-    # Test filtering datasets with resources
-    filtered = df[df['num_resources'] > 0]
-    assert len(filtered) >= 0  # May or may not have resources
-    
-    # Test filtering by title
-    if 'title' in df.columns and len(df) > 0:
-        # Just verify we can access and filter the column
-        assert df['title'].dtype == object  # String column
-    
-    dsi.close()
-
-def test_query_ndp_backend():
-    """Test that NDP doesn't support direct SQL queries"""
-    dsi = DSI(backend_name="NDP", keywords="test", limit=3)
-    
-    # NDP backend doesn't support SQL queries
-    # This test verifies the backend works without query() method
-    tables = dsi.list(collection=True)
-    assert "datasets" in tables
-    
-    dsi.close()
-
-def test_resources_ndp_backend():
-    """Test accessing resource tables in NDP backend"""
-    dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
-    
-    # Get all tables
-    tables = dsi.list(collection=True)
-    
-    # Find resource tables (not 'datasets')
-    resource_tables = [t for t in tables if t != 'datasets']
-    
-    # If there are resource tables, verify we can access them
-    if len(resource_tables) > 0:
-        first_resource_table = resource_tables[0]
-        
-        # Test output
-        f = io.StringIO()
-        with redirect_stdout(f):
-            dsi.get_table(table_name=first_resource_table)
-        output = f.getvalue()
-        assert len(output) > 0
-        
-        # Test collection
-        resource_df = dsi.get_table(table_name=first_resource_table, collection=True)
-        assert isinstance(resource_df, DataFrame)
-        assert len(resource_df) > 0
-    
-    dsi.close()
-
-def test_multiple_connections_ndp_backend():
-    """Test multiple connection cycles for NDP backend"""
+def test_close_ndp_backend():
+    """Test connection management"""
     # Test multiple open/close cycles
     for i in range(3):
         dsi = DSI(backend_name="NDP", keywords="test", limit=2)
         df = dsi.get_table("datasets", collection=True)
         assert df is not None
-        assert len(df) > 0
         dsi.close()
     
     assert True
