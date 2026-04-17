@@ -1,4 +1,4 @@
-# examples/ndp/ndp_developer/8.close.py
+# examples/ndp/ndp_developer/2.list_summary.py
 from dsi.core import Terminal
 
 def main(verbose=False):
@@ -8,18 +8,15 @@ def main(verbose=False):
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "climate", "limit": 5}
+        params={"keywords": "climate energy", "limit": 10}
     )
     
-    backend = terminal.active_modules["back-read"][0]
-    
     if verbose:
-        print(f"\nBefore close: {len(backend._cache)} tables")
-    
-    backend.close()
-    
-    if verbose:
-        print(f"After close: {len(backend._cache)} tables")
+        terminal.list()
+        print("\n")
+        terminal.num_tables()
+        print("\n")
+        terminal.summary()
     
     terminal.close()
 
