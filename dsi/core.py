@@ -26,7 +26,7 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
@@ -34,7 +34,7 @@ class Terminal():
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
@@ -730,7 +730,7 @@ class Terminal():
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
-        return_object = backend.find_column(query_object, range)
+        return_object = backend.find_column(query_object, range=range)
         return self.find_helper(query_object, return_object, start, "column ")
 
     def find_cell(self, query_object, row = False):
@@ -765,7 +765,7 @@ class Terminal():
                 self.logger.error("First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
-        return_object = backend.find_cell(query_object, row)
+        return_object = backend.find_cell(query_object, row=row)
         return self.find_helper(query_object, return_object, start, "cell ")
 
     # Internal function to return found objects or print errors.
@@ -981,7 +981,7 @@ class Terminal():
         Prints/Returns a list of all tables and their dimensions from the first loaded backend
 
         `collection` : bool, optional, default False.
-            - If True, returns the list of table names.  (table_name = None), or a single DataFrame of metadata
+            - If True, returns metadata for tables in backend. Can be a list of table names or DataFrame of table metadata
             - If False (default), prints metadata of all the tables: table names and dimensions.
         """
         if self.debug_level != 0:
@@ -999,25 +999,14 @@ class Terminal():
             raise RuntimeError("First loaded backend needs to have data to be able to list its datd")
         start = datetime.now()
 
-        table_list = backend.list()
+        table_list = backend.list(collection)
 
         end = datetime.now()
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
         if collection:
-            return [t[0] for t in table_list]
-        else:
-            if all(isinstance(t, tuple) for t in table_list):
-                for table in table_list:
-                    print(f"\nTable: {table[0]}")
-                    print(f"  - num of columns: {table[1]}")
-                    print(f"  - num of rows: {table[2]}")
-                print()
-            else:
-                for table in table_list:
-                    print(f"\nTable: {table}")
-                print()
+            return table_list
 
     def summary(self, table_name = None, collection = False):
         """
@@ -1070,6 +1059,7 @@ class Terminal():
             headers = output.columns.tolist()
             rows = output.values.tolist()
             self.table_print_helper(headers, rows, len(rows), 100)
+        # first item in output is list of table names associated to all dataframes from [1:]
         elif isinstance(output, list) and isinstance(output[0], list) and all(isinstance(df, pd.DataFrame) for df in output[1:]):
             for t_name, data in zip(output[0], output[1:]):
                 print(f"\nTable: {t_name}")
@@ -1400,15 +1390,27 @@ class Terminal():
 
     # Internal function used to check if a backend has data
     def valid_backend(self, backend, parent_name):
-        valid = False
         if parent_name == "Filesystem":
             if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
-                valid = True
+                return True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
-                valid = True
+                return True
         elif parent_name == "Webserver":
-            valid = True # NEED TO UPDATE THIS CHECK WHEN WE HAVE A WEB SERVER BACKEND
-        return valid
+            if backend.__class__.__name__ == "NDP":
+                    # NDP is valid if data is loaded and connection works
+                    if not backend._loaded:
+                        return False
+                    
+                    try:
+                        backend.validate_connection()
+                        return True
+                    except (ConnectionError, RuntimeError) as e:
+                        if self.debug_level != 0:
+                            self.logger.warning(
+                                f"NDP backend connection validation failed: {str(e)}"
+                            )
+                        return False
+        return False
 
     # Internal function that returns if a user can create a file/db in a specified location
     def can_create_file_here(self, dir = "."):

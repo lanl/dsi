@@ -1797,3 +1797,74 @@ def test_fail_overwrite_schema_duckdb_backend():
     except Exception as e:
         expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
         assert str(e) == expected
+        
+        
+# NDP
+# NDP
+# NDP
+
+def test_ndp_backend():
+    """Test basic NDP connection"""
+    dsi = DSI(backend_name="NDP", keywords="test", limit=3)
+    dsi.close()
+    assert True
+
+def test_list_ndp_backend():
+    """Test listing NDP tables"""
+    dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
+    
+    tables = dsi.list(collection=True)
+    tables_list = list(tables)  # Convert odict_keys to list
+    assert isinstance(tables_list, list)
+    assert len(tables_list) > 0
+    assert "datasets" in tables_list
+    
+    dsi.close()
+
+def test_get_table_ndp_backend():
+    """Test getting tables from NDP"""
+    dsi = DSI(backend_name="NDP", keywords="ocean", limit=10)
+    
+    # Test display output
+    f = io.StringIO()
+    with redirect_stdout(f):
+        dsi.get_table(table_name="datasets")
+    output = f.getvalue()
+    assert len(output) > 0
+    
+    # Test collection
+    df = dsi.get_table(table_name="datasets", collection=True)
+    assert isinstance(df, DataFrame)
+    assert len(df) > 0
+    assert 'title' in df.columns
+    assert 'num_resources' in df.columns
+    
+    dsi.close()
+
+def test_search_ndp_backend():
+    """Test searching in NDP backend"""
+    dsi = DSI(backend_name="NDP", keywords="data", limit=5)
+    
+    # Test display output
+    f = io.StringIO()
+    with redirect_stdout(f):
+        dsi.search(query="CSV")
+    output = f.getvalue()
+    assert "Searching for all instances of 'CSV' in the active backend" in output
+    
+    # Test collection
+    results = dsi.search(query="CSV", collection=True)
+    assert isinstance(results, list)
+    
+    dsi.close()
+
+def test_close_ndp_backend():
+    """Test connection management"""
+    # Test multiple open/close cycles
+    for i in range(3):
+        dsi = DSI(backend_name="NDP", keywords="test", limit=2)
+        df = dsi.get_table("datasets", collection=True)
+        assert df is not None
+        dsi.close()
+    
+    assert True
