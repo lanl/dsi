@@ -108,6 +108,7 @@ class DSI_cli:
                     self.t.load_module('backend','DuckDB','back-write', filename = self.db_path)
                     self.name = "duckdb"
                 elif backend.lower() == "ndp":
+                    # PLACEHOLDER for future implement
                     # NDP requires params dict for initialization
                     print("NDP backend requires configuration.")
                     print("Use Python API: t.load_module('backend', 'NDP', 'back-read', params={...})")
