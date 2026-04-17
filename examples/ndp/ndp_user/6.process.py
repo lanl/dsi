@@ -1,4 +1,4 @@
-# examples/ndp/ndp_developer/8.close.py
+# examples/ndp/ndp_developer/6.process.py
 from dsi.core import Terminal
 
 def main(verbose=False):
@@ -8,18 +8,17 @@ def main(verbose=False):
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "climate", "limit": 5}
+        params={"keywords": "climate", "limit": 10}
     )
     
     backend = terminal.active_modules["back-read"][0]
+    tables = backend.process_artifacts()
     
     if verbose:
-        print(f"\nBefore close: {len(backend._cache)} tables")
-    
-    backend.close()
-    
-    if verbose:
-        print(f"After close: {len(backend._cache)} tables")
+        print("\nProcessed tables:")
+        for table_name in tables.keys():
+            first_col = list(tables[table_name].values())[0]
+            print(f"  {table_name}: {len(first_col)} rows")
     
     terminal.close()
 

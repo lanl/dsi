@@ -34,11 +34,12 @@ class DSI():
             Accepted file extensions for DSI-compatible backends:
                 - If backend_name = "Sqlite" → .db, .sqlite, .sqlite3
                 - If backend_name = "DuckDB" → .duckdb, .db
+                - If backend_name = "NDP" → No file required (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate. 
             
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", or "NDP".
             
             If using an external backend, provide the relative path to the Python module with the backend. 
         """
@@ -50,15 +51,17 @@ class DSI():
 
         self.silence_messages = kwargs.pop('silence_messages', False)
 
-        if "/" in filename:
-            create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
-        else:
-            create_bool = self.t.can_create_file_here()
-        if create_bool is False:
-            raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
+        # Skip file creation checks for NDP (read-only backend)
+        if backend_name.lower() != "ndp":
+            if "/" in filename:
+                create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
+            else:
+                create_bool = self.t.can_create_file_here()
+            if create_bool is False:
+                raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
 
-        if filename == ".temp_dsi.db" and os.path.exists(filename):
-            os.remove(filename)
+            if filename == ".temp_dsi.db" and os.path.exists(filename):
+                os.remove(filename)
 
         if backend_name.endswith(".py"):
             if not os.path.exists(backend_name):
@@ -106,37 +109,64 @@ class DSI():
                 raise
 
         else:
-            if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
-                file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-                if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
-                    filename += ".db"
-            elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
-                file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-                if file_extension.lower() not in ["db", "duckdb"]:
-                    filename += ".db"
-            self.database_name = filename
+            # Handle NDP separately (read-only backend)
+            if backend_name.lower() == "ndp":
+                self.database_name = None  # NDP doesn't use a file
+                
+                correct_backend = True
+                
+                # Extract NDP query parameters from kwargs
+                query_params = {}
+                ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                
+                for key in ndp_param_keys:
+                    if key in kwargs:
+                        query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                
+                try:
+                    # Pass query params as 'params' argument
+                    self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+                        
+            # Handle file-based backends (Sqlite, DuckDB)
+            else:
+                if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                    file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                    if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
+                        filename += ".db"
+                elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
+                    file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                    if file_extension.lower() not in ["db", "duckdb"]:
+                        filename += ".db"
+                self.database_name = filename
 
-            correct_backend = True
-            try:
-                if backend_name.lower() == 'sqlite':
-                    self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
-                elif backend_name.lower() == 'duckdb':
-                    self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
-                else:
-                    correct_backend = False
-            except Exception as e:
-                logger.error(f"backend ERROR: {e}", exc_info=True)
-                if e.args:
-                    e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
-                raise
-            
-            if not correct_backend:
-                raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
-                                   "Eligible backend_names are: Sqlite, DuckDB")
+                correct_backend = True
+                try:
+                    if backend_name.lower() == 'sqlite':
+                        self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                    elif backend_name.lower() == 'duckdb':
+                        self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                    else:
+                        correct_backend = False
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+                
+                if not correct_backend:
+                    raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP")
         
         self.main_backend_obj = self.t.loaded_backends[0]
 
-        if filename != ".temp_dsi.db":
+        if backend_name.lower() == "ndp":
+            msg = f"Created an instance of DSI with the NDP read-only backend"
+        elif filename != ".temp_dsi.db":
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
             msg = "Created an instance of DSI"

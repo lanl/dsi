@@ -2,13 +2,13 @@
 import subprocess
 
 test_files = [
-    "1.ingest.py",
-    "2.process.py",
-    "3.query.py",
-    "4.find.py",
-    "5.inspect.py",
-    "6.validate.py",
-    "7.notebook.py",
+    "1.load_basic.py",
+    "2.list_summary.py",
+    "3.display.py",
+    "4.query.py",
+    "5.find.py",
+    "6.process.py",
+    "7.validate.py",
     "8.close.py"
 ]
 

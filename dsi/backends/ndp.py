@@ -66,11 +66,11 @@ class NDP(Webserver):
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from CKAN.
             Supported keys:
-                - keywords
-                - organization
-                - tags
-                - formats
-                - limit
+                - keywords : str - Search keywords
+                - organization : str - Organization name filter
+                - tags : list - List of tags to filter by
+                - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
+                - limit : int - Maximum number of datasets to retrieve (default: 100)
         `**kwargs` : dict
             Additional keyword arguments:
                 - api_key : str, optional
@@ -109,9 +109,23 @@ class NDP(Webserver):
         self._loaded = False
         self.params = params or {}
 
-        # Initial data load
+        # Validate connection FIRST before attempting to load data
+        try:
+            self.validate_connection()
+        except (ConnectionError, RuntimeError):
+            self._loaded = False
+            raise
+
+        # Initial data load (only if connection is valid and params provided)
         if self.params:
-            self._load_initial_data(self.params)
+            try:
+                self._load_initial_data(self.params)
+                self._loaded = True  # Data successfully loaded
+            except Exception as e:
+                self._loaded = False
+                raise RuntimeError(f"Failed to load initial data: {e}") from e
+        else:
+            self._loaded = True  # Backend ready, no initial data to load
 
 
     # ----------------------------------------------------------------------
