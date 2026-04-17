@@ -1,5 +1,4 @@
 # examples/ndp/ndp_developer/8.close.py
-import argparse
 from dsi.core import Terminal
 
 def main(verbose=False):
@@ -13,25 +12,20 @@ def main(verbose=False):
     )
     
     backend = terminal.active_modules["back-read"][0]
-
+    
     if verbose:
-        print("\n=== Before close ===")
-        print(f"Loaded: {backend._loaded}")
-        print(f"Cached tables: {list(backend._cache.keys())}")
-        summary = backend.summary()
-        print(f"Number of tables: {len(summary)}")
-
-    # Close resets the backend state
+        print(f"\nBefore close: {len(backend._cache)} tables")
+    
     backend.close()
-
+    
     if verbose:
-        print("\n=== After close ===")
-        print(f"Loaded: {backend._loaded}")
-        print(f"Cached tables: {list(backend._cache.keys())}")
-        print(f"Resource tables: {backend._resource_tables}")
+        print(f"After close: {len(backend._cache)} tables")
+    
+    terminal.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NDP close/reset example")
+    import argparse
+    parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(verbose=args.verbose)

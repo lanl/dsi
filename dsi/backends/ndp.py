@@ -948,48 +948,62 @@ class NDP(Webserver):
         `table_name` : str, optional
             If provided, returns summary for a single table.
             Can be either dataset_title or dataset_id.
-            If None, returns summary for all tables as one DataFrame.
+            If None, returns summary for all tables in expected format.
 
         Returns
         -------
-        pandas.DataFrame
-            Summary information including:
-                - table_name
-                - dataset_id (for resource tables)
-                - num_rows
-                - num_columns
-                - columns
+        pandas.DataFrame or list
+            - If table_name is None: returns [table_names_list, df1, df2, ...]
+            - If table_name provided: returns single DataFrame
         """
 
         if not self._loaded:
             return pd.DataFrame()
 
-        summaries = []
-
         if table_name:
+            # Single table - return DataFrame
             resolved_name = self._resolve_table_name(table_name)
-            table_name = resolved_name
-
-        for name, table in self._cache.items():
-
-            if table_name and name != table_name:
-                continue
-
+            table = self._cache.get(resolved_name)
+            
+            if not table:
+                raise ValueError(f"Table '{resolved_name}' is empty")
+            
             df = pd.DataFrame(table)
-
+            
+            summary_dict = {
+                "table_name": resolved_name,
+                "num_rows": len(df),
+                "num_columns": len(df.columns),
+                "columns": list(df.columns)
+            }
+            
+            if resolved_name in self._resource_tables:
+                summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
+            
+            return pd.DataFrame([summary_dict])
+        
+        # Multiple tables - return list format [table_names, df1, df2, ...]
+        table_names = []
+        summary_dfs = []
+        
+        for name, table in self._cache.items():
+            df = pd.DataFrame(table)
+            
             summary_dict = {
                 "table_name": name,
                 "num_rows": len(df),
                 "num_columns": len(df.columns),
                 "columns": list(df.columns)
             }
-
+            
             if name in self._resource_tables:
                 summary_dict["dataset_id"] = self._dataset_title_map.get(name, "N/A")
-
-            summaries.append(summary_dict)
-
-        return pd.DataFrame(summaries)
+            
+            table_names.append(name)
+            summary_dfs.append(pd.DataFrame([summary_dict]))
+        
+        # Return as [table_names_list, df1, df2, ...]
+        return [table_names] + summary_dfs
 
 
     def display(self, table_name, num_rows=25, display_cols=None):
@@ -1010,7 +1024,7 @@ class NDP(Webserver):
         Returns
         -------
         pandas.DataFrame
-            Displayed table data
+            Displayed table data with long strings truncated
         """
 
         if not self._loaded:
@@ -1034,11 +1048,18 @@ class NDP(Webserver):
                 )
             df = df[display_cols]
 
+        # Set max_rows before limiting rows
+        df.attrs["max_rows"] = len(df)
+        
         if num_rows:
             df = df.head(num_rows)
 
-        return df
+        # Truncate long strings for display using df.map() (pandas 2.1.0+)
+        df = df.map(
+            lambda x: (str(x)[:60] + '...') if isinstance(x, str) and len(str(x)) > 60 else x
+        )
 
+        return df
 
     def notebook(self, **kwargs):
         """
@@ -1095,3 +1116,4 @@ class NDP(Webserver):
             Always raised as NDP backend is read-only
         """
         raise NotImplementedError("NDP backend is read-only")
+    

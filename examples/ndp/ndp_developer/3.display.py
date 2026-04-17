@@ -1,5 +1,4 @@
-# examples/ndp/ndp_developer/3.display.py
-import argparse
+# examples/ndp/ndp_developer/3.disply.py
 from dsi.core import Terminal
 
 def main(verbose=False):
@@ -9,27 +8,33 @@ def main(verbose=False):
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "water", "limit": 8}
+        params={"keywords": "water quality", "limit": 3}
     )
     
-    backend = terminal.active_modules["back-read"][0]
-
     if verbose:
-        print("\n=== Display datasets table ===")
-        backend.display("datasets", num_rows=5)
+        terminal.display("datasets", num_rows=5)
         
-        # Display specific columns
-        print("\n=== Display datasets (specific columns) ===")
-        backend.display("datasets", num_rows=3, display_cols=["title", "organization", "num_resources"])
+        terminal.display(
+            "datasets",
+            num_rows=3,
+            display_cols=["title", "organization", "num_resources"]
+        )
         
-        # Display a resource table if available
-        if backend._resource_tables:
-            resource_table = backend._resource_tables[0]
-            print(f"\n=== Display {resource_table} ===")
-            backend.display(resource_table, num_rows=5, display_cols=["resource_name", "format", "url"])
+        table_names = list(terminal.list(collection=True))
+        resource_tables = [t for t in table_names if t != "datasets"]
+        
+        if resource_tables:
+            terminal.display(
+                resource_tables[0],
+                num_rows=5,
+                display_cols=["resource_name", "format", "url"]
+            )
+    
+    terminal.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NDP display example")
+    import argparse
+    parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(verbose=args.verbose)
