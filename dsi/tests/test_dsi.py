@@ -1814,9 +1814,10 @@ def test_list_ndp_backend():
     dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
     
     tables = dsi.list(collection=True)
-    assert isinstance(tables, list)
-    assert len(tables) > 0
-    assert "datasets" in tables
+    tables_list = list(tables)  # Convert odict_keys to list
+    assert isinstance(tables_list, list)
+    assert len(tables_list) > 0
+    assert "datasets" in tables_list
     
     dsi.close()
 
