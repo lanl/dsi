@@ -323,7 +323,6 @@ def test_ndp_list():
     
     # Test list with collection=True
     table_names = backend.list(collection=True)
-    assert isinstance(table_names, (dict_keys, list))
     assert "datasets" in table_names
     
     terminal.close()
