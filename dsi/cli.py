@@ -107,7 +107,11 @@ class DSI_cli:
                 if backend=="duckdb":
                     self.t.load_module('backend','DuckDB','back-write', filename = self.db_path)
                     self.name = "duckdb"
-                # TODO: Add NDP
+                elif backend.lower() == "ndp":
+                    # NDP requires params dict for initialization
+                    print("NDP backend requires configuration.")
+                    print("Use Python API: t.load_module('backend', 'NDP', 'back-read', params={...})")
+                    self.exit_cli([])
                 else:
                     backend = "sqlite"
                     self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)

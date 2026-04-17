@@ -1397,8 +1397,19 @@ class Terminal():
                 return True
         elif parent_name == "Webserver":
             if backend.__class__.__name__ == "NDP":
-                # TODO: Use URL validation to see if NDP goes down, then let it pass
-                return True
+                    # NDP is valid if data is loaded and connection works
+                    if not backend._loaded:
+                        return False
+                    
+                    try:
+                        backend.validate_connection()
+                        return True
+                    except (ConnectionError, RuntimeError) as e:
+                        if self.debug_level != 0:
+                            self.logger.warning(
+                                f"NDP backend connection validation failed: {str(e)}"
+                            )
+                        return False
         return False
 
     # Internal function that returns if a user can create a file/db in a specified location
