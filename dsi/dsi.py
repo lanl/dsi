@@ -164,6 +164,8 @@ class DSI():
         `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
         if filename:
             if not os.path.exists(filename):
                 raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
@@ -263,6 +265,8 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("read() ERROR: NDP is a read-only backend. Data cannot be added.")
         # only DSI-repo readers require data_sources input. Custom readers do not.
         if isinstance(data_sources, str) and not os.path.exists(data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -705,6 +709,9 @@ class DSI():
         - NOTE: Columns from the original table cannot be deleted during update. Only row edits or column additions are allowed.
         - NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("update() ERROR: NDP is a read-only backend. Data cannot be updated.")
+        
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read:

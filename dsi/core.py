@@ -765,7 +765,7 @@ class Terminal():
                 self.logger.error("First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
         start = datetime.now()
-        return_object = backend.find_cell(query_object, row)
+        return_object = backend.find_cell(query_object, row=row)
         return self.find_helper(query_object, return_object, start, "cell ")
 
     # Internal function to return found objects or print errors.
