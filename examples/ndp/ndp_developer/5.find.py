@@ -1,41 +1,43 @@
 # examples/ndp/ndp_developer/5.find.py
-import argparse
 from dsi.core import Terminal
 
 def main(verbose=False):
     terminal = Terminal()
     
-    # Load NDP backend with initial data
     terminal.load_module(
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "climate", "limit": 10}
+        params={"keywords": "climate ocean", "limit": 10}
     )
     
     backend = terminal.active_modules["back-read"][0]
-
-    # Find methods work on the cached in-memory data
+    
     tables_found = backend.find_table("datasets")
     columns_found = backend.find_column("title")
-    cells_found = backend.find_cell("Canada")
-
+    cells_found = backend.find_cell("climate")
+    
     if verbose:
-        print("\n=== Find Results ===")
-        print(f"\nTables matching 'datasets': {len(tables_found)}")
+        print(f"\n=== Tables matching 'datasets': {len(tables_found)} ===")
         for v in tables_found:
-            print(f"  - {v.t_name} (columns: {', '.join(v.c_name[:3])}...)")
+            print(f"  {v.t_name}")
+            print(f"    Columns ({len(v.c_name)}): {', '.join(v.c_name[:5])}...")
         
-        print(f"\nColumns matching 'title': {len(columns_found)}")
-        for v in columns_found[:5]:  # Show first 5
-            print(f"  - Table: {v.t_name}, Column: {v.c_name[0]}")
+        print(f"\n=== Columns matching 'title': {len(columns_found)} ===")
+        for v in columns_found[:3]:
+            print(f"  {v.t_name}.{v.c_name[0]}")
+            print(f"    Sample values: {v.value[:2]}")
         
-        print(f"\nCells matching 'Canada': {len(cells_found)}")
-        for v in cells_found[:5]:  # Show first 5
-            print(f"  - Table: {v.t_name}, Column: {v.c_name[0]}, Row: {v.row_num}, Value: {v.value}")
+        print(f"\n=== Cells matching 'climate': {len(cells_found)} ===")
+        for v in cells_found[:5]:
+            preview = str(v.value)[:60] + "..." if len(str(v.value)) > 60 else str(v.value)
+            print(f"  {v.t_name}.{v.c_name[0]}[{v.row_num}]: {preview}")
+    
+    terminal.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NDP find example")
+    import argparse
+    parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(verbose=args.verbose)
