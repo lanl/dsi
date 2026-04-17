@@ -1312,8 +1312,6 @@ def test_terminal_ndp_organization_filter():
     
     # Check we got data
     if a.active_metadata["datasets"]:
-        first_col = next(iter(a.active_metadata["datasets"].values()))
-        num_rows = len(first_col)
         
         # Verify organization column exists
         assert "organization" in a.active_metadata["datasets"]
