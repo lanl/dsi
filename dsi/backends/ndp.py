@@ -282,7 +282,7 @@ class NDP(Webserver):
         error_msg = f"Table '{identifier}' not found.\n"
         
         if available_titles:
-            error_msg += f"\nAvailable dataset titles:\n"
+            error_msg += "\nAvailable dataset titles:\n"
             for title in available_titles[:5]:
                 dataset_id = self._dataset_title_map.get(title, "N/A")
                 error_msg += f"  - '{title}' (ID: {dataset_id})\n"
