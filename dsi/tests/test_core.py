@@ -4,7 +4,7 @@ from collections import OrderedDict
 import io
 from contextlib import redirect_stdout
 import textwrap
-
+import pandas as pd
 
 def test_terminal_module_getter():
     a = Terminal()
