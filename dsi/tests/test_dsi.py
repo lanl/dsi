@@ -1850,7 +1850,7 @@ def test_search_ndp_backend():
     with redirect_stdout(f):
         dsi.search(query="CSV")
     output = f.getvalue()
-    assert "Searching for all instances of CSV in the active backend" in output
+    assert "Searching for all instances of 'CSV' in the active backend" in output
     
     # Test collection
     results = dsi.search(query="CSV", collection=True)
