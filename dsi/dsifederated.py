@@ -1,6 +1,9 @@
 import json
 import os
+import random
 import yaml
+import hashlib
+from coolname import generate_slug
 import pandas as pd
 
 #from pandasql import sqldf
@@ -55,7 +58,13 @@ class DSIFederated:
 
             if valid_db:
                 _temp = DSI(str(db_path), backend_name=database_type, silence_messages="True")
-                db_info['id'] = d_id
+
+                # make an easy name for 
+                seed = int(hashlib.md5(str(db_path).encode()).hexdigest()[:8], 16)
+                random.seed(seed)
+
+                db_info['id'] = generate_slug(2)
+
                 db_info['original_location'] = dsi_db_info['original_location_type']
                 db_info['original_path'] = dsi_db_info['original_path']
                 db_info['name'] = dsi_db_info['name']
@@ -78,6 +87,11 @@ class DSIFederated:
         """Returns a DataFrame containing information about the federated databases, including their paths, names, and tables."""
 
         return self.df
+    
+
+    def _list_tables(self):
+        """Returns a DataFrame containing information about the federated databases, including their paths, names, and tables by table."""
+        return self.df_exp
 
     
     def _find_db_path(self, db: str, table: str = "") -> list[str]:
@@ -321,3 +335,9 @@ class DSIFederated:
             _temp.close()
 
         return res
+    
+
+    def f_merge(self, src_id: str, src_tbl_name, dst_id: str, dst_tbl_name):
+        
+        pass
+
