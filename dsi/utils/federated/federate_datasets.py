@@ -3,6 +3,7 @@ import uuid
 import yaml
 from pathlib import Path
 
+
 from dsi.utils.federation_utils import (
     compute_md5, 
     create_directory, 
@@ -18,6 +19,7 @@ from dsi.utils.federation_utils import (
 from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
 from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
 from dsi.utils.web_utils import download_web_file, get_url_file_size
+from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:
@@ -233,6 +235,59 @@ def pull_data(location_type: str,
             return None
     
 
+    elif cleaned_location_type == "s3":
+
+        try:
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+        except ImportError:
+            print(" -- boto3 is not installed. S3 support is unavailable. Skipping this database.")
+            return None
+
+
+        try:
+            bucket, key = resolve_s3_bucket_and_key(location=location, path=path)
+        except ValueError as e:
+            print(f" -- Invalid S3 location/path: {e}. Skipping this database.")
+            return None
+
+        try:
+            filesize = get_s3_remote_file_size(bucket=bucket, key=key)
+        except FileNotFoundError as e:
+            print(f" -- Could not access S3 object s3://{bucket}/{key}; error: {e}. Skipping this database.")
+            return None
+        except Exception as e:
+            print(f" -- Could not access S3 object s3://{bucket}/{key}; error: {e}. Skipping this database.")
+            return None
+
+        if md5_file_hash != "":
+            try:
+                need_redownload = should_download_s3(
+                    bucket=bucket,
+                    key=key,
+                    stored_md5=md5_file_hash
+                )
+                if not need_redownload:
+                    print(" -- Local file is up to date with the S3 object. Skipping download.")
+                    return None
+            except Exception as e:
+                print(f" -- Failed to compare local file with S3 object s3://{bucket}/{key}: {e}")
+                print(" -- Will proceed to download the file to ensure we have the correct version.")
+
+        if not confirm_large_download(filesize, download_limit):
+            print(" -- Skipping this database.")
+            return None
+
+        try:
+            download_s3_file(bucket=bucket, key=key, output_dir=abs_path_db_folder)
+            db_info = make_db_info(f"s3://{bucket}", f"s3://{bucket}/{key}", file_path, filename)
+            return db_info
+
+        except Exception as e:
+            print(f" -- Error downloading file from S3: {e}. Skipping this database.")
+            return None
+
+
     elif cleaned_location_type == "local":
         # Check if the file exists
         if not Path(path).exists():
@@ -256,7 +311,6 @@ def pull_data(location_type: str,
     return None
 
     
-
 
 def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) -> None:
     """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
@@ -370,8 +424,7 @@ def main():
     yaml_folder = Path(yaml_path).parent
     federate_datasets(workspace_folder, config_data, str(yaml_folder))
 
-    
-
+  
 
 if __name__=="__main__":
     main()
