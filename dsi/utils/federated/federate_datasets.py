@@ -19,7 +19,7 @@ from dsi.utils.federation_utils import (
 from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
 from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
 from dsi.utils.web_utils import download_web_file, get_url_file_size
-from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3
+from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3, get_s3_client
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:
@@ -236,23 +236,31 @@ def pull_data(location_type: str,
     
 
     elif cleaned_location_type == "s3":
-
-        try:
-            import boto3
-            from botocore.exceptions import BotoCoreError, ClientError
-        except ImportError:
-            print(" -- boto3 is not installed. S3 support is unavailable. Skipping this database.")
-            return None
-
-
         try:
             bucket, key = resolve_s3_bucket_and_key(location=location, path=path)
         except ValueError as e:
             print(f" -- Invalid S3 location/path: {e}. Skipping this database.")
             return None
 
+        aws_region = "us-gov-west-1"
+        aws_profile = None
+
         try:
-            filesize = get_s3_remote_file_size(bucket=bucket, key=key)
+            s3_client = get_s3_client(
+                region_name=aws_region,
+                profile_name=aws_profile,
+                allow_anonymous=False,
+                interactive=True,
+            )
+        except Exception as e:
+            print(f" -- Could not initialize S3 client: {e}. Skipping this database.")
+            return None
+
+        try:
+            filesize = get_s3_remote_file_size(bucket=bucket, key=key, s3_client=s3_client)
+        except PermissionError as e:
+            print(f" -- Permission error: {e}. Skipping this database.")
+            return None
         except FileNotFoundError as e:
             print(f" -- Could not access S3 object s3://{bucket}/{key}; error: {e}. Skipping this database.")
             return None
@@ -265,7 +273,8 @@ def pull_data(location_type: str,
                 need_redownload = should_download_s3(
                     bucket=bucket,
                     key=key,
-                    stored_md5=md5_file_hash
+                    stored_md5=md5_file_hash,
+                    s3_client=s3_client,
                 )
                 if not need_redownload:
                     print(" -- Local file is up to date with the S3 object. Skipping download.")
@@ -279,10 +288,19 @@ def pull_data(location_type: str,
             return None
 
         try:
-            download_s3_file(bucket=bucket, key=key, output_dir=abs_path_db_folder)
-            db_info = make_db_info(f"s3://{bucket}", f"s3://{bucket}/{key}", file_path, filename)
+            downloaded_path = download_s3_file(
+                bucket=bucket,
+                key=key,
+                output_dir=abs_path_db_folder,
+                s3_client=s3_client,
+            )
+            db_info = make_db_info(
+                f"s3://{bucket}",
+                f"s3://{bucket}/{key}",
+                downloaded_path,
+                Path(downloaded_path).name,
+            )
             return db_info
-
         except Exception as e:
             print(f" -- Error downloading file from S3: {e}. Skipping this database.")
             return None
