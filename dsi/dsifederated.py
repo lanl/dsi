@@ -632,8 +632,4 @@ class DSIFederated:
         print(
             f"Successfully added table '{src_tbl_name}' from database '{src_data['name']}' "
             f"to database '{dst_data['name']}' as table '{dst_tbl_name}'."
-<<<<<<< HEAD
         )
-=======
-        )
->>>>>>> d38c1ba (improved the federation interface)
