@@ -96,6 +96,9 @@ def pull_data(location_type: str,
 
     # Get the absolute path to the file to be downloaded
     file_path = Path(abs_path_db_folder) / filename
+    
+    # remove extra spaces
+    path = path.strip()
 
 
     # Compute the MD5 hash of the existing file if it exists

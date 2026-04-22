@@ -185,8 +185,9 @@ class DSIFederated:
             df = df[df["name"].str.contains(db, case=False, na=False)]
 
         if table is not None:
-            df = df[df["tables"].apply(lambda x: any(table in table for table in x))]
-
+            df = df[df["tables"].apply(
+                lambda x: isinstance(x, (list, tuple, set)) and any(table in t for t in x))]
+            
         if original_location is not None:
             df = df[df["original_location"].str.contains(original_location, case=False, na=False)]
 
