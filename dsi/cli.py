@@ -101,7 +101,11 @@ class DSI_cli:
 
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
-
+        
+        keywords = None
+        if backend.lower() == "ndp":
+            keywords = input("Enter NDP search keywords (e.g., climate, temperature): ").strip()
+            
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
@@ -109,7 +113,6 @@ class DSI_cli:
                     self.name = "duckdb"
                 elif backend.lower() == "ndp":
                     # NDP requires params dict for initialization
-                    keywords = input("Please input the ndp keywords: ").strip()
                     self.t.load_module('backend', 'NDP', 'back-read', params={"keywords": keywords})
                     self.name = "ndp"
                 else:
@@ -880,8 +883,8 @@ def main():
     parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite and duckdb")
 
     args = parser.parse_args()
-    if args.backend.lower() not in ["sqlite", "duckdb"]:
-        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb")
+    if args.backend.lower() not in ["sqlite", "duckdb", "ndp"]:
+        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb, ndp")
         exit(1)
     print("   ", textwrap.dedent(fr"""
          _____           ___
