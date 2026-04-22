@@ -880,11 +880,11 @@ def main():
         exit(0)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite and duckdb")
+    parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite, duckdb, and ndp")
 
     args = parser.parse_args()
     if args.backend.lower() not in ["sqlite", "duckdb", "ndp"]:
-        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb, ndp")
+        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb, and ndp")
         exit(1)
     print("   ", textwrap.dedent(fr"""
          _____           ___
