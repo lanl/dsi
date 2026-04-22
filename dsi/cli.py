@@ -106,6 +106,11 @@ class DSI_cli:
         if backend.lower() == "ndp":
             keywords = input("Enter NDP search keywords (e.g., climate, temperature): ").strip()
             
+        
+        keywords = None
+        if backend.lower() == "ndp":
+            keywords = input("Enter NDP search keywords (e.g., climate, temperature): ").strip()
+            
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
@@ -893,7 +898,7 @@ def main():
 
     args = parser.parse_args()
     if args.backend.lower() not in ["sqlite", "duckdb", "ndp"]:
-        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb, and ndp")
+        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb, ndp")
         exit(1)
     print("   ", textwrap.dedent(fr"""
          _____           ___
