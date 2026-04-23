@@ -29,6 +29,7 @@ include-package-data = true
 
 [project.scripts]
 dsi = "dsi.cli:main"
+dsi-vcs = "dsi.utils.version_control.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
