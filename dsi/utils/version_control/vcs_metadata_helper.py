@@ -9,6 +9,8 @@ import grp
 import sys
 from typing import Optional
 
+from .vcs_db import DB_NAME, SNAPSHOTS_DIR
+
 # ─────────────────────────── METADATA HELPERS ────────────────────────────────
 
 def file_type_str(mode: int) -> str:
