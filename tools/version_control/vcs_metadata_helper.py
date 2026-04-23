@@ -229,31 +229,33 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
     return entry
 
 
-
-def collect_root_metadata(root_folder: str) -> list[dict]:
-    """Collect metadata for every tracked directory and file under root_folder."""
+def collect_tree_metadata(scan_root: str, identity_root: str) -> list[dict]:
+    """Collect metadata under scan_root while storing paths under identity_root."""
     entries = []
     skip_names = {DB_NAME, SNAPSHOTS_DIR}
 
-    for dirpath, dirnames, filenames in os.walk(root_folder, followlinks=False):
+    for dirpath, dirnames, filenames in os.walk(scan_root, followlinks=False):
         dirnames[:] = [d for d in dirnames if d not in skip_names]
-        if dirpath != root_folder:
-            entry = collect_metadata(dirpath, root_folder)
+        if dirpath != scan_root:
+            entry = collect_metadata(dirpath, scan_root)
             if "error" in entry:
                 print(f"  [skip] {entry['relative_path']}: {entry['error']}")
             else:
+                entry["absolute_path"] = os.path.join(identity_root, entry["relative_path"])
                 entries.append(entry)
 
         for fname in filenames:
             if fname in skip_names:
                 continue
-            entry = collect_metadata(os.path.join(dirpath, fname), root_folder)
+            entry = collect_metadata(os.path.join(dirpath, fname), scan_root)
             if "error" in entry:
                 print(f"  [skip] {entry['relative_path']}: {entry['error']}")
             else:
+                entry["absolute_path"] = os.path.join(identity_root, entry["relative_path"])
                 entries.append(entry)
 
     return entries
+
 
 
 # def walk_folder(root_folder: str) -> list[dict]:
