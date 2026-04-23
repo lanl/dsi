@@ -7,6 +7,7 @@ and stores versioned snapshots in SQLite.
 Usage:
     python dsi_vcs.py init                 # init repo in current directory
     python dsi_vcs.py add <path>...        # stage paths for the next commit
+    python dsi_vcs.py delete <path>...     # stage paths for deletion
     python dsi_vcs.py remove <path>...     # unstage paths
     python dsi_vcs.py commit [message]     # commit a new version
     python dsi_vcs.py log                  # list versions
@@ -26,6 +27,7 @@ import subprocess
 import json
 import datetime
 import argparse
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -69,6 +71,26 @@ def rsync_snapshot(
     return True
 
 
+def snapshot_target(snapshot_path: str, relative_path: str) -> str:
+    target = os.path.abspath(os.path.join(snapshot_path, relative_path))
+    snapshot_root = os.path.abspath(snapshot_path)
+    if os.path.commonpath([snapshot_root, target]) != snapshot_root:
+        raise ValueError(f"Snapshot path escapes snapshot root: {relative_path}")
+    return target
+
+
+def apply_snapshot_deletes(snapshot_path: str, root_folder: str, staged_deletes: list[str]) -> None:
+    for abs_path in staged_deletes:
+        rel_path = os.path.relpath(abs_path, root_folder)
+        if rel_path in ("", "."):
+            raise ValueError("Refusing to stage repository root for deletion.")
+        target = snapshot_target(snapshot_path, rel_path)
+        if os.path.isdir(target) and not os.path.islink(target):
+            shutil.rmtree(target)
+        elif os.path.lexists(target):
+            os.unlink(target)
+
+
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
 class DSIVCS():
 
@@ -104,27 +126,22 @@ class DSIVCS():
 
         def stage_path(abs_path: str):
             nonlocal staged
-            # Reject paths outside the root
-            try:
-                os.path.relpath(abs_path, self.root_folder)
-            except ValueError:
-                print(f"  [skip] {abs_path}: outside root folder")
-                return
+            abs_path = os.path.abspath(abs_path)
 
             if not os.path.lexists(abs_path):
                 print(f"  [skip] {abs_path}: path does not exist")
                 return
 
             cur.execute(
-                "INSERT OR IGNORE INTO staging (root_folder, absolute_path, added_at) "
-                "VALUES (?, ?, ?)",
-                (self.root_folder, abs_path, added_at)
+                "INSERT OR REPLACE INTO staging (root_folder, absolute_path, action, added_at) "
+                "VALUES (?, ?, ?, ?)",
+                (self.root_folder, abs_path, "add", added_at)
             )
             if cur.rowcount:
                 staged += 1
 
         for raw in paths:
-            abs_path = os.path.join(self.root_folder, raw)
+            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
 
             if os.path.isdir(abs_path):
                 # Expand directory recursively
@@ -145,20 +162,63 @@ class DSIVCS():
         root_folder = os.path.abspath(self.root_folder)
         conn = open_db(root_folder)
         rows = conn.execute(
-            "SELECT absolute_path, added_at FROM staging "
+            "SELECT absolute_path, action, added_at FROM staging "
             "WHERE root_folder=? ORDER BY absolute_path",
             (root_folder,)
         ).fetchall()
         conn.close()
 
         if not rows:
-            print("Nothing staged. Use 'add <path>...' to stage paths.")
+            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
             return
 
         print(f"Staged paths ({len(rows)}):")
         for r in rows:
             rel = os.path.relpath(r["absolute_path"], root_folder)
-            print(f"  {rel}")
+            print(f"  {rel} [{r['action']}]")
+
+    def cmd_delete(self, paths: list[str]):
+        """Stage path(s) for deletion in the next commit."""
+        db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
+        if not os.path.isfile(db_path):
+            sys.exit("No dsi-vcs repo found. Run 'init' first.")
+
+        conn = open_db(self.root_folder)
+        cur = conn.cursor()
+        added_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        staged = 0
+
+        for raw in paths:
+            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
+            cur.execute(
+                "INSERT OR REPLACE INTO staging (root_folder, absolute_path, action, added_at) "
+                "VALUES (?, ?, ?, ?)",
+                (self.root_folder, abs_path, "delete", added_at)
+            )
+            if cur.rowcount:
+                staged += 1
+
+        conn.commit()
+        conn.close()
+        print(f"  {staged} path(s) staged for deletion.")
+        """Show files currently in the staging area."""
+        root_folder = os.path.abspath(self.root_folder)
+        conn = open_db(root_folder)
+        rows = conn.execute(
+            "SELECT absolute_path, action, added_at FROM staging "
+            "WHERE root_folder=? ORDER BY absolute_path",
+            (root_folder,)
+        ).fetchall()
+        conn.close()
+
+        if not rows:
+            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
+            return
+
+        print(f"Staged paths ({len(rows)}):")
+        for r in rows:
+            rel = os.path.relpath(r["absolute_path"], root_folder)
+            print(f"  {rel} [{r['action']}]")
 
     def cmd_remove(self, paths: list[str]):
         """Remove path(s) from the staging area without touching the actual files."""
@@ -172,7 +232,7 @@ class DSIVCS():
         removed = 0
 
         for raw in paths:
-            abs_path = os.path.abspath(raw)
+            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(root_folder, raw))
             cur.execute(
                 "DELETE FROM staging WHERE root_folder=? AND absolute_path=?",
                 (root_folder, abs_path)
@@ -192,20 +252,20 @@ class DSIVCS():
         root_folder = os.path.abspath(root_folder)
         conn = open_db(root_folder)
         rows = conn.execute(
-            "SELECT absolute_path, added_at FROM staging "
+            "SELECT absolute_path, action, added_at FROM staging "
             "WHERE root_folder=? ORDER BY absolute_path",
             (root_folder,)
         ).fetchall()
         conn.close()
 
         if not rows:
-            print("Nothing staged. Use 'add <path>...' to stage paths.")
+            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
             return
 
         print(f"Staged paths ({len(rows)}):")
         for r in rows:
             rel = os.path.relpath(r["absolute_path"], root_folder)
-            print(f"  {rel}")
+            print(f"  {rel} [{r['action']}]")
 
     def cmd_commit(self, message: str = ""):
         db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
@@ -217,15 +277,16 @@ class DSIVCS():
 
         # ── Load staged paths ────────────────────────────────────────────────────
         staged_rows = cur.execute(
-            "SELECT absolute_path FROM staging WHERE root_folder = ? ORDER BY absolute_path",
+            "SELECT absolute_path, action FROM staging WHERE root_folder = ? ORDER BY absolute_path",
             (self.root_folder,)
         ).fetchall()
 
         if not staged_rows:
             conn.close()
-            sys.exit("Nothing staged. Use 'add' to stage files before committing.")
+            sys.exit("Nothing staged. Use 'add' or 'delete' before committing.")
 
-        staged_paths = [r["absolute_path"] for r in staged_rows]
+        staged_adds = [r["absolute_path"] for r in staged_rows if r["action"] == "add"]
+        staged_deletes = [r["absolute_path"] for r in staged_rows if r["action"] == "delete"]
 
         # ── Previous snapshot for hard-link deduplication ────────────────────────
         prev_row = cur.execute(
@@ -241,9 +302,9 @@ class DSIVCS():
         snapshot_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, commit_hash[:12])
 
         # ── Validate staged paths before creating the snapshot ─────────────────
-        print(f"Validating {len(staged_paths)} staged path(s)…")
-        valid_staged = 0
-        for abs_path in staged_paths:
+        print(f"Validating {len(staged_rows)} staged path(s)…")
+        valid_staged = len(staged_deletes)
+        for abs_path in staged_adds:
             e = collect_metadata(abs_path, self.root_folder)
             if "error" in e:
                 print(f"  [skip] {e['relative_path']}: {e['error']}")
@@ -262,11 +323,15 @@ class DSIVCS():
             conn.close()
             sys.exit("rsync failed — commit aborted.")
 
-        # ── Collect metadata for the complete committed tree ───────────────────
-        entries = collect_root_metadata(self.root_folder)
-        if not entries:
+        try:
+            apply_snapshot_deletes(snapshot_path, self.root_folder, staged_deletes)
+        except ValueError as e:
             conn.close()
-            sys.exit("No readable files — commit aborted.")
+            shutil.rmtree(snapshot_path, ignore_errors=True)
+            sys.exit(str(e))
+
+        # ── Collect metadata for the complete committed tree ───────────────────
+        entries = collect_tree_metadata(snapshot_path, self.root_folder)
 
         total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
         file_count  = sum(1 for e in entries if e.get("file_type") == "file")
@@ -458,10 +523,13 @@ def main():
     p_add = sub.add_parser("add", help="add file or directory to staging")
     p_add.add_argument('files', nargs='+', type=str)
 
+    p_delete = sub.add_parser("delete", help="stage file or directory deletion")
+    p_delete.add_argument('files', nargs='+', type=str)
+
     p_remove = sub.add_parser("remove", help="remove file or directory from staging")
     p_remove.add_argument('files', nargs='+', type=str)
 
-    p_commit = sub.add_parser("commit", help="Snapshot and commit staged files")
+    p_commit = sub.add_parser("commit", help="Snapshot and commit staged paths")
     p_commit.add_argument("message", nargs="?", default="Committed at " + datetime.datetime.now().isoformat())
 
     p_log = sub.add_parser("log", help="List all commits")
@@ -482,6 +550,9 @@ def main():
     elif args.command == "add":
         vcs = DSIVCS(os.getcwd())
         vcs.cmd_add(args.files)
+    elif args.command == "delete":
+        vcs = DSIVCS(os.getcwd())
+        vcs.cmd_delete(args.files)
     elif args.command == "remove":
         vcs = DSIVCS(os.getcwd())
         vcs.cmd_remove(args.files)
