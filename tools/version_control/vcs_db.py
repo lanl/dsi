@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS staging (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     root_folder     TEXT    NOT NULL,
     absolute_path   TEXT    NOT NULL,
+    action          TEXT    NOT NULL DEFAULT 'add',
     added_at        TEXT    NOT NULL,                   -- ISO-8601 timestamp
     UNIQUE(root_folder, absolute_path)
 );
