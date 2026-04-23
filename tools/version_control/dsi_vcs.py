@@ -130,6 +130,7 @@ class DSIVCS():
                 # Expand directory recursively
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in skip_names]
+                    stage_path(dirpath)
                     for fname in filenames:
                         if fname in skip_names:
                             continue
@@ -139,7 +140,7 @@ class DSIVCS():
 
         conn.commit()
         conn.close()
-        print(f"  {staged} file(s) added to staging.")
+        print(f"  {staged} path(s) added to staging.")
         """Show files currently in the staging area."""
         root_folder = os.path.abspath(self.root_folder)
         conn = open_db(root_folder)
@@ -151,16 +152,16 @@ class DSIVCS():
         conn.close()
 
         if not rows:
-            print("Nothing staged. Use 'add <root_folder> <path>...' to stage files.")
+            print("Nothing staged. Use 'add <path>...' to stage paths.")
             return
 
-        print(f"Staged files ({len(rows)}):")
+        print(f"Staged paths ({len(rows)}):")
         for r in rows:
             rel = os.path.relpath(r["absolute_path"], root_folder)
             print(f"  {rel}")
 
     def cmd_remove(self, paths: list[str]):
-        """Remove file(s) from the staging area without touching the actual files."""
+        """Remove path(s) from the staging area without touching the actual files."""
         root_folder = os.path.abspath(self.root_folder)
         db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
         if not os.path.isfile(db_path):
@@ -186,7 +187,7 @@ class DSIVCS():
 
         conn.commit()
         conn.close()
-        print(f"  {removed} file(s) removed from staging.")
+        print(f"  {removed} path(s) removed from staging.")
         """Show files currently in the staging area."""
         root_folder = os.path.abspath(root_folder)
         conn = open_db(root_folder)
@@ -198,10 +199,10 @@ class DSIVCS():
         conn.close()
 
         if not rows:
-            print("Nothing staged. Use 'add <root_folder> <path>...' to stage files.")
+            print("Nothing staged. Use 'add <path>...' to stage paths.")
             return
 
-        print(f"Staged files ({len(rows)}):")
+        print(f"Staged paths ({len(rows)}):")
         for r in rows:
             rel = os.path.relpath(r["absolute_path"], root_folder)
             print(f"  {rel}")
@@ -239,8 +240,8 @@ class DSIVCS():
         running_user = owner_name(os.getuid())
         snapshot_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, commit_hash[:12])
 
-        # ── Validate staged files before creating the snapshot ─────────────────
-        print(f"Validating {len(staged_paths)} staged file(s)…")
+        # ── Validate staged paths before creating the snapshot ─────────────────
+        print(f"Validating {len(staged_paths)} staged path(s)…")
         valid_staged = 0
         for abs_path in staged_paths:
             e = collect_metadata(abs_path, self.root_folder)
@@ -251,7 +252,7 @@ class DSIVCS():
 
         if valid_staged == 0:
             conn.close()
-            sys.exit("No readable staged files — commit aborted.")
+            sys.exit("No readable staged paths — commit aborted.")
 
         # ── Create a complete snapshot of the current repository tree ───────────
         print(f"  Creating rsync snapshot → {snapshot_path}")
@@ -262,7 +263,7 @@ class DSIVCS():
             sys.exit("rsync failed — commit aborted.")
 
         # ── Collect metadata for the complete committed tree ───────────────────
-        entries = collect_root_file_metadata(self.root_folder)
+        entries = collect_root_metadata(self.root_folder)
         if not entries:
             conn.close()
             sys.exit("No readable files — commit aborted.")
