@@ -25,17 +25,19 @@ def file_type_str(mode: int) -> str:
 def permission_str(mode: int) -> str:
     """Convert mode bits → rwxrwxrwx string (no file-type prefix)."""
     chars = []
-    for who in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR,
-                stat.S_IRGRP, stat.S_IWGRP, stat.S_IXGRP,
-                stat.S_IROTH, stat.S_IWOTH, stat.S_IXOTH):
-        chars.append("+" if mode & who else "-")
+    for bit, char in (
+        (stat.S_IRUSR, "r"), (stat.S_IWUSR, "w"), (stat.S_IXUSR, "x"),
+        (stat.S_IRGRP, "r"), (stat.S_IWGRP, "w"), (stat.S_IXGRP, "x"),
+        (stat.S_IROTH, "r"), (stat.S_IWOTH, "w"), (stat.S_IXOTH, "x"),
+    ):
+        chars.append(char if mode & bit else "-")
     # Replace x with s/t for setuid/setgid/sticky
     if mode & stat.S_ISUID:
-        chars[2] = "s" if chars[2] == "+" else "S"
+        chars[2] = "s" if chars[2] == "x" else "S"
     if mode & stat.S_ISGID:
-        chars[5] = "s" if chars[5] == "+" else "S"
+        chars[5] = "s" if chars[5] == "x" else "S"
     if mode & stat.S_ISVTX:
-        chars[8] = "t" if chars[8] == "+" else "T"
+        chars[8] = "t" if chars[8] == "x" else "T"
     return "".join(chars)
 
 
@@ -224,7 +226,6 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
         # convenience shortcut used by walk_folder aggregation (not stored)
         "_st_size": s.st_size,
     }
-    print(f"ACL text for {rel_path}: {entry['acl_text']}")
     return entry
 
 
