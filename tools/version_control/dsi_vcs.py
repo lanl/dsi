@@ -5,11 +5,13 @@ Captures full Linux file metadata (stat, ACL, xattrs), MD5 hash,
 and stores versioned snapshots in SQLite.
 
 Usage:
-    python dsi_vcs.py init   <root_folder>              # init repo
-    python dsi_vcs.py commit <root_folder> [message]    # commit a new version
-    python dsi_vcs.py log    <root_folder>              # list versions
-    python dsi_vcs.py diff   <root_folder> <v1> <v2>   # diff two versions
-    python dsi_vcs.py restore <root_folder> <version>  # restore a version
+    python dsi_vcs.py init                 # init repo in current directory
+    python dsi_vcs.py add <path>...        # stage paths for the next commit
+    python dsi_vcs.py remove <path>...     # unstage paths
+    python dsi_vcs.py commit [message]     # commit a new version
+    python dsi_vcs.py log                  # list versions
+    python dsi_vcs.py diff <v1> <v2>       # diff two versions
+    python dsi_vcs.py restore <version>    # restore a version
 
 Requirements:
     pip install pyxattr                # for extended attributes
@@ -176,7 +178,7 @@ class DSIVCS():
         for r in rows:
             rel = os.path.relpath(r["absolute_path"], root_folder)
             print(f"  {rel}")
-        
+
     def cmd_remove(self, paths: list[str]):
         """Remove file(s) from the staging area without touching the actual files."""
         root_folder = os.path.abspath(self.root_folder)
@@ -483,7 +485,6 @@ def main():
     p_diff.add_argument("c2")
 
     p_restore = sub.add_parser("restore", help="Restore a version")
-    p_restore.add_argument("root_folder")
     p_restore.add_argument("version")
 
     args = parser.parse_args(args=None if sys.argv[1:] else ["-h"])
@@ -507,8 +508,9 @@ def main():
     elif args.command == "log":
         vcs = DSIVCS(os.getcwd())
         vcs.cmd_log()
-    # elif args.command == "diff":    cmd_diff(args.root_folder, args.v1, args.v2)
-    # elif args.command == "restore": cmd_restore(args.root_folder, args.version)
+    elif args.command == "restore":
+        vcs = DSIVCS(os.getcwd())
+        vcs.cmd_restore(args.version)
 
 if __name__ == "__main__":
     # print("\n=== dsi-vcs: rsync-based file version control ===\n")
