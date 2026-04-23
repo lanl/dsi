@@ -38,15 +38,11 @@ def rsync_snapshot(
     root_folder: str,
     dest_path: str,
     prev_snapshot: Optional[str] = None,
-    rel_paths: Optional[list[str]] = None,
 ) -> bool:
     """
-    Copy files from root_folder → dest_path using rsync hard-link deduplication.
-    If rel_paths is given, only those paths are synced (via --files-from).
+    Copy the full root_folder tree to dest_path using rsync hard-link deduplication.
     If prev_snapshot is provided, unchanged files are hard-linked (saves disk).
     """
-    import tempfile
-
     os.makedirs(dest_path, exist_ok=True)
     cmd = ["rsync", "-aAXH"] # for linux
     if sys.platform == "darwin":
@@ -55,38 +51,22 @@ def rsync_snapshot(
     if prev_snapshot and os.path.isdir(prev_snapshot):
         cmd += ["--link-dest", os.path.abspath(prev_snapshot)]
 
-    # Write a temp file-list when only staging specific paths
-    files_from_tmp = None
-    if rel_paths is not None:
-        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-        tmp.write("\n".join(rel_paths))
-        tmp.close()
-        files_from_tmp = tmp.name
-        cmd += ["--files-from", files_from_tmp]
-    else:
-        cmd += [
-            "--delete",
-            "--exclude", DB_NAME,
-            "--exclude", SNAPSHOTS_DIR,
-        ]
+    cmd += [
+        "--delete",
+        "--exclude", DB_NAME,
+        "--exclude", SNAPSHOTS_DIR,
+    ]
 
     cmd += [
         root_folder.rstrip("/") + "/",
         dest_path.rstrip("/") + "/",
     ]
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode not in (0, 24):   # 24 = some files vanished (ok)
-            print(f"[rsync error] {result.stderr.strip()}", file=sys.stderr)
-            return False
-        if sys.platform == "darwin":
-            for rel_path in rel_paths:
-                set_acl(dest_path, get_acl(rel_path) or "")
-        return True
-    finally:
-        if files_from_tmp:
-            os.unlink(files_from_tmp)
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode not in (0, 24):   # 24 = some files vanished (ok)
+        print(f"[rsync error] {result.stderr.strip()}", file=sys.stderr)
+        return False
+    return True
 
 
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
@@ -259,32 +239,37 @@ class DSIVCS():
         running_user = owner_name(os.getuid())
         snapshot_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, commit_hash[:12])
 
-        # ── Collect metadata for each staged file ───────────────────────────────
-        print(f"Collecting metadata for {len(staged_paths)} staged file(s)…")
-        entries = []
+        # ── Validate staged files before creating the snapshot ─────────────────
+        print(f"Validating {len(staged_paths)} staged file(s)…")
+        valid_staged = 0
         for abs_path in staged_paths:
             e = collect_metadata(abs_path, self.root_folder)
             if "error" in e:
                 print(f"  [skip] {e['relative_path']}: {e['error']}")
             else:
-                entries.append(e)
+                valid_staged += 1
 
-        if not entries:
+        if valid_staged == 0:
             conn.close()
             sys.exit("No readable staged files — commit aborted.")
 
-        total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
-        file_count  = sum(1 for e in entries if e.get("file_type") == "file")
-
-        # ── rsync only the staged relative paths ────────────────────────────────
-        rel_paths = [e["relative_path"] for e in entries]
-        print(f"  {file_count} file(s), {total_bytes:,} bytes")
+        # ── Create a complete snapshot of the current repository tree ───────────
         print(f"  Creating rsync snapshot → {snapshot_path}")
 
-        ok = rsync_snapshot(self.root_folder, snapshot_path, prev_snapshot, rel_paths)
+        ok = rsync_snapshot(self.root_folder, snapshot_path, prev_snapshot)
         if not ok:
             conn.close()
             sys.exit("rsync failed — commit aborted.")
+
+        # ── Collect metadata for the complete committed tree ───────────────────
+        entries = collect_root_file_metadata(self.root_folder)
+        if not entries:
+            conn.close()
+            sys.exit("No readable files — commit aborted.")
+
+        total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
+        file_count  = sum(1 for e in entries if e.get("file_type") == "file")
+        print(f"  {file_count} file(s), {total_bytes:,} bytes")
 
         # ── Insert version row ───────────────────────────────────────────────────
         cur.execute(

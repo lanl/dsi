@@ -229,6 +229,25 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
     return entry
 
 
+def collect_root_file_metadata(root_folder: str) -> list[dict]:
+    """Collect metadata for every tracked file under root_folder."""
+    entries = []
+    skip_names = {DB_NAME, SNAPSHOTS_DIR}
+
+    for dirpath, dirnames, filenames in os.walk(root_folder, followlinks=False):
+        dirnames[:] = [d for d in dirnames if d not in skip_names]
+        for fname in filenames:
+            if fname in skip_names:
+                continue
+            entry = collect_metadata(os.path.join(dirpath, fname), root_folder)
+            if "error" in entry:
+                print(f"  [skip] {entry['relative_path']}: {entry['error']}")
+            else:
+                entries.append(entry)
+
+    return entries
+
+
 # def walk_folder(root_folder: str) -> list[dict]:
 #     """Recursively collect metadata for every entry under root_folder."""
 #     entries = []
