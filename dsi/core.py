@@ -1421,3 +1421,39 @@ class Terminal():
             return True
         except (PermissionError, OSError):
             return False
+
+    def vcs_init(self, repo_path):
+        """Initialize VCS repo."
+        pass
+
+    def vcs_status(self):
+        """Return vcs status metadata for the first loaded backend."""
+        pass
+
+    def vcs_commit(self, message, author_name=None, author_email=None):
+        """Commit the current versioned backend state."""
+        pass
+
+    def vcs_diff(self, old_ref=None, new_ref=None, cached=False):
+        """Return the git diff for the first loaded backend."""
+        pass
+
+    def vcs_log(self, limit=None, ref='HEAD'):
+        """Return commit history for the first loaded backend."""
+        pass
+
+    def vcs_current_branch(self):
+        """Return the current branch for the first loaded backend."""
+        pass
+
+    def vcs_list_branches(self):
+        """Return local branches for the first loaded backend."""
+        pass
+
+    def vcs_create_branch(self, name, start_point='HEAD', checkout=False, force=False):
+        """Create a branch on the first loaded backend."""
+        pass
+
+    def vcs_checkout_branch(self, name, force=False):
+        """Checkout a branch on the first loaded backend."""
+        pass
