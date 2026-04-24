@@ -834,6 +834,71 @@ class DSI():
                 e.args = (f'update() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
+    def process(self, backend_name, filename, **kwargs):
+        """
+        Process is processing collections into a specific format: Sqlite or DuckDB for now
+
+        DSI instance will now use that new backend as the base for all functions. 
+        """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot process() data from an empty backend. Please ensure there is data in it.")
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot process() until all associated data is loaded after a complex schema")
+        
+        try:        
+            self.t.artifact_handler(interaction_type='process')
+        except Exception as e:
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        old_backend_data = self.t.active_metadata
+
+        self.u = Terminal()
+        self.u.user_wrapper = True
+        self.u.active_metadata = old_backend_data
+
+        correct_backend = True
+        try:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                if backend_name.lower() == 'sqlite':
+                    self.u.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                    backend_name = 'Sqlite'
+                elif backend_name.lower() == 'duckdb':
+                    self.u.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                    backend_name = 'DuckDB'
+                else:
+                    correct_backend = False
+        except Exception as e:
+            logger.error(f"process() ERROR: {e}", exc_info=True)
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        if not correct_backend:
+            raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                            "Eligible backend_names are: Sqlite, DuckDB")
+        
+        try:
+            self.u.artifact_handler(interaction_type='ingest')
+        except Exception as e:
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+        
+        try:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.u.close()
+                self.t.unload_module('backend',backend_name,'back-write')
+                self.t.load_module('backend',backend_name,'back-write', filename=filename)
+        except Exception as e: # there really shouldn't be an error here
+            logger.error(f"process() ERROR: {e}", exc_info=True)
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+    
     def list_writers(self):
         """
         Prints a list of valid writers that can be used in the `writer_name` argument in `write()`
