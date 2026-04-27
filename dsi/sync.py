@@ -258,6 +258,8 @@ class Sync():
                         # os.makedirs(remote) # Create it
                         print(f"The directory '{remote}' has been created remotely.")
                 except Exception as err:
+                    if "input/output error" in str(err).lower():
+                        raise RuntimeError(f"Environment error: Stale filesystem mount is not allowing write access to {remote}")
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
         # Future: have movement service handle type without user input (cp,scp,ftp,rsync,etc.)
