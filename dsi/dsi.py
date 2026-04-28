@@ -55,8 +55,8 @@ class DSI():
 
         self.silence_messages = kwargs.pop('silence_messages', False)
 
-        # Skip file creation checks for NDP (read-only backend)
-        if backend_name.lower() != "ndp":
+        # Skip file creation checks for NDP and OSTI (read-only backends)
+        if backend_name.lower() not in ["ndp", "osti"]:
             if "/" in filename:
                 create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
             else:
@@ -66,18 +66,7 @@ class DSI():
 
             if filename == ".temp_dsi.db" and os.path.exists(filename):
                 os.remove(filename)
-        # Skip file creation checks for OSTI (read-only backend)
-        if backend_name.lower() != "osti":
-            if "/" in filename:
-                create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
-            else:
-                create_bool = self.t.can_create_file_here()
-            if create_bool is False:
-                raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
-
-            if filename == ".temp_dsi.db" and os.path.exists(filename):
-                os.remove(filename)                
-
+        
         if backend_name.endswith(".py"):
             if not os.path.exists(backend_name):
                 raise RuntimeError("backend() ERROR: `backend_name` must be a valid filepath to the custom backend. Please check again.")
