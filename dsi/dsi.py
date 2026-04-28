@@ -253,7 +253,7 @@ class DSI():
             print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
         n = NDP()
         if n.validate_connection():
-            print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.\n")
+            print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
         n = OSTI()
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")            
