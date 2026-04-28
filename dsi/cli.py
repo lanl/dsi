@@ -113,6 +113,12 @@ class DSI_cli:
                     print("NDP backend requires configuration.")
                     print("Use Python API: t.load_module('backend', 'NDP', 'back-read', params={...})")
                     self.exit_cli([])
+                elif backend.lower() == "osti":
+                    # PLACEHOLDER for future implement
+                    # OSTI requires params dict for initialization
+                    print("OSTI backend requires configuration.")
+                    print("Use Python API: t.load_module('backend', 'OSTI', 'back-read', params={...})")
+                    self.exit_cli([])                    
                 else:
                     backend = "sqlite"
                     self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)
