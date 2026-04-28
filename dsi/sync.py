@@ -258,6 +258,13 @@ class Sync():
                         # os.makedirs(remote) # Create it
                         print(f"The directory '{remote}' has been created remotely.")
                 except Exception as err:
+                    if "input/output error" in str(err).lower():
+                        ls_result = subprocess.run(["ls", remote], stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                                   text=True, encoding='latin-1')
+                        if ls_result.returncode != 0 and "stale file handle" in ls_result.stderr.lower():
+                            raise RuntimeError(f"Stale filesystem mount detected, cannot copy data to {remote}")
+                        else:
+                            raise RuntimeError(f"Input/Output error detected: {err}")
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
         # Future: have movement service handle type without user input (cp,scp,ftp,rsync,etc.)
