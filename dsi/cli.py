@@ -101,18 +101,20 @@ class DSI_cli:
 
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
-
+        
+        keywords = None
+        if backend.lower() == "ndp":
+            keywords = input("Enter NDP search keywords (e.g., climate, temperature): ").strip()
+            
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
                     self.t.load_module('backend','DuckDB','back-write', filename = self.db_path)
                     self.name = "duckdb"
                 elif backend.lower() == "ndp":
-                    # PLACEHOLDER for future implement
                     # NDP requires params dict for initialization
-                    print("NDP backend requires configuration.")
-                    print("Use Python API: t.load_module('backend', 'NDP', 'back-read', params={...})")
-                    self.exit_cli([])
+                    self.t.load_module('backend', 'NDP', 'back-read', params={"keywords": keywords})
+                    self.name = "ndp"
                 else:
                     backend = "sqlite"
                     self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)
@@ -878,11 +880,11 @@ def main():
         exit(0)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite and duckdb")
+    parser.add_argument("-b", "--backend", type=str, default="sqlite", help="Supported backends are sqlite, duckdb, and ndp")
 
     args = parser.parse_args()
-    if args.backend.lower() not in ["sqlite", "duckdb"]:
-        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb")
+    if args.backend.lower() not in ["sqlite", "duckdb", "ndp"]:
+        print("ERROR: Invalid backend input. Valid backends are: sqlite, duckdb, and ndp")
         exit(1)
     print("   ", textwrap.dedent(fr"""
          _____           ___
