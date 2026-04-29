@@ -90,5 +90,5 @@ def test_versioning():
 
     test.version("commit", "Tester Commits")
     test.version("log")
-    test.version("diff", "77345f1115d94c69a1255b9fb0524378 4af9e3d4dc854d699b96b5a84f913ac0")
+    test.version("diff")
     assert True
