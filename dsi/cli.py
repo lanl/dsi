@@ -111,25 +111,28 @@ class DSI_cli:
                 if backend=="duckdb":
                     self.t.load_module('backend','DuckDB','back-write', filename = self.db_path)
                     self.name = "duckdb"
+                    backend = "DuckDB"
                 elif backend.lower() == "ndp":
                     # NDP requires params dict for initialization
                     self.t.load_module('backend', 'NDP', 'back-read', params={"keywords": keywords})
                     self.name = "ndp"
+                    backend = "NDP"
                 elif backend.lower() == "osti":
                     # PLACEHOLDER for future implement
                     # OSTI requires params dict for initialization
                     print("OSTI backend requires configuration.")
                     print("Use Python API: t.load_module('backend', 'OSTI', 'back-read', params={...})")
-                    self.exit_cli([])                    
+                    backend = "OSTI"
+                    self.exit_cli([])
                 else:
-                    backend = "sqlite"
+                    backend = "Sqlite"
                     self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)
                     self.name = "sqlite"
         except Exception as e:
             print(f"backend ERROR: {e}")
             with redirect_stdout(fnull):
                 self.exit_cli([])
-        print(f"Created a temporary {backend.capitalize()} DSI backend")
+        print(f"Created a temporary {backend} DSI backend")
 
 
     def help_fn(self, args):
