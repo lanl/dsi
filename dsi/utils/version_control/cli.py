@@ -1,8 +1,9 @@
 import argparse
 import datetime
 import sys
+import os
 
-from .dsi_vcs import DSIVCS
+from .dsi_vcs import Version
 
 def main():
     parser = argparse.ArgumentParser(
@@ -28,8 +29,8 @@ def main():
     p_log = sub.add_parser("log", help="List all commits")
 
     p_diff = sub.add_parser("diff", help="Diff two commits")
-    p_diff.add_argument("c1")
-    p_diff.add_argument("c2")
+    p_diff.add_argument("c1", nargs="?", default=None)
+    p_diff.add_argument("c2", nargs="?", default=None)
 
     p_restore = sub.add_parser("restore", help="Restore a version")
     p_restore.add_argument("version")
@@ -39,27 +40,27 @@ def main():
     # parser.print_help()
     # parser.format_help()
     if   args.command == "init":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
     elif args.command == "add":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_add(args.files)
     elif args.command == "delete":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_delete(args.files)
     elif args.command == "remove":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_remove(args.files)
     elif args.command == "commit":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_commit(args.message)
     elif args.command == "diff":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_diff(args.c1, args.c2)
     elif args.command == "log":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_log()
     elif args.command == "restore":
-        vcs = DSIVCS(os.getcwd())
+        vcs = Version(os.getcwd())
         vcs.cmd_restore(args.version)
 
 if __name__ == "__main__":

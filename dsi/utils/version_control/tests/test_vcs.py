@@ -5,7 +5,8 @@ from shutil import which
 import pytest
 import stat
 
-from dsi.utils.version_control.dsi_vcs import DSIVCS
+from dsi.dsi import DSI
+from dsi.utils.version_control.dsi_vcs import Version
 from dsi.utils.version_control.vcs_db import DB_NAME, SNAPSHOTS_DIR
 
 def require_rsync():
@@ -34,7 +35,7 @@ def latest_entries(repo_path):
 
 def test_add(tmp_path):
     require_rsync()
-    repo = DSIVCS(str(tmp_path))
+    repo = Version(str(tmp_path))
 
     empty_dir = tmp_path / "empty"
     nested_dir = tmp_path / "nested" / "child"
@@ -68,3 +69,26 @@ def test_add(tmp_path):
     assert empty_entry["permissions_str"] == "rwxrwsr-x"
     assert eval(empty_entry["permissions_octal"]) == 0o2775
     assert empty_entry["setgid"] == 1
+
+
+def test_versioning():
+    test = DSI()
+    # test.version("init", os.getcwd())
+    # wpath = "/Users/ssakin/Public/versioning-test/clover-demo"
+    wpath = os.getcwd()
+    test.version("init", wpath)
+    assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
+
+    test.version("add", os.path.join(wpath, "a_dummy_file"))
+    print(">Single file added.")
+    test.version("add", os.path.join(wpath, "schema.json") + " " + os.path.join(wpath, "schema2.json"))
+    print(">Multi file added.")
+    print(">Versioning initialized.")
+
+    test.version("remove", os.path.join(wpath, "schema2.json"))
+    print(">Single file removed.")
+
+    test.version("commit", "Tester Commits")
+    test.version("log")
+    test.version("diff", "77345f1115d94c69a1255b9fb0524378 4af9e3d4dc854d699b96b5a84f913ac0")
+    assert True

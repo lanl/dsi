@@ -10,6 +10,8 @@ import math
 import ast
 
 import warnings
+
+from dsi.utils.version_control.dsi_vcs import Version
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 logger = logging.getLogger(__name__)
@@ -140,7 +142,7 @@ class DSI():
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
             msg = "Created an instance of DSI"
-        
+        self.vcs = None
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
     def list_backends(self):
@@ -1083,3 +1085,69 @@ class DSI():
 
     def fetch(self, fname):
         pass
+
+    def version(self, command: str, args: str = None):
+        """
+        Internal DSI Versioning.
+
+        `command` : str
+          -  init                            # initialize a versioning repository in a root folder
+          -  add                             # add file(s) to the staging area for the next commit
+          -  remove                          # remove file(s) from the staging area without touching the actual files
+          -  delete                          # delete file(s) from the staging area for the next commit
+          -  commit                          # commit a new version with the staged file(s) and an optional message describing the version
+          -  log                             # list versions
+          -  diff                            # diff between two versions. If no version is provided, diff the current version with the previous version
+          -  restore                         # restore a version with commit hash
+
+        `args` : str        
+          -  init: A required argument with the name of the root folder for the versioning repository.
+          -  add: A required argument with the file(s) to add to the staging area for the next commit, specified as a space-separated string or list of file paths.
+          -  remove: A required argument with the file(s) to remove from the staging area without touching the actual files, specified as a space-separated string or list of file paths.
+          -  delete: A required argument with the file(s) to delete from the staging area for the next commit, specified as a space-separated string or list of file paths.
+          -  commit: An optional message describing the version being committed, specified as a string.
+          -  log: An optional argument to specify the number of recent versions to display, specified as an integer. If not provided, recent 5 versions are displayed.
+          -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
+          -  restore: A required argument to specify the version to restore, specified by its commit hash.
+        """
+        print("hello from versioning")
+        if command == "init":
+            if args is None:
+                raise RuntimeError("version() ERROR: 'init' command requires a 'root_folder' argument specifying the name of the root folder for the versioning repository.")
+            
+            self.vcs = Version(args)
+        elif command == "add" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'add' command requires a 'files' argument specifying the file(s) to add to the staging area for the next commit.")
+            print("-->" + self.vcs.root_folder)
+            self.vcs.cmd_add(args.split())
+        elif command == "remove" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'remove' command requires a 'files' argument specifying the file(s) to remove from the staging area for the next commit.")
+            self.vcs.cmd_remove(args.split())
+        elif command == "delete" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'delete' command requires a 'files' argument specifying the file(s) to delete from the repository.")
+            self.vcs.cmd_delete(args.split())
+        elif command == "commit" and self.vcs is not None:
+            self.vcs.cmd_commit(args)
+        elif command == "diff" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'diff' command requires zero, one, or two commit hashes as arguments.")
+            self.vcs.cmd_diff(c1, c2)
+        elif command == "log" and self.vcs is not None:
+            self.vcs.cmd_log()
+        elif command == "restore" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
+            self.vcs.cmd_restore(args)
+        else:
+            raise RuntimeError("version() ERROR: Invalid command or versioning repository not initialized. Please check the command and ensure 'init' has been called with a root folder argument.")

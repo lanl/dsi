@@ -1423,7 +1423,7 @@ class Terminal():
             return False
 
     def vcs_init(self, repo_path):
-        """Initialize VCS repo."
+        """Initialize VCS repo."""
         pass
 
     def vcs_status(self):

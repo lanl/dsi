@@ -91,7 +91,7 @@ def apply_snapshot_deletes(snapshot_path: str, root_folder: str, staged_deletes:
 
 
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
-class DSIVCS():
+class Version():
 
     def __init__(self, folder: str):
         self.root_folder = os.path.abspath(folder)
@@ -411,16 +411,36 @@ class DSIVCS():
         root_folder = os.path.abspath(self.root_folder)
         conn = open_db(root_folder)
 
+        def get_files_in_root_folder():
+            files = {}
+            for dirpath, dirnames, filenames in os.walk(root_folder, followlinks=False):
+                dirnames[:] = [d for d in dirnames if d not in {DB_NAME, SNAPSHOTS_DIR}]
+                for fname in filenames:
+                    if fname not in {DB_NAME, SNAPSHOTS_DIR}:
+                        abs_path = os.path.join(dirpath, fname)
+                        rel_path = os.path.relpath(abs_path, root_folder)
+                        files[rel_path] = collect_metadata(abs_path, self.root_folder)
+                        files[rel_path]["absolute_path"] = abs_path
+                        files[rel_path]["lstat"] = json.loads(files[rel_path]["lstat"]) if files[rel_path]["lstat"] else {}
+            return files
+            
         def get_files(chash):
-            vid = conn.execute(
-                "SELECT id FROM versions WHERE root_folder = ? AND commit_hash LIKE ?",
-                (root_folder, chash + "%")
-            ).fetchone()
+            vid = None
+            if chash == "latest":
+                vid = conn.execute(
+                    "SELECT id, commit_hash FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
+                    (root_folder,)
+                ).fetchone()
+            else:
+                vid = conn.execute(
+                    "SELECT id, commit_hash FROM versions WHERE root_folder = ? AND commit_hash LIKE ?",
+                    (root_folder, chash + "%")
+                ).fetchone()
             if not vid:
                 conn.close()
                 sys.exit(f"Commit '{chash}' not found.")
             rows = conn.execute(
-                "SELECT relative_path, file_type, md5_hash, permissions_octal, "
+                "SELECT relative_path, absolute_path, file_type, md5_hash, permissions_octal, "
                 "       owner_name, group_name, lstat "
                 "FROM file_entries WHERE version_id=?", (vid["id"],)
             ).fetchall()
@@ -428,12 +448,25 @@ class DSIVCS():
             for r in rows:
                 rec = dict(r)
                 # Unpack the lstat JSON so callers can access st_size, st_mtime, etc.
+                snapshot_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, vid["commit_hash"][:12])
+                rec["absolute_path"] = snapshot_target(snapshot_path, r["relative_path"])
                 rec["lstat"] = json.loads(r["lstat"]) if r["lstat"] else {}
                 result[r["relative_path"]] = rec
             return result
 
-        files1 = get_files(c1)
-        files2 = get_files(c2)
+        files1 = files2 = {}
+        if c1 == None and c2 == None:
+            files1 = get_files_in_root_folder()
+            files2 = get_files("latest")
+        elif c1 == None:
+            files1 = get_files_in_root_folder()
+            files2 = get_files(c2)
+        elif c2 == None:
+            files1 = get_files(c1)
+            files2 = get_files_in_root_folder()
+        else:
+            files1 = get_files(c1)
+            files2 = get_files(c2)
         conn.close()
 
         all_paths = sorted(set(files1) | set(files2))
@@ -461,6 +494,8 @@ class DSIVCS():
                 changes = []
                 if f1["md5_hash"] != f2["md5_hash"] and f1["md5_hash"]:
                     changes.append("content")
+                    result = subprocess.run(['diff', f1["absolute_path"], f2["absolute_path"]], capture_output=True, text=True)
+                    print(f"diff result: {result.stdout.strip()}")
                 if f1["permissions_octal"] != f2["permissions_octal"]:
                     changes.append("perms")
                 if f1["owner_name"] != f2["owner_name"] or f1["group_name"] != f2["group_name"]:
