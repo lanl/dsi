@@ -1,3 +1,3 @@
-from .dsi_vcs import DSIVCS
+from .dsi_vcs import Version
 
-__all__ = ["DSIVCS"]
+__all__ = ["Version"]

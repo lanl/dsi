@@ -76,12 +76,14 @@ def get_acl(path: str) -> Optional[str]:
                         acl_entries.append(acl_part)
 
             return ";".join(acl_entries) if acl_entries else None
-        else:
+        elif sys.platform == "linux":
             result = subprocess.run(
                 ["getfacl", "--omit-header", "--absolute-names", path],
                 capture_output=True, text=True, timeout=5
             )
             return result.stdout.strip() or None
+        else:
+            return None
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
     
@@ -107,29 +109,30 @@ def set_acl(path: str, acl_string: str) -> Optional[str]:
 
 
 def get_xattrs(path: str) -> Optional[str]:
-    """Return JSON dict of extended attributes, or None."""
-    try:
-        import xattr  # pyxattr
-        attrs = {}
-        for key in xattr.listxattr(path, symlink=True):
-            try:
-                val = xattr.getxattr(path, key, symlink=True)
-                attrs[key] = val.decode("utf-8", errors="replace")
-            except OSError:
-                attrs[key] = "<unreadable>"
-        return json.dumps(attrs) if attrs else None
-    except ImportError:
-        # Fallback: use getfattr
-        try:
-            result = subprocess.run(
-                ["getfattr", "-d", "-m", "-", "--absolute-names", path],
-                capture_output=True, text=True, timeout=5
-            )
-            return result.stdout.strip() or None
-        except FileNotFoundError:
-            return None
-    except OSError:
-        return None
+    return None
+    # """Return JSON dict of extended attributes, or None."""
+    # try:
+    #     import xattr  # pyxattr
+    #     attrs = {}
+    #     for key in xattr.listxattr(path, symlink=True):
+    #         try:
+    #             val = xattr.getxattr(path, key, symlink=True)
+    #             attrs[key] = val.decode("utf-8", errors="replace")
+    #         except OSError:
+    #             attrs[key] = "<unreadable>"
+    #     return json.dumps(attrs) if attrs else None
+    # except ImportError:
+    #     # Fallback: use getfattr
+    #     try:
+    #         result = subprocess.run(
+    #             ["getfattr", "-d", "-m", "-", "--absolute-names", path],
+    #             capture_output=True, text=True, timeout=5
+    #         )
+    #         return result.stdout.strip() or None
+    #     except FileNotFoundError:
+    #         return None
+    # except OSError:
+    #     return None
 
 
 def get_security_context(path: str) -> Optional[str]:
@@ -218,7 +221,7 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
 
         # external / subprocess-derived attributes
         "acl_text":         get_acl(abs_path),
-        "xattrs":           get_xattrs(abs_path),
+        # "xattrs":           get_xattrs(abs_path),
         "security_context": get_security_context(abs_path),
         "symlink_target":   os.readlink(abs_path) if ftype == "symlink" else None,
 
