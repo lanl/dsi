@@ -481,7 +481,7 @@ class Terminal():
                             e.args = (f"Error ingesting data - {str(e.args[0])}",  *e.args[1:])
                     else:
                         e.args = (f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e.args[0])}",  *e.args[1:])
-                    raise
+                    raise e from None
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
