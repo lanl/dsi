@@ -143,51 +143,21 @@ class DSI():
                 correct_backend = True
                 
                 # Extract OSTI query parameters from kwargs
-                query_params = {}
+                query_params = kwargs.pop("params", {})
 
-                if "params" in kwargs:
-                    query_params.update(kwargs.pop("params"))
-
-                osti_param_keys = [
-                    "q",
-                    "osti_id",
-                    "doi",
-                    "fulltext",
-                    "biblio",
-                    "author",
-                    "title",
-                    "identifier",
-                    "sponsor_org",
-                    "research_org",
-                    "contributing_org",
-                    "source_id",
-                    "publication_date_start",
-                    "publication_date_end",
-                    "entry_date_start",
-                    "entry_date_end",
-                    "language",
-                    "country",
-                    "site_ownership_code",
-                    "subject",
-                    "has_fulltext",
-                    "sort",
-                    "order",
-                    "rows",
-                    "page",
-                ]  
-
-                for key in osti_param_keys:
-                    if key in kwargs:
-                        query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
-                
                 try:
-                    # Pass query params as 'params' argument
-                    self.t.load_module('backend', 'OSTI', 'back-read', params=query_params, **kwargs)
+                    self.t.load_module(
+                        "backend",
+                        "OSTI",
+                        "back-read",
+                        params=query_params,
+                        **kwargs,
+                    )
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
-                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
-                    raise                
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
+                    raise         
                         
             # Handle file-based backends (Sqlite, DuckDB)
             else:
