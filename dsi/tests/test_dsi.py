@@ -1867,12 +1867,11 @@ def test_close_ndp_backend():
     
     assert True
 
-def main():
-# def test_versioning():
+def test_versioning():
     test = DSI()
     # test.version("init", os.getcwd())
-    wpath = "/Users/ssakin/Public/versioning-test/clover-demo"
-    # wpath = os.getcwd()
+    # wpath = "/Users/ssakin/Public/versioning-test/clover-demo"
+    wpath = os.getcwd()
     test.version("init", wpath)
     assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
 
@@ -1887,7 +1886,5 @@ def main():
 
     test.version("commit", "Tester Commits")
     test.version("log")
+    test.version("diff", "77345f1115d94c69a1255b9fb0524378 4af9e3d4dc854d699b96b5a84f913ac0")
     assert True
-
-if __name__ == "__main__":
-    main()
