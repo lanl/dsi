@@ -134,7 +134,7 @@ def test_wildfire_data_csv_artifact():
             )
             print(row)
             artifacts.append(wildfire_row)
-    store.put_artifacts(artifacts)
+    store.ingest_artifacts(artifacts)
     store.close()
     
     # No error implies success
@@ -144,14 +144,14 @@ def test_wildfire_artifact_query():
     engine_path = "sqlite:///wildfire.db"
     store = SqlAlchemy(engine_path, Base)
     stmt = select(Wildfire).where(Wildfire.burned_area > 188000)
-    results = store.query(stmt)
+    results = store.query_artifacts(stmt)
     print(results)
     store.close()
 
     # No error implies success
     assert True
 
-def test_wildfiredata_artifact_put():
+def test_wildfiredata_artifact_ingest():
     engine_path = "sqlite:///wildfire.db"
     store = SqlAlchemy(engine_path, Base)
     artifacts = []
@@ -169,14 +169,14 @@ def test_wildfiredata_artifact_put():
         files=[File(path='https://wifire-data.sdsc.edu/data//burnpro3d/d/fa/20/run_fa20ed73-8a0b-40e3-bd3f-bca2ff76e3d0/png/run_fa20ed73-8a0b-40e3-bd3f-bca2ff76e3d0_fuels-dens_2100_000.png')]
         )
     artifacts.append(wildfire_row)
-    store.put_artifacts(artifacts)
+    store.ingest_artifacts(artifacts)
     store.close()
     
     # No error implies success
     assert True
 
 #Data from: https://microsoftedge.github.io/Demos/json-dummy-data/64KB.json
-def test_jsondata_artifact_put():
+def test_jsondata_artifact_ingest():
     engine_path = "sqlite:///jsondata.db"
     store = SqlAlchemy(engine_path, JSONBase)
     artifacts = []
@@ -199,7 +199,7 @@ def test_jsondata_artifact_put():
         )
         artifacts.append(json_row)
 
-    store.put_artifacts(artifacts)
+    store.ingest_artifacts(artifacts)
     store.close()
     
     # No error implies success
@@ -231,7 +231,7 @@ def test_yosemite_data_csv_artifact():
             
             artifacts.append(yosemite_row)
             
-    store.put_artifacts(artifacts)
+    store.ingest_artifacts(artifacts)
     store.close()
     
     # No error implies success
