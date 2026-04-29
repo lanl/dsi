@@ -199,7 +199,7 @@ class Terminal():
                                 e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
                             else:
                                 e.args = (f'Error in {original_file} @ line {return_line_number}',)
-                        raise
+                        raise e from None
 
                     if tester == 1:
                         sys.settrace(None) # ends trace to prevent large overhead
@@ -396,7 +396,7 @@ class Terminal():
                         e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
                     else:
                         e.args = (f'Error in {original_file} @ line {return_line_number}',)
-                raise
+                raise e from None
 
             if tester == 1:
                 sys.settrace(None) # ends trace to prevent large overhead
@@ -514,7 +514,7 @@ class Terminal():
                         self.logger.error((str(e)))
                     if not self.user_wrapper:
                         e.args = (f"Caught error in {original_file} @ line {return_line_number}: " + e.args[0], *e.args[1:])
-                    raise
+                    raise e from None
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
