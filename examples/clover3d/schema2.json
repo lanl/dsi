@@ -1,5 +1,5 @@
 {
-   "genesis_datacard": {
+   "dublin_core_datacard": {
        "primary_key": "Title"
    },
     "simulation": {
