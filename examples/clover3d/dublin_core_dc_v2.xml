@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:xsi="http://w3.org"
+  xsi:schemaLocation="http://purl.org/dc/elements/1.1/ https://dublincore.org">
+
+  <dc:title>Cloverleaf 3D Ensemble Dataset</dc:title>
+  <dc:creator>Jesus Pulido</dc:creator>
+  <dc:subject>Physics</dc:subject>
+  <dc:description>This ensemble run of 8 runs is from the Cloverleaf3D simulation code, a Lagrangian-Eulerian hydrodynamics solver. More information about the code can be found here https://github.com/UK-MAC/CloverLeaf3D</dc:description>
+  <dc:publisher>DOE:LANL</dc:publisher>
+  <dc:date>2025-10-09</dc:date>
+  <dc:type>Dataset</dc:type>
+  <dc:format>text/xml</dc:format>
+  <dc:identifier></dc:identifier>
+  <dc:language>en</dc:language>
+  <dc:rights>GNU GENERAL PUBLIC LICENSE
+  Version 3, 29 June 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. http://fsf.org/
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.</dc:rights>
+
+</metadata>
