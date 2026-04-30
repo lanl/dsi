@@ -11,7 +11,7 @@ def main():
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_init = sub.add_parser("init", help="Initialize a new repo")
+    sub.add_parser("init", help="Initialize a new repo")
     # p_init.add_argument("root_folder")
 
     p_add = sub.add_parser("add", help="add file or directory to staging")
@@ -26,7 +26,7 @@ def main():
     p_commit = sub.add_parser("commit", help="Snapshot and commit staged paths")
     p_commit.add_argument("message", nargs="?", default="Committed at " + datetime.datetime.now().isoformat())
 
-    p_log = sub.add_parser("log", help="List all commits")
+    sub.add_parser("log", help="List all commits")
 
     p_diff = sub.add_parser("diff", help="Diff two commits")
     p_diff.add_argument("c1", nargs="?", default=None)

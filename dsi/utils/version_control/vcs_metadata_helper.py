@@ -1,7 +1,6 @@
 import os
 import stat
 import hashlib
-import sqlite3
 import json
 import subprocess
 import pwd
@@ -14,13 +13,20 @@ from .vcs_db import DB_NAME, SNAPSHOTS_DIR
 # ─────────────────────────── METADATA HELPERS ────────────────────────────────
 
 def file_type_str(mode: int) -> str:
-    if stat.S_ISREG(mode):  return "file"
-    if stat.S_ISDIR(mode):  return "dir"
-    if stat.S_ISLNK(mode):  return "symlink"
-    if stat.S_ISBLK(mode):  return "block"
-    if stat.S_ISCHR(mode):  return "char"
-    if stat.S_ISFIFO(mode): return "fifo"
-    if stat.S_ISSOCK(mode): return "socket"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISDIR(mode):
+        return "dir"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISBLK(mode):
+        return "block"
+    if stat.S_ISCHR(mode):
+        return "char"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
     return "unknown"
 
 
@@ -44,13 +50,17 @@ def permission_str(mode: int) -> str:
 
 
 def owner_name(uid: int) -> str:
-    try:   return pwd.getpwuid(uid).pw_name
-    except KeyError: return str(uid)
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return str(uid)
 
 
 def group_name(gid: int) -> str:
-    try:   return grp.getgrgid(gid).gr_name
-    except KeyError: return str(gid)
+    try:
+        return grp.getgrgid(gid).gr_name
+    except KeyError:
+        return str(gid)
 
 
 def get_acl(path: str) -> Optional[str]:
