@@ -7,7 +7,6 @@ from pandas import DataFrame
 from collections import OrderedDict
 import hashlib
 import random
-import tempfile
 
 def test_list_functions():
     test = DSI()
