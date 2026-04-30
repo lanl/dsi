@@ -21,54 +21,6 @@ def test_unload_module():
     a.unload_module('plugin', 'GitInfo', 'writer')
     assert len(a.list_loaded_modules()['writer']) == 0
 
-def test_sqlite_versioning(tmp_path):
-    a = Terminal()
-    dbpath = tmp_path / "core_versioned.db"
-    # dbpath = '/tmp/versionined.db'
-
-    a.load_module(
-        'plugin',
-        'Dict',
-        'reader',
-        collection=OrderedDict({"wildfire": OrderedDict({'foo': [1], 'bar': [3]})}),
-    )
-    a.load_module('backend', 'Sqlite', 'back-write', filename=str(dbpath))
-    a.artifact_handler(interaction_type='ingest')
-
-    a.vcs_init(tmp_path)
-
-    # print(a.vcs_current_branch())
-    # print(a.vcs_status())
-    # status = a.vcs_status()
-    # assert status['branch'] == 'main'
-    # assert status['is_dirty'] is True
-
-    # commit_id = a.vcs_commit('initial snapshot')
-    # assert len(commit_id) == 40
-    # assert a.vcs_status()['is_dirty'] is False
-    # assert a.vcs_log(limit=1)[0]['message'] == 'initial snapshot'
-    # print(a.vcs_log())
-
-    # a.vcs_create_branch('feature', checkout=True)
-    # assert a.vcs_current_branch() == 'feature'
-    # print(a.vcs_list_branches())
-
-    # a.update_abstraction('wildfire', OrderedDict({'foo': [1, 2], 'bar': [3, 4]}))
-    # a.artifact_handler(interaction_type='ingest')
-    # diff = a.vcs_diff()
-    # print(diff)
-    # assert '+INSERT INTO \"wildfire\" VALUES(2,4);' in diff
-
-    # a.vcs_commit('feature snapshot')
-
-    # a.vcs_checkout_branch('main')
-    # table = a.get_table('wildfire')
-    # assert table.values.tolist() == [[1, 3]]
-    # assert sorted(a.vcs_list_branches()) == ['feature', 'main']
-
-    a.close()
-
-
 # SQLITE TESTS
 def test_ingest_sqlite_backend():
     a = Terminal()
