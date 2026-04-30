@@ -531,10 +531,10 @@ class DSI():
 
         `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot query() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
         
         output = None
         try:
@@ -591,10 +591,10 @@ class DSI():
         
         `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
         
         try:
             df = self.t.get_table(table_name)
@@ -657,10 +657,11 @@ class DSI():
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot find() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
+        
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
@@ -734,10 +735,11 @@ class DSI():
 
             If False (default), prints the matches to the console.
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot search() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
+        
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
@@ -811,12 +813,13 @@ class DSI():
         if self.main_backend_obj.__class__.__name__ == "NDP":
             raise RuntimeError("update() ERROR: NDP is a read-only backend. Data cannot be updated.")
         if self.main_backend_obj.__class__.__name__ == "OSTI":
-            raise RuntimeError("update() ERROR: OSTI is a read-only backend. Data cannot be updated.")        
+            raise RuntimeError("update() ERROR: OSTI is a read-only backend. Data cannot be updated.")
         
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
+        
         msg = "Updating the active backend with the input collection of data"
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
@@ -906,12 +909,12 @@ class DSI():
 
         DSI instance will now use that new backend as the base for all functions. 
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot process() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot process() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot process() data from an empty backend. Please ensure there is data in it.")
         
-        try:        
+        try:
             self.t.artifact_handler(interaction_type='process')
         except Exception as e:
             if e.args:
@@ -1000,10 +1003,10 @@ class DSI():
         `table_name`: str, optional
             Required when using "Table_Plot", "Csv" or "Parquet" to specify which table to export.
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot write() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
 
         collection = None
         if "collection" in kwargs:
@@ -1124,11 +1127,10 @@ class DSI():
             ValueError: If backend is empty or invalid.
             RuntimeError: If called before schema data is loaded or if listing fails.
         """
-  
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
 
         output = None
         try:
@@ -1165,10 +1167,10 @@ class DSI():
             
             If False (default), prints each table's name and numerical metadata to the console.
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
         
         output = None
         try:
@@ -1191,10 +1193,11 @@ class DSI():
         """
         Prints the number of tables in the active backend.
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
+
         try:
             self.t.num_tables()
         except Exception as e:
@@ -1217,10 +1220,11 @@ class DSI():
 
             If None (default), all columns are displayed.
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot display() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
+        
         if isinstance(num_rows, list):
             display_cols = num_rows
             num_rows = 25
