@@ -6,6 +6,7 @@
 
   <dc:title>Cloverleaf 3D Ensemble Dataset</dc:title>
   <dc:creator>Jesus Pulido</dc:creator>
+  <dc:contributor>Jesus Pulido</dc:contributor>
   <dc:subject>Physics</dc:subject>
   <dc:description>This ensemble run of 8 runs is from the Cloverleaf3D simulation code, a Lagrangian-Eulerian hydrodynamics solver. More information about the code can be found here https://github.com/UK-MAC/CloverLeaf3D</dc:description>
   <dc:publisher>DOE:LANL</dc:publisher>
@@ -13,7 +14,10 @@
   <dc:type>Dataset</dc:type>
   <dc:format>text/xml</dc:format>
   <dc:identifier>ID-0001</dc:identifier>
+  <dc:source></dc:source>
   <dc:language>en</dc:language>
+  <dc:relation></dc:relation>
+  <dc:coverage></dc:coverage>
   <dc:rights>GNU GENERAL PUBLIC LICENSE
   Version 3, 29 June 2007
 
