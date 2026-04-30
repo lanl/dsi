@@ -1,17 +1,23 @@
-<metadata>
-  <Creator></Creator>
-  <Contributor></Contributor>
-  <Publisher></Publisher>
-  <Title></Title>
-  <Date></Date>
-  <Language></Language>
-  <Format></Format>
-  <Subject></Subject>
-  <Description></Description>
-  <Identifier></Identifier>
-  <Relation></Relation>
-  <Source></Source>
-  <Type></Type>
-  <Coverage></Coverage>
-  <Rights></Rights>
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:xsi="http://w3.org"
+  xsi:schemaLocation="http://purl.org/dc/elements/1.1/ https://dublincore.org">
+
+  <dc:title></dc:title>
+  <dc:creator></dc:creator>
+  <dc:subject></dc:subject>
+  <dc:description></dc:description>
+  <dc:publisher></dc:publisher>
+  <dc:contributor></dc:contributor>
+  <dc:date></dc:date>
+  <dc:type></dc:type>
+  <dc:format></dc:format>
+  <dc:identifier></dc:identifier>
+  <dc:source></dc:source>
+  <dc:language></dc:language>
+  <dc:relation></dc:relation>
+  <dc:coverage></dc:coverage>
+  <dc:rights></dc:rights>
+
 </metadata>
