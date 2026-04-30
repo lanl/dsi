@@ -27,11 +27,10 @@ import subprocess
 import json
 import datetime
 import shutil
-from pathlib import Path
 from typing import Optional
 
-from .vcs_db import *
-from .vcs_metadata_helper import *
+from .vcs_db import DB_NAME, SNAPSHOTS_DIR, open_db
+from .vcs_metadata_helper import collect_metadata, collect_tree_metadata, owner_name
 
 # ─────────────────────────── RSYNC SNAPSHOT ──────────────────────────────────
 
@@ -455,13 +454,13 @@ class Version():
             return result
 
         files1 = files2 = {}
-        if c1 == None and c2 == None:
+        if c1 is None and c2 is None:
             files1 = get_files_in_root_folder()
             files2 = get_files("latest")
-        elif c1 == None:
+        elif c1 is None:
             files1 = get_files_in_root_folder()
             files2 = get_files(c2)
-        elif c2 == None:
+        elif c2 is None:
             files1 = get_files(c1)
             files2 = get_files_in_root_folder()
         else:
