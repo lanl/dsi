@@ -353,16 +353,24 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
     combined_all_df = merged_df[merged_df.cname != None].sort_values(by=['date'], ascending=True)
     combined_all_df["formatted_date"] = pd.to_datetime(combined_all_df['date']).dt.strftime("%b-%d,%Y(%H:%M:%S)")
 
-    combined_all_df = combined_all_df.dropna(subset=perf_filter.extend(["date"])).reset_index(drop=True)
+    combined_all_df = combined_all_df\
+        .dropna(subset=perf_filter.extend(["date"])).reset_index(drop=True)\
+        .drop_duplicates(subset=['formatted_date'], keep='first')
+    
+    # dims = []
+    # labels = []
 
-    # print(combined_all_df["formatted_date"])
+    print(combined_all_df["formatted_date"])
+    # print(combined_all_df["branch"])
     parCordValues = list()
-    if sorted_df is not None and len(sorted_df) > 0:
+    if combined_all_df is not None and len(combined_all_df) > 0:
         f_col = combined_all_df.index.values
+        # labels.append("Commit<br>Time")
+        # dims.append(f_col)
         parCordValues.append(
             dict(range = [f_col.min(), f_col.max()],
                 values = f_col,
-                label = "Commit<br>Time", tickvals = f_col, ticktext = combined_all_df["formatted_date"].astype(str))
+                label = "<br>Commit<br>Time", tickvals = f_col, ticktext = combined_all_df["formatted_date"].astype(str))
         )
         for col_name in perf_filter:# ["pdv", "cell_advection", "mpi_halo_exchange", "self_halo_exchange", "momentum_advection", "total"]:
             if col_name == "date":
@@ -371,7 +379,7 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
             # Replace the second to last underscore with a white space in the label
             parts = col_name.split('_')
             csum = 0
-            label = ''
+            label = '<br>'
             for part in parts:
                 if csum > 0:
                     label += '_'
@@ -380,11 +388,13 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
                 if csum > len(col_name) // 2:
                     label += "<br>"
                     csum = 0
+            # labels.append(label)
+            # dims.append(f_col)
             parCordValues.append(
                 dict(range = [f_col.min(), f_col.max()],
                      label = label, values = f_col)
             )
-    
+    # if len(dims) == 0:
     if len(parCordValues) == 0:
         fig = go.Figure().add_annotation(
             x=2, y=2,
@@ -395,10 +405,11 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
         fig.update_layout(
             xaxis =  { "visible": False },
             yaxis = { "visible": False })
+        # return fig
     else:
         fig = go.Figure(data=go.Parcoords(
                     line = dict(color = parCordValues[0]['values'],
-                            colorscale = 'Electric',
+                            colorscale = [[0, 'blue'], [1, 'blue']],
                             showscale = False,
                             colorbar = dict(x=-0.15, showticklabels=False),
                             cmin = parCordValues[0]['range'][0],
@@ -406,9 +417,12 @@ def generateParCordChart(sorted_df, git_nodes, mk_data=None, perf_filter=list())
                     dimensions = parCordValues,
                     labelangle = 0,
                     labelside = "bottom",
+                    labelfont = dict(size=16, color='black'),
+                    rangefont = dict(size=14, color='black'),
+                    tickfont = dict(size=12, color='black'),
                 )
             )
-    fig.update_layout(margin=dict(l=150))
+    fig.update_layout(margin=dict(l=160))
     return fig
 
 # @callback(
@@ -546,67 +560,74 @@ def main(perf_data, git_nodes):
                                         # 'textOverflow': 'ellipsis',
                                     }
                                      ),
-            ], style={'width': 790,'marginTop': 0,'marginLeft': 0})
+            ], style={'width': '100%','marginTop': 0,'marginLeft': 0}),
             # html.Div(
             #     html.Img(src='assets/image.svg',
             #             style={'marginLeft': 15, 'marginRight': 15, 'marginTop': 30, 'width': 310})
             # )
+        # ], style={
+        #     'width': '60%',
+        #     'height': '1000px',
+        #     'marginLeft': 10,
+        #     'marginTop': 5,
+        #     'marginRight': 10
+        # }),
+            html.Div([
+                html.Div([
+                    html.H4("Search any variable, (regex or plaintext):"),
+                    dcc.Input(id='custom-var-search', value='pragma, define', type='text', style={'marginBottom': 10}),
+                    html.Div(id='search-var-info', children='Choose files types to filter'),
+                    dcc.Dropdown(
+                        options={r"\.c":".c", r"\.cc": ".cc", r"\.py":".py", r"\.f90":".f90", r"\.ipynb": ".ipynb"},
+                        value = [r"\.c", r"\.cc",],
+                        id="filter-file-multi-options",
+                        clearable=True,
+                        optionHeight=40,
+                        multi=True
+                    ),
+                    html.Div(id='file-filter-selection-text', children='Filtered Files', style={'marginBottom': 10}),
+                    html.Button('Search', id='submit-var-search', n_clicks=0, disabled=True),
+                    dash_table.DataTable(id='var-search-table',
+                                        columns=[
+                                            {'name': 'variable', 'id': 'var_name', 'type': 'text'},
+                                            {'name': 'file name', 'id': 'file_name', 'type': 'text'},
+                                            # {'name': 'occurance', 'id': 'occ', 'type': 'numeric'}
+                                        ],
+                                        filter_action='native',
+                                        editable=False,
+                                        sort_action="native",
+                                        row_selectable="multi",
+                                        row_deletable=True,
+                                        style_cell={'textAlign': 'left'},
+                                        style_table={
+                                            'height': '250px', 'minHeight': '200px', 'maxHeight': '250px',
+                                            'overflow': 'auto',
+                                            'font-size': '12px',
+                                        },
+                                        style_data={
+                                            # 'width': '100px', 'minWidth': '100px', 
+                                            'maxWidth': '100px',
+                                            'whiteSpace': 'normal',
+                                            'overflow': 'auto',
+                                            # 'textOverflow': 'ellipsis',
+                                        }
+                                        ),
+                    # html.Div(id='var-results-table', style={'marginTop': 10}),
+                    html.Div(id='code-view', style={'marginTop': 10,
+                                                    'height': '1000px', 'maxHeight': '1000px',
+                                                    'overflow': 'auto',
+                                                    }),
+                ], style={'marginLeft': 0, 'marginTop': 5}),
+            ], style={
+                'width': '100%',
+                'marginLeft': 0,
+            }),
         ], style={
-            'width': '60%',
+            'width': '100%',
             'height': '1000px',
             'marginLeft': 10,
             'marginTop': 5,
             'marginRight': 10
-        }),
-        html.Div([
-            html.Div([
-                html.H4("Search any variable, (regex or plaintext):"),
-                dcc.Input(id='custom-var-search', value='pragma, define', type='text', style={'marginBottom': 10}),
-                html.Div(id='search-var-info', children='Choose files types to filter'),
-                dcc.Dropdown(
-                    options={r"\.c":".c", r"\.cc": ".cc", r"\.py":".py", r"\.f90":".f90", r"\.ipynb": ".ipynb"},
-                    value = [r"\.c", r"\.cc",],
-                    id="filter-file-multi-options",
-                    clearable=True,
-                    optionHeight=40,
-                    multi=True
-                ),
-                html.Div(id='file-filter-selection-text', children='Filtered Files', style={'marginBottom': 10}),
-                html.Button('Search', id='submit-var-search', n_clicks=0, disabled=True),
-                dash_table.DataTable(id='var-search-table',
-                                    columns=[
-                                        {'name': 'variable', 'id': 'var_name', 'type': 'text'},
-                                        {'name': 'file name', 'id': 'file_name', 'type': 'text'},
-                                        # {'name': 'occurance', 'id': 'occ', 'type': 'numeric'}
-                                    ],
-                                    filter_action='native',
-                                    editable=False,
-                                    sort_action="native",
-                                    row_selectable="multi",
-                                    row_deletable=True,
-                                    style_cell={'textAlign': 'left'},
-                                    style_table={
-                                        'height': '250px', 'minHeight': '200px', 'maxHeight': '250px',
-                                        'overflow': 'auto',
-                                        'font-size': '12px',
-                                    },
-                                    style_data={
-                                        # 'width': '100px', 'minWidth': '100px', 
-                                        'maxWidth': '100px',
-                                        'whiteSpace': 'normal',
-                                        'overflow': 'auto',
-                                        # 'textOverflow': 'ellipsis',
-                                    }
-                                     ),
-                # html.Div(id='var-results-table', style={'marginTop': 10}),
-                html.Div(id='code-view', style={'marginTop': 10,
-                                                'height': '1000px', 'maxHeight': '1000px',
-                                                'overflow': 'auto',
-                                                }),
-            ], style={'marginLeft': 0, 'marginTop': 5}),
-        ], style={
-            'width': '40%',
-            'marginLeft': 0,
         }),
     ],
     fluid=True,
@@ -744,12 +765,18 @@ def action_on_selected_vars(rows, derived_virtual_selected_rows, selected_commit
         return mk_component
     elif len(derived_selected_commits_list) > 2:
         return dcc.Markdown("##### Please select upto two commits", id='actual-source-block')
+    elif len(derived_selected_commits_list) == 1:
+        return dcc.Markdown("##### Please select upto two commits", id='actual-source-block')
         
     if derived_virtual_selected_rows is not None and len(derived_virtual_selected_rows) > 0 and len(rows) >= derived_virtual_selected_rows[0]:
         mk_data = list()
         for i in range(len(derived_virtual_selected_rows)):
             mk_data.append(rows[derived_virtual_selected_rows[i]]['file_name'])
 
+    # if len(derived_selected_commits_list) > 0 and derived_selected_commits_list[0] not in selected_commits_row:
+    #     return dcc.Markdown("##### Please select two commits to compare", id='actual-source-block')
+    # if len(derived_selected_commits_list) > 1 and derived_selected_commits_list[1] not in selected_commits_row:
+    #     return dcc.Markdown("##### Please select two commits to compare", id='actual-source-block')
     git_repo = getGitRepo(perf_runner.git_user_repo)
     first_commit_hash = selected_commits_row[derived_selected_commits_list[0]]["long_hash"]
     second_commit_hash = selected_commits_row[derived_selected_commits_list[1]]["long_hash"]
@@ -835,7 +862,7 @@ def find_interesting_perf_metric(df):
         if column == 'testname' or column.startswith("git_") or 'min' in column or 'max' in column or 'x_cells' in column or 'y_cells' in column:
             continue
         df[column] = pd.to_numeric(df[column].fillna(value=np.nan), errors='coerce')
-    another = df.select_dtypes(include='number').std() > 0.015
+    another = df.select_dtypes(include='number').std() > 0.03# 0.015
     return list(another[another].index)
 
 @callback(
