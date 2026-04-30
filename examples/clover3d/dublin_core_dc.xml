@@ -9,10 +9,10 @@
   <Subject>Physics</Subject>
   <Description>This ensemble run of 8 runs is from the Cloverleaf3D simulation code, a Lagrangian-Eulerian hydrodynamics solver. More information about the code can be found here https://github.com/UK-MAC/CloverLeaf3D</Description>
   <Identifier>ID-0001</Identifier>
-  <Relation></Relation>
-  <Source></Source>
+  <Relation>Related software repository: CloverLeaf3D</Relation>
+  <Source>CloverLeaf3D simulation code (https://github.com/UK-MAC/CloverLeaf3D)</Source>
   <Type>Dataset</Type>
-  <Coverage></Coverage>
+  <Coverage>3D computational hydrodynamics simulation; ensemble of 8 runs</Coverage>
   <Rights>GNU GENERAL PUBLIC LICENSE
   Version 3, 29 June 2007
 

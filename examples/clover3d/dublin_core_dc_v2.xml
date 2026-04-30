@@ -14,10 +14,10 @@
   <dc:type>Dataset</dc:type>
   <dc:format>text/xml</dc:format>
   <dc:identifier>ID-0001</dc:identifier>
-  <dc:source></dc:source>
+  <dc:source>CloverLeaf3D simulation code (https://github.com/UK-MAC/CloverLeaf3D)</dc:source>
   <dc:language>en</dc:language>
-  <dc:relation></dc:relation>
-  <dc:coverage></dc:coverage>
+  <dc:relation>Related software repository: CloverLeaf3D</dc:relation>
+  <dc:coverage>3D computational hydrodynamics simulation; ensemble of 8 runs</dc:coverage>
   <dc:rights>GNU GENERAL PUBLIC LICENSE
   Version 3, 29 June 2007
 
