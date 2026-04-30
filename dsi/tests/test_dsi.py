@@ -6,6 +6,8 @@ import textwrap
 from pandas import DataFrame
 from collections import OrderedDict
 import hashlib
+import random
+import tempfile
 
 def test_list_functions():
     test = DSI()
@@ -1804,14 +1806,27 @@ def test_versioning():
     test.version("init", wpath)
     assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
 
+    # Create a file with ten random integers
+    dummy_file_path = os.path.join(wpath, "a_dummy_file")
+    with open(dummy_file_path, 'w') as f:
+        for _ in range(10):
+            f.write(str(random.randint(0, 100)) + '\n')
     test.version("add", os.path.join(wpath, "a_dummy_file"))
-    print(">Single file added.")
-    test.version("add", os.path.join(wpath, "schema.json") + " " + os.path.join(wpath, "schema2.json"))
-    print(">Multi file added.")
-    print(">Versioning initialized.")
 
-    test.version("remove", os.path.join(wpath, "schema2.json"))
-    print(">Single file removed.")
+    dummy_file_path = os.path.join(wpath, "second_dummy_file")
+    with open(dummy_file_path, 'w') as f:
+        for _ in range(10):
+            f.write(str(random.randint(0, 100)) + '\n')
+    test.version("add", os.path.join(wpath, "second_dummy_file"))
+
+    dummy_file_path = os.path.join(wpath, "third_dummy_file")
+    with open(dummy_file_path, 'w') as f:
+        for _ in range(10):
+            f.write(str(random.randint(0, 100)) + '\n')
+    test.version("add", os.path.join(wpath, "third_dummy_file"))
+
+    test.version("remove", os.path.join(wpath, "second_dummy_file"))
+    test.version("delete", os.path.join(wpath, "third_dummy_file"))
 
     test.version("commit", "Tester Commits")
     test.version("log")
