@@ -1,8 +1,12 @@
 from dsi.core import Terminal #, Sync
+from dsi.backends.ndp import NDP
+from dsi.backends.osti import OSTI
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import os
+import logging
+import importlib.util
 from contextlib import redirect_stdout
 import io
 import math
@@ -10,6 +14,8 @@ import ast
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+logger = logging.getLogger(__name__)
 
 class DSI():
     '''
@@ -31,11 +37,13 @@ class DSI():
             Accepted file extensions for DSI-compatible backends:
                 - If backend_name = "Sqlite" → .db, .sqlite, .sqlite3
                 - If backend_name = "DuckDB" → .duckdb, .db
+                - If backend_name = "NDP" → No file required (read-only backend)
+                - If backend_name = "OSTI" → No file required (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate. 
             
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP" or "OSTI".
             
             If using an external backend, provide the relative path to the Python module with the backend. 
         """
@@ -45,16 +53,20 @@ class DSI():
         self.schema_tables = set()
         self.loaded_tables = set()
 
-        if "/" in filename:
-            create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
-        else:
-            create_bool = self.t.can_create_file_here()
-        if create_bool is False:
-            raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
+        self.silence_messages = kwargs.pop('silence_messages', False)
 
-        if filename == ".temp_dsi.db" and os.path.exists(filename):
-            os.remove(filename)
+        # Skip file creation checks for NDP and OSTI (read-only backends)
+        if backend_name.lower() not in ["ndp", "osti"]:
+            if "/" in filename:
+                create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
+            else:
+                create_bool = self.t.can_create_file_here()
+            if create_bool is False:
+                raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
 
+            if filename == ".temp_dsi.db" and os.path.exists(filename):
+                os.remove(filename)
+        
         if backend_name.endswith(".py"):
             if not os.path.exists(backend_name):
                 raise RuntimeError("backend() ERROR: `backend_name` must be a valid filepath to the custom backend. Please check again.")
@@ -95,39 +107,100 @@ class DSI():
                 self.t.add_external_python_module('backend', external_backend_name, backend_name)
                 self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
             except Exception as e:
-                if e.args:
-                    e.args = (f'backend() ERROR: {str(e.args[0])}',) + e.args[1:]
-                raise
-
-        else:
-            if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
-                file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-                if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
-                    filename += ".db"
-            elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
-                file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
-                if file_extension.lower() not in ["db", "duckdb"]:
-                    filename += ".db"
-            self.database_name = filename
-
-            try:
-                if backend_name.lower() == 'sqlite':
-                    self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
-                elif backend_name.lower() == 'duckdb':
-                    self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
-                else:
-                    print("Please check the 'backend_name' argument as that one is not supported by DSI")
-                    print("Eligible backend_names are: Sqlite, DuckDB")
-            except Exception as e:
+                logger.error(f"backend ERROR: {e}", exc_info=True)
                 if e.args:
                     e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
 
-        self.main_backend_obj = self.t.loaded_backends[0]
-        if filename != ".temp_dsi.db":
-            print(f"Created an instance of DSI with the {backend_name} backend: {filename}")
         else:
-            print("Created an instance of DSI")
+            # Handle NDP separately (read-only backend)
+            if backend_name.lower() == "ndp":
+                self.database_name = None  # NDP doesn't use a file
+                
+                correct_backend = True
+                
+                # Extract NDP query parameters from kwargs
+                query_params = {}
+                ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                
+                for key in ndp_param_keys:
+                    if key in kwargs:
+                        query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                
+                try:
+                    # Pass query params as 'params' argument
+                    self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+                
+            # Handle OSTI separately (read-only backend)
+            elif backend_name.lower() == "osti":
+                self.database_name = None  # OSTI doesn't use a file
+                
+                correct_backend = True
+                
+                # Extract OSTI query parameters from kwargs
+                query_params = kwargs.pop("params", {})
+
+                try:
+                    self.t.load_module(
+                        "backend",
+                        "OSTI",
+                        "back-read",
+                        params=query_params,
+                        **kwargs,
+                    )
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
+                    raise         
+                        
+            # Handle file-based backends (Sqlite, DuckDB)
+            else:
+                if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                    file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                    if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
+                        filename += ".db"
+                elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
+                    file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                    if file_extension.lower() not in ["db", "duckdb"]:
+                        filename += ".db"
+                self.database_name = filename
+
+                correct_backend = True
+                try:
+                    if backend_name.lower() == 'sqlite':
+                        self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                    elif backend_name.lower() == 'duckdb':
+                        self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                    else:
+                        correct_backend = False
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+                
+                if not correct_backend:
+                    raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI")
+        
+        self.main_backend_obj = self.t.loaded_backends[0]
+
+        if backend_name.lower() == "ndp":
+            msg = "Created an instance of DSI with the NDP read-only backend"
+        if backend_name.lower() == "osti":
+            msg = "Created an instance of DSI with the OSTI read-only backend"            
+        elif filename != ".temp_dsi.db":
+            msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
+        else:
+            msg = "Created an instance of DSI"
+        
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
     def list_backends(self):
         """
@@ -135,7 +208,14 @@ class DSI():
         """
         print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
-        print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.\n")
+        if importlib.util.find_spec("duckdb") is not None:
+            print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
+        n = NDP()
+        if n.validate_connection():
+            print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
+        n = OSTI()
+        if n.validate_connection():
+            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")            
         print()
 
     def schema(self, filename = None):
@@ -149,6 +229,10 @@ class DSI():
         `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
+        if self.main_backend_obj.__class__.__name__ == "OSTI":
+            raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
         if filename:
             if not os.path.exists(filename):
                 raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
@@ -176,7 +260,9 @@ class DSI():
             else:
                 self.schema_read = True
                 self.schema_tables = all_schema_tables
-            print(f"Successfully loaded the schema file: {filename}")
+
+            msg = f"Successfully loaded the schema file: {filename}"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
         else:
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
@@ -246,6 +332,10 @@ class DSI():
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("read() ERROR: NDP is a read-only backend. Data cannot be added.")
+        if self.main_backend_obj.__class__.__name__ == "OSTI":
+            raise RuntimeError("read() ERROR: OSTI is a read-only backend. Data cannot be added.")        
         # only DSI-repo readers require data_sources input. Custom readers do not.
         if isinstance(data_sources, str) and not os.path.exists(data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -387,12 +477,12 @@ class DSI():
                 raise
             self.t.active_metadata = OrderedDict()
 
+        msg = f"Loaded {data_sources} into the tables: {', '.join(table_keys)}"
         if len(table_keys) == 1:
-            print(f"Loaded {data_sources} into the table {table_keys[0]}")
-        else:
-            print(f"Loaded {data_sources} into the tables: {', '.join(table_keys)}")
+            msg.replace("the tables:", "the table:")
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
-    def query(self, statement, collection = False, update = False):
+    def query(self, statement, collection = False, update = False, **kwargs):
         """
         Executes a SQL query on the active backend.
 
@@ -420,20 +510,18 @@ class DSI():
         try:
             f = io.StringIO()
             with redirect_stdout(f):
-                df = self.t.artifact_handler(interaction_type='query', query=statement)
+                df = self.t.artifact_handler(interaction_type='query', query=statement, **kwargs)
             output = f.getvalue()
         except Exception as e:
             new_args = (f"query() ERROR: {e}",) + e.args[1:]
             raise type(e)(*new_args) from None
    
         if df.empty:
-            if output:
-                print(output)
-            else:
-                print("WARNING: input query returned no data. Please check again.")
+            msg = output if output else "WARNING: input query returned no data. Please check again."
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return
         if not collection:
-            print(f"Printing the result of the SQL query: {statement}")
+            print(f"Printing the result of the query: {statement}")
             headers = df.columns.tolist()
             rows = df.values.tolist()
             clean_rows = [
@@ -443,10 +531,13 @@ class DSI():
             self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
-            print(f"Storing the result of the SQL query: {statement} as a collection")
+            msg = f"Storing the result of the query: {statement} as a collection"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
             if update:
                 df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
-                print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
+                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
     
     def get_table(self, table_name, collection = False, update = False):
@@ -495,10 +586,14 @@ class DSI():
             self.t.table_print_helper(headers, clean_rows, len(clean_rows))
             print()
         else:
-            print(f"Storing all data for the table: {table_name} as a collection")
+            msg = f"Storing all data for the table: {table_name} as a collection"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            
             if update:
                 df.insert(0, "dsi_table_name", table_name)
-                print("Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data.")
+
+                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
         
     def find(self, query, collection = False, update = False):
@@ -545,7 +640,9 @@ class DSI():
         if not any(op in query for op in operators):
             raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
         
-        print(f"Finding all rows where '{query}' in the active backend")
+        msg = f"Finding all rows where '{query}' in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
         output = None
         try:
             f = io.StringIO()
@@ -591,7 +688,8 @@ class DSI():
                 output_df.insert(0, "dsi_row_index", row_list)
                 output_df.insert(0, "dsi_table_name", table_name)
                 first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
-                print(first_msg, "keep any extra rows blank. Drop if not updating.\n")
+                msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return output_df
     
     def search(self, query, collection = False):
@@ -614,7 +712,8 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         val = f"'{query}'" if isinstance(query, str) else query
-        print(f"Searching for all instances of {val} in the active backend")
+        msg = f"Searching for all instances of {val} in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         fnull = open(os.devnull, 'w')
         try:
@@ -679,11 +778,17 @@ class DSI():
         - NOTE: Columns from the original table cannot be deleted during update. Only row edits or column additions are allowed.
         - NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("update() ERROR: NDP is a read-only backend. Data cannot be updated.")
+        if self.main_backend_obj.__class__.__name__ == "OSTI":
+            raise RuntimeError("update() ERROR: OSTI is a read-only backend. Data cannot be updated.")        
+        
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
-        print("Updating the active backend with the input collection of data")
+        msg = "Updating the active backend with the input collection of data"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         if not isinstance(collection, pd.DataFrame):
             raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
@@ -757,13 +862,79 @@ class DSI():
             if backup:
                 extension = self.database_name.rfind('.')
                 backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
-                print(f"Created backup '{backup_file}' before updating the data.")
+                msg = f"Created backup '{backup_file}' before updating the data."
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             self.t.overwrite_table(table_name, actual_df, backup)
         except Exception as e:
             if e.args:
                 e.args = (f'update() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
+    def process(self, backend_name, filename, **kwargs):
+        """
+        Process is processing collections into a specific format: Sqlite or DuckDB for now
+
+        DSI instance will now use that new backend as the base for all functions. 
+        """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot process() data from an empty backend. Please ensure there is data in it.")
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot process() until all associated data is loaded after a complex schema")
+        
+        try:        
+            self.t.artifact_handler(interaction_type='process')
+        except Exception as e:
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        old_backend_data = self.t.active_metadata
+
+        self.u = Terminal()
+        self.u.user_wrapper = True
+        self.u.active_metadata = old_backend_data
+
+        correct_backend = True
+        try:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                if backend_name.lower() == 'sqlite':
+                    self.u.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                    backend_name = 'Sqlite'
+                elif backend_name.lower() == 'duckdb':
+                    self.u.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                    backend_name = 'DuckDB'
+                else:
+                    correct_backend = False
+        except Exception as e:
+            logger.error(f"process() ERROR: {e}", exc_info=True)
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        if not correct_backend:
+            raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                            "Eligible backend_names are: Sqlite, DuckDB")
+        
+        try:
+            self.u.artifact_handler(interaction_type='ingest')
+        except Exception as e:
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+        
+        try:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.u.close()
+                self.t.unload_module('backend',backend_name,'back-write')
+                self.t.load_module('backend',backend_name,'back-write', filename=filename)
+        except Exception as e: # there really shouldn't be an error here
+            logger.error(f"process() ERROR: {e}", exc_info=True)
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+    
     def list_writers(self):
         """
         Prints a list of valid writers that can be used in the `writer_name` argument in `write()`
@@ -905,17 +1076,25 @@ class DSI():
             raise
 
         self.t.active_metadata = OrderedDict()
-        print(f"Successfully wrote to the output file {filename}")
+        msg = f"Successfully wrote to the output file {filename}"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
     
-    def list(self, collection = False):
+
+    def list(self, collection: bool = False) -> list | None:
         """
         Gets the names and dimensions (rows x columns) of all tables in the active backend.
 
-        `collection` : bool, optional, default False. 
-            If True, returns a Python list of all the table names
-            
-            If False (default), prints each table's name and dimensions to the console.
+        Arguments:
+            collection (bool): If True, returns a Python list of all the table names else if False (default), prints each table's name and dimensions to the console.
+
+        Returns:
+            list | None : list of table names if collection is True, else None. If there are no tables in the backend, then nothing is returned or printed.
+
+        Raises:
+            ValueError: If backend is empty or invalid.
+            RuntimeError: If called before schema data is loaded or if listing fails.
         """
+  
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
         if self.schema_read:
@@ -937,6 +1116,8 @@ class DSI():
             return table_list
         else:
             print(output)
+            return None
+        
 
     def summary(self, table_name = None, collection = False):
         """
@@ -952,7 +1133,7 @@ class DSI():
 
             If True, and table_name not specified, returns a list of Pandas DataFrames of the summary of all tables.
             
-            If False (default), prints each table's name and dimensions to the console.
+            If False (default), prints each table's name and numerical metadata to the console.
         """
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
             raise RuntimeError("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
@@ -974,6 +1155,7 @@ class DSI():
             return summary_df
         else:
             print(output)
+    
     
     def num_tables(self):
         """
@@ -1026,11 +1208,19 @@ class DSI():
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.close()
-        print("Closing this instance of DSI()")
+        
+        if not self.silence_messages:
+            print("Closing this instance of DSI()")
     
     #help, edge-finding (find this/that)
-    def get(self, dbname):
+    def get(self, dbname=None):
+        #if not dbname:
+        #    s = Sync(dbname)
+        #else:
+        #    s = Sync("workspace.db")
         pass
+
+        
     
     def move(self, filepath):
         pass

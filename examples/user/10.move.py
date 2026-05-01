@@ -1,4 +1,4 @@
-from dsi.core import Sync
+from dsi.sync import Sync
 
 # Origin location of data
 local_files = "/Users/Shared/dsi/examples/clover3d/"

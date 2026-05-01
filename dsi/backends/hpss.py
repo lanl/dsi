@@ -8,24 +8,21 @@ from collections import OrderedDict
 # HPSS backend class
 class HPSS(Backend):
    def __init__(self, hpss_files):
-        """
-        Initializes an HPSS backend
-        
-        `hpss_files`: list with hpss file paths
+      """
+      Initializes an HPSS backend
+      
+      `hpss_files`: list with hpss file paths
 
-        """
-        self.hpss_info = OrderedDict()
-        for hpss_file in hpss_files.keys():
-           self.hpss_info[hpss_file] = {
-              'local_path': hpss_files[hpss_file],
-              'hpss_hash': None, 
-           }
-           stdout, stderr, _ = self.run_hsi("hashlist", [hpss_file])
-           hpss_hash = self.parse_hpss_hash(stdout, stderr)
-           self.hpss_info[hpss_file]['hpss_hash'] = hpss_hash
-              
-   def git_commit_sha(self):
-      pass
+      """
+      self.hpss_info = OrderedDict()
+      for hpss_file in hpss_files.keys():
+         self.hpss_info[hpss_file] = {
+            'local_path': hpss_files[hpss_file],
+            'hpss_hash': None, 
+         }
+         stdout, stderr, _ = self.run_hsi("hashlist", [hpss_file])
+         hpss_hash = self.parse_hpss_hash(stdout, stderr)
+         self.hpss_info[hpss_file]['hpss_hash'] = hpss_hash
 
    def create_hpss_hash(self, hpss_file) -> str:
       """

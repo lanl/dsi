@@ -1,0 +1,287 @@
+import csv
+import hashlib
+import json
+import shlex
+import subprocess
+
+from datetime import datetime
+from pathlib import Path, PurePosixPath
+from urllib.parse import urlparse
+
+from dsi.dsi import DSI
+
+
+def parse_timestamp(ts: str) -> datetime:
+    """Parses a timestamp string in the format "YYYY-MM-DD--HH:MM:SS" and returns a datetime object. 
+    The function also handles an optional trailing 's' character.
+
+    Args:
+        ts (str): The timestamp string to parse.
+    """
+    
+    # normalize your slightly inconsistent format
+    ts = ts.rstrip("s")  # remove trailing 's' if present
+    return datetime.strptime(ts, "%Y-%m-%d--%H:%M:%S")
+
+
+def deduplicate_keep_latest(records: list[dict]) -> list[dict]:
+    """Deduplicates a list of records by keeping only the latest record for each unique combination of location_type, location, and path. 
+    The function uses the timestamp field to determine which record is the latest.
+    
+    Arg:
+        records: A list of dictionaries, where each dictionary represents a record with at least the following keys: "location_type", "location", "path", and "timsestamp".
+
+    Returns:
+        A deduplicated list of records, where only the latest record for each unique combination of location_type, location, and path is kept.
+    """
+    best = {}
+
+    for record in records:
+        key = (
+            record.get("location_type"),
+            record.get("location"),
+            record.get("path"),
+        )
+
+        current_ts = parse_timestamp(record.get("timsestamp", ""))
+
+        if key not in best:
+            best[key] = record
+        else:
+            existing_ts = parse_timestamp(best[key].get("timsestamp", ""))
+
+            if current_ts > existing_ts:
+                best[key] = record
+
+    return list(best.values())
+
+
+
+def create_folder_from_path(s: str, base_dir: str) -> tuple[str, str]:
+    """Generates a folder name from a given path or URL by taking the last part of the path and hashing it to create a unique identifier.
+    
+    Arg:
+        s (str): The input string, which can be a file path or a URL.
+        base_dir (str): The base directory where the folder will be created.
+
+
+    Returns:
+        str: A unique folder name derived from the last part of the path or URL.
+        str: The full path to the created folder.
+    """
+    name = PurePosixPath(urlparse(s).path).name
+    folder_name = hashlib.sha256(name.encode("utf-8")).hexdigest()[:16]
+
+    out_dir = Path(base_dir) / folder_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+
+    return folder_name, str(out_dir)
+
+
+
+def get_last_part(s: str) -> str:
+    """Get the last part of a path or URL, which is often the filename. Works for both URLs and plain paths.
+    
+    Arg:
+        s (str): The input string, which can be a file path or a URL.
+
+    Returns:
+        str: The last part of the path or URL, typically the filename.
+    """
+    path = urlparse(s).path  # works for both URLs and plain paths
+    return PurePosixPath(path).name
+
+
+
+def human_readable_size(num_bytes: int) -> str:
+    """Converts a file size in bytes to a human-readable string with appropriate units (e.g., KB, MB, GB).  
+    
+    Arg:
+        num_bytes (int): The file size in bytes.
+
+    Returns:
+        str: A human-readable string representing the file size with appropriate units. 
+    """
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    size = float(num_bytes)
+
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.2f} {unit}"
+        size /= 1024
+
+
+
+def remote_md5(remote: str, remote_path: str, timeout: int | None = None) -> str:
+    """Computes the MD5 checksum of a remote file by running md5sum over SSH.
+    
+    Args:
+        remote (str): The remote host, optionally with username (e.g. "user@host")
+        remote_path (str): The path to the file on the remote host (e.g. "/data/file.bin")
+        timeout (int | None): Optional timeout in seconds for the entire operation. Default is None (no timeout).
+
+    Returns:
+        str: The computed MD5 checksum as a hexadecimal string.
+    """
+    cmd = [
+        "ssh",
+        remote,
+        f"md5sum {shlex.quote(remote_path)}"
+    ]
+
+    result = subprocess.run(
+        cmd,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=True,
+    )
+
+    return result.stdout.split()[0]
+
+
+
+def should_download(remote:str, remote_path:str, stored_md5:str) -> bool:
+    """Determines whether a remote file should be downloaded by comparing its MD5 checksum to a stored value.
+    
+    Args:
+        remote (str): The remote host, optionally with username (e.g. "user@host")
+        remote_path (str): The path to the file on the remote host (e.g. "/data/file.bin")
+        stored_md5 (str): The stored MD5 checksum to compare against.
+
+    Returns:
+        bool: True if the file should be downloaded, False otherwise.
+    """
+    try:
+        remote_hash = remote_md5(remote, remote_path)
+    except Exception as e:
+        print(f"Failed to get remote hash for {remote}:{remote_path}: {e}")
+        return False
+
+    return remote_hash != stored_md5
+
+
+
+def compute_md5(file_path:str, chunk_size:int = 8192) -> str:
+    """Computes the MD5 checksum of a file.
+    
+    Args:
+        file_path (str): The path to the file to compute the checksum for.
+        chunk_size (int): The size of the chunks to read from the file. Default is 8192 bytes.
+
+    Returns:
+        str: The computed MD5 checksum as a hexadecimal string.
+    """
+    md5 = hashlib.md5()
+    
+    with open(file_path, "rb") as f:
+        while chunk := f.read(chunk_size):
+            md5.update(chunk)
+    
+    return md5.hexdigest()
+
+
+
+def is_file(path_provided: str)-> int:
+    """Checks if the provided path is a file, a directory, or does not exist.
+    
+    Args:
+        path_provided (str): The path to check.
+
+    Returns:
+        int: 1 if it is a file, 2 if it is a directory, 0 if it does not exist or is something else.
+    """
+    p = Path(path_provided)
+
+    if p.is_file():
+        return 1
+    elif p.is_dir():
+        return 2
+    else:
+        return 0
+
+
+
+def csv_to_list_of_dicts(path: str) -> list[dict[str, str]]:
+    """
+    Reads a CSV file and returns a list of dictionaries, where each dictionary represents a row in the CSV file with column headers as keys.
+
+    Args:
+        path (str): The file path to the CSV file.
+
+    Returns:
+        list[dict[str, str]]: A list of dictionaries representing the rows in the CSV file.
+    """
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+
+def create_directory(dir_name: str = "temp", exist_ok=True):
+    """
+    Creates a directory with the given name in the current working directory.
+    If the directory already exists and exist_ok is True, it will not raise an error.
+
+    Args:
+        dir_name (str): The name of the directory to create. Default is "temp".
+        exist_ok (bool): If True, do not raise an error if the directory already exists. Default is True.   
+    """
+
+    workspace = Path.cwd()  # current directory (your local workspace)
+    dir_path = workspace / dir_name
+    dir_path.mkdir(parents=True, exist_ok=exist_ok)
+    print("Created:", dir_path)
+
+
+
+def create_index_db(index_path:str, catalogue_name: str = "metadata_catalogue.db"):
+    """
+    Creates an index database from a CSV file containing metadata about databases.
+
+    Args:
+        index_path (str): The path to the CSV file containing the metadata.  
+        catalogue_name (str): The name of the catalogue database to create. Default is "metadata_catalogue.db". 
+    """
+
+    print(index_path)
+    dsi_catalogue = DSI(catalogue_name)
+    dsi_catalogue.read(index_path, reader_name="CSV", table_name="catalogue")
+    dsi_catalogue.close()
+    print(f"Database is accessible at: {catalogue_name}")
+
+
+
+def upsert_records(file_path: str, new_records: list[dict], key: str) -> None:
+    """Upserts records into a JSON file by using a specified key to determine uniqueness. If a record with the same key already exists, it will be updated; otherwise, the new record will be inserted.
+
+    Args:
+        file_path (str): The path to the JSON file where the records are stored.
+        new_records (list[dict]): A list of dictionaries representing the new records to upsert.
+        key (str): The key in the dictionaries that should be used to determine uniqueness for upserting.
+
+    """
+    # Load existing data
+    _file_path = Path(file_path)
+    if _file_path.exists():
+        with open(_file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    # Index existing records by key
+    indexed = {item[key]: item for item in data}
+
+    # Insert or update
+    for record in new_records:
+        indexed[record[key]] = record
+
+    # Convert back to list
+    updated_data = list(indexed.values())
+
+    # Save back to file
+    with open(_file_path, "w", encoding="utf-8") as f:
+        json.dump(updated_data, f, indent=2)
+        

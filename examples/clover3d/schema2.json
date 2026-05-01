@@ -1,11 +1,11 @@
 {
-   "genesis_datacard": {
+   "dublin_core_datacard": {
        "primary_key": "Title"
    },
     "simulation": {
        "primary_key": "sim_id",
        "foreign_key": {
-             "dataset": ["genesis_datacard", "Title"]
+             "dataset": ["dublin_core_datacard", "Title"]
        }
     }, 
     "input": {
