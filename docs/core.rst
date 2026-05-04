@@ -50,7 +50,7 @@ and track their movement to the remote location for future access.
 The primary functions, ``Copy``, ``Move``, and ``Get`` serve as mechanisms to copy data, move data, or retrieve data from remote locations
 by creating a DSI database in the process, or retrieving an existing DSI database that contains the location(s) of the target data.
 
-.. autoclass:: dsi.core.Sync
+.. autoclass:: dsi.sync.Sync
       :members:
       :special-members: __init__
 
