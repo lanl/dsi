@@ -97,10 +97,10 @@ class Terminal():
         self.debug_level = debug
         if debug == 1 or debug == 2:
             logging.basicConfig(
-                filename='debug.log',         # Name of the log file
-                filemode='w',               # Overwrite mode ('w' for overwrite, 'a' for append)
-                format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
-                level=logging.INFO          # Minimum log level to capture
+                filename='debug.log',                               # Name of the log file
+                filemode='w',                                       # Overwrite mode ('w' for overwrite, 'a' for append)
+                format='%(asctime)s - %(levelname)s - %(message)s', # Log message format
+                level=logging.INFO                                  # Minimum log level to capture
             )
 
     def list_available_modules(self, mod_type):
@@ -911,7 +911,7 @@ class Terminal():
             - If str, name of the table to overwrite in the backend.
             - If list, list of all tables to overwrite in the backend
 
-        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+        `collection` : pandas.DataFrame or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
 
@@ -1384,7 +1384,7 @@ class Terminal():
         global return_line_number
         global original_file
         if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
+            return_line_number = frame.f_lineno # Get line number
             original_file = frame.f_code.co_filename # Get file name
         return self.trace_function
 
@@ -1423,7 +1423,7 @@ class Terminal():
                             self.logger.warning(
                                 f"OSTI backend connection validation failed: {str(e)}"
                             )
-                        return False                    
+                        return False
         return False
 
     # Internal function that returns if a user can create a file/db in a specified location
