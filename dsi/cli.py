@@ -733,7 +733,7 @@ class DSI_cli:
                     print(f"view ERROR: dashboard viewer has an invalid input directory: {f}")
                     return
                 
-            if os.name != 'nt':    
+            if os.name != 'nt':
                 subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
 
             env = dict(os.environ)
