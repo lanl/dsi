@@ -248,7 +248,7 @@ class Sqlite(Filesystem):
             else:
                 print("WARNING: Complex schemas can only be ingested after all referenced data tables are loaded into a database.")
             
-        if self.runTable:
+        if self.runTable and artifacts:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
 

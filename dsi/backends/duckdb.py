@@ -281,7 +281,7 @@ class DuckDB(Filesystem):
             else:
                 table_order = list(reversed(ordered_tables)) # ingest primary key tables first then children
 
-        if self.runTable:
+        if self.runTable and artifacts:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
 
