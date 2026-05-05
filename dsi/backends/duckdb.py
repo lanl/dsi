@@ -412,17 +412,6 @@ class DuckDB(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
-        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove filesystem passthrough in future
-            try:
-                self.con.execute(query)
-                self.con.commit()
-            except Exception as e:
-                message = str(e)
-                if "Table" in message and "does not exist" in message:
-                    table_name = message[message.find("Table"):message.find("Did you mean")-2]
-                    print(f"WARNING: {table_name} in this database")
-                    return
-                raise
         else:
             raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
         
