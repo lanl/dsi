@@ -7,6 +7,7 @@ import yaml
 import time
 import itertools
 import shutil
+import pandas as pd
 from pathlib import Path
 from typing import Iterator
 from contextlib import redirect_stdout
@@ -33,6 +34,8 @@ class Sync():
                     break
             if extension != "":
                 self.full_db_name = self.project_name + extension
+                if not os.path.exists(self.full_db_name):
+                    raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
             else:
                 proj_db_found = False
                 for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
@@ -42,6 +45,9 @@ class Sync():
                         self.full_db_name = self.project_name + ext
                         proj_db_found = True
 
+                if not proj_db_found:
+                    raise ValueError(f"No database found with name {project_name}. Please input an existing database name.")
+            
             self.remote_location = None
             self.local_location = None
             self.file_list = None
@@ -67,36 +73,88 @@ class Sync():
             if not self.t.valid_backend(self.t.loaded_backends[0], self.t.loaded_backends[0].__class__.__bases__[0].__name__):
                 raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
 
+
     def reindex(self, local_loc, remote_loc, isVerbose = False):
         """
         Helper function that allows users to index their data again by dropping existing filesystem information.
         """
-        # current -- drop filesystem table and call index()
-        # future --- use existing db to "reindex" by updating the filepath cols, not dropping table.
-        #   remove filesystem pass through in query_artifacts if not dropping table
-        self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
-        self.index(local_loc, remote_loc, isVerbose)
-    
+        # # Relative paths (..) will not work
+        # if "../" in local_loc or "../" in remote_loc:
+        #     raise ValueError("Error: Please use absolute paths instead of relative")
+        # local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
+        # remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
+
+        # if isVerbose:
+        #     print("loc: "+local_loc+ " rem: "+remote_loc)
+        
+        # table_list = self.t.list(True)
+        # if "federated" in table_list and "filesystem" in table_list:
+        #     fed_table = self.t.get_table("federated")
+        #     fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
+        #     if fed_local == local_loc:
+        #         if fed_remote == remote_loc:
+        #             print("Skipping index as local and remote inputs are the same as existing index.")
+        #             return
+                
+        #         # update remote file paths to use new remote location
+        #         filesystem_df = self.t.get_table("filesystem")
+        #         filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
+                
+        #         # update remote location in federated table
+        #         fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
+
+        #         self.t.dsi_tables.remove("filesystem")
+        #         self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
+        #         self.t.dsi_tables.append("filesystem")
+
+        #         if isVerbose:
+        #             print("DSI Index complete!\n")
+        #         return
+        
+        # # if in index(), continue with normal index, no need to drop table
+        # #   remove filesystem pass through in query_artifacts for sqlite.py and duckdb.py
+        # self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
+        # self.index(local_loc, remote_loc, isVerbose)
+
+
     def index(self, local_loc, remote_loc, isVerbose=False, no_parent = False):
         """
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        # throw error if filesystem exists -- in future, drop filesystem table if it exists.
-        fnull = open(os.devnull, 'w')
-        with redirect_stdout(fnull):
-            fs_t = self.t.get_table("filesystem")
-        if not fs_t.empty:
-            if isVerbose:
-                print("Warning: filesystem table already exists! DSI Index skipped.")
-            return
-
-        # Relative paths (..) will not work
         if "../" in local_loc or "../" in remote_loc:
             raise ValueError("Error: Please use absolute paths instead of relative")
+        
+        local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
+        remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
 
         if isVerbose:
-            print("loc: "+local_loc+ " rem: "+remote_loc)
+            print("loc: " + local_loc + " rem: " + remote_loc)
+
+        table_list = self.t.list(True)
+        if "federated" in table_list and "filesystem" in table_list:
+            fed_table = self.t.get_table("federated")
+            fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
+            if fed_local == local_loc:
+                if fed_remote == remote_loc:
+                    if isVerbose:
+                        print("DSI Index complete!\n")
+                    return
+                
+                # update remote file paths to use new remote location
+                filesystem_df = self.t.get_table("filesystem")
+                filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
+                
+                # update remote location in federated table
+                fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
+
+                self.t.dsi_tables.remove("filesystem")
+                self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
+                self.t.dsi_tables.append("filesystem")
+
+                if isVerbose:
+                    print("DSI Index complete!\n")
+                return
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, isVerbose)
@@ -175,7 +233,22 @@ class Sync():
             print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
+            if "filesystem" in table_list:
+                new_fs_df = pd.DataFrame(st_dict)
+                self.t.dsi_tables.remove("filesystem")
+                self.t.overwrite_table("filesystem", new_fs_df)
+                self.t.dsi_tables.append("filesystem")
+            else:
+                self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
+
+            # creating federated table -- 2 columns: local location and remote location
+            fed_dict = {"local_location": [self.local_location], "remote_location": [self.remote_location]}
+            if "federated" in table_list:
+                df = pd.DataFrame(fed_dict)
+                self.t.overwrite_table("federated", df)
+            else:
+                self.t.load_module('plugin', "Dictionary", "reader", collection=fed_dict, table_name="federated")              
+            
             self.t.artifact_handler(interaction_type='ingest')
 
         self.file_list = file_list
@@ -184,8 +257,10 @@ class Sync():
         if isVerbose:
             print("DSI Index complete!\n")
 
+
     def move(self, tool="copy", isVerbose=False, **kwargs):
         self.copy(tool,isVerbose,kwargs)
+
 
     def execute_cmd(self, cmd, cmd_name, timer = False):
         """Internal helper for Sync to call executable actions"""
@@ -204,7 +279,8 @@ class Sync():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
             raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
         return stdout
-    
+
+
     def change_group(self, local_loc, user_group):
         """Change group permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
@@ -216,6 +292,7 @@ class Sync():
         except Exception as e:
             print("Warning:", str(e))
 
+
     def change_permissions(self, local_loc):
         """Change read permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
@@ -226,7 +303,8 @@ class Sync():
             self.execute_cmd(cmd, "changing read permissions for database")
         except Exception as e:
             print("Warning:", str(e))
-    
+
+
     def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
@@ -366,7 +444,7 @@ class Sync():
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "rsync database")
-            print(" DSI Rsync database movement comlpete.")
+            print(" DSI Rsync database movement complete.")
         
         elif tool.lower() == "conduit":
             import signal
@@ -422,12 +500,12 @@ class Sync():
             except Exception as e:
                 raise RuntimeError(f"Conduit failed with error: {str(e)} ")
 
-        elif tool.lower() == "pfcp":           
+        elif tool.lower() == "pfcp":
             try:
                 # File Movement
                 if isVerbose:
                     print("pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
-                cmd = ['pfcp','-R',self.local_location,  os.path.join(self.remote_location, self.project_name)]
+                cmd = ['pfcp','-R',self.local_location, os.path.join(self.remote_location, self.project_name)]
                 self.execute_cmd(cmd, "pfcp move data")
                 print(" DSI submitted pfcp data movement job.")
 
@@ -447,6 +525,7 @@ class Sync():
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
 
+
     def dircrawl(self,filepath, verbose=False):
         """
         Crawls the root 'filepath' directory and returns files
@@ -459,8 +538,6 @@ class Sync():
 
         file_list = []
         for root, dirs, files in os.walk(filepath):
-            #if os.path.basename(filepath) != 'tmp': # Lets skip some files
-            #    continue
             if verbose:
                 print(f"Crawling directory: {root}")
                 print(f"  Found {len(files)} files, {len(dirs)} subdirectories")
@@ -476,6 +553,7 @@ class Sync():
             print(f"Runtime: {elapsed:.2f} seconds")
 
         return file_list
+
 
     def dircrawl2(self, filepath: str, verbose: bool = False) -> Iterator[str]:
         start = time.perf_counter()
@@ -502,6 +580,7 @@ class Sync():
             print(f"\nFinished crawling: {filepath}")
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
+
     def get(self, input_yaml = None, workspace_folder = None):
         '''
         Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
@@ -524,6 +603,7 @@ class Sync():
 
         yaml_folder = Path(yaml_path).parent
         federate_datasets(workspace_folder, config_data, str(yaml_folder))
+
 
     def gen_uuid(self, st):
         '''
@@ -680,7 +760,7 @@ class HPSSSync():
             # Create new filesystem collection with origin and remote locations
             # Stage data for ingest
             # Transpose the OrderedDict to a list of row dictionaries
-            num_rows = len(next(iter(st_dict.values())))  # Assume all columns are of equal length
+            num_rows = len(next(iter(st_dict.values()))) # Assume all columns are of equal length
             rows = []
 
             for i in range(num_rows):

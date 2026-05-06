@@ -248,7 +248,7 @@ class Sqlite(Filesystem):
             else:
                 print("WARNING: Complex schemas can only be ingested after all referenced data tables are loaded into a database.")
             
-        if self.runTable:
+        if self.runTable and artifacts:
             runTable_create = "CREATE TABLE IF NOT EXISTS runTable (run_id INTEGER PRIMARY KEY AUTOINCREMENT, run_timestamp TEXT UNIQUE);"
             self.cur.execute(runTable_create)
 
@@ -373,17 +373,6 @@ class Sqlite(Filesystem):
                     if dict_return:
                         return OrderedDict()
                     return pd.DataFrame()
-                raise
-        elif "filesystem" in query.lower() and "drop" in query.lower(): #remove filesystem passthrough in future
-            try:
-                self.cur.execute(query)
-                self.con.commit()
-            except Exception as e:
-                message = str(e)
-                if "no such table" in message:
-                    table_name = message[message.rfind(":")+2:]
-                    print(f"WARNING: '{table_name}' does not exist in this database")
-                    return
                 raise
         else:
             raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")

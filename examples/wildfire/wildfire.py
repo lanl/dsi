@@ -42,7 +42,7 @@ if __name__ == "__main__":
     dsi.read(datacard, "Oceans11Datacard")
 
     #get wildfire table's data
-    wildfire_data = dsi.get_table(table_name, collection=True)
+    wildfire_data = dsi.get_table(table_name, collection=True, update=True)
     
     updatedFilePaths = []
     for url_image in wildfire_data['FILE']:
