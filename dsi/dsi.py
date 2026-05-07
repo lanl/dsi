@@ -2,6 +2,7 @@ from dsi.core import Terminal #, Sync
 from dsi.backends.ndp import NDP
 from dsi.backends.osti import OSTI
 from dsi.backends.oceans11 import Oceans11
+from dsi.backends.wwpdb import WWPDB
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -40,14 +41,15 @@ class DSI:
             Accepted file extensions for DSI-compatible backends:
                 - If backend_name = "Sqlite" → .db, .sqlite, .sqlite3
                 - If backend_name = "DuckDB" → .duckdb, .db
-                - If backend_name = "NDP" → No filename input (read-only backend)
-                - If backend_name = "OSTI" → No filename input (read-only backend)
-                - If backend_name = "Oceans11" → No filename input (read-only backend)
+                - If backend_name = "NDP" → No file required (read-only backend)
+                - If backend_name = "OSTI" → No file required (read-only backend)
+                - If backend_name = "WWPDB" → No file required (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate. 
             
             If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI" or "Oceans11".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI" or "WWPDB".
             
             If using an external backend, provide the relative path to the Python module with the backend. 
         """
@@ -59,6 +61,18 @@ class DSI:
 
         self.silence_messages = kwargs.pop('silence_messages', False)
 
+        # Skip file creation checks for NDP, OSTI and WWPDB (read-only backends)
+        if backend_name.lower() not in ["ndp", "osti", "wwpdb"]:
+            if "/" in filename:
+                create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
+            else:
+                create_bool = self.t.can_create_file_here()
+            if create_bool is False:
+                raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
+
+            if filename == ".temp_dsi.db" and os.path.exists(filename):
+                os.remove(filename)
+        
         if backend_name.endswith(".py"):
             if not os.path.exists(backend_name):
                 raise RuntimeError("backend() ERROR: `backend_name` must be a valid filepath to the custom backend. Please check again.")
@@ -171,8 +185,31 @@ class DSI:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
-                    raise
+                    raise  
 
+            # Handle WWPDB separately (read-only backend)
+            elif backend_name.lower() == "wwpdb":
+                self.database_name = None  # WWPDB doesn't use a file
+                
+                correct_backend = True
+                
+                # Extract WWPDB query parameters from kwargs
+                query_params = kwargs.pop("params", {})
+
+                try:
+                    self.t.load_module(
+                        "backend",
+                        "WWPDB",
+                        "back-read",
+                        params=query_params,
+                        **kwargs,
+                    )
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
+                    raise       
+                        
             # Handle file-based backends (Sqlite, DuckDB)
             else:
                 if "/" in filename:
@@ -205,11 +242,19 @@ class DSI:
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
                     raise
+                
+                if not correct_backend:
+                    raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, WWPDB")
         
         self.main_backend_obj = self.t.loaded_backends[0]
 
-        if self.read_only_flag:
-            msg = f"Created an instance of DSI with the {backend_name} read-only backend"            
+        if backend_name.lower() == "ndp":
+            msg = "Created an instance of DSI with the NDP read-only backend"
+        elif backend_name.lower() == "osti":
+            msg = "Created an instance of DSI with the OSTI read-only backend"
+        elif backend_name.lower() == "wwpdb":
+            msg = "Created an instance of DSI with the WWPDB read-only backend"            
         elif filename != ".temp_dsi.db":
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
@@ -232,10 +277,14 @@ class DSI:
             print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
         n = OSTI()
         if n.validate_connection():
-            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
-        n = Oceans11(only_validate=True)
-        if n.validate_connection(only_validate=True):
-            print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
+            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")
+        try:
+            w = WWPDB(auto_load=False)
+            if w.validate_connection():
+                print("WWPDB : Read-only metadata backend for discovering and querying wwPDB/RCSB structure metadata.\n")
+            w.close()
+        except Exception:
+            pass            
         print()
 
 
@@ -251,6 +300,12 @@ class DSI:
         `return` : If filename = None, returns the structural schema of this backend - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
         """
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
+        if self.main_backend_obj.__class__.__name__ == "OSTI":
+            raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")
+        if self.main_backend_obj.__class__.__name__ == "WWPDB":
+            raise RuntimeError("schema() ERROR: WWPDB is a read-only backend and does not support schema operations.")        
         if filename:
             if self.read_only_flag:
                 backend_name = self.main_backend_obj.__class__.__name__
@@ -356,10 +411,12 @@ class DSI:
             
             Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
         """
-        if self.read_only_flag:
-            backend_name = self.main_backend_obj.__class__.__name__
-            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be ingested.")
-
+        if self.main_backend_obj.__class__.__name__ == "NDP":
+            raise RuntimeError("read() ERROR: NDP is a read-only backend. Data cannot be added.")
+        if self.main_backend_obj.__class__.__name__ == "OSTI":
+            raise RuntimeError("read() ERROR: OSTI is a read-only backend. Data cannot be added.")
+        if self.main_backend_obj.__class__.__name__ == "WWPDB":
+            raise RuntimeError("read() ERROR: WWPDB is a read-only backend. Data cannot be added.")        
         # only DSI-repo readers require data_sources input. Custom readers do not.
         if isinstance(data_sources, str) and not os.path.exists(data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -908,8 +965,7 @@ class DSI:
         try:
             if backup:
                 extension = self.database_name.rfind('.')
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                backup_file = self.database_name[:extension] + f".backup_{timestamp}" + self.database_name[extension:]
+                backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
                 msg = f"Created backup '{backup_file}' before updating the data."
                 logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             self.t.overwrite_table(table_name, actual_df, backup)

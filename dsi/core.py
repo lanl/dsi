@@ -27,7 +27,7 @@ class Terminal:
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11', 'wwpdb']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
@@ -35,7 +35,7 @@ class Terminal:
     VALID_DATACARDS = ['DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11', 'WWPDB']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
@@ -98,10 +98,10 @@ class Terminal:
         self.debug_level = debug
         if debug == 1 or debug == 2:
             logging.basicConfig(
-                filename='debug.log',                               # Name of the log file
-                filemode='w',                                       # Overwrite mode ('w' for overwrite, 'a' for append)
-                format='%(asctime)s - %(levelname)s - %(message)s', # Log message format
-                level=logging.INFO                                  # Minimum log level to capture
+                filename='debug.log',         # Name of the log file
+                filemode='w',               # Overwrite mode ('w' for overwrite, 'a' for append)
+                format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
+                level=logging.INFO          # Minimum log level to capture
             )
 
     def list_available_modules(self, mod_type):
@@ -909,7 +909,7 @@ class Terminal:
             - If str, name of the table to overwrite in the backend.
             - If list, list of all tables to overwrite in the backend
 
-        `collection` : pandas.DataFrame or list of Pandas.DataFrames
+        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
 
@@ -1455,7 +1455,7 @@ class Terminal:
         global return_line_number
         global original_file
         if event == "return":
-            return_line_number = frame.f_lineno # Get line number
+            return_line_number = frame.f_lineno  # Get line number
             original_file = frame.f_code.co_filename # Get file name
         return self.trace_function
 
@@ -1501,6 +1501,10 @@ class Terminal:
                             self.logger.warning(
                                 f"OSTI backend connection validation failed: {e!s}"
                             )
+                        return False 
+            if backend.__class__.__name__ == "WWPDB":
+                    # WWPDB is valid if data is loaded and RCSB connection works
+                    if not backend._loaded:
                         return False
             if backend.__class__.__name__ == "Oceans11":
                 if not backend._loaded:
