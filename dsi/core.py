@@ -461,7 +461,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Creating backup file before ingesting data into the {obj.__class__.__name__} backend")
                     backup_start = datetime.now()
-                    backup_file = obj.filename[:obj.filename.rfind('.')] + ".backup" + obj.filename[obj.filename.rfind('.'):]
+                    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                    backup_file = obj.filename[:obj.filename.rfind('.')] + f".backup_{timestamp}" + obj.filename[obj.filename.rfind('.'):]
                     shutil.copyfile(obj.filename, backup_file)
                     backup_end = datetime.now()
                     if self.debug_level != 0:
@@ -959,7 +960,8 @@ class Terminal():
                 self.logger.info(f"   Creating backup file before overwriting data in the {backend.__class__.__name__} backend")
             backup_start = datetime.now()
             extension = backend.filename.rfind('.')
-            backup_file = backend.filename[:extension] + ".backup" + backend.filename[extension:]
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            backup_file = backend.filename[:extension] + f".backup_{timestamp}" + backend.filename[extension:]
             shutil.copyfile(backend.filename, backup_file)
             backup_end = datetime.now()
             if self.debug_level != 0:
