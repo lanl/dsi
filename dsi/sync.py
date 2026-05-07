@@ -74,49 +74,6 @@ class Sync():
                 raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
 
 
-    def reindex(self, local_loc, remote_loc, isVerbose = False):
-        """
-        Helper function that allows users to index their data again by dropping existing filesystem information.
-        """
-        # # Relative paths (..) will not work
-        # if "../" in local_loc or "../" in remote_loc:
-        #     raise ValueError("Error: Please use absolute paths instead of relative")
-        # local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
-        # remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
-
-        # if isVerbose:
-        #     print("loc: "+local_loc+ " rem: "+remote_loc)
-        
-        # table_list = self.t.list(True)
-        # if "federated" in table_list and "filesystem" in table_list:
-        #     fed_table = self.t.get_table("federated")
-        #     fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
-        #     if fed_local == local_loc:
-        #         if fed_remote == remote_loc:
-        #             print("Skipping index as local and remote inputs are the same as existing index.")
-        #             return
-                
-        #         # update remote file paths to use new remote location
-        #         filesystem_df = self.t.get_table("filesystem")
-        #         filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
-                
-        #         # update remote location in federated table
-        #         fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
-
-        #         self.t.dsi_tables.remove("filesystem")
-        #         self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
-        #         self.t.dsi_tables.append("filesystem")
-
-        #         if isVerbose:
-        #             print("DSI Index complete!\n")
-        #         return
-        
-        # # if in index(), continue with normal index, no need to drop table
-        # #   remove filesystem pass through in query_artifacts for sqlite.py and duckdb.py
-        # self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
-        # self.index(local_loc, remote_loc, isVerbose)
-
-
     def index(self, local_loc, remote_loc, isVerbose=False, no_parent = False):
         """
         Helper function to gather filesystem information, local and remote locations
@@ -136,6 +93,8 @@ class Sync():
             fed_table = self.t.get_table("federated")
             fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
             if fed_local == local_loc:
+                self.remote_location = remote_loc
+                self.local_location = local_loc
                 if fed_remote == remote_loc:
                     if isVerbose:
                         print("DSI Index complete!\n")
@@ -258,10 +217,6 @@ class Sync():
             print("DSI Index complete!\n")
 
 
-    def move(self, tool="copy", isVerbose=False, **kwargs):
-        self.copy(tool,isVerbose,kwargs)
-
-
     def execute_cmd(self, cmd, cmd_name, timer = False):
         """Internal helper for Sync to call executable actions"""
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
@@ -305,12 +260,16 @@ class Sync():
             print("Warning:", str(e))
 
 
+    def move(self, tool="copy", isVerbose=False, **kwargs):
+        self.copy(tool,isVerbose,kwargs)
+
+
     def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
         """
-        if any(x is None for x in (self.remote_location, self.local_location, self.file_list, self.rfile_list)):
-            raise RuntimeError("Must run successful DSI Index right before Copy")
+        if any(x is None for x in (self.remote_location, self.local_location)):
+            raise RuntimeError("Must succesfully run DSI Index before Copy")
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
@@ -347,7 +306,9 @@ class Sync():
         
         # Future: have movement service handle type without user input (cp,scp,ftp,rsync,etc.)
         if tool.lower() == "copy":
-            # Data movement via Unix Copy
+            if any(x is None for x in (self.file_list, self.rfile_list)):
+                raise RuntimeError("Must succesfully run DSI Index before Copy")
+        
             for file,file_remote in zip(self.file_list,self.rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
