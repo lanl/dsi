@@ -25,9 +25,7 @@ db_type = sys.argv[2]
 
 @st.cache_resource(show_spinner=False)
 def get_db():
-    fnull = open(os.devnull, 'w')
-    with redirect_stdout(fnull):
-        return DSI(filename=db_filepath, backend_name=db_type, check_same_thread=False)
+    return DSI(filename=db_filepath, backend_name=db_type, check_same_thread=False, silence_messages = True)
 
 st.set_page_config(page_title="DSI ML Emulator", layout="wide")
 st.title("DSI ML Emulator")
