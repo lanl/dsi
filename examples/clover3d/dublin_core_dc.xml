@@ -1,0 +1,22 @@
+<metadata>
+  <Creator>Jesus Pulido</Creator>
+  <Contributor>Jesus Pulido</Contributor>
+  <Publisher>DOE:LANL</Publisher>
+  <Title>Cloverleaf 3D Ensemble Dataset</Title>
+  <Date>2025-10-09</Date>
+  <Language>en</Language>
+  <Format>text/xml</Format>
+  <Subject>Physics</Subject>
+  <Description>This ensemble run of 8 runs is from the Cloverleaf3D simulation code, a Lagrangian-Eulerian hydrodynamics solver. More information about the code can be found here https://github.com/UK-MAC/CloverLeaf3D</Description>
+  <Identifier>ID-1234</Identifier>
+  <Relation></Relation>
+  <Source></Source>
+  <Type></Type>
+  <Coverage></Coverage>
+  <Rights>GNU GENERAL PUBLIC LICENSE
+  Version 3, 29 June 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. http://fsf.org/
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.</Rights>
+</metadata>

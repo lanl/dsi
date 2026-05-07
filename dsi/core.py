@@ -26,7 +26,7 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
@@ -34,7 +34,7 @@ class Terminal():
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
@@ -97,10 +97,10 @@ class Terminal():
         self.debug_level = debug
         if debug == 1 or debug == 2:
             logging.basicConfig(
-                filename='debug.log',         # Name of the log file
-                filemode='w',               # Overwrite mode ('w' for overwrite, 'a' for append)
-                format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
-                level=logging.INFO          # Minimum log level to capture
+                filename='debug.log',                               # Name of the log file
+                filemode='w',                                       # Overwrite mode ('w' for overwrite, 'a' for append)
+                format='%(asctime)s - %(levelname)s - %(message)s', # Log message format
+                level=logging.INFO                                  # Minimum log level to capture
             )
 
     def list_available_modules(self, mod_type):
@@ -199,7 +199,7 @@ class Terminal():
                                 e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
                             else:
                                 e.args = (f'Error in {original_file} @ line {return_line_number}',)
-                        raise
+                        raise e from None
 
                     if tester == 1:
                         sys.settrace(None) # ends trace to prevent large overhead
@@ -396,7 +396,7 @@ class Terminal():
                         e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
                     else:
                         e.args = (f'Error in {original_file} @ line {return_line_number}',)
-                raise
+                raise e from None
 
             if tester == 1:
                 sys.settrace(None) # ends trace to prevent large overhead
@@ -461,7 +461,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Creating backup file before ingesting data into the {obj.__class__.__name__} backend")
                     backup_start = datetime.now()
-                    backup_file = obj.filename[:obj.filename.rfind('.')] + ".backup" + obj.filename[obj.filename.rfind('.'):]
+                    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                    backup_file = obj.filename[:obj.filename.rfind('.')] + f".backup_{timestamp}" + obj.filename[obj.filename.rfind('.'):]
                     shutil.copyfile(obj.filename, backup_file)
                     backup_end = datetime.now()
                     if self.debug_level != 0:
@@ -481,7 +482,7 @@ class Terminal():
                             e.args = (f"Error ingesting data - {str(e.args[0])}",  *e.args[1:])
                     else:
                         e.args = (f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e.args[0])}",  *e.args[1:])
-                    raise
+                    raise e from None
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
@@ -514,7 +515,7 @@ class Terminal():
                         self.logger.error((str(e)))
                     if not self.user_wrapper:
                         e.args = (f"Caught error in {original_file} @ line {return_line_number}: " + e.args[0], *e.args[1:])
-                    raise
+                    raise e from None
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
@@ -911,7 +912,7 @@ class Terminal():
             - If str, name of the table to overwrite in the backend.
             - If list, list of all tables to overwrite in the backend
 
-        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+        `collection` : pandas.DataFrame or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
 
@@ -959,7 +960,8 @@ class Terminal():
                 self.logger.info(f"   Creating backup file before overwriting data in the {backend.__class__.__name__} backend")
             backup_start = datetime.now()
             extension = backend.filename.rfind('.')
-            backup_file = backend.filename[:extension] + ".backup" + backend.filename[extension:]
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            backup_file = backend.filename[:extension] + f".backup_{timestamp}" + backend.filename[extension:]
             shutil.copyfile(backend.filename, backup_file)
             backup_end = datetime.now()
             if self.debug_level != 0:
@@ -1384,7 +1386,7 @@ class Terminal():
         global return_line_number
         global original_file
         if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
+            return_line_number = frame.f_lineno # Get line number
             original_file = frame.f_code.co_filename # Get file name
         return self.trace_function
 
@@ -1408,6 +1410,20 @@ class Terminal():
                         if self.debug_level != 0:
                             self.logger.warning(
                                 f"NDP backend connection validation failed: {str(e)}"
+                            )
+                        return False
+            if backend.__class__.__name__ == "OSTI":
+                    # OSTI is valid if data is loaded and connection works
+                    if not backend._loaded:
+                        return False
+                    
+                    try:
+                        backend.validate_connection()
+                        return True
+                    except (ConnectionError, RuntimeError) as e:
+                        if self.debug_level != 0:
+                            self.logger.warning(
+                                f"OSTI backend connection validation failed: {str(e)}"
                             )
                         return False
         return False
