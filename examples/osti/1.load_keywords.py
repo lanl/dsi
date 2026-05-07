@@ -1,4 +1,3 @@
-import pandas as pd
 from dsi.dsi import DSI
 
 # load OSTI backend and query for 5 entries with the keyword climate

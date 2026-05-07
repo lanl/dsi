@@ -32,7 +32,7 @@ with open(gan_yaml, "w") as f:
 s = Sync()
 try:
     s.get(gan_yaml, federated_folder)
-except Exception as e:
+except Exception:
     raise RuntimeError("Error accessing remote server. Try again later.")
 
 
