@@ -15,11 +15,10 @@ Access modes
    - query_artifacts({"keywords": "hemoglobin", "limit": 20})
    - query_artifacts("hemoglobin")
 
-# POST is used for RCSB Search API because the query body can contain
-# nested search criteria such as keywords, authors, and filters.
-
-# GET is used for RCSB Data API because each PDB ID maps to a fixed
-# metadata resource URL.
+DOI behavior
+------------
+RCSB Search API is not used for DOI lookup.
+wwPDB DOI input is normalized and converted into a PDB ID when possible.
 
 REST flow
 ---------
@@ -31,6 +30,8 @@ Tables
 - resources
 - errors
 
+Tier mapping
+------------
 self.tables["datasets"] = Tier 1 datasets
 self.tables["resources"] = Tier 2 normalized resources
 self.tables["errors"] = failed/skipped lookups
@@ -42,7 +43,6 @@ Current scope
 - REST APIs only
 - Exposes mmCIF download URLs
 - Does not parse raw mmCIF content yet
-
 """
 
 from __future__ import annotations
@@ -50,16 +50,16 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
-
+import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
+from collections import OrderedDict
 from dsi.backends.webserver import Webserver
 
 
-DATA_CORE_URL = "https://data.rcsb.org/rest/v1/core" #https://data.rcsb.org/index.html#data-api
-SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"  #https://search.rcsb.org/index.html#search-api
+DATA_CORE_URL = "https://data.rcsb.org/rest/v1/core"
+SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 
 ENDPOINTS = {
     "search": SEARCH_URL,
@@ -76,9 +76,7 @@ DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
 WWPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.I)
 PDB_ID_REGEX = re.compile(r"^[A-Za-z0-9]{4}$")
 
-# The 3 in-memory tables and it's defined columns
 
-#Tier-1 schema
 DATASET_SCHEMA = [
     "dataset_id",
     "source_repository",
@@ -98,7 +96,6 @@ DATASET_SCHEMA = [
     "notes",
 ]
 
-#Tier-2 schema
 RESOURCE_SCHEMA = [
     "resource_id",
     "dataset_id",
@@ -111,7 +108,6 @@ RESOURCE_SCHEMA = [
     "raw_metadata",
 ]
 
-#Error schema
 ERROR_SCHEMA = [
     "identifier",
     "normalized_identifier",
@@ -146,6 +142,8 @@ class ValueObject:
 
 @dataclass
 class FileResource:
+    """Normalized downloadable file/resource representation."""
+
     label: Optional[str]
     url: str
     extension: Optional[str]
@@ -154,7 +152,9 @@ class FileResource:
 
 
 @dataclass
-class WWPDBResolution:  #Internal normalized result object for one lookup.
+class WWPDBResolution:
+    """Internal normalized result object for one wwPDB/RCSB lookup."""
+
     original_identifier: str
     normalized_identifier: str
     repo: str
@@ -172,7 +172,8 @@ class WWPDBResolution:  #Internal normalized result object for one lookup.
     notes: List[str] = field(default_factory=list)
 
 
-def classify_usability(exts: Iterable[Optional[str]]) -> str:  #Classifies resource formats.
+def classify_usability(exts: Iterable[Optional[str]]) -> str:
+    """Classify resource usability based on file extensions."""
     ext_set = {e.lower() for e in exts if e}
 
     if not ext_set:
@@ -191,7 +192,7 @@ def classify_usability(exts: Iterable[Optional[str]]) -> str:  #Classifies resou
     return "other_format"
 
 
-class WWPDB(Webserver): # This is the main DSI backend class, it implements the DSI webserver interface.
+class WWPDB(Webserver):
     """
     wwPDB/RCSB metadata backend for DSI.
 
@@ -208,49 +209,91 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         "return_type",
     }
 
-    def __init__( #initializes the backend
+    def __init__(
         self,
         url: Optional[str] = None,
         identifiers: Optional[List[str]] = None,
         params: Optional[Dict[str, Any]] = None,
-        timeout: int = 60,
-        verify: bool | str = True,
-        auto_load: bool = True,
-        retries: int = 3,
-        validate_on_init: bool = True,
         **kwargs,
     ) -> None:
+        """
+        Initialize wwPDB backend and optionally load data from RCSB APIs.
+
+        Parameters
+        ----------
+        url : str, optional
+            Base RCSB Data API URL. Defaults to DATA_CORE_URL.
+        identifiers : list[str], optional
+            Direct PDB IDs or wwPDB DOIs to load.
+        params : dict, optional
+            Query parameters for RCSB Search API.
+            Supported keys:
+                - keywords
+                - authors
+                - experimental_method
+                - limit
+                - start
+                - return_type
+        **kwargs : dict
+            Backend configuration only:
+                - timeout : int, default 60
+                - verify_ssl : bool or str, default True
+                - verify : bool or str, fallback SSL option
+                - retries : int, default 3
+                - validate_on_init : bool, default True
+                - auto_load : bool, default True
+        """
         self.url = (url or DATA_CORE_URL).rstrip("/")
         self.identifiers = list(dict.fromkeys(identifiers or []))
         self.params = params or {}
-        self.timeout = timeout
-        self.verify = verify
-        self.retries = retries
-        self.validate_on_init = validate_on_init
+
+        self.timeout = kwargs.get("timeout", 60)
+        self.verify = kwargs.get("verify_ssl", kwargs.get("verify", True))
+        self.retries = kwargs.get("retries", 3)
+        self.validate_on_init = kwargs.get("validate_on_init", True)
+        self.auto_load = kwargs.get("auto_load", True)
         self.kwargs = kwargs
 
-        self.session = self._create_session(retries=retries)
+        self.session = self._create_session(retries=self.retries)
 
-        self.tables: Dict[str, List[Dict[str, Any]]] = {} #In-memory dictionary created here for main storage
+        self.tables: Dict[str, List[Dict[str, Any]]] = {}
         self.schemas: Dict[str, List[str]] = {
             "datasets": DATASET_SCHEMA,
             "resources": RESOURCE_SCHEMA,
             "errors": ERROR_SCHEMA,
         }
+
         self.raw_results: List[WWPDBResolution] = []
         self.last_search_response: Optional[Dict[str, Any]] = None
+        self._loaded = False
 
-        if auto_load:
-            if self.validate_on_init:
+        if self.validate_on_init:
+            try:
                 self.validate_connection()
+            except Exception as exc:
+                self._loaded = False
+                raise RuntimeError(f"WWPDB connection validation failed: {exc}") from exc
 
-            if self.identifiers:
-                self._load_initial_data()
-            elif self.params:
-                self._load_from_params(self.params)
-            else:
-                self.process_artifacts()
+        if self.auto_load:
+            try:
+                if self.identifiers:
+                    self._load_initial_data()
+                elif self.params:
+                    self._load_from_params(self.params)
+                else:
+                    self.process_artifacts()
 
+                self._loaded = True
+
+            except Exception as exc:
+                self._loaded = False
+                raise RuntimeError(f"Failed to load initial WWPDB data: {exc}") from exc
+        else:
+            self._loaded = True
+
+    # ------------------------------------------------------------------
+    # HTTP/session helpers
+    # ------------------------------------------------------------------
     def _create_session(self, retries: int) -> requests.Session:
         session = requests.Session()
         session.headers.update(
@@ -275,7 +318,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         session.mount("http://", adapter)
         return session
 
-    def validate_connection(self) -> bool: # This is a checking function (a GET request) to see if the RCSB Data API is reachable
+    def validate_connection(self) -> bool:
         test_url = ENDPOINTS["entry"].format(pdb_id="1CBS")
         response = self.session.get(test_url, timeout=self.timeout, verify=self.verify)
         response.raise_for_status()
@@ -303,9 +346,9 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
 
     def _post_json(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
-        POST helper.
+        Generic POST helper.
 
-        Used for the RCSB Search API because the search request can contain
+        Used for the RCSB Search API because search requests can contain
         nested keyword/filter logic in the JSON body.
         """
         response = self.session.post(
@@ -321,8 +364,11 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         except ValueError as exc:
             raise ValueError(f"RCSB response was not valid JSON: {endpoint}") from exc
 
+    # ------------------------------------------------------------------
+    # Identifier helpers
+    # ------------------------------------------------------------------
     @staticmethod
-    def normalize_doi(value: Any) -> Optional[str]:  # Cleans DOI input
+    def normalize_doi(value: Any) -> Optional[str]:
         if value is None:
             return None
 
@@ -348,7 +394,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         return None
 
     @staticmethod
-    def classify_identifier(identifier: Any) -> str:  #Decides on the input type
+    def classify_identifier(identifier: Any) -> str:
         doi = WWPDB.normalize_doi(identifier)
         if doi and WWPDB_DOI_REGEX.search(doi):
             return "wwpdb_doi"
@@ -377,7 +423,10 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
 
         return parts[-1]
 
-    def _load_from_params(self, params: Dict[str, Any]) -> None:   # query driven loading and handling
+    # ------------------------------------------------------------------
+    # Query-driven Search API support
+    # ------------------------------------------------------------------
+    def _load_from_params(self, params: Dict[str, Any]) -> None:
         pdb_ids = self._search_rcsb(params)
         self.identifiers = pdb_ids
         self.raw_results = [
@@ -397,6 +446,9 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         - limit
         - start
         - return_type
+
+        DOI search is not supported here. DOI input is handled by
+        lookup_identifier() using DOI-to-PDB-ID extraction.
         """
         self._validate_params(params)
 
@@ -429,6 +481,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
             identifier = item.get("identifier")
             if not identifier:
                 continue
+
             identifiers.append(str(identifier).split("_")[0].split("-")[0].upper())
 
         return list(dict.fromkeys(identifiers))
@@ -494,7 +547,10 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
             "nodes": nodes,
         }
 
-    def lookup_identifier( #Takes one input and decides how to process it 
+    # ------------------------------------------------------------------
+    # Repository lookup and metadata retrieval
+    # ------------------------------------------------------------------
+    def lookup_identifier(
         self,
         identifier: str,
         query_source: Optional[str] = None,
@@ -530,7 +586,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
             notes=["Identifier did not match a wwPDB DOI or 4-character PDB ID."],
         )
 
-    def lookup_wwpdb( # core metadata fetch function
+    def lookup_wwpdb(
         self,
         pdb_id: Optional[str],
         original_identifier: str,
@@ -603,6 +659,9 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
             result.notes.append(f"wwPDB parsing error: {str(exc)}")
             return result
 
+    # ------------------------------------------------------------------
+    # Loading and normalization
+    # ------------------------------------------------------------------
     def _load_initial_data(self) -> None:
         self.raw_results = [
             self.lookup_identifier(identifier, query_source="identifier")
@@ -610,8 +669,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         ]
         self.process_artifacts()
 
-    def _extract_tables(self, results: List[WWPDBResolution]) -> Dict[str, List[Dict[str, Any]]]:   #Converts internal WWPDBResolution objects into DSI tables.
-        # Rows are built here. Where each API lookup result is converted into row dictionaries
+    def _extract_tables(self, results: List[WWPDBResolution]) -> Dict[str, List[Dict[str, Any]]]:
         datasets: List[Dict[str, Any]] = []
         resources: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
@@ -670,7 +728,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
                     }
                 )
 
-        return { #And the final table dictionary is returned here.
+        return {
             "datasets": self._apply_schema(datasets, DATASET_SCHEMA),
             "resources": self._apply_schema(resources, RESOURCE_SCHEMA),
             "errors": self._apply_schema(errors, ERROR_SCHEMA),
@@ -680,7 +738,15 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         return [{column: row.get(column) for column in schema} for row in rows]
 
     def _rows_to_table(self, rows: List[Dict[str, Any]]):
-        return rows
+        table = OrderedDict()
+
+        if not rows:
+            return table
+
+        for column in rows[0].keys():
+            table[column] = [row.get(column) for row in rows]
+
+        return table
 
     def _resolve_table_name(self, table_name: Optional[str]) -> Optional[str]:
         if table_name is None:
@@ -717,9 +783,17 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         accession_info = raw_metadata.get("rcsb_accession_info", {})
         return accession_info.get("revision_date") if isinstance(accession_info, dict) else None
 
-    def get_table(self, table_name: str):
+    # ------------------------------------------------------------------
+    # Table helpers
+    # ------------------------------------------------------------------
+    def get_table(self, table_name: str, dict_return=False):
         resolved = self._resolve_table_name(table_name)
-        return self.tables.get(resolved, [])
+        table = self.tables.get(resolved, OrderedDict())
+
+        if dict_return:
+            return table
+
+        return pd.DataFrame(table)
 
     def get_tables(self):
         return self.tables
@@ -807,27 +881,37 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         if query is None:
             return self.tables
 
-        if isinstance(query, dict):
-            self.params = query
-            self._load_from_params(query)
-            return self.tables
+        try:
+            if isinstance(query, dict):
+                self.params = query
+                self._load_from_params(query)
+                self._loaded = True
+                return self.tables
 
-        if isinstance(query, str):
-            kind = self.classify_identifier(query)
+            if isinstance(query, str):
+                kind = self.classify_identifier(query)
 
-            if kind in {"wwpdb_doi", "pdb_id"}:
-                self.identifiers = [query]
+                if kind in {"wwpdb_doi", "pdb_id"}:
+                    self.identifiers = [query]
+                    self._load_initial_data()
+                else:
+                    query_params = {"keywords": query}
+                    query_params.update(kwargs)
+                    self.params = query_params
+                    self._load_from_params(self.params)
+
+                self._loaded = True
+                return self.tables
+
+            if isinstance(query, list):
+                self.identifiers = query
                 self._load_initial_data()
-            else:
-                self.params = {"keywords": query, **kwargs}
-                self._load_from_params(self.params)
+                self._loaded = True
+                return self.tables
 
-            return self.tables
-
-        if isinstance(query, list):
-            self.identifiers = query
-            self._load_initial_data()
-            return self.tables
+        except Exception:
+            self._loaded = False
+            raise
 
         raise TypeError("query_artifacts expects None, str, list, or dict.")
 
@@ -843,6 +927,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
             self.tables[table_name] = self._rows_to_table(rows)
             self.schemas[table_name] = list(rows[0].keys()) if rows else self.schemas.get(table_name, [])
 
+        self._loaded = True
         return self.tables
 
     def find(self, query_object, **kwargs):
@@ -917,7 +1002,7 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
             )
         return out
 
-    def list(self, **kwargs):
+    def list(self, collection=False, **kwargs):
         return self.get_table_names()
 
     def display(self, table_name=None, **kwargs):
@@ -926,21 +1011,38 @@ class WWPDB(Webserver): # This is the main DSI backend class, it implements the 
         return self.get_table(table_name)
 
     def summary(self, table_name=None, **kwargs):
+        def _row_count(table):
+            if not table:
+                return 0
+
+            # DSI/NDP-style table: OrderedDict or dict of columns -> lists
+            if isinstance(table, dict):
+                first_col = next(iter(table.values()), [])
+                return len(first_col)
+
+            # Older list-of-row-dicts style fallback
+            return len(table)
+
         if table_name is not None:
-            rows = self.get_table(table_name)
+            table = self.get_table(table_name)
             return {
                 "backend": "WWPDB",
                 "table_name": self._resolve_table_name(table_name),
-                "row_count": len(rows),
+                "row_count": _row_count(table),
                 "columns": self.get_schema(table_name),
+                "loaded": self._loaded,
             }
 
         return {
             "backend": "WWPDB",
             "num_tables": self.num_tables(),
-            "tables": {name: len(rows) for name, rows in self.tables.items()},
+            "tables": {
+                name: _row_count(table)
+                for name, table in self.tables.items()
+            },
             "params": self.params,
             "identifier_count": len(self.identifiers),
+            "loaded": self._loaded,
         }
 
     def close(self):
