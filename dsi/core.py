@@ -12,7 +12,6 @@ import pandas as pd
 import re
 import tempfile
 from packaging import version
-from datetime import datetime
 
 # temporary check since pandas 3.0+ has unstable releases
 if version.parse(pd.__version__) >= version.parse("3.0.0"):
