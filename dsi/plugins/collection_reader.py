@@ -21,7 +21,6 @@ class Dictionary(CollectionReader):
     """
     def __init__(self, collection, table_name = None, **kwargs) -> None:
         super().__init__(collection, **kwargs)
-        print(type(self.input_dict))
         if not isinstance(self.input_dict, dict):
             raise TypeError("Input must be a Python dictionary or an Ordered Dictionary")
         self.table_name = table_name
