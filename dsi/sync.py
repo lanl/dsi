@@ -358,14 +358,17 @@ class Sync():
             self.execute_cmd(cmd, "scp data")
             print(" DSI SCP data movement complete.")
 
-            #remove username from file_remote column in filesystem table
+            # remove username from file_remote column in filesystem table
             username, host = host_part.split("@")
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            # remove username from remote_location column in federated table
+            federated_df = self.t.get_table("federated")
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
-            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
@@ -394,7 +397,7 @@ class Sync():
             self.execute_cmd(cmd, "rsync data")
             print(" DSI Rsync data movement complete.")
 
-            #remove username from file_remote column in filesystem table
+            # remove username from file_remote column in filesystem table
             try:
                 username, host = host_part.split("@")
             except Exception:
@@ -402,9 +405,12 @@ class Sync():
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            # remove username from remote_location column in federated table
+            federated_df = self.t.get_table("federated")
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
-            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
             self.t.dsi_tables.append("filesystem")
             
             # Database movement
