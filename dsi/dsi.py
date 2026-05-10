@@ -248,14 +248,16 @@ class DSI():
         `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
         """
-        if self.main_backend_obj.__class__.__name__ == "NDP":
-            raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
-        if self.main_backend_obj.__class__.__name__ == "OSTI":
-            raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
-        if self.main_backend_obj.__class__.__name__ == "OCEANS11":
-            raise RuntimeError("schema() ERROR: OCEANS11 is a read-only backend and does not support schema operations.")
+        
 
         if filename:
+            if self.main_backend_obj.__class__.__name__ == "NDP":
+                raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
+            if self.main_backend_obj.__class__.__name__ == "OSTI":
+                raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
+            if self.main_backend_obj.__class__.__name__ == "OCEANS11":
+                raise RuntimeError("schema() ERROR: OCEANS11 is a read-only backend and does not support schema operations.")
+            
             if not os.path.exists(filename):
                 raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
             if "dsi_relations" in self.t.active_metadata:
