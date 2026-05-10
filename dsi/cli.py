@@ -124,7 +124,8 @@ class DSI_cli:
                 "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
-            'federate' : ("[yaml config file] <workspace folder>", "Gathers data from many sources listed in the config file into the workspace folder."),
+            'federate' : ("[-y yaml file] [-c csv file] [-w workspace_folder]", 
+                          "Collects data from sources defined in the YAML config file or source from a CSV fifle, optionally saving it to a workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
             'list' : ("", "Lists all tables in the current DSI database"),
@@ -289,54 +290,95 @@ class DSI_cli:
 
 
     def federate(self, args):
-        '''
-        Federate data from multiple sources using a yaml config file
-        '''
+        """
+        Federate data from multiple sources using either:
+        - a YAML config file, or
+        - a CSV source file
+
+        Usage:
+        federate -y input.yaml [-w workspace_folder]
+        federate -c sources.csv [-w workspace_folder]
+        """
+
+        yaml_file = None
+        csv_file = None
         workspace_folder = None
+
         if not args:
-            print("federate ERROR: need to specify at least a yaml config file, see the help")
+            print("federate ERROR: need to specify -y yaml file or -c csv file, see the help")
             return
 
-        if len(args) >= 1:
-            config_file = args[0]
+        i = 0
+        while i < len(args):
+            if args[i] == "-y":
+                if i + 1 >= len(args):
+                    print("federate ERROR: missing yaml file after -y")
+                    return
+                yaml_file = args[i + 1]
+                i += 2
 
-        if len(args) >= 2:
-            workspace_folder = args[1]
+            elif args[i] == "-c":
+                if i + 1 >= len(args):
+                    print("federate ERROR: missing csv file after -c")
+                    return
+                csv_file = args[i + 1]
+                i += 2
 
+            elif args[i] == "-w":
+                if i + 1 >= len(args):
+                    print("federate ERROR: missing workspace folder after -w")
+                    return
+                workspace_folder = args[i + 1]
+                i += 2
 
-        # Check if the file exists and is a valid yaml file before trying to federate
-        if not os.path.exists(config_file):
-            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
-            return
-        else:
-            try:
-                with open(config_file, 'r') as f:
-                    data = f.read()
-                config_data = yaml.safe_load(data)
-            except yaml.YAMLError as e:
-                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again.")
+            else:
+                print(f"federate ERROR: unknown argument {args[i]}")
                 return
+
+        if yaml_file and csv_file:
+            print("federate ERROR: specify either -y yaml file or -c csv file, not both")
+            return
+
+        if not yaml_file and not csv_file:
+            print("federate ERROR: need to specify -y yaml file or -c csv file")
+            return
 
         try:
             s = Sync()
-            if workspace_folder is None:
-                _workspace_folder = config_data.get("workspace_folder", "")
-                if _workspace_folder == "":
-                    workspace_folder = "dsi_data"
-                    print(f"Synchronization data from {config_file} into {workspace_folder}")
-                    s.get(config_file, workspace_folder)
-                else:
-                    print(f"Synchronization data from {config_file} into {workspace_folder}")
-                    workspace_folder = _workspace_folder
-                    s.get(config_file, workspace_folder)
+
+            if yaml_file:
+                if not os.path.exists(yaml_file):
+                    print(f"federate ERROR: {yaml_file} does not exist. Please check the filepath and try again.")
+                    return
+
+                try:
+                    with open(yaml_file, "r", encoding="utf-8") as f:
+                        config_data = yaml.safe_load(f)
+                except yaml.YAMLError:
+                    print(f"Invalid YAML file {yaml_file}. Please check the yaml file and try again.")
+                    return
+
+                if workspace_folder is None:
+                    workspace_folder = config_data.get("workspace_folder", "") or "dsi_data"
+
+                print(f"Synchronization data from {yaml_file} into {workspace_folder}")
+                s.get(input_yaml=yaml_file, workspace_folder=workspace_folder)
+
             else:
-                print(f"Synchronization data from {config_file} into {workspace_folder}")
-                s.get(config_file, workspace_folder)
+                if not os.path.exists(csv_file):
+                    print(f"federate ERROR: {csv_file} does not exist. Please check the filepath and try again.")
+                    return
+
+                if workspace_folder is None:
+                    workspace_folder = "dsi_data"
+
+                print(f"Synchronization data from {csv_file} into {workspace_folder}")
+                s.get(input_csv=csv_file, workspace_folder=workspace_folder)
+
         except Exception as e:
             print(f"federate ERROR: {e}")
             return
         
-
 
 
     def find(self, args):

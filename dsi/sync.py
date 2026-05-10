@@ -495,28 +495,95 @@ class Sync():
             print(f"\nFinished crawling: {filepath}")
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
-    def get(self, input_yaml = None, workspace_folder = None):
-        '''
-        Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
-        '''
+    # def get(self, input_yaml = None, workspace_folder = None):
+    #     '''
+    #     Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
+    #     '''
 
-        # Read configuration from YAML file
+    #     # Read configuration from YAML file
+    #     if input_yaml:
+    #         try:
+    #             yaml_path = Path(input_yaml)
+    #             config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    #         except FileNotFoundError:
+    #             print(f"Error: Could not find YAML file {yaml_path}")
+    #     else:
+    #         True
+        
+    #     # Create a folder for the databases if it doesn't exist, or use the provided one
+    #     if not workspace_folder:
+    #         _workspace_folder = config_data.get("workspace_folder", "")
+    #         workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+
+    #     yaml_folder = Path(yaml_path).parent
+    #     federate_datasets(workspace_folder, config_data, str(yaml_folder))
+    
+    
+    def get(self, input_yaml=None, input_csv=None, workspace_folder=None):
+        """
+        Helper function that searches remote locations from either:
+        - an input YAML file, or
+        - a CSV repository file
+
+        and retrieves metadata that contains DSI databases.
+        """
+
+        if input_yaml and input_csv:
+            raise ValueError("Provide either input_yaml or input_csv, not both.")
+
+        if not input_yaml and not input_csv:
+            raise ValueError("Provide either input_yaml or input_csv.")
+
+        #
+        # YAML input mode
+        #
         if input_yaml:
+            yaml_path = Path(input_yaml)
+
             try:
-                yaml_path = Path(input_yaml)
-                config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+                config_data = yaml.safe_load(
+                    yaml_path.read_text(encoding="utf-8")
+                )
             except FileNotFoundError:
                 print(f"Error: Could not find YAML file {yaml_path}")
-        else:
-            True
-        
-        # Create a folder for the databases if it doesn't exist, or use the provided one
-        if not workspace_folder:
-            _workspace_folder = config_data.get("workspace_folder", "")
-            workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+                return
 
-        yaml_folder = Path(yaml_path).parent
-        federate_datasets(workspace_folder, config_data, str(yaml_folder))
+            base_folder = yaml_path.parent
+
+        #
+        # CSV input mode
+        #
+        else:
+            csv_path = Path(input_csv)
+
+            if not csv_path.exists():
+                print(f"Error: Could not find CSV file {csv_path}")
+                return
+
+            config_data = {
+                "repo_paths": [csv_path.name],
+                "download_limit": 10485760,  # 10 MB
+                "conflict_resolution": "keep_latest",
+            }
+
+            base_folder = csv_path.parent
+
+        #
+        # Workspace folder
+        #
+        if not workspace_folder:
+            workspace_folder = (
+                config_data.get("workspace_folder", "")
+                or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+            )
+
+        federate_datasets(
+            workspace_folder=workspace_folder,
+            config_data=config_data,
+            base_path=base_folder,
+        )
+    
+    
 
     def gen_uuid(self, st):
         '''

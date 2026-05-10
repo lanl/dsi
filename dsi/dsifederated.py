@@ -358,7 +358,6 @@ class DSIFederated:
         else:
             found_dbs = self.f_search_for_databases(db, table, original_location, return_output=True, display_results=False)
     
-
         # Use DSI to run the find operation on the specified database and table
         res = []
         for db_info in found_dbs:

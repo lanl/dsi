@@ -1,8 +1,9 @@
 import sys
+import argparse
 import uuid
+import getpass
 import yaml
 from pathlib import Path
-
 
 from dsi.utils.federation_utils import (
     compute_md5, 
@@ -20,6 +21,7 @@ from dsi.utils.git_utils import download_github_file, get_github_remote_file_siz
 from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
 from dsi.utils.web_utils import download_web_file, get_url_file_size
 from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3, get_s3_client
+from dsi.utils.hpc_copy import sftp_remote_size_bytes, sftp_download_file, compute_remote_md5_sftp, should_download_sftp
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:
@@ -136,81 +138,192 @@ def pull_data(location_type: str,
             return None
         
 
+    # elif cleaned_location_type == "hpc":
+
+    #     # Ask for username if we don't have it for this host yet
+    #     if location not in host_username:
+    #         try:
+    #             username = input(f" -- Enter the username for {location}: ")
+    #             host_username[location] = username
+    #         except KeyboardInterrupt:
+    #             print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+    #             return None
+    #     else:
+    #         username = host_username[location]
+
+        
+    #     # Check if the file exists and get its size
+    #     filesize = 0
+    #     try:
+    #         filesize = ssh_remote_size_bytes_interactive(
+    #             remote=f"{username}@{location}",
+    #             remote_path=path
+    #         )
+    #     except KeyboardInterrupt:
+    #         print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+    #         return None
+    #     except FileNotFoundError as e:
+    #         print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+    #         return None
+    #     except Exception as e:
+    #         print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+    #         return None
+
+
+    #     # Check if the file already exists and has the same hash as the remote file
+    #     if md5_file_hash != "":
+
+    #         need_redownload = True
+    #         try:
+    #             need_redownload = should_download(
+    #                 remote=f"{username}@{location}",
+    #                 remote_path=path,
+    #                 stored_md5=md5_file_hash
+    #             )
+    #         except KeyboardInterrupt:
+    #             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+    #             return None
+    #         except Exception as e:
+    #             print(f" -- Failed to get remote hash for {location}:{path}: {e}")
+    #             print(" -- Will proceed to download the file to ensure we have the correct version.")
+    #         if not need_redownload:
+    #             print(" -- Local file is up to date with the remote file. Skipping download.")
+    #             return None
+
+    #     # Confirm for sizes above a limit
+    #     if not confirm_large_download(filesize, download_limit):
+    #         print(" -- Skipping this database.")
+    #         return None
+
+    #     # Download the file
+    #     try:
+    #         rsync_download_interactive(
+    #             remote=f"{username}@{location}",
+    #             remote_path=path,
+    #             local_path=abs_path_db_folder
+    #         )
+
+    #         db_info = make_db_info(location, path, file_path, filename)
+    #         return db_info
+
+    #     except KeyboardInterrupt:
+    #         print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+    #         return None
+    #     except Exception as e:
+    #         print(f" -- Error {e} downloading file from HPC. Skipping this database.")
+    #         return None
+        
     elif cleaned_location_type == "hpc":
 
-        # Ask for username if we don't have it for this host yet
         if location not in host_username:
             try:
-                username = input(f" -- Enter the username for {location}: ")
+                username = input(
+                    f" -- Enter the username for {location}: "
+                )
+
                 host_username[location] = username
+
             except KeyboardInterrupt:
-                print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+                print(
+                    f"\n -- Interrupted while entering username for {location}. "
+                    "Skipping this database."
+                )
                 return None
+
         else:
             username = host_username[location]
 
-        
-        # Check if the file exists and get its size
-        filesize = 0
+        password = getpass.getpass(
+            f" -- Enter password for {username}@{location}: "
+        )
+
+        remote = f"{username}@{location}"
+
+        #
+        # Get remote file size
+        #
         try:
-            filesize = ssh_remote_size_bytes_interactive(
-                remote=f"{username}@{location}",
-                remote_path=path
+            filesize = sftp_remote_size_bytes(
+                remote=remote,
+                remote_path=path,
+                password=password,
             )
-        except KeyboardInterrupt:
-            print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-            return None
-        except FileNotFoundError as e:
-            print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-            return None
+
         except Exception as e:
-            print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+            print(
+                f" -- Could not access the file at "
+                f"{location}:{path}; error: {e}. "
+                "Skipping this database."
+            )
             return None
 
-
-        # Check if the file already exists and has the same hash as the remote file
+        #
+        # Compare hashes
+        #
         if md5_file_hash != "":
 
-            need_redownload = True
             try:
-                need_redownload = should_download(
-                    remote=f"{username}@{location}",
+                need_redownload = should_download_sftp(
+                    remote=remote,
                     remote_path=path,
-                    stored_md5=md5_file_hash
+                    stored_md5=md5_file_hash,
+                    password=password,
                 )
-            except KeyboardInterrupt:
-                print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-                return None
-            except Exception as e:
-                print(f" -- Failed to get remote hash for {location}:{path}: {e}")
-                print(" -- Will proceed to download the file to ensure we have the correct version.")
-            if not need_redownload:
-                print(" -- Local file is up to date with the remote file. Skipping download.")
-                return None
 
-        # Confirm for sizes above a limit
-        if not confirm_large_download(filesize, download_limit):
+                if not need_redownload:
+                    print(
+                        " -- Local file is up to date with the remote file. "
+                        "Skipping download."
+                    )
+                    return None
+
+            except Exception as e:
+                print(
+                    f" -- Failed to compare hashes for "
+                    f"{location}:{path}: {e}"
+                )
+
+                print(
+                    " -- Will proceed to download the file."
+                )
+
+        #
+        # Confirm large downloads
+        #
+        if not confirm_large_download(
+            filesize,
+            download_limit,
+        ):
             print(" -- Skipping this database.")
             return None
 
-        # Download the file
+        #
+        # Download file
+        #
         try:
-            rsync_download_interactive(
-                remote=f"{username}@{location}",
+            downloaded_path = sftp_download_file(
+                remote=remote,
                 remote_path=path,
-                local_path=abs_path_db_folder
+                local_path=abs_path_db_folder,
+                password=password,
             )
 
-            db_info = make_db_info(location, path, file_path, filename)
+            db_info = make_db_info(
+                location,
+                path,
+                downloaded_path,
+                filename,
+            )
+
             return db_info
 
-        except KeyboardInterrupt:
-            print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-            return None
         except Exception as e:
-            print(f" -- Error {e} downloading file from HPC. Skipping this database.")
+            print(
+                f" -- Error downloading file from HPC: {e}. "
+                "Skipping this database."
+            )
+
             return None
-        
 
     elif cleaned_location_type == "url":
 
@@ -331,9 +444,9 @@ def pull_data(location_type: str,
 
     return None
 
-    
 
-def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) -> None:
+
+def federate_datasets(workspace_folder: str, config_data: dict, base_path) -> None:
     """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
       It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
       The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -341,7 +454,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) 
     Args:
         workspace_folder (str): The local folder where the datasets will be stored.
         config_data (dict): A dictionary containing configuration data, including repository paths and download limits.
-        yaml_path (str): The path to the YAML configuration file, used for resolving relative paths in the configuration.
+        base_path (str): The path used for resolving relative paths to the data.
     """
 
     # Create the workspace folder if it doesn't exist
@@ -357,7 +470,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) 
         if Path(repo).is_absolute():
             repo_path = Path(repo)
         else:
-            repo_path = Path(yaml_path) / repo
+            repo_path = Path(base_path) / repo
 
         clean_repo_path = str(repo_path.resolve())
 
@@ -421,34 +534,93 @@ def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) 
 
 
 def main():
-    # Make sure that we have a file
-    if len(sys.argv) not in (2, 3):
-        print(f"Usage: {Path(sys.argv[0]).name} <input.yaml> [dsi_datasets_folder]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Federate datasets from a YAML config or a CSV repo file."
+    )
 
-    # Read configuration from YAML file
-    try:
-        yaml_path = Path(sys.argv[1])
-        config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        print(f"Error: Could not find YAML file {yaml_path}")
-        sys.exit(1)
+    input_group = parser.add_mutually_exclusive_group(required=True)
 
-    
-    # Create a folder for the databases if it doesn't exist, or use the provided one
-    if len(sys.argv) == 3:
-        workspace_folder = sys.argv[2]
+    input_group.add_argument(
+        "--yaml",
+        type=Path,
+        help="YAML configuration file",
+    )
+
+    input_group.add_argument(
+        "--csv",
+        type=Path,
+        help="CSV repository file to federate",
+    )
+
+    parser.add_argument(
+        "dsi_datasets_folder",
+        nargs="?",
+        help="Optional workspace folder override",
+    )
+
+    args = parser.parse_args()
+
+    #
+    # YAML input mode
+    #
+    if args.yaml:
+        yaml_path = args.yaml
+
+        try:
+            config_data = yaml.safe_load(
+                yaml_path.read_text(encoding="utf-8")
+            )
+        except FileNotFoundError:
+            print(f"Error: Could not find YAML file {yaml_path}")
+            sys.exit(1)
+
+        config_folder = yaml_path.parent
+
+    #
+    # CSV input mode
+    #
     else:
-        _workspace_folder = config_data.get("workspace_folder", "")
-        workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        csv_path = args.csv
 
-    yaml_folder = Path(yaml_path).parent
-    federate_datasets(workspace_folder, config_data, str(yaml_folder))
+        if not csv_path.exists():
+            print(f"Error: Could not find CSV file {csv_path}")
+            sys.exit(1)
 
-  
+        config_data = {
+            "repo_paths": [csv_path.name],
+            "download_limit": 10485760,  # 10 MB
+            "conflict_resolution": "keep_latest",
+        }
+
+        config_folder = csv_path.parent
+
+    #
+    # Workspace folder
+    #
+    if args.dsi_datasets_folder:
+        workspace_folder = args.dsi_datasets_folder
+    else:
+        workspace_folder = (
+            config_data.get("workspace_folder", "")
+            or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        )
+
+    #
+    # Debug prints
+    #
+    # print(workspace_folder)
+    # print(config_data)
+    # print(config_folder)
+
+    #federate_datasets(workspace_folder, config_data, str(config_folder))
+
+
 
 if __name__=="__main__":
     main()
 
 
-# Run as: python dsi/tools/federated/federate_dataset.py examples/federated/input.yaml
+# Run as:
+# python dsi/utils/federated/federate_datasets.py --yaml input.yaml
+# python dsi/utils/federated/federate_datasets.py --csv repo_paths.csv
+# python dsi/utils/federated/federate_datasets.py --csv repo_paths.csv dsi_databases_test_merge_01
