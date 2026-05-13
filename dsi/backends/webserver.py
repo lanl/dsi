@@ -24,6 +24,10 @@ class Webserver(Backend, ABC):
         pass
 
     @abstractmethod
+    def get_schema(self):
+        pass
+
+    @abstractmethod
     def find(self, query_object, **kwargs):
         pass
 

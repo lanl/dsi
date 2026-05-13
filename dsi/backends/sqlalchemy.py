@@ -45,6 +45,9 @@ class SqlAlchemy(Filesystem):
 
     def process_artifacts(self, **kwargs):
         pass
+
+    def get_schema(self):
+        pass
     
     def find(self, query_object, **kwargs):
         pass

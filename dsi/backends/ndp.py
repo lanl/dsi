@@ -735,119 +735,38 @@ class NDP(Webserver):
         else:
             return pd.DataFrame(table)
 
-
-    def get_schema(self, table_name: Optional[str] = None):
+    
+    def get_schema(self):
         """
-        Returns schema information for all tables or a specific table in SQLite CREATE TABLE format.
-        
-        Shows table structure with column names and types (INTEGER, REAL, TEXT, OBJECT, etc.)
-        similar to SQL backends.
-        
-        Parameters
-        ----------
-        table_name : str, optional
-            If provided, returns schema for only that table.
-            If None (default), returns schema for all tables.
-        
-        Returns
-        -------
-        str
-            SQL-style CREATE TABLE statements
+        Return a lightweight schema description of cached tables from CKAN.
         """
-        if not self._loaded or not self._cache:
-            return "-- No tables loaded\n"
-        
-        # If specific table requested
-        if table_name is not None:
-            if table_name not in self._cache:
-                return f"-- Table '{table_name}' not found\n"
-            
-            table_data = self._cache.get(table_name)
-            if not table_data:
-                return f"-- Table '{table_name}' is empty\n"
-            
-            # Generate schema for single table
-            df = pd.DataFrame(table_data)
-            
-            schema_lines = []
-            schema_lines.append(f"CREATE TABLE {table_name} (")
-            
-            column_defs = []
-            for column in df.columns:
-                pandas_dtype = str(df[column].dtype).lower()
-                
-                # Map pandas dtype to SQL-style type
-                if 'int' in pandas_dtype:
-                    sql_type = 'INTEGER'
-                elif 'float' in pandas_dtype:
-                    sql_type = 'REAL'
-                elif pandas_dtype == 'bool':
-                    sql_type = 'BOOLEAN'
-                elif pandas_dtype == 'datetime64[ns]':
-                    sql_type = 'DATETIME'
-                elif pandas_dtype == 'object':
-                    non_null = df[column].dropna()
-                    if non_null.empty:
-                        sql_type = 'TEXT'
-                    elif all(isinstance(x, str) for x in non_null):
-                        sql_type = 'TEXT'
-                    else:
-                        sql_type = 'OBJECT'
-                else:
-                    sql_type = 'OBJECT'
-                
-                column_defs.append(f"    {column} {sql_type}")
-            
-            schema_lines.append(",\n".join(column_defs))
-            schema_lines.append(");")
-            
-            return "\n".join(schema_lines)
-        
-        # Return all table schemas (default behavior)
         schema_lines = []
-        schema_lines.append("-- NDP Backend Schema")
-        schema_lines.append("-- (Read-only CKAN metadata backend)")
-        schema_lines.append("")
-        
-        for table_name, table_data in self._cache.items():
-            if not table_data:
-                continue
-            
-            df = pd.DataFrame(table_data)
-            
-            schema_lines.append(f"CREATE TABLE {table_name} (")
-            
-            column_defs = []
-            for column in df.columns:
-                pandas_dtype = str(df[column].dtype).lower()
-                
-                # Map pandas dtype to SQL-style type
-                if 'int' in pandas_dtype:
-                    sql_type = 'INTEGER'
-                elif 'float' in pandas_dtype:
-                    sql_type = 'REAL'
-                elif pandas_dtype == 'bool':
-                    sql_type = 'BOOLEAN'
-                elif pandas_dtype == 'datetime64[ns]':
-                    sql_type = 'DATETIME'
-                elif pandas_dtype == 'object':
-                    non_null = df[column].dropna()
-                    if non_null.empty:
-                        sql_type = 'TEXT'
-                    elif all(isinstance(x, str) for x in non_null):
-                        sql_type = 'TEXT'
-                    else:
-                        sql_type = 'OBJECT'
-                else:
-                    sql_type = 'OBJECT'
-                
-                column_defs.append(f"    {column} {sql_type}")
-            
-            schema_lines.append(",\n".join(column_defs))
-            schema_lines.append(");")
-            schema_lines.append("")
-        
-        return "\n".join(schema_lines)
+        for table_name, table in self._cache.items():
+            cols = []
+            for col_name, values in table.items():
+                dtype = "TEXT"
+                for v in values:
+                    if v is None:
+                        continue
+
+                    if isinstance(v, bool):
+                        dtype = "BOOLEAN"
+                    elif isinstance(v, int):
+                        dtype = "INTEGER"
+                    elif isinstance(v, float):
+                        dtype = "REAL"
+                    break
+
+                cols.append(f"    {col_name} {dtype}")
+
+            create_stmt = (
+                f"CREATE TABLE {table_name} (\n"
+                + ",\n".join(cols)
+                + "\n);"
+            )
+            schema_lines.append(create_stmt)
+
+        return "\n\n".join(schema_lines)
 
 
     def get_table_names(self, query):
