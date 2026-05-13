@@ -134,7 +134,7 @@ class Sqlite(Filesystem):
             sql_cols = ', '.join(types.unit_keys)
             str_query = "CREATE TABLE IF NOT EXISTS {} ({}".format(str(types.name), sql_cols)
             if self.runTable:
-                str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INTEGER, {}".format(str(types.name), sql_cols)            
+                str_query = "CREATE TABLE IF NOT EXISTS {} (run_id INTEGER, {}".format(str(types.name), sql_cols)
             if foreign_query is not None:
                 str_query += foreign_query
             if self.runTable:
@@ -151,7 +151,7 @@ class Sqlite(Filesystem):
             self.types = types
 
     
-    def ingest_artifacts(self, collection, isVerbose=False):    
+    def ingest_artifacts(self, collection, isVerbose=False):
         """
         Primary function to ingest a collection of tables into the defined SQLite database.
         
@@ -309,7 +309,7 @@ class Sqlite(Filesystem):
                 self.con.rollback()
                 raise sqlite3.Error(e)
                 
-            self.types = types #This will only copy the last table from artifacts (collections input)            
+            self.types = types # This will only copy the last table from artifacts (collections input)
 
         dsi_units_data = self.cur.execute("PRAGMA table_info(dsi_units)").fetchall()
         if len(dsi_units_data) == 3 and dsi_units_data[1][1] == "column": # old dsi_units table exists
@@ -332,14 +332,14 @@ class Sqlite(Filesystem):
                     except sqlite3.Error as e:
                         self.con.rollback()
                         raise sqlite3.Error(e)
-                            
+        
         try:
             self.con.commit()
         except Exception as e:
             self.con.rollback()
             raise sqlite3.Error(e)
 
-    
+
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
         Executes a SQL query on the SQLite backend and returns the result in the specified format dependent on `dict_return`
@@ -758,7 +758,7 @@ class Sqlite(Filesystem):
         """
         tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table';").fetchall()
         tableList = [self.sqlite_compatible_name(table[0]) for table in tableList if table[0] != "sqlite_sequence"]
-                    
+
         query_list = []
         for table in tableList:
             colList = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
@@ -777,7 +777,7 @@ class Sqlite(Filesystem):
                     query += f"{col_name} LIKE '%{query_object}%'" 
                 else:
                     query += f"CAST({col_name} AS TEXT) LIKE '%{query_object}%'" 
-                row_list.append(query)            
+                row_list.append(query)
 
             table_row_query = " UNION ".join(row_list) + ";"
             table_row_return = self.cur.execute(table_row_query).fetchall()
@@ -835,7 +835,7 @@ class Sqlite(Filesystem):
             columns = [row[1] for row in colData]
             if pragma_col_name in columns:
                 all_tables.append(table)
-                col_list = columns        
+                col_list = columns
         
         if len(all_tables) == 0:
             if (user_column[0] == "'" and user_column[-1] == "'") or (user_column[0] == '"' and user_column[-1] == '"'):
@@ -1037,7 +1037,7 @@ class Sqlite(Filesystem):
             - If str, name of the table to overwrite in the backend.
             - If list, list of all tables to overwrite in the backend
 
-        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+        `collection` : pandas.DataFrame or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
         """

@@ -485,13 +485,36 @@ class NDP(Webserver):
 
     
     def get_schema(self):
-        """NDP does not store structural schema - data comes from CKAN API."""
-        return (
-            "-- NDP Backend Schema Information\n"
-            "-- NDP is a read-only CKAN metadata backend\n"
-            "-- Data is retrieved dynamically from the API\n"
-            "-- Use summary() or list() to view available tables and columns\n"
-        )
+        """
+        Return a lightweight schema description of cached tables from CKAN.
+        """
+        schema_lines = []
+        for table_name, table in self._cache.items():
+            cols = []
+            for col_name, values in table.items():
+                dtype = "TEXT"
+                for v in values:
+                    if v is None:
+                        continue
+
+                    if isinstance(v, bool):
+                        dtype = "BOOLEAN"
+                    elif isinstance(v, int):
+                        dtype = "INTEGER"
+                    elif isinstance(v, float):
+                        dtype = "REAL"
+                    break
+
+                cols.append(f"    {col_name} {dtype}")
+
+            create_stmt = (
+                f"CREATE TABLE {table_name} (\n"
+                + ",\n".join(cols)
+                + "\n);"
+            )
+            schema_lines.append(create_stmt)
+
+        return "\n\n".join(schema_lines)
 
 
     def get_table_names(self, query):

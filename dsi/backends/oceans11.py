@@ -574,19 +574,13 @@ class OCEANS11(Webserver):
 
     def get_schema(self):
         """
-        Return a lightweight schema description of cached tables.
+        Return a lightweight schema description of cached tables from oceans11 server.
         """
-
         schema_lines = []
-
         for table_name, table in self._cache.items():
-
             cols = []
-
             for col_name, values in table.items():
-
                 dtype = "TEXT"
-
                 for v in values:
                     if v is None:
                         continue
@@ -597,7 +591,6 @@ class OCEANS11(Webserver):
                         dtype = "INTEGER"
                     elif isinstance(v, float):
                         dtype = "REAL"
-
                     break
 
                 cols.append(f"    {col_name} {dtype}")
@@ -607,7 +600,6 @@ class OCEANS11(Webserver):
                 + ",\n".join(cols)
                 + "\n);"
             )
-
             schema_lines.append(create_stmt)
 
         return "\n\n".join(schema_lines)
