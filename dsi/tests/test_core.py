@@ -1252,7 +1252,69 @@ def test_terminal_ndp_filters():
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "data", "formats": ["CSV", "JSON"], "limit": 5}
+        params={"keywords": "climate", "limit": 5}
+    )
+    
+    schema = a.get_schema()
+    assert isinstance(schema, str)
+    assert "datasets" in schema
+    assert "Full Climate Connectivity Network" in schema
+    assert "Environment Canada Climate Data" in schema
+    assert "Climate Refugia - Baseline (Historical) 1981 - 2010" in schema
+    assert "Change in Average Climatic Water Deficit" in schema
+    assert "Northern Spotted Owl Habitat; Topo-Climatic Fire Refugia" in schema
+    
+    a.close()
+
+def test_terminal_ndp_organization_filter():
+    """Test Terminal loading NDP with organization filter."""
+    a = Terminal()
+    
+    a.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "climate",
+            "organization": "california-landscape-metrics",
+            "limit": 10
+        }
+    )
+    
+    a.artifact_handler(interaction_type="process")
+    
+    assert "datasets" in a.active_metadata
+    assert isinstance(a.active_metadata["datasets"], OrderedDict)
+    
+    # Check we got data
+    if a.active_metadata["datasets"]:
+        
+        # Verify organization column exists
+        assert "organization" in a.active_metadata["datasets"]
+        
+        orgs = a.active_metadata["datasets"]["organization"]
+        # Check at least one is from California Landscape Metrics
+        assert any(
+            org and "California Landscape Metrics" in org 
+            for org in orgs
+        )
+    
+    a.close()
+
+
+def test_terminal_ndp_tags_filter():
+    """Test Terminal loading NDP with tags filter."""
+    a = Terminal()
+    
+    a.load_module(
+        "backend",
+        "NDP",
+        "back-read",
+        params={
+            "keywords": "temperature",
+            "tags": ["climate", "weather"],
+            "limit": 5
+        }
     )
     assert a3.active_modules["back-read"][0]._loaded is True
     a3.close()
