@@ -154,10 +154,10 @@ class DSI():
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
-                    raise    
+                    raise
 
             # Handle OCEANS11 separately (read-only backend)
-            if backend_name.lower() == "oceans11":
+            elif backend_name.lower() == "oceans11":
                 self.database_name = None  # OSTI doesn't use a file
                 
                 correct_backend = True
@@ -200,7 +200,7 @@ class DSI():
                     raise
                 
                 if not correct_backend:
-                    raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+                    raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
                                     "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, OCEANS11")
         
         self.main_backend_obj = self.t.loaded_backends[0]
@@ -245,11 +245,9 @@ class DSI():
             Path to a JSON file describing the relationships of the tables in a database.
             The schema should follow the format described in :ref:`user_schema_example_label`
         
-        `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
+        `return` : If filename = None, returns the structural schema of this backend - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
         """
-        
-
         if filename:
             if self.main_backend_obj.__class__.__name__ == "NDP":
                 raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
@@ -945,7 +943,7 @@ class DSI():
             raise
 
         if not correct_backend:
-            raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
+            raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
                             "Eligible backend_names are: Sqlite, DuckDB")
         
         try:
