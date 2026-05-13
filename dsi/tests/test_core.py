@@ -1285,10 +1285,14 @@ def test_terminal_get_schema_ndp():
     
     schema = a.get_schema()
     assert isinstance(schema, str)
-    assert "NDP" in schema
+    assert "datasets" in schema
+    assert "Full Climate Connectivity Network" in schema
+    assert "Environment Canada Climate Data" in schema
+    assert "Climate Refugia - Baseline (Historical) 1981 - 2010" in schema
+    assert "Change in Average Climatic Water Deficit" in schema
+    assert "Northern Spotted Owl Habitat; Topo-Climatic Fire Refugia" in schema
     
     a.close()
-
 
 def test_terminal_ndp_organization_filter():
     """Test Terminal loading NDP with organization filter."""
