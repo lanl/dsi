@@ -48,11 +48,11 @@ class ValueObject:
 # ----------------------------------------------------------------------
 # Oceans11 Backend (Webserver - Read only)
 # ----------------------------------------------------------------------
-class OCEANS11(Webserver):
+class Oceans11(Webserver):
     """
-    DSI-based web backend for querying OCEANS11 metadata in-memory
+    DSI-based web backend for querying Oceans11 metadata in-memory
     """
-
+    read_only = False
     # ----------------------------------------------------------------------
     # Initialization
     # ----------------------------------------------------------------------
@@ -63,7 +63,7 @@ class OCEANS11(Webserver):
         Parameters
         ----------
         `url` : str, optional
-            Base OCEANS11 URL.
+            Base Oceans11 URL.
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from OSTI.
             Supported keys:
@@ -131,7 +131,7 @@ class OCEANS11(Webserver):
     # ----------------------------------------------------------------------
     def validate_connection(self):
             """
-            Validates that the base OCEANS11 URL is accessible and functional.
+            Validates that the base Oceans11 URL is accessible and functional.
             
             This method tests the connection by making a simple DSI pull_data call to:
                 - Download the oceans11.db catalog from:
@@ -264,7 +264,7 @@ class OCEANS11(Webserver):
         unknown = set(params) - supported_params
         if unknown:
             raise ValueError(
-                f"Unsupported OCEANS11 search parameter(s): {sorted(unknown)}"
+                f"Unsupported Oceans11 search parameter(s): {sorted(unknown)}"
             )
 
         rows = int(params.get("rows", 20))
@@ -724,7 +724,7 @@ class OCEANS11(Webserver):
         return results        
 
         # if not self._loaded:
-        #     raise RuntimeError("OCEANS11 backend is not loaded")
+        #     raise RuntimeError("Oceans11 backend is not loaded")
 
         # import sqlite3
 
@@ -759,7 +759,7 @@ class OCEANS11(Webserver):
     # ----------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Return selected Tier 1 OCEANS11 records for export/process.
+        Return selected Tier 1 Oceans11 records for export/process.
 
         Tier 2 databases remain separate local files and are referenced
         through the `t2db_path` column.
@@ -1015,7 +1015,7 @@ class OCEANS11(Webserver):
     # ----------------------------------------------------------------------
     def list(self, collection=False):
         """
-        Lists cached OCEANS11 tables.
+        Lists cached Oceans11 tables.
 
         Parameters
         ----------
@@ -1038,7 +1038,7 @@ class OCEANS11(Webserver):
 
     def summary(self, table_name=None):
         """
-        Returns table-level metadata for cached OCEANS11 tables.
+        Returns table-level metadata for cached Oceans11 tables.
 
         If table_name is None:
             returns [table_names_list, df1, df2, ...]
@@ -1095,7 +1095,7 @@ class OCEANS11(Webserver):
 
     def display(self, table_name, num_rows=25, display_cols=None):
         """
-        Displays rows from a specified OCEANS11 table.
+        Displays rows from a specified Oceans11 table.
 
         Accepts either dataset_title or dataset_id for resource tables.
 
@@ -1177,7 +1177,7 @@ class OCEANS11(Webserver):
     # # ----------------------------------------------------------------------
     def close(self):
         """
-        Close OCEANS11 backend and clear loaded state.
+        Close Oceans11 backend and clear loaded state.
         """
 
         self._cache.clear()

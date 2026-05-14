@@ -49,7 +49,7 @@ class OSTI(Webserver):
     """
     REST-based web backend for querying OSTI metadata in-memory
     """
-
+    read_only = False
     # ----------------------------
     # Initialization
     # ----------------------------    

@@ -21,6 +21,7 @@ class Gufi(Filesystem):
     table = ""
     column = ""
     isVerbose = False
+    read_only = False
 
     def __init__(self, prefix, index, dbfile, table, column, verbose=False):
         '''

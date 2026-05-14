@@ -14,6 +14,7 @@ from dsi.backends.filesystem import Filesystem
 class SqlAlchemy(Filesystem):
     filename = "sqlite:///fs.db"
     engine = None
+    read_only = False
 
     def __init__(self, filename, base):
         self.filename = filename
