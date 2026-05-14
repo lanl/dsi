@@ -1284,7 +1284,6 @@ class DSI():
           -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
           -  restore: A required argument to specify the version to restore, specified by its commit hash.
         """
-        print("hello from versioning")
         if command == "init":
             if args is None:
                 raise RuntimeError("version() ERROR: 'init' command requires a 'root_folder' argument specifying the name of the root folder for the versioning repository.")
