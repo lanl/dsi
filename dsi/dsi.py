@@ -125,7 +125,10 @@ class DSI():
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
-            self.read_only_flag = backend_class.read_only
+            try:
+                self.read_only_flag = getattr(backend_class, "read_only")
+            except AttributeError:
+                raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
             
             # Handle in-memory backends (NDP, OSTI, Oceans11)
             if self.read_only_flag:
