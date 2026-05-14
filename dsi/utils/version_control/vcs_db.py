@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS versions (
     root_folder     TEXT    NOT NULL,
     commit_hash     TEXT    NOT NULL,           -- UUID4, stored as 32-char hex
     committed_at    TEXT    NOT NULL,           -- ISO-8601 timestamp
-    owner_name      TEXT    NOT NULL,           -- Linux user who ran the commit
+    owner_name      TEXT    NOT NULL,           -- Username of the committer
     message         TEXT,
     snapshot_path   TEXT    NOT NULL,           -- path to rsync copy
     file_count      INTEGER NOT NULL,

@@ -89,22 +89,22 @@ Example output:
 
 ```shell
 Diff f826177ae78f4e48a8c08054e2bb9a71 → None  (./root_folder)  
-                                                          
-STATUS     PATH                                           
+                                                        
+STATUS     PATH                                         
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                              
-MODIFIED   file_schema.json  [owner]                      
-diff result: 2c2                                          
-<    "genesis_datacard": {                                
----                                                       
->    2"genesis_datacard": {                               
-26c26                                                     
-< }                                                       
-\ No newline at end of file                               
----                                                       
-> }                                                       
-MODIFIED   schema2.json  [content, size]                  
-                                                          
+MODIFIED   file_new  [owner]                            
+MODIFIED   file_schema.json  [owner]                    
+diff result: 2c2                                        
+<    "genesis_datacard": {                              
+---                                                     
+>    2"genesis_datacard": {                             
+26c26                                                   
+< }                                                     
+\ No newline at end of file                             
+---                                                     
+> }                                                     
+MODIFIED   schema2.json  [content, size]                
+                                                        
 Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged 
 ```
 
@@ -278,7 +278,7 @@ dsi.version("diff")
 | root_folder   | TEXT       | Repository root path        |
 | commit_hash   | TEXT       | UUID4 hex (32 chars)        |
 | committed_at  | TEXT       | ISO-8601 timestamp          |
-| owner_name    | TEXT       | Linux user who committed    |
+| owner_name    | TEXT       | Username of the committer   |
 | message       | TEXT       | Optional commit message     |
 | snapshot_path | TEXT       | Path to rsync snapshot copy |
 | file_count    | INTEGER    | Number of files in commit   |
