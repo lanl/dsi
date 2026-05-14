@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 OSTI Backend for DSI
 
@@ -60,7 +59,6 @@ class OSTI(Webserver):
 
         Parameters
         ----------
-
         `url` : str, optional
             Base OSTI URL. If None, a default OSTI endpoint is used.
         `params` : dict, optional
@@ -131,7 +129,7 @@ class OSTI(Webserver):
             self._loaded = False
             raise ConnectionError(f"Unable to connect to OSTI API at {self.base_url}")
 
-        # Initial data load
+        # Initial data load (only if connection is valid and params provided)
         if self.params:
             try:
                 self._load_initial_data(self.params)

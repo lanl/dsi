@@ -1,6 +1,7 @@
 from dsi.core import Terminal #, Sync
 from dsi.backends.ndp import NDP
 from dsi.backends.osti import OSTI
+from dsi.backends.oceans11 import OCEANS11
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -40,11 +41,12 @@ class DSI():
                 - If backend_name = "DuckDB" → .duckdb, .db
                 - If backend_name = "NDP" → No file required (read-only backend)
                 - If backend_name = "OSTI" → No file required (read-only backend)
+                - If backend_name = "OCEANS11" → No file required (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate. 
             
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP" or "OSTI".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI" or "OCEANS11".
             
             If using an external backend, provide the relative path to the Python module with the backend. 
         """
@@ -56,8 +58,8 @@ class DSI():
 
         self.silence_messages = kwargs.pop('silence_messages', False)
 
-        # Skip file creation checks for NDP and OSTI (read-only backends)
-        if backend_name.lower() not in ["ndp", "osti"]:
+        # Skip file creation checks for NDP, OSTI and OCEANS11 (read-only backends)
+        if backend_name.lower() not in ["ndp", "osti", "oceans11"]:
             if "/" in filename:
                 create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
             else:
@@ -136,7 +138,7 @@ class DSI():
                     if e.args:
                         e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                     raise
-                
+
             # Handle OSTI separately (read-only backend)
             elif backend_name.lower() == "osti":
                 self.database_name = None  # OSTI doesn't use a file
@@ -147,19 +149,30 @@ class DSI():
                 query_params = kwargs.pop("params", {})
 
                 try:
-                    self.t.load_module(
-                        "backend",
-                        "OSTI",
-                        "back-read",
-                        params=query_params,
-                        **kwargs,
-                    )
+                    self.t.load_module("backend", "OSTI", "back-read", params=query_params, **kwargs)
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
-                    raise         
-                        
+                    raise    
+
+            # Handle OCEANS11 separately (read-only backend)
+            if backend_name.lower() == "oceans11":
+                self.database_name = None  # OSTI doesn't use a file
+                
+                correct_backend = True
+                
+                # Extract OSTI query parameters from kwargs by moniker params
+                query_params = kwargs.pop("params", {})
+
+                try:
+                    self.t.load_module("backend", "OCEANS11", "back-read", params=query_params, **kwargs)
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
+                    raise                   
+
             # Handle file-based backends (Sqlite, DuckDB)
             else:
                 if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
@@ -188,7 +201,7 @@ class DSI():
                 
                 if not correct_backend:
                     raise RuntimeError("Please check the 'backend_name' argument as that one is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, OCEANS11")
         
         self.main_backend_obj = self.t.loaded_backends[0]
 
@@ -196,6 +209,8 @@ class DSI():
             msg = "Created an instance of DSI with the NDP read-only backend"
         if backend_name.lower() == "osti":
             msg = "Created an instance of DSI with the OSTI read-only backend"            
+        if backend_name.lower() == "oceans11":
+            msg = "Created an instance of DSI with the OCEANS11 read-only backend"              
         elif filename != ".temp_dsi.db":
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
@@ -217,6 +232,9 @@ class DSI():
         n = OSTI()
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")            
+        n = OCEANS11()
+        if n.validate_connection():
+            print("OCEANS11 : Read-only data catalog backend for discovering and querying OCEANS11 (DSI-based) open data resources.")            
         print()
 
     def schema(self, filename = None):
@@ -234,6 +252,9 @@ class DSI():
             raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
         if self.main_backend_obj.__class__.__name__ == "OSTI":
             raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
+        if self.main_backend_obj.__class__.__name__ == "OCEANS11":
+            raise RuntimeError("schema() ERROR: OCEANS11 is a read-only backend and does not support schema operations.")
+
         if filename:
             if not os.path.exists(filename):
                 raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
@@ -336,7 +357,9 @@ class DSI():
         if self.main_backend_obj.__class__.__name__ == "NDP":
             raise RuntimeError("read() ERROR: NDP is a read-only backend. Data cannot be added.")
         if self.main_backend_obj.__class__.__name__ == "OSTI":
-            raise RuntimeError("read() ERROR: OSTI is a read-only backend. Data cannot be added.")        
+            raise RuntimeError("read() ERROR: OSTI is a read-only backend. Data cannot be added.") 
+        if self.main_backend_obj.__class__.__name__ == "OCEANS11":
+            raise RuntimeError("read() ERROR: OCEANS11 is a read-only backend. Data cannot be added.")                   
         # only DSI-repo readers require data_sources input. Custom readers do not.
         if isinstance(data_sources, str) and not os.path.exists(data_sources) and not reader_name.endswith(".py"):
             raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
@@ -784,8 +807,10 @@ class DSI():
         if self.main_backend_obj.__class__.__name__ == "NDP":
             raise RuntimeError("update() ERROR: NDP is a read-only backend. Data cannot be updated.")
         if self.main_backend_obj.__class__.__name__ == "OSTI":
-            raise RuntimeError("update() ERROR: OSTI is a read-only backend. Data cannot be updated.")
-        
+            raise RuntimeError("update() ERROR: OSTI is a read-only backend. Data cannot be updated.")        
+        if self.main_backend_obj.__class__.__name__ == "OCEANS11":
+            raise RuntimeError("update() ERROR: OCEANS11 is a read-only backend. Data cannot be updated.")
+
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
