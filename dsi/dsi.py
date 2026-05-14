@@ -519,7 +519,7 @@ class DSI():
             raise RuntimeError("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
-        if not self.read_only_flag and collection and update:
+        if self.read_only_flag and collection and update:
             print("query() WARNING: The returned collection object will include an extra DSI metadata column")
         
         output = None
@@ -581,7 +581,7 @@ class DSI():
             raise RuntimeError("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
-        if not self.read_only_flag and collection and update:
+        if self.read_only_flag and collection and update:
             print("get_table() WARNING: The returned collection object will include an extra DSI metadata column")
         
         try:
@@ -649,7 +649,7 @@ class DSI():
             raise RuntimeError("ERROR: Cannot find() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
-        if not self.read_only_flag and collection and update:
+        if self.read_only_flag and collection and update:
             print("find() WARNING: The returned collection object will include extra DSI metadata columns")
         
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
