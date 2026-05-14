@@ -99,7 +99,7 @@ class DSI():
             if class_name is None:
                 raise RuntimeError("backend() Error: The external backend must be structured as a Class in the Python script.")
             if custom_read_only is None:
-                raise RuntimeError("backend() Error: The external backend must define `read_only` = True/False")
+                raise RuntimeError("backend() Error: The external backend class must define `read_only` = True/False")
             self.read_only_flag = custom_read_only
             
             updated = {}
@@ -883,7 +883,7 @@ class DSI():
 
     def process(self, backend_name, filename, **kwargs):
         """
-        Process is processing collections into a specific format: Sqlite or DuckDB for now
+        Process converts the current backend into another format: Sqlite or DuckDB for now
 
         DSI instance will now use that new backend as the base for all functions. 
         """
