@@ -343,7 +343,11 @@ class Sqlite(Filesystem):
 
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
-        Executes a SQL query on the SQLite backend and returns the result in the specified format dependent on `dict_return`
+        Executes a SQL query on the SQLite backend.
+
+        Supports:
+        - SELECT / PRAGMA: returns DataFrame or OrderedDict depending on dict_return
+        - UPDATE / ALTER: executes command and returns None
 
         `query` : str
             Must be a SELECT or PRAGMA SQL query. Aggregate functions like COUNT are allowed.
@@ -356,12 +360,14 @@ class Sqlite(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
         
-        `return` : pandas.DataFrame or OrderedDict
+        `return` : pandas.DataFrame or OrderedDict or None
+            - If `query` includes UPDATE or ALTER: returns nothing
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
         data = None
-        if query[:6].lower() == "select" or query[:6].lower() == "pragma":
+        command = query.strip().split(None, 1)[0].lower()
+        if command in {"select", "pragma"}:
             try:
                 data = pd.read_sql_query(query, self.con) 
                 if isVerbose:
@@ -375,8 +381,16 @@ class Sqlite(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
+        elif command in {"update", "alter"}:
+            try:
+                self.cur.execute(query)
+                self.con.commit()
+                return None
+            except sqlite3.Error:
+                self.con.rollback()
+                raise
         else:
-            raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
+            raise RuntimeError("Can only run SELECT, PRAGMA, UPDATE, or ALTER queries on the data")
         
         if dict_return:
             tables = self.get_table_names(query)
