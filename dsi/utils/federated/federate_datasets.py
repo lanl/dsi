@@ -72,7 +72,7 @@ def pull_data(location_type: str,
               location: str, 
               path: str, 
               abs_path_workspace_folder: str, 
-              host_username: dict,
+              username: str,
               download_limit: int) -> dict | None:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
@@ -83,7 +83,7 @@ def pull_data(location_type: str,
         location (str): The location of the database (e.g., hostname for HPC, URL for web).
         path (str): The path to the database at the original location.
         abs_path_workspace_folder (str): The absolute path to the workspace folder where the database will be stored.
-        host_username (dict): A dictionary mapping hostnames to usernames for HPC access.
+        username (str): username for hpc systems
         download_limit (int): The maximum size of a file that can be downloaded without confirmation.
     Returns:
         dict | None: A dictionary containing the database information if the data was successfully pulled, or None if there was an error or if the user chose to skip the download.
@@ -140,15 +140,12 @@ def pull_data(location_type: str,
     elif cleaned_location_type == "hpc":
 
         # Ask for username if we don't have it for this host yet
-        if location not in host_username:
+        if username == "":
             try:
                 username = input(f" -- Enter the username for {location}: ")
-                host_username[location] = username
             except KeyboardInterrupt:
                 print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
                 return None
-        else:
-            username = host_username[location]
 
         
         # Check if the file exists and get its size
@@ -400,7 +397,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
             location=db['location'],
             path=db['path'],
             abs_path_workspace_folder=abs_path_workspace_folder,
-            host_username=host_username,
+            username=(host_username or {}).get(db['location'], ""),
             download_limit=config_data["download_limit"]
         )
 
