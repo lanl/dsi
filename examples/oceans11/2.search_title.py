@@ -12,7 +12,7 @@ if os.path.exists(path):
 os.makedirs(path)
 
 # Search OSTI records by title field
-dsi = DSI(backend_name="OCEANS11", params={"title": "monopoly","rows": 10}, workspace=path)
+dsi = DSI(backend_name="Oceans11", params={"title": "monopoly","rows": 10}, workspace=path)
 
 # save the results as a db
 dsi.process("sqlite", path + "monopoly.db")
