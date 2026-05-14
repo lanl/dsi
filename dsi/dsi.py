@@ -74,10 +74,20 @@ class DSI():
             
             class_name = None
             init_params = []
+            custom_read_only = None
             for node in parsed_data.body:
                 if isinstance(node, ast.ClassDef):
                     class_name = node.name
-                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    functions = {}
+                    for item in node.body:
+                        if isinstance(item, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "read_only" for t in item.targets):
+                            value = ast.literal_eval(item.value)
+                            if not isinstance(value, bool):
+                                raise RuntimeError("backend() Error: `read_only` must be True or False.")
+                            custom_read_only = value                        
+                        elif isinstance(item, ast.FunctionDef):
+                            functions[item.name] = item.args
 
                     if "__init__" in functions:
                         arg_names = [a.arg for a in functions["__init__"].args]
@@ -88,6 +98,9 @@ class DSI():
 
             if class_name is None:
                 raise RuntimeError("backend() Error: The external backend must be structured as a Class in the Python script.")
+            if custom_read_only is None:
+                raise RuntimeError("backend() Error: The external backend must define `read_only` = True/False")
+            self.read_only_flag = custom_read_only
             
             updated = {}
             for param in init_params:
@@ -95,7 +108,7 @@ class DSI():
                     updated[param] = filename
 
             try:
-                external_backend_name = os.path.splitext(os.path.basename(backend_name))[0]
+                external_backend_name = class_name
                 self.t.add_external_python_module('backend', external_backend_name, backend_name)
                 self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
             except Exception as e:
@@ -178,7 +191,6 @@ class DSI():
                     raise
         
         self.main_backend_obj = self.t.loaded_backends[0]
-        self.read_only_flag = getattr(self.main_backend_obj, "read_only", False)
 
         if self.read_only_flag:
             msg = f"Created an instance of DSI with the {backend_name} read-only backend"            
@@ -384,7 +396,7 @@ class DSI():
                     updated[param] = table_name
             
             try:
-                self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(reader_name))[0], reader_name)
+                self.t.add_external_python_module('plugin', class_name, reader_name)
                 self.t.load_module('plugin', class_name, 'reader', **updated, **kwargs)
             except Exception as e:
                 if e.args:
@@ -1043,7 +1055,7 @@ class DSI():
                     updated[param] = table_name
             
             try:
-                self.t.add_external_python_module('plugin', os.path.splitext(os.path.basename(writer_name))[0], writer_name)
+                self.t.add_external_python_module('plugin', class_name, writer_name)
                 self.t.load_module('plugin', class_name, 'writer', **updated, **kwargs)
             except Exception as e:
                 if e.args:
