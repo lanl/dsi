@@ -34,7 +34,7 @@ class Terminal():
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'OCEANS11']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
@@ -500,7 +500,7 @@ class Terminal():
         start = datetime.now()
         if interaction_type in ['query']:
             # TODO query all backends together
-            if self.valid_backend(first_backend, parent_backend):
+            if self.valid_backend(first_backend):
                 if "query" in first_backend.query_artifacts.__code__.co_varnames:
                     self.logger.info(f"Query to get data: {query}")
                     kwargs['query'] = query
@@ -525,13 +525,11 @@ class Terminal():
                 raise RuntimeError("Need to ingest data into first loaded backend before querying data from it")
 
         elif interaction_type in ['notebook']:
-            if self.valid_backend(first_backend, parent_backend):
+            if self.valid_backend(first_backend):
                 try:
                     first_backend.notebook(**kwargs)
-                except Exception:
-                    raise RuntimeError("Error in generating notebook. Please ensure data in the actual backend is stable")
-            elif parent_backend == "Connection": # NEED ANOTHER CHECKER TO SEE IF BACKEND IS NOT EMPTY WHEN BACKEND IS NOT A FILESYSTEM
-                pass
+                except Exception as e:
+                    raise RuntimeError(f"Error in generating notebook: {e}") from None
             else: #backend is empty - cannot create notebook
                 if self.debug_level != 0:
                     self.logger.error("Need to ingest data into first loaded backend before generating a Python notebook")
@@ -543,7 +541,7 @@ class Terminal():
                 if parent_backend == "Filesystem" and ".temp_dsi.db" in first_backend.filename:
                     first_backend = self.loaded_backends[1]
                     parent_backend = first_backend.__class__.__bases__[0].__name__
-            if self.valid_backend(first_backend, parent_backend):
+            if self.valid_backend(first_backend):
                 if self.debug_level != 0:
                     self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
                 self.active_metadata = first_backend.process_artifacts()
@@ -588,8 +586,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend to be able to get data from a specified table')
             raise NotImplementedError('Need to load a valid backend to be able to get data from a specified table')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to get a table")
             raise RuntimeError("First loaded backend needs to have data to be able to get a table")
@@ -624,8 +621,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend to be able to get its structural schema')
             raise NotImplementedError('Need to load a valid backend to be able to get its structural schema')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to get its structural schema")
             raise RuntimeError("First loaded backend needs to have data to get its structural schema")
@@ -660,8 +656,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before performing a find on it')
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
@@ -690,8 +685,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before performing a find on it')
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
@@ -725,8 +719,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before performing a find on it')
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
@@ -760,8 +753,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before performing a find on it')
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
@@ -811,8 +803,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before performing a find on it')
             raise NotImplementedError('Need to load a valid backend before performing a find on it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
@@ -928,8 +919,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend to be able to overwrite a table')
             raise NotImplementedError('Need to load a valid backend to be able to overwrite a table')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
             raise RuntimeError("First loaded backend needs to have data to be able to overwrite its data")
@@ -994,8 +984,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before listing all tables in it')
             raise NotImplementedError('Need to load a valid backend before listing all tables in it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to list its data")
             raise RuntimeError("First loaded backend needs to have data to be able to list its datd")
@@ -1034,8 +1023,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to summarize its data")
             raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
@@ -1083,8 +1071,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before listing all tables in it')
             raise NotImplementedError('Need to load a valid backend before listing all tables in it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to get its number of tables")
             raise RuntimeError("First loaded backend needs to have data to be able to get its number of tables")
@@ -1119,8 +1106,7 @@ class Terminal():
                 self.logger.error('Need to load a valid backend before printing table info from it')
             raise NotImplementedError('Need to load a valid backend before printing table info from it')
         backend = self.loaded_backends[0]
-        parent_backend = backend.__class__.__bases__[0].__name__
-        if not self.valid_backend(backend, parent_backend):
+        if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to display its data")
             raise RuntimeError("First loaded backend needs to have data to be able to display its data")
@@ -1391,7 +1377,8 @@ class Terminal():
         return self.trace_function
 
     # Internal function used to check if a backend has data
-    def valid_backend(self, backend, parent_name):
+    def valid_backend(self, backend):
+        parent_name = backend.__class__.__bases__[0].__name__
         if parent_name == "Filesystem":
             if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
                 return True
@@ -1425,8 +1412,8 @@ class Terminal():
                             self.logger.warning(
                                 f"OSTI backend connection validation failed: {str(e)}"
                             )
-                        return False 
-            if backend.__class__.__name__ == "OCEANS11":
+                        return False
+            if backend.__class__.__name__ == "Oceans11":
                 if not backend._loaded:
                     return False
                 
