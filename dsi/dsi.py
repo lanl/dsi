@@ -13,6 +13,7 @@ import io
 import math
 import ast
 from datetime import datetime
+import inspect
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -104,9 +105,18 @@ class DSI():
                 raise
 
         else:
+            backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
+            if backend_module is None:
+                raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11")
+            
+            backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
+                                 if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
+            self.read_only_flag = backend_class.read_only
+            
+            # Handle in-memory backends (NDP, OSTI, Oceans11)
             if self.read_only_flag:
                 self.database_name = None
-                correct_backend = True
 
                 if backend_name.lower() == "ndp":
                     backend_name = "NDP"
@@ -156,26 +166,19 @@ class DSI():
                         filename += ".db"
                 self.database_name = filename
 
-                correct_backend = True
                 try:
                     if backend_name.lower() == 'sqlite':
                         self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
                     elif backend_name.lower() == 'duckdb':
                         self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
-                    else:
-                        correct_backend = False
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
                     raise
-                
-                if not correct_backend:
-                    raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11")
         
         self.main_backend_obj = self.t.loaded_backends[0]
-        self.read_only_flag = self.main_backend_obj.read_only
+        self.read_only_flag = getattr(self.main_backend_obj, "read_only", False)
 
         if self.read_only_flag:
             msg = f"Created an instance of DSI with the {backend_name} read-only backend"            
@@ -505,6 +508,8 @@ class DSI():
             new_args = (f"query() ERROR: {e}",) + e.args[1:]
             raise type(e)(*new_args) from None
 
+        if df is None:
+            return
         if df.empty:
             msg = output if output else "WARNING: input query returned no data. Please check again."
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)

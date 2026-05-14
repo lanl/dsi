@@ -52,7 +52,7 @@ class Oceans11(Webserver):
     """
     DSI-based web backend for querying Oceans11 metadata in-memory
     """
-    read_only = False
+    read_only = True
     # ----------------------------------------------------------------------
     # Initialization
     # ----------------------------------------------------------------------
