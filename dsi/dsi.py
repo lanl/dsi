@@ -62,7 +62,7 @@ class DSI():
             if not os.path.exists(backend_name):
                 raise RuntimeError("backend() ERROR: `backend_name` must be a valid filepath to the custom backend. Please check again.")
             
-            self.database_name = filename
+            self.database_name = filename if filename != ".temp_dsi.db" else None
 
             parsed_data = None
             try:
@@ -104,62 +104,35 @@ class DSI():
                 raise
 
         else:
-            # Handle NDP separately (read-only backend)
-            if backend_name.lower() == "ndp":
-                self.database_name = None  # NDP doesn't use a file
-                
+            if self.read_only_flag:
+                self.database_name = None
                 correct_backend = True
-                
-                # Extract NDP query parameters from kwargs
-                query_params = {}
-                ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
-                
-                for key in ndp_param_keys:
-                    if key in kwargs:
-                        query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+
+                if backend_name.lower() == "ndp":
+                    backend_name = "NDP"
+                    query_params = {}
+                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    
+                    for key in ndp_param_keys:
+                        if key in kwargs:
+                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                elif backend_name.lower() == "osti":
+                    backend_name = "OSTI"
+                    query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "oceans11":
+                    backend_name = "Oceans11"
+                    query_params = kwargs.pop("params", {})
+                else:
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, and Oceans11")
                 
                 try:
                     # Pass query params as 'params' argument
-                    self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
-                except Exception as e:
-                    logger.error(f"backend ERROR: {e}", exc_info=True)
-                    if e.args:
-                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
-                    raise
-
-            # Handle OSTI separately (read-only backend)
-            elif backend_name.lower() == "osti":
-                self.database_name = None  # OSTI doesn't use a file
-                
-                correct_backend = True
-                
-                # Extract OSTI query parameters from kwargs
-                query_params = kwargs.pop("params", {})
-
-                try:
-                    self.t.load_module("backend", "OSTI", "back-read", params=query_params, **kwargs)
+                    self.t.load_module('backend', backend_name, 'back-read', params=query_params, **kwargs)
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
                     raise
-
-            # Handle Oceans11 separately (read-only backend)
-            elif backend_name.lower() == "oceans11":
-                self.database_name = None  # Oceans11 doesn't use a file
-                
-                correct_backend = True
-                
-                # Extract Oceans11 query parameters from kwargs by moniker params
-                query_params = kwargs.pop("params", {})
-
-                try:
-                    self.t.load_module("backend", "Oceans11", "back-read", params=query_params, **kwargs)
-                except Exception as e:
-                    logger.error(f"backend ERROR: {e}", exc_info=True)
-                    if e.args:
-                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
-                    raise                   
 
             # Handle file-based backends (Sqlite, DuckDB)
             else:
@@ -194,7 +167,7 @@ class DSI():
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
-                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
                     raise
                 
                 if not correct_backend:
