@@ -21,6 +21,7 @@ from dsi.utils.git_utils import download_github_file, get_github_remote_file_siz
 from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
 from dsi.utils.web_utils import download_web_file, get_url_file_size
 from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3, get_s3_client
+from dsi.utils.hpc_kerberos import ssh_k_remote_size_bytes, scp_k_copy_from
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:
@@ -74,12 +75,12 @@ def pull_data(location_type: str,
               abs_path_workspace_folder: str, 
               username: str,
               download_limit: int) -> dict | None:
-    """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "URL", "local"). 
+    """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
 
     Args:
-        location_type (str): The type of the original location (e.g., "github", "HPC", "URL", "local").
+        location_type (str): The type of the original location (e.g., "github", "HPC", "HPC-kerberos", "URL", "local").
         location (str): The location of the database (e.g., hostname for HPC, URL for web).
         path (str): The path to the database at the original location.
         abs_path_workspace_folder (str): The absolute path to the workspace folder where the database will be stored.
@@ -136,6 +137,79 @@ def pull_data(location_type: str,
             print(f" -- Error downloading file from GitHub: {e}. Skipping this database.")
             return None
         
+
+    elif cleaned_location_type == "hpc-kerberos":
+        if username == "":
+            try:
+                username = input(f" -- Enter the username for {location}: ")
+            except KeyboardInterrupt:
+                print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+                return None
+            
+        # Check if the file exists and get its size
+        filesize = 0
+        try:
+            filesize = ssh_k_remote_size_bytes(
+                remote=f"{username}@{location}",
+                remote_path=path
+            )
+        except KeyboardInterrupt:
+            print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+            return None
+        except FileNotFoundError as e:
+            print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+            return None
+        except Exception as e:
+            print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+            return None
+
+
+        # Skip for now
+        # # Check if the file already exists and has the same hash as the remote file
+        # if md5_file_hash != "":
+
+        #     need_redownload = True
+        #     try:
+        #         need_redownload = should_download(
+        #             remote=f"{username}@{location}",
+        #             remote_path=path,
+        #             stored_md5=md5_file_hash
+        #         )
+        #     except KeyboardInterrupt:
+        #         print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+        #         return None
+        #     except Exception as e:
+        #         print(f" -- Failed to get remote hash for {location}:{path}: {e}")
+        #         print(" -- Will proceed to download the file to ensure we have the correct version.")
+        #     if not need_redownload:
+        #         print(" -- Local file is up to date with the remote file. Skipping download.")
+        #         return None
+
+        # Confirm for sizes above a limit
+        if not confirm_large_download(filesize, download_limit):
+            print(" -- Skipping this database.")
+            return None
+
+        # Download the file
+        try:
+            scp_k_copy_from(
+                user=username,
+                host=location,
+                remote_path=path,
+                local_path=abs_path_db_folder
+            )
+
+            db_info = make_db_info(location, path, file_path, filename)
+            return db_info
+
+        except KeyboardInterrupt:
+            print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
+            return None
+        except Exception as e:
+            print(f" -- Error {e} downloading file from HPC. Skipping this database.")
+            return None
+
+
 
     elif cleaned_location_type == "hpc":
 
@@ -415,33 +489,6 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
 
 
     print(f"\nFinished gathering databases. Successfully downloaded {success_counter} databases to {abs_path_workspace_folder}.")
-
-
-
-# def main():
-#     # Make sure that we have a file
-#     if len(sys.argv) not in (2, 3):
-#         print(f"Usage: {Path(sys.argv[0]).name} <input.yaml> [dsi_datasets_folder]")
-#         sys.exit(1)
-
-#     # Read configuration from YAML file
-#     try:
-#         yaml_path = Path(sys.argv[1])
-#         config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-#     except FileNotFoundError:
-#         print(f"Error: Could not find YAML file {yaml_path}")
-#         sys.exit(1)
-
-    
-#     # Create a folder for the databases if it doesn't exist, or use the provided one
-#     if len(sys.argv) == 3:
-#         workspace_folder = sys.argv[2]
-#     else:
-#         _workspace_folder = config_data.get("workspace_folder", "")
-#         workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
-
-#     yaml_folder = Path(yaml_path).parent
-#     federate_datasets(workspace_folder, config_data, str(yaml_folder))
 
 
 
