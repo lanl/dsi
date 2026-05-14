@@ -97,10 +97,10 @@ class Terminal():
         self.debug_level = debug
         if debug == 1 or debug == 2:
             logging.basicConfig(
-                filename='debug.log',         # Name of the log file
-                filemode='w',               # Overwrite mode ('w' for overwrite, 'a' for append)
-                format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
-                level=logging.INFO          # Minimum log level to capture
+                filename='debug.log',                               # Name of the log file
+                filemode='w',                                       # Overwrite mode ('w' for overwrite, 'a' for append)
+                format='%(asctime)s - %(levelname)s - %(message)s', # Log message format
+                level=logging.INFO                                  # Minimum log level to capture
             )
 
     def list_available_modules(self, mod_type):
@@ -461,7 +461,8 @@ class Terminal():
                     if self.debug_level != 0:
                         self.logger.info(f"   Creating backup file before ingesting data into the {obj.__class__.__name__} backend")
                     backup_start = datetime.now()
-                    backup_file = obj.filename[:obj.filename.rfind('.')] + ".backup" + obj.filename[obj.filename.rfind('.'):]
+                    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                    backup_file = obj.filename[:obj.filename.rfind('.')] + f".backup_{timestamp}" + obj.filename[obj.filename.rfind('.'):]
                     shutil.copyfile(obj.filename, backup_file)
                     backup_end = datetime.now()
                     if self.debug_level != 0:
@@ -911,7 +912,7 @@ class Terminal():
             - If str, name of the table to overwrite in the backend.
             - If list, list of all tables to overwrite in the backend
 
-        `collection` : pandas.DataFrame  or list of Pandas.DataFrames
+        `collection` : pandas.DataFrame or list of Pandas.DataFrames
             - If one item, a DataFrame containing the updated data will be written to the table.
             - If a list, all DataFrames with updated data will be written to their own table
 
@@ -959,7 +960,8 @@ class Terminal():
                 self.logger.info(f"   Creating backup file before overwriting data in the {backend.__class__.__name__} backend")
             backup_start = datetime.now()
             extension = backend.filename.rfind('.')
-            backup_file = backend.filename[:extension] + ".backup" + backend.filename[extension:]
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            backup_file = backend.filename[:extension] + f".backup_{timestamp}" + backend.filename[extension:]
             shutil.copyfile(backend.filename, backup_file)
             backup_end = datetime.now()
             if self.debug_level != 0:
@@ -1384,7 +1386,7 @@ class Terminal():
         global return_line_number
         global original_file
         if event == "return":
-            return_line_number = frame.f_lineno  # Get line number
+            return_line_number = frame.f_lineno # Get line number
             original_file = frame.f_code.co_filename # Get file name
         return self.trace_function
 
@@ -1423,7 +1425,7 @@ class Terminal():
                             self.logger.warning(
                                 f"OSTI backend connection validation failed: {str(e)}"
                             )
-                        return False                    
+                        return False
         return False
 
     # Internal function that returns if a user can create a file/db in a specified location

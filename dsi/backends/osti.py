@@ -192,11 +192,65 @@ class OSTI(Webserver):
         """
         Fetch records from OSTI API and store in memory.
 
-        Parameters
-        ----------
-        params : dict
-            OSTI query parameters used with GET /records.
-        """ 
+        params can be:
+            dict       -> one OSTI request
+            list[dict] -> multiple OSTI requests merged into one records table
+        """
+
+        if isinstance(params, dict):
+            query_list = [params]
+
+        elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
+            query_list = params
+
+        else:
+            raise TypeError("params must be a dict or a list of dicts")
+
+        all_records = []
+
+        for query_params in query_list:
+            records = self._run_single_query(query_params)
+            all_records.extend(records)
+
+        unique_records = self._deduplicate_records(all_records)
+
+        record_rows = self._extract_tables(unique_records)
+        self._cache["records"] = self._rows_to_table(record_rows)
+
+        self._loaded = True
+
+    def _run_single_query(self, params):
+        """
+        Run one OSTI query and normalize the response to a list of records.
+        """
+
+        if "osti_id" in params and len(params) == 1:
+            result = self._request(f"records/{params['osti_id']}")
+
+            if isinstance(result, dict):
+                return [result]
+
+            if isinstance(result, list):
+                return result
+
+            return []
+
+        request_params = self._build_request_params(params)
+
+        result = self._request("records", request_params)
+
+        if isinstance(result, list):
+            return result
+
+        if isinstance(result, dict):
+            return [result]
+
+        return []
+
+    def _build_request_params(self, params):
+        """
+        Build OSTI /records query parameters from supported inputs.
+        """
 
         supported_params = [
             "q",
@@ -226,41 +280,44 @@ class OSTI(Webserver):
             "page",
         ]
 
-        # Keep OSTI's defaults for rows/page unless caller overrides them.
         request_params = {
             "rows": params.get("rows", 20),
             "page": params.get("page", 1),
-        }        
+        }
 
-        # Build request params from whichever values were provided.
         for key in supported_params:
             if key in ("rows", "page"):
                 continue
+
             value = params.get(key)
             if value is not None:
                 request_params[key] = value
 
-        #### ALTERNATE TO USE BOTH ENDPOINTS:
-        # if "osti_id" in params and len(params) == 1:
-        #     result = self._request(f"records/{params['osti_id']}")
-        #     records = [result]  # normalize to list
-        # else:
-        #     result = self._request("records", request_params)
-        #     records = result if isinstance(result, list) else []
+        return request_params
+    
+    def _deduplicate_records(self, records):
+        """
+        Deduplicate OSTI records using osti_id when available.
+        """
 
-        # Call OSTI's record-list endpoint: GET /records
-        # Note: this does not use the single-record /records/{osti_id} endpoint.
-        result = self._request("records", request_params)
+        seen = set()
+        unique_records = []
 
-        # The OSTI record-list response is a list of record objects
-        # One more check to see if any bad results produced
-        # Validate response shape defensively.
-        records = result if isinstance(result, list) else []
+        for rec in records:
+            if not isinstance(rec, dict):
+                continue
 
-        record_rows = self._extract_tables(records)
-        self._cache["records"] = self._rows_to_table(record_rows)
+            key = rec.get("osti_id") or rec.get("doi") or rec.get("title")
 
-        self._loaded = True
+            if key is None:
+                unique_records.append(rec)
+                continue
+
+            if key not in seen:
+                seen.add(key)
+                unique_records.append(rec)
+
+        return unique_records    
 
 # ---------------------------------------------------
 # API Helpers
