@@ -45,6 +45,9 @@ hostname = f"{username}@{host}:"
 
 # Open db, create list of files to download, and download those files
 data = json.load(open(f"{federated_folder}/dsi_database_list.json"))
+if not data:
+    raise RuntimeError("Could not download wildfire metadata database for GAN")
+
 gan_db = data[0]["local_path"]
 
 store = DSI(gan_db)
