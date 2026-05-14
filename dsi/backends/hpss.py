@@ -7,6 +7,8 @@ from collections import OrderedDict
 
 # HPSS backend class
 class HPSS(Backend):
+    read_only = False
+    
     def __init__(self, hpss_files):
         """
         Initializes an HPSS backend

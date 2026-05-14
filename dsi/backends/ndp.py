@@ -51,7 +51,7 @@ class NDP(Webserver):
     """
     CKAN-based web backend for querying NDP metadata in-memory
     """
-
+    read_only = False
     # ----------------------------------------------------------------------
     # Initialization
     # ----------------------------------------------------------------------

@@ -44,6 +44,7 @@ class Sqlite(Filesystem):
     SQLite Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurrences of a search term
     """
     runTable = False
+    read_only = False
 
     def __init__(self, filename, **kwargs):
         """
