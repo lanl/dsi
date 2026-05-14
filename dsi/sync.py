@@ -70,7 +70,7 @@ class Sync():
             with redirect_stdout(fnull):
                 self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
 
-            if not self.t.valid_backend(self.t.loaded_backends[0], self.t.loaded_backends[0].__class__.__bases__[0].__name__):
+            if not self.t.valid_backend(self.t.loaded_backends[0]):
                 raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
 
 

@@ -770,7 +770,7 @@ class DSI_cli:
 
         elif viewer == "ml":
             #check if current db is empty
-            if not self.t.valid_backend(self.t.loaded_backends[0], "Filesystem"):
+            if not self.t.valid_backend(self.t.loaded_backends[0]):
                 print("view ERROR: the ML viewer requires data to run models.")
                 return
             
