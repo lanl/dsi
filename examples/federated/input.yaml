@@ -1,6 +1,6 @@
 repo_paths: # list of repositories to federate from, can be git urls or local csv files
- - model_sources.csv
- - data_sources.csv
+ - model_card_sources.csv
+ - data_card_sources.csv
   #- "index_db.csv"  # cloned from https://git.lanl.gov/personal/test_dsi_federated.git
   #- "local_dsi_sources.csv"
 workspace_folder: "dsi_databases_test_merge_01"     # your workspace folder where the federated dataset will be stored

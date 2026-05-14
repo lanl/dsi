@@ -142,8 +142,10 @@ class DSI_cli:
                         "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
-            'federate' : ("<config file> [-w workspace_folder]", 
-                          "Collects data from sources defined in the YAML config file, optionally saving it to a workspace folder."),
+            'federate' : ("[-y yaml file] [-c csv file] [-w workspace_folder]", 
+                          "Collects data from sources defined in the YAML config file or source from a CSV fifle, optionally saving it to a workspace folder."),
+            'pulldata' : ("[-l location_type] [-loc location] [-p path] [-d download_dir]", 
+                          "Pulls a single data file from a specified location (github, HPC, URL, S3, local) to a download directory."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
             'list' : ("", "Lists all tables in the current DSI database"),
@@ -314,35 +316,209 @@ class DSI_cli:
         return parser
 
 
-    def federate(self, args):
-        '''
-        Federate data from multiple sources using a yaml config file
-        '''
-        config_file = args.config_file
-
-        workspace_folder = None
-        if args.workspace_folder is not None and args.workspace_folder != "":
-            workspace_folder = args.workspace_folder
-
-        # Check if the config file exists and is a valid yaml file before trying to federate
-        if not os.path.exists(config_file):
-            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
+    def pulldata(self, args):
+        """
+        Pull a single data file using the pull_data function.
+        
+        Usage:
+        pulldata -l <location_type> -loc <location> -p <path> [-d download_dir]
+        
+        location_type: github, HPC, URL, S3, or local
+        location: hostname for HPC, bucket for S3, or descriptive name for others
+        path: path to the file
+        download_dir: optional directory to save the file (default: current directory)
+        """
+        
+        location_type = None
+        location = None
+        path = None
+        download_dir = os.getcwd()
+        
+        if not args:
+            print("pulldata ERROR: need to specify -l location_type, -loc location, and -p path")
+            print("Example: pulldata -l github -loc github.com -p https://raw.githubusercontent.com/user/repo/file.csv")
             return
-        else:
-            try:
-                with open(config_file, 'r') as f:
-                    data = f.read()
-                config_data = yaml.safe_load(data)
-            except yaml.YAMLError as e:
-                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again. Error {e}")
+        
+        i = 0
+        while i < len(args):
+            if args[i] == "-l":
+                if i + 1 >= len(args):
+                    print("pulldata ERROR: missing location_type after -l")
+                    return
+                location_type = args[i + 1]
+                i += 2
+            
+            elif args[i] == "-loc":
+                if i + 1 >= len(args):
+                    print("pulldata ERROR: missing location after -loc")
+                    return
+                location = args[i + 1]
+                i += 2
+            
+            elif args[i] == "-p":
+                if i + 1 >= len(args):
+                    print("pulldata ERROR: missing path after -p")
+                    return
+                path = args[i + 1]
+                i += 2
+            
+            elif args[i] == "-d":
+                if i + 1 >= len(args):
+                    print("pulldata ERROR: missing download directory after -d")
+                    return
+                download_dir = args[i + 1]
+                i += 2
+            
+            else:
+                print(f"pulldata ERROR: unknown argument {args[i]}")
                 return
+        
+        if not location_type or not location or not path:
+            print("pulldata ERROR: must specify -l location_type, -loc location, and -p path")
+            return
+        
+        # Validate location_type
+        valid_types = ["github", "hpc", "url", "s3", "local"]
+        if location_type.lower() not in valid_types:
+            print(f"pulldata ERROR: location_type must be one of {', '.join(valid_types)}")
+            return
+        
+        # Create download directory if it doesn't exist
+        os.makedirs(download_dir, exist_ok=True)
+        
+        try:
+            from dsi.utils.federated.federate_datasets import pull_data
+            
+            # Load host_usernames if they exist
+            host_username = {}
+            host_username_file = os.path.join(download_dir, "host_usernames.json")
+            if os.path.exists(host_username_file):
+                try:
+                    with open(host_username_file, "r", encoding="utf-8") as f:
+                        host_username = yaml.safe_load(f) or {}
+                except Exception:
+                    pass
+            
+            # Default download limit: 100 MB
+            download_limit = 100 * 1024 * 1024
+            
+            print(f"\nPulling data from {location_type}:{location}:{path}")
+            print(f"Download directory: {download_dir}\n")
+            
+            db_info = pull_data(
+                location_type=location_type,
+                location=location,
+                path=path,
+                abs_path_workspace_folder=download_dir,
+                host_username=host_username,
+                download_limit=download_limit
+            )
+            
+            # Save host_usernames if updated
+            if host_username:
+                with open(host_username_file, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(host_username, f)
+            
+            if db_info:
+                print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
+            else:
+                print("\nFile was not downloaded (may already exist or was skipped)")
+        
+        except ImportError as e:
+            print(f"pulldata ERROR: Could not import pull_data function: {e}")
+            return
+        except Exception as e:
+            print(f"pulldata ERROR: {e}")
+            return
+        print()
+
+
+    def federate(self, args):
+        """
+        Federate data from multiple sources using either:
+        - a YAML config file, or
+        - a CSV source file
+
+        Usage:
+        federate -y input.yaml [-w workspace_folder]
+        federate -c sources.csv [-w workspace_folder]
+        """
+
+        yaml_file = None
+        csv_file = None
+        workspace_folder = None
+
+        if not args:
+            print("federate ERROR: need to specify -y yaml file or -c csv file, see the help")
+            return
+
+        i = 0
+        while i < len(args):
+            if args[i] == "-y":
+                if i + 1 >= len(args):
+                    print("federate ERROR: missing yaml file after -y")
+                    return
+                yaml_file = args[i + 1]
+                i += 2
+
+            elif args[i] == "-c":
+                if i + 1 >= len(args):
+                    print("federate ERROR: missing csv file after -c")
+                    return
+                csv_file = args[i + 1]
+                i += 2
+
+            elif args[i] == "-w":
+                if i + 1 >= len(args):
+                    print("federate ERROR: missing workspace folder after -w")
+                    return
+                workspace_folder = args[i + 1]
+                i += 2
+
+            else:
+                print(f"federate ERROR: unknown argument {args[i]}")
+                return
+
+        if yaml_file and csv_file:
+            print("federate ERROR: specify either -y yaml file or -c csv file, not both")
+            return
+
+        if not yaml_file and not csv_file:
+            print("federate ERROR: need to specify -y yaml file or -c csv file")
+            return
 
         try:
             s = Sync()
-            if workspace_folder is None:
-                workspace_folder = config_data.get("workspace_folder", "dsi_data")
-            print(f"Synchronizing data from {config_file} into {workspace_folder}\n")
-            s.get(config_file, workspace_folder)
+
+            if yaml_file:
+                if not os.path.exists(yaml_file):
+                    print(f"federate ERROR: {yaml_file} does not exist. Please check the filepath and try again.")
+                    return
+
+                try:
+                    with open(yaml_file, "r", encoding="utf-8") as f:
+                        config_data = yaml.safe_load(f)
+                except yaml.YAMLError:
+                    print(f"Invalid YAML file {yaml_file}. Please check the yaml file and try again.")
+                    return
+
+                if workspace_folder is None:
+                    workspace_folder = config_data.get("workspace_folder", "") or "dsi_data"
+
+                print(f"Synchronization data from {yaml_file} into {workspace_folder}")
+                s.get(input_yaml=yaml_file, workspace_folder=workspace_folder)
+
+            else:
+                if not os.path.exists(csv_file):
+                    print(f"federate ERROR: {csv_file} does not exist. Please check the filepath and try again.")
+                    return
+
+                if workspace_folder is None:
+                    workspace_folder = "dsi_data"
+
+                print(f"Synchronization data from {csv_file} into {workspace_folder}")
+                s.get(input_csv=csv_file, workspace_folder=workspace_folder)
+
         except Exception as e:
             print(f"federate ERROR: {e}")
             return
@@ -855,7 +1031,8 @@ COMMANDS = {
     'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
-    'federate' : (cli.get_federate_parser, cli.federate),
+    'federate' : (None, cli.federate),
+    'pulldata' : (None, cli.pulldata),
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),

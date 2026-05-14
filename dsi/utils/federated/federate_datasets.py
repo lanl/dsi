@@ -1,6 +1,7 @@
 import sys
 import uuid
 import yaml
+import argparse
 from pathlib import Path
 
 
@@ -333,7 +334,7 @@ def pull_data(location_type: str,
 
     
 
-def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) -> None:
+def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) -> None:
     """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
       It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
       The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -341,7 +342,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) 
     Args:
         workspace_folder (str): The local folder where the datasets will be stored.
         config_data (dict): A dictionary containing configuration data, including repository paths and download limits.
-        yaml_path (str): The path to the YAML configuration file, used for resolving relative paths in the configuration.
+        base_path (str): The path used for resolving relative paths to the data.
     """
 
     # Create the workspace folder if it doesn't exist
@@ -357,7 +358,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) 
         if Path(repo).is_absolute():
             repo_path = Path(repo)
         else:
-            repo_path = Path(yaml_path) / repo
+            repo_path = Path(base_path) / repo
 
         clean_repo_path = str(repo_path.resolve())
 
@@ -420,35 +421,107 @@ def federate_datasets(workspace_folder: str, config_data: dict, yaml_path: str) 
 
 
 
-def main():
-    # Make sure that we have a file
-    if len(sys.argv) not in (2, 3):
-        print(f"Usage: {Path(sys.argv[0]).name} <input.yaml> [dsi_datasets_folder]")
-        sys.exit(1)
+# def main():
+#     # Make sure that we have a file
+#     if len(sys.argv) not in (2, 3):
+#         print(f"Usage: {Path(sys.argv[0]).name} <input.yaml> [dsi_datasets_folder]")
+#         sys.exit(1)
 
-    # Read configuration from YAML file
-    try:
-        yaml_path = Path(sys.argv[1])
-        config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        print(f"Error: Could not find YAML file {yaml_path}")
-        sys.exit(1)
+#     # Read configuration from YAML file
+#     try:
+#         yaml_path = Path(sys.argv[1])
+#         config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+#     except FileNotFoundError:
+#         print(f"Error: Could not find YAML file {yaml_path}")
+#         sys.exit(1)
 
     
-    # Create a folder for the databases if it doesn't exist, or use the provided one
-    if len(sys.argv) == 3:
-        workspace_folder = sys.argv[2]
+#     # Create a folder for the databases if it doesn't exist, or use the provided one
+#     if len(sys.argv) == 3:
+#         workspace_folder = sys.argv[2]
+#     else:
+#         _workspace_folder = config_data.get("workspace_folder", "")
+#         workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+
+#     yaml_folder = Path(yaml_path).parent
+#     federate_datasets(workspace_folder, config_data, str(yaml_folder))
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Federate datasets from a YAML config or a CSV repo file.")
+    input_group = parser.add_mutually_exclusive_group(required=True)
+
+    input_group.add_argument(
+        "--yaml",
+        type=Path,
+        help="YAML configuration file",
+    )
+
+    input_group.add_argument(
+        "--csv",
+        type=Path,
+        help="CSV repository file to federate",
+    )
+
+    parser.add_argument(
+        "dsi_datasets_folder",
+        nargs="?",
+        help="Optional workspace folder override",
+    )
+
+    args = parser.parse_args()
+
+    
+    # YAML input mode
+    if args.yaml:
+        yaml_path = args.yaml
+
+        try:
+            config_data = yaml.safe_load( yaml_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            print(f"Error: Could not find YAML file {yaml_path}")
+            sys.exit(1)
+
+        config_folder = yaml_path.parent
+
+
+    # CSV input mode
     else:
-        _workspace_folder = config_data.get("workspace_folder", "")
-        workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        csv_path = args.csv
 
-    yaml_folder = Path(yaml_path).parent
-    federate_datasets(workspace_folder, config_data, str(yaml_folder))
+        if not csv_path.exists():
+            print(f"Error: Could not find CSV file {csv_path}")
+            sys.exit(1)
 
-  
+        config_data = {
+            "repo_paths": [csv_path.name],
+            "download_limit": 10485760,  # 10 MB
+            "conflict_resolution": "keep_latest",
+        }
+
+        config_folder = csv_path.parent
+
+
+    # Workspace folder
+    if args.dsi_datasets_folder:
+        workspace_folder = args.dsi_datasets_folder
+    else:
+        workspace_folder = (
+            config_data.get("workspace_folder", "")
+            or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        )
+
+
+    print(f"workspace_folder: {workspace_folder}, config_data: {config_data}, config_folder: {config_folder}")
+    federate_datasets(workspace_folder, config_data, str(config_folder))
+
 
 if __name__=="__main__":
     main()
 
 
-# Run as: python dsi/tools/federated/federate_dataset.py examples/federated/input.yaml
+# Run as:
+# python dsi/utils/federated/federate_datasets.py --yaml input.yaml
+# python dsi/utils/federated/federate_datasets.py --csv repo_paths.csv
+# python dsi/utils/federated/federate_datasets.py --csv repo_paths.csv dsi_databases_test_merge_01
