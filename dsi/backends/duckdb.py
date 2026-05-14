@@ -381,7 +381,11 @@ class DuckDB(Filesystem):
     
     def query_artifacts(self, query, isVerbose=False, dict_return = False):
         """
-        Executes a SQL query on the DuckDB backend and returns the result in the specified format dependent on `dict_return`
+        Executes a SQL query on the DuckDB backend.
+
+        Supports:
+        - SELECT / PRAGMA: returns DataFrame or OrderedDict depending on dict_return
+        - UPDATE / ALTER: executes command and returns None
 
         `query` : str
             Must be a SELECT or PRAGMA SQL query. Aggregate functions like COUNT are allowed.
@@ -394,12 +398,14 @@ class DuckDB(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
         
-        `return` : pandas.DataFrame or OrderedDict
+        `return` : pandas.DataFrame or OrderedDict or None
+            - If `query` includes UPDATE or ALTER: returns nothing
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
         data = None
-        if query[:6].lower() == "select" or query[:6].lower() == "pragma":
+        command = query.strip().split(None, 1)[0].lower()
+        if command in {"select", "pragma"}:
             try:
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
@@ -413,8 +419,22 @@ class DuckDB(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
+        elif command in {"update", "alter"}:
+            try:
+                self.cur.execute("BEGIN TRANSACTION")
+                self.cur.execute(query)
+                self.cur.execute("COMMIT")
+                self.cur.execute("FORCE CHECKPOINT")
+                return None
+            except duckdb.Error:
+                try:
+                    self.cur.execute("ROLLBACK")
+                    self.cur.execute("FORCE CHECKPOINT")
+                except duckdb.Error:
+                    pass
+                raise
         else:
-            raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
+            raise RuntimeError("Can only run SELECT, PRAGMA, UPDATE, or ALTER queries on the data")
         
         if dict_return:
             tables = self.get_table_names(query)
