@@ -12,7 +12,7 @@ if os.path.exists(path):
 os.makedirs(path)
 
 # Query OSTI records using osti_id through GET /records?osti_id=...
-dsi = DSI(backend_name="OCEANS11", params={"report_number": "LA-UR-21-30575","rows": 5}, workspace=path)
+dsi = DSI(backend_name="Oceans11", params={"report_number": "LA-UR-21-30575","rows": 5}, workspace=path)
 
 # save the results as a db
 dsi.process("sqlite", path + "firetec.db")

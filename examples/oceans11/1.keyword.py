@@ -13,7 +13,7 @@ if os.path.exists(path):
 os.makedirs(path)
 
 # load OSTI backend and query for 5 entries with the keyword climate
-dsi = DSI(backend_name="OCEANS11", params={"q": "heat","rows": 5}, workspace=path)
+dsi = DSI(backend_name="Oceans11", params={"q": "heat","rows": 5}, workspace=path)
 
 # save the results as a db
 dsi.process("sqlite", path + "heat.db")
