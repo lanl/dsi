@@ -53,10 +53,12 @@ class DSI_cli:
     '''
     t = []
 
+
     def __init__(self):
         self.name = None
         self.start_dir = os.getcwd() + "/"
         return
+
 
     def viewers_check(self):
         '''
@@ -144,7 +146,7 @@ class DSI_cli:
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
             'federate' : ("[-y yaml file] [-c csv file] [-w workspace_folder]", 
                           "Collects data from sources defined in the YAML config file or source from a CSV fifle, optionally saving it to a workspace folder."),
-            'pulldata' : ("[-l location_type] [-loc location] [-p path] [-d download_dir]", 
+            'pulldata' : ("[-l location_type] [-loc location] [-p path] [-d download_dir] [-u username]", 
                           "Pulls a single data file from a specified location (github, HPC, URL, S3, local) to a download directory."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
@@ -321,18 +323,20 @@ class DSI_cli:
         Pull a single data file using the pull_data function.
         
         Usage:
-        pulldata -l <location_type> -loc <location> -p <path> [-d download_dir]
+        pulldata -l <location_type> -loc <location> -p <path> [-d download_dir] [-u username]
         
         location_type: github, HPC, URL, S3, or local
         location: hostname for HPC, bucket for S3, or descriptive name for others
         path: path to the file
         download_dir: optional directory to save the file (default: current directory)
+        username: optional username for HPC connections
         """
         
         location_type = None
         location = None
         path = None
         download_dir = os.getcwd()
+        username = ""
         
         if not args:
             print("pulldata ERROR: need to specify -l location_type, -loc location, and -p path")
@@ -369,6 +373,13 @@ class DSI_cli:
                 download_dir = args[i + 1]
                 i += 2
             
+            elif args[i] == "-u":
+                if i + 1 >= len(args):
+                    print("pulldata ERROR: missing username after -u")
+                    return
+                username = args[i + 1]
+                i += 2
+            
             else:
                 print(f"pulldata ERROR: unknown argument {args[i]}")
                 return
@@ -389,16 +400,6 @@ class DSI_cli:
         try:
             from dsi.utils.federated.federate_datasets import pull_data
             
-            # Load host_usernames if they exist
-            host_username = {}
-            host_username_file = os.path.join(download_dir, "host_usernames.json")
-            if os.path.exists(host_username_file):
-                try:
-                    with open(host_username_file, "r", encoding="utf-8") as f:
-                        host_username = yaml.safe_load(f) or {}
-                except Exception:
-                    pass
-            
             # Default download limit: 100 MB
             download_limit = 100 * 1024 * 1024
             
@@ -410,14 +411,9 @@ class DSI_cli:
                 location=location,
                 path=path,
                 abs_path_workspace_folder=download_dir,
-                host_username=host_username,
+                username=username,
                 download_limit=download_limit
             )
-            
-            # Save host_usernames if updated
-            if host_username:
-                with open(host_username_file, "w", encoding="utf-8") as f:
-                    yaml.safe_dump(host_username, f)
             
             if db_info:
                 print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
@@ -522,7 +518,7 @@ class DSI_cli:
         except Exception as e:
             print(f"federate ERROR: {e}")
             return
-
+        
 
     def find(self, args):
         '''
