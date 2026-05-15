@@ -201,14 +201,14 @@ class Oceans11(Webserver):
             silence_messages=True,
         )
 
-        # coallate results over multiple queries for T1
+        # collate results over multiple queries for T1
         all_records = []
 
         for query_params in query_list:
             records = self._run_single_query(query_params)
             all_records.extend(records)
 
-        # remove any multiple entries that may arrise from merge
+        # remove any multiple entries that may arise from merge
         unique_records = self._deduplicate_records(all_records)
 
         url_column = "t2db_url"
