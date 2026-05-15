@@ -827,8 +827,10 @@ class DSI():
             raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
             raise RuntimeError("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
-        elif 'dsi_table_name' not in collection.columns:
+        elif 'dsi_table_name' in collection.columns:
             t_col = collection['dsi_table_name']
+            if len(collection) == 0:
+                raise RuntimeError("update() ERROR: Cannot overwrite a table without any data.")
             if not isinstance(t_col[0], str):
                 raise RuntimeError("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
             if any(t_val not in (t_col[0], '') for t_val in t_col):
