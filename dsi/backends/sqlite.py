@@ -291,24 +291,26 @@ class Sqlite(Filesystem):
             
             self.ingest_table_helper(types, foreign_query)
             
-            col_names = ', '.join(types.properties.keys())
-            placeholders = ', '.join('?' * len(types.properties))
+            # TODO: move this check to schema reader by allowing users to just create table without data
+            if not all(v == [""] for v in tableData.values()): # if table is just one row of empty strings, don't insert
+                col_names = ', '.join(types.properties.keys())
+                placeholders = ', '.join('?' * len(types.properties))
 
-            str_query = "INSERT INTO "
-            if self.runTable:
-                run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
-                str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
-            else:
-                str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-            if isVerbose:
-                print(str_query)
-            
-            rows = zip(*types.properties.values())
-            try:
-                self.cur.executemany(str_query,rows)
-            except sqlite3.Error as e:
-                self.con.rollback()
-                raise sqlite3.Error(e)
+                str_query = "INSERT INTO "
+                if self.runTable:
+                    run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
+                    str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
+                else:
+                    str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+                if isVerbose:
+                    print(str_query)
+                
+                rows = zip(*types.properties.values())
+                try:
+                    self.cur.executemany(str_query,rows)
+                except sqlite3.Error as e:
+                    self.con.rollback()
+                    raise sqlite3.Error(e)
                 
             self.types = types # This will only copy the last table from artifacts (collections input)
 
@@ -341,7 +343,7 @@ class Sqlite(Filesystem):
             raise sqlite3.Error(e)
 
 
-    def query_artifacts(self, query, isVerbose=False, dict_return = False):
+    def query_artifacts(self, query, isVerbose=False, dict_return = False, **kwargs):
         """
         Executes a SQL query on the SQLite backend.
 
@@ -382,8 +384,9 @@ class Sqlite(Filesystem):
                     return pd.DataFrame()
                 raise
         elif command in {"update", "alter"}:
+            query_params = kwargs.pop("params", ())
             try:
-                self.cur.execute(query)
+                self.cur.execute(query, query_params)
                 self.con.commit()
                 return None
             except sqlite3.Error:
