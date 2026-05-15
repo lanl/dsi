@@ -11,7 +11,7 @@ if __name__ == "__main__":
     table_name = "rundata"
     csvpath = f'pennant_{test_name}.csv'
     dbpath = f'pennant_{test_name}.db'
-    datacard = "pennant_oceans11.yml"
+    datacard = "pennant_dublin_core.xml"
     output_csv = "pennant_output.csv"
 
     if os.path.exists(dbpath):
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     dsi = DSI(dbpath)
 
     dsi.read(csvpath, "Ensemble", table_name=table_name)
-    dsi.read(datacard, "Oceans11Datacard")
+    dsi.read(datacard, "DublinCoreDatacard")
 
     # saves query output as a Pandas DataFrame to then update that table in the backend
     query_output = dsi.query(f"SELECT * FROM {table_name} WHERE hydro_cycle_run_time > 0.006;", collection=True)

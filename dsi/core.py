@@ -31,7 +31,7 @@ class Terminal():
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
     VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'Ensemble', 'Cloverleaf', 'Dictionary', 'Dataframe']
-    VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
+    VALID_DATACARDS = ['DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
     VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11']
@@ -91,7 +91,7 @@ class Terminal():
 
         self.user_wrapper = False
         self.new_tables = None
-        self.dsi_tables = ["runtable", "filesystem", "oceans11_datacard", "dublin_core_datacard",
+        self.dsi_tables = ["runtable", "filesystem", "dublin_core_datacard",
                            "schema_org_datacard", "google_datacard", "genesis_datacard"]
         self.logger = logging.getLogger(self.__class__.__name__)
         self.debug_level = debug

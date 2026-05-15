@@ -14,9 +14,9 @@
   <dc:type>Dataset</dc:type>
   <dc:format>CSV</dc:format>
   <dc:identifier>LA-UR-21-30892</dc:identifier>
-  <dc:source>oceans11 open data server url</dc:source>
+  <dc:source>oceans11.lanl.gov</dc:source>
   <dc:language>English</dc:language>
-  <dc:relation>oceans11 open data server url</dc:relation>
+  <dc:relation>oceans11.lanl.gov</dc:relation>
   <dc:coverage>Simulations of wildfire spread in 2021</dc:coverage>
   <dc:rights>Copyright (c) 2021, Triad National Security, LLC. All rights reserved.</dc:rights>
 
