@@ -987,7 +987,7 @@ class Terminal():
         if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to list its data")
-            raise RuntimeError("First loaded backend needs to have data to be able to list its datd")
+            raise RuntimeError("First loaded backend needs to have data to be able to list its data")
         start = datetime.now()
 
         table_list = backend.list(collection)
