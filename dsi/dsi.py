@@ -531,10 +531,11 @@ class DSI():
 
         if df is None:
             return
+        
         if df.empty:
             msg = output if output else "WARNING: input query returned no data. Please check again."
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-            return
+            return df
         if not collection:
             print(f"Printing the result of the query: {statement}")
             headers = df.columns.tolist()
