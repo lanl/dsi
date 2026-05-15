@@ -586,14 +586,19 @@ class DSI():
         if self.read_only_flag and collection and update:
             print("get_table() WARNING: The returned collection object will include an extra DSI metadata column")
         
+        output = None
         try:
-            df = self.t.get_table(table_name)
+            f = io.StringIO()
+            with redirect_stdout(f):
+                df = self.t.get_table(table_name)
+            output = f.getvalue()
         except Exception as e:
             if e.args:
                 e.args = (f'get_table() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
         if df.empty:
+            logger.log(logging.INFO, output) if self.silence_messages else print(output.rstrip("\n"))
             return df
         if not collection:
             print(f"Printing all data from the table: {table_name}")
