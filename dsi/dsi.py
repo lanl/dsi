@@ -204,6 +204,8 @@ class DSI():
         
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
+
+
     def list_backends(self):
         """
         Prints a list of valid backends that can be used in the `backend_name` argument in `backend()`
@@ -222,7 +224,9 @@ class DSI():
         if n.validate_connection():
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
         print()
-        
+
+
+
     def schema(self, filename = None):
         """
         Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
@@ -274,79 +278,9 @@ class DSI():
             # This is a schema viewing operation (all tables or specific table)
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
-                schema_str = self.t.get_schema()
-            
-            # If filename provided (and not .json), filter for that table
-            if filename:
-                # Extract only the CREATE TABLE for the specified table
-                table_pattern = f"CREATE TABLE {filename} ("
-                if table_pattern in schema_str:
-                    # Find start and end of this table's definition
-                    start_idx = schema_str.index(table_pattern)
-                    
-                    # Find the closing ");
-                    end_idx = schema_str.index(");", start_idx) + 2
-                    
-                    # Extract just this table
-                    table_schema = schema_str[start_idx:end_idx]
-                    
-                    return table_schema
-                else:
-                    raise ValueError(
-                        f"schema() ERROR: Table '{filename}' not found in backend. "
-                        f"Available tables: {self.list(collection=True)}"
-                    )
-            
-            # Return full schema
-            return schema_str
+                return self.t.get_schema()
 
-    # def schema(self, filename = None):
-    #     """
-    #     Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
 
-    #     `filename` : str, optional
-    #         Path to a JSON file describing the relationships of the tables in a database.
-    #         The schema should follow the format described in :ref:`user_schema_example_label`
-        
-    #     `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
-    #     **If loading a relational schema, this function must be called before reading in any associated data files**
-    #     """
-    #     if self.main_backend_obj.__class__.__name__ == "OSTI":
-    #         raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
-    #     if filename:
-    #         if not os.path.exists(filename):
-    #             raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
-    #         if "dsi_relations" in self.t.active_metadata:
-    #             raise RuntimeError("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
-
-    #         self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
-
-    #         pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
-    #         fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] is not None)
-    #         all_schema_tables = pk_tables.union(fk_tables)
-            
-    #         has_data = self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__)
-    #         if has_data and all_schema_tables.issubset(set(self.list(True))):
-    #             try:
-    #                 self.t.artifact_handler(interaction_type='ingest')
-    #             except Exception as e:
-    #                 if e.args:
-    #                     e.args = (f'schema() ERROR: {str(e.args[0])}',) + e.args[1:]
-    #                 raise
-    #             self.t.active_metadata = OrderedDict()
-    #             self.schema_read = False
-    #             self.schema_tables = set()
-    #             self.loaded_tables = set()
-    #         else:
-    #             self.schema_read = True
-    #             self.schema_tables = all_schema_tables
-
-    #         msg = f"Successfully loaded the schema file: {filename}"
-    #         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-    #     else:
-    #         fnull = open(os.devnull, 'w')
-    #         with redirect_stdout(fnull):
-    #             return self.t.get_schema()
 
     def list_readers(self):
         """
@@ -369,6 +303,8 @@ class DSI():
         print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
         print("GenesisDatacard      : Loads dataset metadata for Genesis data standard (Markdown with YAML frontmatter)")
         print()
+
+
 
     # in future release, make data_sources and reader_name mandatory again
     def read(self, data_sources: str | list[str] | dict | pd.DataFrame | None = None, reader_name: str | None = None, table_name = None, **kwargs):
@@ -558,6 +494,8 @@ class DSI():
             msg.replace("the tables:", "the table:")
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
+
+
     def query(self, statement, collection = False, update = False, **kwargs):
         """
         Executes a SQL query on the active backend.
@@ -619,7 +557,9 @@ class DSI():
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
-    
+
+
+
     def get_table(self, table_name, collection = False, update = False):
         """
         Retrieves all data from a specified table without requiring knowledge of the active backend's query language.
@@ -677,7 +617,9 @@ class DSI():
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
-        
+
+
+
     def find(self, query, collection = False, update = False):
         """
         Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
@@ -782,7 +724,9 @@ class DSI():
                 msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
                 logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return output_df
-    
+
+
+
     def search(self, query, collection = False):
         """
         Finds all rows across all tables in the active backend where `query` can be found.
@@ -849,6 +793,8 @@ class DSI():
                     output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
             
             return list(output_dict.values())
+
+
 
     def update(self, collection, backup = False):
         """
@@ -961,6 +907,8 @@ class DSI():
                 e.args = (f'update() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
+
+
     def process(self, backend_name, filename, **kwargs):
         """
         Process converts the current backend into another format: Sqlite or DuckDB for now
@@ -1025,7 +973,9 @@ class DSI():
             if e.args:
                 e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-    
+
+
+
     def list_writers(self):
         """
         Prints a list of valid writers that can be used in the `writer_name` argument in `write()`
@@ -1036,6 +986,8 @@ class DSI():
         print("Csv         : Exports the data of a specified table to a CSV file.")
         print("Parquet     : Exports the data of a specified table to a Parquet file.")
         print()
+
+
 
     def write(self, filename, writer_name, table_name = None, **kwargs):
         """
@@ -1169,7 +1121,8 @@ class DSI():
         self.t.active_metadata = OrderedDict()
         msg = f"Successfully wrote to the output file {filename}"
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-    
+
+
 
     def list(self, collection: bool = False) -> list | None:
         """
@@ -1207,7 +1160,8 @@ class DSI():
         else:
             print(output)
             return None
-        
+
+
 
     def summary(self, table_name = None, collection = False):
         """
@@ -1245,8 +1199,9 @@ class DSI():
             return summary_df
         else:
             print(output)
-    
-    
+
+
+
     def num_tables(self):
         """
         Prints the number of tables in the active backend.
@@ -1261,64 +1216,9 @@ class DSI():
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-    
-    def num_datasets(self): # ADDED NEW
-        """
-        Prints the number of datasets in the active backend.
-        
-        For NDP backend: returns the count of rows in the datasets table.
-        For other backends: equivalent to num_tables().
-        """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
-            raise RuntimeError("ERROR: Cannot call num_datasets() on an empty backend. Please ensure there is data in it.")
-        if self.schema_read:
-            raise RuntimeError("ERROR: Cannot call num_datasets() until all associated data is loaded after a complex schema")
-        
-        # Check if backend has num_datasets method (NDP-specific)
-        if hasattr(self.main_backend_obj, 'num_datasets'):
-            try:
-                count = self.main_backend_obj.num_datasets()
-                return count
-            except Exception as e:
-                if e.args:
-                    e.args = (f'num_datasets() ERROR: {str(e.args[0])}',) + e.args[1:]
-                raise
-        else:
-            # Fall back to num_tables for other backends
-           return self.num_tables()
-            
-    def validate_urls(self): # ADDED NEW
-        """
-        Validates URLs in the resources table (NDP backend only).
-        
-        Adds a 'url_valid' boolean column indicating URL accessibility.
-        
-        Raises
-        ------
-        RuntimeError
-            If called on a non-NDP backend
-        """
-        if self.main_backend_obj.__class__.__name__ != "NDP":
-            raise RuntimeError(
-                "validate_urls() ERROR: This method is only available for the NDP backend.\n"
-                f"Current backend: {self.main_backend_obj.__class__.__name__}"
-            )
-        
-        if not hasattr(self.main_backend_obj, 'validate_urls'):
-            raise RuntimeError(
-                "validate_urls() ERROR: NDP backend does not have validate_urls() method. "
-                "Please update your DSI installation."
-            )
-        
-        try:
-            self.main_backend_obj.validate_urls()
-            msg = "Validated all resource URLs"
-            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-        except Exception as e:
-            if e.args:
-                e.args = (f'validate_urls() ERROR: {str(e.args[0])}',) + e.args[1:]
-            raise
-        
+
+
+
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Prints data from a specified table in the active backend.
@@ -1348,6 +1248,8 @@ class DSI():
                 e.args = (f'display() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
+
+
     def close(self):
         """
         Closes the connection to the active backend and clears all loaded DSI modules.
@@ -1358,7 +1260,9 @@ class DSI():
         
         if not self.silence_messages:
             print("Closing this instance of DSI()")
-    
+
+
+
     #help, edge-finding (find this/that)
     def get(self, dbname=None):
         #if not dbname:
@@ -1367,10 +1271,12 @@ class DSI():
         #    s = Sync("workspace.db")
         pass
 
-        
-    
+
+
     def move(self, filepath):
         pass
+
+
 
     def fetch(self, fname):
         pass
