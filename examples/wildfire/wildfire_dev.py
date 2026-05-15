@@ -24,7 +24,7 @@ if __name__ == "__main__":
     db_name = 'wildfire.db'
     cinema_db_name = "wildfire.cdb/"
     path_to_cinema_images = cinema_db_name + "images/"
-    datacard = "wildfire_oceans11.yml"
+    datacard = "wildfire_dublin_core.xml"
     output_csv = cinema_db_name + "wildfire_output.csv"
     table_name = "wfdata"
     columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "LOCAL_PATH"]
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     core.load_module('plugin', "Ensemble", "reader", filenames = input_csv, table_name = table_name)
 
     #ingest metadata information via data card
-    core.load_module('plugin', "Oceans11Datacard", "reader", filenames = datacard)
+    core.load_module('plugin', "DublinCoreDatacard", "reader", filenames = datacard)
 
     # update DSI abstraction directly
     updatedFilePaths = []
