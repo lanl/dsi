@@ -594,7 +594,7 @@ class DSI():
             raise
 
         if df.empty:
-            return
+            return df
         if not collection:
             print(f"Printing all data from the table: {table_name}")
             headers = df.columns.tolist()
