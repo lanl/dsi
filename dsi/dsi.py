@@ -828,17 +828,15 @@ class DSI():
         elif 'dsi_table_name' not in collection.columns:
             raise RuntimeError("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
         elif 'dsi_table_name' in collection.columns:
-            t_col = collection['dsi_table_name']
             if len(collection) == 0:
                 raise RuntimeError("update() ERROR: Cannot overwrite a table without any data.")
-            if not isinstance(t_col[0], str):
+            t_col = collection['dsi_table_name']
+            if not t_col.map(lambda x: isinstance(x, str)).all():
                 raise RuntimeError("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
-            if any(t_val not in (t_col[0], '') for t_val in t_col):
-                raise RuntimeError("update() ERROR: 'dsi_table_name' column must be unchanged table name. Extra rows must be empty strings.")
             if t_col.replace('', pd.NA).dropna().nunique() > 1:
-                raise RuntimeError("update() ERROR: The 'dsi_table_name' column should not be modified.")
+                raise RuntimeError("update() ERROR: 'dsi_table_name' column must contain unchanged table name. Extra rows must be empty strings.")
         
-        table_name = collection['dsi_table_name'][0]
+        table_name = collection['dsi_table_name'].iloc[0]
         actual_df = None
         if table_name.lower() in self.t.dsi_tables:
             raise RuntimeError(f"update() ERROR: '{table_name}' is a DSI-read-only table. Cannot update it.")
