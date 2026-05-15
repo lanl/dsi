@@ -204,6 +204,8 @@ class DSI():
         
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
+
+
     def list_backends(self):
         """
         Prints a list of valid backends that can be used in the `backend_name` argument in `backend()`
@@ -222,6 +224,8 @@ class DSI():
         if n.validate_connection():
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
         print()
+
+
 
     def schema(self, filename = None):
         """
@@ -273,6 +277,8 @@ class DSI():
             with redirect_stdout(fnull):
                 return self.t.get_schema()
 
+
+
     def list_readers(self):
         """
         Prints a list of valid readers that can be used in the `reader_name` argument in `read()`
@@ -294,6 +300,8 @@ class DSI():
         print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
         print("GenesisDatacard      : Loads dataset metadata for Genesis data standard (Markdown with YAML frontmatter)")
         print()
+
+
 
     # in future release, make data_sources and reader_name mandatory again
     def read(self, data_sources: str | list[str] | dict | pd.DataFrame | None = None, reader_name: str | None = None, table_name = None, **kwargs):
@@ -483,6 +491,8 @@ class DSI():
             msg.replace("the tables:", "the table:")
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
+
+
     def query(self, statement, collection = False, update = False, **kwargs):
         """
         Executes a SQL query on the active backend.
@@ -544,7 +554,9 @@ class DSI():
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
-    
+
+
+
     def get_table(self, table_name, collection = False, update = False):
         """
         Retrieves all data from a specified table without requiring knowledge of the active backend's query language.
@@ -602,7 +614,9 @@ class DSI():
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
-        
+
+
+
     def find(self, query, collection = False, update = False):
         """
         Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
@@ -701,7 +715,9 @@ class DSI():
                 msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
                 logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             return output_df
-    
+
+
+
     def search(self, query, collection = False):
         """
         Finds all rows across all tables in the active backend where `query` can be found.
@@ -768,6 +784,8 @@ class DSI():
                     output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
             
             return list(output_dict.values())
+
+
 
     def update(self, collection, backup = False):
         """
@@ -880,6 +898,8 @@ class DSI():
                 e.args = (f'update() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
+
+
     def process(self, backend_name, filename, **kwargs):
         """
         Process converts the current backend into another format: Sqlite or DuckDB for now
@@ -944,7 +964,9 @@ class DSI():
             if e.args:
                 e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-    
+
+
+
     def list_writers(self):
         """
         Prints a list of valid writers that can be used in the `writer_name` argument in `write()`
@@ -955,6 +977,8 @@ class DSI():
         print("Csv         : Exports the data of a specified table to a CSV file.")
         print("Parquet     : Exports the data of a specified table to a Parquet file.")
         print()
+
+
 
     def write(self, filename, writer_name, table_name = None, **kwargs):
         """
@@ -1088,7 +1112,8 @@ class DSI():
         self.t.active_metadata = OrderedDict()
         msg = f"Successfully wrote to the output file {filename}"
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-    
+
+
 
     def list(self, collection: bool = False) -> list | None:
         """
@@ -1126,7 +1151,8 @@ class DSI():
         else:
             print(output)
             return None
-        
+
+
 
     def summary(self, table_name = None, collection = False):
         """
@@ -1164,8 +1190,9 @@ class DSI():
             return summary_df
         else:
             print(output)
-    
-    
+
+
+
     def num_tables(self):
         """
         Prints the number of tables in the active backend.
@@ -1180,6 +1207,8 @@ class DSI():
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
+
+
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
@@ -1210,6 +1239,8 @@ class DSI():
                 e.args = (f'display() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
 
+
+
     def close(self):
         """
         Closes the connection to the active backend and clears all loaded DSI modules.
@@ -1220,7 +1251,9 @@ class DSI():
         
         if not self.silence_messages:
             print("Closing this instance of DSI()")
-    
+
+
+
     #help, edge-finding (find this/that)
     def get(self, dbname=None):
         #if not dbname:
@@ -1229,10 +1262,12 @@ class DSI():
         #    s = Sync("workspace.db")
         pass
 
-        
-    
+
+
     def move(self, filepath):
         pass
+
+
 
     def fetch(self, fname):
         pass
