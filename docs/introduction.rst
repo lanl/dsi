@@ -71,7 +71,6 @@ Currently, DSI has the following Readers:
   - Bueno
   - Ensemble (Reader to ingest ensemble data. Ex: the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . 
     Assumes each data row is a separate sim.)
-  - Oceans11Datacard (Data card for datasets on the `Oceans11 LANL data server <https://oceans11.lanl.gov>`_)
   - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
   - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
   - GoogleDatacard (Data card that adheres to the `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_ )

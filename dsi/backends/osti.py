@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 OSTI Backend for DSI
 
@@ -50,7 +49,7 @@ class OSTI(Webserver):
     """
     REST-based web backend for querying OSTI metadata in-memory
     """
-
+    read_only = True
     # ----------------------------
     # Initialization
     # ----------------------------    
@@ -60,7 +59,6 @@ class OSTI(Webserver):
 
         Parameters
         ----------
-
         `url` : str, optional
             Base OSTI URL. If None, a default OSTI endpoint is used.
         `params` : dict, optional
@@ -131,7 +129,7 @@ class OSTI(Webserver):
             self._loaded = False
             raise ConnectionError(f"Unable to connect to OSTI API at {self.base_url}")
 
-        # Initial data load
+        # Initial data load (only if connection is valid and params provided)
         if self.params:
             try:
                 self._load_initial_data(self.params)
@@ -533,13 +531,36 @@ class OSTI(Webserver):
         return pd.DataFrame(table)
 
     def get_schema(self):
-        """OSTI does not store structural schema - data comes from OSTI API."""
-        return (
-            "-- OSTI Backend Schema Information\n"
-            "-- OSTI is a read-only REST metadata backend\n"
-            "-- Data is retrieved dynamically from the API\n"
-            "-- Use summary() or list() to view available tables and columns\n"
-        )
+        """
+        Return a lightweight schema description of cached tables from OSTI.
+        """
+        schema_lines = []
+        for table_name, table in self._cache.items():
+            cols = []
+            for col_name, values in table.items():
+                dtype = "TEXT"
+                for v in values:
+                    if v is None:
+                        continue
+
+                    if isinstance(v, bool):
+                        dtype = "BOOLEAN"
+                    elif isinstance(v, int):
+                        dtype = "INTEGER"
+                    elif isinstance(v, float):
+                        dtype = "REAL"
+                    break
+
+                cols.append(f"    {col_name} {dtype}")
+
+            create_stmt = (
+                f"CREATE TABLE {table_name} (\n"
+                + ",\n".join(cols)
+                + "\n);"
+            )
+            schema_lines.append(create_stmt)
+
+        return "\n\n".join(schema_lines)
 
     def overwrite_table(self, table_name, collection):
         """

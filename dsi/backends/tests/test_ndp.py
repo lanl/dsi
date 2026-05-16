@@ -159,8 +159,12 @@ def test_ndp_get_schema():
     
     schema = backend.get_schema()
     assert isinstance(schema, str)
-    assert "NDP" in schema
-    assert "read-only" in schema.lower()
+    assert "datasets" in schema
+    assert "Full Climate Connectivity Network" in schema
+    assert "Environment Canada Climate Data" in schema
+    assert "Climate Refugia - Baseline (Historical) 1981 - 2010" in schema
+    assert "Change in Average Climatic Water Deficit" in schema
+    assert "Northern Spotted Owl Habitat; Topo-Climatic Fire Refugia" in schema
     
     backend.close()
 

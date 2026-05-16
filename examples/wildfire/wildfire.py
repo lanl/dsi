@@ -24,7 +24,7 @@ if __name__ == "__main__":
     input_csv = "wildfiredataSmall.csv"
     db_name = 'wildfire.db'
     output_csv = "wildfire_output.csv"
-    datacard = "wildfire_oceans11.yml"
+    datacard = "wildfire_dublin_core.xml"
     table_name = "wfdata"
     columns_to_keep = ["wind_speed", "wdir", "smois", "burned_area", "LOCAL_PATH"]
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     dsi = DSI(db_name)
 
     dsi.read(input_csv, "Ensemble", table_name=table_name)
-    dsi.read(datacard, "Oceans11Datacard")
+    dsi.read(datacard, "DublinCoreDatacard")
 
     #get wildfire table's data
     wildfire_data = dsi.get_table(table_name, collection=True, update=True)

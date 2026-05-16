@@ -14,6 +14,7 @@ from dsi.backends.filesystem import Filesystem
 class SqlAlchemy(Filesystem):
     filename = "sqlite:///fs.db"
     engine = None
+    read_only = False
 
     def __init__(self, filename, base):
         self.filename = filename
@@ -44,6 +45,9 @@ class SqlAlchemy(Filesystem):
         pass
 
     def process_artifacts(self, **kwargs):
+        pass
+
+    def get_schema(self):
         pass
     
     def find(self, query_object, **kwargs):

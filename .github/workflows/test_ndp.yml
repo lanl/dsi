@@ -1,4 +1,4 @@
-name: NDP Backend CI
+name: ndp.py test
 
 on:
   push:
