@@ -280,6 +280,13 @@ class Sync():
         if any(x is None for x in (self.remote_location, self.local_location)):
             raise RuntimeError("Must successfully run DSI Index before Copy")
 
+        # kwargs, add to list of moving dbs
+        db_list = [self.full_db_name]
+        if kwargs:
+            add_dbs = kwargs.pop("add_dbs", [])
+            if add_dbs and isinstance(add_dbs, list):
+                db_list.extend(add_dbs)
+
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             filesystem_df = self.t.get_table("filesystem")
@@ -340,9 +347,10 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
-            if isVerbose:
-                print(" cp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
-            shutil.copy2(self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name))
+            for dbname in db_list:
+                if isVerbose:
+                    print(" cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
+                shutil.copy2(dbname, os.path.join(self.remote_location, self.project_name, dbname))
 
             print(" Data Copy Complete!")
         
@@ -384,11 +392,12 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
-            cmd = ["scp", "-p", self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
-            if isVerbose:
-                print()
-                print(*cmd)
-            self.execute_cmd(cmd, "scp database")
+            for dbname in db_list:
+                cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                if isVerbose:
+                    print()
+                    print(*cmd)
+                self.execute_cmd(cmd, "scp database")
             print(" DSI SCP database movement complete.")
         
         elif tool.lower() == "rsync":
@@ -426,6 +435,7 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
             
             # Database movement
+            for dbname in db_list
             cmd = ["rsync", "-av", self.full_db_name, os.path.join(self.remote_location, self.project_name)]
             if isVerbose:
                 print()
@@ -480,11 +490,12 @@ class Sync():
                 self.t.dsi_tables.append("filesystem")
 
                 # Database Movement
-                if isVerbose:
-                    print("conduit cp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
-                cmd = base_cmd + [self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
-                self.execute_cmd(cmd, "Conduit copy database")
-                print(" DSI submitted Conduit database movement job.")
+                for dbname in db_list:
+                    if isVerbose:
+                        print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
+                    cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                    self.execute_cmd(cmd, "Conduit copy database")
+                    print(" DSI submitted Conduit database movement job.")
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, data move is in queue.")
@@ -509,11 +520,12 @@ class Sync():
                 self.t.dsi_tables.append("filesystem")
 
                 # Database Movement
-                if isVerbose:
-                    print("pfcp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
-                cmd = ['pfcp', self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
-                self.execute_cmd(cmd, "pfcp move database")
-                print(" DSI submitted pfcp database movement job.")
+                for dbname in db_list:
+                    if isVerbose:
+                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
+                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                    self.execute_cmd(cmd, "pfcp move database")
+                    print(" DSI submitted pfcp database movement job.")
             except Exception as e:
                 raise RuntimeError(f"pfcp failed with error: {str(e)} ")
         
