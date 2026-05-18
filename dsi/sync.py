@@ -341,7 +341,7 @@ class Sync():
                 shutil.copy2(file , file_remote)
 
             # delete temp columns from filesystem table
-            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table("filesystem", filesystem_df)
             self.t.dsi_tables.append("filesystem")
@@ -382,7 +382,7 @@ class Sync():
             username, host = host_part.split("@")
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
             # delete temp columns from filesystem table
-            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
             # remove username from remote_location column in federated table
             federated_df = self.t.get_table("federated")
             federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
@@ -425,7 +425,7 @@ class Sync():
                 raise ValueError("Remote path's hostname must be in the format user@server") from None
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
             # delete temp columns from filesystem table
-            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
             # remove username from remote_location column in federated table
             federated_df = self.t.get_table("federated")
             federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
@@ -484,7 +484,7 @@ class Sync():
                 print(" DSI submitted Conduit data movement job.")
 
                 # delete temp columns from filesystem table
-                filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+                filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
                 self.t.dsi_tables.remove("filesystem")
                 self.t.overwrite_table("filesystem", filesystem_df)
                 self.t.dsi_tables.append("filesystem")
@@ -514,7 +514,7 @@ class Sync():
                 print(" DSI submitted pfcp data movement job.")
 
                 # delete temp columns from filesystem table
-                filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+                filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
                 self.t.dsi_tables.remove("filesystem")
                 self.t.overwrite_table("filesystem", filesystem_df)
                 self.t.dsi_tables.append("filesystem")
@@ -531,14 +531,14 @@ class Sync():
         
         elif tool.lower() == "ftp":
             # delete temp columns from filesystem table -- do after data has been moved
-            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table("filesystem", filesystem_df)
             self.t.dsi_tables.append("filesystem")
 
         elif tool.lower() == "git":
             # delete temp columns from filesystem table -- do after data has been moved
-            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"])
+            filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table("filesystem", filesystem_df)
             self.t.dsi_tables.append("filesystem")
