@@ -404,8 +404,6 @@ class OSTI(Webserver):
         record_rows = []
 
         for rec in records:
-            authors = rec.get("authors", []) or []
-            subjects = rec.get("subjects", []) or []
             links = rec.get("links", []) or []
 
             citation_url = None
@@ -432,34 +430,30 @@ class OSTI(Webserver):
                 "entry_date": rec.get("entry_date"),
                 "language": rec.get("language"),
                 "country_publication": rec.get("country_publication"),
-                "site_ownership_code": rec.get("site_ownership_code"),
                 "product_type": rec.get("product_type"),
                 "description": rec.get("description"),
                 "publisher": rec.get("publisher"),
                 "journal_name": rec.get("journal_name"),
                 "journal_volume": rec.get("journal_volume"),
                 "journal_issue": rec.get("journal_issue"),
-                "journal_page": rec.get("journal_page"),
-                "conference_name": rec.get("conference_name"),
-                "conference_location": rec.get("conference_location"),
-                "conference_date": rec.get("conference_date"),
+                "availability": rec.get("availability"),
+                "format": rec.get("format"), 
                 "report_number": rec.get("report_number"),
-                "contract_number": rec.get("contract_number") or rec.get("doe_contract_number"),
-                "source_id": rec.get("source_id"),
-                "source_osti_id": rec.get("source_osti_id"),
+                "doe_contract_number": rec.get("doe_contract_number"),
+                "nsa_number": rec.get("doe_contract_number"), 
 
-                "authors": self._flatten_list(authors, key="name"),
-                "subjects": self._flatten_list(subjects),
-                "sponsor_orgs": self._flatten_list(rec.get("sponsor_orgs", []) or [], key="name"),
-                "research_orgs": self._flatten_list(rec.get("research_orgs", []) or [], key="name"),
-                "other_identifiers": self._flatten_list(rec.get("other_identifiers", []) or []),
+                "authors": self._flatten_list(rec.get("authors", []) or [], key="name"),
+                "subjects": self._flatten_list(rec.get("subjects", []) or []),
+                "sponsor_org": self._flatten_list(rec.get("sponsor_org", []) or [], key="name"),
+                "research_org": self._flatten_list(rec.get("research_org", []) or [], key="name"),
+                "contributor_org": self._flatten_list(rec.get("contributor_org", []) or [], key="name"),
 
                 "has_fulltext": fulltext_url is not None,
                 "citation_url": citation_url,
                 "citation_doe_pages_url": doe_pages_url,
                 "fulltext_url": fulltext_url,
 
-                "raw_links": links,
+                # "raw_links": links,
                 "raw_record": rec,
             })
 
