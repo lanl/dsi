@@ -16,7 +16,7 @@ os.makedirs(path)
 dsi = DSI(backend_name="Oceans11", params={"q": "heat","rows": 5}, workspace=path)
 
 # save the results as a db
-dsi.process("sqlite", path + "heat.db")
+dsi.process("sqlite", path + "heat_search.db")
 # list the number of resulting entries
 dsi.list()
 
