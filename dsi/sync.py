@@ -435,12 +435,12 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
             
             # Database movement
-            for dbname in db_list
-            cmd = ["rsync", "-av", self.full_db_name, os.path.join(self.remote_location, self.project_name)]
-            if isVerbose:
-                print()
-                print(*cmd)
-            self.execute_cmd(cmd, "rsync database")
+            for dbname in db_list:
+                cmd = ["rsync", "-av", dbname, os.path.join(self.remote_location, self.project_name)]
+                if isVerbose:
+                    print()
+                    print(*cmd)
+                self.execute_cmd(cmd, "rsync database")
             print(" DSI Rsync database movement complete.")
         
         elif tool.lower() == "conduit":
