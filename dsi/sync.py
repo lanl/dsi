@@ -35,7 +35,10 @@ class Sync():
             if extension != "":
                 self.full_db_name = self.project_name + extension
                 if not os.path.exists(self.full_db_name):
-                    raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
+                    print("Creating new database: " + self.full_db_name)
+                    # We now allow a user to begin indexing from an empty database, so bypass raise
+                    #raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
+
             else:
                 proj_db_found = False
                 for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
@@ -52,7 +55,7 @@ class Sync():
             self.local_location = None
 
             self.t = Terminal()
-            # first check if user can create db here
+            # First check if user can create db here
             if "/" in project_name:
                 create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
             else:
@@ -61,15 +64,24 @@ class Sync():
                 raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
         
             backend_name = self.t.identify_backend(self.full_db_name)
+            # Allows an empty database to be created, autoselect SQLite for the user
             if backend_name is None:
-                raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+                #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+                print("Auto-selecting sqlite backend.")
+                backend_name = "Sqlite"
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
 
+            # Actually create a database and add a placeholder table
             if not self.t.valid_backend(self.t.loaded_backends[0]):
-                raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
+                #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
+                st_dict = OrderedDict()
+                st_dict['file_origin'] = []
+                self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
+                self.t.artifact_handler(interaction_type='ingest')
+
 
 
     def index(self, local_loc, remote_loc, isVerbose=False, no_parent = False):
