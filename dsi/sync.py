@@ -23,8 +23,12 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name=None):
+    def __init__(self, project_name=None, isVerbose = False, no_parent = False, **kwargs):
         self.project_name = project_name
+        self.verbose = isVerbose
+        self.no_parent = no_parent
+        self.add_dbs = kwargs.pop("add_dbs", [])
+
         extension = ""
         if project_name:
             for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
@@ -84,7 +88,7 @@ class Sync():
 
 
 
-    def index(self, local_loc, remote_loc, isVerbose=False, no_parent = False):
+    def index(self, local_loc, remote_loc):
         """
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
@@ -95,7 +99,7 @@ class Sync():
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
 
-        if isVerbose:
+        if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
 
         table_list = self.t.list(True)
@@ -109,7 +113,7 @@ class Sync():
                     self.remote_location = remote_loc
                     self.local_location = local_loc
                     if fed_remote == remote_loc:
-                        if isVerbose:
+                        if self.verbose:
                             print("DSI Index complete!\n")
                         return
                     
@@ -123,14 +127,14 @@ class Sync():
                     self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
                     self.t.dsi_tables.append("filesystem")
 
-                    if isVerbose:
+                    if self.verbose:
                         print("DSI Index complete!\n")
                     return
 
         # Data Crawl and gather metadata of local location
-        file_list = self.dircrawl2(local_loc, isVerbose)
+        file_list = self.dircrawl2(local_loc, self.verbose)
 
-        if isVerbose:
+        if self.verbose:
             file_list, tmp = itertools.tee(file_list)
             file_len=sum(1 for _ in tmp)
             print("Crawled "+str(file_len)+" files.")
@@ -161,7 +165,7 @@ class Sync():
         st_dict['uuid'] = []
         st_dict['file_remote'] = []
 
-        if isVerbose:
+        if self.verbose:
             print("Collection object [", end="")
             last = -10
 
@@ -171,7 +175,7 @@ class Sync():
             filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
-            if no_parent: # exclude parent dir of every file in remote location
+            if self.no_parent: # exclude parent dir of every file in remote location
                 rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
             else:
                 rfilepath = os.path.join(remote_loc,self.project_name, parent_rel_file)
@@ -190,17 +194,17 @@ class Sync():
             st_dict['uuid'].append(self.gen_uuid(st))
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
-            if isVerbose:
+            if self.verbose:
                 progress = int(len(st_list) / file_len * 100)
                 # Print progress bar every 2%
                 if progress % 2 == 0 and progress != last:
                     print(".", end="")
                     last = progress
 
-        if isVerbose:
+        if self.verbose:
             print(f"] Collection object created with {len(st_list)} entries.")
                 
-        if isVerbose:
+        if self.verbose:
             print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
@@ -222,7 +226,7 @@ class Sync():
             
             self.t.artifact_handler(interaction_type='ingest')
 
-        if isVerbose:
+        if self.verbose:
             print("DSI Index complete!\n")
 
 
@@ -241,6 +245,9 @@ class Sync():
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
+            elif "No credentials" in stdout:
+                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.")
+                raise RuntimeError("Kerberos message: " + str(stdout))
             raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
         return stdout
 
@@ -269,23 +276,20 @@ class Sync():
             print("Warning:", str(e))
 
 
-    def move(self, tool="copy", isVerbose=False, **kwargs):
-        self.copy(tool,isVerbose,kwargs)
+    def move(self, tool="copy"):
+        self.copy(tool)
 
 
-    def copy(self, tool="copy", isVerbose=False, **kwargs):
+    def copy(self, tool="copy"):
         """
         Helper function to perform the data copy over using a preferred API
         """
         if any(x is None for x in (self.remote_location, self.local_location)):
             raise RuntimeError("Must successfully run DSI Index before Copy")
 
-        # kwargs, add to list of moving dbs
+        # move additional dbs as well if specified in init
         db_list = [self.full_db_name]
-        if kwargs:
-            add_dbs = kwargs.pop("add_dbs", [])
-            if add_dbs and isinstance(add_dbs, list):
-                db_list.extend(add_dbs)
+        db_list.extend(self.add_dbs)
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
@@ -303,11 +307,10 @@ class Sync():
         if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
             remote_list = [ os.path.join(self.remote_location,self.project_name) ]
             for remote in remote_list:
-                if isVerbose:
+                if self.verbose:
                     print(f"Testing access to '{remote}' directory.")
                 try: # Try for file permissions
                     if os.path.exists(remote): # Check if exists
-                        # TODO: add extra arg that overwrites the dir or creates a new one with _1 , _2 etc
                         print(f"The directory '{remote}' already exists remotely.")
                     else:
                         path = Path(remote)
@@ -328,7 +331,7 @@ class Sync():
             for file, file_remote in zip(file_list, rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
-                    if isVerbose:
+                    if self.verbose:
                         print(" mkdir " + abspath)
                     path = Path(abspath)
                     try:
@@ -336,7 +339,7 @@ class Sync():
                     except Exception:
                         raise RuntimeError(f"Unable to create folder {abspath}. Check your access rights")
 
-                if isVerbose:
+                if self.verbose:
                     print(" cp " + file + " " + file_remote)
                 shutil.copy2(file , file_remote)
 
@@ -348,7 +351,7 @@ class Sync():
 
             # Database movement
             for dbname in db_list:
-                if isVerbose:
+                if self.verbose:
                     print(" cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
                 shutil.copy2(dbname, os.path.join(self.remote_location, self.project_name, dbname))
 
@@ -364,7 +367,7 @@ class Sync():
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # making remote dir
-            if isVerbose:
+            if self.verbose:
                 print(" ssh "+ str(host_part) + " \"mkdir -p " + str(os.path.join(path_part, self.project_name)) + "\"" )
             cmd = ["ssh", host_part, f'mkdir -p \"{os.path.join(path_part, self.project_name)}\"']
             print("Creating remote directory if it doesn't exist")
@@ -372,7 +375,7 @@ class Sync():
 
             # File movement
             cmd = ["scp", "-rp", self.local_location, os.path.join(self.remote_location, self.project_name)]
-            if isVerbose:
+            if self.verbose:
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
@@ -394,7 +397,7 @@ class Sync():
             # Database movement
             for dbname in db_list:
                 cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, self.project_name, dbname)]
-                if isVerbose:
+                if self.verbose:
                     print()
                     print(*cmd)
                 self.execute_cmd(cmd, "scp database")
@@ -413,7 +416,7 @@ class Sync():
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
             cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
                    self.local_location, os.path.join(self.remote_location, self.project_name)]
-            if isVerbose:
+            if self.verbose:
                 print(*cmd)
             self.execute_cmd(cmd, "rsync data")
             print(" DSI Rsync data movement complete.")
@@ -437,7 +440,7 @@ class Sync():
             # Database movement
             for dbname in db_list:
                 cmd = ["rsync", "-av", dbname, os.path.join(self.remote_location, self.project_name)]
-                if isVerbose:
+                if self.verbose:
                     print()
                     print(*cmd)
                 self.execute_cmd(cmd, "rsync database")
@@ -447,7 +450,7 @@ class Sync():
             import signal
 
             # Test Kerberos
-            if isVerbose:
+            if self.verbose:
                 print( "Testing: klist")
             cmd = ['klist']
             stdout = self.execute_cmd(cmd, "Testing klist")
@@ -462,12 +465,12 @@ class Sync():
             signal.alarm(10)
 
             try:
-                if isVerbose:
+                if self.verbose:
                     print("Testing Conduit: conduit get")
                 cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
-                if "TRANSFER_ID" in stdout and isVerbose:
+                if "TRANSFER_ID" in stdout and self.verbose:
                     print(" Conduit is authenticated.")
                 elif "TRANSFER_ID" not in stdout:
                     raise RuntimeError("Conduit Error: " + str(stdout))
@@ -477,7 +480,7 @@ class Sync():
             try:
                 base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
                 # File Movement
-                if isVerbose:
+                if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
                 self.execute_cmd(cmd, "Conduit copy data")
@@ -491,7 +494,7 @@ class Sync():
 
                 # Database Movement
                 for dbname in db_list:
-                    if isVerbose:
+                    if self.verbose:
                         print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
                     cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
                     self.execute_cmd(cmd, "Conduit copy database")
@@ -507,7 +510,7 @@ class Sync():
         elif tool.lower() == "pfcp":
             try:
                 # File Movement
-                if isVerbose:
+                if self.verbose:
                     print("pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = ['pfcp','-R',self.local_location, os.path.join(self.remote_location, self.project_name)]
                 self.execute_cmd(cmd, "pfcp move data")
@@ -521,7 +524,7 @@ class Sync():
 
                 # Database Movement
                 for dbname in db_list:
-                    if isVerbose:
+                    if self.verbose:
                         print("pfcp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
                     cmd = ['pfcp', dbname, os.path.join(self.remote_location, self.project_name, dbname)]
                     self.execute_cmd(cmd, "pfcp move database")

@@ -6,6 +6,6 @@ local_files = "/Users/Shared/dsi/examples/clover3d/"
 remote_path = "/Users/Shared/staging/"
 
 # Create Sync type with project database name
-s = Sync("clover3d")
-s.index(local_files,remote_path,True)
-s.copy("copy",True)
+s = Sync("clover3d", True)
+s.index(local_files, remote_path)
+s.copy("copy")
