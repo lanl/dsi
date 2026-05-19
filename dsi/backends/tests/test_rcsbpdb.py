@@ -7,7 +7,7 @@ Run from the repository root with something like:
 python -m pytest -s dsi/backends/tests/test_wwpdb.py
 """
 
-from dsi.backends.wwpdb import WWPDB
+from dsi.dsi.backends.rcsbpdb import WWPDB
 
 
 TEST_DOIS = [
