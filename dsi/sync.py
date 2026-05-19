@@ -100,30 +100,32 @@ class Sync():
 
         table_list = self.t.list(True)
         if "federated" in table_list and "filesystem" in table_list:
-            fed_table = self.t.get_table("federated")
-            fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
-            if fed_local == local_loc:
-                self.remote_location = remote_loc
-                self.local_location = local_loc
-                if fed_remote == remote_loc:
+            filesystem_df = self.t.get_table("filesystem")
+            # only skip reindexing if data not moved yet
+            if "file_abs" in filesystem_df.columns.tolist():
+                fed_table = self.t.get_table("federated")
+                fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
+                if fed_local == local_loc:
+                    self.remote_location = remote_loc
+                    self.local_location = local_loc
+                    if fed_remote == remote_loc:
+                        if isVerbose:
+                            print("DSI Index complete!\n")
+                        return
+                    
+                    # update remote file paths to use new remote location
+                    filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
+                    
+                    # update remote location in federated table
+                    fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
+
+                    self.t.dsi_tables.remove("filesystem")
+                    self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
+                    self.t.dsi_tables.append("filesystem")
+
                     if isVerbose:
                         print("DSI Index complete!\n")
                     return
-                
-                # update remote file paths to use new remote location
-                filesystem_df = self.t.get_table("filesystem")
-                filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
-                
-                # update remote location in federated table
-                fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
-
-                self.t.dsi_tables.remove("filesystem")
-                self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
-                self.t.dsi_tables.append("filesystem")
-
-                if isVerbose:
-                    print("DSI Index complete!\n")
-                return
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, isVerbose)
@@ -145,8 +147,7 @@ class Sync():
         # Create ordered dictionary
         st_dict = OrderedDict()
         st_dict['file_origin'] = []
-        # st_dict['file_abs'] = []
-        # st_dict['file_rel'] = []
+        st_dict['file_abs'] = [] # Temporary column for unix copy
         st_dict['size']= []
         st_dict['modified_time'] = []
         st_dict['created_time'] = []
@@ -175,8 +176,7 @@ class Sync():
             else:
                 rfilepath = os.path.join(remote_loc,self.project_name, parent_rel_file)
             st_dict['file_origin'].append(rel_file)
-            # st_dict['file_abs'].append(file) # Temporary column for move
-            # st_dict['file_rel'].append(rfilepath) # Temporary column for move
+            st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
             st_dict['modified_time'].append(st.st_mtime)
             st_dict['created_time'].append(st.st_ctime)
@@ -273,7 +273,7 @@ class Sync():
         self.copy(tool,isVerbose,kwargs)
 
 
-    def copy(self, tool="copy", isVerbose=False, no_parent = False, **kwargs):
+    def copy(self, tool="copy", isVerbose=False, **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
         """
@@ -295,8 +295,8 @@ class Sync():
             print(" Data copy failed.")
             return
         
-        # file_list = filesystem_df["file_abs"].tolist()
-        # rfile_list = filesystem_df["file_rel"].tolist()
+        file_list = filesystem_df["file_abs"].tolist()
+        rfile_list = filesystem_df["file_remote"].tolist()
         
         # Test remote location validity and try creating folders
         # TODO: iterate through remote/server list here, for now:
@@ -307,11 +307,11 @@ class Sync():
                     print(f"Testing access to '{remote}' directory.")
                 try: # Try for file permissions
                     if os.path.exists(remote): # Check if exists
+                        # TODO: add extra arg that overwrites the dir or creates a new one with _1 , _2 etc
                         print(f"The directory '{remote}' already exists remotely.")
                     else:
                         path = Path(remote)
                         path.mkdir(parents=True, exist_ok=True)
-                        # os.makedirs(remote) # Create it
                         print(f"The directory '{remote}' has been created remotely.")
                 except Exception as err:
                     if "input/output error" in str(err).lower():
@@ -323,16 +323,9 @@ class Sync():
                             raise RuntimeError(f"Input/Output error detected: {err}")
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
-        # TODO: have movement service handle type without user input (cp,scp,ftp,rsync,etc.)
-        if tool.lower() == "copy":
-            file_list = [str(Path(self.local_location) / s) for s in filesystem_df["file_origin"]]
-            if no_parent:
-                rfile_list = [os.path.join(self.remote_location, self.project_name, s) for s in filesystem_df["file_origin"]]
-            else:
-                base_parent = Path(self.local_location).parent
-                rfile_list = [str(Path(self.remote_location) / self.project_name / Path(f).relative_to(base_parent)) for f in file_list]
-            
-            for file,file_remote in zip(file_list, rfile_list):
+        # TODO: have movement service handle type without user input (cp,scp,rsync,conduit,pfcp,ftp,etc.)
+        if tool.lower() == "copy":            
+            for file, file_remote in zip(file_list, rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
                     if isVerbose:
@@ -348,10 +341,10 @@ class Sync():
                 shutil.copy2(file , file_remote)
 
             # delete temp columns from filesystem table
-            # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
-            # self.t.dsi_tables.remove("filesystem")
-            # self.t.overwrite_table("filesystem", filesystem_df)
-            # self.t.dsi_tables.append("filesystem")
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
 
             # Database movement
             for dbname in db_list:
@@ -388,8 +381,8 @@ class Sync():
             # remove username from file_remote column in filesystem table
             username, host = host_part.split("@")
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
-            # # delete temp columns from filesystem table
-            # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             # remove username from remote_location column in federated table
             federated_df = self.t.get_table("federated")
             federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
@@ -431,8 +424,8 @@ class Sync():
             except Exception:
                 raise ValueError("Remote path's hostname must be in the format user@server") from None
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
-            # # delete temp columns from filesystem table
-            # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             # remove username from remote_location column in federated table
             federated_df = self.t.get_table("federated")
             federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
@@ -490,11 +483,11 @@ class Sync():
                 self.execute_cmd(cmd, "Conduit copy data")
                 print(" DSI submitted Conduit data movement job.")
 
-                # # delete temp columns from filesystem table
-                # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
-                # self.t.dsi_tables.remove("filesystem")
-                # self.t.overwrite_table("filesystem", filesystem_df)
-                # self.t.dsi_tables.append("filesystem")
+                # delete temp columns from filesystem table
+                filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+                self.t.dsi_tables.remove("filesystem")
+                self.t.overwrite_table("filesystem", filesystem_df)
+                self.t.dsi_tables.append("filesystem")
 
                 # Database Movement
                 for dbname in db_list:
@@ -520,11 +513,11 @@ class Sync():
                 self.execute_cmd(cmd, "pfcp move data")
                 print(" DSI submitted pfcp data movement job.")
 
-                # # delete temp columns from filesystem table
-                # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
-                # self.t.dsi_tables.remove("filesystem")
-                # self.t.overwrite_table("filesystem", filesystem_df)
-                # self.t.dsi_tables.append("filesystem")
+                # delete temp columns from filesystem table
+                filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+                self.t.dsi_tables.remove("filesystem")
+                self.t.overwrite_table("filesystem", filesystem_df)
+                self.t.dsi_tables.append("filesystem")
 
                 # Database Movement
                 for dbname in db_list:
@@ -538,19 +531,19 @@ class Sync():
         
         elif tool.lower() == "ftp":
             pass
-            # # delete temp columns from filesystem table -- do after data has been moved
-            # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
-            # self.t.dsi_tables.remove("filesystem")
-            # self.t.overwrite_table("filesystem", filesystem_df)
-            # self.t.dsi_tables.append("filesystem")
+            # delete temp columns from filesystem table -- do after data has been moved
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
 
         elif tool.lower() == "git":
             pass
-            # # delete temp columns from filesystem table -- do after data has been moved
-            # filesystem_df = filesystem_df.drop(columns=["file_abs", "file_rel"], errors="ignore")
-            # self.t.dsi_tables.remove("filesystem")
-            # self.t.overwrite_table("filesystem", filesystem_df)
-            # self.t.dsi_tables.append("filesystem")
+            # delete temp columns from filesystem table -- do after data has been moved
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
 
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
