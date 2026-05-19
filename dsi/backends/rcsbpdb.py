@@ -1,7 +1,7 @@
 """
-wwPDB Webserver Backend for DSI
+RCSBPDB Webserver Backend for DSI
 
-Read-only metadata-first backend that retrieves wwPDB/RCSB metadata
+Read-only metadata-first backend that retrieves rcsb pdb metadata
 and exposes it as in-memory DSI tables.
 
 Access modes
@@ -18,7 +18,7 @@ Access modes
 DOI behavior
 ------------
 RCSB Search API is not used for DOI lookup.
-wwPDB DOI input is normalized and converted into a PDB ID when possible.
+rcsbpdb DOI input is normalized and converted into a PDB ID when possible.
 
 REST flow
 ---------
@@ -43,81 +43,38 @@ Current scope
 - REST APIs only
 - Exposes mmCIF download URLs
 - Does not parse raw mmCIF content yet
+
+identifiers
+→ __init__()
+→ _load_initial_data()
+→ lookup_identifier()
+→ lookup_rcsbpdb()
+→ _request()
+→ GET https://data.rcsb.org/rest/v1/core/entry/{pdb_id}
+
+params
+→ __init__()
+→ _load_from_params()
+→ _search_rcsb()
+→ _build_search_query()
+→ _post_json()
+→ POST https://search.rcsb.org/rcsbsearch/v2/query
 """
+
 
 from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
+from collections import OrderedDict
+
 import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from collections import OrderedDict
+
 from dsi.backends.webserver import Webserver
-
-
-DATA_CORE_URL = "https://data.rcsb.org/rest/v1/core"
-SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
-
-ENDPOINTS = {
-    "search": SEARCH_URL,
-    "data_core": DATA_CORE_URL,
-    "entry": f"{DATA_CORE_URL}/entry/{{pdb_id}}",
-    "entry_landing": "https://www.rcsb.org/structure/{pdb_id}",
-    "mmcif_gz": (
-        "https://files.wwpdb.org/pub/pdb/data/structures/divided/mmCIF/"
-        "{subdir}/{pdb_id}.cif.gz"
-    ),
-}
-
-DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
-WWPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.I)
-PDB_ID_REGEX = re.compile(r"^[A-Za-z0-9]{4}$")
-
-
-DATASET_SCHEMA = [
-    "dataset_id",
-    "source_repository",
-    "doi",
-    "title",
-    "description",
-    "landing_page",
-    "metadata_url",
-    "experimental_method",
-    "release_date",
-    "revision_date",
-    "resource_count",
-    "usability_label",
-    "api_status",
-    "query_source",
-    "raw_metadata",
-    "notes",
-]
-
-RESOURCE_SCHEMA = [
-    "resource_id",
-    "dataset_id",
-    "source_repository",
-    "name",
-    "download_url",
-    "format",
-    "resource_type",
-    "source",
-    "raw_metadata",
-]
-
-ERROR_SCHEMA = [
-    "identifier",
-    "normalized_identifier",
-    "repo",
-    "status",
-    "endpoint_used",
-    "endpoint_variables",
-    "query_source",
-    "notes",
-]
 
 
 class ValueObject:
@@ -152,8 +109,8 @@ class FileResource:
 
 
 @dataclass
-class WWPDBResolution:
-    """Internal normalized result object for one wwPDB/RCSB lookup."""
+class RCSBPDBResolution:
+    """Internal normalized result object for one rcsbpdb/RCSB lookup."""
 
     original_identifier: str
     normalized_identifier: str
@@ -172,33 +129,73 @@ class WWPDBResolution:
     notes: List[str] = field(default_factory=list)
 
 
-def classify_usability(exts: Iterable[Optional[str]]) -> str:
-    """Classify resource usability based on file extensions."""
-    ext_set = {e.lower() for e in exts if e}
-
-    if not ext_set:
-        return "lookup_failed"
-
-    tabular = {"csv", "tsv", "xlsx", "xls", "json", "xml", "txt", "parquet"}
-    scientific = {"cif", "cif.gz", "nc", "h5", "hdf5", "cdf"}
-    archive_only = {"zip", "tar", "tar.gz", "gz"}
-
-    if ext_set & tabular:
-        return "tabular_or_easy_parse"
-    if ext_set & scientific:
-        return "scientific_structured"
-    if ext_set <= archive_only:
-        return "archive_only"
-    return "other_format"
-
-
-class WWPDB(Webserver):
+class RCSBPDB(Webserver):
     """
-    wwPDB/RCSB metadata backend for DSI.
+    rcsbpdb/RCSB metadata backend for DSI.
 
-    Implements the DSI Webserver interface and exposes RCSB/wwPDB
+    Implements the DSI Webserver interface and exposes RCSB/rcsbpdb
     metadata as in-memory DSI tables.
     """
+
+    DATA_CORE_URL = "https://data.rcsb.org/rest/v1/core"
+    SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
+
+    ENDPOINTS = {
+        "search": SEARCH_URL,
+        "data_core": DATA_CORE_URL,
+        "entry": f"{DATA_CORE_URL}/entry/{{pdb_id}}",
+        "entry_landing": "https://www.rcsb.org/structure/{pdb_id}",
+        "mmcif_gz": (
+            "https://files.wwpdb.org/pub/pdb/data/structures/divided/mmCIF/"
+            "{subdir}/{pdb_id}.cif.gz"
+        ),
+    }
+
+    DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
+    RCSBPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.I)
+    PDB_ID_REGEX = re.compile(r"^[A-Za-z0-9]{4}$")
+
+    DATASET_SCHEMA = [
+        "dataset_id",
+        "source_repository",
+        "doi",
+        "title",
+        "description",
+        "landing_page",
+        "metadata_url",
+        "experimental_method",
+        "release_date",
+        "revision_date",
+        "resource_count",
+        "usability_label",
+        "api_status",
+        "query_source",
+        "raw_metadata",
+        "notes",
+    ]
+
+    RESOURCE_SCHEMA = [
+        "resource_id",
+        "dataset_id",
+        "source_repository",
+        "name",
+        "download_url",
+        "format",
+        "resource_type",
+        "source",
+        "raw_metadata",
+    ]
+
+    ERROR_SCHEMA = [
+        "identifier",
+        "normalized_identifier",
+        "repo",
+        "status",
+        "endpoint_used",
+        "endpoint_variables",
+        "query_source",
+        "notes",
+    ]
 
     SUPPORTED_PARAMS = {
         "keywords",
@@ -217,33 +214,9 @@ class WWPDB(Webserver):
         **kwargs,
     ) -> None:
         """
-        Initialize wwPDB backend and optionally load data from RCSB APIs.
-
-        Parameters
-        ----------
-        url : str, optional
-            Base RCSB Data API URL. Defaults to DATA_CORE_URL.
-        identifiers : list[str], optional
-            Direct PDB IDs or wwPDB DOIs to load.
-        params : dict, optional
-            Query parameters for RCSB Search API.
-            Supported keys:
-                - keywords
-                - authors
-                - experimental_method
-                - limit
-                - start
-                - return_type
-        **kwargs : dict
-            Backend configuration only:
-                - timeout : int, default 60
-                - verify_ssl : bool or str, default True
-                - verify : bool or str, fallback SSL option
-                - retries : int, default 3
-                - validate_on_init : bool, default True
-                - auto_load : bool, default True
+        Initialize rcsbpdb backend and optionally load data from RCSB APIs.
         """
-        self.url = (url or DATA_CORE_URL).rstrip("/")
+        self.url = (url or self.DATA_CORE_URL).rstrip("/")
         self.identifiers = list(dict.fromkeys(identifiers or []))
         self.params = params or {}
 
@@ -258,12 +231,12 @@ class WWPDB(Webserver):
 
         self.tables: Dict[str, List[Dict[str, Any]]] = {}
         self.schemas: Dict[str, List[str]] = {
-            "datasets": DATASET_SCHEMA,
-            "resources": RESOURCE_SCHEMA,
-            "errors": ERROR_SCHEMA,
+            "datasets": self.DATASET_SCHEMA,
+            "resources": self.RESOURCE_SCHEMA,
+            "errors": self.ERROR_SCHEMA,
         }
 
-        self.raw_results: List[WWPDBResolution] = []
+        self.raw_results: List[RCSBPDBResolution] = []
         self.last_search_response: Optional[Dict[str, Any]] = None
         self._loaded = False
 
@@ -272,7 +245,7 @@ class WWPDB(Webserver):
                 self.validate_connection()
             except Exception as exc:
                 self._loaded = False
-                raise RuntimeError(f"WWPDB connection validation failed: {exc}") from exc
+                raise RuntimeError(f"rcsbpdb connection validation failed: {exc}") from exc
 
         if self.auto_load:
             try:
@@ -287,7 +260,7 @@ class WWPDB(Webserver):
 
             except Exception as exc:
                 self._loaded = False
-                raise RuntimeError(f"Failed to load initial WWPDB data: {exc}") from exc
+                raise RuntimeError(f"Failed to load initial rcsbpdb data: {exc}") from exc
         else:
             self._loaded = True
 
@@ -298,7 +271,7 @@ class WWPDB(Webserver):
         session = requests.Session()
         session.headers.update(
             {
-                "User-Agent": "dsi-wwpdb-backend/1.0",
+                "User-Agent": "dsi-rcsbpdb-backend/1.0",
                 "Accept": "application/json",
             }
         )
@@ -319,7 +292,7 @@ class WWPDB(Webserver):
         return session
 
     def validate_connection(self) -> bool:
-        test_url = ENDPOINTS["entry"].format(pdb_id="1CBS")
+        test_url = self.ENDPOINTS["entry"].format(pdb_id="1CBS")
         response = self.session.get(test_url, timeout=self.timeout, verify=self.verify)
         response.raise_for_status()
         return True
@@ -327,9 +300,6 @@ class WWPDB(Webserver):
     def _request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Generic GET helper.
-
-        Used for the RCSB Data API because each PDB ID maps to a fixed
-        metadata resource URL.
         """
         response = self.session.get(
             endpoint,
@@ -347,9 +317,6 @@ class WWPDB(Webserver):
     def _post_json(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generic POST helper.
-
-        Used for the RCSB Search API because search requests can contain
-        nested keyword/filter logic in the JSON body.
         """
         response = self.session.post(
             endpoint,
@@ -367,8 +334,8 @@ class WWPDB(Webserver):
     # ------------------------------------------------------------------
     # Identifier helpers
     # ------------------------------------------------------------------
-    @staticmethod
-    def normalize_doi(value: Any) -> Optional[str]:
+    @classmethod
+    def normalize_doi(cls, value: Any) -> Optional[str]:
         if value is None:
             return None
 
@@ -379,35 +346,35 @@ class WWPDB(Webserver):
         for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
             s = s.replace(prefix, "")
 
-        match = DOI_REGEX.search(s)
+        match = cls.DOI_REGEX.search(s)
         return match.group(1).lower().rstrip(" .;,)") if match else None
 
-    @staticmethod
-    def normalize_pdb_id(value: Any) -> Optional[str]:
+    @classmethod
+    def normalize_pdb_id(cls, value: Any) -> Optional[str]:
         if value is None:
             return None
 
         s = str(value).strip()
-        if PDB_ID_REGEX.match(s):
+        if cls.PDB_ID_REGEX.match(s):
             return s.upper()
 
         return None
 
-    @staticmethod
-    def classify_identifier(identifier: Any) -> str:
-        doi = WWPDB.normalize_doi(identifier)
-        if doi and WWPDB_DOI_REGEX.search(doi):
-            return "wwpdb_doi"
+    @classmethod
+    def classify_identifier(cls, identifier: Any) -> str:
+        doi = cls.normalize_doi(identifier)
+        if doi and cls.RCSBPDB_DOI_REGEX.search(doi):
+            return "rcsbpdb_doi"
 
-        pdb_id = WWPDB.normalize_pdb_id(identifier)
+        pdb_id = cls.normalize_pdb_id(identifier)
         if pdb_id:
             return "pdb_id"
 
         return "other"
 
-    @staticmethod
-    def extract_pdb_id_from_doi(doi: str) -> Optional[str]:
-        match = WWPDB_DOI_REGEX.search(doi)
+    @classmethod
+    def extract_pdb_id_from_doi(cls, doi: str) -> Optional[str]:
+        match = cls.RCSBPDB_DOI_REGEX.search(doi)
         return match.group(1).upper() if match else None
 
     @staticmethod
@@ -422,6 +389,28 @@ class WWPDB(Webserver):
             return ".".join(parts[-2:])
 
         return parts[-1]
+
+    @staticmethod
+    def classify_usability(exts: Iterable[Optional[str]]) -> str:
+        """
+        Classify resource usability based on file extensions.
+        """
+        ext_set = {e.lower() for e in exts if e}
+
+        if not ext_set:
+            return "lookup_failed"
+
+        tabular = {"csv", "tsv", "xlsx", "xls", "json", "xml", "txt", "parquet"}
+        scientific = {"cif", "cif.gz", "nc", "h5", "hdf5", "cdf"}
+        archive_only = {"zip", "tar", "tar.gz", "gz"}
+
+        if ext_set & tabular:
+            return "tabular_or_easy_parse"
+        if ext_set & scientific:
+            return "scientific_structured"
+        if ext_set <= archive_only:
+            return "archive_only"
+        return "other_format"
 
     # ------------------------------------------------------------------
     # Query-driven Search API support
@@ -438,17 +427,6 @@ class WWPDB(Webserver):
     def _search_rcsb(self, params: Dict[str, Any]) -> List[str]:
         """
         Search RCSB and return PDB IDs.
-
-        Supported params:
-        - keywords
-        - authors
-        - experimental_method
-        - limit
-        - start
-        - return_type
-
-        DOI search is not supported here. DOI input is handled by
-        lookup_identifier() using DOI-to-PDB-ID extraction.
         """
         self._validate_params(params)
 
@@ -471,7 +449,7 @@ class WWPDB(Webserver):
             },
         }
 
-        data = self._post_json(ENDPOINTS["search"], payload)
+        data = self._post_json(self.ENDPOINTS["search"], payload)
         self.last_search_response = data
 
         result_set = data.get("result_set", [])
@@ -490,7 +468,7 @@ class WWPDB(Webserver):
         unsupported = set(params.keys()) - self.SUPPORTED_PARAMS
         if unsupported:
             raise ValueError(
-                f"Unsupported wwPDB search params: {sorted(unsupported)}. "
+                f"Unsupported rcsbpdb search params: {sorted(unsupported)}. "
                 f"Supported params: {sorted(self.SUPPORTED_PARAMS)}"
             )
 
@@ -554,13 +532,13 @@ class WWPDB(Webserver):
         self,
         identifier: str,
         query_source: Optional[str] = None,
-    ) -> WWPDBResolution:
+    ) -> RCSBPDBResolution:
         kind = self.classify_identifier(identifier)
 
-        if kind == "wwpdb_doi":
+        if kind == "rcsbpdb_doi":
             doi = self.normalize_doi(identifier)
             pdb_id = self.extract_pdb_id_from_doi(doi)
-            return self.lookup_wwpdb(
+            return self.lookup_rcsbpdb(
                 pdb_id=pdb_id,
                 original_identifier=identifier,
                 doi=doi,
@@ -569,35 +547,35 @@ class WWPDB(Webserver):
 
         if kind == "pdb_id":
             pdb_id = self.normalize_pdb_id(identifier)
-            return self.lookup_wwpdb(
+            return self.lookup_rcsbpdb(
                 pdb_id=pdb_id,
                 original_identifier=identifier,
                 doi=None,
                 query_source=query_source or "identifier",
             )
 
-        return WWPDBResolution(
+        return RCSBPDBResolution(
             original_identifier=str(identifier),
             normalized_identifier=str(identifier),
             repo="other",
             endpoint_used=None,
             status="skipped",
             query_source=query_source,
-            notes=["Identifier did not match a wwPDB DOI or 4-character PDB ID."],
+            notes=["Identifier did not match a rcsbpdb DOI or 4-character PDB ID."],
         )
 
-    def lookup_wwpdb(
+    def lookup_rcsbpdb(
         self,
         pdb_id: Optional[str],
         original_identifier: str,
         doi: Optional[str] = None,
         query_source: Optional[str] = None,
-    ) -> WWPDBResolution:
-        result = WWPDBResolution(
+    ) -> RCSBPDBResolution:
+        result = RCSBPDBResolution(
             original_identifier=original_identifier,
             normalized_identifier=doi or pdb_id or str(original_identifier),
-            repo="wwpdb",
-            endpoint_used=ENDPOINTS["entry"],
+            repo="rcsbpdb",
+            endpoint_used=self.ENDPOINTS["entry"],
             endpoint_variables={"pdb_id": pdb_id},
             doi=doi,
             query_source=query_source,
@@ -607,10 +585,13 @@ class WWPDB(Webserver):
             result.notes.append("Could not resolve a 4-character PDB ID.")
             return result
 
-        meta_url = ENDPOINTS["entry"].format(pdb_id=pdb_id)
+        meta_url = self.ENDPOINTS["entry"].format(pdb_id=pdb_id)
         subdir = pdb_id.lower()[1:3]
-        cif_url = ENDPOINTS["mmcif_gz"].format(subdir=subdir, pdb_id=pdb_id.lower())
-        landing_url = ENDPOINTS["entry_landing"].format(pdb_id=pdb_id)
+        cif_url = self.ENDPOINTS["mmcif_gz"].format(
+            subdir=subdir,
+            pdb_id=pdb_id.lower(),
+        )
+        landing_url = self.ENDPOINTS["entry_landing"].format(pdb_id=pdb_id)
 
         result.metadata_url = meta_url
         result.landing_page_url = landing_url
@@ -630,6 +611,7 @@ class WWPDB(Webserver):
                 "keywords": meta.get("struct_keywords", {}),
                 "rcsb_accession_info": meta.get("rcsb_accession_info", {}),
                 "citation": meta.get("citation", []),
+                "full_metadata": meta,
             }
 
             result.files = [
@@ -637,7 +619,7 @@ class WWPDB(Webserver):
                     label=f"{pdb_id.lower()}.cif.gz",
                     url=cif_url,
                     extension="cif.gz",
-                    source="wwpdb.archive_path",
+                    source="rcsbpdb.archive_path",
                     format_hint="mmCIF",
                 )
             ]
@@ -651,12 +633,12 @@ class WWPDB(Webserver):
 
         except requests.RequestException as exc:
             result.status = "request_failed"
-            result.notes.append(f"wwPDB request error: {str(exc)}")
+            result.notes.append(f"rcsbpdb request error: {str(exc)}")
             return result
 
         except Exception as exc:
             result.status = "parse_failed"
-            result.notes.append(f"wwPDB parsing error: {str(exc)}")
+            result.notes.append(f"rcsbpdb parsing error: {str(exc)}")
             return result
 
     # ------------------------------------------------------------------
@@ -669,7 +651,7 @@ class WWPDB(Webserver):
         ]
         self.process_artifacts()
 
-    def _extract_tables(self, results: List[WWPDBResolution]) -> Dict[str, List[Dict[str, Any]]]:
+    def _extract_tables(self, results: List[RCSBPDBResolution]) -> Dict[str, List[Dict[str, Any]]]:
         datasets: List[Dict[str, Any]] = []
         resources: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
@@ -695,7 +677,7 @@ class WWPDB(Webserver):
             datasets.append(
                 {
                     "dataset_id": res.record_id,
-                    "source_repository": "wwPDB",
+                    "source_repository": "RCSBPDB",
                     "doi": res.doi,
                     "title": res.title,
                     "description": res.title,
@@ -705,7 +687,7 @@ class WWPDB(Webserver):
                     "release_date": self._extract_release_date(res.raw_metadata),
                     "revision_date": self._extract_revision_date(res.raw_metadata),
                     "resource_count": len(res.files),
-                    "usability_label": classify_usability(file_exts),
+                    "usability_label": self.classify_usability(file_exts),
                     "api_status": res.status,
                     "query_source": res.query_source,
                     "raw_metadata": res.raw_metadata,
@@ -718,7 +700,7 @@ class WWPDB(Webserver):
                     {
                         "resource_id": f"{res.record_id}:{idx}",
                         "dataset_id": res.record_id,
-                        "source_repository": "wwPDB",
+                        "source_repository": "RCSBPDB",
                         "name": file_obj.label,
                         "download_url": file_obj.url,
                         "format": file_obj.extension,
@@ -729,9 +711,9 @@ class WWPDB(Webserver):
                 )
 
         return {
-            "datasets": self._apply_schema(datasets, DATASET_SCHEMA),
-            "resources": self._apply_schema(resources, RESOURCE_SCHEMA),
-            "errors": self._apply_schema(errors, ERROR_SCHEMA),
+            "datasets": self._apply_schema(datasets, self.DATASET_SCHEMA),
+            "resources": self._apply_schema(resources, self.RESOURCE_SCHEMA),
+            "errors": self._apply_schema(errors, self.ERROR_SCHEMA),
         }
 
     def _apply_schema(self, rows: List[Dict[str, Any]], schema: List[str]) -> List[Dict[str, Any]]:
@@ -820,7 +802,7 @@ class WWPDB(Webserver):
         rows = self.get_table(table_name)
         results = []
 
-        for idx, row in enumerate(rows):
+        for idx, row in rows.iterrows():
             url = row.get(url_column)
             is_valid = False
             status_code = None
@@ -875,7 +857,7 @@ class WWPDB(Webserver):
     # Webserver abstract interface methods
     # ------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
-        raise NotImplementedError("WWPDB backend is read-only.")
+        raise NotImplementedError("rcsbpdb backend is read-only.")
 
     def query_artifacts(self, query, **kwargs):
         if query is None:
@@ -891,7 +873,7 @@ class WWPDB(Webserver):
             if isinstance(query, str):
                 kind = self.classify_identifier(query)
 
-                if kind in {"wwpdb_doi", "pdb_id"}:
+                if kind in {"rcsbpdb_doi", "pdb_id"}:
                     self.identifiers = [query]
                     self._load_initial_data()
                 else:
@@ -916,8 +898,12 @@ class WWPDB(Webserver):
         raise TypeError("query_artifacts expects None, str, list, or dict.")
 
     def notebook(self, **kwargs):
-        table_name = kwargs.pop("table_name", None)
-        return self.display(table_name, **kwargs)
+        """
+        Notebook generation is not supported for the rcsbpdb backend.
+        """
+        raise NotImplementedError(
+            "Notebook generation is not supported for the rcsbpdb backend."
+        )
 
     def process_artifacts(self, **kwargs):
         extracted = self._extract_tables(self.raw_results)
@@ -925,7 +911,9 @@ class WWPDB(Webserver):
 
         for table_name, rows in extracted.items():
             self.tables[table_name] = self._rows_to_table(rows)
-            self.schemas[table_name] = list(rows[0].keys()) if rows else self.schemas.get(table_name, [])
+            self.schemas[table_name] = (
+                list(rows[0].keys()) if rows else self.schemas.get(table_name, [])
+            )
 
         self._loaded = True
         return self.tables
@@ -934,9 +922,15 @@ class WWPDB(Webserver):
         needle = str(query_object).lower()
         matches: List[ValueObject] = []
 
-        for table_name, rows in self.tables.items():
+        for table_name, table in self.tables.items():
+            if not table:
+                continue
+
+            columns = list(table.keys())
+            rows = zip(*table.values())
+
             for row_num, row in enumerate(rows):
-                for col_name, value in row.items():
+                for col_name, value in zip(columns, row):
                     if needle in str(value).lower():
                         vo = ValueObject()
                         vo.t_name = table_name
@@ -985,8 +979,8 @@ class WWPDB(Webserver):
         if column_name != "dataset_id":
             return []
 
-        datasets = self.get_table("datasets")
-        resources = self.get_table("resources")
+        datasets = self.get_table("datasets").to_dict(orient="records")
+        resources = self.get_table("resources").to_dict(orient="records")
 
         out = []
         for ds in datasets:
@@ -1012,21 +1006,25 @@ class WWPDB(Webserver):
 
     def summary(self, table_name=None, **kwargs):
         def _row_count(table):
+            if table is None:
+                return 0
+
+            if isinstance(table, pd.DataFrame):
+                return len(table)
+
             if not table:
                 return 0
 
-            # DSI/NDP-style table: OrderedDict or dict of columns -> lists
             if isinstance(table, dict):
                 first_col = next(iter(table.values()), [])
                 return len(first_col)
 
-            # Older list-of-row-dicts style fallback
             return len(table)
 
         if table_name is not None:
             table = self.get_table(table_name)
             return {
-                "backend": "WWPDB",
+                "backend": "rcsbpdb",
                 "table_name": self._resolve_table_name(table_name),
                 "row_count": _row_count(table),
                 "columns": self.get_schema(table_name),
@@ -1034,7 +1032,7 @@ class WWPDB(Webserver):
             }
 
         return {
-            "backend": "WWPDB",
+            "backend": "rcsbpdb",
             "num_tables": self.num_tables(),
             "tables": {
                 name: _row_count(table)
@@ -1046,7 +1044,18 @@ class WWPDB(Webserver):
         }
 
     def close(self):
-        self.session.close()
+        """
+        Resets backend state, clears loaded rcsbpdb data, and releases HTTP resources.
+        """
+        if hasattr(self, "session"):
+            self.session.close()
+
+        self.tables = {}
+        self.raw_results = []
+        self.last_search_response = None
+        self.identifiers = []
+        self.params = {}
+        self._loaded = False
 
     def __enter__(self):
         return self

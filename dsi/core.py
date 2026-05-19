@@ -26,7 +26,7 @@ class Terminal():
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'wwpdb']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'rcsbpdb']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
@@ -34,7 +34,7 @@ class Terminal():
     VALID_DATACARDS = ['Oceans11Datacard', 'DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'WWPDB']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'RCSBPDB']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
@@ -1424,8 +1424,8 @@ class Terminal():
                                 f"OSTI backend connection validation failed: {str(e)}"
                             )
                         return False 
-            if backend.__class__.__name__ == "WWPDB":
-                    # WWPDB is valid if data is loaded and RCSB connection works
+            if backend.__class__.__name__ == "RCSBPDB":
+                    # RCSBPDB is valid if data is loaded and RCSB connection works
                     if not backend._loaded:
                         return False
                     
@@ -1435,7 +1435,7 @@ class Terminal():
                     except (ConnectionError, RuntimeError) as e:
                         if self.debug_level != 0:
                             self.logger.warning(
-                                f"WWPDB backend connection validation failed: {str(e)}"
+                                f"RCSBPDB backend connection validation failed: {str(e)}"
                             )
                         return False                   
         return False

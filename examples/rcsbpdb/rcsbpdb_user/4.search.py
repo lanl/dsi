@@ -9,7 +9,7 @@ def main(verbose=False):
 
     print("\nSearching for 'hemoglobin':")
     dsi.search("hemoglobin")
-
+    # other examples "retinoic acid", "kinase", "DNA polymerase"
     print("\nSearching for 'X-RAY':")
     dsi.search("X-RAY")
 
