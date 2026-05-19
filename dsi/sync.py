@@ -483,8 +483,10 @@ class Sync():
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
-                self.execute_cmd(cmd, "Conduit copy data")
-                print(" DSI submitted Conduit data movement job.")
+                stdout = self.execute_cmd(cmd, "Conduit copy data")
+                if stdout:
+                    print(stdout)
+                print(" DSI-Conduit data movement job complete.")
 
                 # delete temp columns from filesystem table
                 filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
@@ -497,8 +499,10 @@ class Sync():
                     if self.verbose:
                         print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
                     cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
-                    self.execute_cmd(cmd, "Conduit copy database")
-                    print(" DSI submitted Conduit database movement job.")
+                    stdout = self.execute_cmd(cmd, "Conduit copy database")
+                    if stdout:
+                        print(stdout)
+                    print(" DSI-Conduit database movement job complete.")
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, data move is in queue.")
