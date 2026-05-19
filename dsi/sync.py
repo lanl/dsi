@@ -478,7 +478,7 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
+                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', '-w']
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
