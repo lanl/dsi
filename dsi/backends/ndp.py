@@ -139,22 +139,13 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def validate_connection(self):
         """
-        Validates that the base CKAN URL is accessible and functional.
+        Validates the connection to the base CKAN URL is reachable and CKAN API is responsive.
         
-        This method tests the connection by making a simple API call to verify:
-            - The URL is reachable
-            - The CKAN API is responding
+        Raises: 
+            - **ConnectionError** : If the URL cannot be reached
+            - **RuntimeError** : If the CKAN API returns an error response
         
-        Raises
-        ------
-        ConnectionError
-            If the URL cannot be reached
-        RuntimeError
-            If the CKAN API returns an error response
-        
-        Returns
-        -------
-        bool
+        Return : bool
             True if connection is valid
         """
         try:
@@ -969,7 +960,7 @@ class NDP(Webserver):
                 ...
             }
 
-        Useful for exporting or writing to external systems.
+        Useful for exporting or writing data to external formats.
 
         Return : OrderedDict
             All cached tables in tiered structure
