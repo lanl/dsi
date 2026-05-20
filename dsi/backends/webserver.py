@@ -6,6 +6,10 @@ class Webserver(Backend, ABC):
     def __init__(self, url, **kwargs) -> None:
         pass
 
+    @abstractmethod
+    def validate_connection(self):
+        pass
+
     # Can raise NotImplementedError for a read-only backend
     @abstractmethod
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
