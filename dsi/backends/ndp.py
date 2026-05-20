@@ -1041,7 +1041,6 @@ class NDP(Webserver):
             - row_num : (int or None) Row index
             - value :   (any) Matched value or data
             - type :    (str) {'table', 'column', 'cell'}
-                
         """
         
         query_str = str(query_object).lower()
