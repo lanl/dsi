@@ -78,7 +78,7 @@ class Sqlite(Filesystem):
         `input_list` : list
             A list of values to analyze for type compatibility.
 
-        `return`: str
+        Return: str
             A string representing the inferred SQLite data type for the input list.
         """
         SQLITE_INT_MIN = -9223372036854775808
@@ -362,7 +362,7 @@ class Sqlite(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
         
-        `return` : pandas.DataFrame or OrderedDict or None
+        Return : pandas.DataFrame or OrderedDict or None
             - If `query` includes UPDATE or ALTER: returns nothing
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
@@ -416,7 +416,7 @@ class Sqlite(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
 
-        `return` : pandas.DataFrame or OrderedDict
+        Return : pandas.DataFrame or OrderedDict
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
@@ -429,7 +429,7 @@ class Sqlite(Filesystem):
         `query` : str
             A SQL query string, typically passed into `query_artifacts()`.
 
-        `return`: list of str
+        Return: list of str
             List of table names referenced in the query.
         """
         all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
@@ -440,7 +440,7 @@ class Sqlite(Filesystem):
         """
         Returns the structural schema of this database in the form of CREATE TABLE statements.
 
-       `return`: str
+        Return: str
             Each table's CREATE TABLE statement is concatenated into one large string.
         """
         schema_stmts = self.query_artifacts(query="SELECT sql FROM sqlite_master where sql NOT NULL ORDER BY type, name")
@@ -570,7 +570,7 @@ class Sqlite(Filesystem):
         `only_units_relations` : bool, default=False
             **USERS SHOULD IGNORE THIS FLAG.** Used internally by sqlite.py.
 
-        `return` : OrderedDict
+        Return : OrderedDict
             A nested OrderedDict containing all data from the SQLite database.
         """
         artifact = OrderedDict()
@@ -627,7 +627,7 @@ class Sqlite(Filesystem):
         `query_object` : int, float, or str
             The value to search for across all tables in the backend.
 
-        `return` : list
+        Return : list
             A list of ValueObjects representing matches.
 
         - Note: ValueObjects may vary in structure depending on whether the match occurred at the table, column, or cell level.
@@ -655,7 +655,7 @@ class Sqlite(Filesystem):
         `query_object` : str
             The string to search for in table names.
 
-        `return` : list of ValueObjects
+        Return : list of ValueObjects
             One ValueObject per matching table.
 
         ValueObject Structure:
@@ -698,7 +698,7 @@ class Sqlite(Filesystem):
             If True, `value` in the returned ValueObject will be the [min, max] of the matching numerical column.
             If False, `value` in the returned ValueObject will be the full list of column data.
 
-        `return` : List of ValueObjects if there is a match. 
+        Return : List of ValueObjects if there is a match. 
         
         ValueObject Structure:
             - t_name:   table name (str)
@@ -756,7 +756,7 @@ class Sqlite(Filesystem):
             If True, `value` in the returned ValueObject will be the entire row where a cell matched.
             If False, `value` in the returned ValueObject will only be the matching cell value.
 
-        `return` : List of ValueObjects if there is a match.
+        Return : List of ValueObjects if there is a match.
 
         ValueObject Structure:
             - t_name:   table name (str)
@@ -830,7 +830,7 @@ class Sqlite(Filesystem):
         `relation` : str
             The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5), ~4, ~~4
 
-        `return` : list of ValueObjects
+        Return : list of ValueObjects
             One ValueObject per matching row in that first table.
 
         ValueObject Structure:

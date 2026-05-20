@@ -59,24 +59,26 @@ class NDP(Webserver):
         """
         Initialize backend and optionally load data from CKAN API.
 
-        Parameters
-        ----------
         `url` : str, optional
             Base CKAN URL. If None, a default CKAN endpoint is used.
+
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from CKAN.
+            
             Supported keys:
                 - keywords : str - Search keywords
                 - organization : str - Organization name filter
                 - tags : list - List of tags to filter by
                 - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
                 - limit : int - Maximum number of datasets to retrieve (default: 100)
+        
         `**kwargs` : dict
-            Additional keyword arguments:
-                - api_key : str, optional
-                    API key for authentication
-                - verify_ssl : bool, optional
-                    Toggle SSL verification (default False)
+            Additional keyword arguments.
+
+            - api_key : str, optional
+                API key for authentication
+            - verify_ssl : bool, optional
+                Toggle SSL verification (default False)
         """
 
         DEFAULT_URL = "https://nationaldataplatform.org/catalog"
@@ -459,16 +461,13 @@ class NDP(Webserver):
         """
         Returns all data from a specified table.
         
-        Parameters
-        ----------
         `table_name` : str
             Dataset title or ID
         `dict_return` : bool, default False
-            If True, returns OrderedDict. If False, returns DataFrame.
+            If True, returns OrderedDict. 
+            If False, returns DataFrame.
         
-        Returns
-        -------
-        OrderedDict or pandas.DataFrame
+        **Return : OrderedDict or pandas.DataFrame**
         """
         if not self._loaded:
             raise RuntimeError("No data loaded. Call load_datasets() first.")
@@ -487,6 +486,9 @@ class NDP(Webserver):
     def get_schema(self):
         """
         Return a lightweight schema description of cached tables from CKAN.
+
+        Return: str
+            Each table's structural schema is combined into one large string.
         """
         schema_lines = []
         for table_name, table in self._cache.items():
@@ -521,14 +523,10 @@ class NDP(Webserver):
         """
         Extracts table/dataset names mentioned in a query string.
         
-        Parameters
-        ----------
         `query` : str
             Query string to parse
         
-        Returns
-        -------
-        list
+        Return : list
             List of dataset names/IDs found in query
         """
         if not self._loaded:
@@ -549,29 +547,6 @@ class NDP(Webserver):
         return list(set(found_tables))
 
 
-    def overwrite_table(self, table_name, collection):
-        """
-        Not supported - NDP backend is read-only.
-        
-        Parameters
-        ----------
-        `table_name` : str or list
-            Table name(s)
-        `collection` : DataFrame or list
-            Data
-        
-        Raises
-        ------
-        NotImplementedError
-            Always raised as NDP is read-only
-        """
-        raise NotImplementedError(
-            "NDP backend is read-only. Cannot overwrite tables. "
-            "To modify data, use artifact_handler('process') to load into "
-            "a writable backend (Sqlite/DuckDB), make changes, then query."
-        )
-
-
     # ----------------------------------------------------------------------
     # Query Interface (in-memory)
     # ----------------------------------------------------------------------
@@ -579,19 +554,16 @@ class NDP(Webserver):
         """
         Query all tables using a pandas query string.
 
-        Parameters
-        ----------
-        `query` : str
-            Pandas query string for filtering data
-        `dict_return` : bool, default True
-            If True, returns dict format.
-            If False, returns pandas DataFrames.
-        `**kwargs` : dict
-            Additional keyword arguments
+        Parameters:
+            - `query` : str
+                Pandas query string for filtering data
+            - `dict_return` : bool, default True
+                If True, returns dict format.
+                If False, returns pandas DataFrames.
+            - `**kwargs` : dict
+                Additional keyword arguments
 
-        Returns
-        -------
-        dict
+        Return : dict
             Dictionary mapping table names to query results
         """
 
@@ -630,9 +602,8 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Returns all cached tables in tiered format.
+        Returns all cached tables in tiered format::
 
-        Structure:
             {
                 "datasets": <dataset table>,
                 "<dataset_name>": <resource table>,
@@ -641,9 +612,7 @@ class NDP(Webserver):
 
         Useful for exporting or writing to external systems.
 
-        Returns
-        -------
-        OrderedDict
+        Return : OrderedDict
             All cached tables in tiered structure
         """
 
@@ -701,38 +670,26 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def find(self, query_object, **kwargs):
         """
-        Searches for all instances of query_object across all tables.
+        Searches for all instances of `query_object` across the table, column, and cell levels.
 
-        Searches at the table, column, and cell levels.
-
-        Parameters
-        ----------
         `query_object` : int, float, or str
             The value to search for across all tables in the backend
+        
         `**kwargs` : dict
             Additional keyword arguments
 
-        Returns
-        -------
-        list of ValueObject
-            A list of ValueObjects representing matches across:
-                - table names
-                - column names
-                - cell values
+        Return : list of ValueObjects representing matches across:
+            - table names
+            - column names
+            - cell values
 
-        Notes
-        -----
         ValueObject Structure:
-            - t_name : str
-                Table name
-            - c_name : list
-                Column name(s)
-            - row_num : int or None
-                Row index
-            - value : any
-                Matched value or data
-            - type : str
-                {'table', 'column', 'cell'}
+            - t_name :  (str) Table name
+            - c_name :  (list) Column name(s)
+            - row_num : (int or None) Row index
+            - value :   (any) Matched value or data
+            - type :    (str) {'table', 'column', 'cell'}
+                
         """
         
         query_str = str(query_object).lower()
@@ -746,33 +703,22 @@ class NDP(Webserver):
 
     def find_table(self, query_object, **kwargs):
         """
-        Finds all tables whose names contain the given query_object.
+        Finds all tables whose names contain the given query_object. Search is case-insensitive.
 
-        Search is case-insensitive.
-
-        Parameters
-        ----------
         `query_object` : str
             The string to match against table names
         `**kwargs` : dict
             Additional keyword arguments
 
-        Returns
-        -------
-        list of ValueObject
+        Return : list of ValueObject
             One ValueObject per matching table
 
-        Notes
-        -----
         ValueObject Structure:
-            - t_name : str
-                Table name
-            - c_name : list
-                List of all columns in the table
-            - value : dict
-                Full table data (dict of columns)
-            - row_num : None
-            - type : 'table'
+            - t_name :  (str) Table name
+            - c_name :  (list) List of all columns in the table
+            - value :   (dict) Full table data (dict of columns)
+            - row_num : (None)
+            - type :    (str) 'table'
         """
 
         if not isinstance(query_object, str):
@@ -795,33 +741,22 @@ class NDP(Webserver):
 
     def find_column(self, query_object, **kwargs):
         """
-        Finds all columns whose names contain the given query_object.
+        Finds all columns whose names contain the given query_object. Search is case-insensitive.
 
-        Search is case-insensitive.
-
-        Parameters
-        ----------
         `query_object` : str
             The string to match against column names
         `**kwargs` : dict
             Additional keyword arguments
 
-        Returns
-        -------
-        list of ValueObject
+        Return: list of ValueObject
             One ValueObject per matching column
 
-        Notes
-        -----
         ValueObject Structure:
-            - t_name : str
-                Table name
-            - c_name : list
-                List containing the matched column name
-            - value : list
-                Full column data
-            - row_num : None
-            - type : 'column'
+            - t_name :  (str) Table name
+            - c_name :  (list) List with the matched column name
+            - value :   (list) Full column data
+            - row_num : (None)
+            - type :    (str) 'column'
         """
 
         if not isinstance(query_object, str):
@@ -847,35 +782,23 @@ class NDP(Webserver):
     def find_cell(self, query_object, **kwargs):
         """
         Finds all cells that match the given query_object.
+        
+        Exact match for all data types, plus case-insensitive partial match for strings.
 
-        Matching behavior:
-            - Exact match for all data types
-            - Case-insensitive partial match for strings
-
-        Parameters
-        ----------
         `query_object` : int, float, or str
             The value to search for within table cells
         `**kwargs` : dict
             Additional keyword arguments
 
-        Returns
-        -------
-        list of ValueObject
+        Return : list of ValueObject
             One ValueObject per matching cell
 
-        Notes
-        -----
         ValueObject Structure:
-            - t_name : str
-                Table name
-            - c_name : list
-                List containing the matched column name
-            - row_num : int
-                Row index of the match
-            - value : any
-                Matched cell value
-            - type : 'cell'
+            - t_name :  (str) Table name
+            - c_name :  (list) List with the matched column name
+            - row_num : (int) Row index of the match
+            - value :   (any) Matched cell value
+            - type :    (str) 'cell'
         """
 
         matches = []
@@ -921,26 +844,10 @@ class NDP(Webserver):
 
     def find_relation(self, column_name, relation, **kwargs):
         """
-        Not supported for NDP backend.
-
-        NDP is a read-only metadata backend and does not support
-        relational queries on columns.
-
-        Parameters
-        ----------
-        `column_name` : str
-            Column name (unused)
-        `relation` : str
-            Relation type (unused)
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        list
-            Always returns an empty list
+        **NDP is a read-only metadata backend and does not support
+        relational queries on columns.**
         """
-        return []
+        raise NotImplementedError("NDP Backend does not support find_relation")
 
 
     # ----------------------------------------------------------------------
@@ -1052,8 +959,6 @@ class NDP(Webserver):
 
         Accepts either dataset_title or dataset_id for resource tables.
 
-        Parameters
-        ----------
         `table_name` : str
             Title or ID of the table to display
         `num_rows` : int, default 25
@@ -1061,9 +966,7 @@ class NDP(Webserver):
         `display_cols` : list of str, optional
             Subset of columns to display
 
-        Returns
-        -------
-        pandas.DataFrame
+        Return : pandas.DataFrame
             Displayed table data with long strings truncated
         """
 
@@ -1137,23 +1040,7 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         """
-        Ingest not supported for NDP backend (read-only).
-
-        Parameters
-        ----------
-        `artifacts` : any
-            Artifacts to ingest (unused)
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised as NDP backend is read-only
+        **Not supported - NDP backend is read-only**
         """
         raise NotImplementedError("NDP backend is read-only")
     
