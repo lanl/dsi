@@ -137,7 +137,7 @@ class RCSBPDB(Webserver):
     Implements the DSI Webserver interface and exposes RCSB/rcsbpdb
     metadata as in-memory DSI tables.
     """
-
+    read_only = True
     DATA_CORE_URL = "https://data.rcsb.org/rest/v1/core"
     SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 
