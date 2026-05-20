@@ -905,7 +905,8 @@ class DSI():
         try:
             if backup:
                 extension = self.database_name.rfind('.')
-                backup_file = self.database_name[:extension] + ".backup" + self.database_name[extension:]
+                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                backup_file = self.database_name[:extension] + f".backup_{timestamp}" + self.database_name[extension:]
                 msg = f"Created backup '{backup_file}' before updating the data."
                 logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
             self.t.overwrite_table(table_name, actual_df, backup)
