@@ -135,22 +135,13 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def validate_connection(self):
         """
-        Validates that the base CKAN URL is accessible and functional.
+        Validates the connection to the base CKAN URL is reachable and CKAN API is responsive.
         
-        This method tests the connection by making a simple API call to verify:
-            - The URL is reachable
-            - The CKAN API is responding
+        Raises: 
+            - **ConnectionError** : If the URL cannot be reached
+            - **RuntimeError** : If the CKAN API returns an error response
         
-        Raises
-        ------
-        ConnectionError
-            If the URL cannot be reached
-        RuntimeError
-            If the CKAN API returns an error response
-        
-        Returns
-        -------
-        bool
+        Return : bool
             True if connection is valid
         """
         try:
@@ -554,14 +545,14 @@ class NDP(Webserver):
         """
         Query all tables using a pandas query string.
 
-        Parameters:
-            - `query` : str
-                Pandas query string for filtering data
-            - `dict_return` : bool, default True
-                If True, returns dict format.
-                If False, returns pandas DataFrames.
-            - `**kwargs` : dict
-                Additional keyword arguments
+        `query` : str
+            Pandas query string for filtering data
+        `dict_return` : bool, optional, default True
+            If True, returns dict format.
+            If False, returns pandas DataFrames.
+        
+        `**kwargs` : dict
+            Additional keyword arguments
 
         Return : dict
             Dictionary mapping table names to query results
@@ -610,7 +601,7 @@ class NDP(Webserver):
                 ...
             }
 
-        Useful for exporting or writing to external systems.
+        Useful for exporting or writing data to external formats.
 
         Return : OrderedDict
             All cached tables in tiered structure
@@ -863,7 +854,7 @@ class NDP(Webserver):
             - If True, return list of table names.
             - If False, print table names with dimensions and dataset IDs.
 
-        Return: dict_keys or None
+        Return: list or None
             Table names if collection=True, otherwise None
         """
 
@@ -882,20 +873,13 @@ class NDP(Webserver):
 
     def summary(self, table_name=None):
         """
-        Returns numerical metadata for tables.
+        Returns numerical metadata for tables. For resource tables, includes dataset_id information.
 
-        For resource tables, includes dataset_id information.
-
-        Parameters
-        ----------
         `table_name` : str, optional
-            If provided, returns summary for a single table.
-            Can be either dataset_title or dataset_id.
+            If provided, returns summary for a single table. Either dataset_title or dataset_id.
             If None, returns summary for all tables in expected format.
 
-        Returns
-        -------
-        pandas.DataFrame or list
+        Return : pandas.DataFrame or list
             - If table_name is None: returns [table_names_list, df1, df2, ...]
             - If table_name provided: returns single DataFrame
         """
@@ -1002,16 +986,7 @@ class NDP(Webserver):
 
     def notebook(self, **kwargs):
         """
-        Notebook generation not supported for NDP backend.
-
-        Parameters
-        ----------
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        None
+        **Notebook generation not supported for NDP backend.**
         """
         pass
 

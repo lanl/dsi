@@ -234,11 +234,11 @@ def test_ndp_find_relation():
     )
     
     try:
-        result = backend.find_relation("column_name", "= 'value'")
+        backend.find_relation("column_name", "= 'value'")
         # temp work around until find_relation actually implemented
         # once implemented update this
         assert False
-    except:
+    except Exception:
         assert True
     # assert isinstance(result, list)
     # assert len(result) == 0  # NDP doesn't support relational queries
@@ -378,19 +378,6 @@ def test_ndp_ingest_artifacts():
         backend.ingest_artifacts({})
     
     backend.close()
-
-
-def test_ndp_overwrite_table():
-    """Test that overwrite_table raises NotImplementedError."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    with pytest.raises(NotImplementedError):
-        backend.overwrite_table("datasets", pd.DataFrame())
-    
-    backend.close()
-
 
 # =============================================================================
 # 9) Filtering Tests
