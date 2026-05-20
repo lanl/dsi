@@ -6,6 +6,7 @@ class Filesystem(Backend, ABC):
     def __init__(self, filename, **kwargs) -> None:
         pass
 
+    # Can raise NotImplementedError for a read-only backend
     @abstractmethod
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         pass
@@ -16,6 +17,10 @@ class Filesystem(Backend, ABC):
 
     @abstractmethod
     def get_table(self, table_name, **kwargs):
+        pass
+
+    @abstractmethod
+    def get_table_names(self,query):
         pass
 
     @abstractmethod
@@ -66,6 +71,7 @@ class Filesystem(Backend, ABC):
     def summary(self, table_name, **kwargs):
         pass
 
+    # Can raise NotImplementedError for a read-only backend
     @abstractmethod
     def overwrite_table(self, table_name, collection, **kwargs):
         pass
