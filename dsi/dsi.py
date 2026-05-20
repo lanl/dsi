@@ -501,7 +501,7 @@ class DSI():
             A SQL query to execute. Only `SELECT` and `PRAGMA` statements are allowed.
 
         `collection` : bool, optional, default False.
-            If True, returns the result as a pandas DataFrame.
+            If True, returns the result as a pandas DataFrame or python dictionary.
             
             If False (default), prints the result.
 

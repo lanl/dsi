@@ -478,7 +478,7 @@ class NDP(Webserver):
         """
         Return a lightweight schema description of cached tables from CKAN.
 
-        Return: str
+        Return : str
             Each table's structural schema is combined into one large string.
         """
         schema_lines = []
@@ -739,7 +739,7 @@ class NDP(Webserver):
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return: list of ValueObject
+        Return : list of ValueObject
             One ValueObject per matching column
 
         ValueObject Structure:
@@ -854,7 +854,7 @@ class NDP(Webserver):
             - If True, return list of table names.
             - If False, print table names with dimensions and dataset IDs.
 
-        Return: list or None
+        Return : list or None
             Table names if collection=True, otherwise None
         """
 
