@@ -696,8 +696,8 @@ class DuckDB(Filesystem):
             The value to search for at the cell level, across all tables in the backend.
 
         `row`: bool, optional, default=False
-            If True, `value` in the returned ValueObject will be the entire row where a cell matched.
-            If False, `value` in the returned ValueObject will only be the matching cell value.
+            If True, certain fields in ValueObject will contain entire row's metadata/data
+            If False, certain fields in ValueObject will only contain the matching cell's metadata/data.
 
         Return : List of ValueObjects if there is a match.
 
@@ -931,9 +931,10 @@ class DuckDB(Filesystem):
         Returns numerical metadata from tables in the first activated backend.
 
         `table_name` : str, optional
-            If specified, only the numerical metadata for that table will be returned as a Pandas DataFrame.
+            If specified, only the numerical metadata for that table is returned as a Pandas DataFrame.
             
-            If None (default), metadata for all available tables is returned as a list of Pandas DataFrames.
+            If None (default), names of all tables and metadata for each table is returned as a list.
+            [table_name_list, table1_df, table2_df, table3df ...]
         """
         if table_name is None:
             tableList = self.cur.execute("""
