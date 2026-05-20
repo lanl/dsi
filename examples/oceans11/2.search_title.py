@@ -15,7 +15,7 @@ os.makedirs(path)
 dsi = DSI(backend_name="Oceans11", params={"title": "monopoly","rows": 10}, workspace=path)
 
 # save the results as a db
-dsi.process("sqlite", path + "monopoly.db")
+dsi.process("sqlite", path + "monopoly_search.db")
 
 dsi.summary()
 

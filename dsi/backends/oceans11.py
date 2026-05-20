@@ -197,15 +197,25 @@ class Oceans11(Webserver):
             silence_messages=True,
         )
 
-        # collate results over multiple queries for T1
-        all_records = []
+        # If any query requests download_all, load every T1 record.
+        download_all = any(
+            bool(query_params.get("download_all", False))
+            for query_params in query_list
+        )
 
-        for query_params in query_list:
-            records = self._run_single_query(query_params)
-            all_records.extend(records)
+        if download_all:
+            unique_records = self._run_all_records_query()
+        else:
+            # collate results over multiple queries for T1
+            all_records = []
+            for query_params in query_list:
+                records = self._run_single_query(query_params)
+                all_records.extend(records)
 
-        # remove any multiple entries that may arise from merge
-        unique_records = self._deduplicate_records(all_records)
+            # remove any multiple entries that may arise from merge
+            unique_records = self._deduplicate_records(all_records)
+
+
 
         url_column = "t2db_url"
         # Download/load T2 DBs only for selected records
@@ -240,6 +250,15 @@ class Oceans11(Webserver):
     # ---------------------------------------------------
     # Data Load Helpers - T1
     # ---------------------------------------------------
+    def _run_all_records_query(self):
+        """Return every record from the local Oceans11 Tier 1 catalog DB."""
+        df = self._catalog_dsi.query("SELECT * FROM records", collection=True)
+
+        if df is None or df.empty:
+            return []
+
+        return df.to_dict(orient="records")
+
 
     def _run_single_query(self, params):
         """
@@ -255,6 +274,7 @@ class Oceans11(Webserver):
             "doi",
             "report_number",
             "rows",
+            "download_all"
         }
 
         unknown = set(params) - supported_params
