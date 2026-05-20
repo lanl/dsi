@@ -23,8 +23,12 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name=None):
+    def __init__(self, project_name=None, isVerbose = False, no_parent = False, **kwargs):
         self.project_name = project_name
+        self.verbose = isVerbose
+        self.no_parent = no_parent
+        self.add_dbs = kwargs.pop("add_dbs", [])
+
         extension = ""
         if project_name:
             for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
@@ -35,7 +39,10 @@ class Sync():
             if extension != "":
                 self.full_db_name = self.project_name + extension
                 if not os.path.exists(self.full_db_name):
-                    raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
+                    print("Creating new database: " + self.full_db_name)
+                    # We now allow a user to begin indexing from an empty database, so bypass raise
+                    #raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
+
             else:
                 proj_db_found = False
                 for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
@@ -50,11 +57,9 @@ class Sync():
             
             self.remote_location = None
             self.local_location = None
-            self.file_list = None
-            self.rfile_list = None
 
             self.t = Terminal()
-            # first check if user can create db here
+            # First check if user can create db here
             if "/" in project_name:
                 create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
             else:
@@ -63,61 +68,27 @@ class Sync():
                 raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
         
             backend_name = self.t.identify_backend(self.full_db_name)
+            # Allows an empty database to be created, autoselect SQLite for the user
             if backend_name is None:
-                raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+                #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+                print("Auto-selecting sqlite backend.")
+                backend_name = "Sqlite"
 
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
 
+            # Actually create a database and add a placeholder table
             if not self.t.valid_backend(self.t.loaded_backends[0]):
-                raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
+                #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
+                st_dict = OrderedDict()
+                st_dict['file_origin'] = []
+                self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
+                self.t.artifact_handler(interaction_type='ingest')
 
 
-    def reindex(self, local_loc, remote_loc, isVerbose = False):
-        """
-        Helper function that allows users to index their data again by dropping existing filesystem information.
-        """
-        # # Relative paths (..) will not work
-        # if "../" in local_loc or "../" in remote_loc:
-        #     raise ValueError("Error: Please use absolute paths instead of relative")
-        # local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
-        # remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
 
-        # if isVerbose:
-        #     print("loc: "+local_loc+ " rem: "+remote_loc)
-        
-        # table_list = self.t.list(True)
-        # if "federated" in table_list and "filesystem" in table_list:
-        #     fed_table = self.t.get_table("federated")
-        #     fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
-        #     if fed_local == local_loc:
-        #         if fed_remote == remote_loc:
-        #             print("Skipping index as local and remote inputs are the same as existing index.")
-        #             return
-                
-        #         # update remote file paths to use new remote location
-        #         filesystem_df = self.t.get_table("filesystem")
-        #         filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
-                
-        #         # update remote location in federated table
-        #         fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
-
-        #         self.t.dsi_tables.remove("filesystem")
-        #         self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
-        #         self.t.dsi_tables.append("filesystem")
-
-        #         if isVerbose:
-        #             print("DSI Index complete!\n")
-        #         return
-        
-        # # if in index(), continue with normal index, no need to drop table
-        # #   remove filesystem pass through in query_artifacts for sqlite.py and duckdb.py
-        # self.t.artifact_handler(interaction_type='query', query = "DROP TABLE IF EXISTS filesystem;")
-        # self.index(local_loc, remote_loc, isVerbose)
-
-
-    def index(self, local_loc, remote_loc, isVerbose=False, no_parent = False):
+    def index(self, local_loc, remote_loc):
         """
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
@@ -128,38 +99,42 @@ class Sync():
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
 
-        if isVerbose:
+        if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
 
         table_list = self.t.list(True)
         if "federated" in table_list and "filesystem" in table_list:
-            fed_table = self.t.get_table("federated")
-            fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
-            if fed_local == local_loc:
-                if fed_remote == remote_loc:
-                    if isVerbose:
+            filesystem_df = self.t.get_table("filesystem")
+            # only skip reindexing if data not moved yet
+            if "file_abs" in filesystem_df.columns.tolist():
+                fed_table = self.t.get_table("federated")
+                fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
+                if fed_local == local_loc:
+                    self.remote_location = remote_loc
+                    self.local_location = local_loc
+                    if fed_remote == remote_loc:
+                        if self.verbose:
+                            print("DSI Index complete!\n")
+                        return
+                    
+                    # update remote file paths to use new remote location
+                    filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
+                    
+                    # update remote location in federated table
+                    fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
+
+                    self.t.dsi_tables.remove("filesystem")
+                    self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
+                    self.t.dsi_tables.append("filesystem")
+
+                    if self.verbose:
                         print("DSI Index complete!\n")
                     return
-                
-                # update remote file paths to use new remote location
-                filesystem_df = self.t.get_table("filesystem")
-                filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
-                
-                # update remote location in federated table
-                fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
-
-                self.t.dsi_tables.remove("filesystem")
-                self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
-                self.t.dsi_tables.append("filesystem")
-
-                if isVerbose:
-                    print("DSI Index complete!\n")
-                return
 
         # Data Crawl and gather metadata of local location
-        file_list = self.dircrawl2(local_loc, isVerbose)
+        file_list = self.dircrawl2(local_loc, self.verbose)
 
-        if isVerbose:
+        if self.verbose:
             file_list, tmp = itertools.tee(file_list)
             file_len=sum(1 for _ in tmp)
             print("Crawled "+str(file_len)+" files.")
@@ -170,13 +145,13 @@ class Sync():
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
-        rfile_list = []
 
         # Do a quick validation of group access permissions
         # While crawling os.stat info
         # Create ordered dictionary
         st_dict = OrderedDict()
         st_dict['file_origin'] = []
+        st_dict['file_abs'] = [] # Temporary column for unix copy
         st_dict['size']= []
         st_dict['modified_time'] = []
         st_dict['created_time'] = []
@@ -190,7 +165,7 @@ class Sync():
         st_dict['uuid'] = []
         st_dict['file_remote'] = []
 
-        if isVerbose:
+        if self.verbose:
             print("Collection object [", end="")
             last = -10
 
@@ -200,12 +175,12 @@ class Sync():
             filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
-            if no_parent: # exclude parent dir of every file in remote location
+            if self.no_parent: # exclude parent dir of every file in remote location
                 rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
             else:
                 rfilepath = os.path.join(remote_loc,self.project_name, parent_rel_file)
-            rfile_list.append(rfilepath)
             st_dict['file_origin'].append(rel_file)
+            st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
             st_dict['modified_time'].append(st.st_mtime)
             st_dict['created_time'].append(st.st_ctime)
@@ -219,17 +194,17 @@ class Sync():
             st_dict['uuid'].append(self.gen_uuid(st))
             st_dict['file_remote'].append(rfilepath)
             st_list.append(st)
-            if isVerbose:
+            if self.verbose:
                 progress = int(len(st_list) / file_len * 100)
                 # Print progress bar every 2%
                 if progress % 2 == 0 and progress != last:
                     print(".", end="")
                     last = progress
 
-        if isVerbose:
+        if self.verbose:
             print(f"] Collection object created with {len(st_list)} entries.")
                 
-        if isVerbose:
+        if self.verbose:
             print("Creating filesystem table")
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
@@ -251,15 +226,8 @@ class Sync():
             
             self.t.artifact_handler(interaction_type='ingest')
 
-        self.file_list = file_list
-        self.rfile_list = rfile_list
-
-        if isVerbose:
+        if self.verbose:
             print("DSI Index complete!\n")
-
-
-    def move(self, tool="copy", isVerbose=False, **kwargs):
-        self.copy(tool,isVerbose,kwargs)
 
 
     def execute_cmd(self, cmd, cmd_name, timer = False):
@@ -277,6 +245,9 @@ class Sync():
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
+            elif "No credentials" in stdout:
+                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.")
+                raise RuntimeError("Kerberos message: " + str(stdout))
             raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
         return stdout
 
@@ -305,27 +276,38 @@ class Sync():
             print("Warning:", str(e))
 
 
-    def copy(self, tool="copy", isVerbose=False, **kwargs):
+    def move(self, tool="copy"):
+        self.copy(tool)
+
+
+    def copy(self, tool="copy"):
         """
         Helper function to perform the data copy over using a preferred API
         """
-        if any(x is None for x in (self.remote_location, self.local_location, self.file_list, self.rfile_list)):
-            raise RuntimeError("Must run successful DSI Index right before Copy")
+        if any(x is None for x in (self.remote_location, self.local_location)):
+            raise RuntimeError("Must successfully run DSI Index before Copy")
+
+        # move additional dbs as well if specified in init
+        db_list = [self.full_db_name]
+        db_list.extend(self.add_dbs)
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            fs_t = self.t.get_table("filesystem")
-        if fs_t.empty:
+            filesystem_df = self.t.get_table("filesystem")
+        if filesystem_df.empty:
             print(" filesystem table not found. Must run Index first.")
             print(" Data copy failed.")
             return
         
+        file_list = filesystem_df["file_abs"].tolist()
+        rfile_list = filesystem_df["file_remote"].tolist()
+        
         # Test remote location validity and try creating folders
-        # Future: iterate through remote/server list here, for now:
+        # TODO: iterate through remote/server list here, for now:
         if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
             remote_list = [ os.path.join(self.remote_location,self.project_name) ]
             for remote in remote_list:
-                if isVerbose:
+                if self.verbose:
                     print(f"Testing access to '{remote}' directory.")
                 try: # Try for file permissions
                     if os.path.exists(remote): # Check if exists
@@ -333,7 +315,6 @@ class Sync():
                     else:
                         path = Path(remote)
                         path.mkdir(parents=True, exist_ok=True)
-                        # os.makedirs(remote) # Create it
                         print(f"The directory '{remote}' has been created remotely.")
                 except Exception as err:
                     if "input/output error" in str(err).lower():
@@ -345,13 +326,12 @@ class Sync():
                             raise RuntimeError(f"Input/Output error detected: {err}")
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
-        # Future: have movement service handle type without user input (cp,scp,ftp,rsync,etc.)
-        if tool.lower() == "copy":
-            # Data movement via Unix Copy
-            for file,file_remote in zip(self.file_list,self.rfile_list):
+        # TODO: have movement service handle type without user input (cp,scp,rsync,conduit,pfcp,ftp,etc.)
+        if tool.lower() == "copy":            
+            for file, file_remote in zip(file_list, rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
-                    if isVerbose:
+                    if self.verbose:
                         print(" mkdir " + abspath)
                     path = Path(abspath)
                     try:
@@ -359,14 +339,21 @@ class Sync():
                     except Exception:
                         raise RuntimeError(f"Unable to create folder {abspath}. Check your access rights")
 
-                if isVerbose:
+                if self.verbose:
                     print(" cp " + file + " " + file_remote)
                 shutil.copy2(file , file_remote)
 
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
             # Database movement
-            if isVerbose:
-                print(" cp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
-            shutil.copy2(self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name))
+            for dbname in db_list:
+                if self.verbose:
+                    print(" cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
+                shutil.copy2(dbname, os.path.join(self.remote_location, self.project_name, dbname))
 
             print(" Data Copy Complete!")
         
@@ -380,34 +367,40 @@ class Sync():
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # making remote dir
-            if isVerbose:
+            if self.verbose:
                 print(" ssh "+ str(host_part) + " \"mkdir -p " + str(os.path.join(path_part, self.project_name)) + "\"" )
             cmd = ["ssh", host_part, f'mkdir -p \"{os.path.join(path_part, self.project_name)}\"']
             print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
 
-
-            #remove username from file_remote column in filesystem table
-            username, host = host_part.split("@")
-            filesystem_df = self.t.get_table("filesystem")
-            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
-
-            self.t.dsi_tables.remove("filesystem")
-            self.t.overwrite_table("filesystem", filesystem_df)
-            self.t.dsi_tables.append("filesystem")
-
+            # File movement
             cmd = ["scp", "-rp", self.local_location, os.path.join(self.remote_location, self.project_name)]
-            if isVerbose:
+            if self.verbose:
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
             print(" DSI SCP data movement complete.")
 
-            cmd = ["scp", "-p", self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
-            if isVerbose:
-                print()
-                print(*cmd)
-            self.execute_cmd(cmd, "scp database")
+            # remove username from file_remote column in filesystem table
+            username, host = host_part.split("@")
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            # remove username from remote_location column in federated table
+            federated_df = self.t.get_table("federated")
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
+
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
+            self.t.dsi_tables.append("filesystem")
+
+            # Database movement
+            for dbname in db_list:
+                cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                if self.verbose:
+                    print()
+                    print(*cmd)
+                self.execute_cmd(cmd, "scp database")
             print(" DSI SCP database movement complete.")
         
         elif tool.lower() == "rsync":
@@ -419,38 +412,45 @@ class Sync():
             if not path_part.startswith("/"):
                 raise ValueError("Remote path must be absolute (starting with /)")
             
-            #remove username from file_remote column in filesystem table
+            # File movement
+            self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
+            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
+                   self.local_location, os.path.join(self.remote_location, self.project_name)]
+            if self.verbose:
+                print(*cmd)
+            self.execute_cmd(cmd, "rsync data")
+            print(" DSI Rsync data movement complete.")
+
+            # remove username from file_remote column in filesystem table
             try:
                 username, host = host_part.split("@")
             except Exception:
                 raise ValueError("Remote path's hostname must be in the format user@server") from None
-            filesystem_df = self.t.get_table("filesystem")
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            # remove username from remote_location column in federated table
+            federated_df = self.t.get_table("federated")
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
-            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
             self.t.dsi_tables.append("filesystem")
             
-            self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
-            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
-                   self.local_location, os.path.join(self.remote_location, self.project_name)]
-            if isVerbose:
-                print(*cmd)
-            self.execute_cmd(cmd, "rsync data")
-            print(" DSI Rsync data movement complete.")
-            
-            cmd = ["rsync", "-av", self.full_db_name, os.path.join(self.remote_location, self.project_name)]
-            if isVerbose:
-                print()
-                print(*cmd)
-            self.execute_cmd(cmd, "rsync database")
+            # Database movement
+            for dbname in db_list:
+                cmd = ["rsync", "-av", dbname, os.path.join(self.remote_location, self.project_name)]
+                if self.verbose:
+                    print()
+                    print(*cmd)
+                self.execute_cmd(cmd, "rsync database")
             print(" DSI Rsync database movement complete.")
         
         elif tool.lower() == "conduit":
             import signal
 
             # Test Kerberos
-            if isVerbose:
+            if self.verbose:
                 print( "Testing: klist")
             cmd = ['klist']
             stdout = self.execute_cmd(cmd, "Testing klist")
@@ -465,12 +465,12 @@ class Sync():
             signal.alarm(10)
 
             try:
-                if isVerbose:
+                if self.verbose:
                     print("Testing Conduit: conduit get")
                 cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
-                if "TRANSFER_ID" in stdout and isVerbose:
+                if "TRANSFER_ID" in stdout and self.verbose:
                     print(" Conduit is authenticated.")
                 elif "TRANSFER_ID" not in stdout:
                     raise RuntimeError("Conduit Error: " + str(stdout))
@@ -478,20 +478,31 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r']
+                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', '-w']
                 # File Movement
-                if isVerbose:
+                if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
-                self.execute_cmd(cmd, "Conduit copy data")
-                print(" DSI submitted Conduit data movement job.")
+                stdout = self.execute_cmd(cmd, "Conduit copy data")
+                if stdout:
+                    print(stdout)
+                print(" DSI-Conduit data movement job complete.")
+
+                # delete temp columns from filesystem table
+                filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+                self.t.dsi_tables.remove("filesystem")
+                self.t.overwrite_table("filesystem", filesystem_df)
+                self.t.dsi_tables.append("filesystem")
 
                 # Database Movement
-                if isVerbose:
-                    print("conduit cp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
-                cmd = base_cmd + [self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
-                self.execute_cmd(cmd, "Conduit copy database")
-                print(" DSI submitted Conduit database movement job.")
+                for dbname in db_list:
+                    if self.verbose:
+                        print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
+                    cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                    stdout = self.execute_cmd(cmd, "Conduit copy database")
+                    if stdout:
+                        print(stdout)
+                    print(" DSI-Conduit database movement job complete.")
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, data move is in queue.")
@@ -503,25 +514,44 @@ class Sync():
         elif tool.lower() == "pfcp":
             try:
                 # File Movement
-                if isVerbose:
+                if self.verbose:
                     print("pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = ['pfcp','-R',self.local_location, os.path.join(self.remote_location, self.project_name)]
                 self.execute_cmd(cmd, "pfcp move data")
                 print(" DSI submitted pfcp data movement job.")
 
+                # delete temp columns from filesystem table
+                filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+                self.t.dsi_tables.remove("filesystem")
+                self.t.overwrite_table("filesystem", filesystem_df)
+                self.t.dsi_tables.append("filesystem")
+
                 # Database Movement
-                if isVerbose:
-                    print("pfcp " + self.full_db_name + " " + os.path.join(self.remote_location, self.project_name, self.full_db_name))
-                cmd = ['pfcp', self.full_db_name, os.path.join(self.remote_location, self.project_name, self.full_db_name)]
-                self.execute_cmd(cmd, "pfcp move database")
-                print(" DSI submitted pfcp database movement job.")
+                for dbname in db_list:
+                    if self.verbose:
+                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
+                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                    self.execute_cmd(cmd, "pfcp move database")
+                    print(" DSI submitted pfcp database movement job.")
             except Exception as e:
                 raise RuntimeError(f"pfcp failed with error: {str(e)} ")
         
         elif tool.lower() == "ftp":
-            True
+            pass
+            # delete temp columns from filesystem table -- do after data has been moved
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
         elif tool.lower() == "git":
-            True
+            pass
+            # delete temp columns from filesystem table -- do after data has been moved
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
         else:
             raise TypeError(f"Data movement format not supported:, Type: {tool}")
 

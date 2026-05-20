@@ -34,7 +34,7 @@ def main(verbose=False):
             
             # Print each row with its num_resources
             if 'num_resources' in table_data and num_rows > 0:
-                print(f"\n  Rows with resource counts:")
+                print("\n  Rows with resource counts:")
                 for i in range(num_rows):
                     title = table_data.get('title', ['N/A'] * num_rows)[i]
                     resources = table_data['num_resources'][i]

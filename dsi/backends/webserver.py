@@ -4,15 +4,27 @@ from dsi.backends import Backend
 class Webserver(Backend, ABC):
     @abstractmethod
     def __init__(self, url, **kwargs) -> None:
-        # Need to define webserver generic-all input
         pass
 
+    @abstractmethod
+    def validate_connection(self):
+        pass
+
+    # Can raise NotImplementedError for a read-only backend
     @abstractmethod
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         pass
 
     @abstractmethod
     def query_artifacts(self, query, **kwargs):
+        pass
+
+    @abstractmethod
+    def get_table(self, table_name, **kwargs):
+        pass
+
+    @abstractmethod
+    def get_table_names(self,query):
         pass
 
     @abstractmethod
@@ -49,6 +61,10 @@ class Webserver(Backend, ABC):
 
     @abstractmethod
     def list(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def num_tables(self):
         pass
 
     @abstractmethod

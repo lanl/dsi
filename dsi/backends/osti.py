@@ -496,6 +496,18 @@ class OSTI(Webserver):
     # ----------------------------------------------------------------------
     # Terminal Methods
     # ----------------------------------------------------------------------
+    def num_tables(self):
+        """
+        Prints the number of tables (datasets) loaded.
+        """
+        if not self._loaded:
+            print("0 tables loaded")
+            return
+        
+        num = len(self._cache) - (1 if "datasets" in self._cache else 0)
+        print(f"{num} tables loaded")
+    
+
     def get_table(self, table_name="records", dict_return=False):
         """
         Returns all data from the records table.
@@ -556,27 +568,18 @@ class OSTI(Webserver):
 
         return "\n\n".join(schema_lines)
 
-    def overwrite_table(self, table_name, collection):
+
+    def get_table_names(self, query):
         """
-        Not supported - OSTI backend is read-only.
+        Extracts table/dataset names mentioned in a query string.
         
-        Parameters
-        ----------
-        `table_name` : str or list
-            Table name(s)
-        `collection` : DataFrame or list
-            Data
+        `query` : str
+            Query string to parse
         
-        Raises
-        ------
-        NotImplementedError
-            Always raised as OSTI is read-only
+        Return : list
+            List of dataset names/IDs found in query
         """
-        raise NotImplementedError(
-            "OSTI backend is read-only. Cannot overwrite tables. "
-            "To modify data, use artifact_handler('process') to load into "
-            "a writable backend (Sqlite/DuckDB), make changes, then query."
-        )
+        raise NotImplementedError("OSTI backend has not implemented get_table_names")
 
     # ---------------------------------------------------
     # Query Interface (in-memory)
@@ -842,7 +845,7 @@ class OSTI(Webserver):
         """
         Relation finding is not supported for the OSTI backend.
         """
-        return []
+        raise NotImplementedError("OSTI Backend does not support find_relation")
 
     # ----------------------------------------------------------------------
     # Utility / Display
@@ -858,7 +861,7 @@ class OSTI(Webserver):
             If False, print table names with dimensions.
         """
         if collection:
-            return self._cache.keys()
+            return list(self._cache.keys())
 
         for name, table in self._cache.items():
             df = pd.DataFrame(table)

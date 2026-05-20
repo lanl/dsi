@@ -919,6 +919,10 @@ class Terminal():
                 self.logger.error('Need to load a valid backend to be able to overwrite a table')
             raise NotImplementedError('Need to load a valid backend to be able to overwrite a table')
         backend = self.loaded_backends[0]
+
+        if backend.__class__.__bases__[0].__name__ == "Webserver":
+            raise NotImplementedError("Cannot overwrite data in a Webserver backend")
+        
         if not self.valid_backend(backend):
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
