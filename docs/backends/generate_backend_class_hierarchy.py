@@ -39,6 +39,8 @@ class ClassTreeNode:
         def process_children(r):
             # print(r.clas.__name__)
             for ch in r.subclasses:
+                if ch.clas.__name__ == "HPSS":
+                    continue
                 dot.node(ch.clas.__name__)
                 dot.edge(r.clas.__name__, ch.clas.__name__)
                 process_children(ch)
