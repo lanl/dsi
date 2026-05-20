@@ -1237,10 +1237,8 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def list(self, collection=False):
         """
-        Lists tables or prints metadata in SQLite-compatible format.
+        Lists tables or prints each table's dimensions in SQLite-compatible format.
         
-        Parameters
-        ----------
         `collection` : bool, default False
             If True, return list of table names.
             If False, print table names with dimensions.

@@ -851,7 +851,7 @@ class OSTI(Webserver):
         """
         Relation finding is not supported for the OSTI backend.
         """
-        return []
+        raise NotImplementedError("OSTI Backend does not support find_relation")
 
     # ----------------------------------------------------------------------
     # Utility / Display
@@ -867,7 +867,7 @@ class OSTI(Webserver):
             If False, print table names with dimensions.
         """
         if collection:
-            return self._cache.keys()
+            return list(self._cache.keys())
 
         for name, table in self._cache.items():
             df = pd.DataFrame(table)

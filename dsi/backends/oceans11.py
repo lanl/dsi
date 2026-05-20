@@ -543,7 +543,6 @@ class Oceans11(Webserver):
         """
         Prints the number of cached tables.
         """
-
         num = len(self._cache)
         print(f"{num} tables loaded")
 
@@ -1003,7 +1002,7 @@ class Oceans11(Webserver):
         """
 
         if collection:
-            return self._cache.keys()
+            return list(self._cache.keys())
 
         for name, table in self._cache.items():
             df = pd.DataFrame(table)

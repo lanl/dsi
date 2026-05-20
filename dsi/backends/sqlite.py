@@ -970,9 +970,10 @@ class Sqlite(Filesystem):
         Returns numerical metadata from tables in the first activated backend.
 
         `table_name` : str, optional
-            If specified, only the numerical metadata for that table will be returned as a Pandas DataFrame.
+            If specified, only the numerical metadata for that table is returned as a Pandas DataFrame.
             
-            If None (default), metadata for all available tables is returned as a list of Pandas DataFrames.
+            If None (default), names of all tables and metadata for each table is returned as a list.
+            [table_name_list, table1_df, table2_df, table3df ...]
         """
         if table_name is None:
             tableList = self.cur.execute("SELECT name FROM sqlite_master WHERE type ='table' AND name != 'sqlite_sequence';").fetchall()
