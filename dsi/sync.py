@@ -23,10 +23,11 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name=None, isVerbose = False, no_parent = False, **kwargs):
+    def __init__(self, project_name=None, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
         self.project_name = project_name
         self.verbose = isVerbose
         self.no_parent = no_parent
+        self.skip_index = skip_index
         self.add_dbs = kwargs.pop("add_dbs", [])
 
         extension = ""
@@ -130,6 +131,14 @@ class Sync():
                     if self.verbose:
                         print("DSI Index complete!\n")
                     return
+            else:
+                if self.skip_index:
+                    # adding fake file_abs col so it goes through actual skip dircrawl check above
+                    filesystem_df["file_abs"] = None
+                    self.t.dsi_tables.remove("filesystem")
+                    self.t.overwrite_table("filesystem", filesystem_df)
+                    self.t.dsi_tables.append("filesystem")
+                    return self.index(local_loc, remote_loc)
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, self.verbose)
@@ -327,7 +336,9 @@ class Sync():
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
         # TODO: have movement service handle type without user input (cp,scp,rsync,conduit,pfcp,ftp,etc.)
-        if tool.lower() == "copy":            
+        if tool.lower() == "copy":
+            if all(x is None for x in file_list):
+                file_list = [str(Path(self.local_location) / s) for s in filesystem_df["file_origin"]]
             for file, file_remote in zip(file_list, rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
