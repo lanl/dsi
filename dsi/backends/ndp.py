@@ -619,7 +619,8 @@ class NDP(Webserver):
     def validate_urls(self):
         """
         Validates resource URLs across all resource tables.
-        Adds 'url_valid' column to each resource table.
+
+        Adds 'url_valid' boolean column to each resource table.
         """
         headers = {"User-Agent": "NDP-Validator"}
 
@@ -680,7 +681,6 @@ class NDP(Webserver):
             - row_num : (int or None) Row index
             - value :   (any) Matched value or data
             - type :    (str) {'table', 'column', 'cell'}
-                
         """
         
         query_str = str(query_object).lower()
