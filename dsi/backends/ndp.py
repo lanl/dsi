@@ -85,7 +85,6 @@ class NDP(Webserver):
             - verify_ssl : bool, optional
                 Toggle SSL verification (default False)
         """
-
         DEFAULT_URL = "https://nationaldataplatform.org/catalog"
 
         base_url = url or DEFAULT_URL
@@ -489,7 +488,6 @@ class NDP(Webserver):
         dict
             Result data from CKAN API response
         """
-
         url = f"{self.base_url}/api/3/action/{endpoint}"
 
         r = requests.get(
@@ -618,7 +616,6 @@ class NDP(Webserver):
         OrderedDict
             Column-oriented table structure
         """
-
         if not rows:
             return OrderedDict()
 
@@ -965,7 +962,6 @@ class NDP(Webserver):
         Return : OrderedDict
             All cached tables in tiered structure
         """
-
         if not self._loaded:
             return {}
 
@@ -1042,7 +1038,6 @@ class NDP(Webserver):
             - value :   (any) Matched value or data
             - type :    (str) {'table', 'column', 'cell'}
         """
-        
         query_str = str(query_object).lower()
 
         return (
@@ -1071,7 +1066,6 @@ class NDP(Webserver):
             - row_num : (None)
             - type :    (str) 'table'
         """
-
         if not isinstance(query_object, str):
             raise RuntimeError(
                 "find_table() ERROR: Cannot search an empty backend. "
@@ -1112,7 +1106,6 @@ class NDP(Webserver):
             - row_num : (None)
             - type :    (str) 'column'
         """
-
         if not isinstance(query_object, str):
             raise RuntimeError(
                 "find_column() ERROR: Cannot search an empty backend. "
@@ -1216,8 +1209,7 @@ class NDP(Webserver):
 
     def find_relation(self, column_name, relation, **kwargs):
         """
-        **NDP is a read-only metadata backend and does not support
-        relational queries on columns.**
+        **NDP is a read-only metadata backend and does not support relational queries on columns.**
         """
         raise NotImplementedError("NDP Backend does not support find_relation")
 
@@ -1551,7 +1543,6 @@ class NDP(Webserver):
         """
         Resets backend state and clears all cached data.
         """
-
         self._cache = OrderedDict()
         self._dataset_id_map = {}
         self._dataset_title_map = {}
