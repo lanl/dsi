@@ -42,6 +42,7 @@ class DuckDB(Filesystem):
     DuckDB Filesystem Backend to which a user can ingest/process data, generate a Jupyter notebook, and find occurrences of a search term
     """
     runTable = False
+    read_only = False
 
     def __init__(self, filename, **kwargs):
         """
@@ -65,7 +66,7 @@ class DuckDB(Filesystem):
         `input_list` : list
             A list of values to analyze for type compatibility.
 
-        `return`: str
+        Return: str
             A string representing the inferred DuckDB data type for the input list.
         """
         DUCKDB_BIGINT_MIN = -9223372036854775808
@@ -328,27 +329,29 @@ class DuckDB(Filesystem):
             
             self.ingest_table_helper(types, foreign_query)
             
-            col_names = ', '.join(types.properties.keys())
-            placeholders = ', '.join('?' * len(types.properties))
+            # TODO: move this check to schema reader by allowing users to just create table without data
+            if not all(v == [""] for v in tableData.values()): # if table is just one row of empty strings, don't insert
+                col_names = ', '.join(types.properties.keys())
+                placeholders = ', '.join('?' * len(types.properties))
 
-            str_query = "INSERT INTO "
-            if self.runTable:
-                run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
-                str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
-            else:
-                str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
-            if isVerbose:
-                print(str_query)
-            
-            rows = zip(*types.properties.values())
-            try:
-                self.cur.executemany(str_query,rows)
-            except duckdb.Error as e:
-                self.cur.execute("ROLLBACK")
-                self.cur.execute("CHECKPOINT")
-                raise duckdb.Error(e)
+                str_query = "INSERT INTO "
+                if self.runTable:
+                    run_id = self.cur.execute("SELECT run_id FROM runTable ORDER BY run_id DESC LIMIT 1;").fetchone()[0]
+                    str_query += "{} (run_id, {}) VALUES ({}, {});".format(str(types.name), col_names, run_id, placeholders)
+                else:
+                    str_query += "{} ({}) VALUES ({});".format(str(types.name), col_names, placeholders)
+                if isVerbose:
+                    print(str_query)
                 
-            self.types = types #This will only copy the last table from artifacts (collections input)            
+                rows = zip(*types.properties.values())
+                try:
+                    self.cur.executemany(str_query,rows)
+                except duckdb.Error as e:
+                    self.cur.execute("ROLLBACK")
+                    self.cur.execute("CHECKPOINT")
+                    raise duckdb.Error(e)
+                
+            self.types = types # This will only copy the last table from artifacts (collections input)            
 
         if "dsi_units" in artifacts.keys():
             create_query = "CREATE TABLE IF NOT EXISTS dsi_units (table_name TEXT, column_name TEXT, unit TEXT)"
@@ -378,9 +381,13 @@ class DuckDB(Filesystem):
             raise duckdb.Error(e)
 
     
-    def query_artifacts(self, query, isVerbose=False, dict_return = False):
+    def query_artifacts(self, query, isVerbose=False, dict_return = False, **kwargs):
         """
-        Executes a SQL query on the DuckDB backend and returns the result in the specified format dependent on `dict_return`
+        Executes a SQL query on the DuckDB backend.
+
+        Supports:
+        - SELECT / PRAGMA: returns DataFrame or OrderedDict depending on dict_return
+        - UPDATE / ALTER: executes command and returns None
 
         `query` : str
             Must be a SELECT or PRAGMA SQL query. Aggregate functions like COUNT are allowed.
@@ -393,12 +400,14 @@ class DuckDB(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
         
-        `return` : pandas.DataFrame or OrderedDict
+        Return : pandas.DataFrame or OrderedDict or None
+            - If `query` includes UPDATE or ALTER: returns nothing
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
         data = None
-        if query[:6].lower() == "select" or query[:6].lower() == "pragma":
+        command = query.strip().split(None, 1)[0].lower()
+        if command in {"select", "pragma"}:
             try:
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
@@ -412,8 +421,23 @@ class DuckDB(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
+        elif command in {"update", "alter"}:
+            query_params = kwargs.pop("params", ())
+            try:
+                self.cur.execute("BEGIN TRANSACTION")
+                self.cur.execute(query, query_params)
+                self.cur.execute("COMMIT")
+                self.cur.execute("FORCE CHECKPOINT")
+                return None
+            except duckdb.Error:
+                try:
+                    self.cur.execute("ROLLBACK")
+                    self.cur.execute("FORCE CHECKPOINT")
+                except duckdb.Error:
+                    pass
+                raise
         else:
-            raise RuntimeError("Can only run SELECT or PRAGMA queries on the data")
+            raise RuntimeError("Can only run SELECT, PRAGMA, UPDATE, or ALTER queries on the data")
         
         if dict_return:
             tables = self.get_table_names(query)
@@ -437,7 +461,7 @@ class DuckDB(Filesystem):
             If True, returns the result as an OrderedDict.
             If False, returns the result as a pandas DataFrame.
 
-        `return` : pandas.DataFrame or OrderedDict
+        Return : pandas.DataFrame or OrderedDict
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
@@ -450,7 +474,7 @@ class DuckDB(Filesystem):
         `query` : str
             A SQL query string, typically passed into `query_artifacts()`.
 
-        `return`: list of str
+        Return: list of str
             List of table names referenced in the query.
         """
         all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
@@ -461,7 +485,7 @@ class DuckDB(Filesystem):
         """
         Returns the structural schema of this database in the form of CREATE TABLE statements.
 
-        `return`: str
+        Return: str
             Each table's CREATE TABLE statement is concatenated into one large string.
         """
         schema_stmts = self.query_artifacts(query="SELECT sql FROM duckdb_tables where sql NOT NULL ")
@@ -482,7 +506,7 @@ class DuckDB(Filesystem):
         `only_units_relations` : bool, default=False
             **USERS SHOULD IGNORE THIS FLAG.** Used internally by duckdb.py.
 
-        `return` : OrderedDict
+        Return : OrderedDict
             A nested OrderedDict containing all data from the DuckDB database.
         """
         artifact = OrderedDict()
@@ -540,7 +564,7 @@ class DuckDB(Filesystem):
         `query_object` : int, float, or str
             The value to search for across all tables in the backend.
 
-        `return` : list
+        Return : list
             A list of ValueObjects representing matches.
 
         - Note: ValueObjects may vary in structure depending on whether the match occurred at the table, column, or cell level.
@@ -568,7 +592,7 @@ class DuckDB(Filesystem):
         `query_object` : str
             The string to search for in table names.
 
-        `return` : list of ValueObjects
+        Return : list of ValueObjects
             One ValueObject per matching table.
 
         ValueObject Structure:
@@ -614,7 +638,7 @@ class DuckDB(Filesystem):
             If True, `value` in the returned ValueObject will be the [min, max] of the matching numerical column.
             If False, `value` in the returned ValueObject will be the full list of column data.
 
-        `return` : List of ValueObjects if there is a match. 
+        Return : List of ValueObjects if there is a match. 
         
         ValueObject Structure:
             - t_name:   table name (str)
@@ -675,7 +699,7 @@ class DuckDB(Filesystem):
             If True, `value` in the returned ValueObject will be the entire row where a cell matched.
             If False, `value` in the returned ValueObject will only be the matching cell value.
 
-        `return` : List of ValueObjects if there is a match.
+        Return : List of ValueObjects if there is a match.
 
         ValueObject Structure:
             - t_name:   table name (str)
@@ -757,7 +781,7 @@ class DuckDB(Filesystem):
         `relation` : str
             The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4, (4,5), ~4, ~~4
 
-        `return` : list of ValueObjects
+        Return : list of ValueObjects
             One ValueObject per matching row in that first table.
 
         ValueObject Structure:
@@ -1077,7 +1101,7 @@ class DuckDB(Filesystem):
         `relation_dict` : OrderedDict
             An OrderedDict describing table relationships. Structured as the `dsi_relations` object with primary and foreign keys.
 
-        `return`: tuple of (has_cycle, ordered_tables)
+        Return: tuple of (has_cycle, ordered_tables)
             - has_cycle (bool): True if a circular dependency is detected.
             - ordered_tables (list or None): Ordered list of tables if no cycle is found; None if a circular dependency exists.
         """
@@ -1136,6 +1160,6 @@ class DuckDB(Filesystem):
         """
         Closes the DuckDB database's connection.
 
-        `return`: None
+        Return: None
         """
         self.con.close()

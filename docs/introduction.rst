@@ -71,7 +71,6 @@ Currently, DSI has the following Readers:
   - Bueno
   - Ensemble (Reader to ingest ensemble data. Ex: the `Wildfire ensemble dataset <https://github.com/lanl/dsi/tree/main/examples/wildfire>`_ . 
     Assumes each data row is a separate sim.)
-  - Oceans11Datacard (Data card for datasets on the `Oceans11 LANL data server <https://oceans11.lanl.gov>`_)
   - DublinCoreDatacard (Data card that adheres to the `Dublin Core metadata standard <https://www.dublincore.org/resources/metadata-basics/>`_ ) 
   - SchemaOrgDatacard (Data card that adheres to the `Schema.org metadata standard <https://schema.org/Dataset>`_ )
   - GoogleDatacard (Data card that adheres to the `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_ )
@@ -84,12 +83,13 @@ Currently, DSI has the following Writers:
 DSI Backends
 ~~~~~~~~~~~~~
 
-Backends are an interface between the DSI Core and a storage medium.
-Backends are designed to support a user-needed functionality.
-The default backend used in DSI is **SQLite**, but there are an options to use others such as DuckDB as well.
+Backends are an interface between the DSI Core and a storage medium designed to support a user-needed functionality.
+DSI's default backend is **SQLite**, but users can load other ones instead.
 
-Users can interact with a backend by ingesting data into one from DSI, querying its data through abstracted find functions, or processing its data into DSI.
+Users can interact with a backend by ingesting data into one with DSI, querying its data through abstracted find functions, or processing its data into DSI.
 Users can also find instances of an object in a backend, display a table's data, or view statistics of each table in a backend.
+
+Certain backends are read-only so data cannot be ingested or updated, only queried.
 
 .. figure:: images/user_story.png
    :alt: This figure depicts a user asking a typical query on the user's metadata
@@ -101,10 +101,16 @@ Users can also find instances of an object in a backend, display a table's data,
    The user needs to extract all instances of the variable **foo**. 
    DSI backends find data from the DSI metadata to locate and return all such information.
 
-Current DSI backends include:
+DSI currently has two categories of backends:
 
-- SQLite: Python based SQL database and backend; the **default** DSI API backend.
-- DuckDB: In-process SQL database designed for fast queries on large data files
+Filesystem Backends - Create a permanent database file in the user's local directory:
+  - SQLite: Python based SQL database and backend; the **default** DSI API backend. Supports POSIX-enforced file permissions.
+  - DuckDB: In-process SQL database designed for fast queries on large data files. Supports POSIX-enforced file permissions.
+
+Webserver Backends - Create a connection to a remote data platform for users to retrieve data in-memory:
+  - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
+  - Oceans11 (Read-only): Connection to data on DSI's `open data server: <https://oceans11.lanl.gov/>`_
+  - OSTI (Read-only): Connection to data hosted by the Department of Energy's `Office of Scientific and Technical Information <https://www.osti.gov/>`_
 
 DSI Core
 ~~~~~~~~

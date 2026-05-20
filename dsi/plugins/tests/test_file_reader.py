@@ -97,21 +97,22 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
 
 def test_yaml_reader():
     a=Terminal()
-    a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], table_name = "oceans")
+    a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_google.yml'], table_name = "wildfire_google_dc")
 
-    assert len(a.active_metadata.keys()) == 1 # 1 table - oceans
+    assert len(a.active_metadata.keys()) == 1 # 1 table - wildfire_google_dc
     for name, tableData in a.active_metadata.items():
         assert isinstance(tableData, OrderedDict)
-        assert len(tableData.keys()) == 15
+        print(len(tableData.keys()))
+        assert len(tableData.keys()) == 36
 
 def test_yaml_reader_v1_2():
     a=Terminal()
-    a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], table_name = "oceans", yaml_version = "1.2")
+    a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_google.yml'], table_name = "wildfire_google_dc", yaml_version = "1.2")
 
-    assert len(a.active_metadata.keys()) == 1 # 1 table - oceans
+    assert len(a.active_metadata.keys()) == 1 # 1 table - wildfire_google_dc
     for name, tableData in a.active_metadata.items():
         assert isinstance(tableData, OrderedDict)
-        assert len(tableData.keys()) == 15
+        assert len(tableData.keys()) == 36
 
 def test_yaml1_reader():
     a=Terminal()

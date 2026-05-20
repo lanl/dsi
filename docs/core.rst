@@ -3,9 +3,8 @@
 Core
 ====
 
-The DSI Core middleware defines the `Terminal` and `Sync` concepts.
+The DSI Core middleware defines the `Terminal`concept.
 An instantiated `Terminal` is the human/machine DSI interface to connect Readers/Writers and DSI backends.
-An instantiated `Sync` supports data movement capabilities between local and remote locations and captures metadata documentation
 
 Core: Terminal
 --------------
@@ -34,23 +33,6 @@ Notes for users:
               Ex: (ValueError, "this is an error")
 
 .. autoclass:: dsi.core.Terminal
-      :members:
-      :special-members: __init__
-
-Core: Sync
-----------
-
-The DSI Core middleware also defines data management functionality in ``Sync``.
-
-The purpose of ``Sync`` is to provide file metadata documentation and data movement capabilities when moving data to/from local and remote locations.
-The purpose of data documentation is to capture and archive metadata
-(i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates)
-and track their movement to the remote location for future access.
-
-The primary functions, ``Copy``, ``Move``, and ``Get`` serve as mechanisms to copy data, move data, or retrieve data from remote locations
-by creating a DSI database in the process, or retrieving an existing DSI database that contains the location(s) of the target data.
-
-.. autoclass:: dsi.sync.Sync
       :members:
       :special-members: __init__
 

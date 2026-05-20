@@ -9,7 +9,7 @@ my_user@local-machine examples % dsi
   \  \ \/ /     \  \  / / /       \__\  /
    \  \  /       \__\/ / /        /__/ / 
     \__\/          /__/ /         \__\/  
-                   \__\/                   v1.1.4
+                   \__\/                   v1.2.1
 
 Created a temporary Sqlite DSI backend
 
@@ -21,6 +21,9 @@ display <table_name> [-n num_rows] [-e filename] Displays a table's data. Option
 draw [-f filename]                               Draws an ER diagram of all tables in the 
                                                   current DSI database
 exit                                             Exits the DSI Command Line Interface (CLI)
+federate <config file> [-w workspace_folder]     Collects data from sources defined in the 
+                                                  YAML config file, optionally saving it to 
+                                                  a workspace folder.
 find <condition>                                 Finds all rows of a table that match a 
                                                   column-level condition.
 help                                             Shows this help message.
@@ -43,12 +46,8 @@ ls                                               Lists all files in the current 
 cd <path>                                        Changes the working directory within the CLI 
                                                   environment.
 
-dsi> read wildfire/wildfire_oceans11.yml -t oceans_data
-Loaded wildfire/wildfire_oceans11.yml into the table oceans_data
-Database now has 1 table
-
-dsi> read pennant/pennant_oceans11.yml -t oceans_data
-Loaded pennant/pennant_oceans11.yml into the table oceans_data
+dsi> read wildfire/wildfire_google.yml -t google_data
+Loaded wildfire/wildfire_google.yml into the table google_data
 Database now has 1 table
 
 dsi> read test/example.toml
@@ -65,9 +64,9 @@ Database now has 4 tables
 
 dsi> list
 
-Table: oceans_data
-  - num of columns: 15
-  - num of rows: 2
+Table: google_data
+  - num of columns: 36
+  - num of rows: 1
 
 Table: nodes
   - num of columns: 2
@@ -107,27 +106,48 @@ Saved an ER Diagram at dsi_er_diagram.png
 dsi> plot_table people -f people_plot.png
 Saved a plot of the people table in people_plot.png
 
-dsi> summary -t oceans_data
+dsi> summary -t google_data
 
-Table: oceans_data
+Table: google_data
 
-column                  | type    | unique | min  | max  | avg  | std_dev            
--------------------------------------------------------------------------------------
-title                   | VARCHAR | 2      | None | None | None | None               
-description             | VARCHAR | 2      | None | None | None | None               
-keywords                | VARCHAR | 2      | None | None | None | None               
-instructions_of_use     | VARCHAR | 2      | None | None | None | None               
-authorship_authors      | VARCHAR | 2      | None | None | None | None               
-authorship_release_date | VARCHAR | 2      | None | None | None | None               
-authorship_la_ur        | VARCHAR | 2      | None | None | None | None               
-authorship_funding      | VARCHAR | 1      | None | None | None | None               
-authorship_rights       | VARCHAR | 2      | None | None | None | None               
-data_file_types         | VARCHAR | 2      | None | None | None | None               
-data_file_size          | VARCHAR | 2      | None | None | None | None               
-data_num_files          | INTEGER | 2      | 10   | 75   | 42.5 | 32.5               
-data_dataset_size       | VARCHAR | 2      | None | None | None | None               
-data_version            | FLOAT   | 2      | 0.9  | 1.0  | 0.95 | 0.04999999999999999
-data_doi                | VARCHAR | 1      | None | None | None | None  
+column                                | type    | unique | min  | max  | avg  | std_dev
+---------------------------------------------------------------------------------------
+summary_dataset_name                  | VARCHAR | 1      | None | None | None | None   
+summary_summary                       | VARCHAR | 1      | None | None | None | None   
+summary_dataset_link                  | VARCHAR | 1      | None | None | None | None   
+summary_documentation_link            | VARCHAR | 1      | None | None | None | None   
+authorship_datacard_author1           | VARCHAR | 1      | None | None | None | None   
+authorship_datacard_author2           | VARCHAR | 1      | None | None | None | None   
+authorship_datacard_author3           | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_organization    | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_POC             | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_POC_affiliation | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_POC_contact     | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owner1             | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owner2             | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owner3             | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owners_affiliation | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owners_contact     | VARCHAR | 1      | None | None | None | None   
+authorship_funding_institution        | VARCHAR | 1      | None | None | None | None   
+authorship_funding_summary            | VARCHAR | 1      | None | None | None | None   
+overview_data_subjects                | VARCHAR | 1      | None | None | None | None   
+overview_data_sensitivity             | VARCHAR | 1      | None | None | None | None   
+overview_version                      | FLOAT   | 1      | 1.0  | 1.0  | 1.0  | 0      
+overview_maintenance_status           | VARCHAR | 1      | None | None | None | None   
+overview_last_updated                 | VARCHAR | 1      | None | None | None | None   
+overview_release_date                 | VARCHAR | 1      | None | None | None | None   
+overview_motivation                   | VARCHAR | 1      | None | None | None | None   
+overview_dataset_uses                 | VARCHAR | 1      | None | None | None | None   
+overview_citation_guidelines          | VARCHAR | 1      | None | None | None | None   
+overview_citation_bibtex              | VARCHAR | 1      | None | None | None | None   
+provenance_collection_methods_used    | VARCHAR | 1      | None | None | None | None   
+provenance_source                     | VARCHAR | 1      | None | None | None | None   
+provenance_platform                   | VARCHAR | 1      | None | None | None | None   
+provenance_dates_of_collection        | VARCHAR | 1      | None | None | None | None   
+provenance_type_of_data               | VARCHAR | 1      | None | None | None | None   
+provenance_data_selection             | VARCHAR | 1      | None | None | None | None   
+provenance_data_inclusion             | VARCHAR | 1      | None | None | None | None   
+provenance_data_exclusion             | VARCHAR | 1      | None | None | None | None   
 
 dsi> viewers
 Available viewers are: dashboard, ml

@@ -23,7 +23,6 @@ test.read(data_sources=["student_test1.yml", "student_test2.yml"], reader_name='
 # test.read(data_sources="test.txt", reader_name="text_file_reader.py")
 # test.read(data_sources="wildfiredata.pq", reader_name="Parquet", table_name="Wildfire_parquet")
 
-# test.read(data_sources=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
 # test.read(data_sources="../wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
 # test.read(data_sources="../wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
 # test.read(data_sources="../wildfire/wildfire_google.yml", reader_name='GoogleDatacard')

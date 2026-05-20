@@ -40,6 +40,7 @@ class FileReader(StructuredMetadata):
             self.file_info[abspath(filename)] = sha.hexdigest()
     
     def store_dict(self, reader_name: str, data_dict: dict, expected_columns: list[str]) -> OrderedDict:
+        data_dict = {k.lower(): v for k, v in data_dict.items()} # convert keys to lowercase
         if all(isinstance(val, list) for val in data_dict.values()):
             extra = set(data_dict.keys()) - set(expected_columns)
             if extra:
@@ -62,7 +63,7 @@ class FileReader(StructuredMetadata):
             raise ValueError("Input dictionary must represent one table of data.")
 
     def store_dataframe(self, reader_name: str, data_df: DataFrame, expected_columns: list[str]) -> OrderedDict:
-        df_cols = set(data_df.columns)
+        df_cols = set(data_df.columns.str.lower())
         extra = df_cols - set(expected_columns)
         if extra:
             raise ValueError(f"Input DataFrame for {reader_name} data card reader has extra columns: {', '.join(extra)}")
@@ -983,72 +984,6 @@ class Cloverleaf(FileReader):
         self.set_schema_2(self.cloverleaf_data)
 
 
-class Oceans11Datacard(YAML):
-    """
-    DSI Reader that stores a dataset's data card as a row in the `oceans11_datacard` table.
-    Input datacard should follow template in `examples/test/template_dc_oceans11.yml`
-    """
-    def __init__(self, filenames, **kwargs):
-        """
-        `filenames` : str, list of str, or data object (dict or pandas DataFrame)
-            File name(s) of YAML data card files to ingest. Each file must adhere to the
-            Oceans 11 Server metadata standard.
-        """
-        super().__init__(filenames, **kwargs)
-        if isinstance(filenames, str):
-            self.datacard_files = [filenames]
-        else:
-            self.datacard_files = filenames
-        self.datacard_data = OrderedDict()
-
-    def add_rows(self) -> None:
-        """
-        Flattens data in the input data card as a row in the `oceans11_datacard` table
-        """
-        expected_columns = ["title", "description", "keywords", "instructions_of_use", "authors", "release_date", "la_ur", 
-                            "funding", "rights", "file_types", "file_size", "num_files", "dataset_size", "version", "doi"]
-        if isinstance(self.datacard_files, dict):
-            self.set_schema_2(OrderedDict([("oceans11_datacard", self.store_dict("Oceans11", self.datacard_files, expected_columns))]))
-        elif isinstance(self.datacard_files, DataFrame):
-            self.set_schema_2(OrderedDict([("oceans11_datacard", self.store_dataframe("Oceans11", self.datacard_files, expected_columns))]))
-        elif isinstance(self.datacard_files, list):
-
-            temp_data = OrderedDict()
-            for filename in self.datacard_files:
-                with open(filename, 'r') as yaml_file:
-                    data = self._safe_load(yaml_file)
-                    
-                field_names = []
-                for element, val in data.items():
-                    if element not in ['authorship', 'data']:
-                        if isinstance(val, list):
-                            val = ",, ".join(val)
-                        if element not in temp_data.keys():
-                            temp_data[element] = [val]
-                        else:
-                            temp_data[element].append(val)
-                        field_names.append(element)
-                    else:
-                        for field, val2 in val.items():
-                            if isinstance(val2, list):
-                                val2 = ",, ".join(val2)
-                            if field not in temp_data.keys():
-                                temp_data[field] = [val2]
-                            else:
-                                temp_data[field].append(val2)
-                            field_names.append(field)
-
-                if sorted(field_names) != sorted(["title", "description", "keywords", "instructions_of_use", "authors", 
-                                                "release_date", "la_ur", "funding", "rights", "file_types", 
-                                                "file_size", "num_files", "dataset_size", "version", "doi"]):
-                    raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Oceans11 template")
-
-            self.datacard_data["oceans11_datacard"] = temp_data
-            self.set_schema_2(self.datacard_data)
-        else:
-            raise ValueError("Input for the Oceans11Datacard reader must be a YAML file, dictionary or pandas DataFrame")
-
-
 class DublinCoreDatacard(FileReader):
     """
     DSI Reader that stores a dataset's data card as a row in the `dublin_core_datacard` table.
@@ -1071,32 +1006,48 @@ class DublinCoreDatacard(FileReader):
         """
         Flattens data in the input data card as a row in the `dublin_core_datacard` table
         """
-        expected_columns = ['Creator', 'Contributor', 'Publisher', 'Title', 'Date', 'Language', 'Format', 'Subject', 
-                            'Description', 'Identifier', 'Relation', 'Source', 'Type', 'Coverage', 'Rights']
+        expected_columns = ['title', 'creator', 'subject', 'description', 'publisher', 'contributor', 'date', 'type', 'format', 
+                            'identifier', 'source', 'language', 'relation', 'coverage', 'rights']
         if isinstance(self.datacard_files, dict):
             self.set_schema_2(OrderedDict([("dublin_core_datacard", self.store_dict("Dublin Core", self.datacard_files, expected_columns))]))
         elif isinstance(self.datacard_files, DataFrame):
             self.set_schema_2(OrderedDict([("dublin_core_datacard", self.store_dataframe("Dublin Core", self.datacard_files, expected_columns))]))
         elif isinstance(self.datacard_files, list):
-
             import xmltodict
-            temp_data = OrderedDict()
+            temp_data = OrderedDict((k, []) for k in expected_columns)
             for filename in self.datacard_files:
                 with open(filename, 'r', encoding="utf-8") as xml_file:
                     xml_data = xml_file.read()
                     data = xmltodict.parse(xml_data)
-                    
-                field_names = []
-                for element, val in next(iter(data.values())).items():
-                    if val is None:
-                        val = ""
-                    if element not in temp_data.keys():
-                        temp_data[element] = [val]
-                    else:
-                        temp_data[element].append(val)
-                    field_names.append(element)
-                if sorted(field_names) != sorted(expected_columns):
-                    raise ValueError(f"Error in reading {filename} data card. Please ensure all fields match the Dublin Core template")
+                    if list(data.keys()) == ['metadata']:
+                        data = data['metadata']
+
+                # actual dublin core standard
+                if any(isinstance(k, str) and (k.startswith("dc:") or "xmlns" in k or "xsi" in k) for k in data):
+                    data = {k: v for k, v in data.items() if k.startswith("dc:")} # only keep dc: elements
+                    for element, val in data.items():
+                        if element[3:].lower() not in expected_columns:
+                            raise ValueError(f"Error reading {filename} data card. All fields must be a subset of the Dublin Core template")
+                        if isinstance(val, list): # if multiple values for same property, convert to a comma-separated string
+                            val = ", ".join(str(x) for x in val if x is not None)
+                        temp_data[element[3:].lower()].append(val)
+                        
+                # old standard to deprecate eventually
+                else:
+                    for element, val in data.items():
+                        if element.lower() not in expected_columns:
+                            raise ValueError(f"Error reading {filename} data card. All fields must be a subset of the Dublin Core template")
+                        if isinstance(val, list): # if multiple values for same property, convert to a comma-separated string
+                            val = ", ".join(str(x) for x in val if x is not None)
+                        temp_data[element.lower()].append(val)
+
+                max_len = max(len(v) for v in temp_data.values())
+                for v in temp_data.values():
+                    if len(v) < max_len:
+                        v.extend([None] * (max_len - len(v)))
+                
+                if all(v[-1] is None or v[-1] == "" for v in temp_data.values()):
+                    raise ValueError(f"Error reading {filename} data card. All fields are empty.")
 
             self.datacard_data["dublin_core_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
