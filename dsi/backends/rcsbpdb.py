@@ -17,8 +17,9 @@ Access modes
 
 DOI behavior
 ------------
-RCSB Search API is not used for DOI lookup.
-rcsbpdb DOI input is normalized and converted into a PDB ID when possible.
+RCSB-style DOI input is supported through identifiers or params.
+Only DOIs of the form 10.2210/pdbXXXX/pdb are converted directly into PDB IDs.
+General publication DOI search is not currently supported.
 
 REST flow
 ---------
@@ -201,6 +202,15 @@ class RCSBPDB(Webserver):
         "keywords",
         "authors",
         "experimental_method",
+        "pdb_id",
+        "pdbID",
+        "pdbId",
+        "PDB_ID",
+        "pdbid",
+        "PDBID",
+        "doi",
+        "DOI",
+        "identifiers",
         "limit",
         "start",
         "return_type",
@@ -415,7 +425,57 @@ class RCSBPDB(Webserver):
     # ------------------------------------------------------------------
     # Query-driven Search API support
     # ------------------------------------------------------------------
+    def _extract_identifiers_from_params(self, params: Dict[str, Any]) -> List[str]:
+        """
+        Extract DOI/PDB identifiers from params and normalize aliases.
+
+        Supported identifier-style params:
+        - identifiers
+        - pdb_id, pdbID, pdbId, PDB_ID, pdbid, PDBID
+        - doi, DOI
+        """
+        identifiers: List[str] = []
+
+        for key in ("identifiers",):
+            value = params.get(key)
+            if value:
+                if isinstance(value, list):
+                    identifiers.extend(str(v) for v in value)
+                else:
+                    identifiers.append(str(value))
+
+        for key in ("pdb_id", "pdbID", "pdbId", "PDB_ID", "pdbid", "PDBID"):
+            value = params.get(key)
+            if value:
+                if isinstance(value, list):
+                    identifiers.extend(str(v) for v in value)
+                else:
+                    identifiers.append(str(value))
+
+        for key in ("doi", "DOI"):
+            value = params.get(key)
+            if value:
+                if isinstance(value, list):
+                    identifiers.extend(str(v) for v in value)
+                else:
+                    identifiers.append(str(value))
+
+        return list(dict.fromkeys(identifiers))
+    
     def _load_from_params(self, params: Dict[str, Any]) -> None:
+        self._validate_params(params)
+
+        identifiers = self._extract_identifiers_from_params(params)
+
+        if identifiers:
+            self.identifiers = identifiers
+            self.raw_results = [
+                self.lookup_identifier(identifier, query_source="params")
+                for identifier in self.identifiers
+            ]
+            self.process_artifacts()
+            return
+
         pdb_ids = self._search_rcsb(params)
         self.identifiers = pdb_ids
         self.raw_results = [
