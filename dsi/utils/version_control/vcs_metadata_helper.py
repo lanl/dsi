@@ -39,7 +39,6 @@ def permission_str(mode: int) -> str:
         (stat.S_IROTH, "r"), (stat.S_IWOTH, "w"), (stat.S_IXOTH, "x"),
     ):
         chars.append(char if mode & bit else "-")
-    # Replace x with s/t for setuid/setgid/sticky
     if mode & stat.S_ISUID:
         chars[2] = "s" if chars[2] == "x" else "S"
     if mode & stat.S_ISGID:
@@ -219,15 +218,9 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
         "lstat": json.dumps(lstat_dict),
 
         # human-readable permission strings
-        "permissions_octal": oct(stat.S_IMODE(mode)),
-        "permissions_str":   permission_str(mode),
+        "permissions_int":   stat.S_IMODE(mode),
         "owner_name":        owner_name(s.st_uid),
         "group_name":        group_name(s.st_gid),
-
-        # special-bit flags
-        "setuid": int(bool(mode & stat.S_ISUID)),
-        "setgid": int(bool(mode & stat.S_ISGID)),
-        "sticky": int(bool(mode & stat.S_ISVTX)),
 
         # external / subprocess-derived attributes
         "acl_text":         get_acl(abs_path),

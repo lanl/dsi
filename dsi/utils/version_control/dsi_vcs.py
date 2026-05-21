@@ -351,8 +351,7 @@ class Version():
             "version_id", "root_folder", "relative_path", "absolute_path",
             "file_name", "file_type", "md5_hash",
             "lstat",
-            "permissions_octal", "permissions_str", "owner_name", "group_name",
-            "setuid", "setgid", "sticky",
+            "permissions_int", "owner_name", "group_name",
             "acl_text", "xattrs", "security_context", "symlink_target",
         ]
         placeholders = ",".join("?" * len(cols))
@@ -439,7 +438,7 @@ class Version():
                 conn.close()
                 sys.exit(f"Commit '{chash}' not found.")
             rows = conn.execute(
-                "SELECT relative_path, absolute_path, file_type, md5_hash, permissions_octal, "
+                "SELECT relative_path, absolute_path, file_type, md5_hash, permissions_int, "
                 "       owner_name, group_name, lstat "
                 "FROM file_entries WHERE version_id=?", (vid["id"],)
             ).fetchall()
@@ -495,7 +494,7 @@ class Version():
                     changes.append("content")
                     result = subprocess.run(['diff', f1["absolute_path"], f2["absolute_path"]], capture_output=True, text=True)
                     print(f"diff result: {result.stdout.strip()}")
-                if f1["permissions_octal"] != f2["permissions_octal"]:
+                if f1["permissions_int"] != f2["permissions_int"]:
                     changes.append("perms")
                 if f1["owner_name"] != f2["owner_name"] or f1["group_name"] != f2["group_name"]:
                     changes.append("owner")

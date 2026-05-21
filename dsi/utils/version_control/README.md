@@ -89,22 +89,22 @@ Example output:
 
 ```shell
 Diff f826177ae78f4e48a8c08054e2bb9a71 → None  (./root_folder)  
-                                                        
-STATUS     PATH                                         
+                                                      
+STATUS     PATH                                       
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                            
-MODIFIED   file_schema.json  [owner]                    
-diff result: 2c2                                        
-<    "genesis_datacard": {                              
----                                                     
->    2"genesis_datacard": {                             
-26c26                                                   
-< }                                                     
-\ No newline at end of file                             
----                                                     
-> }                                                     
-MODIFIED   schema2.json  [content, size]                
-                                                        
+MODIFIED   file_new  [owner]                          
+MODIFIED   file_schema.json  [owner]                  
+diff result: 2c2                                      
+<    "genesis_datacard": {                            
+---                                                   
+>    2"genesis_datacard": {                           
+26c26                                                 
+< }                                                   
+\ No newline at end of file                           
+---                                                   
+> }                                                   
+MODIFIED   schema2.json  [content, size]              
+                                                      
 Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged 
 ```
 
@@ -288,26 +288,24 @@ dsi.version("diff")
 
 Stores metadata for each file in each commit.
 
-| Column                 | Type       | Description                      |
-| ---------------------- | ---------- | -------------------------------- |
-| id                     | INTEGER PK | Auto-increment                   |
-| version_id             | INTEGER FK | References versions(id)          |
-| root_folder            | TEXT       | Partition key                    |
-| relative_path          | TEXT       | Path relative to root            |
-| absolute_path          | TEXT       | Full path                        |
-| file_name              | TEXT       | Filename only                    |
-| file_type              | TEXT       | file/dir/symlink/etc             |
-| md5_hash               | TEXT       | Content hash (files only)        |
-| lstat                  | TEXT       | JSON of os.lstat() result        |
-| permissions_octal      | TEXT       | e.g., "0o755"                    |
-| permissions_str        | TEXT       | e.g., "rwxr-xr-x"                |
-| owner_name             | TEXT       | Username                         |
-| group_name             | TEXT       | Group name                       |
-| setuid, setgid, sticky | INTEGER    | Special bits (0/1)               |
-| acl_text               | TEXT       | Raw getfacl output               |
-| xattrs                 | TEXT       | JSON dict of extended attributes |
-| security_context       | TEXT       | SELinux context                  |
-| symlink_target         | TEXT       | Target of symlink                |
+| Column           | Type       | Description                      |
+| ---------------- | ---------- | -------------------------------- |
+| id               | INTEGER PK | Auto-increment                   |
+| version_id       | INTEGER FK | References versions(id)          |
+| root_folder      | TEXT       | Partition key                    |
+| relative_path    | TEXT       | Path relative to root            |
+| absolute_path    | TEXT       | Full path                        |
+| file_name        | TEXT       | Filename only                    |
+| file_type        | TEXT       | file/dir/symlink/etc             |
+| md5_hash         | TEXT       | Content hash (files only)        |
+| lstat            | TEXT       | JSON of os.lstat() result        |
+| permissions_int  | INTEGER    | e.g. 755                         |
+| owner_name       | TEXT       | Username                         |
+| group_name       | TEXT       | Group name                       |
+| acl_text         | TEXT       | Raw getfacl output               |
+| xattrs           | TEXT       | JSON dict of extended attributes |
+| security_context | TEXT       | SELinux context                  |
+| symlink_target   | TEXT       | Target of symlink                |
 
 ### `staging` Table
 
