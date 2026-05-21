@@ -42,15 +42,9 @@ CREATE TABLE IF NOT EXISTS file_entries (
     lstat           TEXT    NOT NULL,
 
     -- ── Human-readable permission strings ─────────────────────────────────
-    permissions_octal   TEXT,                   -- e.g. "0o755"
-    permissions_str     TEXT,                   -- e.g. "rwxr-xr-x"
+    permissions_int     INTEGER,                -- e.g. "755" as an integer
     owner_name      TEXT,
     group_name      TEXT,
-
-    -- ── Special bits ──────────────────────────────────────────────────────
-    setuid          INTEGER DEFAULT 0,
-    setgid          INTEGER DEFAULT 0,
-    sticky          INTEGER DEFAULT 0,
 
     -- ── ACL (POSIX) ───────────────────────────────────────────────────────
     acl_text        TEXT,                       -- raw getfacl output

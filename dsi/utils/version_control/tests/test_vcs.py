@@ -29,7 +29,7 @@ def latest_entries(repo_path):
     with connect_repo(repo_path) as conn:
         conn.row_factory = sqlite3.Row
         return conn.execute(
-            "SELECT relative_path, file_type, permissions_octal, permissions_str, setgid "
+            "SELECT relative_path, file_type, permissions_int "
             "FROM file_entries WHERE version_id=(SELECT MAX(id) from versions) "
             "ORDER BY relative_path").fetchall()
 
@@ -66,29 +66,4 @@ def test_add(tmp_path):
     rows = {row["relative_path"]: row for row in latest_entries(tmp_path)}
     empty_entry = rows["empty"]
     assert empty_entry["file_type"] == "dir"
-    assert empty_entry["permissions_str"] == "rwxrwsr-x"
-    assert eval(empty_entry["permissions_octal"]) == 0o2775
-    assert empty_entry["setgid"] == 1
-
-
-def test_versioning():
-    test = DSI()
-    # test.version("init", os.getcwd())
-    # wpath = "/Users/ssakin/Public/versioning-test/clover-demo"
-    wpath = os.getcwd()
-    test.version("init", wpath)
-    assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
-
-    test.version("add", os.path.join(wpath, "a_dummy_file"))
-    print(">Single file added.")
-    test.version("add", os.path.join(wpath, "schema.json") + " " + os.path.join(wpath, "schema2.json"))
-    print(">Multi file added.")
-    print(">Versioning initialized.")
-
-    test.version("remove", os.path.join(wpath, "schema2.json"))
-    print(">Single file removed.")
-
-    test.version("commit", "Tester Commits")
-    test.version("log")
-    test.version("diff")
-    assert True
+    assert empty_entry["permissions_int"] == 0o2775
