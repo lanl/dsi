@@ -826,7 +826,7 @@ class DSI():
         if not isinstance(collection, pd.DataFrame):
             raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
-            raise RuntimeError("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
+            raise RuntimeError("update() ERROR: The 'dsi_table_name' column was not found. Ensure you set 'update'=True in the function that returned this collection")
         elif 'dsi_table_name' in collection.columns:
             if len(collection) == 0:
                 raise RuntimeError("update() ERROR: Cannot overwrite a table without any data.")
