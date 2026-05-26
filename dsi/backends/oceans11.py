@@ -783,48 +783,19 @@ class Oceans11(Webserver):
     # Find Methods
     # ----------------------------------------------------------------------
     def find(self, query_object, **kwargs):
+        """
+        Search for query_object across table names, column names, and cell values.
+        """        
         if not self._loaded:
             return []
 
-        results = []
+        query_str = str(query_object).lower()
 
-        for table_name, table in self._cache.items():
-
-            columns = list(table.keys())
-
-            if not columns:
-                continue
-
-            num_rows = len(table[columns[0]])
-
-            for row_idx in range(num_rows):
-
-                row_values = []
-
-                matched = False
-
-                for col in columns:
-
-                    value = table[col][row_idx]
-                    row_values.append(value)
-
-                    if query_object is None:
-                        continue
-
-                    if value is not None and str(query_object).lower() in str(value).lower():
-                        matched = True
-
-                if matched:
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=columns,
-                            row_num=row_idx + 1,
-                            value=row_values,
-                        )
-                    )
-
-        return results
+        return (
+            self.find_table(query_str) +
+            self.find_column(query_str) +
+            self.find_cell(query_object)
+        )
     
     def find_table(self, query_object, **kwargs):
         """
@@ -840,14 +811,13 @@ class Oceans11(Webserver):
 
         for table_name in self._cache.keys():
             if query in table_name.lower():
-                results.append(
-                    ValueObject(
-                        t_name=table_name,
-                        c_name=["table_name"],
-                        row_num=None,
-                        value=[table_name],
-                    )
-                )
+                value_object = ValueObject()
+                value_object.t_name = table_name
+                value_object.c_name = ["table_name"]
+                value_object.row_num = None
+                value_object.value = [table_name]
+                value_object.type = "table"
+                results.append(value_object)
 
         return results
 
@@ -868,15 +838,13 @@ class Oceans11(Webserver):
             for col_name, values in table.items():
 
                 if query in col_name.lower():
-
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=[col_name],
-                            row_num=None,
-                            value=values,
-                        )
-                    )
+                    value_object = ValueObject()
+                    value_object.t_name = table_name
+                    value_object.c_name = [col_name]
+                    value_object.row_num = None
+                    value_object.value = values
+                    value_object.type = "column"
+                    results.append(value_object)
 
         return results
 
@@ -915,17 +883,16 @@ class Oceans11(Webserver):
                         matched_cols.append(col)
 
                 if matched_cols:
-
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=matched_cols if not row else columns,
-                            row_num=row_idx + 1,
-                            value=row_values if row else [
-                                table[c][row_idx] for c in matched_cols
-                            ],
-                        )
+                    value_object = ValueObject()
+                    value_object.t_name = table_name
+                    value_object.c_name = matched_cols if not row else columns
+                    value_object.row_num = row_idx + 1
+                    value_object.value = (
+                        row_values if row
+                        else [table[c][row_idx] for c in matched_cols]
                     )
+                    value_object.type = "cell"
+                    results.append(value_object)
 
         return results
 
@@ -994,14 +961,13 @@ class Oceans11(Webserver):
                             for c in columns
                         ]
 
-                        results.append(
-                            ValueObject(
-                                t_name=table_name,
-                                c_name=columns,
-                                row_num=row_idx + 1,
-                                value=row_values,
-                            )
-                        )
+                        value_object = ValueObject()
+                        value_object.t_name = table_name
+                        value_object.c_name = columns
+                        value_object.row_num = row_idx + 1
+                        value_object.value = row_values
+                        value_object.type = "row"
+                        results.append(value_object)
 
                 except Exception:
                     continue
