@@ -202,6 +202,32 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Initial Data Load
     # ----------------------------------------------------------------------
+    def _quote_if_needed(self, value):
+        """
+        Quote a value if it contains spaces or special Solr characters.
+        
+        Parameters
+        ----------
+        value : str
+            Value to potentially quote
+            
+        Returns
+        -------
+        str
+            Quoted or unquoted value
+        """
+        if not isinstance(value, str):
+            return str(value)
+        
+        # Quote if contains spaces
+        if ' ' in value:
+            # Escape any existing quotes within the value
+            value = value.replace('"', '\\"')
+            return f'"{value}"'
+        
+        return value
+
+
     def _load_initial_data(self, params):
         """
         Loads data from NDP API based on query parameters.
