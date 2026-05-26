@@ -6,6 +6,7 @@ and exposes it as an in-memory DSI table: records
 """
 
 import requests
+import operator
 import pandas as pd
 from urllib.parse import urlparse
 from collections import OrderedDict
@@ -578,9 +579,11 @@ class OSTI(Webserver):
             Query string to parse
         
         Return : list
-            List of dataset names/IDs found in query
+            OSTI is a single-table backend, so the only table is 'records'.
         """
-        raise NotImplementedError("OSTI backend has not implemented get_table_names")
+        if not self._loaded or "records" not in self._cache:
+            return []
+        return ["records"]
 
     # ---------------------------------------------------
     # Query Interface (in-memory)
@@ -894,10 +897,69 @@ class OSTI(Webserver):
 
 
     def find_relation(self, column_name, relation, **kwargs):
+        """Find rows in the cached OSTI records table satisfying a column relation.
         """
-        Relation finding is not supported for the OSTI backend.
-        """
-        raise NotImplementedError("OSTI Backend does not support find_relation")
+        if not self._loaded:
+            return []
+
+        if "records" not in self._cache:
+            return []
+
+        ops = {
+            "=": operator.eq,
+            "==": operator.eq,
+            "!=": operator.ne,
+            ">": operator.gt,
+            "<": operator.lt,
+            ">=": operator.ge,
+            "<=": operator.le,
+        }
+
+        relation = relation.strip()
+        
+        matched_op = None
+        matched_value = None
+
+        for op in sorted(ops.keys(), key=len, reverse=True):
+            if relation.startswith(op):
+                matched_op = op
+                matched_value = relation[len(op):].strip().strip("'\"")
+                break
+
+        if matched_op is None:
+            raise ValueError(f"Unsupported relation: {relation}")
+
+        table_name = "records"
+        table = self._cache[table_name]
+
+        if column_name not in table:
+            return []
+
+        compare = ops[matched_op]
+        columns = list(table.keys())
+        results = []
+
+        for row_idx, value in enumerate(table[column_name]):
+            try:
+                lhs = float(value)
+                rhs = float(matched_value)
+            except Exception:
+                lhs = str(value)
+                rhs = str(matched_value)
+
+            try:
+                if compare(lhs, rhs):
+                    val = ValueObject()
+                    val.t_name = table_name
+                    val.c_name = columns
+                    val.row_num = row_idx
+                    val.value = [table[c][row_idx] for c in columns]
+                    val.type = "row"
+                    results.append(val)
+            except Exception:
+                continue
+
+        return results
 
     # ----------------------------------------------------------------------
     # Utility / Display
