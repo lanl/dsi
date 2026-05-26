@@ -11,7 +11,9 @@ def demo_earthquake_orgs():
         "backend",
         "NDP",
         "back-read",
-        params={"organization": "wfsi", "limit": 100}
+        # params={"keyword": "salton", "limit": 100}
+
+        params={"organization": "ucr-earth-and-planetary-sciences", "limit": 100}
     )
     
     # Display all datasets with key columns

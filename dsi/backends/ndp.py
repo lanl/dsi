@@ -206,62 +206,216 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Initial Data Load
     # ----------------------------------------------------------------------
+    def _quote_if_needed(self, value):
+        """
+        Quote a value if it contains spaces or special Solr characters.
+        
+        Parameters
+        ----------
+        value : str
+            Value to potentially quote
+            
+        Returns
+        -------
+        str
+            Quoted or unquoted value
+        """
+        if not isinstance(value, str):
+            return str(value)
+        
+        # Quote if contains spaces
+        if ' ' in value:
+            # Escape any existing quotes within the value
+            value = value.replace('"', '\\"')
+            return f'"{value}"'
+        
+        return value
+
+
     def _load_initial_data(self, params):
         """
         Fetch datasets/resources from CKAN API and store in memory.
 
         Parameters
         ----------
-        `params` : dict
-            Query parameters including:
-                - keywords : str, optional
-                - organization : str, optional
-                - tags : list, optional
-                - formats : list, optional
-                - limit : int, optional
+        `params` : dict or list[dict]
+            Single query dict or list of query dicts to chain together
         """
-
-        query_params = {"rows": params.get("limit", 100)}
-
-        q_parts, fq_parts = [], []
-
-        if params.get("keywords"):
-            q_parts.append(params["keywords"])
-
-        if params.get("organization"):
-            fq_parts.append(f"organization:{params['organization']}")
-
-        if params.get("tags"):
-            fq_parts += [f"tags:{t}" for t in params["tags"]]
-
-        if params.get("formats"):
-            fq_parts.append("(" + " OR ".join(
-                [f"res_format:{f}" for f in params["formats"]]) + ")")
-
-        if q_parts:
-            query_params["q"] = " ".join(q_parts)
-
-        if fq_parts:
-            query_params["fq"] = " AND ".join(fq_parts)
-
-        result = self._request("package_search", query_params)
-
-        dataset_rows, resource_map, id_map = self._extract_tables(result.get("results", []))
-
+        
+        # Normalize params to list for uniform processing
+        if isinstance(params, dict):
+            query_list = [params]
+        elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
+            query_list = params
+        else:
+            raise TypeError("params must be a dict or a list of dicts")
+        
+        # Collect all datasets from all queries
+        all_datasets = []
+        
+        for query_params in query_list:
+            result = self._run_single_query(query_params)
+            all_datasets.extend(result.get("results", []))
+        
+        # Deduplicate by dataset ID
+        unique_datasets = self._deduplicate_datasets(all_datasets)
+        
+        # Extract and cache tables
+        dataset_rows, resource_map, id_map = self._extract_tables(unique_datasets)
+        
         # Tier 1: datasets
         self._cache["datasets"] = self._rows_to_table(dataset_rows)
         
         self._dataset_id_map = id_map
         self._dataset_title_map = {v: k for k, v in id_map.items()}
-
+        
         # Tier 2: per-dataset resource tables
         self._resource_tables = []
         for dataset_title, rows in resource_map.items():
             table_name = dataset_title
             self._cache[table_name] = self._rows_to_table(rows)
             self._resource_tables.append(table_name)
-
+        
         self._loaded = True
+
+
+    def _run_single_query(self, params):
+        """
+        Execute a single CKAN query with proper value quoting.
+        
+        Parameters
+        ----------
+        params : dict
+            Query parameters
+            
+        Returns
+        -------
+        dict
+            CKAN API response
+        """
+        query_params = {"rows": params.get("limit", 100)}
+        
+        q_parts, fq_parts = [], []
+        
+        # Keywords search
+        if params.get("keywords"):
+            q_parts.append(params["keywords"])
+        
+        # Organization filter - QUOTE IF HAS SPACES
+        if params.get("organization"):
+            org_value = self._quote_if_needed(params["organization"])
+            fq_parts.append(f"organization:{org_value}")
+        
+        # Tags filter - QUOTE EACH TAG IF HAS SPACES
+        if params.get("tags"):
+            for tag in params["tags"]:
+                tag_value = self._quote_if_needed(tag)
+                fq_parts.append(f"tags:{tag_value}")
+        
+        # Format filter - QUOTE EACH FORMAT IF HAS SPACES
+        if params.get("formats"):
+            format_parts = []
+            for fmt in params["formats"]:
+                fmt_value = self._quote_if_needed(fmt)
+                format_parts.append(f"res_format:{fmt_value}")
+            fq_parts.append("(" + " OR ".join(format_parts) + ")")
+        
+        # Build final query params
+        if q_parts:
+            query_params["q"] = " ".join(q_parts)
+        
+        if fq_parts:
+            query_params["fq"] = " AND ".join(fq_parts)
+        
+        return self._request("package_search", query_params)
+
+
+    def _deduplicate_datasets(self, datasets):
+        """
+        Remove duplicate datasets based on ID.
+        
+        Parameters
+        ----------
+        datasets : list
+            List of dataset dicts from CKAN API
+            
+        Returns
+        -------
+        list
+            Deduplicated list of datasets
+        """
+        seen_ids = set()
+        unique_datasets = []
+        
+        for ds in datasets:
+            dataset_id = ds.get("id")
+            
+            if dataset_id is None:
+                # Keep datasets without IDs (shouldn't happen in practice)
+                unique_datasets.append(ds)
+                continue
+            
+            if dataset_id not in seen_ids:
+                seen_ids.add(dataset_id)
+                unique_datasets.append(ds)
+        
+        return unique_datasets
+    # def _load_initial_data(self, params):
+    #     """
+    #     Fetch datasets/resources from CKAN API and store in memory.
+
+    #     Parameters
+    #     ----------
+    #     `params` : dict
+    #         Query parameters including:
+    #             - keywords : str, optional
+    #             - organization : str, optional
+    #             - tags : list, optional
+    #             - formats : list, optional
+    #             - limit : int, optional
+    #     """
+
+    #     query_params = {"rows": params.get("limit", 100)}
+
+    #     q_parts, fq_parts = [], []
+
+    #     if params.get("keywords"):
+    #         q_parts.append(params["keywords"])
+
+    #     if params.get("organization"):
+    #         fq_parts.append(f"organization:{params['organization']}")
+
+    #     if params.get("tags"):
+    #         fq_parts += [f"tags:{t}" for t in params["tags"]]
+
+    #     if params.get("formats"):
+    #         fq_parts.append("(" + " OR ".join(
+    #             [f"res_format:{f}" for f in params["formats"]]) + ")")
+
+    #     if q_parts:
+    #         query_params["q"] = " ".join(q_parts)
+
+    #     if fq_parts:
+    #         query_params["fq"] = " AND ".join(fq_parts)
+
+    #     result = self._request("package_search", query_params)
+
+    #     dataset_rows, resource_map, id_map = self._extract_tables(result.get("results", []))
+
+    #     # Tier 1: datasets
+    #     self._cache["datasets"] = self._rows_to_table(dataset_rows)
+        
+    #     self._dataset_id_map = id_map
+    #     self._dataset_title_map = {v: k for k, v in id_map.items()}
+
+    #     # Tier 2: per-dataset resource tables
+    #     self._resource_tables = []
+    #     for dataset_title, rows in resource_map.items():
+    #         table_name = dataset_title
+    #         self._cache[table_name] = self._rows_to_table(rows)
+    #         self._resource_tables.append(table_name)
+
+    #     self._loaded = True
 
 
     # ----------------------------------------------------------------------
@@ -393,7 +547,8 @@ class NDP(Webserver):
                 "created": ds.get("metadata_created"),
                 "modified": ds.get("metadata_modified"),
                 "tags": ",".join(t["name"] for t in ds.get("tags", [])),
-                "num_resources": ds.get("num_resources", 0)
+                "num_resources": ds.get("num_resources", 0),
+                "raw_dataset": ds
             })
 
             resource_map.setdefault(dataset_title, [])
@@ -406,7 +561,8 @@ class NDP(Webserver):
                     "size": r.get("size"),
                     "url": r.get("url"),
                     "dataset_id": dataset_id,
-                    "dataset_title": dataset_title
+                    "dataset_title": dataset_title,
+                    "raw_dataset": r
                 })
 
         return dataset_rows, resource_map, id_map
