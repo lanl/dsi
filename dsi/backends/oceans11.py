@@ -1,7 +1,7 @@
 """
 Oceans11 Webserver Backend for DSI
 
-Read-only backend that pulls metadata from DSI-based oceans11.lanl.gov
+Read-only backend that pulls metadata from DSI-based https://oceans11.lanl.gov
 data catalog and exposes it as in-memory DSI tables: datasets and resources.
 """
 
@@ -60,25 +60,26 @@ class Oceans11(Webserver):
         """
         Initialize backend and optionally load data from DSI databases.
 
-        Parameters
-        ----------
         `url` : str, optional
             Base Oceans11 URL.
+        
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from OSTI.
+
             Supported keys:
-                "q",
-                "keyword",
-                "osti_id",
-                "title",
-                "authors",
-                "doi",
-                "report_number",
-                "rows",
-                "download_all"
+                - "q",
+                - "keyword",
+                - "osti_id",
+                - "title",
+                - "authors",
+                - "doi",
+                - "report_number",
+                - "rows"
+        
         `**kwargs` : dict
             Additional keyword arguments:
-                - workspace : str, optional
+            
+            - workspace : str, optional
                     
         """         
         DEFAULT_URL = "https://oceans11.lanl.gov/dataCatalog/oceans11.db"
@@ -131,49 +132,43 @@ class Oceans11(Webserver):
     # Connection Validation
     # ----------------------------------------------------------------------
     def validate_connection(self):
-            """
-            Validates that the base Oceans11 URL is accessible and functional.
-            
-            This method tests the connection by making a simple DSI pull_data call to:
-                - Download the oceans11.db catalog from:
-                https://oceans11.lanl.gov/dataCatalog/
-                - Set self.catalog_path to the download location
-            
-            Raises
-            ------
-            ConnectionError
-                If online catalog is inaccessible or pull_data failed
-            RuntimeError
-                If the downloaded catalog is corrupt or inaccessible
-            
-            Returns
-            -------
-            bool
-                True if connection is valid
-            """                
-            try:
-                from dsi.utils.federated.federate_datasets import pull_data
+        """
+        Validates that the base Oceans11 URL is accessible and functional.
+        
+        Tests the connection by calling DSI Federated's pull_data() to:
+            - Download the oceans11.db catalog from https://oceans11.lanl.gov/dataCatalog/
+            - Set `self.catalog_path` to the download location
+        
+        Raises:
+            - **ConnectionError** : If online catalog is inaccessible or pull_data failed
+            - **RuntimeError** : If the downloaded catalog is corrupt or inaccessible
+        
+        Return : bool
+            True if connection is valid
+        """                
+        try:
+            from dsi.utils.federated.federate_datasets import pull_data
 
-                info = pull_data(
-                    location_type="url",
-                    location=self.base_url,
-                    path=self.base_url,
-                    abs_path_workspace_folder=self.workspace,
-                    host_username={},
-                    download_limit = float("inf")
-                )
+            info = pull_data(
+                location_type="url",
+                location=self.base_url,
+                path=self.base_url,
+                abs_path_workspace_folder=self.workspace,
+                host_username={},
+                download_limit = float("inf")
+            )
 
-                if info is None:
-                    raise ConnectionError(f"Failed to download catalog from {self.base_url}")
+            if info is None:
+                raise ConnectionError(f"Failed to download catalog from {self.base_url}")
 
-                local_path = info.get("local_path")
-                if not local_path or not Path(local_path).is_file():
-                    raise RuntimeError("Downloaded catalog file is invalid or missing")
+            local_path = info.get("local_path")
+            if not local_path or not Path(local_path).is_file():
+                raise RuntimeError("Downloaded catalog file is invalid or missing")
 
-                return local_path
+            return local_path
 
-            except Exception as e:
-                raise ConnectionError(f"Unable to access Oceans11 catalog: {e}") from e
+        except Exception as e:
+            raise ConnectionError(f"Unable to access Oceans11 catalog: {e}") from e
 
     # ---------------------------------------------------
     # Initial Data Load
@@ -569,16 +564,15 @@ class Oceans11(Webserver):
 
     def get_table(self, table_name, dict_return=False):
         """
-        Return a cached table by name.
-
-        Parameters
-        ----------
-        table_name : str
-            Name of the cached table.
-
-        dict_return : bool, optional
-            If True, return OrderedDict table directly.
-            If False, return pandas DataFrame.
+        Returns all data from a specified table.
+        
+        `table_name` : str
+            Dataset title or ID
+        `dict_return` : bool, default False
+            If True, returns OrderedDict. 
+            If False, returns DataFrame.
+        
+        **Return : OrderedDict or pandas.DataFrame**
         """
 
         resolved_name = self._resolve_table_name(table_name)
@@ -595,7 +589,10 @@ class Oceans11(Webserver):
 
     def get_schema(self):
         """
-        Return a lightweight schema description of cached tables from oceans11 server.
+        Return a lightweight schema description of cached tables from CKAN.
+
+        Return : str
+            Each table's structural schema is combined into one large string.
         """
         schema_lines = []
         for table_name, table in self._cache.items():
@@ -630,14 +627,10 @@ class Oceans11(Webserver):
         """
         Extracts table/dataset names mentioned in a query string.
         
-        Parameters
-        ----------
         `query` : str
             Query string to parse
         
-        Returns
-        -------
-        list
+        Return : list
             List of dataset names/IDs found in query
         """
         if not self._loaded:
@@ -663,19 +656,16 @@ class Oceans11(Webserver):
         """
         Query all tables using a pandas query string.
 
-        Parameters
-        ----------
         `query` : str
             Pandas query string for filtering data
-        `dict_return` : bool, default True
+        `dict_return` : bool, optional, default True
             If True, returns dict format.
             If False, returns pandas DataFrames.
+        
         `**kwargs` : dict
             Additional keyword arguments
 
-        Returns
-        -------
-        dict
+        Return : dict
             Dictionary mapping table names to query results
         """
         if not self._loaded:
@@ -762,9 +752,7 @@ class Oceans11(Webserver):
         Tier 2 databases remain separate local files and are referenced
         through the `t2db_path` column.
 
-        Returns
-        -------
-        OrderedDict
+        Return : OrderedDict
             Exportable Tier 1 records table
         """
 
@@ -783,6 +771,27 @@ class Oceans11(Webserver):
     # Find Methods
     # ----------------------------------------------------------------------
     def find(self, query_object, **kwargs):
+        """
+        Searches for all instances of `query_object` across the table, column, and cell levels.
+
+        `query_object` : int, float, or str
+            The value to search for across all tables in the backend
+        
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObjects representing matches across:
+            - table names
+            - column names
+            - cell values
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) Column name(s)
+            - row_num : (int or None) Row index
+            - value :   (any) Matched value or data
+            - type :    (str) {'table', 'column', 'cell'}
+        """
         if not self._loaded:
             return []
 
@@ -828,7 +837,22 @@ class Oceans11(Webserver):
     
     def find_table(self, query_object, **kwargs):
         """
-        Find cached table names matching query_object.
+        Finds all tables whose names contain the given query_object. Search is case-insensitive.
+
+        `query_object` : str
+            The string to match against table names
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObject
+            One ValueObject per matching table
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) List of all columns in the table
+            - value :   (dict) Full table data (dict of columns)
+            - row_num : (None)
+            - type :    (str) 'table'
         """
 
         if not self._loaded:
@@ -846,6 +870,7 @@ class Oceans11(Webserver):
                         c_name=["table_name"],
                         row_num=None,
                         value=[table_name],
+                        type="table"
                     )
                 )
 
@@ -853,7 +878,22 @@ class Oceans11(Webserver):
 
     def find_column(self, query_object, **kwargs):
         """
-        Find columns matching query_object across cached tables.
+        Finds all columns whose names contain the given query_object. Search is case-insensitive.
+
+        `query_object` : str
+            The string to match against column names
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObject
+            One ValueObject per matching column
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) List with the matched column name
+            - value :   (list) Full column data
+            - row_num : (None)
+            - type :    (str) 'column'
         """
 
         if not self._loaded:
@@ -875,6 +915,7 @@ class Oceans11(Webserver):
                             c_name=[col_name],
                             row_num=None,
                             value=values,
+                            type='column'
                         )
                     )
 
@@ -882,7 +923,29 @@ class Oceans11(Webserver):
 
     def find_cell(self, query_object, row=False, **kwargs):
         """
-        Find cells matching query_object across cached tables.
+        Finds all cells that match the given query_object.
+        
+        Exact match for all data types, plus case-insensitive partial match for strings.
+
+        `query_object` : int, float, or str
+            The value to search for within table cells
+        
+        `row`: bool, optional, default=False
+            If True, certain fields in ValueObject will contain entire row's metadata/data
+            If False, certain fields in ValueObject will only contain the matching cell's metadata/data.
+        
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObject
+            One ValueObject per matching cell
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) All columns in table (row=True) or just matched column name (row=False)
+            - row_num : (int) Row index of the match
+            - value :   (any) full row of values (row=True) or just matched cell value (row=False)
+            - type :    (str) 'row' (row=True) or 'cell' (row=False)
         """
 
         if not self._loaded:
@@ -924,6 +987,7 @@ class Oceans11(Webserver):
                             value=row_values if row else [
                                 table[c][row_idx] for c in matched_cols
                             ],
+                            type='row' if row else 'cell'
                         )
                     )
 
@@ -932,7 +996,23 @@ class Oceans11(Webserver):
 
     def find_relation(self, column_name, relation, **kwargs):
         """
-        Find rows satisfying a column relation across cached tables.
+        Finds all rows in the 'records' table that satisfy the relation on the given column.
+
+        `column_name` : str
+            The name of the column to apply the relation to.
+        
+        `relation` : str
+            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4
+
+        Return : list of ValueObjects
+            One ValueObject per matching row in that first table.
+
+        ValueObject Structure:
+            - t_name:   (str) table name
+            - c_name:   (list) list of all columns in the table
+            - value:    (list) full row of values
+            - row_num:  (int) row index of the match
+            - type:     (str) 'relation'
         """
 
         if not self._loaded:
@@ -1000,6 +1080,7 @@ class Oceans11(Webserver):
                                 c_name=columns,
                                 row_num=row_idx + 1,
                                 value=row_values,
+                                type='relation'
                             )
                         )
 
@@ -1013,13 +1094,14 @@ class Oceans11(Webserver):
     # ----------------------------------------------------------------------
     def list(self, collection=False):
         """
-        Lists cached Oceans11 tables.
+        Lists tables or prints each table's dimensions.
 
-        Parameters
-        ----------
         `collection` : bool, default False
-            If True, return list of table names.
-            If False, print table names with dimensions and dataset IDs.
+            - If True, return list of table names.
+            - If False, print table names with dimensions.
+
+        Return : list or None
+            Table names if collection=True, otherwise None
         """
 
         if collection:
@@ -1036,13 +1118,15 @@ class Oceans11(Webserver):
 
     def summary(self, table_name=None):
         """
-        Returns table-level metadata for cached Oceans11 tables.
+        Returns numerical metadata for tables. For resource tables, includes dataset_id information.
 
-        If table_name is None:
-            returns [table_names_list, df1, df2, ...]
+        `table_name` : str, optional
+            If provided, returns summary for a single table. Either dataset_title or dataset_id.
+            If None, returns summary for all tables in expected format.
 
-        If table_name is provided:
-            returns a single DataFrame
+        Return : pandas.DataFrame or list
+            - If table_name is None: returns [table_names_list, df1, df2, ...]
+            - If table_name provided: returns single DataFrame
         """
 
         if not self._loaded:
@@ -1097,8 +1181,6 @@ class Oceans11(Webserver):
 
         Accepts either dataset_title or dataset_id for resource tables.
 
-        Parameters
-        ----------
         `table_name` : str
             Name or ID of the table to display
 
@@ -1108,9 +1190,7 @@ class Oceans11(Webserver):
         `display_cols` : list of str, optional
             Subset of columns to display
 
-        Returns
-        -------
-        pandas.DataFrame
+        Return : pandas.DataFrame
             Displayed table data with long strings truncated
         """
 
@@ -1156,16 +1236,7 @@ class Oceans11(Webserver):
 
     def notebook(self, **kwargs):
         """
-        Notebook generation not supported for Oceans11 backend.
-
-        Parameters
-        ----------
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        None
+        **Notebook generation not supported for Oceans11 backend.**
         """
         pass
 
@@ -1198,23 +1269,7 @@ class Oceans11(Webserver):
     # ----------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         """
-        Ingest not supported for NDP backend (read-only).
-
-        Parameters
-        ----------
-        `artifacts` : any
-            Artifacts to ingest (unused)
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised as Oceans11 backend is read-only
+        **Not supported - Oceans11 backend is read-only**
         """
         raise NotImplementedError("Oceans11 backend is read-only")
     
