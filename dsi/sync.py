@@ -253,11 +253,11 @@ class Sync():
         stdout, stderr = process.communicate()
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
-                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
+                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
             elif "No credentials" in stderr:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.")
-                raise RuntimeError("Kerberos message: " + str(stderr))
-            raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
+                raise RuntimeError("Kerberos message: " + str(stderr)) from None
+            raise RuntimeError(f"{cmd_name} failed: \n{stderr}") from None
         return stdout
 
 
