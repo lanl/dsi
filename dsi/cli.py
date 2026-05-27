@@ -12,8 +12,9 @@ import sys
 import io
 import yaml
 import subprocess
-import signal
 import importlib.util
+import getpass
+import socket
 
 from dsi.core import Terminal
 from dsi.sync import Sync
@@ -716,11 +717,6 @@ class DSI_cli:
         if viewer not in self.valid_viewers:
             print(f"view ERROR: To load the {viewer} viewer, pip install {' '.join(self.all_viewers[viewer])}")
             return
-        
-        if os.name != 'nt':
-            bash_script_filepath = os.path.join(os.path.dirname(__file__),"utils","launch_streamlit.sh")
-        else:
-            bash_script_filepath = os.path.join(os.path.dirname(__file__),"utils","launch_streamlit.bat")
 
         if viewer == "dashboard":
             # user must specify at least one directory
@@ -732,86 +728,78 @@ class DSI_cli:
                 if not os.path.isdir(f):
                     print(f"view ERROR: dashboard viewer has an invalid input directory: {f}")
                     return
-                
-            if os.name != 'nt':
-                subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
 
-            env = dict(os.environ)
-            dashboard_code_filepath = os.path.join(os.path.dirname(__file__),"plugins","dashboard.py")
-            bash_command = [bash_script_filepath, dashboard_code_filepath] + args[1:]
-            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-                try:
-                    is_remote = False
-                    for idx, line in enumerate(proc.stdout):
-                        if idx == 0 and line == "remote\n":
-                            is_remote = True
-                        if is_remote:
-                            if idx in [1, 2] or idx > 9:
-                                print(line[:-1])
-                            if idx == 3:
-                                print(" (Leave the new terminal running while using the Dashboard)")
-                                print("\nView the Dashboard at", line[:-1])
-                                print("To exit, press [Ctrl + C] here")
-                        else:
-                            if idx == 4:
-                                print("\nView the Dashboard at", line[line.index("http"):-1])
-                                print("To exit, press [Ctrl + C] here")
-                            elif idx>12:
-                                print(line[:-1])
-                except KeyboardInterrupt:
-                    print("\nClosing Dashboard.\n")
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    try:
-                        proc.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                        proc.wait()
+            PORT = 8501
+            dashboard_code_filepath = os.path.join(os.path.dirname(__file__), "plugins", "dashboard.py")
+            input_dirs = args[1:]
+            self.launch_streamlit_viewer(PORT, "Dashboard", dashboard_code_filepath, extra_args=input_dirs)
 
         elif viewer == "ml":
             #check if current db is empty
             if not self.t.valid_backend(self.t.loaded_backends[0]):
                 print("view ERROR: the ML viewer requires data to run models.")
                 return
-            
-            if os.name != 'nt':
-                subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
-            
-            env = dict(os.environ)
-            ml_code_filepath = os.path.join(os.path.dirname(__file__),"plugins","ml_emulator.py")
-            bash_command = [bash_script_filepath, ml_code_filepath, self.db_path, self.name]
-            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-                try:
-                    is_remote = False
-                    for idx, line in enumerate(proc.stdout):
-                        if idx == 0 and line == "remote\n":
-                            is_remote = True
-                        if is_remote:
-                            if idx in [1, 2] or idx > 9:
-                                print(line[:-1])
-                            if idx == 3:
-                                print(" (Leave the new terminal running while using the Emulator)")
-                                print("\nView the ML emulator at", line[:-1])
-                                print("To exit, press [Ctrl + C] here")
-                        else:
-                            if idx == 4:
-                                print("\nView the ML emulator at", line[line.index("http"):-1])
-                                print("To exit, press [Ctrl + C] here")
-                            elif idx>12:
-                                print(line[:-1])
-                except KeyboardInterrupt:
-                    print("\n Closing ML Emulator.\n")
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    try:
-                        proc.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                        proc.wait()
+
+            PORT = 8502
+            ml_code_filepath = os.path.join(os.path.dirname(__file__), "plugins", "ml_emulator.py")
+            extra_args = [self.db_path, self.name]
+            self.launch_streamlit_viewer(PORT, "ML Emulator", ml_code_filepath, extra_args=extra_args)
             
         else:
             print("view ERROR: input viewer was invalid. Please try again.")
             return
+
+
+    def launch_streamlit_viewer(self, port: int, app_name: str, app_file: str, extra_args: list):
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+
+        if os.name != "nt":
+            subprocess.run(f"lsof -t -i:{port} | xargs -r kill -9", shell=True, check=False, 
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.run(f'for /f "tokens=5" %a in (\'netstat -ano ^| findstr :{port}\') do taskkill /F /PID %a >nul 2>&1', 
+                        shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        is_remote = any(os.environ.get(x) for x in ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"])
+        if is_remote:
+            remote_user = getpass.getuser()
+            remote_host = socket.getfqdn() or socket.gethostname()
+
+            print("In a separate terminal on your local machine, run:")
+            print(f" ssh -L {port}:localhost:{port} {remote_user}@{remote_host}")
+            print(f" (Leave the new terminal running while using the {app_name})")
+
+        print(f"\nView the {app_name} at \033[1;34mhttp://localhost:{port}\033[0m")
+        print("To exit, enter [Ctrl+C] here")
+
+        cmd = [sys.executable, "-m", "streamlit", "run", app_file, f"--server.port={port}", "--server.headless=true", 
+                   "--browser.gatherUsageStats=false", "--"] + extra_args
+        proc = subprocess.Popen(cmd, env=env, stdin=None, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1)
+        try:
+            for line in proc.stdout:
+                line = line.rstrip("\n")
+                if (
+                    "You can now view your Streamlit app" in line
+                    or "Local URL:" in line
+                    or "Network URL:" in line
+                    or "External URL:" in line
+                    or "For better performance" in line
+                    or "$ xcode-select" in line
+                    or "$ pip install watchdog" in line
+                    or line == ""
+                ):
+                    continue
+                print(line, flush=True)
+            proc.wait()
+        except KeyboardInterrupt:
+            print(f"\n Closing {app_name}.\n")
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
 
     def get_write_parser(self):
