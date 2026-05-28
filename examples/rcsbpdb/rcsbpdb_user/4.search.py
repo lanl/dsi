@@ -1,24 +1,27 @@
-from dsi.dsi import DSI
+#Example 4: author search
 
+from dsi.dsi import DSI
 
 def main(verbose=False):
     dsi = DSI(
-        backend_name="WWPDB",
-        params={"keywords": "hemoglobin", "limit": 5},
+        backend_name="RCSBPDB",
+        params={"authors": "Kleywegt", "limit": 5},
     )
 
-    print("\nSearching for 'hemoglobin':")
-    dsi.search("hemoglobin")
-    # other examples "retinoic acid", "kinase", "DNA polymerase"
-    print("\nSearching for 'X-RAY':")
-    dsi.search("X-RAY")
+    print("\nLoaded RCSBPDB backend using author search.")
+
+    print("\nSearching loaded tables for author-related value:")
+    dsi.search("Kleywegt")
+
+    print("\nSearching loaded tables for mmCIF resource information:")
+    dsi.search("mmCIF")
 
     if verbose:
-        results = dsi.search("mmCIF", collection=True)
+        results = dsi.search("RCSBPDB", collection=True)
         if results:
-            print(f"\nFound matches in {len(results)} location(s)")
-            for i, df in enumerate(results):
-                print(f"\nResult {i + 1}:")
+            print(f"\nFound matches in {len(results)} result table(s).")
+            for i, df in enumerate(results, start=1):
+                print(f"\nResult {i}:")
                 print(df.head())
 
     dsi.close()
