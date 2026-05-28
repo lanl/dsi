@@ -1,28 +1,23 @@
-from dsi.dsi import DSI
+#Example 3: DOI lookup
 
+from dsi.dsi import DSI
 
 def main(verbose=False):
     dsi = DSI(
-        backend_name="WWPDB",
-        params={"keywords": "hemoglobin", "limit": 5},
+        backend_name="RCSBPDB",
+        params={"DOI": "10.2210/pdb1cbs/pdb"},
     )
 
-    print("\nGetting datasets table:")
-    datasets_df = dsi.get_table("datasets", collection=True)
-    print(f"Shape: {datasets_df.shape}")
-    print(f"Columns: {list(datasets_df.columns)}")
+    print("\nLoaded RCSBPDB backend using DOI lookup.")
 
-    print("\nGetting resources table:")
-    resources_df = dsi.get_table("resources", collection=True)
-    print(f"Shape: {resources_df.shape}")
-    print(f"Columns: {list(resources_df.columns)}")
+    for table_name in ["datasets", "resources", "errors"]:
+        print(f"\nGetting {table_name} table:")
+        df = dsi.get_table(table_name, collection=True)
+        print(f"Shape: {df.shape}")
+        print(f"Columns: {list(df.columns)}")
 
-    if verbose:
-        print("\nFirst 3 dataset rows:")
-        print(datasets_df.head(3))
-
-        print("\nFirst 3 resource rows:")
-        print(resources_df.head(3))
+        if verbose and not df.empty:
+            print(df.head(3))
 
     dsi.close()
 
