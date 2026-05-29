@@ -504,7 +504,7 @@ class DSI_cli:
                 print(f"Synchronization data from {yaml_file} into {workspace_folder}")
                 s.get(input_yaml=yaml_file, workspace_folder=workspace_folder)
 
-            else:
+            elif csv_file:
                 if not os.path.exists(csv_file):
                     print(f"federate ERROR: {csv_file} does not exist. Please check the filepath and try again.")
                     return
@@ -514,7 +514,9 @@ class DSI_cli:
 
                 print(f"Synchronization data from {csv_file} into {workspace_folder}")
                 s.get(input_csv=csv_file, workspace_folder=workspace_folder)
-
+            else:
+                print("A yaml or CSV file is needed!")
+                return
         except Exception as e:
             print(f"federate ERROR: {e}")
             return

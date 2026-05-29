@@ -560,7 +560,6 @@ def main():
     print(f"workspace_folder: {workspace_folder}, config_data: {config_data}, config_folder: {config_folder}")
     federate_datasets(workspace_folder, config_data, str(config_folder))
 
-
 if __name__=="__main__":
     main()
 
