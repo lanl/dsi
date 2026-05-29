@@ -624,7 +624,7 @@ class Sync():
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
 
-    def get(self, input_yaml = None, workspace_folder = None):
+    def get(self, input_yaml = None, input_csv = None, workspace_folder = None):
         '''
         Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
         '''
@@ -634,18 +634,32 @@ class Sync():
             try:
                 yaml_path = Path(input_yaml)
                 config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+                
+                base_path = str(Path(yaml_path).parent)
             except FileNotFoundError:
                 print(f"Error: Could not find YAML file {yaml_path}")
+        elif input_csv:
+            filename = str(Path(input_csv).name)
+            config_data = {  
+                            'repo_paths': [filename], 
+                            'workspace_folder': workspace_folder, 
+                            'download_limit': 10485760, 
+                            'conflict_resolution': 'keep_latest'}
+            base_path = str(Path(input_csv).parent)
         else:
-            True
+            config_data = {  
+                            'repo_paths': [], 
+                            'workspace_folder': workspace_folder, 
+                            'download_limit': 10485760, 
+                            'conflict_resolution': 'keep_latest'}
+            base_path = ""
         
         # Create a folder for the databases if it doesn't exist, or use the provided one
         if not workspace_folder:
             _workspace_folder = config_data.get("workspace_folder", "")
             workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
 
-        yaml_folder = Path(yaml_path).parent
-        federate_datasets(workspace_folder, config_data, str(yaml_folder))
+        federate_datasets(workspace_folder, config_data, base_path)
 
 
     def gen_uuid(self, st):
