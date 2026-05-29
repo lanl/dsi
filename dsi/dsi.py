@@ -214,15 +214,24 @@ class DSI():
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         if importlib.util.find_spec("duckdb") is not None:
             print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
-        n = NDP()
-        if n.validate_connection():
-            print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
-        n = OSTI()
-        if n.validate_connection():
-            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")
-        n = Oceans11()
-        if n.validate_connection():
-            print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
+        try:
+            n = NDP()
+            if n.validate_connection():
+                print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
+        except: # noqa: E722
+            pass
+        try:
+            n = OSTI()
+            if n.validate_connection():
+                print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")
+        except: # noqa: E722
+            pass
+        try:
+            n = Oceans11()
+            if n.validate_connection():
+                print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
+        except: # noqa: E722
+            pass
         print()
 
 
