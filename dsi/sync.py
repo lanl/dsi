@@ -23,10 +23,11 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name=None, isVerbose = False, no_parent = False, **kwargs):
+    def __init__(self, project_name=None, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
         self.project_name = project_name
         self.verbose = isVerbose
         self.no_parent = no_parent
+        self.skip_index = skip_index
         self.add_dbs = kwargs.pop("add_dbs", [])
 
         extension = ""
@@ -130,6 +131,14 @@ class Sync():
                     if self.verbose:
                         print("DSI Index complete!\n")
                     return
+            else:
+                if self.skip_index:
+                    # adding fake file_abs col so it goes through actual skip dircrawl check above
+                    filesystem_df["file_abs"] = None
+                    self.t.dsi_tables.remove("filesystem")
+                    self.t.overwrite_table("filesystem", filesystem_df)
+                    self.t.dsi_tables.append("filesystem")
+                    return self.index(local_loc, remote_loc)
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, self.verbose)
@@ -244,11 +253,11 @@ class Sync():
         stdout, stderr = process.communicate()
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
-                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
-            elif "No credentials" in stdout:
-                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.")
-                raise RuntimeError("Kerberos message: " + str(stdout))
-            raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
+                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
+            elif "No credentials" in stderr:
+                raise RuntimeError("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.\n"
+                                   f"Kerberos message: {str(stderr)}") from None
+            raise RuntimeError(f"{cmd_name} failed: \n{stderr}") from None
         return stdout
 
 
@@ -327,7 +336,9 @@ class Sync():
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
         # TODO: have movement service handle type without user input (cp,scp,rsync,conduit,pfcp,ftp,etc.)
-        if tool.lower() == "copy":            
+        if tool.lower() == "copy":
+            if all(x is None for x in file_list):
+                file_list = [str(Path(self.local_location) / s) for s in filesystem_df["file_origin"]]
             for file, file_remote in zip(file_list, rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
@@ -467,7 +478,7 @@ class Sync():
             try:
                 if self.verbose:
                     print("Testing Conduit: conduit get")
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
                 if "TRANSFER_ID" in stdout and self.verbose:
@@ -478,15 +489,16 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', '-w']
+                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','cp','-r']
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
                 cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
                 stdout = self.execute_cmd(cmd, "Conduit copy data")
-                if stdout:
-                    print(stdout)
-                print(" DSI-Conduit data movement job complete.")
+                if "Finalized" in stdout:
+                    print(" DSI-Conduit data movement job complete.")
+                else:
+                    print(" WARNING: DSI-Conduit data movement job may not have completed")
 
                 # delete temp columns from filesystem table
                 filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
@@ -500,9 +512,10 @@ class Sync():
                         print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
                     cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
                     stdout = self.execute_cmd(cmd, "Conduit copy database")
-                    if stdout:
-                        print(stdout)
-                    print(" DSI-Conduit database movement job complete.")
+                    if "Finalized" in stdout:
+                        print(" DSI-Conduit database movement job complete.")
+                    else:
+                        print(" WARNING: DSI-Conduit database movement job may not have completed")
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, data move is in queue.")

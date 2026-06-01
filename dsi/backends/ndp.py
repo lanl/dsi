@@ -80,7 +80,6 @@ class NDP(Webserver):
             - verify_ssl : bool, optional
                 Toggle SSL verification (default False)
         """
-
         DEFAULT_URL = "https://nationaldataplatform.org/catalog"
 
         base_url = url or DEFAULT_URL
@@ -213,7 +212,6 @@ class NDP(Webserver):
                 - formats : list, optional
                 - limit : int, optional
         """
-
         query_params = {"rows": params.get("limit", 100)}
 
         q_parts, fq_parts = [], []
@@ -323,7 +321,6 @@ class NDP(Webserver):
         dict
             Result data from CKAN API response
         """
-
         url = f"{self.base_url}/api/3/action/{endpoint}"
 
         r = requests.get(
@@ -362,7 +359,6 @@ class NDP(Webserver):
                 - id_map : dict
                     Maps dataset_id to dataset_title
         """
-
         dataset_rows = []
         resource_map = {}
         id_map = {}
@@ -419,7 +415,6 @@ class NDP(Webserver):
         OrderedDict
             Column-oriented table structure
         """
-
         if not rows:
             return OrderedDict()
 
@@ -478,7 +473,7 @@ class NDP(Webserver):
         """
         Return a lightweight schema description of cached tables from CKAN.
 
-        Return: str
+        Return : str
             Each table's structural schema is combined into one large string.
         """
         schema_lines = []
@@ -557,7 +552,6 @@ class NDP(Webserver):
         Return : dict
             Dictionary mapping table names to query results
         """
-
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot query empty backend.")
 
@@ -606,7 +600,6 @@ class NDP(Webserver):
         Return : OrderedDict
             All cached tables in tiered structure
         """
-
         if not self._loaded:
             return {}
 
@@ -619,7 +612,8 @@ class NDP(Webserver):
     def validate_urls(self):
         """
         Validates resource URLs across all resource tables.
-        Adds 'url_valid' column to each resource table.
+
+        Adds 'url_valid' boolean column to each resource table.
         """
         headers = {"User-Agent": "NDP-Validator"}
 
@@ -680,9 +674,7 @@ class NDP(Webserver):
             - row_num : (int or None) Row index
             - value :   (any) Matched value or data
             - type :    (str) {'table', 'column', 'cell'}
-                
         """
-        
         query_str = str(query_object).lower()
 
         return (
@@ -711,7 +703,6 @@ class NDP(Webserver):
             - row_num : (None)
             - type :    (str) 'table'
         """
-
         if not isinstance(query_object, str):
             return []
 
@@ -739,7 +730,7 @@ class NDP(Webserver):
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return: list of ValueObject
+        Return : list of ValueObject
             One ValueObject per matching column
 
         ValueObject Structure:
@@ -749,7 +740,6 @@ class NDP(Webserver):
             - row_num : (None)
             - type :    (str) 'column'
         """
-
         if not isinstance(query_object, str):
             return []
 
@@ -791,7 +781,6 @@ class NDP(Webserver):
             - value :   (any) Matched cell value
             - type :    (str) 'cell'
         """
-
         matches = []
 
         is_str_query = isinstance(query_object, str)
@@ -835,8 +824,7 @@ class NDP(Webserver):
 
     def find_relation(self, column_name, relation, **kwargs):
         """
-        **NDP is a read-only metadata backend and does not support
-        relational queries on columns.**
+        **NDP is a read-only metadata backend and does not support relational queries on columns.**
         """
         raise NotImplementedError("NDP Backend does not support find_relation")
 
@@ -854,10 +842,9 @@ class NDP(Webserver):
             - If True, return list of table names.
             - If False, print table names with dimensions and dataset IDs.
 
-        Return: list or None
+        Return : list or None
             Table names if collection=True, otherwise None
         """
-
         if collection:
             return list(self._cache.keys())
 
@@ -883,7 +870,6 @@ class NDP(Webserver):
             - If table_name is None: returns [table_names_list, df1, df2, ...]
             - If table_name provided: returns single DataFrame
         """
-
         if not self._loaded:
             return pd.DataFrame()
 
@@ -949,7 +935,6 @@ class NDP(Webserver):
         Return : pandas.DataFrame
             Displayed table data with long strings truncated
         """
-
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot display empty backend.")
 
@@ -998,7 +983,6 @@ class NDP(Webserver):
         """
         Resets backend state and clears all cached data.
         """
-
         self._cache = OrderedDict()
         self._resource_tables = []
         self._dataset_id_map = {}
