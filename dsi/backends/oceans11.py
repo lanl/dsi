@@ -38,12 +38,12 @@ class ValueObject:
     type : str
         {'table', 'column', 'cell'}
     """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
+    def __init__(self, t_name, c_name, row_num, value, type):
+        self.t_name = t_name # ""
+        self.c_name = c_name #[]
+        self.row_num = row_num # None
+        self.value = value # None
+        self.type = type # ""
 
 # ----------------------------------------------------------------------
 # Oceans11 Backend (Webserver - Read only)
