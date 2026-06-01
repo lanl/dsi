@@ -478,7 +478,7 @@ class Sync():
             try:
                 if self.verbose:
                     print("Testing Conduit: conduit get")
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
                 if "TRANSFER_ID" in stdout and self.verbose:
@@ -489,7 +489,7 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', '-w']
+                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','cp','-r', '-w']
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
