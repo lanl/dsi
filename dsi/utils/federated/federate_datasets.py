@@ -150,7 +150,8 @@ def pull_data(location_type: str,
         filesize = 0
         try:
             filesize = ssh_k_remote_size_bytes(
-                remote=f"{username}@{location}",
+                user=username,
+                host=location,
                 remote_path=path
             )
         except KeyboardInterrupt:

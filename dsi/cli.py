@@ -389,7 +389,7 @@ class DSI_cli:
             return
         
         # Validate location_type
-        valid_types = ["github", "hpc", "url", "s3", "local"]
+        valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
         if location_type.lower() not in valid_types:
             print(f"pulldata ERROR: location_type must be one of {', '.join(valid_types)}")
             return
