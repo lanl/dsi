@@ -1,16 +1,15 @@
 from dsi.backends.gufi import Gufi
 
-isVerbose = False
-
-
 def test_artifact_query():
-    dbpath = "db.db"
-    index = "gufi_indexes"
-    prefix = "/usr/local/bin"
-    table = "sample"
-    column = "sample_col"
-    store = Gufi(prefix, index, dbpath, table, column, isVerbose)
-    sqlstr = "select * from dsi_entries"
-    rows = store.query_artifacts(sqlstr)
-    store.close()
+    gufi_index_path = "/search/db_name"
+    gufi_prefix = "/usr/projects/systems/gufi/"
+    dsi_table_name = "metadata_uuid"
+    db_path = "/db_name.db"
+    dsi_columns = ["metric1", "metric2", "time"]
+    gufi_columns = ["fullpath", "size", "mtime"]
+    collection_name = "DATA_UUID"
+    from dsi.sync import Sync
+    s = Sync()
+    s.gufi_query_index(gufi_prefix, gufi_index_path, db_path, dsi_table_name, dsi_columns,
+                       gufi_columns, collection_name, isVerbose=True)
     assert len(rows) > 0
