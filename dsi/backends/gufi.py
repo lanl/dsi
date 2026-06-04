@@ -91,7 +91,6 @@ class Gufi(Filesystem):
             # disable extension loading again
             con.enable_load_extension(False)
 
-            username = os.environ["USER"]
             dsi_column_names = ",".join(self.dsi_columns)
             gufi_column_names = ",".join((["rpath(sname, sroll, name) AS fullpath"] + self.gufi_columns[1:]
                                     if self.gufi_columns[0] == "fullpath" else self.gufi_columns))
