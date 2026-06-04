@@ -272,8 +272,6 @@ class Terminal():
                                     raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
                                 
                             class_.runTable = self.runTable
-                        elif mod_type == "backend" and class_.__name__ == "Gufi":
-                             has_data = True
 
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
