@@ -55,9 +55,6 @@ class Gufi(Filesystem):
         self.dsi_db = dsi_db
         self.isVerbose = verbose
 
-    # OLD NAME OF query_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def get_artifacts(self, query):
-        return self.query_artifacts(query)
     
     # Query GUFI and DSI db ˘
     def query_artifacts(self, query):
@@ -75,12 +72,9 @@ class Gufi(Filesystem):
         except:
             print("Error running GUFI query")
 
-    # OLD NAME OF ingest_artifacts(). TO BE DEPRECATED IN FUTURE DSI RELEASE
-    def put_artifacts(self, query):
-        return self.ingest_artifacts(query)
     
     def ingest_artifacts(self, query):
-        pass
+        raise NotImplementedError("Cannot ingest data with the GUFI backend")
 
     # Runs the gufi query command
     def _run_gufi_query(self, sqlstring):
@@ -144,34 +138,34 @@ class Gufi(Filesystem):
         return metadata
 
     def close(self):
-        pass
+        raise NotImplementedError("No connection to close for the GUFI backend")
     def display(self):
-        pass
+        raise NotImplementedError("Cannot display data with the GUFI backend")
     def find(self):
-        pass
+        raise NotImplementedError("Cannot find data with the GUFI backend")
     def find_cell(self):
-        pass
+        raise NotImplementedError("Cannot find cell data with the GUFI backend")
     def find_column(self):
-        pass
+        raise NotImplementedError("Cannot find column data with the GUFI backend")
     def find_relation(self):
-        pass
+        raise NotImplementedError("Cannot find data on a relation with the GUFI backend")
     def find_table(self):
-        pass
+        raise NotImplementedError("Cannot find table data with the GUFI backend")
     def get_schema(self):
         pass
     def get_table(self):
-        pass
+        raise NotImplementedError("Cannot get table data with the GUFI backend")
     def get_table_names(self):
-        pass
+        raise NotImplementedError("Cannot get table names with the GUFI backend")
     def list(self):
-        pass
+        raise NotImplementedError("Cannot list tables with the GUFI backend")
     def notebook(self):
-        pass
+        raise NotImplementedError("Cannot create notebook with the GUFI backend")
     def num_tables(self):
-        pass
+        raise NotImplementedError("Cannot count tables with the GUFI backend")
     def overwrite_table(self):
-        pass
+        raise NotImplementedError("Cannot overwrite table with the GUFI backend")
     def process_artifacts(self):
-        pass
+        raise NotImplementedError("Cannot process artifacts with the GUFI backend")
     def summary(self):
-        pass
+        raise NotImplementedError("Cannot summarize data with the GUFI backend")
