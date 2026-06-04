@@ -1,5 +1,4 @@
 import sqlite3
-import os
 
 # Holds table name and data properties
 from dsi.backends.filesystem import Filesystem
