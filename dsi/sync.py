@@ -275,7 +275,7 @@ class Sync():
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 t.load_module('backend','Sqlite','back-read', filename=f)
-        except Exception as err:
+        except Exception:
             print(f"Database {f} not found")
             raise
 
@@ -286,7 +286,7 @@ class Sync():
                 print(f"uuid column not found in {dsi_table_name}")
             else:
                 got_uuid = True
-        except Exception as err:
+        except Exception:
             print(f"uuid column not found in {dsi_table_name}")
 
         if not got_uuid:

@@ -3,8 +3,6 @@ import os
 
 # Holds table name and data properties
 from dsi.backends.filesystem import Filesystem
-from pathlib import Path
-import subprocess
 
 class DataType:
     name = "DEFAULT"
@@ -69,7 +67,7 @@ class Gufi(Filesystem):
                 print(resout)
 
             return resout
-        except:
+        except Exception:
             print("Error running GUFI query")
 
     
