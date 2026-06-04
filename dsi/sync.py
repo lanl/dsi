@@ -290,10 +290,9 @@ class Sync():
             print(f"uuid column not found in {dsi_table_name}")
 
         if not got_uuid:
-            return metadata
+            return None
 
         rows = t.artifact_handler(interaction_type='query', query=f"select * from {dsi_table_name};", dict_return=True)
-        uuids = rows['uuid']
         t.unload_module('backend', 'Sqlite', 'back-read')
 
         # GUFI Query
