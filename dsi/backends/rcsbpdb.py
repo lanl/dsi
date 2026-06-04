@@ -12,8 +12,8 @@ Access modes
 
 2. Query-driven mode, closer to NDP
    - params={"keywords": "hemoglobin", "limit": 20}
-   - query_artifacts({"keywords": "hemoglobin", "limit": 20})
-   - query_artifacts("hemoglobin")
+   - find_relation({"keywords": "hemoglobin", "limit": 20})
+   - find_relation("hemoglobin")
 
 DOI behavior
 ------------
@@ -107,6 +107,9 @@ class FileResource:
     extension: Optional[str]
     source: str
     format_hint: Optional[str] = None
+    exists: Optional[bool] = None
+    status_code: Optional[int] = None
+    content_type: Optional[str] = None
 
 
 @dataclass
@@ -232,6 +235,7 @@ class RCSBPDB(Webserver):
 
         self.timeout = kwargs.get("timeout", 60)
         self.verify = kwargs.get("verify_ssl", kwargs.get("verify", True))
+        self.validate_resource_urls = kwargs.get("validate_resource_urls", False)
         self.retries = kwargs.get("retries", 3)
         self.validate_on_init = kwargs.get("validate_on_init", True)
         self.auto_load = kwargs.get("auto_load", True)
@@ -624,6 +628,205 @@ class RCSBPDB(Webserver):
             notes=["Identifier did not match a rcsbpdb DOI or 4-character PDB ID."],
         )
 
+    def _url_exists(self, url: str):
+        try:
+            response = self.session.head(
+                url,
+                allow_redirects=True,
+                timeout=self.timeout,
+                verify=self.verify,
+            )
+
+            if response.status_code == 405:
+                response = self.session.get(
+                    url,
+                    stream=True,
+                    allow_redirects=True,
+                    timeout=self.timeout,
+                    verify=self.verify,
+                )
+
+            exists = 200 <= response.status_code < 400
+            status_code = response.status_code
+            content_type = response.headers.get("content-type")
+            response.close()
+
+            return exists, status_code, content_type
+
+        except Exception:
+            return None, None, None
+
+    def _make_resource(
+        self,
+        pdb_id: str,
+        label: str,
+        url: str,
+        extension: str,
+        source: str,
+        format_hint: str,
+    ) -> Optional[FileResource]:
+        exists = None
+        status_code = None
+        content_type = None
+
+        if self.validate_resource_urls:
+            exists, status_code, content_type = self._url_exists(url)
+
+            if exists is False:
+                return None
+
+        return FileResource(
+            label=label,
+            url=url,
+            extension=extension,
+            source=source,
+            format_hint=format_hint,
+            exists=exists,
+            status_code=status_code,
+            content_type=content_type,
+        )
+
+    def _build_file_resources(self, pdb_id: str, meta: Dict[str, Any]) -> List[FileResource]:
+        pdb_id_upper = pdb_id.upper()
+        pdb_id_lower = pdb_id.lower()
+
+        candidates = [
+            (
+                f"{pdb_id_lower}.cif",
+                f"https://files.rcsb.org/download/{pdb_id_upper}.cif",
+                "cif",
+                "rcsb.download",
+                "PDBx/mmCIF Format",
+            ),
+            (
+                f"{pdb_id_lower}.cif.gz",
+                f"https://files.rcsb.org/download/{pdb_id_upper}.cif.gz",
+                "cif.gz",
+                "rcsb.download",
+                "PDBx/mmCIF Format (gz)",
+            ),
+            (
+                f"{pdb_id_lower}.bcif.gz",
+                f"https://files.rcsb.org/download/{pdb_id_upper}.bcif.gz",
+                "bcif.gz",
+                "rcsb.download",
+                "BinaryCIF Format (gz)",
+            ),
+            (
+                f"{pdb_id_lower}.pdb",
+                f"https://files.rcsb.org/download/{pdb_id_upper}.pdb",
+                "pdb",
+                "rcsb.download",
+                "Legacy PDB Format",
+            ),
+            (
+                f"{pdb_id_lower}.pdb.gz",
+                f"https://files.rcsb.org/download/{pdb_id_upper}.pdb.gz",
+                "pdb.gz",
+                "rcsb.download",
+                "Legacy PDB Format (gz)",
+            ),
+            (
+                f"{pdb_id_lower}.xml.gz",
+                f"https://files.rcsb.org/download/{pdb_id_upper}.xml.gz",
+                "xml.gz",
+                "rcsb.download",
+                "PDBML/XML Format (gz)",
+            ),
+            (
+                f"{pdb_id_lower}-sf.cif",
+                f"https://files.rcsb.org/download/{pdb_id_upper}-sf.cif",
+                "cif",
+                "rcsb.download",
+                "Structure Factors (CIF)",
+            ),
+            (
+                f"{pdb_id_lower}-sf.cif.gz",
+                f"https://files.rcsb.org/download/{pdb_id_upper}-sf.cif.gz",
+                "cif.gz",
+                "rcsb.download",
+                "Structure Factors (CIF - gz)",
+            ),
+        ]
+
+        subdir = pdb_id_lower[1:3]
+
+        validation_base = (
+            f"https://files.rcsb.org/pub/pdb/validation_reports/"
+            f"{subdir}/{pdb_id_lower}/{pdb_id_lower}"
+        )
+
+        candidates.extend(
+            [
+                (
+                    f"{pdb_id_lower}_validation.pdf.gz",
+                    f"{validation_base}_validation.pdf.gz",
+                    "pdf.gz",
+                    "rcsb.validation",
+                    "Validation Full (PDF - gz)",
+                ),
+                (
+                    f"{pdb_id_lower}_validation.xml.gz",
+                    f"{validation_base}_validation.xml.gz",
+                    "xml.gz",
+                    "rcsb.validation",
+                    "Validation (XML - gz)",
+                ),
+                (
+                    f"{pdb_id_lower}_validation.cif.gz",
+                    f"{validation_base}_validation.cif.gz",
+                    "cif.gz",
+                    "rcsb.validation",
+                    "Validation (CIF - gz)",
+                ),
+            ]
+        )
+
+        assemblies = meta.get("pdbx_struct_assembly", [])
+        assembly_ids = []
+
+        if isinstance(assemblies, list):
+            for assembly in assemblies:
+                if isinstance(assembly, dict) and assembly.get("id"):
+                    assembly_ids.append(str(assembly["id"]))
+
+        for assembly_id in assembly_ids:
+            candidates.extend(
+                [
+                    (
+                        f"{pdb_id_lower}-assembly{assembly_id}.cif.gz",
+                        f"https://files.rcsb.org/download/{pdb_id_upper}-assembly{assembly_id}.cif.gz",
+                        "cif.gz",
+                        "rcsb.assembly",
+                        f"Biological Assembly {assembly_id} (CIF - gz)",
+                    ),
+                    (
+                        f"{pdb_id_lower}-assembly{assembly_id}.pdb.gz",
+                        f"https://files.rcsb.org/download/{pdb_id_upper}-assembly{assembly_id}.pdb.gz",
+                        "pdb.gz",
+                        "rcsb.assembly",
+                        f"Biological Assembly {assembly_id} (PDB - gz)",
+                    ),
+                ]
+            )
+
+        resources = []
+
+        for label, url, extension, source, format_hint in candidates:
+            resource = self._make_resource(
+                pdb_id=pdb_id_upper,
+                label=label,
+                url=url,
+                extension=extension,
+                source=source,
+                format_hint=format_hint,
+            )
+
+            if resource is not None:
+                resources.append(resource)
+
+        return resources
+
     def lookup_rcsbpdb(
         self,
         pdb_id: Optional[str],
@@ -646,17 +849,11 @@ class RCSBPDB(Webserver):
             return result
 
         meta_url = self.ENDPOINTS["entry"].format(pdb_id=pdb_id)
-        subdir = pdb_id.lower()[1:3]
-        cif_url = self.ENDPOINTS["mmcif_gz"].format(
-            subdir=subdir,
-            pdb_id=pdb_id.lower(),
-        )
         landing_url = self.ENDPOINTS["entry_landing"].format(pdb_id=pdb_id)
 
         result.metadata_url = meta_url
         result.landing_page_url = landing_url
-        result.endpoint_variables["subdir"] = subdir
-
+        
         try:
             meta = self._request(meta_url)
 
@@ -674,15 +871,7 @@ class RCSBPDB(Webserver):
                 "full_metadata": meta,
             }
 
-            result.files = [
-                FileResource(
-                    label=f"{pdb_id.lower()}.cif.gz",
-                    url=cif_url,
-                    extension="cif.gz",
-                    source="rcsbpdb.archive_path",
-                    format_hint="mmCIF",
-                )
-            ]
+            result.files = self._build_file_resources(pdb_id, meta)
 
             return result
 
@@ -850,7 +1039,7 @@ class RCSBPDB(Webserver):
         return list(self.tables.keys())
 
     def num_tables(self) -> int:
-        return len(self.tables)
+        return len(self.tables) 
 
     def overwrite_table(self, table_name: str, rows: List[Dict[str, Any]]) -> None:
         resolved = self._resolve_table_name(table_name)
@@ -920,42 +1109,10 @@ class RCSBPDB(Webserver):
         raise NotImplementedError("rcsbpdb backend is read-only.")
 
     def query_artifacts(self, query, **kwargs):
-        if query is None:
-            return self.tables
-
-        try:
-            if isinstance(query, dict):
-                self.params = query
-                self._load_from_params(query)
-                self._loaded = True
-                return self.tables
-
-            if isinstance(query, str):
-                kind = self.classify_identifier(query)
-
-                if kind in {"rcsbpdb_doi", "pdb_id"}:
-                    self.identifiers = [query]
-                    self._load_initial_data()
-                else:
-                    query_params = {"keywords": query}
-                    query_params.update(kwargs)
-                    self.params = query_params
-                    self._load_from_params(self.params)
-
-                self._loaded = True
-                return self.tables
-
-            if isinstance(query, list):
-                self.identifiers = query
-                self._load_initial_data()
-                self._loaded = True
-                return self.tables
-
-        except Exception:
-            self._loaded = False
-            raise
-
-        raise TypeError("query_artifacts expects None, str, list, or dict.")
+        raise NotImplementedError(
+            "query_artifacts() is not implemented for RCSBPDB because it is not an SQL backend. "
+            "Use find_relation() for RCSBPDB API-backed lookup/search behavior."
+        )
 
     def notebook(self, **kwargs):
         """
@@ -1035,26 +1192,43 @@ class RCSBPDB(Webserver):
     def find_cell(self, query_object, **kwargs):
         return self.find(query_object, **kwargs)
 
-    def find_relation(self, column_name, relation, **kwargs):
-        if column_name != "dataset_id":
-            return []
+    def find_relation(self, query, relation=None, **kwargs):
+        if query is None:
+            return self.tables
 
-        datasets = self.get_table("datasets").to_dict(orient="records")
-        resources = self.get_table("resources").to_dict(orient="records")
+        try:
+            if isinstance(query, dict):
+                self.params = query
+                self._load_from_params(query)
+                self._loaded = True
+                return self.tables
 
-        out = []
-        for ds in datasets:
-            dsid = ds.get("dataset_id")
-            out.append(
-                {
-                    "dataset_id": dsid,
-                    "relation": relation,
-                    "related_resource_count": len(
-                        [r for r in resources if r.get("dataset_id") == dsid]
-                    ),
-                }
-            )
-        return out
+            if isinstance(query, str):
+                kind = self.classify_identifier(query)
+
+                if kind in {"rcsbpdb_doi", "pdb_id"}:
+                    self.identifiers = [query]
+                    self._load_initial_data()
+                else:
+                    query_params = {"keywords": query}
+                    query_params.update(kwargs)
+                    self.params = query_params
+                    self._load_from_params(self.params)
+
+                self._loaded = True
+                return self.tables
+
+            if isinstance(query, list):
+                self.identifiers = query
+                self._load_initial_data()
+                self._loaded = True
+                return self.tables
+
+        except Exception:
+            self._loaded = False
+            raise
+
+        raise TypeError("find_relation() expects None, str, list, or dict.")
 
     def list(self, collection=False, **kwargs):
         return self.get_table_names()
