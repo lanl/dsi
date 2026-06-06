@@ -7,6 +7,7 @@ import yaml
 import time
 import itertools
 import shutil
+import re
 import pandas as pd
 from pathlib import Path
 from typing import Iterator
@@ -14,7 +15,7 @@ from contextlib import redirect_stdout
 from collections import OrderedDict
 
 from dsi.core import Terminal
-from dsi.utils.federated.federate_datasets import federate_datasets
+from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
 
 class Sync():
     """
@@ -31,62 +32,60 @@ class Sync():
         self.add_dbs = kwargs.pop("add_dbs", [])
 
         extension = ""
-        if project_name:
-            for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
-                if project_name.lower().endswith(ext):
-                    self.project_name = project_name[:-len(ext)]
-                    extension = ext
-                    break
-            if extension != "":
-                self.full_db_name = self.project_name + extension
-                if not os.path.exists(self.full_db_name):
-                    print("Creating new database: " + self.full_db_name)
-                    # We now allow a user to begin indexing from an empty database, so bypass raise
-                    #raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
+        for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
+            if project_name.lower().endswith(ext):
+                self.project_name = project_name[:-len(ext)]
+                extension = ext
+                break
+        if extension != "":
+            self.full_db_name = self.project_name + extension
+            if not os.path.exists(self.full_db_name):
+                print("Creating new database: " + self.full_db_name)
+                # We now allow a user to begin indexing from an empty database, so bypass raise
+                #raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
 
-            else:
-                proj_db_found = False
-                for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
-                    if os.path.exists(self.project_name + ext):
-                        if proj_db_found:
-                            raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
-                        self.full_db_name = self.project_name + ext
-                        proj_db_found = True
+        else:
+            proj_db_found = False
+            for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
+                if os.path.exists(self.project_name + ext):
+                    if proj_db_found:
+                        raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
+                    self.full_db_name = self.project_name + ext
+                    proj_db_found = True
 
-                if not proj_db_found:
-                    raise ValueError(f"No database found with name {project_name}. Please input an existing database name.")
-            
-            self.remote_location = None
-            self.local_location = None
-
-            self.t = Terminal()
-            # First check if user can create db here
-            if "/" in project_name:
-                create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
-            else:
-                create_bool = self.t.can_create_file_here()
-            if create_bool is False:
-                raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
+            if not proj_db_found:
+                raise ValueError(f"No database found with name {project_name}. Please input an existing database name.")
         
-            backend_name = self.t.identify_backend(self.full_db_name)
-            # Allows an empty database to be created, autoselect SQLite for the user
-            if backend_name is None:
-                #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
-                print("Auto-selecting sqlite backend.")
-                backend_name = "Sqlite"
+        self.remote_location = None
+        self.local_location = None
 
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
+        self.t = Terminal()
+        # First check if user can create db here
+        if "/" in project_name:
+            create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
+        else:
+            create_bool = self.t.can_create_file_here()
+        if create_bool is False:
+            raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
+    
+        backend_name = self.t.identify_backend(self.full_db_name)
+        # Allows an empty database to be created, autoselect SQLite for the user
+        if backend_name is None:
+            #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+            print("Auto-selecting sqlite backend.")
+            backend_name = "Sqlite"
 
-            # Actually create a database and add a placeholder table
-            if not self.t.valid_backend(self.t.loaded_backends[0]):
-                #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
-                st_dict = OrderedDict()
-                st_dict['file_origin'] = []
-                self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
-                self.t.artifact_handler(interaction_type='ingest')
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
 
+        # Actually create a database and add a placeholder table
+        if not self.t.valid_backend(self.t.loaded_backends[0]):
+            #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
+            st_dict = OrderedDict()
+            st_dict['file_origin'] = []
+            self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
+            self.t.artifact_handler(interaction_type='ingest')
 
 
     def index(self, local_loc, remote_loc):
@@ -111,7 +110,7 @@ class Sync():
                 fed_table = self.t.get_table("federated")
                 fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
                 if fed_local == local_loc:
-                    self.remote_location = remote_loc
+                    self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
                     self.local_location = local_loc
                     if fed_remote == remote_loc:
                         if self.verbose:
@@ -122,7 +121,7 @@ class Sync():
                     filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
                     
                     # update remote location in federated table
-                    fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
+                    fed_table.at[fed_table.index[0], "remote_location"] = os.path.join(remote_loc, self.project_name) + os.sep
 
                     self.t.dsi_tables.remove("filesystem")
                     self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
@@ -150,7 +149,7 @@ class Sync():
         
         file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
         
-        self.remote_location = remote_loc
+        self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
@@ -185,9 +184,9 @@ class Sync():
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
-                rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
+                rfilepath = os.path.join(remote_loc, self.project_name, rel_file)
             else:
-                rfilepath = os.path.join(remote_loc,self.project_name, parent_rel_file)
+                rfilepath = os.path.join(remote_loc, self.project_name, parent_rel_file)
             st_dict['file_origin'].append(rel_file)
             st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
@@ -314,7 +313,7 @@ class Sync():
         # Test remote location validity and try creating folders
         # TODO: iterate through remote/server list here, for now:
         if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
-            remote_list = [ os.path.join(self.remote_location,self.project_name) ]
+            remote_list = self.remote_location
             for remote in remote_list:
                 if self.verbose:
                     print(f"Testing access to '{remote}' directory.")
@@ -363,8 +362,8 @@ class Sync():
             # Database movement
             for dbname in db_list:
                 if self.verbose:
-                    print(" cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
-                shutil.copy2(dbname, os.path.join(self.remote_location, self.project_name, dbname))
+                    print(" cp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                shutil.copy2(dbname, os.path.join(self.remote_location, dbname))
 
             print(" Data Copy Complete!")
         
@@ -379,13 +378,13 @@ class Sync():
             
             # making remote dir
             if self.verbose:
-                print(" ssh "+ str(host_part) + " \"mkdir -p " + str(os.path.join(path_part, self.project_name)) + "\"" )
-            cmd = ["ssh", host_part, f'mkdir -p \"{os.path.join(path_part, self.project_name)}\"']
+                print(" ssh "+ str(host_part) + " \"mkdir -p " + path_part + "\"" )
+            cmd = ["ssh", host_part, f'mkdir -p \"{path_part}\"']
             print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
 
             # File movement
-            cmd = ["scp", "-rp", self.local_location, os.path.join(self.remote_location, self.project_name)]
+            cmd = ["scp", "-rp", self.local_location, self.remote_location]
             if self.verbose:
                 print()
                 print(*cmd)
@@ -394,12 +393,12 @@ class Sync():
 
             # remove username from file_remote column in filesystem table
             username, host = host_part.split("@")
-            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(host_part+":", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
-            # remove username from remote_location column in federated table
+            # remove username@hostname from remote_location column in federated table
             federated_df = self.t.get_table("federated")
-            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(host_part+":", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
@@ -407,7 +406,7 @@ class Sync():
 
             # Database movement
             for dbname in db_list:
-                cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, dbname)]
                 if self.verbose:
                     print()
                     print(*cmd)
@@ -425,8 +424,7 @@ class Sync():
             
             # File movement
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
-            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
-                   self.local_location, os.path.join(self.remote_location, self.project_name)]
+            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {path_part} && rsync", self.local_location, self.remote_location]
             if self.verbose:
                 print(*cmd)
             self.execute_cmd(cmd, "rsync data")
@@ -437,12 +435,12 @@ class Sync():
                 username, host = host_part.split("@")
             except Exception:
                 raise ValueError("Remote path's hostname must be in the format user@server") from None
-            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(host_part+":", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
-            # remove username from remote_location column in federated table
+            # remove username@hostname from remote_location column in federated table
             federated_df = self.t.get_table("federated")
-            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(host_part+":", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
@@ -450,7 +448,7 @@ class Sync():
             
             # Database movement
             for dbname in db_list:
-                cmd = ["rsync", "-av", dbname, os.path.join(self.remote_location, self.project_name)]
+                cmd = ["rsync", "-av", dbname, self.remote_location]
                 if self.verbose:
                     print()
                     print(*cmd)
@@ -492,8 +490,8 @@ class Sync():
                 base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','cp','-r']
                 # File Movement
                 if self.verbose:
-                    print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
-                cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
+                    print("conduit cp -r " + self.local_location + " " + self.remote_location)
+                cmd = base_cmd + [self.local_location, self.remote_location]
                 stdout = self.execute_cmd(cmd, "Conduit copy data")
                 if "Finalized" in stdout:
                     print(" DSI-Conduit data movement job complete.")
@@ -509,8 +507,8 @@ class Sync():
                 # Database Movement
                 for dbname in db_list:
                     if self.verbose:
-                        print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
-                    cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                        print("conduit cp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                    cmd = base_cmd + [dbname, os.path.join(self.remote_location, dbname)]
                     stdout = self.execute_cmd(cmd, "Conduit copy database")
                     if "Finalized" in stdout:
                         print(" DSI-Conduit database movement job complete.")
@@ -528,8 +526,8 @@ class Sync():
             try:
                 # File Movement
                 if self.verbose:
-                    print("pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
-                cmd = ['pfcp','-R',self.local_location, os.path.join(self.remote_location, self.project_name)]
+                    print("pfcp -R " + self.local_location + " " + self.remote_location)
+                cmd = ['pfcp','-R',self.local_location, self.remote_location]
                 self.execute_cmd(cmd, "pfcp move data")
                 print(" DSI submitted pfcp data movement job.")
 
@@ -542,8 +540,8 @@ class Sync():
                 # Database Movement
                 for dbname in db_list:
                     if self.verbose:
-                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
-                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, dbname)]
                     self.execute_cmd(cmd, "pfcp move database")
                     print(" DSI submitted pfcp database movement job.")
             except Exception as e:
@@ -659,7 +657,46 @@ class Sync():
             _workspace_folder = config_data.get("workspace_folder", "")
             workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
 
-        federate_datasets(workspace_folder, config_data, base_path)
+        downloaded_dbs = federate_datasets(workspace_folder, config_data, base_path)
+
+        if downloaded_dbs:
+            df = pd.DataFrame(downloaded_dbs)
+            df = df[["location_type", "location", "name", "local_path", "submitter_name"]]
+            df = df.rename(columns={"name": "db_name", "local_path": "local_db_path"})
+
+            # Create 'federation' table in db
+            curr_tables = self.t.list(True)
+            if "federation" in curr_tables:
+                # TODO: currently overwrites existing federation table
+                self.t.overwrite_table("federation", df)
+            else:
+                self.t.load_module('plugin', "Dataframe", "reader", collection=df, table_name="federation")
+                self.t.artifact_handler(interaction_type='ingest')
+
+
+    def get_data(self, db_name: str, workspace_folder: str):
+        curr_tables = self.t.list(True)
+        if "federation" not in curr_tables:
+            raise ValueError("Must first download DSI databases using Sync.get()")
+        if " " in db_name:
+            raise ValueError("Input db_name cannot have spaces")
+        db_data = self.t.artifact_handler("query", query=f"SELECT * FROM federation WHERE db_name LIKE '%{db_name}%'").iloc[0]
+
+        t2 = Terminal()
+        backend_name = self.t.identify_backend(db_data["local_db_path"])
+        t2.load_module('backend', backend_name, 'back-write', filename=db_data["local_db_path"])
+
+        db_tables = t2.list(True)
+        if "filesystem" not in db_tables or "federated" not in db_tables:
+            raise ValueError(f"{db_name} must have been previously indexed by DSI to be able to download all its data.")
+        remote_loc = t2.get_table("federated")["remote_location"].iloc[0]
+
+        with open(f"{workspace_folder}/host_usernames.json", "r", encoding="utf-8") as f:
+            host_username = yaml.safe_load(f)
+        username = (host_username or {}).get(db_data['location'], "")
+
+        # Currently pulling all data referenced -- eventually allow user to specify certain data
+        pull_data(db_data["location_type"], db_data["location"], remote_loc, workspace_folder, username)
 
 
     def gen_uuid(self, st):

@@ -3,6 +3,7 @@ import uuid
 import yaml
 import argparse
 from pathlib import Path
+import subprocess
 
 
 from dsi.utils.federation_utils import (
@@ -74,7 +75,7 @@ def pull_data(location_type: str,
               path: str, 
               abs_path_workspace_folder: str, 
               username: str,
-              download_limit: int) -> dict | None:
+              download_limit: int = 10485760) -> tuple[dict | None, str]:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -82,18 +83,19 @@ def pull_data(location_type: str,
     Args:
         location_type (str): The type of the original location (e.g., "github", "HPC", "HPC-kerberos", "URL", "local").
         location (str): The location of the database (e.g., hostname for HPC, URL for web).
-        path (str): The path to the database at the original location.
-        abs_path_workspace_folder (str): The absolute path to the workspace folder where the database will be stored.
+        path (str): The path to the data or database at the original location.
+        abs_path_workspace_folder (str): The absolute path to the workspace folder where the data or database will be stored.
         username (str): username for hpc systems
         download_limit (int): The maximum size of a file that can be downloaded without confirmation.
     Returns:
-        dict | None: A dictionary containing the database information if the data was successfully pulled, or None if there was an error or if the user chose to skip the download.
+        tuple[dict, str]: A tuple of (data/db information | None, username). First element is None if there was an error or user skipped the download.
     """
 
     cleaned_location_type = location_type.strip().lower()
     filename = get_last_part(path)
 
-    # Create folder for data        
+    # Create folder for data
+    abs_path_workspace_folder = str(Path(abs_path_workspace_folder).resolve()) 
     _, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
 
     # Get the absolute path to the file to be downloaded
@@ -119,23 +121,23 @@ def pull_data(location_type: str,
             filesize = get_github_remote_file_size(path)
         except Exception:
             print(f" -- Could not access the file at {path}. Skipping this database.")
-            return None
+            return None, ""
 
         # Confirm for sizes above a limit
         if not confirm_large_download(filesize, download_limit):
             print(" -- Skipping this database.")
-            return None
+            return None, ""
 
         # Download the file
         try:
             download_github_file(url=path, out_path=abs_path_db_folder)
 
             db_info = make_db_info(location, path, file_path, filename)
-            return db_info
+            return db_info, username
             
         except Exception as e:
             print(f" -- Error downloading file from GitHub: {e}. Skipping this database.")
-            return None
+            return None, ""
         
 
     elif cleaned_location_type == "hpc-kerberos":
@@ -144,8 +146,21 @@ def pull_data(location_type: str,
                 username = input(f" -- Enter the username for {location}: ")
             except KeyboardInterrupt:
                 print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
-                return None
-            
+                return None, ""
+        
+        # can now download data from HPC-kerberos
+        if path.endswith("/"):
+            try:
+                abs_path_workspace_folder = abs_path_workspace_folder if abs_path_workspace_folder.endswith("/") else abs_path_workspace_folder + "/"
+                subprocess.run(["rsync", "-av", f"{username}@{location}:{path}", abs_path_workspace_folder], check=True)
+                return None, ""
+            except KeyboardInterrupt:
+                print(f" -- Interrupted while downloading data from {location}:{path}")
+                return None, ""
+            except Exception as e:
+                print(f" -- Error {e} downloading data from HPC.")
+                return None, ""
+        
         # Check if the file exists and get its size
         filesize = 0
         try:
@@ -156,13 +171,13 @@ def pull_data(location_type: str,
             )
         except KeyboardInterrupt:
             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-            return None
+            return None, ""
         except FileNotFoundError as e:
             print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-            return None
+            return None, ""
         except Exception as e:
             print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-            return None
+            return None, ""
 
 
         # Skip for now
@@ -178,18 +193,19 @@ def pull_data(location_type: str,
         #         )
         #     except KeyboardInterrupt:
         #         print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-        #         return None
+        #         return None, ""
         #     except Exception as e:
         #         print(f" -- Failed to get remote hash for {location}:{path}: {e}")
         #         print(" -- Will proceed to download the file to ensure we have the correct version.")
         #     if not need_redownload:
         #         print(" -- Local file is up to date with the remote file. Skipping download.")
-        #         return None
+        #         db_info = make_db_info(location, path, file_path, filename)
+        #         return db_info, username
 
         # Confirm for sizes above a limit
         if not confirm_large_download(filesize, download_limit):
             print(" -- Skipping this database.")
-            return None
+            return None, ""
 
         # Download the file
         try:
@@ -201,14 +217,14 @@ def pull_data(location_type: str,
             )
 
             db_info = make_db_info(location, path, file_path, filename)
-            return db_info
+            return db_info, username
 
         except KeyboardInterrupt:
             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-            return None
+            return None, ""
         except Exception as e:
             print(f" -- Error {e} downloading file from HPC. Skipping this database.")
-            return None
+            return None, ""
 
 
 
@@ -220,9 +236,21 @@ def pull_data(location_type: str,
                 username = input(f" -- Enter the username for {location}: ")
             except KeyboardInterrupt:
                 print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
-                return None
+                return None, ""
 
-        
+        # can now download data from HPC
+        if path.endswith("/"):
+            try:
+                abs_path_workspace_folder = abs_path_workspace_folder if abs_path_workspace_folder.endswith("/") else abs_path_workspace_folder + "/"
+                subprocess.run(["rsync", "-av", f"{username}@{location}:{path}", abs_path_workspace_folder], check=True)
+                return None, ""
+            except KeyboardInterrupt:
+                print(f" -- Interrupted while downloading data from {location}:{path}")
+                return None, ""
+            except Exception as e:
+                print(f" -- Error {e} downloading data from HPC.")
+                return None, ""
+
         # Check if the file exists and get its size
         filesize = 0
         try:
@@ -232,13 +260,13 @@ def pull_data(location_type: str,
             )
         except KeyboardInterrupt:
             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-            return None
+            return None, ""
         except FileNotFoundError as e:
             print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-            return None
+            return None, ""
         except Exception as e:
             print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-            return None
+            return None, ""
 
 
         # Check if the file already exists and has the same hash as the remote file
@@ -253,18 +281,19 @@ def pull_data(location_type: str,
                 )
             except KeyboardInterrupt:
                 print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-                return None
+                return None, ""
             except Exception as e:
                 print(f" -- Failed to get remote hash for {location}:{path}: {e}")
                 print(" -- Will proceed to download the file to ensure we have the correct version.")
             if not need_redownload:
                 print(" -- Local file is up to date with the remote file. Skipping download.")
-                return None
+                db_info = make_db_info(location, path, file_path, filename)
+                return db_info, username
 
         # Confirm for sizes above a limit
         if not confirm_large_download(filesize, download_limit):
             print(" -- Skipping this database.")
-            return None
+            return None, ""
 
         # Download the file
         try:
@@ -275,14 +304,14 @@ def pull_data(location_type: str,
             )
 
             db_info = make_db_info(location, path, file_path, filename)
-            return db_info
+            return db_info, username
 
         except KeyboardInterrupt:
             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-            return None
+            return None, ""
         except Exception as e:
             print(f" -- Error {e} downloading file from HPC. Skipping this database.")
-            return None
+            return None, ""
         
 
     elif cleaned_location_type == "url":
@@ -292,23 +321,23 @@ def pull_data(location_type: str,
             filesize = get_url_file_size(path)
         except Exception:
             print(f" -- Could not access the file at {path}. Skipping this database.")
-            return None
+            return None, ""
 
         # Confirm for sizes above a limit
         if not confirm_large_download(filesize, download_limit):
             print(" -- Skipping this database.")
-            return None
+            return None, ""
 
         # Download the file
         try:
             download_web_file(url=path, output_dir=abs_path_db_folder)
 
             db_info = make_db_info(location, path, file_path, filename)
-            return db_info
+            return db_info, username
 
         except Exception as e:
             print(f" -- Error {e} downloading file at {path}. Skipping this database.")
-            return None
+            return None, ""
     
 
     elif cleaned_location_type == "s3":
@@ -316,7 +345,7 @@ def pull_data(location_type: str,
             bucket, key = resolve_s3_bucket_and_key(location=location, path=path)
         except ValueError as e:
             print(f" -- Invalid S3 location/path: {e}. Skipping this database.")
-            return None
+            return None, ""
 
         aws_region = "us-gov-west-1"
         aws_profile = None
@@ -330,19 +359,19 @@ def pull_data(location_type: str,
             )
         except Exception as e:
             print(f" -- Could not initialize S3 client: {e}. Skipping this database.")
-            return None
+            return None, ""
 
         try:
             filesize = get_s3_remote_file_size(bucket=bucket, key=key, s3_client=s3_client)
         except PermissionError as e:
             print(f" -- Permission error: {e}. Skipping this database.")
-            return None
+            return None, ""
         except FileNotFoundError as e:
             print(f" -- Could not access S3 object s3://{bucket}/{key}; error: {e}. Skipping this database.")
-            return None
+            return None, ""
         except Exception as e:
             print(f" -- Could not access S3 object s3://{bucket}/{key}; error: {e}. Skipping this database.")
-            return None
+            return None, ""
 
         if md5_file_hash != "":
             try:
@@ -354,14 +383,16 @@ def pull_data(location_type: str,
                 )
                 if not need_redownload:
                     print(" -- Local file is up to date with the S3 object. Skipping download.")
-                    return None
+                    # TODO: if skipping since already downloaded, how to get that database's info
+                    # db_info = make_db_info(f"s3://{bucket}", f"s3://{bucket}/{key}", file_path, filename)
+                    return None, username
             except Exception as e:
                 print(f" -- Failed to compare local file with S3 object s3://{bucket}/{key}: {e}")
                 print(" -- Will proceed to download the file to ensure we have the correct version.")
 
         if not confirm_large_download(filesize, download_limit):
             print(" -- Skipping this database.")
-            return None
+            return None, ""
 
         try:
             downloaded_path = download_s3_file(
@@ -376,37 +407,38 @@ def pull_data(location_type: str,
                 downloaded_path,
                 Path(downloaded_path).name,
             )
-            return db_info
+            return db_info, username
         except Exception as e:
             print(f" -- Error downloading file from S3: {e}. Skipping this database.")
-            return None
+            return None, ""
 
 
     elif cleaned_location_type == "local":
         # Check if the file exists
         if not Path(path).exists():
             print(f" -- Local file {path} does not exist. Skipping this database.")
-            return None
+            return None, ""
 
         # Check if it's a file
         if not Path(path).is_file():
             print(f" -- Local path {path} is not a file. Skipping this database.")
-            return None
+            return None, ""
 
 
         _abs_path = str(Path(path).resolve())
         db_info = make_db_info(location, _abs_path, _abs_path, filename)
-        return db_info
+        return db_info, username
 
 
     else:
         print(f"Location type {location_type} for database {path} is unsupported. Skipping.")
 
-    return None
+    return None, ""
 
     
 
-def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) -> None:
+
+def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) -> list[dict[str, str]]:
     """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
       It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
       The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -415,6 +447,8 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
         workspace_folder (str): The local folder where the datasets will be stored.
         config_data (dict): A dictionary containing configuration data, including repository paths and download limits.
         base_path (str): The path used for resolving relative paths to the data.
+    Returns:
+        list[dict[str, str]]: A list of dictionaries of downloaded databases and associated metadata, or an empty list if no databases downloaded.
     """
 
     # Create the workspace folder if it doesn't exist
@@ -461,13 +495,14 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
 
     # information about each database
     database_info = []
+    federation_dbs = []
 
     
     # Gather the databases and create the index database
     success_counter = 0
     for db in cleaned_db_catalogue_list:
 
-        db_info = pull_data(
+        db_info, actual_username = pull_data(
             location_type=db['location_type'],
             location=db['location'],
             path=db['path'],
@@ -478,8 +513,11 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
 
         if db_info is not None:
             database_info.append(db_info)
+            combined = {k: db[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name"]}
+            federation_dbs.append(combined)
+            if actual_username != "":
+                host_username[db['location']] = actual_username
             success_counter += 1
-
 
     # Save host_usernames to a file for future runs
     with open(f"{abs_path_workspace_folder}/host_usernames.json", "w", encoding="utf-8") as f:
@@ -491,6 +529,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
 
     print(f"\nFinished gathering databases. Successfully downloaded {success_counter} databases to {abs_path_workspace_folder}.")
 
+    return federation_dbs
 
 
 def main():
