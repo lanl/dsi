@@ -22,23 +22,38 @@ from dsi.sync import Sync
 from ._version import __version__
 
 def autofill_path(text, state):
-    """ Completes file and directory paths for the current input """
+    """Completes CLI actions as first token, then file/directory paths."""
     line = readline.get_line_buffer()
-    parts = shlex.split(line[:readline.get_endidx()], posix=True)
+    endidx = readline.get_endidx()
 
-    if line and line[-1].isspace():
+    try:
+        parts = shlex.split(line[:endidx], posix=True)
+    except ValueError:
+        parts = line[:endidx].split()
+
+    if line[:endidx] and line[:endidx][-1].isspace():
         parts.append('')
 
     curr = parts[-1] if parts else ''
 
-    matches = glob.glob(os.path.expanduser(curr) + '*')
-    matches = [m + '/' if os.path.isdir(m) else m for m in matches]
-    matches = [m[m[:-1].rfind('/')+1:] if '/' in m[:-1] else m for m in matches]
+    if len(parts) <= 1:
+        matches = [a for a in COMMANDS.keys() if a.startswith(curr)]
+        matches += path_matches(curr)
+    else:
+        matches = path_matches(curr)
 
     try:
         return matches[state]
     except IndexError:
         return None
+
+
+def path_matches(curr):
+    matches = glob.glob(os.path.expanduser(curr) + "*")
+    matches = [m + "/" if os.path.isdir(m) else m for m in matches]
+    matches = [m[m[:-1].rfind("/") + 1:] if "/" in m[:-1] else m for m in matches]
+    return matches
+
 
 readline.set_completer(autofill_path)
 if "libedit" in readline.__doc__:
