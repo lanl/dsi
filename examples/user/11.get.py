@@ -7,8 +7,11 @@ remote_sources = "../federated/input.yaml"
 workspace = "dsi_data"
 
 # Create Sync type with project database name
-s = Sync()
+s = Sync("federated.db")
 s.get(input_yaml=remote_sources,workspace_folder=workspace)
+
+# Uncomment to download data referenced in this database -- ensure db was previously indexed by DSI
+# s.get_data("ocean_11_datasets.db", workspace)
 
 federated_databases = DSIFederated(workspace, operating_mode="notebook")
 federated_databases.f_display_databases()
