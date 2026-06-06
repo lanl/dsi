@@ -622,28 +622,30 @@ class Sync():
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
 
-    def get(self, input_yaml = None, input_csv = None, workspace_folder = None):
+    def get(self, config_file = None, workspace_folder = None):
         '''
-        Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
+        Helper function that searches remote location-based input config file, and retrieves metadata that contains DSI databases
         '''
-
-        # Read configuration from YAML file
-        if input_yaml:
+        suffix = Path(config_file).suffix.lower()
+        # Check if config file is YAML - contains paths to CSV files
+        if suffix == ".yaml" or suffix == ".yml":
             try:
-                yaml_path = Path(input_yaml)
+                yaml_path = Path(config_file)
                 config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
                 
                 base_path = str(Path(yaml_path).parent)
             except FileNotFoundError:
                 print(f"Error: Could not find YAML file {yaml_path}")
-        elif input_csv:
-            filename = str(Path(input_csv).name)
+        
+        elif suffix == ".csv":
+            filename = str(Path(config_file).name)
             config_data = {  
                             'repo_paths': [filename], 
                             'workspace_folder': workspace_folder, 
                             'download_limit': 10485760, 
                             'conflict_resolution': 'keep_latest'}
-            base_path = str(Path(input_csv).parent)
+            base_path = str(Path(config_file).parent)
+        
         else:
             config_data = {  
                             'repo_paths': [], 
@@ -701,6 +703,8 @@ class Sync():
                 print(f" -- Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.")
                 return
             db_data = db_data.iloc[int(db_idx)-1]
+        else:
+            db_data = db_data.iloc[0]
 
         t2 = Terminal()
         backend_name = self.t.identify_backend(db_data["local_db_path"])

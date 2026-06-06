@@ -161,8 +161,8 @@ class DSI_cli:
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
             'federate' : ("[-y yaml file] [-c csv file] [-w workspace_folder]", 
                           "Collects data from sources defined in the YAML config file or source from a CSV fifle, optionally saving it to a workspace folder."),
-            'pull_data' : ("[-l location_type] [-loc location] [-p path] [-d download_dir] [-u username]", 
-                          "Pulls a single data file from a specified location (github, HPC, URL, S3, local) to a download directory."),
+            'pull_data' : ("[-l location_type] [-loc location] [-p path] [-u username]", 
+                          "Pulls data from a specified location (github, HPC, URL, S3, local) to the current directory."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
             'list' : ("", "Lists all tables in the current DSI database"),
@@ -379,13 +379,6 @@ class DSI_cli:
                     print("pull_data ERROR: missing path after -p")
                     return
                 path = args[i + 1]
-                i += 2
-            
-            elif args[i] == "-d":
-                if i + 1 >= len(args):
-                    print("pull_data ERROR: missing download directory after -d")
-                    return
-                download_dir = args[i + 1]
                 i += 2
             
             elif args[i] == "-u":
