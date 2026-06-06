@@ -670,8 +670,10 @@ class Sync():
                 # TODO: currently overwrites existing federation table
                 self.t.overwrite_table("federation", df)
             else:
-                self.t.load_module('plugin', "Dataframe", "reader", collection=df, table_name="federation")
-                self.t.artifact_handler(interaction_type='ingest')
+                fnull = open(os.devnull, 'w')
+                with redirect_stdout(fnull):
+                    self.t.load_module('plugin', "Dataframe", "reader", collection=df, table_name="federation")
+                    self.t.artifact_handler(interaction_type='ingest')
 
 
     def get_data(self, db_name: str, workspace_folder: str):
@@ -680,11 +682,31 @@ class Sync():
             raise ValueError("Must first download DSI databases using Sync.get()")
         if " " in db_name:
             raise ValueError("Input db_name cannot have spaces")
-        db_data = self.t.artifact_handler("query", query=f"SELECT * FROM federation WHERE db_name LIKE '%{db_name}%'").iloc[0]
+        db_data = self.t.artifact_handler("query", query=f"SELECT * FROM federation WHERE db_name LIKE '%{db_name}%'")
+
+        if len(db_data) > 1:
+            try:
+                print(f"\nMultiple local databases were found with the name `{db_name}`:")
+                for idx, row in db_data.iterrows():
+                    print(f"{idx+1}) {row['local_db_path']}")
+                db_idx = input(f"\n -- Select which database's data to download (enter number): ")
+                db_idx = int(db_idx)
+                if not (1 <= db_idx <= len(db_data)):
+                    print(" -- Invalid selection. Skipping data download.")
+                    return
+            except (KeyboardInterrupt, EOFError):
+                print("\n -- Interrupted while entering database selection. Skipping data download.")
+                return
+            except ValueError:
+                print(f" -- Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.")
+                return
+            db_data = db_data.iloc[int(db_idx)-1]
 
         t2 = Terminal()
         backend_name = self.t.identify_backend(db_data["local_db_path"])
-        t2.load_module('backend', backend_name, 'back-write', filename=db_data["local_db_path"])
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            t2.load_module('backend', backend_name, 'back-write', filename=db_data["local_db_path"])
 
         db_tables = t2.list(True)
         if "filesystem" not in db_tables or "federated" not in db_tables:
