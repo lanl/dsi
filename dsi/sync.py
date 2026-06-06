@@ -390,8 +390,6 @@ class Sync():
             self.execute_cmd(cmd, "scp data")
             print(" DSI SCP data movement complete.")
 
-            # remove username from file_remote column in filesystem table
-            username, host = host_part.split("@")
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(host_part+":", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
@@ -429,11 +427,6 @@ class Sync():
             self.execute_cmd(cmd, "rsync data")
             print(" DSI Rsync data movement complete.")
 
-            # remove username from file_remote column in filesystem table
-            try:
-                username, host = host_part.split("@")
-            except Exception:
-                raise ValueError("Remote path's hostname must be in the format user@server") from None
             filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(host_part+":", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")

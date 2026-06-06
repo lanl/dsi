@@ -160,15 +160,15 @@ class DSI_cli:
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
             'federate' : ("<config file> [-w workspace_folder]", 
-                          "Collects databases from sources in a YAML file or a source from a CSV file, saving it to an optional workspace folder."),
-            'pull_data' : ("[-l location_type] [-loc location] [-p path] [-u username]", 
-                          "Pulls data from a specified location (github, HPC, URL, S3, local) to the current directory."),
+                          "Collects databases from sources in a YAML file or source in a CSV file, saving it to an optional workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'get_data' : ("<database_name> [-w workspace_folder]", 
-                          "Collects referenced data from a downloaded database in local directory or optional workspace folder"),
-            'help': ("", "Shows this help message."),
+                          "Collects referenced data in a DSI database, saving it to current dir or optional workspace folder"),
+            'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
             'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            'pull_data' : ("<source_type> <source> <path>", 
+                          "Pulls data from a source to the current directory. Enter 'pull_data -h' to learn the inputs"),
             'query' : ("<SQL query> [-n num_rows] [-e filename]",
                        "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
             'read' : ("<data source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
@@ -187,7 +187,9 @@ class DSI_cli:
         terminal_width = shutil.get_terminal_size().columns
         for key, val in commands.items():
             cmd = f'{key} {val[0]}'
-            print(textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50))
+            wrapped = textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50)
+            print(wrapped)
+            if '\n' in wrapped: print()
         print()
 
 
@@ -326,110 +328,6 @@ class DSI_cli:
                 return 1
 
         self.t.active_metadata = OrderedDict()
-
-
-    def pull_data(self, args):
-        """
-        Pull a single data file using the pull_data function.
-        
-        Usage:
-        pull_data -l <location_type> -loc <location> -p <path> [-d download_dir] [-u username]
-        
-        location_type: github, HPC, URL, S3, or local
-        location: hostname for HPC, bucket for S3, or descriptive name for others
-        path: path to the file
-        download_dir: optional directory to save the file (default: current directory)
-        username: optional username for HPC connections
-        """
-        
-        location_type = None
-        location = None
-        path = None
-        download_dir = os.getcwd()
-        username = ""
-        
-        if not args:
-            print("pull_data ERROR: need to specify -l location_type, -loc location, and -p path")
-            print("Example: pull_data -l github -loc github.com -p https://raw.githubusercontent.com/user/repo/file.csv")
-            return
-        
-        i = 0
-        while i < len(args):
-            if args[i] == "-l":
-                if i + 1 >= len(args):
-                    print("pull_data ERROR: missing location_type after -l")
-                    return
-                location_type = args[i + 1]
-                i += 2
-            
-            elif args[i] == "-loc":
-                if i + 1 >= len(args):
-                    print("pull_data ERROR: missing location after -loc")
-                    return
-                location = args[i + 1]
-                i += 2
-            
-            elif args[i] == "-p":
-                if i + 1 >= len(args):
-                    print("pull_data ERROR: missing path after -p")
-                    return
-                path = args[i + 1]
-                i += 2
-            
-            elif args[i] == "-u":
-                if i + 1 >= len(args):
-                    print("pull_data ERROR: missing username after -u")
-                    return
-                username = args[i + 1]
-                i += 2
-            
-            else:
-                print(f"pull_data ERROR: unknown argument {args[i]}")
-                return
-        
-        if not location_type or not location or not path:
-            print("pull_data ERROR: must specify -l location_type, -loc location, and -p path")
-            return
-        
-        # Validate location_type
-        valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
-        if location_type.lower() not in valid_types:
-            print(f"pull_data ERROR: location_type must be one of {', '.join(valid_types)}")
-            return
-        
-        # Create download directory if it doesn't exist
-        os.makedirs(download_dir, exist_ok=True)
-        
-        try:
-            from dsi.utils.federated.federate_datasets import pull_data
-            
-            # Default download limit: 100 MB
-            download_limit = 100 * 1024 * 1024
-            
-            print(f"\nPulling data from {location_type}:{location}:{path}")
-            print(f"Download directory: {download_dir}\n")
-            
-            db_info = pull_data(
-                location_type=location_type,
-                location=location,
-                path=path,
-                abs_path_workspace_folder=download_dir,
-                username=username,
-                download_limit=download_limit
-            )
-            
-            if db_info:
-                print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
-            else:
-                print("\nFile was not downloaded (may already exist or was skipped)")
-        
-        except ImportError as e:
-            print(f"pull_data ERROR: Could not import pull_data function: {e}")
-            return
-        except Exception as e:
-            print(f"pull_data ERROR: {e}")
-            return
-        print()
 
 
     def get_federate_parser(self):
@@ -634,6 +532,79 @@ class DSI_cli:
         error = self.export_table("dsi_tb_" + table_name, filename)
         if error != 1:
             print(f"Saved a plot of the {table_name} table in {filename}")
+        print()
+
+
+    def pull_data_parser(self):
+        parser = argparse.ArgumentParser(prog='pull_data')
+        parser.add_argument('source_type', help='Type of location data is stored in: GitHub, HPC, HPC-Kerberos, URL, S3, local')
+        parser.add_argument('source', help='user@hostname for HPC/HPC-Kerberos, bucket for S3, or descriptive name for others')
+        parser.add_argument('path', help='Absolute path or URL to data')
+        return parser
+
+
+    def pull_data(self, args):
+        """
+        Pull data using the pull_data function.
+        
+        Usage:
+        pull_data source_type source path
+        
+        source_type: github, HPC, URL, S3, or local
+        source: hostname for HPC, bucket for S3, or descriptive name for others
+        path: path to the file
+        """
+        source_type = args.source_type
+        source = args.source
+        path = args.path
+        username = ""
+        download_dir = os.getcwd()
+        
+        # Validate location_type
+        valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
+        if source_type.lower() not in valid_types:
+            print(f"pull_data ERROR: location_type must be one of {', '.join(valid_types)}")
+            return
+        
+        # validate source is correct for HPC
+        if source_type.lower() == "hpc":
+            if "@" not in source:
+                print("pull_data ERROR: source must be 'user@hostname' to access the HPC")
+                return
+            username, source = source.split("@")
+        
+        # Create download directory if it doesn't exist
+        os.makedirs(download_dir, exist_ok=True)
+        
+        try:
+            from dsi.utils.federated.federate_datasets import pull_data
+            
+            # Default download limit: 100 MB
+            download_limit = 100 * 1024 * 1024
+            
+            print(f"\nPulling data from {source_type}:{source}:{path}")
+            print(f"Download directory: {download_dir}\n")
+            print(source_type, source, path, download_dir, username, download_limit)
+            db_info, _ = pull_data(
+                location_type=source_type,
+                location=source,
+                path=path,
+                abs_path_workspace_folder=download_dir,
+                username=username,
+                download_limit=download_limit
+            )
+            
+            if db_info:
+                print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
+            else:
+                print("\nFile was not downloaded (may already exist or was skipped)")
+        
+        except ImportError as e:
+            print(f"pull_data ERROR: Could not import pull_data function: {e}")
+            return
+        except Exception as e:
+            print(f"pull_data ERROR: {e}")
+            return
         print()
 
 
@@ -1016,12 +987,12 @@ COMMANDS = {
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
     'federate' : (cli.get_federate_parser, cli.federate),
-    'pull_data' : (None, cli.pull_data), # to delete
     'find' : (None, cli.find),
     'get_data' : (cli.get_data_parser, cli.get_data),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
+    'pull_data' : (cli.pull_data_parser, cli.pull_data), # to delete
     'query' : (cli.get_query_parser, cli.query),
     'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
