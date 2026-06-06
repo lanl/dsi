@@ -1,5 +1,4 @@
 from dsi.sync import Sync
-from dsi.dsifederated import DSIFederated
 
 # Origin location of data
 remote_sources = "../federated/input.yaml"
@@ -10,8 +9,10 @@ workspace = "dsi_data"
 s = Sync("federated.db")
 s.get(input_yaml=remote_sources,workspace_folder=workspace)
 
-# Uncomment to download data referenced in this database -- ensure db was previously indexed by DSI
-# s.get_data("ocean_11_datasets.db", workspace)
+# Download data referenced in this database -- db must have been previously indexed by DSI
+s.get_data("ocean_11_datasets.db", workspace)
 
+
+from dsi.dsifederated import DSIFederated
 federated_databases = DSIFederated(workspace, operating_mode="notebook")
 federated_databases.f_display_databases()

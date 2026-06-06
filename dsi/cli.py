@@ -146,7 +146,7 @@ class DSI_cli:
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
             'federate' : ("[-y yaml file] [-c csv file] [-w workspace_folder]", 
                           "Collects data from sources defined in the YAML config file or source from a CSV fifle, optionally saving it to a workspace folder."),
-            'pulldata' : ("[-l location_type] [-loc location] [-p path] [-d download_dir] [-u username]", 
+            'pull_data' : ("[-l location_type] [-loc location] [-p path] [-d download_dir] [-u username]", 
                           "Pulls a single data file from a specified location (github, HPC, URL, S3, local) to a download directory."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message."),
@@ -318,12 +318,12 @@ class DSI_cli:
         return parser
 
 
-    def pulldata(self, args):
+    def pull_data(self, args):
         """
         Pull a single data file using the pull_data function.
         
         Usage:
-        pulldata -l <location_type> -loc <location> -p <path> [-d download_dir] [-u username]
+        pull_data -l <location_type> -loc <location> -p <path> [-d download_dir] [-u username]
         
         location_type: github, HPC, URL, S3, or local
         location: hostname for HPC, bucket for S3, or descriptive name for others
@@ -339,59 +339,59 @@ class DSI_cli:
         username = ""
         
         if not args:
-            print("pulldata ERROR: need to specify -l location_type, -loc location, and -p path")
-            print("Example: pulldata -l github -loc github.com -p https://raw.githubusercontent.com/user/repo/file.csv")
+            print("pull_data ERROR: need to specify -l location_type, -loc location, and -p path")
+            print("Example: pull_data -l github -loc github.com -p https://raw.githubusercontent.com/user/repo/file.csv")
             return
         
         i = 0
         while i < len(args):
             if args[i] == "-l":
                 if i + 1 >= len(args):
-                    print("pulldata ERROR: missing location_type after -l")
+                    print("pull_data ERROR: missing location_type after -l")
                     return
                 location_type = args[i + 1]
                 i += 2
             
             elif args[i] == "-loc":
                 if i + 1 >= len(args):
-                    print("pulldata ERROR: missing location after -loc")
+                    print("pull_data ERROR: missing location after -loc")
                     return
                 location = args[i + 1]
                 i += 2
             
             elif args[i] == "-p":
                 if i + 1 >= len(args):
-                    print("pulldata ERROR: missing path after -p")
+                    print("pull_data ERROR: missing path after -p")
                     return
                 path = args[i + 1]
                 i += 2
             
             elif args[i] == "-d":
                 if i + 1 >= len(args):
-                    print("pulldata ERROR: missing download directory after -d")
+                    print("pull_data ERROR: missing download directory after -d")
                     return
                 download_dir = args[i + 1]
                 i += 2
             
             elif args[i] == "-u":
                 if i + 1 >= len(args):
-                    print("pulldata ERROR: missing username after -u")
+                    print("pull_data ERROR: missing username after -u")
                     return
                 username = args[i + 1]
                 i += 2
             
             else:
-                print(f"pulldata ERROR: unknown argument {args[i]}")
+                print(f"pull_data ERROR: unknown argument {args[i]}")
                 return
         
         if not location_type or not location or not path:
-            print("pulldata ERROR: must specify -l location_type, -loc location, and -p path")
+            print("pull_data ERROR: must specify -l location_type, -loc location, and -p path")
             return
         
         # Validate location_type
         valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
         if location_type.lower() not in valid_types:
-            print(f"pulldata ERROR: location_type must be one of {', '.join(valid_types)}")
+            print(f"pull_data ERROR: location_type must be one of {', '.join(valid_types)}")
             return
         
         # Create download directory if it doesn't exist
@@ -421,10 +421,10 @@ class DSI_cli:
                 print("\nFile was not downloaded (may already exist or was skipped)")
         
         except ImportError as e:
-            print(f"pulldata ERROR: Could not import pull_data function: {e}")
+            print(f"pull_data ERROR: Could not import pull_data function: {e}")
             return
         except Exception as e:
-            print(f"pulldata ERROR: {e}")
+            print(f"pull_data ERROR: {e}")
             return
         print()
 
@@ -1030,7 +1030,7 @@ COMMANDS = {
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
     'federate' : (None, cli.federate),
-    'pulldata' : (None, cli.pulldata),
+    'pull_data' : (None, cli.pull_data),
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
