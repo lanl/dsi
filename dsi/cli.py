@@ -159,11 +159,13 @@ class DSI_cli:
                         "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
-            'federate' : ("[-y yaml file] [-c csv file] [-w workspace_folder]", 
-                          "Collects data from sources defined in the YAML config file or source from a CSV fifle, optionally saving it to a workspace folder."),
+            'federate' : ("<config file> [-w workspace_folder]", 
+                          "Collects databases from sources in a YAML file or a source from a CSV file, saving it to an optional workspace folder."),
             'pull_data' : ("[-l location_type] [-loc location] [-p path] [-u username]", 
                           "Pulls data from a specified location (github, HPC, URL, S3, local) to the current directory."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
+            'get_data' : ("<database_name> [-w workspace_folder]", 
+                          "Collects referenced data from a downloaded database in local directory or optional workspace folder"),
             'help': ("", "Shows this help message."),
             'list' : ("", "Lists all tables in the current DSI database"),
             'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
@@ -326,13 +328,6 @@ class DSI_cli:
         self.t.active_metadata = OrderedDict()
 
 
-    def get_federate_parser(self):
-        parser = argparse.ArgumentParser(prog='federate')
-        parser.add_argument('config_file', help='YAML config file that lists all data sources to download')
-        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded sources')
-        return parser
-
-
     def pull_data(self, args):
         """
         Pull a single data file using the pull_data function.
@@ -437,6 +432,13 @@ class DSI_cli:
         print()
 
 
+    def get_federate_parser(self):
+        parser = argparse.ArgumentParser(prog='federate')
+        parser.add_argument('config_file', help='YAML config file that lists all data sources to download')
+        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded sources')
+        return parser
+
+
     def federate(self, args):
         """
         Federate data from multiple sources using either:
@@ -444,89 +446,30 @@ class DSI_cli:
         - a CSV source file
 
         Usage:
-        federate -y input.yaml [-w workspace_folder]
-        federate -c sources.csv [-w workspace_folder]
+        federate input.yaml [-w workspace_folder]
+        federate sources.csv [-w workspace_folder]
         """
+        config_file = args.config_file
 
-        yaml_file = None
-        csv_file = None
         workspace_folder = None
+        if args.workspace_folder is not None and args.workspace_folder != "":
+            workspace_folder = args.workspace_folder
 
-        if not args:
-            print("federate ERROR: need to specify -y yaml file or -c csv file, see the help")
-            return
-
-        i = 0
-        while i < len(args):
-            if args[i] == "-y":
-                if i + 1 >= len(args):
-                    print("federate ERROR: missing yaml file after -y")
-                    return
-                yaml_file = args[i + 1]
-                i += 2
-
-            elif args[i] == "-c":
-                if i + 1 >= len(args):
-                    print("federate ERROR: missing csv file after -c")
-                    return
-                csv_file = args[i + 1]
-                i += 2
-
-            elif args[i] == "-w":
-                if i + 1 >= len(args):
-                    print("federate ERROR: missing workspace folder after -w")
-                    return
-                workspace_folder = args[i + 1]
-                i += 2
-
-            else:
-                print(f"federate ERROR: unknown argument {args[i]}")
-                return
-
-        if yaml_file and csv_file:
-            print("federate ERROR: specify either -y yaml file or -c csv file, not both")
-            return
-
-        if not yaml_file and not csv_file:
-            print("federate ERROR: need to specify -y yaml file or -c csv file")
-            return
+        # small provision if no data in db:
+        if not self.t.valid_backend(self.t.loaded_backends[0]):
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
+                self.t.artifact_handler(interaction_type='ingest')
 
         try:
-            s = Sync()
+            s = Sync(self.db_path)
+            s.user_wrapper = True
+            print(f"Synchronizing data from {config_file} into {workspace_folder}")
+            s.get(config_file=config_file, workspace_folder=workspace_folder)
 
-            if yaml_file:
-                if not os.path.exists(yaml_file):
-                    print(f"federate ERROR: {yaml_file} does not exist. Please check the filepath and try again.")
-                    return
-
-                try:
-                    with open(yaml_file, "r", encoding="utf-8") as f:
-                        config_data = yaml.safe_load(f)
-                except yaml.YAMLError:
-                    print(f"Invalid YAML file {yaml_file}. Please check the yaml file and try again.")
-                    return
-
-                if workspace_folder is None:
-                    workspace_folder = config_data.get("workspace_folder", "") or "dsi_data"
-
-                print(f"Synchronization data from {yaml_file} into {workspace_folder}")
-                s.get(input_yaml=yaml_file, workspace_folder=workspace_folder)
-
-            elif csv_file:
-                if not os.path.exists(csv_file):
-                    print(f"federate ERROR: {csv_file} does not exist. Please check the filepath and try again.")
-                    return
-
-                if workspace_folder is None:
-                    workspace_folder = "dsi_data"
-
-                print(f"Synchronization data from {csv_file} into {workspace_folder}")
-                s.get(input_csv=csv_file, workspace_folder=workspace_folder)
-            else:
-                print("A yaml or CSV file is needed!")
-                return
         except Exception as e:
-            print(f"federate ERROR: {e}")
+            print(f"federate ERROR: {str(e)}")
             return
         
 
@@ -593,6 +536,38 @@ class DSI_cli:
         print()
 
 
+    def get_data_parser(self):
+        parser = argparse.ArgumentParser(prog='get_data')
+        parser.add_argument('database_name', help='Previously downloaded database whose data will be downloaded')
+        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded data')
+        return parser
+
+
+    def get_data(self, args):
+        db_name = args.database_name
+
+        workspace_folder = None
+        if args.workspace_folder is not None and args.workspace_folder != "":
+            workspace_folder = args.workspace_folder
+        
+        try:
+            curr_tables = self.t.list(True)
+        except Exception:
+            print("get_data ERROR: Need to call 'federate' to download databases before getting the associated data.")
+            return
+        
+        if "federation" not in curr_tables:
+            print("get_data ERROR: Need to call 'federate' to download databases before getting the associated data.")
+            return
+        
+        try:
+            s = Sync(self.db_path)
+            s.get_data(db_name, workspace_folder)
+        except Exception as e:
+            print(f"get_data ERROR: {e}")
+            return
+
+
     def list_tables(self, args):
         '''
         Lists the tables in the database
@@ -600,7 +575,10 @@ class DSI_cli:
         try:
             self.t.list()
         except Exception as e:
-            print(f"list ERROR: {e}")
+            if "needs to have data" in str(e).lower():
+                print("Currently 0 tables loaded")
+            else:
+                print(f"list ERROR: {e}")
 
 
     def ls(self, args):
@@ -1037,9 +1015,10 @@ COMMANDS = {
     'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
-    'federate' : (None, cli.federate),
-    'pull_data' : (None, cli.pull_data),
+    'federate' : (cli.get_federate_parser, cli.federate),
+    'pull_data' : (None, cli.pull_data), # to delete
     'find' : (None, cli.find),
+    'get_data' : (cli.get_data_parser, cli.get_data),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),

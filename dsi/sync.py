@@ -82,10 +82,9 @@ class Sync():
         # Actually create a database and add a placeholder table
         if not self.t.valid_backend(self.t.loaded_backends[0]):
             #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
-            st_dict = OrderedDict()
-            st_dict['file_origin'] = []
-            self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
-            self.t.artifact_handler(interaction_type='ingest')
+            with redirect_stdout(fnull):
+                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
+                self.t.artifact_handler(interaction_type='ingest')
 
 
     def index(self, local_loc, remote_loc):
@@ -622,10 +621,13 @@ class Sync():
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
 
-    def get(self, config_file = None, workspace_folder = None):
+    def get(self, config_file: str | None = None, workspace_folder: str | None = None):
         '''
         Helper function that searches remote location-based input config file, and retrieves metadata that contains DSI databases
         '''
+        if not os.path.exists(config_file):
+            raise ValueError(f"{config_file} does not exist. Please check the filepath and try again.")
+        
         suffix = Path(config_file).suffix.lower()
         # Check if config file is YAML - contains paths to CSV files
         if suffix == ".yaml" or suffix == ".yml":
@@ -634,8 +636,8 @@ class Sync():
                 config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
                 
                 base_path = str(Path(yaml_path).parent)
-            except FileNotFoundError:
-                print(f"Error: Could not find YAML file {yaml_path}")
+            except yaml.YAMLError:
+                raise ValueError(f"Invalid YAML file {yaml_path}. Please check the yaml file and try again.")
         
         elif suffix == ".csv":
             filename = str(Path(config_file).name)
@@ -663,14 +665,16 @@ class Sync():
 
         if downloaded_dbs:
             df = pd.DataFrame(downloaded_dbs)
-            df = df[["location_type", "location", "name", "local_path", "submitter_name"]]
+            df = df[["location_type", "location", "name", "workspace_folder", "local_path", "submitter_name"]]
             df = df.rename(columns={"name": "db_name", "local_path": "local_db_path"})
 
             # Create 'federation' table in db
             curr_tables = self.t.list(True)
             if "federation" in curr_tables:
                 # TODO: currently overwrites existing federation table
-                self.t.overwrite_table("federation", df)
+                federation_df = self.t.get_table("federation")
+                federation_df = pd.concat([federation_df, df], ignore_index=True).drop_duplicates()
+                self.t.overwrite_table("federation", federation_df)
             else:
                 fnull = open(os.devnull, 'w')
                 with redirect_stdout(fnull):
@@ -678,13 +682,16 @@ class Sync():
                     self.t.artifact_handler(interaction_type='ingest')
 
 
-    def get_data(self, db_name: str, workspace_folder: str):
+    def get_data(self, db_name: str, workspace_folder: str | None = None):
         curr_tables = self.t.list(True)
         if "federation" not in curr_tables:
             raise ValueError("Must first download DSI databases using Sync.get()")
         if " " in db_name:
             raise ValueError("Input db_name cannot have spaces")
         db_data = self.t.artifact_handler("query", query=f"SELECT * FROM federation WHERE db_name LIKE '%{db_name}%'")
+        
+        if db_data.empty:
+            raise ValueError(f"Could not find a downloaded database named '{db_name}'")
 
         if len(db_data) > 1:
             try:
@@ -694,13 +701,13 @@ class Sync():
                 db_idx = input(f"\n -- Select which database's data to download (enter number): ")
                 db_idx = int(db_idx)
                 if not (1 <= db_idx <= len(db_data)):
-                    print(" -- Invalid selection. Skipping data download.")
+                    print(" -- ERROR: Invalid selection. Skipping data download.")
                     return
             except (KeyboardInterrupt, EOFError):
                 print("\n -- Interrupted while entering database selection. Skipping data download.")
                 return
             except ValueError:
-                print(f" -- Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.")
+                print(f" -- ERROR: Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.")
                 return
             db_data = db_data.iloc[int(db_idx)-1]
         else:
@@ -714,14 +721,17 @@ class Sync():
 
         db_tables = t2.list(True)
         if "filesystem" not in db_tables or "federated" not in db_tables:
-            raise ValueError(f"{db_name} must have been previously indexed by DSI to be able to download all its data.")
+            raise ValueError(f"Cannot download data from '{db_name}' because it has not been indexed by DSI.")
         remote_loc = t2.get_table("federated")["remote_location"].iloc[0]
 
-        with open(f"{workspace_folder}/host_usernames.json", "r", encoding="utf-8") as f:
+        with open(f"{db_data["workspace_folder"]}/host_usernames.json", "r", encoding="utf-8") as f:
             host_username = yaml.safe_load(f)
         username = (host_username or {}).get(db_data['location'], "")
 
-        # Currently pulling all data referenced -- eventually allow user to specify certain data
+        if not workspace_folder:
+            workspace_folder = f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        
+        # Currently pulling all data referenced -- eventually allow user to download certain data
         pull_data(db_data["location_type"], db_data["location"], remote_loc, workspace_folder, username)
 
 

@@ -514,6 +514,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
         if db_info is not None:
             database_info.append(db_info)
             combined = {k: db[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name"]}
+            combined["workspace_folder"] = abs_path_workspace_folder
             federation_dbs.append(combined)
             if actual_username != "":
                 host_username[db['location']] = actual_username
