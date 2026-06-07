@@ -7,7 +7,6 @@ import yaml
 import time
 import itertools
 import shutil
-import re
 import pandas as pd
 from pathlib import Path
 from typing import Iterator
@@ -24,7 +23,7 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name=None, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
+    def __init__(self, project_name, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
         self.project_name = project_name
         self.verbose = isVerbose
         self.no_parent = no_parent
@@ -554,10 +553,10 @@ class Sync():
                     print("conduit cp -r " + self.local_location + " " + self.remote_location)
                 cmd = base_cmd + [self.local_location, self.remote_location]
                 stdout = self.execute_cmd(cmd, "Conduit copy data")
-                if "Finalized" in stdout:
+                if "finalized" in stdout.lower():
                     print(" DSI-Conduit data movement job complete.")
                 else:
-                    print(" WARNING: DSI-Conduit data movement job may not have completed")
+                    print(" WARNING: DSI-Conduit data movement job may not be complete")
 
                 # delete temp columns from filesystem table
                 filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
@@ -571,10 +570,10 @@ class Sync():
                         print("conduit cp " + dbname + " " + os.path.join(self.remote_location, dbname))
                     cmd = base_cmd + [dbname, os.path.join(self.remote_location, dbname)]
                     stdout = self.execute_cmd(cmd, "Conduit copy database")
-                    if "Finalized" in stdout:
+                    if "finalized" in stdout.lower():
                         print(" DSI-Conduit database movement job complete.")
                     else:
-                        print(" WARNING: DSI-Conduit database movement job may not have completed")
+                        print(" WARNING: DSI-Conduit database movement job may not be complete")
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, data move is in queue.")
@@ -692,7 +691,7 @@ class Sync():
         
         suffix = Path(config_file).suffix.lower()
         # Check if config file is YAML - contains paths to CSV files
-        if suffix == ".yaml" or suffix == ".yml":
+        if suffix in [".yaml", ".yml"]:
             try:
                 yaml_path = Path(config_file)
                 config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
@@ -700,7 +699,6 @@ class Sync():
                 base_path = str(Path(yaml_path).parent)
             except yaml.YAMLError:
                 raise ValueError(f"Invalid YAML file {yaml_path}. Please check the yaml file and try again.")
-        
         elif suffix == ".csv":
             filename = str(Path(config_file).name)
             config_data = {  
@@ -709,7 +707,6 @@ class Sync():
                             'download_limit': 10485760, 
                             'conflict_resolution': 'keep_latest'}
             base_path = str(Path(config_file).parent)
-        
         else:
             config_data = {  
                             'repo_paths': [], 

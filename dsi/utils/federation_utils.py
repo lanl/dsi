@@ -29,7 +29,7 @@ def deduplicate_keep_latest(records: list[dict]) -> list[dict]:
     The function uses the timestamp field to determine which record is the latest.
     
     Arg:
-        records: A list of dictionaries, where each dictionary represents a record with at least the following keys: "location_type", "location", "path", and "timsestamp".
+        records: A list of dictionaries, where each dictionary represents a record with at least the following keys: "location_type", "location", "path", and "timestamp".
 
     Returns:
         A deduplicated list of records, where only the latest record for each unique combination of location_type, location, and path is kept.
@@ -43,12 +43,12 @@ def deduplicate_keep_latest(records: list[dict]) -> list[dict]:
             record.get("path"),
         )
 
-        current_ts = parse_timestamp(record.get("timsestamp", ""))
+        current_ts = parse_timestamp(record.get("timestamp", ""))
 
         if key not in best:
             best[key] = record
         else:
-            existing_ts = parse_timestamp(best[key].get("timsestamp", ""))
+            existing_ts = parse_timestamp(best[key].get("timestamp", ""))
 
             if current_ts > existing_ts:
                 best[key] = record
