@@ -311,7 +311,7 @@ class Sync():
         # Test remote location validity and try creating folders
         # TODO: iterate through remote/server list here, for now:
         if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
-            remote_list = self.remote_location
+            remote_list = [self.remote_location]
             for remote in remote_list:
                 if self.verbose:
                     print(f"Testing access to '{remote}' directory.")
