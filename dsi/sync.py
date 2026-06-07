@@ -251,9 +251,9 @@ class Sync():
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
-            elif "No credentials" in stderr:
-                raise RuntimeError("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.\n"
-                                   f"Kerberos message: {str(stderr)}") from None
+            # elif "No credentials" in stderr:
+            #     raise RuntimeError("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.\n"
+            #                        f"Kerberos message: {str(stderr)}") from None
             raise RuntimeError(f"{cmd_name} failed: \n{stderr}") from None
         return stdout
 
@@ -449,14 +449,14 @@ class Sync():
         elif tool.lower() == "conduit":
             import signal
 
-            # Test Kerberos
+            # Create kerberos ticket
             if self.verbose:
-                print( "Testing: klist")
-            cmd = ['klist']
-            stdout = self.execute_cmd(cmd, "Testing klist")
-            if "No credentials" in stdout:
-                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
-                raise RuntimeError("Kerberos message: " + str(stdout))
+                print( "Creating kerberos ticket - may require an OTP")
+            cmd = ['kinit', '-n']
+            stdout = self.execute_cmd(cmd, "Creating kerberos ticket")
+            # if "No credentials" in stdout:
+            #     print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
+            #     raise RuntimeError("Kerberos message: " + str(stdout))
 
             # Test Conduit status
             def alarm_handler(signum, frame):
