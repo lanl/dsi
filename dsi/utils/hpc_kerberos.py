@@ -95,8 +95,8 @@ def ssh_k_remote_size_bytes(
     Uses the same keepalive options as other SSH commands in this module.
 
     Args:
-        user: LLNL LC username
-        host: LLNL login host
+        user: username for external HPC
+        host: login host for external HPC
         remote_path: The path to the file on the remote host (e.g. "/data/file.bin")
         skip_kinit: Skip Kerberos ticket check if True
         timeout: Optional timeout in seconds for the entire operation
@@ -172,8 +172,8 @@ def execute_command(
 
     Args:
         command: The command to execute ('ssh', 'upload', or 'download')
-        user: LLNL LC username
-        host: LLNL login host
+        user: username for external HPC
+        host: login host for external HPC
         skip_kinit: Skip Kerberos ticket check if True
         local_path: Local file path (for upload/download)
         remote_path: Remote file path (for upload/download)
@@ -205,25 +205,23 @@ def execute_command(
 
 def main():
     """Parse command-line arguments and execute the requested command."""
-    parser = argparse.ArgumentParser(
-        description="LANL → LLNL SSH/SCP helper (Kerberos-aware)"
-    )
+    parser = argparse.ArgumentParser(description="Current HPC → External HPC SSH/SCP helper (Kerberos-aware)")
 
-    parser.add_argument("--user", required=True, help="LLNL LC username")
-    parser.add_argument("--host", required=True, help="LLNL login host")
+    parser.add_argument("--user", required=True, help="username for external HPC")
+    parser.add_argument("--host", required=True, help="login host for external HPC")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # SSH command
-    subparsers.add_parser("ssh", help="SSH into LLNL")
+    subparsers.add_parser("ssh", help="SSH into external HPC")
 
     # Upload
-    up = subparsers.add_parser("upload", help="Copy file to LLNL")
+    up = subparsers.add_parser("upload", help="Copy file to external HPC")
     up.add_argument("local_path", help="Local file path")
     up.add_argument("remote_path", help="Remote destination path")
 
     # Download
-    down = subparsers.add_parser("download", help="Copy file from LLNL")
+    down = subparsers.add_parser("download", help="Copy file from external HPC")
     down.add_argument("remote_path", help="Remote file path")
     down.add_argument("local_path", help="Local destination path")
 
