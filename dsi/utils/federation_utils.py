@@ -143,6 +143,24 @@ def remote_md5(remote: str, remote_path: str, timeout: int | None = None) -> str
     return result.stdout.split()[0]
 
 
+def local_md5(local_path: str, timeout: int | None = None) -> str:
+    """Computes the MD5 checksum of a file using hashlib.
+
+    Args:
+        local_path (str): The path to the file on the local filesystem
+        timeout (int | None): Optional timeout in seconds for the entire operation. Default is None (no timeout).
+
+    Returns:
+        str: The computed MD5 checksum as a hexadecimal string.
+    """
+    h = hashlib.md5()
+
+    with open(local_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+
+    return h.hexdigest()
+
 
 def should_download(remote:str, remote_path:str, stored_md5:str) -> bool:
     """Determines whether a remote file should be downloaded by comparing its MD5 checksum to a stored value.
@@ -156,12 +174,18 @@ def should_download(remote:str, remote_path:str, stored_md5:str) -> bool:
         bool: True if the file should be downloaded, False otherwise.
     """
     try:
-        remote_hash = remote_md5(remote, remote_path)
+        if remote != "":
+            returned_hash = remote_md5(remote, remote_path)
+        else:
+            returned_hash = local_md5(remote_path)
     except Exception as e:
-        print(f"Failed to get remote hash for {remote}:{remote_path}: {e}")
+        if remote != "":
+            print(f"Failed to get remote hash for {remote}:{remote_path}: {e}")
+        else:
+            print(f"Failed to get hash for {remote_path}: {e}")
         return False
 
-    return remote_hash != stored_md5
+    return returned_hash != stored_md5
 
 
 

@@ -4,6 +4,7 @@ import yaml
 import argparse
 from pathlib import Path
 import subprocess
+import shutil
 
 
 from dsi.utils.federation_utils import (
@@ -48,12 +49,13 @@ def confirm_large_download(filesize: int, download_limit: int) -> bool:
 
 
 
-def make_db_info(location_type:str, path:str, local_path:str, db_name:str) -> dict:
+def make_db_info(location_type:str, path:str, folder_hash:str, local_path:str, db_name:str) -> dict:
     """Creates a dictionary containing information about a database, including its original location type, original path, local path, and name.
     
     Args:
      location_type (str): The type of the original location (e.g., "github", "HPC", "URL", "local").
         path (str): The original path to the database.
+        folder_hash (str): The unique hash identifier for the folder that stores this database.
         local_path (str): The local path where the database is stored after downloading or copying.
         db_name (str): The name of the database.
 
@@ -64,6 +66,7 @@ def make_db_info(location_type:str, path:str, local_path:str, db_name:str) -> di
     return {
         "original_location_type": location_type,
         "original_path": path,
+        "folder_hash": folder_hash,
         "local_path": str(local_path),
         "name": db_name,
     }
@@ -88,7 +91,7 @@ def pull_data(location_type: str,
         username (str): username for hpc systems
         download_limit (int): The maximum size of a file that can be downloaded without confirmation.
     Returns:
-        tuple[dict, str]: A tuple of (data/db information | None, username). First element is None if there was an error or user skipped the download.
+        tuple[dict, str]: A tuple of (data/db information, username).
     """
 
     cleaned_location_type = location_type.strip().lower()
@@ -96,7 +99,7 @@ def pull_data(location_type: str,
 
     # Create folder for data
     abs_path_workspace_folder = str(Path(abs_path_workspace_folder).resolve()) 
-    _, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
+    folder_hash, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
 
     # Get the absolute path to the file to be downloaded
     file_path = Path(abs_path_db_folder) / filename
@@ -132,7 +135,7 @@ def pull_data(location_type: str,
         try:
             download_github_file(url=path, out_path=abs_path_db_folder)
 
-            db_info = make_db_info(location, path, file_path, filename)
+            db_info = make_db_info(location, path, folder_hash, file_path, filename)
             return db_info, username
             
         except Exception as e:
@@ -199,7 +202,7 @@ def pull_data(location_type: str,
         #         print(" -- Will proceed to download the file to ensure we have the correct version.")
         #     if not need_redownload:
         #         print(" -- Local file is up to date with the remote file. Skipping download.")
-        #         db_info = make_db_info(location, path, file_path, filename)
+        #         db_info = make_db_info(location, path, folder_hash, file_path, filename)
         #         return db_info, username
 
         # Confirm for sizes above a limit
@@ -216,7 +219,7 @@ def pull_data(location_type: str,
                 local_path=abs_path_db_folder
             )
 
-            db_info = make_db_info(location, path, file_path, filename)
+            db_info = make_db_info(location, path, folder_hash, file_path, filename)
             return db_info, username
 
         except KeyboardInterrupt:
@@ -287,7 +290,7 @@ def pull_data(location_type: str,
                 print(" -- Will proceed to download the file to ensure we have the correct version.")
             if not need_redownload:
                 print(" -- Local file is up to date with the remote file. Skipping download.")
-                db_info = make_db_info(location, path, file_path, filename)
+                db_info = make_db_info(location, path, folder_hash, file_path, filename)
                 return db_info, username
 
         # Confirm for sizes above a limit
@@ -303,7 +306,7 @@ def pull_data(location_type: str,
                 local_path=abs_path_db_folder
             )
 
-            db_info = make_db_info(location, path, file_path, filename)
+            db_info = make_db_info(location, path, folder_hash, file_path, filename)
             return db_info, username
 
         except KeyboardInterrupt:
@@ -332,7 +335,7 @@ def pull_data(location_type: str,
         try:
             download_web_file(url=path, output_dir=abs_path_db_folder)
 
-            db_info = make_db_info(location, path, file_path, filename)
+            db_info = make_db_info(location, path, folder_hash, file_path, filename)
             return db_info, username
 
         except Exception as e:
@@ -383,9 +386,7 @@ def pull_data(location_type: str,
                 )
                 if not need_redownload:
                     print(" -- Local file is up to date with the S3 object. Skipping download.")
-                    # TODO: if skipping since already downloaded, how to get that database's info
-                    # db_info = make_db_info(f"s3://{bucket}", f"s3://{bucket}/{key}", file_path, filename)
-                    return None, username
+                    return None, ""
             except Exception as e:
                 print(f" -- Failed to compare local file with S3 object s3://{bucket}/{key}: {e}")
                 print(" -- Will proceed to download the file to ensure we have the correct version.")
@@ -404,6 +405,7 @@ def pull_data(location_type: str,
             db_info = make_db_info(
                 f"s3://{bucket}",
                 f"s3://{bucket}/{key}",
+                folder_hash,
                 downloaded_path,
                 Path(downloaded_path).name,
             )
@@ -426,7 +428,31 @@ def pull_data(location_type: str,
 
 
         _abs_path = str(Path(path).resolve())
-        db_info = make_db_info(location, _abs_path, _abs_path, filename)
+
+        if md5_file_hash != "":
+
+            need_redownload = True
+            try:
+                need_redownload = should_download(remote="", remote_path=_abs_path, stored_md5=md5_file_hash)
+            except KeyboardInterrupt:
+                print(f" -- Interrupted while checking {_abs_path}. Skipping this database.")
+                return None, ""
+            except Exception as e:
+                print(f" -- Failed to get hash for {_abs_path}: {e}")
+                print(" -- Will proceed to download the file to ensure we have the correct version.")
+            if not need_redownload:
+                print(f" -- File in workspace is up to date with the file in {_abs_path}. Skipping download.")
+                db_info = make_db_info(location, _abs_path, folder_hash, file_path, filename)
+                return db_info, username
+        
+        try:
+            shutil.copy2(_abs_path, file_path)
+            print(f"Downloaded to {file_path}")
+        except Exception as e:
+            print(f" -- Error copying this file from local: {e}. Skipping this database.")
+            return None, ""
+
+        db_info = make_db_info(location, _abs_path, folder_hash, file_path, filename)
         return db_info, username
 
 
@@ -513,7 +539,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
 
         if db_info is not None:
             database_info.append(db_info)
-            combined = {k: db[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name"]}
+            combined = {k: db[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name", "folder_hash"]}
             combined["workspace_folder"] = abs_path_workspace_folder
             federation_dbs.append(combined)
             if actual_username != "":
