@@ -720,7 +720,8 @@ class Sync():
         workspace_folder = os.path.join(workspace_folder, db_data["folder_hash"])
         
         # Currently pulling all data referenced -- eventually allow user to download certain data
-        db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, workspace_folder, username)
+        db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
+                                      workspace_folder, username, internal_use=True)
         new_folder = Path(db_info.pop("new_db_folder"))
         if new_folder.is_dir() and not any(new_folder.iterdir()):
             new_folder.rmdir()

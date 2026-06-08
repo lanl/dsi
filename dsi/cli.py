@@ -584,7 +584,7 @@ class DSI_cli:
             print(f"\nPulling data from {source_type}:{source}:{path}")
             print(f"Download directory: {download_dir}\n")
             print(source_type, source, path, download_dir, username, download_limit)
-            db_info, _ = pull_data(
+            db_info = pull_data(
                 location_type=source_type,
                 location=source,
                 path=path,
