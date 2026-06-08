@@ -212,13 +212,17 @@ class JSON(FileReader):
 
     def add_rows(self) -> None:
         """Parses JSON data and stores data into a table as an Ordered Dictionary."""
+        SCALAR_TYPES = (str, int, float, bool, type(None))
 
         temp_dict = OrderedDict()
         for filename in self.filenames:
             with open(filename, 'r') as fh:
                 file_content = json.load(fh)
                 for key, val in file_content.items():
-                    if not isinstance(val, (str, float, int)):
+                    valid = (isinstance(val, SCALAR_TYPES) or 
+                             (isinstance(val, list) and all(isinstance(item, SCALAR_TYPES) for item in val)))
+                    
+                    if not valid:
                         raise TypeError("Generic JSON reader cannot handle nested data, only flat JSON values.")
                     if key not in temp_dict:
                         temp_dict[key] = []
