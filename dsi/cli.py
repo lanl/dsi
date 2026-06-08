@@ -167,8 +167,8 @@ class DSI_cli:
             'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
             'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
-            'pull_data' : ("<source_type> <source> <path>", 
-                          "Pulls data from a source to the current directory. Enter 'pull_data -h' to learn the inputs"),
+            #'pull_data' : ("<source_type> <source> <path>", 
+            #              "Pulls data from a source to the current directory. Enter 'pull_data -h' to learn the inputs"),
             'query' : ("<SQL query> [-n num_rows] [-e filename]",
                        "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
             'read' : ("<data source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
@@ -451,11 +451,11 @@ class DSI_cli:
         try:
             curr_tables = self.t.list(True)
         except Exception:
-            print("get_data ERROR: Need to call 'federate' to download databases before getting the associated data.")
+            print("get_data ERROR: Call 'federate' first to access data associated with a downloaded database.")
             return
         
         if "federation" not in curr_tables:
-            print("get_data ERROR: Need to call 'federate' to download databases before getting the associated data.")
+            print("get_data ERROR: Call 'federate' first to access data associated with a downloaded database.")
             return
         
         try:
