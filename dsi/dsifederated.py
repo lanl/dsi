@@ -103,7 +103,7 @@ class DSIFederated:
                 with open(config_file, 'r') as f:
                     data = f.read()
                 config_data = yaml.safe_load(data)
-            except yaml.YAMLError as e:
+            except yaml.YAMLError:
                 print(f"Invalid YAML file {config_file}. Please check the yaml file and try again.")
                 return
             
