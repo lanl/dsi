@@ -79,7 +79,7 @@ def pull_data(location_type: str,
               abs_path_workspace_folder: str, 
               username: str,
               download_limit: int = 10485760,
-              internal_use = False) -> tuple[dict | None, str]:
+              internal_use = False) -> dict | tuple[dict | None, str]:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -93,7 +93,7 @@ def pull_data(location_type: str,
         download_limit (int): The maximum size of a file that can be downloaded without confirmation.
         internal_use (bool): Determines if returned object is a dict or a tuple of (dict, username)
     Returns:
-        tuple[dict, str]: A tuple of (data/db information, username).
+        dict | tuple[dict, str]: A dict of data/db info or a tuple of (data/db information, username). Second case if internal_use = True
     """
 
     cleaned_location_type = location_type.strip().lower()
