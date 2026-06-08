@@ -683,7 +683,7 @@ class Sync():
                 print(f"\nMultiple local databases were found with the name `{db_name}`:")
                 for idx, row in db_data.iterrows():
                     print(f"{idx+1}) {row['local_db_path']}")
-                db_idx = input(f"\n -- Select which database's data to download (enter number): ")
+                db_idx = input("\n -- Select which database's data to download (enter number): ")
                 db_idx = int(db_idx)
                 if not (1 <= db_idx <= len(db_data)):
                     print(" -- ERROR: Invalid selection. Skipping data download.")

@@ -10,7 +10,6 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
-import yaml
 import subprocess
 import importlib.util
 import getpass
