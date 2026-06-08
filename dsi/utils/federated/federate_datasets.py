@@ -138,7 +138,7 @@ def pull_data(location_type: str,
             download_github_file(url=path, out_path=abs_path_db_folder)
 
             db_info = make_db_info(location, path, folder_hash, file_path, filename)
-            return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+            return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
             
         except Exception as e:
             print(f" -- Error downloading file from GitHub: {e}. Skipping this database.")
@@ -206,7 +206,7 @@ def pull_data(location_type: str,
         #     if not need_redownload:
         #         print(" -- Local file is up to date with the remote file. Skipping download.")
         #         db_info = make_db_info(location, path, folder_hash, file_path, filename)
-        #         return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+        #         return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
 
         # Confirm for sizes above a limit
         if not confirm_large_download(filesize, download_limit):
@@ -223,7 +223,7 @@ def pull_data(location_type: str,
             )
 
             db_info = make_db_info(location, path, folder_hash, file_path, filename)
-            return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+            return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
 
         except KeyboardInterrupt:
             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
@@ -295,7 +295,7 @@ def pull_data(location_type: str,
             if not need_redownload:
                 print(" -- Local file is up to date with the remote file. Skipping download.")
                 db_info = make_db_info(location, path, folder_hash, file_path, filename)
-                return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+                return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
 
         # Confirm for sizes above a limit
         if not confirm_large_download(filesize, download_limit):
@@ -311,7 +311,7 @@ def pull_data(location_type: str,
             )
 
             db_info = make_db_info(location, path, folder_hash, file_path, filename)
-            return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+            return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
 
         except KeyboardInterrupt:
             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
@@ -340,7 +340,7 @@ def pull_data(location_type: str,
             download_web_file(url=path, output_dir=abs_path_db_folder)
 
             db_info = make_db_info(location, path, folder_hash, file_path, filename)
-            return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+            return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
 
         except Exception as e:
             print(f" -- Error {e} downloading file at {path}. Skipping this database.")
@@ -413,7 +413,7 @@ def pull_data(location_type: str,
                 downloaded_path,
                 Path(downloaded_path).name,
             )
-            return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+            return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
         except Exception as e:
             print(f" -- Error downloading file from S3: {e}. Skipping this database.")
             return {"new_db_folder": abs_path_db_folder}, "" if internal_use else None
@@ -447,7 +447,7 @@ def pull_data(location_type: str,
             if not need_redownload:
                 print(f" -- File in workspace is up to date with the file in {_abs_path}. Skipping download.")
                 db_info = make_db_info(location, _abs_path, folder_hash, file_path, filename)
-                return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+                return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
         
         try:
             shutil.copy2(_abs_path, file_path)
@@ -457,7 +457,7 @@ def pull_data(location_type: str,
             return {"new_db_folder": abs_path_db_folder}, "" if internal_use else None
 
         db_info = make_db_info(location, _abs_path, folder_hash, file_path, filename)
-        return db_info | {"new_db_folder": abs_path_db_folder}, username if internal_use else db_info
+        return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
 
 
     else:
