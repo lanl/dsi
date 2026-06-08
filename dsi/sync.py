@@ -613,7 +613,7 @@ class Sync():
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
 
-    def get(self, config_file: str | None = None, workspace_folder: str | None = None):
+    def get(self, config_file: str, workspace_folder: str):
         '''
         Helper function that searches remote location-based input config file, and retrieves metadata that contains DSI databases
         '''
@@ -639,12 +639,7 @@ class Sync():
                             'conflict_resolution': 'keep_latest'}
             base_path = str(Path(config_file).parent)
         else:
-            config_data = {  
-                            'repo_paths': [], 
-                            'workspace_folder': workspace_folder, 
-                            'download_limit': 10485760, 
-                            'conflict_resolution': 'keep_latest'}
-            base_path = ""
+            raise ValueError("Config file must be a YAML or CSV file")
         
         # Create a folder for the databases if it doesn't exist, or use the provided one
         if not workspace_folder:
@@ -655,7 +650,7 @@ class Sync():
 
         if downloaded_dbs:
             df = pd.DataFrame(downloaded_dbs)
-            df = df[["location_type", "location", "name", "workspace_folder", "local_path", "submitter_name"]]
+            df = df[["location_type", "location", "name", "workspace_folder", "folder_hash", "local_path", "submitter_name"]]
             df = df.rename(columns={"name": "db_name", "local_path": "local_db_path"})
 
             # Create 'federation' table in db
@@ -720,6 +715,9 @@ class Sync():
 
         if not workspace_folder:
             workspace_folder = f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        
+        # add unique hash to download data
+        workspace_folder = os.path.join(workspace_folder, db_data["folder_hash"])
         
         # Currently pulling all data referenced -- eventually allow user to download certain data
         pull_data(db_data["location_type"], db_data["location"], remote_loc, workspace_folder, username)
