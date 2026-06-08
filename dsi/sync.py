@@ -669,8 +669,8 @@ class Sync():
 
     def get_data(self, db_name: str, workspace_folder: str | None = None):
         curr_tables = self.t.list(True)
-        if "federation" not in curr_tables:
-            raise ValueError("Must first download DSI databases using Sync.get()")
+        if "federation" not in curr_tables or self.t.get_table("federation").empty:
+            raise RuntimeError("Must first download DSI databases with the get() function")
         if " " in db_name:
             raise ValueError("Input db_name cannot have spaces")
         db_data = self.t.artifact_handler("query", query=f"SELECT * FROM federation WHERE db_name LIKE '%{db_name}%'")
@@ -689,10 +689,10 @@ class Sync():
                     print(" -- ERROR: Invalid selection. Skipping data download.")
                     return
             except (KeyboardInterrupt, EOFError):
-                print("\n -- Interrupted while entering database selection. Skipping data download.")
+                print("\n -- Interrupted while entering database selection. Skipping data download.\n")
                 return
             except ValueError:
-                print(f" -- ERROR: Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.")
+                print(f" -- ERROR: Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.\n")
                 return
             db_data = db_data.iloc[int(db_idx)-1]
         else:
@@ -720,7 +720,10 @@ class Sync():
         workspace_folder = os.path.join(workspace_folder, db_data["folder_hash"])
         
         # Currently pulling all data referenced -- eventually allow user to download certain data
-        pull_data(db_data["location_type"], db_data["location"], remote_loc, workspace_folder, username)
+        db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, workspace_folder, username)
+        new_folder = Path(db_info.pop("new_db_folder"))
+        if new_folder.is_dir() and not any(new_folder.iterdir()):
+            new_folder.rmdir()
 
 
     def gen_uuid(self, st):
