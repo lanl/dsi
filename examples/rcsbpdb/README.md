@@ -415,15 +415,15 @@ Perform a DOI lookup and retrieve the datasets, resources, and errors tables.
 
 ### 4.search.py
 
-Perform an author search and demonstrate searching within the loaded DSI tables.
+Perform an author search and preview the returned datasets.
 
 ### 5.filter_data.py
 
-Retrieve X-ray diffraction entries and perform simple filtering operations.
+Retrieve Solution NMR entries and summarize the returned datasets by count, experimental method, and resource count.
 
 ### 6.get_columns.py
 
-Read identifiers from an Excel spreadsheet, retrieve metadata, and display all associated resource paths.
+Read PDB IDs and DOIs from an Excel spreadsheet, retrieve metadata, and display all associated resource metadata and paths.
 
 ---
 
