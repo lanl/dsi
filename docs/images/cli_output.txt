@@ -9,7 +9,7 @@ my_user@local-machine examples % dsi
   \  \ \/ /     \  \  / / /       \__\  /
    \  \  /       \__\/ / /        /__/ / 
     \__\/          /__/ /         \__\/  
-                   \__\/                   v1.2.1
+                   \__\/                   v1.2.2
 
 Created a temporary Sqlite DSI backend
 
@@ -18,20 +18,31 @@ dsi> help
 
 display <table_name> [-n num_rows] [-e filename] Displays a table's data. Optionally limit 
                                                   displayed rows and export to CSV/Parquet
+
 draw [-f filename]                               Draws an ER diagram of all tables in the 
                                                   current DSI database
+
 exit                                             Exits the DSI Command Line Interface (CLI)
-federate <config file> [-w workspace_folder]     Collects data from sources defined in the 
-                                                  YAML config file, optionally saving it to 
-                                                  a workspace folder.
+federate <config file> [-w workspace_folder]     Collects databases from sources in a YAML
+                                                  file, or source in a CSV file, saving it to 
+                                                  an optional workspace folder.
+
 find <condition>                                 Finds all rows of a table that match a 
                                                   column-level condition.
-help                                             Shows this help message.
+
+get_data <database_name> [-w workspace_folder]   Collects referenced data in a DSI database,
+                                                  saving it to an optional workspace folder
+
+help                                             Shows this help message. For help with a
+                                                  command, enter <command name> -h
+
 list                                             Lists all tables in the current DSI database
 plot_table <table_name> [-f filename]            Plots numerical data from a table to an 
                                                   optional file name argument
+
 query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes). Optionally 
                                                   limit printed rows or export to CSV/Parquet
+
 read <data_source> [-t table_name]               Reads a file or URL into the DSI database. 
                                                   Optionally set table name.
 search <value>                                   Searches for a string or number across DSI.
@@ -39,10 +50,13 @@ summary [-t table_name]                          Summary of the database or a sp
 viewers                                          Prints the available viewers for the user.
 view <available viewer>                          Creates an instance of the DSI viewer in 
                                                   another application.
+
 write <filename>                                 Writes data in DSI database to a permanent 
                                                   location.
+
 ls                                               Lists all files in the current or specified 
                                                   directory.
+
 cd <path>                                        Changes the working directory within the CLI 
                                                   environment.
 
