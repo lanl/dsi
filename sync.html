@@ -1,0 +1,215 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sync &mdash; DSI 1.2.2 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=27bdb456" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=fd7cadf9"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="DSI Development Plans" href="development.html" />
+    <link rel="prev" title="Core" href="core.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DSI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Quick Start: Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="federation.html">Federation for DSI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">DSI Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="contributors.html">Contributor Resources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cr_intro.html">Contributor Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">DSI Readers/Writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_reader.html">Custom DSI Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_writer.html">Custom DSI Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backends.html">Backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="core.html">Core</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Sync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dsi.sync.Sync"><code class="docutils literal notranslate"><span class="pre">Sync</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.__init__"><code class="docutils literal notranslate"><span class="pre">Sync.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.change_group"><code class="docutils literal notranslate"><span class="pre">Sync.change_group()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.change_permissions"><code class="docutils literal notranslate"><span class="pre">Sync.change_permissions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.copy"><code class="docutils literal notranslate"><span class="pre">Sync.copy()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.dircrawl"><code class="docutils literal notranslate"><span class="pre">Sync.dircrawl()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.execute_cmd"><code class="docutils literal notranslate"><span class="pre">Sync.execute_cmd()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.gen_uuid"><code class="docutils literal notranslate"><span class="pre">Sync.gen_uuid()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.get"><code class="docutils literal notranslate"><span class="pre">Sync.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dsi.sync.Sync.index"><code class="docutils literal notranslate"><span class="pre">Sync.index()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="development.html">DSI Development Plans</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cr_examples.html">DSI Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DSI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="contributors.html">Contributor Resources</a></li>
+      <li class="breadcrumb-item active">Sync</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/sync.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sync">
+<span id="sync-page"></span><h1>Sync<a class="headerlink" href="#sync" title="Link to this heading"></a></h1>
+<p>The DSI Sync middleware defines the <cite>Sync</cite> concepts.
+An instantiated <cite>Sync</cite> supports data movement capabilities between local and remote locations and captures metadata documentation</p>
+<p>The purpose of <code class="docutils literal notranslate"><span class="pre">Sync</span></code> is to provide file metadata documentation and data movement capabilities when moving data to/from local and remote locations.
+The purpose of data documentation is to capture and archive metadata
+(i.e. location of local file structure, their access permissions, file sizes, and creation/access/modification dates),
+and track their movement to the remote location for future access.</p>
+<p>The functions, <code class="docutils literal notranslate"><span class="pre">index</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>, and <code class="docutils literal notranslate"><span class="pre">move</span></code> serve as mechanisms to index data for documentation, and copy/move data  by creating a DSI
+database using <code class="docutils literal notranslate"><span class="pre">Terminal</span></code>.
+The function <code class="docutils literal notranslate"><span class="pre">get</span></code> serves as a mechanism to retrieve data from remote locations by downloading an existing DSI database that contains the
+pointers to the target data.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dsi.sync.Sync">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">dsi.sync.</span></span><span class="sig-name descname"><span class="pre">Sync</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_index</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync" title="Link to this definition"></a></dt>
+<dd><p>A class defined to assist in data management activities for DSI</p>
+<p>Sync is where data movement functions such as copy (to remote location) and
+sync (local filesystem with remote) exist.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">project_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVerbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_index</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.change_group">
+<span class="sig-name descname"><span class="pre">change_group</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_group</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.change_group" title="Link to this definition"></a></dt>
+<dd><p>Change group permissions for data and db. Only works for OS with Unix (not Windows)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.change_permissions">
+<span class="sig-name descname"><span class="pre">change_permissions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_loc</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.change_permissions" title="Link to this definition"></a></dt>
+<dd><p>Change read permissions for data and db. Only works for OS with Unix (not Windows)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tool</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'copy'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.copy" title="Link to this definition"></a></dt>
+<dd><p>Helper function to perform the data copy over using a preferred API</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.dircrawl">
+<span class="sig-name descname"><span class="pre">dircrawl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.dircrawl" title="Link to this definition"></a></dt>
+<dd><p>Crawls the root ‘filepath’ directory and returns files</p>
+<p><cite>filepath</cite>: source filepath to be crawled</p>
+<p><cite>return</cite>: returns crawled file-list</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.execute_cmd">
+<span class="sig-name descname"><span class="pre">execute_cmd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmd_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.execute_cmd" title="Link to this definition"></a></dt>
+<dd><p>Internal helper for Sync to call executable actions</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.gen_uuid">
+<span class="sig-name descname"><span class="pre">gen_uuid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">st</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.gen_uuid" title="Link to this definition"></a></dt>
+<dd><p>Generates a unique file identifier using the os.stat data object as the input</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.get" title="Link to this definition"></a></dt>
+<dd><p>Helper function that searches remote location-based input config file, and retrieves metadata that contains DSI databases</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsi.sync.Sync.index">
+<span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote_loc</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dsi.sync.Sync.index" title="Link to this definition"></a></dt>
+<dd><p>Helper function to gather filesystem information, local and remote locations
+to create a filesystem entry in a new or existing database</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="core.html" class="btn btn-neutral float-left" title="Core" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="development.html" class="btn btn-neutral float-right" title="DSI Development Plans" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
