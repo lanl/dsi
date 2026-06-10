@@ -235,7 +235,7 @@ class RCSBPDB(Webserver):
 
         self.timeout = kwargs.get("timeout", 60)
         self.verify = kwargs.get("verify_ssl", kwargs.get("verify", True))
-        self.validate_resource_urls = kwargs.get("validate_resource_urls", False)
+        self.validate_resource_urls = kwargs.get("validate_resource_urls", True)
         self.retries = kwargs.get("retries", 3)
         self.validate_on_init = kwargs.get("validate_on_init", True)
         self.auto_load = kwargs.get("auto_load", True)
@@ -861,6 +861,9 @@ class RCSBPDB(Webserver):
             result.title = meta.get("struct", {}).get("title")
             result.record_id = pdb_id
 
+            if result.doi is None:
+                result.doi = f"10.2210/pdb{pdb_id.lower()}/pdb"
+
             result.raw_metadata = {
                 "entry": pdb_id,
                 "title": result.title,
@@ -868,6 +871,7 @@ class RCSBPDB(Webserver):
                 "keywords": meta.get("struct_keywords", {}),
                 "rcsb_accession_info": meta.get("rcsb_accession_info", {}),
                 "citation": meta.get("citation", []),
+                "primary_citation": meta.get("rcsb_primary_citation", {}),
                 "full_metadata": meta,
             }
 
@@ -927,9 +931,13 @@ class RCSBPDB(Webserver):
                 {
                     "dataset_id": res.record_id,
                     "source_repository": "RCSBPDB",
-                    "doi": res.doi,
+                    "doi": (
+                        res.doi
+                        or self._extract_doi(res.raw_metadata)
+                        or (f"10.2210/pdb{str(res.record_id).lower()}/pdb" if res.record_id else None)
+                    ),
                     "title": res.title,
-                    "description": res.title,
+                    "description": self._extract_description(res.raw_metadata),
                     "landing_page": res.landing_page_url,
                     "metadata_url": res.metadata_url,
                     "experimental_method": self._extract_experimental_method(res.raw_metadata),
@@ -1014,6 +1022,44 @@ class RCSBPDB(Webserver):
         accession_info = raw_metadata.get("rcsb_accession_info", {})
         return accession_info.get("revision_date") if isinstance(accession_info, dict) else None
 
+    @staticmethod
+    def _extract_doi(raw_metadata: Dict[str, Any]) -> Optional[str]:
+        full_metadata = raw_metadata.get("full_metadata", {})
+
+        citation = full_metadata.get("rcsb_primary_citation", {})
+        if isinstance(citation, dict):
+            doi = citation.get("pdbx_database_id_DOI")
+            if doi:
+                return doi
+
+        citations = raw_metadata.get("citation", [])
+        if isinstance(citations, list):
+            for item in citations:
+                if isinstance(item, dict):
+                    doi = item.get("pdbx_database_id_DOI")
+                    if doi:
+                        return doi
+
+        return None
+
+    @staticmethod
+    def _extract_description(raw_metadata: Dict[str, Any]) -> Optional[str]:
+        full_metadata = raw_metadata.get("full_metadata", {})
+
+        struct_keywords = full_metadata.get("struct_keywords", {})
+        if isinstance(struct_keywords, dict):
+            keywords = struct_keywords.get("pdbx_keywords")
+            text = struct_keywords.get("text")
+
+            if keywords and text:
+                return f"{keywords}: {text}"
+            if text:
+                return text
+            if keywords:
+                return keywords
+
+        return None
+
     # ------------------------------------------------------------------
     # Table helpers
     # ------------------------------------------------------------------
@@ -1023,6 +1069,9 @@ class RCSBPDB(Webserver):
 
         if dict_return:
             return table
+
+        if not table:
+            return pd.DataFrame(columns=self.get_schema(resolved))
 
         return pd.DataFrame(table)
 
@@ -1038,8 +1087,12 @@ class RCSBPDB(Webserver):
     def get_table_names(self) -> List[str]:
         return list(self.tables.keys())
 
-    def num_tables(self) -> int:
-        return len(self.tables) 
+    def num_tables(self):
+        table_count = len(self.tables)
+        if table_count != 1:
+            print(f"Database now has {table_count} tables")
+        else:
+            print(f"Database now has {table_count} table")
 
     def overwrite_table(self, table_name: str, rows: List[Dict[str, Any]]) -> None:
         resolved = self._resolve_table_name(table_name)
@@ -1231,51 +1284,81 @@ class RCSBPDB(Webserver):
         raise TypeError("find_relation() expects None, str, list, or dict.")
 
     def list(self, collection=False, **kwargs):
-        return self.get_table_names()
+        table_names = self.get_table_names()
+
+        if collection:
+            return table_names
+
+        for table_name in table_names:
+            df = self.get_table(table_name)
+            print(f"\nTable: {table_name}")
+            print(f"  - num of columns: {df.shape[1]}")
+            print(f"  - num of rows: {df.shape[0]}")
+        print()
 
     def display(self, table_name=None, **kwargs):
         if table_name is None:
             return self.tables
         return self.get_table(table_name)
 
-    def summary(self, table_name=None, **kwargs):
-        def _row_count(table):
-            if table is None:
-                return 0
+    def summary(self, table_name=None, *args, **kwargs):
+        """
+        Returns summary metadata for RCSBPDB tables.
 
-            if isinstance(table, pd.DataFrame):
-                return len(table)
+        If table_name is provided:
+            Returns a single DataFrame.
 
-            if not table:
-                return 0
+        If table_name is None:
+            Returns [table_names, df1, df2, ...]
+            which matches the format expected by DSI.
+        """
 
-            if isinstance(table, dict):
-                first_col = next(iter(table.values()), [])
-                return len(first_col)
+        def summarize_table(name):
+            resolved = self._resolve_table_name(name)
+            df = self.get_table(resolved)
 
-            return len(table)
-
-        if table_name is not None:
-            table = self.get_table(table_name)
-            return {
-                "backend": "rcsbpdb",
-                "table_name": self._resolve_table_name(table_name),
-                "row_count": _row_count(table),
-                "columns": self.get_schema(table_name),
-                "loaded": self._loaded,
+            summary_dict = {
+                "table_name": resolved,
+                "num_rows": df.shape[0],
+                "num_columns": df.shape[1],
+                "columns": list(df.columns),
             }
 
-        return {
-            "backend": "rcsbpdb",
-            "num_tables": self.num_tables(),
-            "tables": {
-                name: _row_count(table)
-                for name, table in self.tables.items()
-            },
-            "params": self.params,
-            "identifier_count": len(self.identifiers),
-            "loaded": self._loaded,
-        }
+            if resolved == "datasets":
+                summary_dict["tier"] = "Tier 1"
+                summary_dict["description"] = (
+                    "Dataset-level RCSBPDB metadata"
+                )
+
+            elif resolved == "resources":
+                summary_dict["tier"] = "Tier 2"
+                summary_dict["description"] = (
+                    "Resource-level file metadata and download paths"
+                )
+                summary_dict["foreign_key"] = "dataset_id"
+                summary_dict["references"] = "datasets.dataset_id"
+
+            elif resolved == "errors":
+                summary_dict["tier"] = "Errors"
+                summary_dict["description"] = (
+                    "Failed, skipped, or unresolved lookups"
+                )
+
+            return pd.DataFrame([summary_dict])
+
+        # Single-table summary
+        if table_name is not None:
+            return summarize_table(table_name)
+
+        # All-table summary
+        table_names = self.get_table_names()
+
+        summary_dfs = [
+            summarize_table(name)
+            for name in table_names
+        ]
+
+        return [table_names] + summary_dfs
 
     def close(self):
         """
