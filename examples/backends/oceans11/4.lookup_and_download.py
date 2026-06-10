@@ -31,7 +31,7 @@ dsi_db.process("sqlite", path + "firetec_search.db")
 
 dsi_db.close()
 
-### Now nagivate through the data to identify the T2 database. ###
+### Now navigate through the data to identify the T2 database. ###
 
 dsi_db = DSI(path+"firetec_search.db")
 df = dsi_db.query("SELECT t2db_path FROM records", collection=True)
