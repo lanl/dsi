@@ -93,15 +93,6 @@ class Gufi(Filesystem):
             dsi_column_names = ",".join(self.dsi_columns)
             gufi_column_names = ",".join((["rpath(sname, sroll, name) AS fullpath"] + self.gufi_columns[1:]
                                     if self.gufi_columns[0] == "fullpath" else self.gufi_columns))
-#            query=f"""
-#            CREATE VIRTUAL TABLE uview USING gufi_vt(
-#                threads=2, 
-#                E='SELECT rpath(sname, sroll, name), xattr_name, xattr_value FROM vrxpentries;',
-#                setup_res_col_type="ATTACH ':memory:' AS '{self.collection_name}'; CREATE TABLE {self.collection_name}.{self.dsi_table_name} ({dsi_column_names});",
-#                index='{self.gufi_index}',
-#                plugin='gufi_plugin_operations:/usr/projects/systems/gufi/lib/libdsi_querying.so'
-#            );"""
-
             query=f"""
             CREATE VIRTUAL TABLE uview USING gufi_vt(
                 threads=64,
@@ -111,7 +102,6 @@ class Gufi(Filesystem):
             );
             """
 
-            print("query: ", query)
             # example from SQLite wiki
             cur = con.execute(query)
             query=f"""
@@ -119,13 +109,16 @@ class Gufi(Filesystem):
                 {self.collection_name};
             """
             cur = con.execute(query)
-            print("query: ", query)
 
-            query = f"""
-                SELECT uview.*, {dsi_column_names} FROM uview JOIN ATLAS_UUID.zarr_metadata_uuid ON uview.uuid == ATLAS_UUID.zarr_metadata_uuid.uuid;
-            """
-            cur.execute(query)
+            if sqlstring is None or len(sqlstring) == 0:
+                query = f"""
+                    SELECT uview.*, {dsi_column_names} FROM uview JOIN ATLAS_UUID.zarr_metadata_uuid ON uview.uuid == ATLAS_UUID.zarr_metadata_uuid.uuid;
+                """
+            else:
+                query = sqlstring
+
             print("query: ", query)
+            cur.execute(query)
             rows = cur.fetchall()
             for row in rows:
                 print(row)

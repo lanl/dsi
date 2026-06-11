@@ -239,7 +239,7 @@ class Sync():
             print("DSI Index complete!\n")
 
     def gufi_query_index(self, gufi_prefix, gufi_index, db_path, dsi_table_name, dsi_columns, gufi_columns,
-                         collection_name, isVerbose=False):
+                         collection_name, custom_query=None, isVerbose=False):
         """
         Helper function to query GUFI for metadata and join on the dsi table by uuid
 
@@ -256,6 +256,8 @@ class Sync():
         `gufi_columns`: the GUFI columns that should be included in the join with DSI
 
         `collection_name`: the name that identifies the collection that the DSI database belongs to
+
+        `custom_query`: an sql string to query the dsi and gufi index
 
         """
         
@@ -300,7 +302,7 @@ class Sync():
         t.load_module('backend', 'Gufi', 'back-read', gufi_prefix=gufi_prefix, gufi_index=gufi_index, dsi_table_name=f"{dsi_table_name}", 
                       dsi_columns=dsi_columns, gufi_columns=gufi_columns, collection_name=collection_name,
                       dsi_db=f)
-        metadata = t.artifact_handler(interaction_type='query', query = 'select * from uview')
+        metadata = t.artifact_handler(interaction_type='query', query=custom_query)
         t.unload_module('backend', 'Gufi', 'back-read')
         t.close()
 
