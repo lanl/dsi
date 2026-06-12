@@ -148,15 +148,18 @@ class Oceans11(Webserver):
         """                
         try:
             from dsi.utils.federated.federate_datasets import pull_data
+            import os
+            from contextlib import redirect_stdout
 
-            info = pull_data(
-                location_type="url",
-                location=self.base_url,
-                path=self.base_url,
-                abs_path_workspace_folder=self.workspace,
-                host_username={},
-                download_limit = float("inf")
-            )
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                info = pull_data(
+                    location_type="url",
+                    location=self.base_url,
+                    path=self.base_url,
+                    abs_path_workspace_folder=self.workspace,
+                    username="",
+                )
 
             if info is None:
                 raise ConnectionError(f"Failed to download catalog from {self.base_url}")
@@ -383,8 +386,7 @@ class Oceans11(Webserver):
             location=full_url,
             path=full_url,
             abs_path_workspace_folder=self.workspace,
-            host_username={},
-            download_limit=float("inf")
+            host_username=""
         )
 
         if info is None or not info.get("local_path"):

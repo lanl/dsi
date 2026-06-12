@@ -219,7 +219,7 @@ class DSI():
             print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
         n = OSTI()
         if n.validate_connection():
-            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")
+            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
         n = Oceans11()
         if n.validate_connection():
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")

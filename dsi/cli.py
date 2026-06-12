@@ -10,7 +10,6 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
-import yaml
 import subprocess
 import importlib.util
 import getpass
@@ -22,23 +21,38 @@ from dsi.sync import Sync
 from ._version import __version__
 
 def autofill_path(text, state):
-    """ Completes file and directory paths for the current input """
+    """Completes CLI actions as first token, then file/directory paths."""
     line = readline.get_line_buffer()
-    parts = shlex.split(line[:readline.get_endidx()], posix=True)
+    endidx = readline.get_endidx()
 
-    if line and line[-1].isspace():
+    try:
+        parts = shlex.split(line[:endidx], posix=True)
+    except ValueError:
+        parts = line[:endidx].split()
+
+    if line[:endidx] and line[:endidx][-1].isspace():
         parts.append('')
 
     curr = parts[-1] if parts else ''
 
-    matches = glob.glob(os.path.expanduser(curr) + '*')
-    matches = [m + '/' if os.path.isdir(m) else m for m in matches]
-    matches = [m[m[:-1].rfind('/')+1:] if '/' in m[:-1] else m for m in matches]
+    if len(parts) <= 1:
+        matches = [a for a in COMMANDS.keys() if a.startswith(curr)]
+        matches += path_matches(curr)
+    else:
+        matches = path_matches(curr)
 
     try:
         return matches[state]
     except IndexError:
         return None
+
+
+def path_matches(curr):
+    matches = glob.glob(os.path.expanduser(curr) + "*")
+    matches = [m + "/" if os.path.isdir(m) else m for m in matches]
+    matches = [m[m[:-1].rfind("/") + 1:] if "/" in m[:-1] else m for m in matches]
+    return matches
+
 
 readline.set_completer(autofill_path)
 if "libedit" in readline.__doc__:
@@ -53,10 +67,12 @@ class DSI_cli:
     '''
     t = []
 
+
     def __init__(self):
         self.name = None
         self.start_dir = os.getcwd() + "/"
         return
+
 
     def viewers_check(self):
         '''
@@ -143,11 +159,15 @@ class DSI_cli:
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
             'federate' : ("<config file> [-w workspace_folder]", 
-                          "Collects data from sources defined in the YAML config file, optionally saving it to a workspace folder."),
+                          "Collects databases from sources in a YAML file, or source in a CSV file, saving it to an optional workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
-            'help': ("", "Shows this help message."),
+            'get_data' : ("<database_name> [-w workspace_folder]", 
+                          "Collects referenced data in a DSI database, saving it to an optional workspace folder"),
+            'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
             'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            #'pull_data' : ("<source_type> <source> <path>", 
+            #              "Pulls data from a source to the current directory. Enter 'pull_data -h' to learn the inputs"),
             'query' : ("<SQL query> [-n num_rows] [-e filename]",
                        "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
             'read' : ("<data source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
@@ -166,7 +186,9 @@ class DSI_cli:
         terminal_width = shutil.get_terminal_size().columns
         for key, val in commands.items():
             cmd = f'{key} {val[0]}'
-            print(textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50))
+            wrapped = textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50)
+            print(wrapped)
+            if '\n' in wrapped: print()
         print()
 
 
@@ -315,38 +337,38 @@ class DSI_cli:
 
 
     def federate(self, args):
-        '''
-        Federate data from multiple sources using a yaml config file
-        '''
+        """
+        Federate data from multiple sources using either:
+        - a YAML config file, or
+        - a CSV source file
+
+        Usage:
+        federate input.yaml [-w workspace_folder]
+        federate sources.csv [-w workspace_folder]
+        """
         config_file = args.config_file
 
         workspace_folder = None
         if args.workspace_folder is not None and args.workspace_folder != "":
             workspace_folder = args.workspace_folder
 
-        # Check if the config file exists and is a valid yaml file before trying to federate
-        if not os.path.exists(config_file):
-            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
-            return
-        else:
-            try:
-                with open(config_file, 'r') as f:
-                    data = f.read()
-                config_data = yaml.safe_load(data)
-            except yaml.YAMLError as e:
-                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again. Error {e}")
-                return
+        # small provision if no data in db:
+        if not self.t.valid_backend(self.t.loaded_backends[0]):
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
+                self.t.artifact_handler(interaction_type='ingest')
 
         try:
-            s = Sync()
-            if workspace_folder is None:
-                workspace_folder = config_data.get("workspace_folder", "dsi_data")
-            print(f"Synchronizing data from {config_file} into {workspace_folder}\n")
-            s.get(config_file, workspace_folder)
-        except Exception as e:
-            print(f"federate ERROR: {e}")
-            return
+            s = Sync(self.db_path)
+            s.user_wrapper = True
+            print(f"Synchronizing data from {config_file} into {workspace_folder}")
+            s.get(config_file=config_file, workspace_folder=workspace_folder)
 
+        except Exception as e:
+            print(f"federate ERROR: {str(e)}")
+            return
+        
 
     def find(self, args):
         '''
@@ -411,6 +433,38 @@ class DSI_cli:
         print()
 
 
+    def get_data_parser(self):
+        parser = argparse.ArgumentParser(prog='get_data')
+        parser.add_argument('database_name', help='Previously downloaded database whose data will be downloaded')
+        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded data')
+        return parser
+
+
+    def get_data(self, args):
+        db_name = args.database_name
+
+        workspace_folder = None
+        if args.workspace_folder is not None and args.workspace_folder != "":
+            workspace_folder = args.workspace_folder
+        
+        try:
+            curr_tables = self.t.list(True)
+        except Exception:
+            print("get_data ERROR: Call 'federate' first to access data associated with a downloaded database.")
+            return
+        
+        if "federation" not in curr_tables:
+            print("get_data ERROR: Call 'federate' first to access data associated with a downloaded database.")
+            return
+        
+        try:
+            s = Sync(self.db_path)
+            s.get_data(db_name, workspace_folder)
+        except Exception as e:
+            print(f"get_data ERROR: {e}")
+            return
+
+
     def list_tables(self, args):
         '''
         Lists the tables in the database
@@ -418,7 +472,10 @@ class DSI_cli:
         try:
             self.t.list()
         except Exception as e:
-            print(f"list ERROR: {e}")
+            if "needs to have data" in str(e).lower():
+                print("Currently 0 tables loaded")
+            else:
+                print(f"list ERROR: {e}")
 
 
     def ls(self, args):
@@ -474,6 +531,79 @@ class DSI_cli:
         error = self.export_table("dsi_tb_" + table_name, filename)
         if error != 1:
             print(f"Saved a plot of the {table_name} table in {filename}")
+        print()
+
+
+    def pull_data_parser(self):
+        parser = argparse.ArgumentParser(prog='pull_data')
+        parser.add_argument('source_type', help='Type of location data is stored in: GitHub, HPC, HPC-Kerberos, URL, S3, local')
+        parser.add_argument('source', help='user@hostname for HPC/HPC-Kerberos, bucket for S3, or descriptive name for others')
+        parser.add_argument('path', help='Absolute path or URL to data')
+        return parser
+
+
+    def pull_data(self, args):
+        """
+        Pull data using the pull_data function.
+        
+        Usage:
+        pull_data source_type source path
+        
+        source_type: github, HPC, URL, S3, or local
+        source: hostname for HPC, bucket for S3, or descriptive name for others
+        path: path to the file
+        """
+        source_type = args.source_type
+        source = args.source
+        path = args.path
+        username = ""
+        download_dir = os.getcwd()
+        
+        # Validate location_type
+        valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
+        if source_type.lower() not in valid_types:
+            print(f"pull_data ERROR: location_type must be one of {', '.join(valid_types)}")
+            return
+        
+        # validate source is correct for HPC
+        if source_type.lower() == "hpc":
+            if "@" not in source:
+                print("pull_data ERROR: source must be 'user@hostname' to access the HPC")
+                return
+            username, source = source.split("@")
+        
+        # Create download directory if it doesn't exist
+        os.makedirs(download_dir, exist_ok=True)
+        
+        try:
+            from dsi.utils.federated.federate_datasets import pull_data
+            
+            # Default download limit: 100 MB
+            download_limit = 100 * 1024 * 1024
+            
+            print(f"\nPulling data from {source_type}:{source}:{path}")
+            print(f"Download directory: {download_dir}\n")
+            print(source_type, source, path, download_dir, username, download_limit)
+            db_info = pull_data(
+                location_type=source_type,
+                location=source,
+                path=path,
+                abs_path_workspace_folder=download_dir,
+                username=username,
+                download_limit=download_limit
+            )
+            
+            if db_info:
+                print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
+            else:
+                print("\nFile was not downloaded (may already exist or was skipped)")
+        
+        except ImportError as e:
+            print(f"pull_data ERROR: Could not import pull_data function: {e}")
+            return
+        except Exception as e:
+            print(f"pull_data ERROR: {e}")
+            return
         print()
 
 
@@ -857,9 +987,11 @@ COMMANDS = {
     'exit': (None, cli.exit_cli),
     'federate' : (cli.get_federate_parser, cli.federate),
     'find' : (None, cli.find),
+    'get_data' : (cli.get_data_parser, cli.get_data),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
+    'pull_data' : (cli.pull_data_parser, cli.pull_data), # to delete
     'query' : (cli.get_query_parser, cli.query),
     'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
