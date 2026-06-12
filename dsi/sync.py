@@ -238,6 +238,75 @@ class Sync():
         if self.verbose:
             print("DSI Index complete!\n")
 
+    def gufi_query_index(self, gufi_prefix, gufi_index, db_path, dsi_table_name, dsi_columns, gufi_columns,
+                         collection_name, custom_query=None, isVerbose=False):
+        """
+        Helper function to query GUFI for metadata and join on the dsi table by uuid
+
+        `gufi_prefix`: the directory where GUFI is installed
+
+        `gufi_index`: the directory where GUFI indexes are
+
+        `db_path`: the full path of the dsi database
+
+        `dsi_table_name`: the DSI table name that has the UUID for each file as a column
+
+        `dsi_columns`: the DSI table columns that should be included in the join with GUFI
+
+        `gufi_columns`: the GUFI columns that should be included in the join with DSI
+
+        `collection_name`: the name that identifies the collection that the DSI database belongs to
+
+        `custom_query`: an sql string to query the dsi and gufi index
+
+        """
+        
+        if isVerbose:
+            print(f"dsi table name {dsi_table_name}")
+
+        # Try to open existing local database to store filesystem info before copy
+        # Open and validate local DSI data store
+        t = Terminal()
+
+        f = db_path
+        try:
+            if isVerbose:
+                print("trying db: ", f)
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception:
+            print(f"Database {f} not found")
+            raise
+
+        got_uuid = False
+        try:
+            rows = t.artifact_handler(interaction_type='query', query = f"select uuid from {dsi_table_name};")
+            if len(rows.columns) == 0:
+                print(f"uuid column not found in {dsi_table_name}")
+            else:
+                got_uuid = True
+        except Exception:
+            print(f"uuid column not found in {dsi_table_name}")
+
+        if not got_uuid:
+            return None
+
+        rows = t.artifact_handler(interaction_type='query', query=f"select * from {dsi_table_name};", dict_return=True)
+        t.unload_module('backend', 'Sqlite', 'back-read')
+
+        # GUFI Query
+#        with redirect_stdout(fnull):
+        t.load_module('backend', 'Gufi', 'back-read', gufi_prefix=gufi_prefix, gufi_index=gufi_index, dsi_table_name=f"{dsi_table_name}", 
+                      dsi_columns=dsi_columns, gufi_columns=gufi_columns, collection_name=collection_name,
+                      dsi_db=f)
+        metadata = t.artifact_handler(interaction_type='query', query=custom_query)
+        t.unload_module('backend', 'Gufi', 'back-read')
+        t.close()
+
+        return metadata
 
     def execute_cmd(self, cmd, cmd_name, timer = False):
         """Internal helper for Sync to call executable actions"""

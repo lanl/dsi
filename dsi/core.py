@@ -272,6 +272,7 @@ class Terminal():
                                     raise ValueError("runTable flag is only valid for in-situ workflows, not for populated backends without a runTable.")
                                 
                             class_.runTable = self.runTable
+
                         class_object = class_(**kwargs)
                         self.active_modules[mod_function].append(class_object)
                         if mod_type == "backend":
@@ -1385,6 +1386,8 @@ class Terminal():
         parent_name = backend.__class__.__bases__[0].__name__
         if parent_name == "Filesystem":
             if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
+                return True
+            if backend.__class__.__name__ == "Gufi":
                 return True
             if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
                 return True
