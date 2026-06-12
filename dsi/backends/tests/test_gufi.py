@@ -15,6 +15,6 @@ def test_artifact_query():
 
     from dsi.sync import Sync
     s = Sync()
-    s.gufi_query_index(gufi_prefix, gufi_index_path, db_path, dsi_table_name, dsi_columns,
+    rows = s.gufi_query_index(gufi_prefix, gufi_index_path, db_path, dsi_table_name, dsi_columns,
                        gufi_columns, collection_name, custom_query, isVerbose=True)
     assert len(rows) > 0
