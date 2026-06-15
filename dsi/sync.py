@@ -778,7 +778,7 @@ class Sync():
             raise ValueError(f"Cannot download data from '{db_name}' because it has not been indexed by DSI.")
         remote_loc = t2.get_table("federated")["remote_location"].iloc[0]
 
-        with open(f"{db_data["workspace_folder"]}/host_usernames.json", "r", encoding="utf-8") as f:
+        with open(f'{db_data["workspace_folder"]}/host_usernames.json', "r", encoding="utf-8") as f:
             host_username = yaml.safe_load(f)
         username = (host_username or {}).get(db_data['location'], "")
 
