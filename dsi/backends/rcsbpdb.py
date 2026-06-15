@@ -77,7 +77,6 @@ from urllib3.util.retry import Retry
 
 from dsi.backends.webserver import Webserver
 
-
 class ValueObject:
     """Container used by find/find_table/find_column/find_cell."""
 
@@ -161,7 +160,6 @@ class RCSBPDB(Webserver):
 
     DATASET_SCHEMA = [
         "dataset_id",
-        "source_repository",
         "doi",
         "title",
         "description",
@@ -171,9 +169,6 @@ class RCSBPDB(Webserver):
         "release_date",
         "revision_date",
         "resource_count",
-        "usability_label",
-        "api_status",
-        "query_source",
         "raw_metadata",
         "notes",
     ]
@@ -181,7 +176,6 @@ class RCSBPDB(Webserver):
     RESOURCE_SCHEMA = [
         "resource_id",
         "dataset_id",
-        "source_repository",
         "name",
         "download_url",
         "format",
@@ -197,7 +191,6 @@ class RCSBPDB(Webserver):
         "status",
         "endpoint_used",
         "endpoint_variables",
-        "query_source",
         "notes",
     ]
 
@@ -919,7 +912,6 @@ class RCSBPDB(Webserver):
                         "status": res.status,
                         "endpoint_used": res.endpoint_used,
                         "endpoint_variables": res.endpoint_variables,
-                        "query_source": res.query_source,
                         "notes": " | ".join(res.notes) if res.notes else None,
                     }
                 )
@@ -930,7 +922,6 @@ class RCSBPDB(Webserver):
             datasets.append(
                 {
                     "dataset_id": res.record_id,
-                    "source_repository": "RCSBPDB",
                     "doi": (
                         res.doi
                         or self._extract_doi(res.raw_metadata)
@@ -944,9 +935,6 @@ class RCSBPDB(Webserver):
                     "release_date": self._extract_release_date(res.raw_metadata),
                     "revision_date": self._extract_revision_date(res.raw_metadata),
                     "resource_count": len(res.files),
-                    "usability_label": self.classify_usability(file_exts),
-                    "api_status": res.status,
-                    "query_source": res.query_source,
                     "raw_metadata": res.raw_metadata,
                     "notes": " | ".join(res.notes) if res.notes else None,
                 }
@@ -957,7 +945,6 @@ class RCSBPDB(Webserver):
                     {
                         "resource_id": f"{res.record_id}:{idx}",
                         "dataset_id": res.record_id,
-                        "source_repository": "RCSBPDB",
                         "name": file_obj.label,
                         "download_url": file_obj.url,
                         "format": file_obj.extension,
@@ -1075,6 +1062,61 @@ class RCSBPDB(Webserver):
 
         return pd.DataFrame(table)
 
+    def _parse_find_query(self, query: str):
+        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
+
+        for op in operators:
+            pattern = rf"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*{re.escape(op)}\s*(.+?)\s*$"
+            match = re.match(pattern, query)
+
+            if match:
+                column_name = match.group(1)
+                value = match.group(2).strip().strip("'").strip('"')
+                return column_name, op, value
+
+        return None
+
+
+    def _evaluate_find_condition(self, series, op: str, target_value: str):
+        if op in {"~", "~~"}:
+            return series.fillna("").astype(str).str.contains(
+                str(target_value),
+                case=False,
+                na=False,
+            )
+
+        numeric_series = pd.to_numeric(series, errors="coerce")
+        numeric_target = pd.to_numeric(pd.Series([target_value]), errors="coerce").iloc[0]
+
+        use_numeric = pd.notna(numeric_target) and numeric_series.notna().any()
+
+        if use_numeric and op in {">", "<", ">=", "<=", "=", "==", "!="}:
+            comparisons = {
+                ">": numeric_series > numeric_target,
+                "<": numeric_series < numeric_target,
+                ">=": numeric_series >= numeric_target,
+                "<=": numeric_series <= numeric_target,
+                "=": numeric_series == numeric_target,
+                "==": numeric_series == numeric_target,
+                "!=": numeric_series != numeric_target,
+            }
+            return comparisons[op].fillna(False)
+
+        string_series = series.fillna("").astype(str)
+        target = str(target_value)
+
+        if op in {"=", "=="}:
+            return string_series.str.lower() == target.lower()
+
+        if op == "!=":
+            return string_series.str.lower() != target.lower()
+
+        print(
+            f"find() operator '{op}' is not valid for non-numeric values "
+            f"in this query."
+        )
+        return pd.Series([False] * len(series), index=series.index)
+
     def get_tables(self):
         return self.tables
 
@@ -1089,10 +1131,13 @@ class RCSBPDB(Webserver):
 
     def num_tables(self):
         table_count = len(self.tables)
+
         if table_count != 1:
             print(f"Database now has {table_count} tables")
         else:
             print(f"Database now has {table_count} table")
+
+        return table_count
 
     def overwrite_table(self, table_name: str, rows: List[Dict[str, Any]]) -> None:
         resolved = self._resolve_table_name(table_name)
@@ -1160,11 +1205,23 @@ class RCSBPDB(Webserver):
     # ------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         raise NotImplementedError("rcsbpdb backend is read-only.")
+    
+    def write(self, *args, **kwargs):
+        raise NotImplementedError("rcsbpdb backend is read-only.")
+
+    def update(self, *args, **kwargs):
+        raise NotImplementedError("rcsbpdb backend is read-only.")
 
     def query_artifacts(self, query, **kwargs):
         raise NotImplementedError(
-            "query_artifacts() is not implemented for RCSBPDB because it is not an SQL backend. "
-            "Use find_relation() for RCSBPDB API-backed lookup/search behavior."
+            "query() is not implemented for RCSBPDB because it is not a SQL backend."
+        )
+
+    def query(self, statement, collection=False, update=False, **kwargs):
+        raise NotImplementedError(
+            "query() is not implemented for RCSBPDB because it is not a SQL backend. "
+            "Use get_table(), display(), find(), search(), summary(), or process() "
+            "to convert the data into a SQL backend first."
         )
 
     def notebook(self, **kwargs):
@@ -1189,26 +1246,56 @@ class RCSBPDB(Webserver):
         return self.tables
 
     def find(self, query_object, **kwargs):
-        needle = str(query_object).lower()
+        """
+        Find rows across loaded tables using a simple column-level condition.
+
+        Supported examples:
+        - resource_count > 8
+        - experimental_method = SOLUTION NMR
+        - format = pdb.gz
+        - title ~ genomics
+        """
+        query = str(query_object).strip()
+
+        if not query:
+            print("find() requires a non-empty query string.")
+            return []
+
+        parsed = self._parse_find_query(query)
+
+        if parsed is None:
+            print(
+                "find() could not parse the query. Use format: "
+                "'column operator value', for example 'resource_count > 8' "
+                "or 'format = pdb.gz'."
+            )
+            return []
+
+        column_name, op, target_value = parsed
         matches: List[ValueObject] = []
 
-        for table_name, table in self.tables.items():
-            if not table:
+        for table_name in self.get_table_names():
+            df = self.get_table(table_name)
+
+            if df.empty or column_name not in df.columns:
                 continue
 
-            columns = list(table.keys())
-            rows = zip(*table.values())
+            mask = self._evaluate_find_condition(df[column_name], op, target_value)
 
-            for row_num, row in enumerate(rows):
-                for col_name, value in zip(columns, row):
-                    if needle in str(value).lower():
-                        vo = ValueObject()
-                        vo.t_name = table_name
-                        vo.c_name = [col_name]
-                        vo.row_num = row_num
-                        vo.value = value
-                        vo.type = "cell"
-                        matches.append(vo)
+            for row_num in df[mask].index:
+                vo = ValueObject()
+                vo.t_name = table_name
+                vo.c_name = list(df.columns)
+                row_dict = df.loc[row_num].to_dict()
+                row_dict.pop("raw_metadata", None)
+
+                vo.c_name = list(row_dict.keys())
+                vo.value = row_dict
+                vo.type = "row"
+                matches.append(vo)
+
+        if not matches:
+            print(f"No matches found for query: {query}")
 
         return matches
 
@@ -1246,10 +1333,40 @@ class RCSBPDB(Webserver):
         return self.find(query_object, **kwargs)
 
     def find_relation(self, query, relation=None, **kwargs):
+        """
+        Supports DSI find-style calls and RCSBPDB API-backed lookup/search.
+
+        DSI wrapper may call this as:
+            find_relation("resource_count", "> 8")
+
+        Direct backend use may call:
+            find_relation("resource_count > 8")
+            find_relation({"keywords": "genomics", "limit": 5})
+            find_relation("1CBS")
+        """
         if query is None:
             return self.tables
 
         try:
+            # DSI wrapper path: dsi.find("resource_count > 8")
+            # may arrive here as query="resource_count", relation="> 8"
+            if relation is not None:
+                condition = f"{query} {relation}".strip()
+
+                if self._parse_find_query(condition) is not None:
+                    return self.find(condition)
+
+                print(
+                    "find_relation() could not parse the condition. "
+                    "Use format like 'resource_count > 8' or 'format = pdb.gz'."
+                )
+                return []
+
+            # Direct condition string path
+            if isinstance(query, str) and self._parse_find_query(query) is not None:
+                return self.find(query)
+
+            # API-backed query path
             if isinstance(query, dict):
                 self.params = query
                 self._load_from_params(query)
@@ -1282,7 +1399,7 @@ class RCSBPDB(Webserver):
             raise
 
         raise TypeError("find_relation() expects None, str, list, or dict.")
-
+    
     def list(self, collection=False, **kwargs):
         table_names = self.get_table_names()
 
@@ -1296,69 +1413,155 @@ class RCSBPDB(Webserver):
             print(f"  - num of rows: {df.shape[0]}")
         print()
 
-    def display(self, table_name=None, **kwargs):
+    def display(self, table_name=None, num_rows=25, display_cols=None, **kwargs):
+        """
+        Print data from a table.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the table to display.
+        num_rows : int, optional
+            Number of rows to print.
+        display_cols : list[str], optional
+            Specific columns to display.
+        """
         if table_name is None:
-            return self.tables
-        return self.get_table(table_name)
+            print(
+                "display() requires a table_name. "
+                f"Available tables: {self.get_table_names()}"
+            )
+            return None
+
+        resolved = self._resolve_table_name(table_name)
+
+        if resolved not in self.schemas:
+            print(
+                f"display() could not find table '{table_name}'. "
+                f"Available tables: {self.get_table_names()}"
+            )
+            return None
+
+        df = self.get_table(resolved)
+
+        if df.empty:
+            print(f"Table '{resolved}' is empty.")
+            return None
+
+        if display_cols is not None:
+            missing_cols = [col for col in display_cols if col not in df.columns]
+
+            if missing_cols:
+                print(
+                    f"display() could not find column(s) {missing_cols} "
+                    f"in table '{resolved}'. Available columns: {list(df.columns)}"
+                )
+                return None
+
+            df = df[display_cols]
+
+        print(df.head(num_rows).to_string(index=False))
+        return None
 
     def summary(self, table_name=None, *args, **kwargs):
-        """
-        Returns summary metadata for RCSBPDB tables.
+        def is_complex_value(value):
+            return isinstance(value, (dict, list, tuple, set))
 
-        If table_name is provided:
-            Returns a single DataFrame.
-
-        If table_name is None:
-            Returns [table_names, df1, df2, ...]
-            which matches the format expected by DSI.
-        """
-
-        def summarize_table(name):
-            resolved = self._resolve_table_name(name)
-            df = self.get_table(resolved)
-
-            summary_dict = {
-                "table_name": resolved,
-                "num_rows": df.shape[0],
-                "num_columns": df.shape[1],
-                "columns": list(df.columns),
+        def is_url_or_metadata_column(column):
+            return column in {
+                "raw_metadata",
+                "landing_page",
+                "metadata_url",
+                "download_url",
+                "endpoint_variables",
             }
 
-            if resolved == "datasets":
-                summary_dict["tier"] = "Tier 1"
-                summary_dict["description"] = (
-                    "Dataset-level RCSBPDB metadata"
+        def is_long_text_series(series):
+            non_null = series.dropna()
+
+            if non_null.empty:
+                return False
+
+            string_series = non_null.astype(str)
+            return string_series.str.len().max() > 80
+
+        def summarize_dataframe(df):
+            rows = []
+
+            for column in df.columns:
+                original_series = df[column]
+                non_null = original_series.dropna()
+
+                has_complex_values = (
+                    non_null.apply(is_complex_value).any()
+                    if not non_null.empty
+                    else False
                 )
 
-            elif resolved == "resources":
-                summary_dict["tier"] = "Tier 2"
-                summary_dict["description"] = (
-                    "Resource-level file metadata and download paths"
-                )
-                summary_dict["foreign_key"] = "dataset_id"
-                summary_dict["references"] = "datasets.dataset_id"
+                safe_series = non_null.astype(str) if has_complex_values else non_null
 
-            elif resolved == "errors":
-                summary_dict["tier"] = "Errors"
-                summary_dict["description"] = (
-                    "Failed, skipped, or unresolved lookups"
-                )
+                dtype = str(original_series.dtype).upper()
+                unique = int(safe_series.nunique()) if not safe_series.empty else 0
 
-            return pd.DataFrame([summary_dict])
+                row = {
+                    "column": column,
+                    "type": dtype,
+                    "unique": unique,
+                    "min": None,
+                    "max": None,
+                    "avg": None,
+                    "std_dev": None,
+                }
 
-        # Single-table summary
+                numeric_series = pd.to_numeric(non_null, errors="coerce").dropna()
+
+                if not non_null.empty and len(numeric_series) == len(non_null):
+                    row["min"] = numeric_series.min()
+                    row["max"] = numeric_series.max()
+                    row["avg"] = numeric_series.mean()
+                    row["std_dev"] = numeric_series.std()
+
+                elif (
+                    not non_null.empty
+                    and not has_complex_values
+                    and not is_url_or_metadata_column(column)
+                    and not is_long_text_series(non_null)
+                ):
+                    try:
+                        row["min"] = non_null.min()
+                        row["max"] = non_null.max()
+                    except TypeError:
+                        row["min"] = None
+                        row["max"] = None
+
+                rows.append(row)
+
+            return pd.DataFrame(
+                rows,
+                columns=[
+                    "column",
+                    "type",
+                    "unique",
+                    "min",
+                    "max",
+                    "avg",
+                    "std_dev",
+                ],
+            )
+
         if table_name is not None:
-            return summarize_table(table_name)
+            resolved = self._resolve_table_name(table_name)
+            df = self.get_table(resolved)
+            return summarize_dataframe(df)
 
-        # All-table summary
         table_names = self.get_table_names()
+        summary_tables = []
 
-        summary_dfs = [
-            summarize_table(name)
-            for name in table_names
-        ]
+        for name in table_names:
+            df = self.get_table(name)
+            summary_tables.append(summarize_dataframe(df))
 
-        return [table_names] + summary_dfs
+        return [table_names] + summary_tables
 
     def close(self):
         """

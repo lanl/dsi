@@ -58,7 +58,16 @@ def main():
     existing_dataset_columns = [
         col for col in dataset_columns if col in datasets_df.columns
     ]
-    print(datasets_df[existing_dataset_columns])
+
+    with pd.option_context(
+        "display.max_columns",
+        None,
+        "display.width",
+        None,
+        "display.max_colwidth",
+        None,
+    ):
+        print(datasets_df[existing_dataset_columns])
 
     print("\nAssociated resource metadata and paths:")
     resource_columns = [
@@ -72,7 +81,16 @@ def main():
     existing_resource_columns = [
         col for col in resource_columns if col in resources_df.columns
     ]
-    print(resources_df[existing_resource_columns])
+
+    with pd.option_context(
+        "display.max_columns",
+        None,
+        "display.width",
+        None,
+        "display.max_colwidth",
+        None,
+    ):
+        print(resources_df[existing_resource_columns])
 
     print("\nResource counts by dataset:")
     if not resources_df.empty and "dataset_id" in resources_df.columns:
@@ -82,7 +100,15 @@ def main():
 
     if not errors_df.empty:
         print("\nErrors or skipped identifiers:")
-        print(errors_df)
+        with pd.option_context(
+            "display.max_columns",
+            None,
+            "display.width",
+            None,
+            "display.max_colwidth",
+            None,
+        ):
+            print(errors_df)
 
     print("\nFull metadata location:")
     print("The curated fields are stored as columns in the datasets and resources tables.")

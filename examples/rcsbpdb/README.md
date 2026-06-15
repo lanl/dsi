@@ -403,27 +403,46 @@ The following example scripts demonstrate common workflows.
 
 ### 1.load_basic.py
 
-Initialize the backend using a keyword search and preview the datasets table.
+Initialize the RCSBPDB backend using a keyword search and demonstrate the core DSI inspection utilities:
+
+- `dsi.list()`
+- `dsi.summary()`
+
+This example provides a quick overview of the available tables and their contents.
 
 ### 2.list_tables.py
 
-Perform a PDB ID lookup and display table summaries.
+Retrieve the curated DSI tables using `get_table()` and display them as Pandas DataFrames.
 
-### 3.get_table.py
+This example demonstrates:
 
-Perform a DOI lookup and retrieve the datasets, resources, and errors tables.
+- Accessing the `datasets` table
+- Accessing the `resources` table
+- Accessing the `errors` table
+- Viewing selected metadata fields in a tabular format
 
-### 4.search.py
+### 3.filter_data.py
 
-Perform an author search and preview the returned datasets.
+Filter the Tier 2 `resources` table by file format and use the associated `download_url` values to download matching files.
 
-### 5.filter_data.py
+This example demonstrates:
 
-Retrieve Solution NMR entries and summarize the returned datasets by count, experimental method, and resource count.
+- Resource-level filtering
+- Accessing downloadable file metadata
+- Using `download_url` paths
+- Downloading selected resources to a local directory
 
-### 6.get_columns.py
+### 4.get_columns.py
 
-Read PDB IDs and DOIs from an Excel spreadsheet, retrieve metadata, and display all associated resource metadata and paths.
+Read PDB IDs and DOIs from an Excel spreadsheet, retrieve metadata, and display all associated dataset and resource information.
+
+This example demonstrates:
+
+- Excel-driven identifier input
+- PDB ID and DOI resolution
+- Dataset metadata retrieval
+- Resource metadata and download path retrieval
+- Resource count summaries by dataset
 
 ---
 
