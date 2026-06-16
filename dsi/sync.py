@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterator
 from contextlib import redirect_stdout
 from collections import OrderedDict
+from urllib.parse import urlparse
 
 from dsi.core import Terminal
 from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
@@ -787,13 +788,31 @@ class Sync():
         
         # add unique hash to download data
         workspace_folder = os.path.join(workspace_folder, db_data["folder_hash"])
-        
-        # Currently pulling all data referenced -- eventually allow user to download certain data
-        db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
-                                      workspace_folder, username, internal_use=True)
-        new_folder = Path(db_info.pop("new_db_folder"))
-        if new_folder.is_dir() and not any(new_folder.iterdir()):
-            new_folder.rmdir()
+
+        # if data files are URLs, then download them from filesystem, not using federated
+        def is_url(s):
+            try:
+                result = urlparse(s)
+                return all([result.scheme, result.netloc])
+            except Exception:
+                return False
+
+        if is_url(remote_loc):
+            remote_files = t2.get_table("filesystem")["file_remote"]
+            for remote_url in remote_files:
+                # Downloading each file from fileystem
+                db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_url, 
+                                            workspace_folder, username, internal_use=True)
+                new_folder = Path(db_info.pop("new_db_folder"))
+                if new_folder.is_dir() and not any(new_folder.iterdir()):
+                    new_folder.rmdir()
+        else:        
+            # Currently pulling all referenced data -- eventually allow user to download certain data
+            db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
+                                        workspace_folder, username, internal_use=True)
+            new_folder = Path(db_info.pop("new_db_folder"))
+            if new_folder.is_dir() and not any(new_folder.iterdir()):
+                new_folder.rmdir()
 
 
     def gen_uuid(self, st):
