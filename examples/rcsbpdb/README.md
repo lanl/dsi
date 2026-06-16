@@ -179,6 +179,7 @@ print(
 The `resources` table contains downloadable file metadata and paths associated with each structure.
 
 Each row corresponds to a single downloadable resource.
+
 Resource rows contain metadata and download paths. The backend does not download files automatically during metadata retrieval. It follows a search-then-retrieval workflow.
 
 Typical columns include:
@@ -390,6 +391,8 @@ This example demonstrates:
 
 - Excel-driven identifier input
 - PDB ID and DOI resolution
+- DSI `find()`
+- DSI `display()`
 - Dataset metadata retrieval
 - Resource metadata and download path retrieval
 - Resource count summaries by dataset
