@@ -557,6 +557,7 @@ class NDP(Webserver):
                 resource_map[dataset_title].append({
                     "resource_id": r.get("id"),
                     "resource_name": r.get("name"),
+                    "issue_date": r.get("issueDate"),
                     "format": r.get("format"),
                     "size": r.get("size"),
                     "url": r.get("url"),
@@ -564,6 +565,7 @@ class NDP(Webserver):
                     "dataset_title": dataset_title,
                     "raw_dataset": r
                 })
+            #print(r)
 
         return dataset_rows, resource_map, id_map
 

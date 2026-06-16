@@ -8,7 +8,7 @@ def main(verbose=False):
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "climate energy", "limit": 10}
+        params={"keywords": "climate energy", "limit": 20}
     )
     
     if verbose:
