@@ -57,44 +57,46 @@ class OSTI(Webserver):
         """
         Initialize backend and optionally load data from REST API.
 
-        Parameters
-        ----------
         `url` : str, optional
             Base OSTI URL. If None, a default OSTI endpoint is used.
+
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from OSTI.
+
             Supported keys:
-                "q",
-                "osti_id",
-                "doi",
-                "fulltext",
-                "biblio",
-                "author",
-                "title",
-                "identifier",
-                "sponsor_org",
-                "research_org",
-                "contributing_org",
-                "source_id",
-                "publication_date_start",
-                "publication_date_end",
-                "entry_date_start",
-                "entry_date_end",
-                "language",
-                "country",
-                "site_ownership_code",
-                "subject",
-                "has_fulltext",
-                "sort",
-                "order",
-                "rows",
-                "page",
+                - "q",
+                - "osti_id",
+                - "doi",
+                - "fulltext",
+                - "biblio",
+                - "author",
+                - "title",
+                - "identifier",
+                - "sponsor_org",
+                - "research_org",
+                - "contributing_org",
+                - "source_id",
+                - "publication_date_start",
+                - "publication_date_end",
+                - "entry_date_start",
+                - "entry_date_end",
+                - "language",
+                - "country",
+                - "site_ownership_code",
+                - "subject",
+                - "has_fulltext",
+                - "sort",
+                - "order",
+                - "rows",
+                - "page",
+        
         `**kwargs` : dict
-            Additional keyword arguments:
-                - api_key : str, optional
-                    API key for authentication
-                - verify_ssl : bool, optional
-                    Toggle SSL verification (default False)
+            Additional keyword arguments.
+
+            - api_key : str, optional
+                API key for authentication
+            - verify_ssl : bool, optional
+                Toggle SSL verification (default False)
         """        
 
         DEFAULT_URL = "https://www.osti.gov/api/v1"
@@ -147,15 +149,14 @@ class OSTI(Webserver):
         """
         Validates that the base OSTI URL is accessible and functional.
         
-        This method tests the connection by making a simple API call to verify:
-            - The URL is reachable
-            - The API responds with valid JSON
-            - The response format is as expected (list of records)
+        Tests the connection by making an API call to verify:
+            - URL is reachable
+            - API responds with valid JSON
+            - Response format is a list of records
         
-        Returns
-        -------
-        bool
-            True if connection is valid, False otherwise
+        Return : bool
+            True if connection is valid
+            False if connection is invalid
         """
         try:
             # test_url = f"{self.base_url}/records"
@@ -510,18 +511,15 @@ class OSTI(Webserver):
 
     def get_table(self, table_name="records", dict_return=False):
         """
-        Returns all data from the records table.
+        Returns all data from the 'records' table
         
-        Parameters
-        ----------
-        `table_name` : str
-            Must be "records"
+        `table_name` : str, optional, default='records'
+            table_name must be 'records' or None
         `dict_return` : bool, default False
-            If True, returns OrderedDict. If False, returns DataFrame.
+            If True, returns OrderedDict. 
+            If False, returns DataFrame.
         
-        Returns
-        -------
-        OrderedDict or pandas.DataFrame
+        **Return : OrderedDict or pandas.DataFrame**
         """
         if table_name != "records":
             raise ValueError("OSTI backend only contains the 'records' table")
@@ -539,6 +537,9 @@ class OSTI(Webserver):
     def get_schema(self):
         """
         Return a lightweight schema description of cached tables from OSTI.
+
+        Return : str
+            Each table's structural schema is combined into one large string.
         """
         schema_lines = []
         for table_name, table in self._cache.items():
@@ -586,22 +587,19 @@ class OSTI(Webserver):
     # ---------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
-        Query the cached records table using pandas.query().
+        Query all tables using pandas.query()
 
-        Parameters
-        ----------
-        query : str
-            Pandas query string for filtering data.
-        dict_return : bool, default True
-            If True, returns OrderedDict format.
-            If False, returns a pandas DataFrame.
-        **kwargs : dict
-            Additional keyword arguments.
+        `query` : str
+            Pandas query string for filtering data
+        `dict_return` : bool, optional, default True
+            If True, returns dict format.
+            If False, returns pandas DataFrames.
+        
+        `**kwargs` : dict
+            Additional keyword arguments
 
-        Returns
-        -------
-        OrderedDict or pandas.DataFrame
-            Query results from the records table.
+        Return : dict
+            Dictionary mapping table names to query results
         """
         if not self._loaded:
             raise RuntimeError("No metadata loaded. Cannot query empty backend.")
@@ -639,18 +637,15 @@ class OSTI(Webserver):
     # ----------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Returns all cached OSTI data.
+        Returns all cached OSTI data::
 
-        Structure:
             {
                 "records": <records table>
             }
 
-        Useful for exporting or writing to external systems.
+        Useful for exporting or writing data to external formats.
 
-        Returns
-        -------
-        OrderedDict
+        Return : OrderedDict
             Cached records table
         """
         if not self._loaded:
@@ -670,10 +665,6 @@ class OSTI(Webserver):
             - citation_url_valid
             - citation_doe_pages_url_valid
             - fulltext_url_valid
-
-        Returns
-        -------
-        None
         """
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot validate URLs.")
@@ -735,7 +726,25 @@ class OSTI(Webserver):
     # ----------------------------------------------------------------------
     def find(self, query_object, **kwargs):
         """
-        Search for query_object across table names, column names, and cell values.
+        Searches for all instances of `query_object` across the table, column, and cell levels.
+
+        `query_object` : int, float, or str
+            The value to search for across all tables in the backend
+        
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObjects representing matches across:
+            - table names
+            - column names
+            - cell values
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) Column name(s)
+            - row_num : (int or None) Row index
+            - value :   (any) Matched value or data
+            - type :    (str) {'table', 'column', 'cell'}
         """
         if not self._loaded:
             return []
@@ -751,7 +760,22 @@ class OSTI(Webserver):
 
     def find_table(self, query_object, **kwargs):
         """
-        Find tables whose names contain query_object.
+        Finds all tables whose names contain the given query_object. Search is case-insensitive.
+
+        `query_object` : str
+            The string to match against table names
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObject
+            One ValueObject per matching table
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) List of all columns in the table
+            - value :   (dict) Full table data (dict of columns)
+            - row_num : (None)
+            - type :    (str) 'table'
         """
         if not self._loaded or not isinstance(query_object, str):
             return []
@@ -772,7 +796,22 @@ class OSTI(Webserver):
 
     def find_column(self, query_object, **kwargs):
         """
-        Find columns whose names contain query_object.
+        Finds all columns whose names contain the given query_object. Search is case-insensitive.
+
+        `query_object` : str
+            The string to match against column names
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObject
+            One ValueObject per matching column
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) List with the matched column name
+            - value :   (list) Full column data
+            - row_num : (None)
+            - type :    (str) 'column'
         """
         if not self._loaded or not isinstance(query_object, str):
             return []
@@ -794,11 +833,24 @@ class OSTI(Webserver):
 
     def find_cell(self, query_object, **kwargs):
         """
-        Find cells that match query_object.
+        Finds all cells that match the given query_object.
+        
+        Exact match for all data types, plus case-insensitive partial match for strings.
 
-        Matching behavior:
-            - Exact match for all data types
-            - Case-insensitive partial match for strings
+        `query_object` : int, float, or str
+            The value to search for within table cells
+        `**kwargs` : dict
+            Additional keyword arguments
+
+        Return : list of ValueObject
+            One ValueObject per matching cell
+
+        ValueObject Structure:
+            - t_name :  (str) Table name
+            - c_name :  (list) List with the matched column name
+            - row_num : (int) Row index of the match
+            - value :   (any) Matched cell value
+            - type :    (str) 'cell'
         """
         if not self._loaded:
             return []
@@ -852,13 +904,15 @@ class OSTI(Webserver):
     # ----------------------------------------------------------------------
     def list(self, collection=False):
         """
-        List cached OSTI tables.
+        Lists tables or prints each table's dimensions.
 
-        Parameters
-        ----------
-        collection : bool, default False
-            If True, return table names.
-            If False, print table names with dimensions.
+
+        `collection` : bool, default False
+            - If True, return list of table names.
+            - If False, print table names with dimensions.
+
+        Return : list or None
+            Table names if collection=True, otherwise None
         """
         if collection:
             return list(self._cache.keys())
@@ -870,7 +924,14 @@ class OSTI(Webserver):
 
     def summary(self, table_name=None):
         """
-        Return metadata summary for the cached records table.
+        Returns numerical metadata for the cached 'records' table.
+
+        `table_name` : str, optional
+            If provided or not, returns summary for the 'records' table.
+
+        Return : pandas.DataFrame or list
+            - If table_name is None: returns [['records'], records_df]
+            - If table_name provided: returns single DataFrame for records table
         """
         if not self._loaded or "records" not in self._cache:
             return pd.DataFrame()
@@ -897,7 +958,17 @@ class OSTI(Webserver):
 
     def display(self, table_name="records", num_rows=25, display_cols=None):
         """
-        Display rows from the records table.
+        Displays rows from the 'records' table.
+
+        `table_name` : str, optional, default = 'records'
+            Name of the table to display
+        `num_rows` : int, default 25
+            Number of rows to display
+        `display_cols` : list of str, optional
+            Subset of columns to display
+
+        Return : pandas.DataFrame
+            Displayed table data with long strings truncated
         """
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot display empty backend.")
@@ -938,7 +1009,7 @@ class OSTI(Webserver):
 
     def notebook(self, **kwargs):
         """
-        Notebook generation is not supported for the OSTI backend.
+        **Notebook generation not supported for OSTI backend.**
         """
         pass
 

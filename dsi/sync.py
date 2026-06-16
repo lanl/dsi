@@ -14,7 +14,7 @@ from contextlib import redirect_stdout
 from collections import OrderedDict
 
 from dsi.core import Terminal
-from dsi.utils.federated.federate_datasets import federate_datasets
+from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
 
 class Sync():
     """
@@ -23,69 +23,67 @@ class Sync():
     Sync is where data movement functions such as copy (to remote location) and
     sync (local filesystem with remote) exist.
     """
-    def __init__(self, project_name=None, isVerbose = False, no_parent = False, **kwargs):
+    def __init__(self, project_name, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
         self.project_name = project_name
         self.verbose = isVerbose
         self.no_parent = no_parent
+        self.skip_index = skip_index
         self.add_dbs = kwargs.pop("add_dbs", [])
 
         extension = ""
-        if project_name:
-            for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
-                if project_name.lower().endswith(ext):
-                    self.project_name = project_name[:-len(ext)]
-                    extension = ext
-                    break
-            if extension != "":
-                self.full_db_name = self.project_name + extension
-                if not os.path.exists(self.full_db_name):
-                    print("Creating new database: " + self.full_db_name)
-                    # We now allow a user to begin indexing from an empty database, so bypass raise
-                    #raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
+        for ext in (".duckdb", ".sqlite", ".db", ".sqlite3"):
+            if project_name.lower().endswith(ext):
+                self.project_name = project_name[:-len(ext)]
+                extension = ext
+                break
+        if extension != "":
+            self.full_db_name = self.project_name + extension
+            if not os.path.exists(self.full_db_name):
+                print("Creating new database: " + self.full_db_name)
+                # We now allow a user to begin indexing from an empty database, so bypass raise
+                #raise ValueError(f"Database {self.full_db_name} not found. Please input an existing database name.")
 
-            else:
-                proj_db_found = False
-                for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
-                    if os.path.exists(self.project_name + ext):
-                        if proj_db_found:
-                            raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
-                        self.full_db_name = self.project_name + ext
-                        proj_db_found = True
+        else:
+            proj_db_found = False
+            for ext in (".db", ".duckdb", ".sqlite", ".sqlite3"):
+                if os.path.exists(self.project_name + ext):
+                    if proj_db_found:
+                        raise ValueError(f"Multiple databases found with {project_name}. Specify an extension.")
+                    self.full_db_name = self.project_name + ext
+                    proj_db_found = True
 
-                if not proj_db_found:
-                    raise ValueError(f"No database found with name {project_name}. Please input an existing database name.")
-            
-            self.remote_location = None
-            self.local_location = None
-
-            self.t = Terminal()
-            # First check if user can create db here
-            if "/" in project_name:
-                create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
-            else:
-                create_bool = self.t.can_create_file_here()
-            if create_bool is False:
-                raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
+            if not proj_db_found:
+                raise ValueError(f"No database found with name {project_name}. Please input an existing database name.")
         
-            backend_name = self.t.identify_backend(self.full_db_name)
-            # Allows an empty database to be created, autoselect SQLite for the user
-            if backend_name is None:
-                #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
-                print("Auto-selecting sqlite backend.")
-                backend_name = "Sqlite"
+        self.remote_location = None
+        self.local_location = None
 
-            fnull = open(os.devnull, 'w')
+        self.t = Terminal()
+        # First check if user can create db here
+        if "/" in project_name:
+            create_bool = self.t.can_create_file_here(project_name.rsplit("/", 1)[0])
+        else:
+            create_bool = self.t.can_create_file_here()
+        if create_bool is False:
+            raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
+    
+        backend_name = self.t.identify_backend(self.full_db_name)
+        # Allows an empty database to be created, autoselect SQLite for the user
+        if backend_name is None:
+            #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
+            print("Auto-selecting sqlite backend.")
+            backend_name = "Sqlite"
+
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
+
+        # Actually create a database and add a placeholder table
+        if not self.t.valid_backend(self.t.loaded_backends[0]):
+            #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
             with redirect_stdout(fnull):
-                self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
-
-            # Actually create a database and add a placeholder table
-            if not self.t.valid_backend(self.t.loaded_backends[0]):
-                #raise RuntimeError(f"{project_name} database must have metadata in it before trying to call DSI move functions.")
-                st_dict = OrderedDict()
-                st_dict['file_origin'] = []
-                self.t.load_module('plugin', "Dictionary", "reader", collection=st_dict, table_name="filesystem")
+                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
                 self.t.artifact_handler(interaction_type='ingest')
-
 
 
     def index(self, local_loc, remote_loc):
@@ -110,7 +108,7 @@ class Sync():
                 fed_table = self.t.get_table("federated")
                 fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
                 if fed_local == local_loc:
-                    self.remote_location = remote_loc
+                    self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
                     self.local_location = local_loc
                     if fed_remote == remote_loc:
                         if self.verbose:
@@ -121,7 +119,7 @@ class Sync():
                     filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
                     
                     # update remote location in federated table
-                    fed_table.at[fed_table.index[0], "remote_location"] = remote_loc
+                    fed_table.at[fed_table.index[0], "remote_location"] = os.path.join(remote_loc, self.project_name) + os.sep
 
                     self.t.dsi_tables.remove("filesystem")
                     self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
@@ -130,6 +128,14 @@ class Sync():
                     if self.verbose:
                         print("DSI Index complete!\n")
                     return
+            else:
+                if self.skip_index:
+                    # adding fake file_abs col so it goes through actual skip dircrawl check above
+                    filesystem_df["file_abs"] = None
+                    self.t.dsi_tables.remove("filesystem")
+                    self.t.overwrite_table("filesystem", filesystem_df)
+                    self.t.dsi_tables.append("filesystem")
+                    return self.index(local_loc, remote_loc)
 
         # Data Crawl and gather metadata of local location
         file_list = self.dircrawl2(local_loc, self.verbose)
@@ -141,7 +147,7 @@ class Sync():
         
         file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
         
-        self.remote_location = remote_loc
+        self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
@@ -176,9 +182,9 @@ class Sync():
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
-                rfilepath = os.path.join(remote_loc,self.project_name, rel_file)
+                rfilepath = os.path.join(remote_loc, self.project_name, rel_file)
             else:
-                rfilepath = os.path.join(remote_loc,self.project_name, parent_rel_file)
+                rfilepath = os.path.join(remote_loc, self.project_name, parent_rel_file)
             st_dict['file_origin'].append(rel_file)
             st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
@@ -229,6 +235,75 @@ class Sync():
         if self.verbose:
             print("DSI Index complete!\n")
 
+    def gufi_query_index(self, gufi_prefix, gufi_index, db_path, dsi_table_name, dsi_columns, gufi_columns,
+                         collection_name, custom_query=None, isVerbose=False):
+        """
+        Helper function to query GUFI for metadata and join on the dsi table by uuid
+
+        `gufi_prefix`: the directory where GUFI is installed
+
+        `gufi_index`: the directory where GUFI indexes are
+
+        `db_path`: the full path of the dsi database
+
+        `dsi_table_name`: the DSI table name that has the UUID for each file as a column
+
+        `dsi_columns`: the DSI table columns that should be included in the join with GUFI
+
+        `gufi_columns`: the GUFI columns that should be included in the join with DSI
+
+        `collection_name`: the name that identifies the collection that the DSI database belongs to
+
+        `custom_query`: an sql string to query the dsi and gufi index
+
+        """
+        
+        if isVerbose:
+            print(f"dsi table name {dsi_table_name}")
+
+        # Try to open existing local database to store filesystem info before copy
+        # Open and validate local DSI data store
+        t = Terminal()
+
+        f = db_path
+        try:
+            if isVerbose:
+                print("trying db: ", f)
+            assert os.path.exists(f)
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                t.load_module('backend','Sqlite','back-read', filename=f)
+        except Exception:
+            print(f"Database {f} not found")
+            raise
+
+        got_uuid = False
+        try:
+            rows = t.artifact_handler(interaction_type='query', query = f"select uuid from {dsi_table_name};")
+            if len(rows.columns) == 0:
+                print(f"uuid column not found in {dsi_table_name}")
+            else:
+                got_uuid = True
+        except Exception:
+            print(f"uuid column not found in {dsi_table_name}")
+
+        if not got_uuid:
+            return None
+
+        rows = t.artifact_handler(interaction_type='query', query=f"select * from {dsi_table_name};", dict_return=True)
+        t.unload_module('backend', 'Sqlite', 'back-read')
+
+        # GUFI Query
+#        with redirect_stdout(fnull):
+        t.load_module('backend', 'Gufi', 'back-read', gufi_prefix=gufi_prefix, gufi_index=gufi_index, dsi_table_name=f"{dsi_table_name}", 
+                      dsi_columns=dsi_columns, gufi_columns=gufi_columns, collection_name=collection_name,
+                      dsi_db=f)
+        metadata = t.artifact_handler(interaction_type='query', query=custom_query)
+        t.unload_module('backend', 'Gufi', 'back-read')
+        t.close()
+
+        return metadata
 
     def execute_cmd(self, cmd, cmd_name, timer = False):
         """Internal helper for Sync to call executable actions"""
@@ -244,11 +319,11 @@ class Sync():
         stdout, stderr = process.communicate()
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
-                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.")
-            elif "No credentials" in stdout:
-                print("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.")
-                raise RuntimeError("Kerberos message: " + str(stdout))
-            raise RuntimeError(f"{cmd_name} failed: \n{stderr}")
+                raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
+            elif "No credentials" in stderr:
+                raise RuntimeError("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.\n"
+                                   f"Kerberos message: {str(stderr)}") from None
+            raise RuntimeError(f"{cmd_name} failed: \n{stderr}") from None
         return stdout
 
 
@@ -305,7 +380,7 @@ class Sync():
         # Test remote location validity and try creating folders
         # TODO: iterate through remote/server list here, for now:
         if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
-            remote_list = [ os.path.join(self.remote_location,self.project_name) ]
+            remote_list = [self.remote_location]
             for remote in remote_list:
                 if self.verbose:
                     print(f"Testing access to '{remote}' directory.")
@@ -327,7 +402,9 @@ class Sync():
                     raise RuntimeError(f"Error creating remote directory: {err}")
         
         # TODO: have movement service handle type without user input (cp,scp,rsync,conduit,pfcp,ftp,etc.)
-        if tool.lower() == "copy":            
+        if tool.lower() == "copy":
+            if all(x is None for x in file_list):
+                file_list = [str(Path(self.local_location) / s) for s in filesystem_df["file_origin"]]
             for file, file_remote in zip(file_list, rfile_list):
                 abspath = os.path.dirname(os.path.abspath(file_remote))
                 if not os.path.exists(abspath):
@@ -352,8 +429,8 @@ class Sync():
             # Database movement
             for dbname in db_list:
                 if self.verbose:
-                    print(" cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
-                shutil.copy2(dbname, os.path.join(self.remote_location, self.project_name, dbname))
+                    print(" cp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                shutil.copy2(dbname, os.path.join(self.remote_location, dbname))
 
             print(" Data Copy Complete!")
         
@@ -368,27 +445,25 @@ class Sync():
             
             # making remote dir
             if self.verbose:
-                print(" ssh "+ str(host_part) + " \"mkdir -p " + str(os.path.join(path_part, self.project_name)) + "\"" )
-            cmd = ["ssh", host_part, f'mkdir -p \"{os.path.join(path_part, self.project_name)}\"']
+                print(" ssh "+ str(host_part) + " \"mkdir -p " + path_part + "\"" )
+            cmd = ["ssh", host_part, f'mkdir -p \"{path_part}\"']
             print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
 
             # File movement
-            cmd = ["scp", "-rp", self.local_location, os.path.join(self.remote_location, self.project_name)]
+            cmd = ["scp", "-rp", self.local_location, self.remote_location]
             if self.verbose:
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "scp data")
             print(" DSI SCP data movement complete.")
 
-            # remove username from file_remote column in filesystem table
-            username, host = host_part.split("@")
-            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(host_part+":", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
-            # remove username from remote_location column in federated table
+            # remove username@hostname from remote_location column in federated table
             federated_df = self.t.get_table("federated")
-            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(host_part+":", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
@@ -396,7 +471,7 @@ class Sync():
 
             # Database movement
             for dbname in db_list:
-                cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, dbname)]
                 if self.verbose:
                     print()
                     print(*cmd)
@@ -414,24 +489,18 @@ class Sync():
             
             # File movement
             self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
-            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {os.path.join(path_part, self.project_name)} && rsync", 
-                   self.local_location, os.path.join(self.remote_location, self.project_name)]
+            cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {path_part} && rsync", self.local_location, self.remote_location]
             if self.verbose:
                 print(*cmd)
             self.execute_cmd(cmd, "rsync data")
             print(" DSI Rsync data movement complete.")
 
-            # remove username from file_remote column in filesystem table
-            try:
-                username, host = host_part.split("@")
-            except Exception:
-                raise ValueError("Remote path's hostname must be in the format user@server") from None
-            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(f"{username}@", "", regex=False)
+            filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(host_part+":", "", regex=False)
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
-            # remove username from remote_location column in federated table
+            # remove username@hostname from remote_location column in federated table
             federated_df = self.t.get_table("federated")
-            federated_df["remote_location"] = federated_df["remote_location"].str.replace(f"{username}@", "", regex=False)
+            federated_df["remote_location"] = federated_df["remote_location"].str.replace(host_part+":", "", regex=False)
 
             self.t.dsi_tables.remove("filesystem")
             self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
@@ -439,7 +508,7 @@ class Sync():
             
             # Database movement
             for dbname in db_list:
-                cmd = ["rsync", "-av", dbname, os.path.join(self.remote_location, self.project_name)]
+                cmd = ["rsync", "-av", dbname, self.remote_location]
                 if self.verbose:
                     print()
                     print(*cmd)
@@ -467,7 +536,7 @@ class Sync():
             try:
                 if self.verbose:
                     print("Testing Conduit: conduit get")
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','get']
+                cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','get']
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
                 if "TRANSFER_ID" in stdout and self.verbose:
@@ -478,15 +547,16 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cmd','--config','/usr/projects/systems/conduit/conf/conduit-cmd-config.yaml','cp','-r', '-w']
+                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','cp','-r']
                 # File Movement
                 if self.verbose:
-                    print("conduit cp -r " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
-                cmd = base_cmd + [self.local_location, os.path.join(self.remote_location, self.project_name)]
+                    print("conduit cp -r " + self.local_location + " " + self.remote_location)
+                cmd = base_cmd + [self.local_location, self.remote_location]
                 stdout = self.execute_cmd(cmd, "Conduit copy data")
-                if stdout:
-                    print(stdout)
-                print(" DSI-Conduit data movement job complete.")
+                if "finalized" in stdout.lower():
+                    print(" DSI-Conduit data movement job complete.")
+                else:
+                    print(" WARNING: DSI-Conduit data movement job may not be complete")
 
                 # delete temp columns from filesystem table
                 filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
@@ -497,12 +567,13 @@ class Sync():
                 # Database Movement
                 for dbname in db_list:
                     if self.verbose:
-                        print("conduit cp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
-                    cmd = base_cmd + [dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                        print("conduit cp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                    cmd = base_cmd + [dbname, os.path.join(self.remote_location, dbname)]
                     stdout = self.execute_cmd(cmd, "Conduit copy database")
-                    if stdout:
-                        print(stdout)
-                    print(" DSI-Conduit database movement job complete.")
+                    if "finalized" in stdout.lower():
+                        print(" DSI-Conduit database movement job complete.")
+                    else:
+                        print(" WARNING: DSI-Conduit database movement job may not be complete")
 
                 print("Type 'conduit get' to track status of both jobs.")
                 print("  If 'WaitingForLease' status, data move is in queue.")
@@ -515,8 +586,8 @@ class Sync():
             try:
                 # File Movement
                 if self.verbose:
-                    print("pfcp -R " + self.local_location + " " + os.path.join(self.remote_location, self.project_name))
-                cmd = ['pfcp','-R',self.local_location, os.path.join(self.remote_location, self.project_name)]
+                    print("pfcp -R " + self.local_location + " " + self.remote_location)
+                cmd = ['pfcp','-R',self.local_location, self.remote_location]
                 self.execute_cmd(cmd, "pfcp move data")
                 print(" DSI submitted pfcp data movement job.")
 
@@ -529,8 +600,8 @@ class Sync():
                 # Database Movement
                 for dbname in db_list:
                     if self.verbose:
-                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, self.project_name, dbname))
-                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, self.project_name, dbname)]
+                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, dbname)]
                     self.execute_cmd(cmd, "pfcp move database")
                     print(" DSI submitted pfcp database movement job.")
             except Exception as e:
@@ -611,28 +682,118 @@ class Sync():
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
 
-    def get(self, input_yaml = None, workspace_folder = None):
+    def get(self, config_file: str, workspace_folder: str):
         '''
-        Helper function that searches remote location based input yaml file, and retrieves metadata that contains DSI databases
+        Helper function that searches remote location-based input config file, and retrieves metadata that contains DSI databases
         '''
-
-        # Read configuration from YAML file
-        if input_yaml:
+        if not os.path.exists(config_file):
+            raise ValueError(f"{config_file} does not exist. Please check the filepath and try again.")
+        
+        suffix = Path(config_file).suffix.lower()
+        # Check if config file is YAML - contains paths to CSV files
+        if suffix in [".yaml", ".yml"]:
             try:
-                yaml_path = Path(input_yaml)
+                yaml_path = Path(config_file)
                 config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-            except FileNotFoundError:
-                print(f"Error: Could not find YAML file {yaml_path}")
+                
+                base_path = str(Path(yaml_path).parent)
+            except yaml.YAMLError:
+                raise ValueError(f"Invalid YAML file {yaml_path}. Please check the yaml file and try again.")
+        elif suffix == ".csv":
+            filename = str(Path(config_file).name)
+            config_data = {  
+                            'repo_paths': [filename], 
+                            'workspace_folder': workspace_folder, 
+                            'download_limit': 10485760, 
+                            'conflict_resolution': 'keep_latest'}
+            base_path = str(Path(config_file).parent)
         else:
-            True
+            raise ValueError("Config file must be a YAML or CSV file")
         
         # Create a folder for the databases if it doesn't exist, or use the provided one
         if not workspace_folder:
             _workspace_folder = config_data.get("workspace_folder", "")
             workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
 
-        yaml_folder = Path(yaml_path).parent
-        federate_datasets(workspace_folder, config_data, str(yaml_folder))
+        downloaded_dbs = federate_datasets(workspace_folder, config_data, base_path)
+
+        if downloaded_dbs:
+            df = pd.DataFrame(downloaded_dbs)
+            df = df[["location_type", "location", "name", "workspace_folder", "folder_hash", "local_path", "submitter_name"]]
+            df = df.rename(columns={"name": "db_name", "local_path": "local_db_path"})
+
+            # Create 'federation' table in db
+            curr_tables = self.t.list(True)
+            if "federation" in curr_tables:
+                # TODO: currently overwrites existing federation table
+                federation_df = self.t.get_table("federation")
+                federation_df = pd.concat([federation_df, df], ignore_index=True).drop_duplicates()
+                self.t.overwrite_table("federation", federation_df)
+            else:
+                fnull = open(os.devnull, 'w')
+                with redirect_stdout(fnull):
+                    self.t.load_module('plugin', "Dataframe", "reader", collection=df, table_name="federation")
+                    self.t.artifact_handler(interaction_type='ingest')
+
+
+    def get_data(self, db_name: str, workspace_folder: str | None = None):
+        curr_tables = self.t.list(True)
+        if "federation" not in curr_tables or self.t.get_table("federation").empty:
+            raise RuntimeError("Must first download DSI databases with the get() function")
+        if " " in db_name:
+            raise ValueError("Input db_name cannot have spaces")
+        db_data = self.t.artifact_handler("query", query=f"SELECT * FROM federation WHERE db_name LIKE '%{db_name}%'")
+        
+        if db_data.empty:
+            raise ValueError(f"Could not find a downloaded database named '{db_name}'")
+
+        if len(db_data) > 1:
+            try:
+                print(f"\nMultiple local databases were found with the name `{db_name}`:")
+                for idx, row in db_data.iterrows():
+                    print(f"{idx+1}) {row['local_db_path']}")
+                db_idx = input("\n -- Select which database's data to download (enter number): ")
+                db_idx = int(db_idx)
+                if not (1 <= db_idx <= len(db_data)):
+                    print(" -- ERROR: Invalid selection. Skipping data download.")
+                    return
+            except (KeyboardInterrupt, EOFError):
+                print("\n -- Interrupted while entering database selection. Skipping data download.\n")
+                return
+            except ValueError:
+                print(f" -- ERROR: Input must be a number between 1 and {len(db_data)} (inclusive). Skipping data download.\n")
+                return
+            db_data = db_data.iloc[int(db_idx)-1]
+        else:
+            db_data = db_data.iloc[0]
+
+        t2 = Terminal()
+        backend_name = self.t.identify_backend(db_data["local_db_path"])
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            t2.load_module('backend', backend_name, 'back-write', filename=db_data["local_db_path"])
+
+        db_tables = t2.list(True)
+        if "filesystem" not in db_tables or "federated" not in db_tables:
+            raise ValueError(f"Cannot download data from '{db_name}' because it has not been indexed by DSI.")
+        remote_loc = t2.get_table("federated")["remote_location"].iloc[0]
+
+        with open(f'{db_data["workspace_folder"]}/host_usernames.json', "r", encoding="utf-8") as f:
+            host_username = yaml.safe_load(f)
+        username = (host_username or {}).get(db_data['location'], "")
+
+        if not workspace_folder:
+            workspace_folder = f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
+        
+        # add unique hash to download data
+        workspace_folder = os.path.join(workspace_folder, db_data["folder_hash"])
+        
+        # Currently pulling all data referenced -- eventually allow user to download certain data
+        db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
+                                      workspace_folder, username, internal_use=True)
+        new_folder = Path(db_info.pop("new_db_folder"))
+        if new_folder.is_dir() and not any(new_folder.iterdir()):
+            new_folder.rmdir()
 
 
     def gen_uuid(self, st):

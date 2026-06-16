@@ -1,5 +1,4 @@
 from dsi.sync import Sync
-from dsi.dsifederated import DSIFederated
 
 # Origin location of data
 remote_sources = "../federated/input.yaml"
@@ -7,8 +6,13 @@ remote_sources = "../federated/input.yaml"
 workspace = "dsi_data"
 
 # Create Sync type with project database name
-s = Sync()
-s.get(remote_sources,workspace)
+s = Sync("federated.db")
+s.get(config_file=remote_sources, workspace_folder=workspace)
 
+# Download data referenced in this database -- db must have been previously indexed by DSI
+s.get_data(db_name="ocean_11_datasets.db", workspace_folder=workspace)
+
+
+from dsi.dsifederated import DSIFederated
 federated_databases = DSIFederated(workspace, operating_mode="notebook")
-federated_databases.f_display_databases()
+federated_databases.f_list_databases()

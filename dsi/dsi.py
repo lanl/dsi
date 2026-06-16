@@ -231,6 +231,7 @@ class DSI():
             n.close()
         except Exception:
             pass            
+            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
         n = Oceans11()
         if n.validate_connection():
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
@@ -512,7 +513,7 @@ class DSI():
             A SQL query to execute. Only `SELECT` and `PRAGMA` statements are allowed.
 
         `collection` : bool, optional, default False.
-            If True, returns the result as a pandas DataFrame.
+            If True, returns the result as a pandas DataFrame or python dictionary.
             
             If False (default), prints the result.
 
@@ -837,7 +838,7 @@ class DSI():
         if not isinstance(collection, pd.DataFrame):
             raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
-            raise RuntimeError("update() ERROR: The 'dsi_table_name' column was deleted. Need unchanged column to update() that table")
+            raise RuntimeError("update() ERROR: The 'dsi_table_name' column was not found. Ensure you set 'update'=True in the function that returned this collection")
         elif 'dsi_table_name' in collection.columns:
             if len(collection) == 0:
                 raise RuntimeError("update() ERROR: Cannot overwrite a table without any data.")

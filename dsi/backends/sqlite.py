@@ -753,8 +753,8 @@ class Sqlite(Filesystem):
             The value to search for at the cell level, across all tables in the backend.
 
         `row`: bool, optional, default=False
-            If True, `value` in the returned ValueObject will be the entire row where a cell matched.
-            If False, `value` in the returned ValueObject will only be the matching cell value.
+            If True, certain fields in ValueObject will contain entire row's metadata/data
+            If False, certain fields in ValueObject will only contain the matching cell's metadata/data.
 
         Return : List of ValueObjects if there is a match.
 

@@ -10,10 +10,10 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
-import yaml
 import subprocess
-import signal
 import importlib.util
+import getpass
+import socket
 
 from dsi.core import Terminal
 from dsi.sync import Sync
@@ -21,23 +21,38 @@ from dsi.sync import Sync
 from ._version import __version__
 
 def autofill_path(text, state):
-    """ Completes file and directory paths for the current input """
+    """Completes CLI actions as first token, then file/directory paths."""
     line = readline.get_line_buffer()
-    parts = shlex.split(line[:readline.get_endidx()], posix=True)
+    endidx = readline.get_endidx()
 
-    if line and line[-1].isspace():
+    try:
+        parts = shlex.split(line[:endidx], posix=True)
+    except ValueError:
+        parts = line[:endidx].split()
+
+    if line[:endidx] and line[:endidx][-1].isspace():
         parts.append('')
 
     curr = parts[-1] if parts else ''
 
-    matches = glob.glob(os.path.expanduser(curr) + '*')
-    matches = [m + '/' if os.path.isdir(m) else m for m in matches]
-    matches = [m[m[:-1].rfind('/')+1:] if '/' in m[:-1] else m for m in matches]
+    if len(parts) <= 1:
+        matches = [a for a in COMMANDS.keys() if a.startswith(curr)]
+        matches += path_matches(curr)
+    else:
+        matches = path_matches(curr)
 
     try:
         return matches[state]
     except IndexError:
         return None
+
+
+def path_matches(curr):
+    matches = glob.glob(os.path.expanduser(curr) + "*")
+    matches = [m + "/" if os.path.isdir(m) else m for m in matches]
+    matches = [m[m[:-1].rfind("/") + 1:] if "/" in m[:-1] else m for m in matches]
+    return matches
+
 
 readline.set_completer(autofill_path)
 if "libedit" in readline.__doc__:
@@ -52,10 +67,12 @@ class DSI_cli:
     '''
     t = []
 
+
     def __init__(self):
         self.name = None
         self.start_dir = os.getcwd() + "/"
         return
+
 
     def viewers_check(self):
         '''
@@ -142,11 +159,15 @@ class DSI_cli:
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
             'federate' : ("<config file> [-w workspace_folder]", 
-                          "Collects data from sources defined in the YAML config file, optionally saving it to a workspace folder."),
+                          "Collects databases from sources in a YAML file, or source in a CSV file, saving it to an optional workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
-            'help': ("", "Shows this help message."),
+            'get_data' : ("<database_name> [-w workspace_folder]", 
+                          "Collects referenced data in a DSI database, saving it to an optional workspace folder"),
+            'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
             'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
+            #'pull_data' : ("<source_type> <source> <path>", 
+            #              "Pulls data from a source to the current directory. Enter 'pull_data -h' to learn the inputs"),
             'query' : ("<SQL query> [-n num_rows] [-e filename]",
                        "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
             'read' : ("<data source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
@@ -165,7 +186,9 @@ class DSI_cli:
         terminal_width = shutil.get_terminal_size().columns
         for key, val in commands.items():
             cmd = f'{key} {val[0]}'
-            print(textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50))
+            wrapped = textwrap.fill(f"{cmd:48} {val[1]}", width=terminal_width, subsequent_indent=' ' * 50)
+            print(wrapped)
+            if '\n' in wrapped: print()
         print()
 
 
@@ -314,38 +337,38 @@ class DSI_cli:
 
 
     def federate(self, args):
-        '''
-        Federate data from multiple sources using a yaml config file
-        '''
+        """
+        Federate data from multiple sources using either:
+        - a YAML config file, or
+        - a CSV source file
+
+        Usage:
+        federate input.yaml [-w workspace_folder]
+        federate sources.csv [-w workspace_folder]
+        """
         config_file = args.config_file
 
         workspace_folder = None
         if args.workspace_folder is not None and args.workspace_folder != "":
             workspace_folder = args.workspace_folder
 
-        # Check if the config file exists and is a valid yaml file before trying to federate
-        if not os.path.exists(config_file):
-            print(f"federate ERROR: {config_file} does not exist. Please check the filepath and try again.")
-            return
-        else:
-            try:
-                with open(config_file, 'r') as f:
-                    data = f.read()
-                config_data = yaml.safe_load(data)
-            except yaml.YAMLError as e:
-                print(f"Invalid YAML file {config_file}. Please check the yaml file and try again. Error {e}")
-                return
+        # small provision if no data in db:
+        if not self.t.valid_backend(self.t.loaded_backends[0]):
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
+                self.t.artifact_handler(interaction_type='ingest')
 
         try:
-            s = Sync()
-            if workspace_folder is None:
-                workspace_folder = config_data.get("workspace_folder", "dsi_data")
-            print(f"Synchronizing data from {config_file} into {workspace_folder}\n")
-            s.get(config_file, workspace_folder)
-        except Exception as e:
-            print(f"federate ERROR: {e}")
-            return
+            s = Sync(self.db_path)
+            s.user_wrapper = True
+            print(f"Synchronizing data from {config_file} into {workspace_folder}")
+            s.get(config_file=config_file, workspace_folder=workspace_folder)
 
+        except Exception as e:
+            print(f"federate ERROR: {str(e)}")
+            return
+        
 
     def find(self, args):
         '''
@@ -410,6 +433,38 @@ class DSI_cli:
         print()
 
 
+    def get_data_parser(self):
+        parser = argparse.ArgumentParser(prog='get_data')
+        parser.add_argument('database_name', help='Previously downloaded database whose data will be downloaded')
+        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded data')
+        return parser
+
+
+    def get_data(self, args):
+        db_name = args.database_name
+
+        workspace_folder = None
+        if args.workspace_folder is not None and args.workspace_folder != "":
+            workspace_folder = args.workspace_folder
+        
+        try:
+            curr_tables = self.t.list(True)
+        except Exception:
+            print("get_data ERROR: Call 'federate' first to access data associated with a downloaded database.")
+            return
+        
+        if "federation" not in curr_tables:
+            print("get_data ERROR: Call 'federate' first to access data associated with a downloaded database.")
+            return
+        
+        try:
+            s = Sync(self.db_path)
+            s.get_data(db_name, workspace_folder)
+        except Exception as e:
+            print(f"get_data ERROR: {e}")
+            return
+
+
     def list_tables(self, args):
         '''
         Lists the tables in the database
@@ -417,7 +472,10 @@ class DSI_cli:
         try:
             self.t.list()
         except Exception as e:
-            print(f"list ERROR: {e}")
+            if "needs to have data" in str(e).lower():
+                print("Currently 0 tables loaded")
+            else:
+                print(f"list ERROR: {e}")
 
 
     def ls(self, args):
@@ -473,6 +531,79 @@ class DSI_cli:
         error = self.export_table("dsi_tb_" + table_name, filename)
         if error != 1:
             print(f"Saved a plot of the {table_name} table in {filename}")
+        print()
+
+
+    def pull_data_parser(self):
+        parser = argparse.ArgumentParser(prog='pull_data')
+        parser.add_argument('source_type', help='Type of location data is stored in: GitHub, HPC, HPC-Kerberos, URL, S3, local')
+        parser.add_argument('source', help='user@hostname for HPC/HPC-Kerberos, bucket for S3, or descriptive name for others')
+        parser.add_argument('path', help='Absolute path or URL to data')
+        return parser
+
+
+    def pull_data(self, args):
+        """
+        Pull data using the pull_data function.
+        
+        Usage:
+        pull_data source_type source path
+        
+        source_type: github, HPC, URL, S3, or local
+        source: hostname for HPC, bucket for S3, or descriptive name for others
+        path: path to the file
+        """
+        source_type = args.source_type
+        source = args.source
+        path = args.path
+        username = ""
+        download_dir = os.getcwd()
+        
+        # Validate location_type
+        valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
+        if source_type.lower() not in valid_types:
+            print(f"pull_data ERROR: location_type must be one of {', '.join(valid_types)}")
+            return
+        
+        # validate source is correct for HPC
+        if source_type.lower() == "hpc":
+            if "@" not in source:
+                print("pull_data ERROR: source must be 'user@hostname' to access the HPC")
+                return
+            username, source = source.split("@")
+        
+        # Create download directory if it doesn't exist
+        os.makedirs(download_dir, exist_ok=True)
+        
+        try:
+            from dsi.utils.federated.federate_datasets import pull_data
+            
+            # Default download limit: 100 MB
+            download_limit = 100 * 1024 * 1024
+            
+            print(f"\nPulling data from {source_type}:{source}:{path}")
+            print(f"Download directory: {download_dir}\n")
+            print(source_type, source, path, download_dir, username, download_limit)
+            db_info = pull_data(
+                location_type=source_type,
+                location=source,
+                path=path,
+                abs_path_workspace_folder=download_dir,
+                username=username,
+                download_limit=download_limit
+            )
+            
+            if db_info:
+                print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
+            else:
+                print("\nFile was not downloaded (may already exist or was skipped)")
+        
+        except ImportError as e:
+            print(f"pull_data ERROR: Could not import pull_data function: {e}")
+            return
+        except Exception as e:
+            print(f"pull_data ERROR: {e}")
+            return
         print()
 
 
@@ -716,11 +847,6 @@ class DSI_cli:
         if viewer not in self.valid_viewers:
             print(f"view ERROR: To load the {viewer} viewer, pip install {' '.join(self.all_viewers[viewer])}")
             return
-        
-        if os.name != 'nt':
-            bash_script_filepath = os.path.join(os.path.dirname(__file__),"utils","launch_streamlit.sh")
-        else:
-            bash_script_filepath = os.path.join(os.path.dirname(__file__),"utils","launch_streamlit.bat")
 
         if viewer == "dashboard":
             # user must specify at least one directory
@@ -732,86 +858,78 @@ class DSI_cli:
                 if not os.path.isdir(f):
                     print(f"view ERROR: dashboard viewer has an invalid input directory: {f}")
                     return
-                
-            if os.name != 'nt':
-                subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
 
-            env = dict(os.environ)
-            dashboard_code_filepath = os.path.join(os.path.dirname(__file__),"plugins","dashboard.py")
-            bash_command = [bash_script_filepath, dashboard_code_filepath] + args[1:]
-            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-                try:
-                    is_remote = False
-                    for idx, line in enumerate(proc.stdout):
-                        if idx == 0 and line == "remote\n":
-                            is_remote = True
-                        if is_remote:
-                            if idx in [1, 2] or idx > 9:
-                                print(line[:-1])
-                            if idx == 3:
-                                print(" (Leave the new terminal running while using the Dashboard)")
-                                print("\nView the Dashboard at", line[:-1])
-                                print("To exit, press [Ctrl + C] here")
-                        else:
-                            if idx == 4:
-                                print("\nView the Dashboard at", line[line.index("http"):-1])
-                                print("To exit, press [Ctrl + C] here")
-                            elif idx>12:
-                                print(line[:-1])
-                except KeyboardInterrupt:
-                    print("\nClosing Dashboard.\n")
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    try:
-                        proc.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                        proc.wait()
+            PORT = 8501
+            dashboard_code_filepath = os.path.join(os.path.dirname(__file__), "plugins", "dashboard.py")
+            input_dirs = args[1:]
+            self.launch_streamlit_viewer(PORT, "Dashboard", dashboard_code_filepath, extra_args=input_dirs)
 
         elif viewer == "ml":
             #check if current db is empty
             if not self.t.valid_backend(self.t.loaded_backends[0]):
                 print("view ERROR: the ML viewer requires data to run models.")
                 return
-            
-            if os.name != 'nt':
-                subprocess.run(["chmod", "+x", bash_script_filepath], check=True)
-            
-            env = dict(os.environ)
-            ml_code_filepath = os.path.join(os.path.dirname(__file__),"plugins","ml_emulator.py")
-            bash_command = [bash_script_filepath, ml_code_filepath, self.db_path, self.name]
-            with subprocess.Popen(bash_command, env=env, start_new_session=True, text=True, 
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-                try:
-                    is_remote = False
-                    for idx, line in enumerate(proc.stdout):
-                        if idx == 0 and line == "remote\n":
-                            is_remote = True
-                        if is_remote:
-                            if idx in [1, 2] or idx > 9:
-                                print(line[:-1])
-                            if idx == 3:
-                                print(" (Leave the new terminal running while using the Emulator)")
-                                print("\nView the ML emulator at", line[:-1])
-                                print("To exit, press [Ctrl + C] here")
-                        else:
-                            if idx == 4:
-                                print("\nView the ML emulator at", line[line.index("http"):-1])
-                                print("To exit, press [Ctrl + C] here")
-                            elif idx>12:
-                                print(line[:-1])
-                except KeyboardInterrupt:
-                    print("\n Closing ML Emulator.\n")
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    try:
-                        proc.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                        proc.wait()
+
+            PORT = 8502
+            ml_code_filepath = os.path.join(os.path.dirname(__file__), "plugins", "ml_emulator.py")
+            extra_args = [self.db_path, self.name]
+            self.launch_streamlit_viewer(PORT, "ML Emulator", ml_code_filepath, extra_args=extra_args)
             
         else:
             print("view ERROR: input viewer was invalid. Please try again.")
             return
+
+
+    def launch_streamlit_viewer(self, port: int, app_name: str, app_file: str, extra_args: list):
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+
+        if os.name != "nt":
+            subprocess.run(f"lsof -t -i:{port} | xargs -r kill -9", shell=True, check=False, 
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.run(f'for /f "tokens=5" %a in (\'netstat -ano ^| findstr :{port}\') do taskkill /F /PID %a >nul 2>&1', 
+                        shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        is_remote = any(os.environ.get(x) for x in ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"])
+        if is_remote:
+            remote_user = getpass.getuser()
+            remote_host = socket.getfqdn() or socket.gethostname()
+
+            print("In a separate terminal on your local machine, run:")
+            print(f" ssh -L {port}:localhost:{port} {remote_user}@{remote_host}")
+            print(f" (Leave the new terminal running while using the {app_name})")
+
+        print(f"\nView the {app_name} at \033[1;34mhttp://localhost:{port}\033[0m")
+        print("To exit, enter [Ctrl+C] here")
+
+        cmd = [sys.executable, "-m", "streamlit", "run", app_file, f"--server.port={port}", "--server.headless=true", 
+                   "--browser.gatherUsageStats=false", "--"] + extra_args
+        proc = subprocess.Popen(cmd, env=env, stdin=None, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1)
+        try:
+            for line in proc.stdout:
+                line = line.rstrip("\n")
+                if (
+                    "You can now view your Streamlit app" in line
+                    or "Local URL:" in line
+                    or "Network URL:" in line
+                    or "External URL:" in line
+                    or "For better performance" in line
+                    or "$ xcode-select" in line
+                    or "$ pip install watchdog" in line
+                    or line == ""
+                ):
+                    continue
+                print(line, flush=True)
+            proc.wait()
+        except KeyboardInterrupt:
+            print(f"\n Closing {app_name}.\n")
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
 
     def get_write_parser(self):
@@ -869,9 +987,11 @@ COMMANDS = {
     'exit': (None, cli.exit_cli),
     'federate' : (cli.get_federate_parser, cli.federate),
     'find' : (None, cli.find),
+    'get_data' : (cli.get_data_parser, cli.get_data),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
+    'pull_data' : (cli.pull_data_parser, cli.pull_data), # to delete
     'query' : (cli.get_query_parser, cli.query),
     'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
