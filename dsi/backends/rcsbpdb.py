@@ -487,7 +487,7 @@ class RCSBPDB(Webserver):
         """
         self._validate_params(params)
 
-        limit = int(params.get("limit", 100))
+        limit = int(params.get("limit", 10))
         start = int(params.get("start", 0))
         return_type = params.get("return_type", "entry")
 
