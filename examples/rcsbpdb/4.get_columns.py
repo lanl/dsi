@@ -36,6 +36,9 @@ def main():
     for identifier in identifiers:
         print(f" - {identifier}")
 
+    print("\nFind one loaded DOI:")
+    dsi.find("doi = 10.2210/pdb4hhb/pdb")
+
     dsi = DSI(
         backend_name="RCSBPDB",
         params={"identifiers": identifiers},
