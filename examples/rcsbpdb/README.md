@@ -69,7 +69,7 @@ dsi = DSI(
 ```python
 dsi = DSI(
     backend_name="RCSBPDB",
-    params={"experimental_method": "X-RAY DIFFRACTION"}
+    params={"experimental_method": "X-RAY DIFFRACTION", "limit": 10}
 )
 ```
 
@@ -109,69 +109,17 @@ dsi = DSI(
 
 ## Supported Parameters
 
-### Search Parameters
+The backend supports the following parameters through the unified `params` interface.
 
-* `keywords`
-* `authors`
-* `experimental_method`
-* `limit`
-* `start`
-
-### Identifier Parameters
-
-* `pdb_id`
-* `pdbID`
-* `pdbId`
-* `PDB_ID`
-* `pdbid`
-* `PDBID`
-* `doi`
-* `DOI`
-* `identifiers`
-
----
-
-## Backend Execution Flow
-
-### Search-Driven Flow
-
-Keyword, author, and experimental method searches follow:
-
-```text
-User Search Parameters
-        ↓
-RCSB Search API
-        ↓
-PDB IDs
-        ↓
-RCSB Data API
-        ↓
-Normalized DSI Tables
-```
-
-### Identifier-Driven Flow
-
-PDB IDs and supported DOI values follow:
-
-```text
-PDB ID / DOI
-        ↓
-Identifier Normalization
-        ↓
-RCSB Data API
-        ↓
-Normalized DSI Tables
-```
-
-Only RCSB-style DOIs of the form:
-
-```text
-10.2210/pdbXXXX/pdb
-```
-
-are directly converted into PDB IDs.
-
-General publication DOI searches are not currently supported.
+| Parameter | Description |
+|------------|------------|
+| keywords | Full-text search |
+| authors | Author search |
+| experimental_method | Experimental method search |
+| pdb_id/ pdbID/ pdbId/ PDB_ID/ pdbid/ PDBID | PDB ID lookup |
+| doi/ DOI | DOI lookup |
+| identifiers | Multiple PDB IDs and/or DOIs |
+| limit | Maximum number of results |
 
 ---
 
@@ -191,24 +139,21 @@ The `datasets` table contains one row per RCSB PDB structure.
 
 Typical columns include:
 
-| Column              | Description                             |
-| ------------------- | --------------------------------------- |
-| dataset_id          | PDB ID                                  |
-| source_repository   | Source repository name                  |
-| doi                 | DOI if available                        |
-| title               | Structure title                         |
-| description         | Structure description                   |
-| landing_page        | RCSB structure URL                      |
-| metadata_url        | API metadata URL                        |
-| experimental_method | Experimental method                     |
-| release_date        | Initial release date                    |
-| revision_date       | Latest revision date                    |
-| resource_count      | Number of associated resource entries   |
-| usability_label     | Resource usability classification       |
-| api_status          | Lookup status                           |
-| query_source        | How the entry was retrieved             |
-| raw_metadata        | Curated metadata plus full API response |
-| notes               | Lookup notes                            |
+| Column              | Description                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| dataset_id          | PDB ID                                                                                    |
+| doi                 | DOI if available                                                                          |
+| title               | Structure title                                                                           |
+| description         | Structure description                                                                     |
+| landing_page        | RCSB structure URL                                                                        |
+| metadata_url        | API metadata URL                                                                          |
+| experimental_method | Experimental method                                                                       |
+| release_date        | Initial release date                                                                      |
+| revision_date       | Latest revision date                                                                      |
+| resource_count      | Number of associated resource entries                                                     |
+| raw_metadata        | Curated metadata plus full API response                                                   |
+| notes               | Additional messages for skipped or failed lookups; typically empty for successful entries |
+
 
 Example:
 
@@ -234,6 +179,7 @@ print(
 The `resources` table contains downloadable file metadata and paths associated with each structure.
 
 Each row corresponds to a single downloadable resource.
+Resource rows contain metadata and download paths. The backend does not download files automatically during metadata retrieval. It follows a search-then-retrieval workflow.
 
 Typical columns include:
 
@@ -241,7 +187,6 @@ Typical columns include:
 | ----------------- | -------------------------- |
 | resource_id       | Unique resource identifier |
 | dataset_id        | Associated PDB ID          |
-| source_repository | Source repository          |
 | name              | Resource file name         |
 | download_url      | Download URL               |
 | format            | File format                |
@@ -315,10 +260,15 @@ Typical columns include:
 | status                | Error status        |
 | endpoint_used         | API endpoint        |
 | endpoint_variables    | Endpoint parameters |
-| query_source          | Query source        |
 | notes                 | Error details       |
 
 An empty errors table typically indicates all lookups succeeded.
+
+Example error row:
+
+| identifier | status | notes |
+|------------|--------|-------|
+| NOT_A_PDB_ID | skipped | Identifier did not match a supported DOI or 4-character PDB ID |
 
 ---
 
@@ -452,7 +402,7 @@ This example demonstrates:
 * The `datasets` table is the Tier 1 table.
 * The `resources` table is the Tier 2 table.
 * Multiple resource rows may exist for a single dataset.
-* Resource rows contain metadata and download paths, not downloaded file contents.
+* Resource rows contain metadata and download paths. We do not download files along with metadata. We follow a search-then-retrieval process.
 * Full API responses are preserved under:
 
 ```python
