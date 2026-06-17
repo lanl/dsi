@@ -604,10 +604,24 @@ def test_rcsbpdb_find_condition(mocked_rcsb):
     matches = backend.find("dataset_id = 1CBS")
 
     assert isinstance(matches, list)
-    assert len(matches) == 1
-    assert matches[0].t_name == "datasets"
-    assert matches[0].type == "row"
-    assert matches[0].value["dataset_id"] == "1CBS"
+    assert len(matches) >= 1
+
+    dataset_matches = [
+        match for match in matches
+        if match.t_name == "datasets"
+    ]
+
+    assert len(dataset_matches) == 1
+    assert dataset_matches[0].type == "row"
+    assert dataset_matches[0].value["dataset_id"] == "1CBS"
+
+    resource_matches = [
+        match for match in matches
+        if match.t_name == "resources"
+    ]
+
+    assert len(resource_matches) >= 1
+    assert all(match.value["dataset_id"] == "1CBS" for match in resource_matches)
 
     backend.close()
 
@@ -620,11 +634,12 @@ def test_rcsbpdb_find_contains(mocked_rcsb):
         validate_resource_urls=False,
     )
 
-    matches = backend.find("title ~ hemoglobin")
+    matches = backend.find("title ~ structure")
 
     assert isinstance(matches, list)
     assert len(matches) >= 1
-    assert any(match.t_name == "datasets" for match in matches)
+    assert all(match.t_name == "datasets" for match in matches)
+    assert any("STRUCTURE" in match.value["title"].upper() for match in matches)
 
     backend.close()
 
@@ -706,10 +721,18 @@ def test_rcsbpdb_find_cell_aliases_find(mocked_rcsb):
     matches = backend.find_cell("dataset_id = 1CBS")
 
     assert isinstance(matches, list)
-    assert len(matches) == 1
-    assert matches[0].value["dataset_id"] == "1CBS"
+    assert len(matches) >= 1
+
+    dataset_matches = [
+        match for match in matches
+        if match.t_name == "datasets"
+    ]
+
+    assert len(dataset_matches) == 1
+    assert dataset_matches[0].value["dataset_id"] == "1CBS"
 
     backend.close()
+
 
 
 def test_rcsbpdb_find_relation_condition_string(mocked_rcsb):
@@ -723,8 +746,15 @@ def test_rcsbpdb_find_relation_condition_string(mocked_rcsb):
     matches = backend.find_relation("dataset_id = 1CBS")
 
     assert isinstance(matches, list)
-    assert len(matches) == 1
-    assert matches[0].value["dataset_id"] == "1CBS"
+    assert len(matches) >= 1
+
+    dataset_matches = [
+        match for match in matches
+        if match.t_name == "datasets"
+    ]
+
+    assert len(dataset_matches) == 1
+    assert dataset_matches[0].value["dataset_id"] == "1CBS"
 
     backend.close()
 
@@ -740,8 +770,15 @@ def test_rcsbpdb_find_relation_condition_split_args(mocked_rcsb):
     matches = backend.find_relation("dataset_id", "= 1CBS")
 
     assert isinstance(matches, list)
-    assert len(matches) == 1
-    assert matches[0].value["dataset_id"] == "1CBS"
+    assert len(matches) >= 1
+
+    dataset_matches = [
+        match for match in matches
+        if match.t_name == "datasets"
+    ]
+
+    assert len(dataset_matches) == 1
+    assert dataset_matches[0].value["dataset_id"] == "1CBS"
 
     backend.close()
 
