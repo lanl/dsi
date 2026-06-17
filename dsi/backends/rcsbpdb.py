@@ -1234,13 +1234,19 @@ class RCSBPDB(Webserver):
 
     def process_artifacts(self, **kwargs):
         extracted = self._extract_tables(self.raw_results)
-        self.tables = {}
+        self.tables = OrderedDict()
 
         for table_name, rows in extracted.items():
-            self.tables[table_name] = self._rows_to_table(rows)
-            self.schemas[table_name] = (
-                list(rows[0].keys()) if rows else self.schemas.get(table_name, [])
-            )
+            if not rows:
+                continue
+
+            table = self._rows_to_table(rows)
+
+            if not table or len(table.keys()) == 0:
+                continue
+
+            self.tables[table_name] = table
+            self.schemas[table_name] = list(rows[0].keys())
 
         self._loaded = True
         return self.tables

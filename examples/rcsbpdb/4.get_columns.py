@@ -20,6 +20,7 @@ def create_sample_excel(input_file: Path) -> None:
 def main():
     base_dir = Path(__file__).resolve().parent
     input_file = base_dir / "pdb_inputs.xlsx"
+    output_db = base_dir / "data.db"
 
     if not input_file.exists():
         create_sample_excel(input_file)
@@ -36,41 +37,19 @@ def main():
     for identifier in identifiers:
         print(f" - {identifier}")
 
-    print("\nFind one loaded DOI:")
-    dsi.find("doi = 10.2210/pdb4hhb/pdb")
-
     dsi = DSI(
         backend_name="RCSBPDB",
         params={"identifiers": identifiers},
         silence_messages=True,
     )
 
-    datasets_df = dsi.get_table("datasets", collection=True)
+    print("\nFind one loaded DOI:")
+    dsi.find("doi = 10.2210/pdb4hhb/pdb")
+
+    print("\nDisplay selected dataset columns:")
+    dsi.display("datasets", display_cols=["title", "description"])
+
     resources_df = dsi.get_table("resources", collection=True)
-    errors_df = dsi.get_table("errors", collection=True)
-
-    print("\nRetrieved datasets:")
-    dataset_columns = [
-        "dataset_id",
-        "doi",
-        "title",
-        "experimental_method",
-        "release_date",
-        "resource_count",
-    ]
-    existing_dataset_columns = [
-        col for col in dataset_columns if col in datasets_df.columns
-    ]
-
-    with pd.option_context(
-        "display.max_columns",
-        None,
-        "display.width",
-        None,
-        "display.max_colwidth",
-        None,
-    ):
-        print(datasets_df[existing_dataset_columns])
 
     print("\nAssociated resource metadata and paths:")
     resource_columns = [
@@ -101,21 +80,15 @@ def main():
     else:
         print("No resources found.")
 
-    if not errors_df.empty:
-        print("\nErrors or skipped identifiers:")
-        with pd.option_context(
-            "display.max_columns",
-            None,
-            "display.width",
-            None,
-            "display.max_colwidth",
-            None,
-        ):
-            print(errors_df)
+    if output_db.exists():
+        output_db.unlink()
 
-    print("\nFull metadata location:")
-    print("The curated fields are stored as columns in the datasets and resources tables.")
-    print("The complete RCSB JSON response is stored in datasets.raw_metadata['full_metadata'].")
+    print("\nStore results in SQLite:")
+    try:
+        dsi.process("sqlite", str(output_db))
+        print(f"Stored results in: {output_db}")
+    except Exception as exc:
+        print(f"Could not store results in SQLite: {exc}")
 
     dsi.close()
 
