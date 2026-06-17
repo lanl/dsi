@@ -85,7 +85,7 @@ class Oceans11(Webserver):
         DEFAULT_URL = "https://oceans11.lanl.gov/dataCatalog/oceans11.db"
         base_url = url or DEFAULT_URL
 
-       # ----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         # Auth / connection config
         # ----------------------------------------------------------------------
         self.workspace = kwargs.get(
@@ -98,6 +98,10 @@ class Oceans11(Webserver):
             raise ValueError("Oceans11 catalog URL must be http or https")
 
         self.base_url = base_url.rstrip("/")
+
+        # skip data retrieval if only checking connection to oceans11
+        if kwargs.get("only_validate", False):
+            return
 
         # Data storage (tiered structure)
         # Tier 1: datasets, Tier 2: per-dataset resource tables
@@ -131,7 +135,7 @@ class Oceans11(Webserver):
     # ----------------------------------------------------------------------
     # Connection Validation
     # ----------------------------------------------------------------------
-    def validate_connection(self):
+    def validate_connection(self, **kwargs):
         """
         Validates that the base Oceans11 URL is accessible and functional.
         
@@ -162,15 +166,27 @@ class Oceans11(Webserver):
                 )
 
             if info is None:
+                if kwargs.get("only_validate", False):
+                    return False
                 raise ConnectionError(f"Failed to download catalog from {self.base_url}")
 
             local_path = info.get("local_path")
             if not local_path or not Path(local_path).is_file():
+                if kwargs.get("only_validate", False):
+                    return False
                 raise RuntimeError("Downloaded catalog file is invalid or missing")
+
+            # skip data retrieval if only checking connection to oceans11
+            if kwargs.get("only_validate", False):
+                import shutil
+                shutil.rmtree(info["folder_hash"] + "/")
+                return True
 
             return local_path
 
         except Exception as e:
+            if kwargs.get("only_validate", False):
+                return False
             raise ConnectionError(f"Unable to access Oceans11 catalog: {e}") from e
 
     # ---------------------------------------------------
