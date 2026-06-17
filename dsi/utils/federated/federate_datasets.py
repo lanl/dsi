@@ -79,7 +79,8 @@ def pull_data(location_type: str,
               abs_path_workspace_folder: str, 
               username: str,
               download_limit: int = 10485760,
-              internal_use = False) -> dict | tuple[dict | None, str]:
+              internal_use = False,
+              parent_hash: str = None) -> dict | tuple[dict | None, str]:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -100,8 +101,11 @@ def pull_data(location_type: str,
     filename = get_last_part(path)
 
     # Create folder for data
-    abs_path_workspace_folder = str(Path(abs_path_workspace_folder).resolve()) 
-    folder_hash, abs_path_db_folder = create_folder_from_path(location, abs_path_workspace_folder)  
+    abs_path_workspace_folder = str(Path(abs_path_workspace_folder).resolve())
+    if parent_hash:
+        folder_hash, abs_path_db_folder = create_folder_from_path(parent_hash, abs_path_workspace_folder)
+    else:
+        folder_hash, abs_path_db_folder = create_folder_from_path(path, abs_path_workspace_folder)
 
     # Get the absolute path to the file to be downloaded
     file_path = Path(abs_path_db_folder) / filename

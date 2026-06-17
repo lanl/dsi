@@ -799,10 +799,11 @@ class Sync():
 
         if is_url(remote_loc):
             remote_files = t2.get_table("filesystem")["file_remote"]
+            parent_url = os.path.commonprefix(remote_files.tolist())
             for remote_url in remote_files:
                 # Downloading each file from fileystem
                 db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_url, 
-                                            workspace_folder, username, internal_use=True)
+                                            workspace_folder, username, internal_use=True, parent_hash=parent_url)
                 new_folder = Path(db_info.pop("new_db_folder"))
                 if new_folder.is_dir() and not any(new_folder.iterdir()):
                     new_folder.rmdir()
