@@ -816,6 +816,29 @@ class NDP(Webserver):
         return list(set(found_tables))
 
 
+    def overwrite_table(self, table_name, collection):
+        """
+        Not supported - NDP backend is read-only.
+        
+        Parameters
+        ----------
+        `table_name` : str or list
+            Table name(s)
+        `collection` : DataFrame or list
+            Data
+        
+        Raises
+        ------
+        NotImplementedError
+            Always raised as NDP is read-only
+        """
+        raise NotImplementedError(
+            "NDP backend is read-only. Cannot overwrite tables. "
+            "To modify data, use artifact_handler('process') to load into "
+            "a writable backend (Sqlite/DuckDB), make changes, then query."
+        )
+
+
     # ----------------------------------------------------------------------
     # Query Interface (in-memory)
     # ----------------------------------------------------------------------
@@ -853,6 +876,7 @@ class NDP(Webserver):
         """
         Find rows where column matches relation (e.g., 'num_resources > 5').
         """
+        
         if not self._loaded:
             raise RuntimeError(
                 "find_relation() ERROR: Cannot search an empty backend. "
@@ -1233,16 +1257,132 @@ class NDP(Webserver):
         return matches
 
 
-    def find_relation(self, column_name, relation, **kwargs):
-        """
-        **NDP is a read-only metadata backend and does not support relational queries on columns.**
-        """
-        raise NotImplementedError("NDP Backend does not support find_relation")
+    # def find_relation(self, column_name, relation, **kwargs):
+    #     """
+    #     Not supported for NDP backend.
+
+    #     NDP is a read-only metadata backend and does not support
+    #     relational queries on columns.
+
+    #     Parameters
+    #     ----------
+    #     `column_name` : str
+    #         Column name (unused)
+    #     `relation` : str
+    #         Relation type (unused)
+    #     `**kwargs` : dict
+    #         Additional keyword arguments (unused)
+
+    #     Returns
+    #     -------
+    #     list
+    #         Always returns an empty list
+    #     """
+    #     return []
 
 
     # ----------------------------------------------------------------------
     # Utility / Display
     # ----------------------------------------------------------------------
+    # def list(self, collection=False):
+    #     """
+    #     Lists tables or prints metadata.
+
+    #     For resource tables, displays both dataset_title and dataset_id.
+
+    #     Parameters
+    #     ----------
+    #     `collection` : bool, default False
+    #         If True, return list of table names.
+    #         If False, print table names with dimensions and dataset IDs.
+
+    #     Returns
+    #     -------
+    #     dict_keys or None
+    #         Table names if collection=True, otherwise None
+    #     """
+
+    #     if collection:
+    #         return self._cache.keys()
+
+    #     for name, table in self._cache.items():
+    #         df = pd.DataFrame(table)
+            
+    #         if name in self._resource_tables:
+    #             dataset_id = self._dataset_title_map.get(name, "N/A")
+    #             print(f"{name} (ID: {dataset_id}): ({len(df)} rows, {len(df.columns)} cols)")
+    #         else:
+    #             print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
+
+
+    # def summary(self, table_name=None):
+    #     """
+    #     Returns numerical metadata for tables.
+
+    #     For resource tables, includes dataset_id information.
+
+    #     Parameters
+    #     ----------
+    #     `table_name` : str, optional
+    #         If provided, returns summary for a single table.
+    #         Can be either dataset_title or dataset_id.
+    #         If None, returns summary for all tables in expected format.
+
+    #     Returns
+    #     -------
+    #     pandas.DataFrame or list
+    #         - If table_name is None: returns [table_names_list, df1, df2, ...]
+    #         - If table_name provided: returns single DataFrame
+    #     """
+
+    #     if not self._loaded:
+    #         return pd.DataFrame()
+
+    #     if table_name:
+    #         # Single table - return DataFrame
+    #         resolved_name = self._resolve_table_name(table_name)
+    #         table = self._cache.get(resolved_name)
+            
+    #         if not table:
+    #             raise ValueError(f"Table '{resolved_name}' is empty")
+            
+    #         df = pd.DataFrame(table)
+            
+    #         summary_dict = {
+    #             "table_name": resolved_name,
+    #             "num_rows": len(df),
+    #             "num_columns": len(df.columns),
+    #             "columns": list(df.columns)
+    #         }
+            
+    #         if resolved_name in self._resource_tables:
+    #             summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
+            
+    #         return pd.DataFrame([summary_dict])
+        
+    #     # Multiple tables - return list format [table_names, df1, df2, ...]
+    #     table_names = []
+    #     summary_dfs = []
+        
+    #     for name, table in self._cache.items():
+    #         df = pd.DataFrame(table)
+            
+    #         summary_dict = {
+    #             "table_name": name,
+    #             "num_rows": len(df),
+    #             "num_columns": len(df.columns),
+    #             "columns": list(df.columns)
+    #         }
+            
+    #         if name in self._resource_tables:
+    #             summary_dict["dataset_id"] = self._dataset_title_map.get(name, "N/A")
+            
+    #         table_names.append(name)
+    #         summary_dfs.append(pd.DataFrame([summary_dict]))
+        
+    #     # Return as [table_names_list, df1, df2, ...]
+    #     return [table_names] + summary_dfs
+    
     def list(self, collection=False):
         """
         Lists tables or prints each table's dimensions in SQLite-compatible format.

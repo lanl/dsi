@@ -1222,9 +1222,32 @@ class DSI():
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-
-
-
+    
+    def num_datasets(self): # ADDED NEW
+        """
+        Prints the number of datasets in the active backend.
+        
+        For NDP backend: returns the count of rows in the datasets table.
+        For other backends: equivalent to num_tables().
+        """
+        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+            raise RuntimeError("ERROR: Cannot call num_datasets() on an empty backend. Please ensure there is data in it.")
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot call num_datasets() until all associated data is loaded after a complex schema")
+        
+        # Check if backend has num_datasets method (NDP-specific)
+        if hasattr(self.main_backend_obj, 'num_datasets'):
+            try:
+                count = self.main_backend_obj.num_datasets()
+                print(f"{count} datasets loaded")
+            except Exception as e:
+                if e.args:
+                    e.args = (f'num_datasets() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+        else:
+            # Fall back to num_tables for other backends
+            self.num_tables()
+        
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Prints data from a specified table in the active backend.
