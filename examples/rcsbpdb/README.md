@@ -385,7 +385,7 @@ This example demonstrates:
 
 ### 4.get_columns.py
 
-Read PDB IDs and DOIs from an Excel spreadsheet, retrieve metadata, and display all associated dataset and resource information.
+Read PDB IDs and DOIs from an Excel spreadsheet, retrieve metadata, display selected dataset and resource information, export results to CSV, and store the loaded tables in SQLite.
 
 This example demonstrates:
 
@@ -396,6 +396,17 @@ This example demonstrates:
 - Dataset metadata retrieval
 - Resource metadata and download path retrieval
 - Resource count summaries by dataset
+- Errors table handling using an intentionally invalid identifier
+- DSI `write()` export to CSV
+- DSI `process("sqlite", "data.db")` storage workflow
+
+The script creates `pdb_inputs.xlsx` if it does not already exist. It also adds `NOT_A_PDB_ID` during loading to demonstrate how failed or skipped lookups are represented in the `errors` table.
+
+Expected output files:
+
+- `pdb_inputs.xlsx`
+- `datasets.csv`
+- `data.db`
 
 ---
 
