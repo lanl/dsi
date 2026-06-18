@@ -8,9 +8,6 @@ dsi = DSI(
 )
 
 # ✅ CORRECT: Use find() with pandas query syntax
-dsi.find("num_resources > 2")
-dsi.find("num_resources < 2")
-dsi.find('organization == "Oceans11 - LANL"')
-
+dsi.num_tables()
 # ❌ WRONG: Don't use query() - will raise NotImplementedError
 # dsi.query("SELECT * FROM datasets WHERE num_resources > 2")

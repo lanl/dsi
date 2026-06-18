@@ -251,7 +251,7 @@ class NDP(Webserver):
             Individual query parameters (backward compatible)
         """
         
-        # Normalize params to list for uniform processing
+        # Normalize params to list
         if isinstance(params, dict):
             query_list = [params]
         elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
@@ -269,21 +269,21 @@ class NDP(Webserver):
         # Deduplicate by dataset ID
         unique_datasets = self._deduplicate_datasets(all_datasets)
         
-        # Extract and cache tables
-        dataset_rows, resource_map, id_map = self._extract_tables(unique_datasets)
+        # Extract tables (returns combined resources now)
+        dataset_rows, all_resource_rows, id_map = self._extract_tables(unique_datasets)
         
         # Tier 1: datasets
         self._cache["datasets"] = self._rows_to_table(dataset_rows)
         
+        # Tier 2: resources (ONE table for ALL resources)
+        if all_resource_rows:
+            self._cache["resources"] = self._rows_to_table(all_resource_rows)
+        
         self._dataset_id_map = id_map
         self._dataset_title_map = {v: k for k, v in id_map.items()}
         
-        # Tier 2: per-dataset resource tables
+        # No longer need _resource_tables list
         self._resource_tables = []
-        for dataset_title, rows in resource_map.items():
-            table_name = dataset_title
-            self._cache[table_name] = self._rows_to_table(rows)
-            self._resource_tables.append(table_name)
         
         self._loaded = True
 
@@ -515,29 +515,32 @@ class NDP(Webserver):
 
     def _extract_tables(self, datasets):
         """
-        Flatten CKAN dataset JSON into dataset and resource tables.
-
+        Flatten CKAN dataset JSON into datasets and resources tables.
+        
+        Creates:
+            - datasets: One row per dataset
+            - resources: Combined resources from ALL datasets
+        
         Parameters
         ----------
         `datasets` : list
             List of dataset dictionaries from CKAN API
-
+        
         Returns
         -------
         tuple
-            (dataset_rows, resource_map, id_map) where:
+            (dataset_rows, all_resource_rows, id_map) where:
                 - dataset_rows : list of dict
                     Flattened dataset metadata
-                - resource_map : dict
-                    Maps dataset_name to list of resource rows
+                - all_resource_rows : list of dict
+                    Combined resources from all datasets
                 - id_map : dict
                     Maps dataset_id to dataset_title
         """
-
         dataset_rows = []
-        resource_map = {}
+        all_resource_rows = []
         id_map = {}
-
+        
         for ds in datasets:
             dataset_id = ds.get("id")
             dataset_name = ds.get("name") or dataset_id
@@ -545,7 +548,7 @@ class NDP(Webserver):
             
             if dataset_id and dataset_title:
                 id_map[dataset_id] = dataset_title
-
+            
             dataset_rows.append({
                 "id": dataset_id,
                 "name": dataset_name,
@@ -560,11 +563,10 @@ class NDP(Webserver):
                 "num_resources": ds.get("num_resources", 0),
                 "raw_dataset": ds
             })
-
-            resource_map.setdefault(dataset_title, [])
             
+            # Add all resources to ONE list
             for r in ds.get("resources", []):
-                resource_map[dataset_title].append({
+                all_resource_rows.append({
                     "resource_id": r.get("id"),
                     "resource_name": r.get("name"),
                     "issue_date": r.get("issueDate"),
@@ -573,12 +575,10 @@ class NDP(Webserver):
                     "url": r.get("url"),
                     "dataset_id": dataset_id,
                     "dataset_title": dataset_title,
-                    "raw_dataset": r
+                    "raw_resource": r
                 })
-            #print(r)
-
-        return dataset_rows, resource_map, id_map
-
+        
+        return dataset_rows, all_resource_rows, id_map
 
     def _rows_to_table(self, rows):
         """
@@ -636,9 +636,9 @@ class NDP(Webserver):
         """
         Returns the number of tables currently loaded.
         
-        Counts:
-            - 1 datasets table (if loaded)
-            - N resource tables (one per dataset, if loaded)
+        NDP backend has 2 main tables:
+            - datasets: Dataset metadata
+            - resources: Combined resources from all datasets
         
         Returns
         -------
@@ -650,18 +650,21 @@ class NDP(Webserver):
             return
         
         # Count actual tables in cache
-        total_tables = 0
+        table_count = 0
         
-        # Check if datasets table exists and is not empty
+        # Check for datasets table
         if "datasets" in self._cache and self._cache["datasets"]:
-            total_tables += 1
+            table_count += 1
         
-        # Count resource tables
-        for table_name in self._resource_tables:
-            if table_name in self._cache and self._cache[table_name]:
-                total_tables += 1
+        # Check for resources table
+        if "resources" in self._cache and self._cache["resources"]:
+            table_count += 1
         
-        print(f"{total_tables} tables loaded")
+        # Check for errors table (if implemented)
+        if "errors" in self._cache and self._cache["errors"]:
+            table_count += 1
+        
+        print(f"{table_count} tables loaded")
 
     def get_table(self, table_name, dict_return=False):
         """
@@ -670,7 +673,7 @@ class NDP(Webserver):
         Parameters
         ----------
         `table_name` : str
-            Dataset title or ID
+            Must be 'datasets' or 'resources'
         `dict_return` : bool, default False
             If True, returns OrderedDict. If False, returns DataFrame.
         
@@ -679,13 +682,18 @@ class NDP(Webserver):
         OrderedDict or pandas.DataFrame
         """
         if not self._loaded:
-            raise RuntimeError("No data loaded. Call load_datasets() first.")
+            raise RuntimeError("No data loaded")
         
-        resolved_name = self._resolve_table_name(table_name)
-        table = self._cache.get(resolved_name)
+        if table_name not in self._cache:
+            raise ValueError(
+                f"Table '{table_name}' not found. "
+                f"Available tables: {list(self._cache.keys())}"
+            )
+        
+        table = self._cache.get(table_name)
         
         if not table:
-            raise ValueError(f"Table '{resolved_name}' is empty")
+            raise ValueError(f"Table '{table_name}' is empty")
         
         if dict_return:
             return table
@@ -1333,22 +1341,21 @@ class NDP(Webserver):
     def list(self, collection=False):
         """
         Lists tables or prints metadata in SQLite-compatible format.
-
+        
         Parameters
         ----------
         `collection` : bool, default False
             If True, return list of table names.
             If False, print table names with dimensions.
-
+        
         Returns
         -------
         list or None
             Table names if collection=True, otherwise None
         """
-
         if collection:
             return list(self._cache.keys())
-
+        
         # Print in SQLite-compatible format
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
@@ -1359,17 +1366,16 @@ class NDP(Webserver):
     def summary(self, table_name=None, collection=False):
         """
         Returns numerical metadata for tables in SQLite-compatible format.
-
+        
         Parameters
         ----------
         `table_name` : str, optional
-            If provided, returns summary for a single table.
-            Can be either dataset_title or dataset_id.
-            If None, returns summary for all tables.
+            If provided, returns summary for that table.
+            Must be 'datasets' or 'resources'.
         `collection` : bool, default False
             If True, returns data as DataFrame(s).
             If False, returns list format for Terminal to print.
-
+        
         Returns
         -------
         pandas.DataFrame or list
@@ -1377,42 +1383,42 @@ class NDP(Webserver):
             - If collection=True and table_name=None: returns list [table_names, df1, df2, ...]
             - If collection=False: returns list [table_names, df1, df2, ...] for Terminal
         """
-
         if not self._loaded:
             if collection:
                 return pd.DataFrame()
             else:
                 return [[], pd.DataFrame()]
-
+        
         if table_name:
             # Single table
-            resolved_name = self._resolve_table_name(table_name)
-            table = self._cache.get(resolved_name)
+            if table_name not in self._cache:
+                raise ValueError(
+                    f"Table '{table_name}' not found. "
+                    f"Available tables: {list(self._cache.keys())}"
+                )
+            
+            table = self._cache.get(table_name)
             
             if not table:
-                raise ValueError(f"Table '{resolved_name}' is empty")
+                raise ValueError(f"Table '{table_name}' is empty")
             
             df = pd.DataFrame(table)
             
             summary_dict = {
-                "table_name": resolved_name,
+                "table_name": table_name,
                 "num_rows": len(df),
                 "num_columns": len(df.columns),
                 "columns": list(df.columns)
             }
-            
-            if resolved_name in self._resource_tables:
-                summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
             
             summary_df = pd.DataFrame([summary_dict])
             
             if collection:
                 return summary_df
             else:
-                # Return in list format for Terminal to handle printing
-                return [[resolved_name], summary_df]
+                return [[table_name], summary_df]
         
-        # Multiple tables - return list format [table_names, df1, df2, ...]
+        # Multiple tables
         table_names = []
         summary_dfs = []
         
@@ -1426,70 +1432,120 @@ class NDP(Webserver):
                 "columns": list(df.columns)
             }
             
-            if name in self._resource_tables:
-                summary_dict["dataset_id"] = self._dataset_title_map.get(name, "N/A")
-            
             table_names.append(name)
             summary_dfs.append(pd.DataFrame([summary_dict]))
         
-        # Always return as [table_names_list, df1, df2, ...]
-        # collection flag doesn't matter - Terminal will handle printing
         return [table_names] + summary_dfs
 
     def display(self, table_name, num_rows=25, display_cols=None):
         """
         Displays rows from a specified table.
-
-        Accepts either dataset_title or dataset_id for resource tables.
-
+        
         Parameters
         ----------
         `table_name` : str
-            Title or ID of the table to display
+            Must be 'datasets' or 'resources'
         `num_rows` : int, default 25
             Number of rows to display
         `display_cols` : list of str, optional
             Subset of columns to display
-
+        
         Returns
         -------
         pandas.DataFrame
             Displayed table data with long strings truncated
         """
-
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot display empty backend.")
-
-        resolved_name = self._resolve_table_name(table_name)
-
-        table = self._cache.get(resolved_name)
-
+        
+        if table_name not in self._cache:
+            raise ValueError(
+                f"Table '{table_name}' not found. "
+                f"Available tables: {list(self._cache.keys())}"
+            )
+        
+        table = self._cache.get(table_name)
+        
         if not table:
-            raise ValueError(f"Table '{resolved_name}' is empty")
-
+            raise ValueError(f"Table '{table_name}' is empty")
+        
         df = pd.DataFrame(table)
-
+        
         if display_cols:
             missing_cols = set(display_cols) - set(df.columns)
             if missing_cols:
                 raise ValueError(
-                    f"Columns not found in '{resolved_name}': {missing_cols}\n"
+                    f"Columns not found in '{table_name}': {missing_cols}\n"
                     f"Available columns: {list(df.columns)}"
                 )
             df = df[display_cols]
-
-        # Set max_rows before limiting rows
+        
         df.attrs["max_rows"] = len(df)
         
         if num_rows:
             df = df.head(num_rows)
-
-        # Truncate long strings for display using df.map() (pandas 2.1.0+)
+        
+        # Truncate long strings for display
         df = df.map(
             lambda x: (str(x)[:60] + '...') if isinstance(x, str) and len(str(x)) > 60 else x
         )
-
+        
         return df
+
+    # def display(self, table_name, num_rows=25, display_cols=None):
+    #     """
+    #     Displays rows from a specified table.
+
+    #     Accepts either dataset_title or dataset_id for resource tables.
+
+    #     Parameters
+    #     ----------
+    #     `table_name` : str
+    #         Title or ID of the table to display
+    #     `num_rows` : int, default 25
+    #         Number of rows to display
+    #     `display_cols` : list of str, optional
+    #         Subset of columns to display
+
+    #     Returns
+    #     -------
+    #     pandas.DataFrame
+    #         Displayed table data with long strings truncated
+    #     """
+
+    #     if not self._loaded:
+    #         raise RuntimeError("No data loaded. Cannot display empty backend.")
+
+    #     resolved_name = self._resolve_table_name(table_name)
+
+    #     table = self._cache.get(resolved_name)
+
+    #     if not table:
+    #         raise ValueError(f"Table '{resolved_name}' is empty")
+
+    #     df = pd.DataFrame(table)
+
+    #     if display_cols:
+    #         missing_cols = set(display_cols) - set(df.columns)
+    #         if missing_cols:
+    #             raise ValueError(
+    #                 f"Columns not found in '{resolved_name}': {missing_cols}\n"
+    #                 f"Available columns: {list(df.columns)}"
+    #             )
+    #         df = df[display_cols]
+
+    #     # Set max_rows before limiting rows
+    #     df.attrs["max_rows"] = len(df)
+        
+    #     if num_rows:
+    #         df = df.head(num_rows)
+
+    #     # Truncate long strings for display using df.map() (pandas 2.1.0+)
+    #     df = df.map(
+    #         lambda x: (str(x)[:60] + '...') if isinstance(x, str) and len(str(x)) > 60 else x
+    #     )
+
+    #     return df
 
     def notebook(self, **kwargs):
         """
