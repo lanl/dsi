@@ -1686,6 +1686,61 @@ class NDP(Webserver):
         print()
 
 
+    # def display(self, table_name, num_rows=25, display_cols=None):
+    #     """
+    #     Displays rows from a specified table.
+
+    #     Accepts either dataset_title or dataset_id for resource tables.
+
+    #     Parameters
+    #     ----------
+    #     `table_name` : str
+    #         Title or ID of the table to display
+    #     `num_rows` : int, default 25
+    #         Number of rows to display
+    #     `display_cols` : list of str, optional
+    #         Subset of columns to display
+
+    #     Returns
+    #     -------
+    #     pandas.DataFrame
+    #         Displayed table data with long strings truncated
+    #     """
+
+    #     if not self._loaded:
+    #         raise RuntimeError("No data loaded. Cannot display empty backend.")
+
+    #     resolved_name = self._resolve_table_name(table_name)
+
+    #     table = self._cache.get(resolved_name)
+
+    #     if not table:
+    #         raise ValueError(f"Table '{resolved_name}' is empty")
+
+    #     df = pd.DataFrame(table)
+
+    #     if display_cols:
+    #         missing_cols = set(display_cols) - set(df.columns)
+    #         if missing_cols:
+    #             raise ValueError(
+    #                 f"Columns not found in '{resolved_name}': {missing_cols}\n"
+    #                 f"Available columns: {list(df.columns)}"
+    #             )
+    #         df = df[display_cols]
+
+    #     # Set max_rows before limiting rows
+    #     df.attrs["max_rows"] = len(df)
+        
+    #     if num_rows:
+    #         df = df.head(num_rows)
+
+    #     # Truncate long strings for display using df.map() (pandas 2.1.0+)
+    #     df = df.map(
+    #         lambda x: (str(x)[:60] + '...') if isinstance(x, str) and len(str(x)) > 60 else x
+    #     )
+
+    #     return df
+
     def notebook(self, **kwargs):
         """
         Notebook generation not supported for NDP backend.
