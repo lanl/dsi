@@ -20,6 +20,7 @@ def create_sample_excel(input_file: Path) -> None:
 def main():
     base_dir = Path(__file__).resolve().parent
     input_file = base_dir / "pdb_inputs.xlsx"
+    output_csv = base_dir / "datasets.csv"
     output_db = base_dir / "data.db"
 
     if not input_file.exists():
@@ -39,7 +40,7 @@ def main():
 
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={"identifiers": identifiers},
+        params={"identifiers": identifiers + ["NOT_A_PDB_ID"]},
         silence_messages=True,
     )
 
@@ -80,15 +81,32 @@ def main():
     else:
         print("No resources found.")
 
+    errors_df = dsi.get_table("errors", collection=True)
+
+    print("\nErrors table:")
+    with pd.option_context(
+        "display.max_columns",
+        None,
+        "display.width",
+        None,
+        "display.max_colwidth",
+        None,
+    ):
+        print(errors_df)
+
+    if output_csv.exists():
+        output_csv.unlink()
+
+    print("\nExport datasets table to CSV:")
+    dsi.write(str(output_csv), "CSV", table_name="datasets")
+    print(f"Stored datasets table in: {output_csv}")
+
     if output_db.exists():
         output_db.unlink()
 
     print("\nStore results in SQLite:")
-    try:
-        dsi.process("sqlite", str(output_db))
-        print(f"Stored results in: {output_db}")
-    except Exception as exc:
-        print(f"Could not store results in SQLite: {exc}")
+    dsi.process("sqlite", str(output_db))
+    print(f"Stored results in: {output_db}")
 
     dsi.close()
 

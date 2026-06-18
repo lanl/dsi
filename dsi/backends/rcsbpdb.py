@@ -11,8 +11,8 @@ Access modes
    - PDB ID input, e.g. "1CBS"
 
 2. Query-driven mode, closer to NDP
-   - params={"keywords": "hemoglobin", "limit": 20}
-   - find_relation({"keywords": "hemoglobin", "limit": 20})
+   - params={"keywords": "hemoglobin", "limit": 5}
+   - find_relation({"keywords": "hemoglobin", "limit": 5})
    - find_relation("hemoglobin")
 
 DOI behavior
@@ -66,6 +66,7 @@ params
 from __future__ import annotations
 
 import re
+import json
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 from collections import OrderedDict
@@ -911,13 +912,11 @@ class RCSBPDB(Webserver):
                         "repo": res.repo,
                         "status": res.status,
                         "endpoint_used": res.endpoint_used,
-                        "endpoint_variables": res.endpoint_variables,
+                        "endpoint_variables": self._json_or_none(res.endpoint_variables),
                         "notes": " | ".join(res.notes) if res.notes else None,
                     }
                 )
                 continue
-
-            file_exts = [f.extension for f in res.files]
 
             datasets.append(
                 {
@@ -935,7 +934,7 @@ class RCSBPDB(Webserver):
                     "release_date": self._extract_release_date(res.raw_metadata),
                     "revision_date": self._extract_revision_date(res.raw_metadata),
                     "resource_count": len(res.files),
-                    "raw_metadata": res.raw_metadata,
+                    "raw_metadata": self._json_or_none(res.raw_metadata),
                     "notes": " | ".join(res.notes) if res.notes else None,
                 }
             )
@@ -950,7 +949,7 @@ class RCSBPDB(Webserver):
                         "format": file_obj.extension,
                         "resource_type": file_obj.format_hint,
                         "source": file_obj.source,
-                        "raw_metadata": asdict(file_obj),
+                        "raw_metadata": self._json_or_none(asdict(file_obj)),
                     }
                 )
 
@@ -963,13 +962,10 @@ class RCSBPDB(Webserver):
     def _apply_schema(self, rows: List[Dict[str, Any]], schema: List[str]) -> List[Dict[str, Any]]:
         return [{column: row.get(column) for column in schema} for row in rows]
 
-    def _rows_to_table(self, rows: List[Dict[str, Any]]):
+    def _rows_to_table(self, rows: List[Dict[str, Any]], schema: List[str]):
         table = OrderedDict()
 
-        if not rows:
-            return table
-
-        for column in rows[0].keys():
+        for column in schema:
             table[column] = [row.get(column) for row in rows]
 
         return table
@@ -987,6 +983,16 @@ class RCSBPDB(Webserver):
             "errors": "errors",
         }
         return aliases.get(str(table_name).lower(), str(table_name))
+
+    @staticmethod
+    def _json_or_none(value):
+        if value is None:
+            return None
+
+        try:
+            return json.dumps(value, sort_keys=True)
+        except TypeError:
+            return str(value)
 
     @staticmethod
     def _extract_experimental_method(raw_metadata: Dict[str, Any]) -> Optional[str]:
@@ -1142,7 +1148,10 @@ class RCSBPDB(Webserver):
     def overwrite_table(self, table_name: str, rows: List[Dict[str, Any]]) -> None:
         resolved = self._resolve_table_name(table_name)
         schema = self.schemas.get(resolved, list(rows[0].keys()) if rows else [])
-        self.tables[resolved] = self._rows_to_table(self._apply_schema(rows, schema))
+        self.tables[resolved] = self._rows_to_table(
+            self._apply_schema(rows, schema),
+            schema,
+        )
         self.schemas[resolved] = schema
 
     def validate_urls(self, table_name: str = "resources", url_column: str = "download_url", **kwargs):
@@ -1237,16 +1246,11 @@ class RCSBPDB(Webserver):
         self.tables = OrderedDict()
 
         for table_name, rows in extracted.items():
-            if not rows:
-                continue
-
-            table = self._rows_to_table(rows)
-
-            if not table or len(table.keys()) == 0:
-                continue
+            schema = self.schemas[table_name]
+            table = self._rows_to_table(rows, schema)
 
             self.tables[table_name] = table
-            self.schemas[table_name] = list(rows[0].keys())
+            self.schemas[table_name] = schema
 
         self._loaded = True
         return self.tables

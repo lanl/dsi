@@ -7,7 +7,7 @@ from dsi.dsi import DSI
 def main():
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={"keywords": "genomics", "limit": 10},
+        params={"keywords": "genomics", "limit": 5},
         silence_messages=True,
     )
 
