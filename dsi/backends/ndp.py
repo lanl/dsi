@@ -234,12 +234,21 @@ class NDP(Webserver):
 
     def _load_initial_data(self, params):
         """
-        Fetch datasets/resources from CKAN API and store in memory.
-
+        Loads data from NDP API based on query parameters.
+        
+        Supports single query (dict or kwargs) or multiple queries (list of dicts).
+        Results are deduplicated by dataset ID and stored in tiered structure:
+            - Tier 1: datasets table
+            - Tier 2: per-dataset resource tables
+        
         Parameters
         ----------
-        `params` : dict or list[dict]
-            Single query dict or list of query dicts to chain together
+        params : dict or list of dict, optional
+            Query parameters or list of query parameter dicts.
+            Each dict can contain: keywords, organization, tags, formats, limit
+        
+        **kwargs : dict
+            Individual query parameters (backward compatible)
         """
         
         # Normalize params to list for uniform processing
@@ -304,7 +313,7 @@ class NDP(Webserver):
         # Organization filter - QUOTE IF HAS SPACES
         if params.get("organization"):
             org_value = self._quote_if_needed(params["organization"])
-            fq_parts.append(f"organization:{org_value}")
+            fq_parts.append(f"organization:{org_value.lower()}")
         
         # Tags filter - QUOTE EACH TAG IF HAS SPACES
         if params.get("tags"):
@@ -360,6 +369,7 @@ class NDP(Webserver):
                 unique_datasets.append(ds)
         
         return unique_datasets
+    
     # def _load_initial_data(self, params):
     #     """
     #     Fetch datasets/resources from CKAN API and store in memory.
@@ -601,17 +611,57 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Terminal Methods
     # ----------------------------------------------------------------------
+    def num_datasets(self):
+        """
+        Returns the number of datasets (rows in the datasets table).
+        
+        Returns
+        -------
+        int
+            Number of datasets loaded
+        """
+        if not self._loaded:
+            return 0
+        
+        datasets_table = self._cache.get("datasets", {})
+        
+        if not datasets_table:
+            return 0
+        
+        # Get length of first column to determine row count
+        first_col = next(iter(datasets_table.values()), [])
+        return len(first_col)
+
     def num_tables(self):
         """
-        Prints the number of tables (datasets) loaded.
+        Returns the number of tables currently loaded.
+        
+        Counts:
+            - 1 datasets table (if loaded)
+            - N resource tables (one per dataset, if loaded)
+        
+        Returns
+        -------
+        None
+            Prints the count to console
         """
         if not self._loaded:
             print("0 tables loaded")
             return
         
-        num = len(self._cache) - (1 if "datasets" in self._cache else 0)
-        print(f"{num} tables loaded")
-
+        # Count actual tables in cache
+        total_tables = 0
+        
+        # Check if datasets table exists and is not empty
+        if "datasets" in self._cache and self._cache["datasets"]:
+            total_tables += 1
+        
+        # Count resource tables
+        for table_name in self._resource_tables:
+            if table_name in self._cache and self._cache[table_name]:
+                total_tables += 1
+        
+        print(f"{total_tables} tables loaded")
 
     def get_table(self, table_name, dict_return=False):
         """
@@ -712,52 +762,152 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
-        Query all tables using a pandas query string.
+        Query not supported for NDP backend (non-SQL backend).
+        
+        NDP is a read-only metadata backend that does not support SQL queries.
+        Use find() or find_relation() for searching data instead.
 
         Parameters
         ----------
         `query` : str
-            Pandas query string for filtering data
+            Query string (unused)
         `dict_return` : bool, default True
-            If True, returns dict format.
-            If False, returns pandas DataFrames.
+            Return format flag (unused)
         `**kwargs` : dict
-            Additional keyword arguments
+            Additional keyword arguments (unused)
 
+        Raises
+        ------
+        NotImplementedError
+            Always raised as NDP does not support SQL queries
+        """
+        raise NotImplementedError(
+            "query() is not supported for NDP backend - it is a non-SQL backend.\n"
+            "Please use find() or find_relation() instead for searching data.\n\n"
+            "Examples:\n"
+            "  # Search for a value across all tables\n"
+            "  dsi.find('num_resources > 5')\n\n"
+            "  # Find rows matching a condition\n"
+            "  dsi.find('organization == \"Oceans11 - LANL\"')\n"
+        )
+    
+    # def find_relation(self, query, dict_return=True, **kwargs):
+    #     """
+    #     Query all tables using a pandas query string.
+
+    #     Parameters
+    #     ----------
+    #     `query` : str
+    #         Pandas query string for filtering data
+    #     `dict_return` : bool, default True
+    #         If True, returns dict format.
+    #         If False, returns pandas DataFrames.
+    #     `**kwargs` : dict
+    #         Additional keyword arguments
+
+    #     Returns
+    #     -------
+    #     dict
+    #         Dictionary mapping table names to query results
+    #     """
+
+    #     if not self._loaded:
+    #         raise RuntimeError("No data loaded. Cannot query empty backend.")
+
+    #     results = {}
+
+    #     for t_name, table in self._cache.items():
+    #         df = pd.DataFrame(table)
+
+    #         if df.empty:
+    #             continue
+
+    #         try:
+    #             result_df = df.query(query, engine="python")
+
+    #             if not result_df.empty:
+    #                 results[t_name] = (
+    #                     result_df.to_dict(orient="list")
+    #                     if dict_return else result_df
+    #                 )
+    #         except pd.errors.UndefinedVariableError:
+    #             continue
+    #         except Exception as e:
+    #             raise ValueError(f"Query error in {t_name}: {e}")
+
+    #     if not results:
+    #         raise ValueError(f"Query returned no results: '{query}'")
+
+    #     return results
+
+    def find_relation(self, column_name, relation, **kwargs):
+        """
+        Finds all rows across all tables where a column relation is satisfied.
+        
+        DSI core calls this with parsed query components.
+        
+        Parameters
+        ----------
+        column_name : str
+            The column to query (e.g., "num_resources")
+        relation : str
+            The relation/operator (e.g., "< 2", "> 5", "== 'value'")
+        **kwargs : dict
+            Additional keyword arguments
+        
         Returns
         -------
-        dict
-            Dictionary mapping table names to query results
+        list of ValueObject
+            List of ValueObjects representing matching rows
         """
-
+        
         if not self._loaded:
-            raise RuntimeError("No data loaded. Cannot query empty backend.")
-
-        results = {}
-
-        for t_name, table in self._cache.items():
+            return []
+        
+        # Reconstruct pandas query from column_name and relation
+        query = f"{column_name} {relation}"
+        
+        matches = []
+        
+        for table_name, table in self._cache.items():
             df = pd.DataFrame(table)
-
+            
             if df.empty:
                 continue
-
-            try:
-                result_df = df.query(query, engine="python")
-
-                if not result_df.empty:
-                    results[t_name] = (
-                        result_df.to_dict(orient="list")
-                        if dict_return else result_df
-                    )
-            except pd.errors.UndefinedVariableError:
+            
+            # Check if column exists in this table
+            if column_name not in df.columns:
                 continue
-            except Exception as e:
-                raise ValueError(f"Query error in {t_name}: {e}")
-
-        if not results:
-            raise ValueError(f"Query returned no results: '{query}'")
-
-        return results
+            
+            try:
+                # Reset index to ensure 0-based indexing
+                df = df.reset_index(drop=True)
+                
+                # Use pandas query to filter rows
+                result_df = df.query(query, engine="python")
+                
+                if result_df.empty:
+                    continue
+                
+                # Convert matching rows to ValueObjects
+                for idx, row in result_df.iterrows():
+                    val = ValueObject()
+                    val.t_name = table_name
+                    val.c_name = list(df.columns)
+                    val.row_num = idx + 1  # 1-indexed row numbers
+                    val.value = row.tolist()
+                    val.type = "cell"
+                    
+                    matches.append(val)
+                    
+            except pd.errors.UndefinedVariableError:
+                # Column doesn't exist in this table - skip it
+                continue
+            except Exception:
+                # Query failed for this table - skip it
+                continue
+        
+        return matches
 
 
     # ----------------------------------------------------------------------
@@ -1054,89 +1204,188 @@ class NDP(Webserver):
         return matches
 
 
-    def find_relation(self, column_name, relation, **kwargs):
-        """
-        Not supported for NDP backend.
+    # def find_relation(self, column_name, relation, **kwargs):
+    #     """
+    #     Not supported for NDP backend.
 
-        NDP is a read-only metadata backend and does not support
-        relational queries on columns.
+    #     NDP is a read-only metadata backend and does not support
+    #     relational queries on columns.
 
-        Parameters
-        ----------
-        `column_name` : str
-            Column name (unused)
-        `relation` : str
-            Relation type (unused)
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
+    #     Parameters
+    #     ----------
+    #     `column_name` : str
+    #         Column name (unused)
+    #     `relation` : str
+    #         Relation type (unused)
+    #     `**kwargs` : dict
+    #         Additional keyword arguments (unused)
 
-        Returns
-        -------
-        list
-            Always returns an empty list
-        """
-        return []
+    #     Returns
+    #     -------
+    #     list
+    #         Always returns an empty list
+    #     """
+    #     return []
 
 
     # ----------------------------------------------------------------------
     # Utility / Display
     # ----------------------------------------------------------------------
+    # def list(self, collection=False):
+    #     """
+    #     Lists tables or prints metadata.
+
+    #     For resource tables, displays both dataset_title and dataset_id.
+
+    #     Parameters
+    #     ----------
+    #     `collection` : bool, default False
+    #         If True, return list of table names.
+    #         If False, print table names with dimensions and dataset IDs.
+
+    #     Returns
+    #     -------
+    #     dict_keys or None
+    #         Table names if collection=True, otherwise None
+    #     """
+
+    #     if collection:
+    #         return self._cache.keys()
+
+    #     for name, table in self._cache.items():
+    #         df = pd.DataFrame(table)
+            
+    #         if name in self._resource_tables:
+    #             dataset_id = self._dataset_title_map.get(name, "N/A")
+    #             print(f"{name} (ID: {dataset_id}): ({len(df)} rows, {len(df.columns)} cols)")
+    #         else:
+    #             print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
+
+
+    # def summary(self, table_name=None):
+    #     """
+    #     Returns numerical metadata for tables.
+
+    #     For resource tables, includes dataset_id information.
+
+    #     Parameters
+    #     ----------
+    #     `table_name` : str, optional
+    #         If provided, returns summary for a single table.
+    #         Can be either dataset_title or dataset_id.
+    #         If None, returns summary for all tables in expected format.
+
+    #     Returns
+    #     -------
+    #     pandas.DataFrame or list
+    #         - If table_name is None: returns [table_names_list, df1, df2, ...]
+    #         - If table_name provided: returns single DataFrame
+    #     """
+
+    #     if not self._loaded:
+    #         return pd.DataFrame()
+
+    #     if table_name:
+    #         # Single table - return DataFrame
+    #         resolved_name = self._resolve_table_name(table_name)
+    #         table = self._cache.get(resolved_name)
+            
+    #         if not table:
+    #             raise ValueError(f"Table '{resolved_name}' is empty")
+            
+    #         df = pd.DataFrame(table)
+            
+    #         summary_dict = {
+    #             "table_name": resolved_name,
+    #             "num_rows": len(df),
+    #             "num_columns": len(df.columns),
+    #             "columns": list(df.columns)
+    #         }
+            
+    #         if resolved_name in self._resource_tables:
+    #             summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
+            
+    #         return pd.DataFrame([summary_dict])
+        
+    #     # Multiple tables - return list format [table_names, df1, df2, ...]
+    #     table_names = []
+    #     summary_dfs = []
+        
+    #     for name, table in self._cache.items():
+    #         df = pd.DataFrame(table)
+            
+    #         summary_dict = {
+    #             "table_name": name,
+    #             "num_rows": len(df),
+    #             "num_columns": len(df.columns),
+    #             "columns": list(df.columns)
+    #         }
+            
+    #         if name in self._resource_tables:
+    #             summary_dict["dataset_id"] = self._dataset_title_map.get(name, "N/A")
+            
+    #         table_names.append(name)
+    #         summary_dfs.append(pd.DataFrame([summary_dict]))
+        
+    #     # Return as [table_names_list, df1, df2, ...]
+    #     return [table_names] + summary_dfs
+    
     def list(self, collection=False):
         """
-        Lists tables or prints metadata.
-
-        For resource tables, displays both dataset_title and dataset_id.
+        Lists tables or prints metadata in SQLite-compatible format.
 
         Parameters
         ----------
         `collection` : bool, default False
             If True, return list of table names.
-            If False, print table names with dimensions and dataset IDs.
+            If False, print table names with dimensions.
 
         Returns
         -------
-        dict_keys or None
+        list or None
             Table names if collection=True, otherwise None
         """
 
         if collection:
-            return self._cache.keys()
+            return list(self._cache.keys())
 
+        # Print in SQLite-compatible format
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
+            print(f"Table: {name}")
+            print(f"  - num of columns: {len(df.columns)}")
+            print(f"  - num of rows: {len(df)}")
             
-            if name in self._resource_tables:
-                dataset_id = self._dataset_title_map.get(name, "N/A")
-                print(f"{name} (ID: {dataset_id}): ({len(df)} rows, {len(df.columns)} cols)")
-            else:
-                print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
-
-
-    def summary(self, table_name=None):
+    def summary(self, table_name=None, collection=False):
         """
-        Returns numerical metadata for tables.
-
-        For resource tables, includes dataset_id information.
+        Returns numerical metadata for tables in SQLite-compatible format.
 
         Parameters
         ----------
         `table_name` : str, optional
             If provided, returns summary for a single table.
             Can be either dataset_title or dataset_id.
-            If None, returns summary for all tables in expected format.
+            If None, returns summary for all tables.
+        `collection` : bool, default False
+            If True, returns data as DataFrame(s).
+            If False, returns list format for Terminal to print.
 
         Returns
         -------
         pandas.DataFrame or list
-            - If table_name is None: returns [table_names_list, df1, df2, ...]
-            - If table_name provided: returns single DataFrame
+            - If collection=True and table_name specified: returns single DataFrame
+            - If collection=True and table_name=None: returns list [table_names, df1, df2, ...]
+            - If collection=False: returns list [table_names, df1, df2, ...] for Terminal
         """
 
         if not self._loaded:
-            return pd.DataFrame()
+            if collection:
+                return pd.DataFrame()
+            else:
+                return [[], pd.DataFrame()]
 
         if table_name:
-            # Single table - return DataFrame
+            # Single table
             resolved_name = self._resolve_table_name(table_name)
             table = self._cache.get(resolved_name)
             
@@ -1155,7 +1404,13 @@ class NDP(Webserver):
             if resolved_name in self._resource_tables:
                 summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
             
-            return pd.DataFrame([summary_dict])
+            summary_df = pd.DataFrame([summary_dict])
+            
+            if collection:
+                return summary_df
+            else:
+                # Return in list format for Terminal to handle printing
+                return [[resolved_name], summary_df]
         
         # Multiple tables - return list format [table_names, df1, df2, ...]
         table_names = []
@@ -1177,9 +1432,9 @@ class NDP(Webserver):
             table_names.append(name)
             summary_dfs.append(pd.DataFrame([summary_dict]))
         
-        # Return as [table_names_list, df1, df2, ...]
+        # Always return as [table_names_list, df1, df2, ...]
+        # collection flag doesn't matter - Terminal will handle printing
         return [table_names] + summary_dfs
-
 
     def display(self, table_name, num_rows=25, display_cols=None):
         """
