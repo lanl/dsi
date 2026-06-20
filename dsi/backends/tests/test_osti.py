@@ -10,6 +10,8 @@ import pandas as pd
 from collections import OrderedDict
 from dsi.backends.osti import OSTI
 
+# Define a global type to keep the connection open
+cached = None
 
 # =============================================================================
 # 1) Basic Backend Initialization
@@ -25,14 +27,18 @@ def test_osti_initialization():
     assert len(backend._cache) > 0
     assert "records" in backend._cache
 
+    cached = backend
     backend.close()
 
 
 def test_osti_validate_connection():
     """Test connection validation to OSTI API."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend=cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     assert backend.validate_connection() is True
 
@@ -50,12 +56,15 @@ def test_osti_invalid_url():
 
 def test_osti_load_initial_data():
     """Test that initial data load creates proper structure."""
-    backend = OSTI(
-        params={
-            "q": "climate",
-            "rows": 5
-        }
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={
+                "q": "climate",
+                "rows": 5
+            }
+        )
 
     assert isinstance(backend._cache, OrderedDict)
     assert "records" in backend._cache
@@ -97,9 +106,12 @@ def test_osti_bad_params_type():
 
 def test_osti_query_artifacts():
     """Test querying loaded OSTI data with pandas query string."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 4}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 4}
+        )
 
     result = backend.query_artifacts("title.notnull()", dict_return=True)
 
@@ -113,9 +125,12 @@ def test_osti_query_artifacts():
 
 def test_osti_query_artifacts_dataframe():
     """Test querying loaded OSTI data and returning a DataFrame."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 10}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 10}
+        )
 
     result = backend.query_artifacts("title.notnull()", dict_return=False)
 
@@ -127,9 +142,12 @@ def test_osti_query_artifacts_dataframe():
 
 def test_osti_query_invalid():
     """Test that invalid pandas queries raise appropriate errors."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     with pytest.raises(ValueError):
         backend.query_artifacts("INVALID SYNTAX ###")
@@ -139,9 +157,12 @@ def test_osti_query_invalid():
 
 def test_osti_query_unknown_column():
     """Test that queries referencing unknown columns raise ValueError."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     with pytest.raises(ValueError):
         backend.query_artifacts("not_a_column == 'value'")
@@ -150,9 +171,12 @@ def test_osti_query_unknown_column():
 
 def test_osti_get_table():
     """Test getting table data as DataFrame or OrderedDict."""
-    backend = OSTI(
-        params={"keywords": "climate", "limit": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"keywords": "climate", "limit": 5}
+        )
     
     # Get as DataFrame
     df = backend.get_table("records", dict_return=False)
@@ -169,9 +193,12 @@ def test_osti_get_table():
 
 def test_osti_get_table_invalid_name():
     """Test that requesting a non-records table raises ValueError."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     with pytest.raises(ValueError):
         backend.get_table("fake_table")
@@ -181,9 +208,12 @@ def test_osti_get_table_invalid_name():
 
 def test_osti_get_schema():
     """Test that get_schema returns informative schema."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     schema = backend.get_schema()
 
@@ -203,9 +233,12 @@ def test_osti_get_schema():
 
 def test_osti_find():
     """Test general find operation across all levels."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 8}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 8}
+        )
 
     results = backend.find("title")
     assert isinstance(results, list)
@@ -215,9 +248,12 @@ def test_osti_find():
 
 def test_osti_find_table():
     """Test finding tables by name."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 8}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 8}
+        )
 
     tables_found = backend.find_table("records")
 
@@ -230,9 +266,12 @@ def test_osti_find_table():
 
 def test_osti_find_column():
     """Test finding columns by name."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 8}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 8}
+        )
 
     columns_found = backend.find_column("title")
 
@@ -245,9 +284,12 @@ def test_osti_find_column():
 
 def test_osti_find_cell():
     """Test finding cells by value."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 8}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 8}
+        )
 
     cells_found = backend.find_cell("climate")
 
@@ -260,9 +302,12 @@ def test_osti_find_cell():
 
 def test_osti_find_relation():
     """Test that find_relation returns empty list (not supported)."""
-    backend = OSTI(
-        params={"q": "climate", "limit": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "limit": 5}
+        )
     
     try:
         backend.find_relation("column_name", "= 'value'")
@@ -283,12 +328,15 @@ def test_osti_find_relation():
 
 def test_osti_validate_urls():
     """Test URL validation for OSTI URL fields."""
-    backend = OSTI(
-        params={
-            "q": "climate",
-            "rows": 5
-        }
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={
+                "q": "climate",
+                "rows": 5
+            }
+        )
 
     backend.validate_urls()
 
@@ -314,9 +362,12 @@ def test_osti_validate_urls():
 
 def test_osti_list():
     """Test list method returns table names."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 6}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 6}
+        )
 
     table_names = backend.list(collection=True)
 
@@ -328,9 +379,12 @@ def test_osti_list():
 
 def test_osti_num_tables():
     """Test num_tables does not raise exception."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     backend.num_tables()
 
@@ -339,9 +393,12 @@ def test_osti_num_tables():
 
 def test_osti_summary():
     """Test summary returns table metadata."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     summary_list = backend.summary()
 
@@ -362,9 +419,12 @@ def test_osti_summary():
 
 def test_osti_summary_invalid_table():
     """Test summary rejects invalid table names."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     with pytest.raises(ValueError):
         backend.summary("fake_table")
@@ -374,9 +434,12 @@ def test_osti_summary_invalid_table():
 
 def test_osti_display():
     """Test display method for records table."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     result = backend.display("records", num_rows=10)
 
@@ -388,9 +451,12 @@ def test_osti_display():
 
 def test_osti_display_cols():
     """Test display with selected columns."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     result = backend.display(
         "records",
@@ -406,9 +472,12 @@ def test_osti_display_cols():
 
 def test_osti_display_invalid_table():
     """Test display rejects invalid table names."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     with pytest.raises(ValueError):
         backend.display("fake_table")
@@ -493,12 +562,15 @@ def test_osti_title_filter():
 
 def test_osti_subject_filter():
     """Test loading data with subject filter."""
-    backend = OSTI(
-        params={
-            "subject": "climate",
-            "rows": 5
-        }
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={
+                "subject": "climate",
+                "rows": 5
+            }
+        )
 
     assert backend._loaded is True
     data = backend.process_artifacts()
@@ -549,9 +621,12 @@ def test_osti_close():
 
 def test_osti_notebook():
     """Test that notebook() doesn't raise errors."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "rows": 5}
+        )
 
     backend.notebook()
 
@@ -560,9 +635,12 @@ def test_osti_notebook():
 
 def test_osti_get_table_names():
     """Test extracting table names from query strings."""
-    backend = OSTI(
-        params={"q": "climate", "limit": 5}
-    )
+    if cached:
+        backend = cached
+    else:
+        backend = OSTI(
+            params={"q": "climate", "limit": 5}
+        )
     
     # Test with records table
     names = backend.get_table_names("SELECT * FROM records WHERE title LIKE '%climate%'")
