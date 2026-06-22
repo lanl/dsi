@@ -120,26 +120,68 @@ class DSI():
                 
                 correct_backend = True
                 
-                # Check if params was passed directly (for multiple queries)
-                if 'params' in kwargs:
-                    query_params = kwargs.pop('params')  # Remove from kwargs
+                # NDP only accepts params dict or list of dicts format
+                if 'params' not in kwargs:
+                    raise ValueError(
+                        "NDP backend requires a 'params' dictionary or list of dictionaries.\n"
+                        "Single query example: DSI(backend_name='NDP', params={'keywords': 'temperature', 'limit': 5})\n"
+                        "Multiple queries example: DSI(backend_name='NDP', params=[{'keywords': 'temp'}, {'organization': 'NASA'}])"
+                    )
+                
+                query_params = kwargs.pop('params')
+                
+                # Validate params is a dict or list of dicts
+                if isinstance(query_params, dict):
+                    # Single query - valid
+                    pass
+                elif isinstance(query_params, list):
+                    # Multiple queries - validate each is a dict
+                    if not all(isinstance(p, dict) for p in query_params):
+                        raise TypeError(
+                            "'params' list must contain only dictionaries.\n"
+                            "Example: params=[{'keywords': 'temperature'}, {'organization': 'NASA'}]"
+                        )
                 else:
-                    # Extract individual NDP query parameters from kwargs
-                    query_params = {}
-                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
-                    
-                    for key in ndp_param_keys:
-                        if key in kwargs:
-                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                    raise TypeError(
+                        "'params' must be a dictionary or a list of dictionaries.\n"
+                        "Single query example: params={'keywords': 'temperature', 'limit': 5}\n"
+                        "Multiple queries example: params=[{'keywords': 'temp'}, {'organization': 'NASA'}]"
+                    )
                 
                 try:
-                    # Pass query params as 'params' argument
+                    # Pass query params to backend
                     self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                     raise
+            # # Handle NDP separately (read-only backend)
+            # if backend_name.lower() == "ndp":
+            #     self.database_name = None  # NDP doesn't use a file
+                
+            #     correct_backend = True
+                
+            #     # Check if params was passed directly (for multiple queries)
+            #     if 'params' in kwargs:
+            #         query_params = kwargs.pop('params')  # Remove from kwargs
+            #     else:
+            #         # Extract individual NDP query parameters from kwargs
+            #         query_params = {}
+            #         ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    
+            #         for key in ndp_param_keys:
+            #             if key in kwargs:
+            #                 query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                
+            #     try:
+            #         # Pass query params as 'params' argument
+            #         self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
+            #     except Exception as e:
+            #         logger.error(f"backend ERROR: {e}", exc_info=True)
+            #         if e.args:
+            #             e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+            #         raise
                 
             # Handle OSTI separately (read-only backend)
             elif backend_name.lower() == "osti":

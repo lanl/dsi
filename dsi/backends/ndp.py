@@ -236,19 +236,16 @@ class NDP(Webserver):
         """
         Loads data from NDP API based on query parameters.
         
-        Supports single query (dict or kwargs) or multiple queries (list of dicts).
-        Results are deduplicated by dataset ID and stored in tiered structure:
-            - Tier 1: datasets table
-            - Tier 2: per-dataset resource tables
+        Supports:
+            - Single query (dict)
+            - Multiple queries (list of dicts)
+            - Direct ID lookup (id parameter)
         
         Parameters
         ----------
         params : dict or list of dict, optional
             Query parameters or list of query parameter dicts.
-            Each dict can contain: keywords, organization, tags, formats, limit
-        
-        **kwargs : dict
-            Individual query parameters (backward compatible)
+            Each dict can contain: id, keywords, organization, tags, formats, limit
         """
         
         # Normalize params to list
@@ -263,8 +260,15 @@ class NDP(Webserver):
         all_datasets = []
         
         for query_params in query_list:
-            result = self._run_single_query(query_params)
-            all_datasets.extend(result.get("results", []))
+            # Check if this is a direct ID lookup
+            if "id" in query_params:
+                dataset = self._get_dataset_by_id(query_params["id"])
+                if dataset:
+                    all_datasets.append(dataset)
+            else:
+                # Standard search query
+                result = self._run_single_query(query_params)
+                all_datasets.extend(result.get("results", []))
         
         # Deduplicate by dataset ID
         unique_datasets = self._deduplicate_datasets(all_datasets)
@@ -287,6 +291,82 @@ class NDP(Webserver):
         
         self._loaded = True
 
+    def _get_dataset_by_id(self, dataset_id):
+        """
+        Retrieve a single dataset by ID or name using package_show.
+        
+        Parameters
+        ----------
+        dataset_id : str
+            Dataset ID or name
+            
+        Returns
+        -------
+        dict or None
+            Dataset dict if found, None otherwise
+        """
+        try:
+            result = self._request("package_show", {"id": dataset_id})
+            return result
+        except Exception as e:
+            print(f"Warning: Could not retrieve dataset '{dataset_id}': {e}")
+            return None
+        
+    # def _load_initial_data(self, params):
+    #     """
+    #     Loads data from NDP API based on query parameters.
+        
+    #     Supports single query (dict or kwargs) or multiple queries (list of dicts).
+    #     Results are deduplicated by dataset ID and stored in tiered structure:
+    #         - Tier 1: datasets table
+    #         - Tier 2: per-dataset resource tables
+        
+    #     Parameters
+    #     ----------
+    #     params : dict or list of dict, optional
+    #         Query parameters or list of query parameter dicts.
+    #         Each dict can contain: keywords, organization, tags, formats, limit
+        
+    #     **kwargs : dict
+    #         Individual query parameters (backward compatible)
+    #     """
+        
+    #     # Normalize params to list
+    #     if isinstance(params, dict):
+    #         query_list = [params]
+    #     elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
+    #         query_list = params
+    #     else:
+    #         raise TypeError("params must be a dict or a list of dicts")
+        
+    #     # Collect all datasets from all queries
+    #     all_datasets = []
+        
+    #     for query_params in query_list:
+    #         result = self._run_single_query(query_params)
+    #         all_datasets.extend(result.get("results", []))
+        
+    #     # Deduplicate by dataset ID
+    #     unique_datasets = self._deduplicate_datasets(all_datasets)
+        
+    #     # Extract tables (returns combined resources now)
+    #     dataset_rows, all_resource_rows, id_map = self._extract_tables(unique_datasets)
+        
+    #     # Tier 1: datasets
+    #     self._cache["datasets"] = self._rows_to_table(dataset_rows)
+        
+    #     # Tier 2: resources (ONE table for ALL resources)
+    #     if all_resource_rows:
+    #         self._cache["resources"] = self._rows_to_table(all_resource_rows)
+        
+    #     self._dataset_id_map = id_map
+    #     self._dataset_title_map = {v: k for k, v in id_map.items()}
+        
+    #     # No longer need _resource_tables list
+    #     self._resource_tables = []
+        
+    #     self._loaded = True
+
 
     def _run_single_query(self, params):
         """
@@ -306,6 +386,10 @@ class NDP(Webserver):
         
         q_parts, fq_parts = [], []
         
+        # # ID search
+        # if params.get("id"):
+        #     q_parts.append(params["id"])
+            
         # Keywords search
         if params.get("keywords"):
             q_parts.append(params["keywords"])
