@@ -118,42 +118,92 @@ class DSI():
                 raise
 
         else:
-            backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
-            if backend_module is None:
-                raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11")
-            
-            backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
-                                 if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
-            try:
-                self.read_only_flag = getattr(backend_class, "read_only")
-            except AttributeError:
-                raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
-            
-            # Handle in-memory backends (NDP, OSTI, Oceans11)
-            if self.read_only_flag:
-                self.database_name = None
-
-                if backend_name.lower() == "ndp":
-                    backend_name = "NDP"
-                    query_params = {}
-                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
-                    
-                    for key in ndp_param_keys:
-                        if key in kwargs:
-                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
-                elif backend_name.lower() == "osti":
-                    backend_name = "OSTI"
-                    query_params = kwargs.pop("params", {})
-                elif backend_name.lower() == "oceans11":
-                    backend_name = "Oceans11"
-                    query_params = kwargs.pop("params", {})
+            # Handle NDP separately (read-only backend)
+            if backend_name.lower() == "ndp":
+                self.database_name = None  # NDP doesn't use a file
+                
+                correct_backend = True
+                
+                # NDP only accepts params dict or list of dicts format
+                if 'params' not in kwargs:
+                    raise ValueError(
+                        "NDP backend requires a 'params' dictionary or list of dictionaries.\n"
+                        "Single query example: DSI(backend_name='NDP', params={'keywords': 'temperature', 'limit': 5})\n"
+                        "Multiple queries example: DSI(backend_name='NDP', params=[{'keywords': 'temp'}, {'organization': 'NASA'}])"
+                    )
+                
+                query_params = kwargs.pop('params')
+                
+                # Validate params is a dict or list of dicts
+                if isinstance(query_params, dict):
+                    # Single query - valid
+                    pass
+                elif isinstance(query_params, list):
+                    # Multiple queries - validate each is a dict
+                    if not all(isinstance(p, dict) for p in query_params):
+                        raise TypeError(
+                            "'params' list must contain only dictionaries.\n"
+                            "Example: params=[{'keywords': 'temperature'}, {'organization': 'NASA'}]"
+                        )
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, and Oceans11")
+                    raise TypeError(
+                        "'params' must be a dictionary or a list of dictionaries.\n"
+                        "Single query example: params={'keywords': 'temperature', 'limit': 5}\n"
+                        "Multiple queries example: params=[{'keywords': 'temp'}, {'organization': 'NASA'}]"
+                    )
                 
                 try:
-                    # Pass query params as 'params' argument
-                    self.t.load_module('backend', backend_name, 'back-read', params=query_params, **kwargs)
+                    # Pass query params to backend
+                    self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+            # # Handle NDP separately (read-only backend)
+            # if backend_name.lower() == "ndp":
+            #     self.database_name = None  # NDP doesn't use a file
+                
+            #     correct_backend = True
+                
+            #     # Check if params was passed directly (for multiple queries)
+            #     if 'params' in kwargs:
+            #         query_params = kwargs.pop('params')  # Remove from kwargs
+            #     else:
+            #         # Extract individual NDP query parameters from kwargs
+            #         query_params = {}
+            #         ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    
+            #         for key in ndp_param_keys:
+            #             if key in kwargs:
+            #                 query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                
+            #     try:
+            #         # Pass query params as 'params' argument
+            #         self.t.load_module('backend', 'NDP', 'back-read', params=query_params, **kwargs)
+            #     except Exception as e:
+            #         logger.error(f"backend ERROR: {e}", exc_info=True)
+            #         if e.args:
+            #             e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+            #         raise
+                
+            # Handle OSTI separately (read-only backend)
+            elif backend_name.lower() == "osti":
+                self.database_name = None  # OSTI doesn't use a file
+                
+                correct_backend = True
+                
+                # Extract OSTI query parameters from kwargs
+                query_params = kwargs.pop("params", {})
+
+                try:
+                    self.t.load_module(
+                        "backend",
+                        "OSTI",
+                        "back-read",
+                        params=query_params,
+                        **kwargs,
+                    )
                 except Exception as e:
                     logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:

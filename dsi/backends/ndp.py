@@ -410,6 +410,10 @@ class NDP(Webserver):
         
         q_parts, fq_parts = [], []
         
+        # # ID search
+        # if params.get("id"):
+        #     q_parts.append(params["id"])
+            
         # Keywords search
         if params.get("keywords"):
             q_parts.append(params["keywords"])
