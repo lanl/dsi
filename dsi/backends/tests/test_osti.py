@@ -29,7 +29,6 @@ def test_osti_initialization():
     assert "records" in backend._cache
 
     cached = backend
-    backend.close()
 
 
 def test_osti_validate_connection():
@@ -43,7 +42,6 @@ def test_osti_validate_connection():
 
     assert backend.validate_connection() is True
 
-    backend.close()
 
 
 def test_osti_invalid_url():
@@ -76,7 +74,6 @@ def test_osti_load_initial_data():
     assert "title" in record_cols
     assert "authors" in record_cols
 
-    backend.close()
 
 
 def test_osti_multiple_query_params():
@@ -92,7 +89,6 @@ def test_osti_multiple_query_params():
     assert "records" in backend._cache
     assert isinstance(backend._cache["records"], OrderedDict)
 
-    backend.close()
 
 
 def test_osti_bad_params_type():
@@ -121,7 +117,6 @@ def test_osti_query_artifacts():
     for col_values in result.values():
         assert isinstance(col_values, list)
 
-    backend.close()
 
 
 def test_osti_query_artifacts_dataframe():
@@ -138,7 +133,6 @@ def test_osti_query_artifacts_dataframe():
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
 
-    backend.close()
 
 
 def test_osti_query_invalid():
@@ -153,7 +147,6 @@ def test_osti_query_invalid():
     with pytest.raises(ValueError):
         backend.query_artifacts("INVALID SYNTAX ###")
 
-    backend.close()
 
 
 def test_osti_query_unknown_column():
@@ -168,7 +161,6 @@ def test_osti_query_unknown_column():
     with pytest.raises(ValueError):
         backend.query_artifacts("not_a_column == 'value'")
 
-    backend.close()
 
 def test_osti_get_table():
     """Test getting table data as DataFrame or OrderedDict."""
@@ -189,7 +181,6 @@ def test_osti_get_table():
     assert isinstance(dict_data, OrderedDict)
     assert len(dict_data) > 0
     
-    backend.close()
 
 
 def test_osti_get_table_invalid_name():
@@ -204,7 +195,6 @@ def test_osti_get_table_invalid_name():
     with pytest.raises(ValueError):
         backend.get_table("fake_table")
 
-    backend.close()
 
 
 def test_osti_get_schema():
@@ -225,7 +215,6 @@ def test_osti_get_schema():
     assert "doi" in schema
     assert "has_fulltext" in schema
 
-    backend.close()
 
 
 # =============================================================================
@@ -244,7 +233,6 @@ def test_osti_find():
     results = backend.find("title")
     assert isinstance(results, list)
 
-    backend.close()
 
 
 def test_osti_find_table():
@@ -262,7 +250,6 @@ def test_osti_find_table():
     assert len(tables_found) > 0
     assert any("records" in t.t_name for t in tables_found)
 
-    backend.close()
 
 
 def test_osti_find_column():
@@ -280,7 +267,6 @@ def test_osti_find_column():
     assert len(columns_found) > 0
     assert any("title" in c.c_name for c in columns_found)
 
-    backend.close()
 
 
 def test_osti_find_cell():
@@ -298,7 +284,6 @@ def test_osti_find_cell():
     if cells_found:
         assert all(hasattr(cell, "type") and cell.type == "cell" for cell in cells_found)
 
-    backend.close()
 
 
 def test_osti_find_relation():
@@ -320,7 +305,6 @@ def test_osti_find_relation():
     # assert isinstance(result, list)
     # assert len(result) == 0  # OSTI doesn't support relational queries
     
-    backend.close()
 
 
 # =============================================================================
@@ -354,7 +338,6 @@ def test_osti_validate_urls():
             assert all(isinstance(v, bool) for v in table[valid_field])
             assert len(table[valid_field]) == len(table[field])
 
-    backend.close()
 
 
 # =============================================================================
@@ -375,7 +358,6 @@ def test_osti_list():
     assert "records" in table_names
     assert isinstance(table_names, list)
 
-    backend.close()
 
 
 def test_osti_num_tables():
@@ -389,7 +371,6 @@ def test_osti_num_tables():
 
     backend.num_tables()
 
-    backend.close()
 
 
 def test_osti_summary():
@@ -415,7 +396,6 @@ def test_osti_summary():
     assert "table_name" in summary_single.columns
     assert summary_single.iloc[0]["table_name"] == "records"
 
-    backend.close()
 
 
 def test_osti_summary_invalid_table():
@@ -430,7 +410,6 @@ def test_osti_summary_invalid_table():
     with pytest.raises(ValueError):
         backend.summary("fake_table")
 
-    backend.close()
 
 
 def test_osti_display():
@@ -447,7 +426,6 @@ def test_osti_display():
     assert isinstance(result, pd.DataFrame)
     assert len(result) <= 10
 
-    backend.close()
 
 
 def test_osti_display_cols():
@@ -468,7 +446,6 @@ def test_osti_display_cols():
     assert isinstance(result, pd.DataFrame)
     assert list(result.columns) == ["osti_id", "title"]
 
-    backend.close()
 
 
 def test_osti_display_invalid_table():
@@ -483,7 +460,6 @@ def test_osti_display_invalid_table():
     with pytest.raises(ValueError):
         backend.display("fake_table")
 
-    backend.close()
 
 
 # =============================================================================
@@ -503,7 +479,6 @@ def test_osti_process_artifacts():
     assert "records" in artifacts
     assert isinstance(artifacts["records"], OrderedDict)
     
-    backend.close()
 
 
 # =============================================================================
@@ -519,7 +494,6 @@ def test_osti_ingest_artifacts():
     with pytest.raises(NotImplementedError):
         backend.ingest_artifacts({})
 
-    backend.close()
 
 # =============================================================================
 # 9) Filtering Tests
@@ -540,7 +514,6 @@ def test_osti_author_filter():
     assert "records" in data
     assert isinstance(data["records"], OrderedDict)
 
-    backend.close()
 
 
 def test_osti_title_filter():
@@ -558,7 +531,6 @@ def test_osti_title_filter():
     assert "records" in data
     assert isinstance(data["records"], OrderedDict)
 
-    backend.close()
 
 
 def test_osti_subject_filter():
@@ -579,8 +551,6 @@ def test_osti_subject_filter():
     assert "records" in data
     assert isinstance(data["records"], OrderedDict)
 
-    backend.close()
-
 
 def test_osti_fulltext_filter():
     """Test loading data with has_fulltext filter."""
@@ -598,8 +568,6 @@ def test_osti_fulltext_filter():
     assert "records" in data
     assert isinstance(data["records"], OrderedDict)
 
-    backend.close()
-
 
 # =============================================================================
 # 10) Lifecycle
@@ -614,7 +582,6 @@ def test_osti_close():
     assert backend._loaded is True
     assert len(backend._cache) > 0
 
-    backend.close()
 
     assert backend._loaded is False
     assert len(backend._cache) == 0
@@ -631,7 +598,6 @@ def test_osti_notebook():
 
     backend.notebook()
 
-    backend.close()
 
 
 def test_osti_get_table_names():
@@ -647,4 +613,3 @@ def test_osti_get_table_names():
     names = backend.get_table_names("SELECT * FROM records WHERE title LIKE '%climate%'")
     assert "records" in names
     
-    backend.close()
