@@ -163,6 +163,7 @@ class Oceans11(Webserver):
                     path=self.base_url,
                     abs_path_workspace_folder=self.workspace,
                     username="",
+                    download_limit=1024**5
                 )
 
             if info is None:
@@ -402,7 +403,8 @@ class Oceans11(Webserver):
             location=full_url,
             path=full_url,
             abs_path_workspace_folder=self.workspace,
-            username=""
+            username="",
+            download_limit=1024**5
         )
 
         if info is None or not info.get("local_path"):
