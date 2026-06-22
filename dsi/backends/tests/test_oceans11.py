@@ -334,7 +334,7 @@ def test_oceans11_find_relation(tmp_path):
     assert isinstance(results, list)
 
     if results:
-        assert all(hasattr(row, "type") and row.type == "row" for row in results)
+        assert all(hasattr(row, "type") and row.type == "relation" for row in results)
         assert all(hasattr(row, "t_name") for row in results)
         assert all(hasattr(row, "c_name") for row in results)
         assert all(hasattr(row, "row_num") for row in results)
