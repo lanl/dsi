@@ -581,6 +581,7 @@ def test_osti_close():
 
     assert backend._loaded is True
     assert len(backend._cache) > 0
+    backend.close()
 
 
     assert backend._loaded is False
