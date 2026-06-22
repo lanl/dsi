@@ -19,6 +19,7 @@ cached = None
 
 def test_osti_initialization():
     """Test OSTI backend initializes correctly."""
+    global cached
     backend = OSTI(
         params={"q": "climate", "rows": 5}
     )
