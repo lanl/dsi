@@ -135,9 +135,9 @@ The backend returns three DSI tables:
 
 ### datasets (Tier 1)
 
-The `datasets` table contains one row per RCSB PDB structure.
+The `datasets` table contains one row per resolved RCSB PDB dataset.
 
-Typical columns include:
+Table fields are a subset of the following properties:
 
 | Column              | Description                                                                               |
 | ------------------- | ----------------------------------------------------------------------------------------- |
@@ -176,13 +176,9 @@ print(
 
 ### resources (Tier 2)
 
-The `resources` table contains downloadable file metadata and paths associated with each structure.
+The `resources` table contains downloadable file-based or file-specific metadata associated with each dataset. Each row corresponds to a single downloadable resource. The backend does not download files automatically during metadata retrieval; it follows a search-then-retrieval workflow.
 
-Each row corresponds to a single downloadable resource.
-
-Resource rows contain metadata and download paths. The backend does not download files automatically during metadata retrieval. It follows a search-then-retrieval workflow.
-
-Typical columns include:
+Table fields are a subset of the following properties:
 
 | Column            | Description                |
 | ----------------- | -------------------------- |
@@ -251,7 +247,7 @@ resources
 
 The `errors` table stores failed, skipped, or unresolved lookups.
 
-Typical columns include:
+Table fields are a subset of the following properties:
 
 | Column                | Description         |
 | --------------------- | ------------------- |
@@ -263,7 +259,7 @@ Typical columns include:
 | endpoint_variables    | Endpoint parameters |
 | notes                 | Error details       |
 
-An empty errors table typically indicates all lookups succeeded.
+An empty `errors` table indicates that all lookups succeeded.
 
 Example error row:
 
@@ -297,25 +293,21 @@ These fields appear directly in:
 
 ### Full Metadata
 
-The complete RCSB Data API response is preserved inside:
-
-```python
-raw_metadata["full_metadata"]
-```
+The complete RCSB Data API response is preserved in the `raw_metadata` field.
 
 Example:
 
 ```python
 datasets_df = dsi.get_table("datasets", collection=True)
 
-full_metadata = datasets_df.iloc[0]["raw_metadata"]["full_metadata"]
+full_metadata = datasets_df.iloc[0]["raw_metadata"]
 ```
 
 This ensures:
 
 * no metadata loss
 * future compatibility
-* access to all original API fields
+* access to the original API metadata
 * support for advanced workflows
 
 ---
@@ -340,10 +332,16 @@ dsi.summary()
 datasets_df = dsi.get_table("datasets", collection=True)
 ```
 
-### Search Loaded Metadata
+### Search Loaded Row Data
 
 ```python
 dsi.search("X-RAY")
+```
+
+### Find Rows by Column Condition
+
+```python
+dsi.find("doi = 10.2210/pdb4hhb/pdb")
 ```
 
 ---
@@ -385,28 +383,39 @@ This example demonstrates:
 
 ### 4.get_columns.py
 
-Read PDB IDs and DOIs from an Excel spreadsheet, retrieve metadata, display selected dataset and resource information, export results to CSV, and store the loaded tables in SQLite.
+Read PDB IDs and DOIs from a CSV file, retrieve metadata, display selected dataset and resource information, export results to CSV, and store the loaded tables in SQLite.
 
 This example demonstrates:
 
-- Excel-driven identifier input
+- CSV-driven identifier input
 - PDB ID and DOI resolution
 - DSI `find()`
+- DSI `search()`
 - DSI `display()`
 - Dataset metadata retrieval
 - Resource metadata and download path retrieval
 - Resource count summaries by dataset
-- Errors table handling using an intentionally invalid identifier
 - DSI `write()` export to CSV
 - DSI `process("sqlite", "data.db")` storage workflow
 
-The script creates `pdb_inputs.xlsx` if it does not already exist. It also adds `NOT_A_PDB_ID` during loading to demonstrate how failed or skipped lookups are represented in the `errors` table.
+The script creates `pdb_inputs.csv` if it does not already exist.
 
 Expected output files:
 
-- `pdb_inputs.xlsx`
+- `pdb_inputs.csv`
 - `datasets.csv`
 - `data.db`
+
+### 5.error_handling.py
+
+Load a mixture of valid and invalid identifiers to demonstrate how failed or skipped lookups are represented in the `errors` table.
+
+This example demonstrates:
+
+- Valid PDB ID lookup
+- Invalid identifier handling
+- Accessing the `errors` table
+- Interpreting `status` and `notes` values for skipped records
 
 ---
 
@@ -416,13 +425,8 @@ Expected output files:
 * The `datasets` table is the Tier 1 table.
 * The `resources` table is the Tier 2 table.
 * Multiple resource rows may exist for a single dataset.
-* Resource rows contain metadata and download paths. We do not download files along with metadata. We follow a search-then-retrieval process.
-* Full API responses are preserved under:
-
-```python
-raw_metadata["full_metadata"]
-```
-
+* Resource rows describe downloadable file-based or file-specific metadata associated with each dataset. Files are not downloaded automatically during metadata retrieval; use the `download_url` values for explicit download workflows.
+* Full API metadata is preserved in the `raw_metadata` field.
 * Empty `errors` tables typically indicate successful lookups.
 * RCSB-style DOI values are automatically converted into PDB IDs when possible.
 * Curated tables provide simplified access while preserving the complete original metadata.

@@ -1255,6 +1255,118 @@ class RCSBPDB(Webserver):
         self._loaded = True
         return self.tables
 
+    def search(
+        self,
+        query_object,
+        table_name=None,
+        columns=None,
+        include_raw_metadata=False,
+        collection=False,
+        **kwargs,
+    ):
+        """
+        Search loaded table rows for a value.
+
+        search() is row-based. It scans the actual loaded table data and
+        returns rows where the search value appears in any searchable column.
+
+        This is different from find(), which is column-condition based.
+
+        Examples
+        --------
+        dsi.search("X-RAY")
+        dsi.search("4HHB")
+        dsi.search("pdf.gz")
+        dsi.search("hemoglobin", table_name="datasets")
+        """
+        search_value = str(query_object).strip()
+
+        if not search_value:
+            print("search() requires a non-empty search value.")
+            return []
+
+        if table_name is not None:
+            resolved_table = self._resolve_table_name(table_name)
+
+            if resolved_table not in self.tables:
+                print(
+                    f"search() could not find table '{table_name}'. "
+                    f"Available tables: {self.get_table_names()}"
+                )
+                return []
+
+            table_names = [resolved_table]
+        else:
+            table_names = self.get_table_names()
+
+        matches: List[ValueObject] = []
+
+        for current_table_name in table_names:
+            df = self.get_table(current_table_name)
+
+            if df.empty:
+                continue
+
+            if columns is not None:
+                search_columns = [col for col in columns if col in df.columns]
+            else:
+                search_columns = list(df.columns)
+
+            if not include_raw_metadata:
+                search_columns = [
+                    col
+                    for col in search_columns
+                    if col not in {"raw_metadata", "endpoint_variables"}
+                ]
+
+            if not search_columns:
+                continue
+
+            for row_num, row in df.iterrows():
+                row_values = row[search_columns]
+
+                found = row_values.astype(str).str.contains(
+                    search_value,
+                    case=False,
+                    na=False,
+                    regex=False,
+                ).any()
+
+                if not found:
+                    continue
+
+                display_row = row.drop(
+                    labels=[
+                        col
+                        for col in ["raw_metadata", "endpoint_variables"]
+                        if col in row.index
+                    ],
+                    errors="ignore",
+                )
+
+                vo = ValueObject()
+                vo.t_name = current_table_name
+                vo.c_name = list(display_row.index)
+                vo.row_num = row_num
+                vo.value = display_row.tolist()
+                vo.type = "row"
+                matches.append(vo)
+
+        if collection:
+            return matches
+
+        if not matches:
+            print(f"No matches found for search value: {search_value}")
+            return []
+
+        for match in matches:
+            print(f"\nTable: {match.t_name}")
+            print(f"- Columns: {match.c_name}")
+            print(f"- Row Number: {match.row_num}")
+            print(f"- Data: {match.value}")
+
+        return matches
+
     def find(self, query_object, **kwargs):
         """
         Find rows across loaded tables using a simple column-level condition.
@@ -1340,7 +1452,13 @@ class RCSBPDB(Webserver):
         return matches
 
     def find_cell(self, query_object, **kwargs):
-        return self.find(query_object, **kwargs)
+        """
+        Search loaded row values for DSI search() calls.
+
+        find() remains column-condition based.
+        find_cell()/search() are row-value based.
+        """
+        return self.search(query_object, collection=True, **kwargs)
 
     def find_relation(self, query, relation=None, **kwargs):
         """
