@@ -2,16 +2,18 @@ from pathlib import Path
 from urllib.parse import urlparse
 import getpass
 import os
+import importlib.util
 
-import boto3
-from botocore import UNSIGNED
-from botocore.config import Config
-from botocore.exceptions import (
-    BotoCoreError,
-    ClientError,
-    NoCredentialsError,
-    PartialCredentialsError,
-)
+if importlib.util.find_spec("duckdb") is not None:
+    import boto3
+    from botocore import UNSIGNED
+    from botocore.config import Config
+    from botocore.exceptions import (
+        BotoCoreError,
+        ClientError,
+        NoCredentialsError,
+        PartialCredentialsError,
+    )
 
 
 def get_s3_client(

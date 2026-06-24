@@ -10,7 +10,7 @@ s = Sync("federated.db")
 s.get(config_file=remote_sources, workspace_folder=workspace)
 
 # Download data referenced in this database -- db must have been previously indexed by DSI
-s.get_data(db_name="ocean_11_datasets.db", workspace_folder=workspace)
+s.get_data(db_name="oceans11.db", workspace_folder=workspace)
 
 
 from dsi.dsifederated import DSIFederated

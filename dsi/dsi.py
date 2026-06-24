@@ -232,8 +232,8 @@ class DSI():
         except Exception:
             pass            
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
-        n = Oceans11()
-        if n.validate_connection():
+        n = Oceans11(only_validate=True)
+        if n.validate_connection(only_validate=True):
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
         print()
 
