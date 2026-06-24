@@ -202,32 +202,6 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Initial Data Load
     # ----------------------------------------------------------------------
-    def _quote_if_needed(self, value):
-        """
-        Quote a value if it contains spaces or special Solr characters.
-        
-        Parameters
-        ----------
-        value : str
-            Value to potentially quote
-            
-        Returns
-        -------
-        str
-            Quoted or unquoted value
-        """
-        if not isinstance(value, str):
-            return str(value)
-        
-        # Quote if contains spaces
-        if ' ' in value:
-            # Escape any existing quotes within the value
-            value = value.replace('"', '\\"')
-            return f'"{value}"'
-        
-        return value
-
-
     def _load_initial_data(self, params):
         """
         Loads data from NDP API based on query parameters.
@@ -410,10 +384,6 @@ class NDP(Webserver):
         
         q_parts, fq_parts = [], []
         
-        # # ID search
-        # if params.get("id"):
-        #     q_parts.append(params["id"])
-            
         # Keywords search
         if params.get("keywords"):
             q_parts.append(params["keywords"])
@@ -465,7 +435,6 @@ class NDP(Webserver):
             query_params["fq"] = " AND ".join(fq_parts)
         
         return self._request("package_search", query_params)
-
 
     def _deduplicate_datasets(self, datasets):
         """
@@ -1065,6 +1034,48 @@ class NDP(Webserver):
                 valid_list.append(False)
         
         table["url_valid"] = valid_list
+
+    # # ----------------------------------------------------------------------
+    # # URL Validation
+    # # ----------------------------------------------------------------------
+    # def validate_urls(self):
+    #     """
+    #     Validates resource URLs across all resource tables.
+    #     Adds 'url_valid' column to each resource table.
+    #     """
+    #     headers = {"User-Agent": "NDP-Validator"}
+
+    #     for table_name in self._resource_tables:
+    #         table = self._cache.get(table_name, {})
+    #         urls = table.get("url", [])
+
+    #         valid_list = []
+
+    #         for url in urls:
+    #             try:
+    #                 r = requests.head(
+    #                     url,
+    #                     allow_redirects=True,
+    #                     headers=headers,
+    #                     timeout=10,
+    #                     verify=self.verify_ssl
+    #                 )
+
+    #                 if r.status_code == 405:
+    #                     r = requests.get(
+    #                         url,
+    #                         stream=True,
+    #                         headers=headers,
+    #                         timeout=10,
+    #                         verify=self.verify_ssl
+    #                     )
+
+    #                 valid_list.append(200 <= r.status_code < 400)
+
+    #             except Exception:
+    #                 valid_list.append(False)
+
+    #         table["url_valid"] = valid_list
 
 
     # ----------------------------------------------------------------------
