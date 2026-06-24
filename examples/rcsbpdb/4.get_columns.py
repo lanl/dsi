@@ -5,7 +5,7 @@ import pandas as pd
 from dsi.dsi import DSI
 
 
-def create_sample_excel(input_file: Path) -> None:
+def create_sample_csv(input_file: Path) -> None:
     sample_inputs = pd.DataFrame(
         {
             "identifier": [
@@ -14,38 +14,41 @@ def create_sample_excel(input_file: Path) -> None:
             ]
         }
     )
-    sample_inputs.to_excel(input_file, index=False)
+    sample_inputs.to_csv(input_file, index=False)
 
 
 def main():
     base_dir = Path(__file__).resolve().parent
-    input_file = base_dir / "pdb_inputs.xlsx"
+    input_file = base_dir / "pdb_inputs.csv"
     output_csv = base_dir / "datasets.csv"
     output_db = base_dir / "data.db"
 
     if not input_file.exists():
-        create_sample_excel(input_file)
-        print(f"\nCreated sample Excel input file: {input_file}")
+        create_sample_csv(input_file)
+        print(f"\nCreated sample CSV input file: {input_file}")
 
-    inputs_df = pd.read_excel(input_file)
+    inputs_df = pd.read_csv(input_file)
 
     if "identifier" not in inputs_df.columns:
-        raise RuntimeError("Input Excel file must contain an 'identifier' column.")
+        raise RuntimeError("Input CSV file must contain an 'identifier' column.")
 
     identifiers = inputs_df["identifier"].dropna().astype(str).tolist()
 
-    print("\nLoaded PDB IDs / DOIs from Excel:")
+    print("\nLoaded PDB IDs / DOIs from CSV:")
     for identifier in identifiers:
         print(f" - {identifier}")
 
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={"identifiers": identifiers + ["NOT_A_PDB_ID"]},
+        params={"identifiers": identifiers},
         silence_messages=True,
     )
 
     print("\nFind one loaded DOI:")
     dsi.find("doi = 10.2210/pdb4hhb/pdb")
+
+    print("\nSearch loaded row data:")
+    dsi.search("X-RAY")
 
     print("\nDisplay selected dataset columns:")
     dsi.display("datasets", display_cols=["title", "description"])
@@ -81,25 +84,18 @@ def main():
     else:
         print("No resources found.")
 
-    errors_df = dsi.get_table("errors", collection=True)
-
-    print("\nErrors table:")
-    with pd.option_context(
-        "display.max_columns",
-        None,
-        "display.width",
-        None,
-        "display.max_colwidth",
-        None,
-    ):
-        print(errors_df)
-
     if output_csv.exists():
         output_csv.unlink()
 
     print("\nExport datasets table to CSV:")
     dsi.write(str(output_csv), "CSV", table_name="datasets")
     print(f"Stored datasets table in: {output_csv}")
+
+    exported_df = pd.read_csv(output_csv)
+
+    print("\nRead exported CSV with pandas:")
+    with pd.option_context("display.max_columns", None, "display.width", None):
+        print(exported_df.head())
 
     if output_db.exists():
         output_db.unlink()
