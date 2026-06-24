@@ -1428,7 +1428,7 @@ class Terminal():
                     backend.catalog_path is not None
                     and os.path.isfile(backend.catalog_path)
                 )
-        return False
+        return True
 
     # Internal function that returns if a user can create a file/db in a specified location
     def can_create_file_here(self, dir = "."):
