@@ -66,9 +66,13 @@ class NDP(Webserver):
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from CKAN.
             Supported keys:
-                - keywords : str - Search keywords
-                - organization : str - Organization name filter
+                - keywords : str - Full-text search
+                - author : str - Author name filter
+                - maintainer : str - Maintainer name filter
+                - organization : str - Organization name filter (auto-slugified)
+                - license : str - License filter
                 - tags : list - List of tags to filter by
+                - groups : list - List of groups/collections to filter by (auto-slugified)
                 - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
                 - limit : int - Maximum number of datasets to retrieve (default: 100)
         `**kwargs` : dict
@@ -84,7 +88,7 @@ class NDP(Webserver):
         base_url = url or DEFAULT_URL
 
         # ----------------------------------------------------------------------
-        # Auth / connection config
+        # Auth / Connection Config
         # ----------------------------------------------------------------------
         self.api_key = kwargs.get("api_key")
         self.verify_ssl = kwargs.get("verify_ssl", False)
@@ -102,14 +106,13 @@ class NDP(Webserver):
         # Data storage (tiered structure)
         # Tier 1: datasets, Tier 2: per-dataset resource tables
         self._cache = OrderedDict()
-        self._resource_tables = []
         self._dataset_id_map = {}
         self._dataset_title_map = {}
 
         self._loaded = False
         self.params = params or {}
 
-        # Validate connection FIRST before attempting to load data
+        # Validate connection before attempting to load data
         try:
             self.validate_connection()
         except (ConnectionError, RuntimeError):
@@ -120,12 +123,12 @@ class NDP(Webserver):
         if self.params:
             try:
                 self._load_initial_data(self.params)
-                self._loaded = True  # Data successfully loaded
+                self._loaded = True
             except Exception as e:
                 self._loaded = False
                 raise RuntimeError(f"Failed to load initial data: {e}") from e
         else:
-            self._loaded = True  # Backend ready, no initial data to load
+            self._loaded = True
 
 
     # ----------------------------------------------------------------------
@@ -206,32 +209,6 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Initial Data Load
     # ----------------------------------------------------------------------
-    def _quote_if_needed(self, value):
-        """
-        Quote a value if it contains spaces or special Solr characters.
-        
-        Parameters
-        ----------
-        value : str
-            Value to potentially quote
-            
-        Returns
-        -------
-        str
-            Quoted or unquoted value
-        """
-        if not isinstance(value, str):
-            return str(value)
-        
-        # Quote if contains spaces
-        if ' ' in value:
-            # Escape any existing quotes within the value
-            value = value.replace('"', '\\"')
-            return f'"{value}"'
-        
-        return value
-
-
     def _load_initial_data(self, params):
         """
         Loads data from NDP API based on query parameters.
@@ -241,11 +218,25 @@ class NDP(Webserver):
             - Multiple queries (list of dicts)
             - Direct ID lookup (id parameter)
         
+        Results are deduplicated by dataset ID and stored in a unified structure:
+            - Tier 1: datasets table (one row per dataset)
+            - Tier 2: resources table (combined resources from ALL datasets)
+        
         Parameters
         ----------
-        params : dict or list of dict, optional
+        params : dict or list of dict
             Query parameters or list of query parameter dicts.
-            Each dict can contain: id, keywords, organization, tags, formats, limit
+            Each dict can contain:
+                - id : str - Direct PDB ID or dataset ID lookup
+                - keywords : str - Full-text search
+                - author : str - Author name filter
+                - maintainer : str - Maintainer name filter
+                - organization : str - Organization filter (auto-slugified)
+                - license : str - License filter
+                - tags : list - List of tags
+                - groups : list - List of groups/collections (auto-slugified)
+                - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
+                - limit : int - Maximum number of datasets (default: 100)
         """
         
         # Normalize params to list
@@ -273,7 +264,7 @@ class NDP(Webserver):
         # Deduplicate by dataset ID
         unique_datasets = self._deduplicate_datasets(all_datasets)
         
-        # Extract tables (returns combined resources now)
+        # Extract tables from deduplicated datasets
         dataset_rows, all_resource_rows, id_map = self._extract_tables(unique_datasets)
         
         # Tier 1: datasets
@@ -285,11 +276,55 @@ class NDP(Webserver):
         
         self._dataset_id_map = id_map
         self._dataset_title_map = {v: k for k, v in id_map.items()}
-        
-        # No longer need _resource_tables list
-        self._resource_tables = []
-        
+       
         self._loaded = True
+        
+    def _slugify(self, value):
+        """
+        Convert a value to CKAN-compatible slug format.
+        
+        CKAN stores organization and group names as lowercase slugs
+        with spaces replaced by hyphens.
+        
+        Parameters
+        ----------
+        value : str
+            Value to slugify
+            
+        Returns
+        -------
+        str
+            Slugified value
+        """
+        if not isinstance(value, str):
+            return str(value).lower()
+        
+        return value.lower().replace(" ", "-")
+
+    def _quote_if_needed(self, value):
+        """
+        Quote a value if it contains spaces or special Solr characters.
+        
+        Parameters
+        ----------
+        value : str
+            Value to potentially quote
+            
+        Returns
+        -------
+        str
+            Quoted or unquoted value
+        """
+        if not isinstance(value, str):
+            return str(value)
+        
+        # Quote if contains spaces
+        if ' ' in value:
+            # Escape any existing quotes within the value
+            value = value.replace('"', '\\"')
+            return f'"{value}"'
+        
+        return value
 
     def _get_dataset_by_id(self, dataset_id):
         """
@@ -311,101 +346,87 @@ class NDP(Webserver):
         except Exception as e:
             print(f"Warning: Could not retrieve dataset '{dataset_id}': {e}")
             return None
-        
-    # def _load_initial_data(self, params):
-    #     """
-    #     Loads data from NDP API based on query parameters.
-        
-    #     Supports single query (dict or kwargs) or multiple queries (list of dicts).
-    #     Results are deduplicated by dataset ID and stored in tiered structure:
-    #         - Tier 1: datasets table
-    #         - Tier 2: per-dataset resource tables
-        
-    #     Parameters
-    #     ----------
-    #     params : dict or list of dict, optional
-    #         Query parameters or list of query parameter dicts.
-    #         Each dict can contain: keywords, organization, tags, formats, limit
-        
-    #     **kwargs : dict
-    #         Individual query parameters (backward compatible)
-    #     """
-        
-    #     # Normalize params to list
-    #     if isinstance(params, dict):
-    #         query_list = [params]
-    #     elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
-    #         query_list = params
-    #     else:
-    #         raise TypeError("params must be a dict or a list of dicts")
-        
-    #     # Collect all datasets from all queries
-    #     all_datasets = []
-        
-    #     for query_params in query_list:
-    #         result = self._run_single_query(query_params)
-    #         all_datasets.extend(result.get("results", []))
-        
-    #     # Deduplicate by dataset ID
-    #     unique_datasets = self._deduplicate_datasets(all_datasets)
-        
-    #     # Extract tables (returns combined resources now)
-    #     dataset_rows, all_resource_rows, id_map = self._extract_tables(unique_datasets)
-        
-    #     # Tier 1: datasets
-    #     self._cache["datasets"] = self._rows_to_table(dataset_rows)
-        
-    #     # Tier 2: resources (ONE table for ALL resources)
-    #     if all_resource_rows:
-    #         self._cache["resources"] = self._rows_to_table(all_resource_rows)
-        
-    #     self._dataset_id_map = id_map
-    #     self._dataset_title_map = {v: k for k, v in id_map.items()}
-        
-    #     # No longer need _resource_tables list
-    #     self._resource_tables = []
-        
-    #     self._loaded = True
-
 
     def _run_single_query(self, params):
         """
-        Execute a single CKAN query with proper value quoting.
+        Execute a single CKAN query with proper value normalization.
+        
+        Handles:
+            - Slugification for organization and groups (lowercase + hyphens)
+            - Quoting for values with spaces (tags, author, maintainer, license)
+            - Multiple filter combinations
         
         Parameters
         ----------
         params : dict
-            Query parameters
-            
+            Query parameters. Supported keys:
+                - keywords : str
+                    Full-text search (no normalization)
+                - author : str
+                    Author name filter (quoted if spaces)
+                - maintainer : str
+                    Maintainer name filter (quoted if spaces)
+                - organization : str
+                    Organization name filter (slugified: lowercase, spaces → hyphens)
+                - license : str
+                    License filter (quoted if spaces)
+                - tags : list of str
+                    Tag filters (each quoted if spaces)
+                - groups : list of str
+                    Group/collection filters (each slugified)
+                - formats : list of str
+                    Resource format filters (each quoted if spaces)
+                - limit : int, default 100
+                    Maximum number of results
+        
         Returns
         -------
         dict
-            CKAN API response
+            CKAN API response containing:
+                - success : bool
+                - result : dict with 'results' list
         """
         query_params = {"rows": params.get("limit", 100)}
         
         q_parts, fq_parts = [], []
         
-        # # ID search
-        # if params.get("id"):
-        #     q_parts.append(params["id"])
-            
         # Keywords search
         if params.get("keywords"):
             q_parts.append(params["keywords"])
         
-        # Organization filter - QUOTE IF HAS SPACES
-        if params.get("organization"):
-            org_value = self._quote_if_needed(params["organization"])
-            fq_parts.append(f"organization:{org_value.lower()}")
+        # Author filter (quote if has spaces)
+        if params.get("author"):
+            author_value = self._quote_if_needed(params["author"])
+            fq_parts.append(f"author:{author_value}")
         
-        # Tags filter - QUOTE EACH TAG IF HAS SPACES
+        # Maintainer filter (quote if has spaces)
+        if params.get("maintainer"):
+            maintainer_value = self._quote_if_needed(params["maintainer"])
+            fq_parts.append(f"maintainer:{maintainer_value}")
+        
+        # Organization filter (slugify)
+        if params.get("organization"):
+            org_value = self._slugify(params["organization"])
+            fq_parts.append(f"organization:{org_value}")
+        
+        # License filter (quote if has spaces)
+        if params.get("license"):
+            license_value = self._quote_if_needed(params["license"])
+            fq_parts.append(f"license_id:{license_value}")
+        
+        # Tags filter (quote each if has spaces)
         if params.get("tags"):
             for tag in params["tags"]:
                 tag_value = self._quote_if_needed(tag)
                 fq_parts.append(f"tags:{tag_value}")
         
-        # Format filter - QUOTE EACH FORMAT IF HAS SPACES
+        # Groups filter (slugify each)
+        if params.get("groups"):
+            for group in params["groups"]:
+                group_value = self._slugify(group)
+                fq_parts.append(f"groups:{group_value}")
+        
+        # Format filter (quote each if has spaces)
         if params.get("formats"):
             format_parts = []
             for fmt in params["formats"]:
@@ -421,7 +442,6 @@ class NDP(Webserver):
             query_params["fq"] = " AND ".join(fq_parts)
         
         return self._request("package_search", query_params)
-
 
     def _deduplicate_datasets(self, datasets):
         """
@@ -453,111 +473,54 @@ class NDP(Webserver):
                 unique_datasets.append(ds)
         
         return unique_datasets
-    
-    # def _load_initial_data(self, params):
-    #     """
-    #     Fetch datasets/resources from CKAN API and store in memory.
-
-    #     Parameters
-    #     ----------
-    #     `params` : dict
-    #         Query parameters including:
-    #             - keywords : str, optional
-    #             - organization : str, optional
-    #             - tags : list, optional
-    #             - formats : list, optional
-    #             - limit : int, optional
-    #     """
-
-    #     query_params = {"rows": params.get("limit", 100)}
-
-    #     q_parts, fq_parts = [], []
-
-    #     if params.get("keywords"):
-    #         q_parts.append(params["keywords"])
-
-    #     if params.get("organization"):
-    #         fq_parts.append(f"organization:{params['organization']}")
-
-    #     if params.get("tags"):
-    #         fq_parts += [f"tags:{t}" for t in params["tags"]]
-
-    #     if params.get("formats"):
-    #         fq_parts.append("(" + " OR ".join(
-    #             [f"res_format:{f}" for f in params["formats"]]) + ")")
-
-    #     if q_parts:
-    #         query_params["q"] = " ".join(q_parts)
-
-    #     if fq_parts:
-    #         query_params["fq"] = " AND ".join(fq_parts)
-
-    #     result = self._request("package_search", query_params)
-
-    #     dataset_rows, resource_map, id_map = self._extract_tables(result.get("results", []))
-
-    #     # Tier 1: datasets
-    #     self._cache["datasets"] = self._rows_to_table(dataset_rows)
-        
-    #     self._dataset_id_map = id_map
-    #     self._dataset_title_map = {v: k for k, v in id_map.items()}
-
-    #     # Tier 2: per-dataset resource tables
-    #     self._resource_tables = []
-    #     for dataset_title, rows in resource_map.items():
-    #         table_name = dataset_title
-    #         self._cache[table_name] = self._rows_to_table(rows)
-    #         self._resource_tables.append(table_name)
-
-    #     self._loaded = True
 
 
     # ----------------------------------------------------------------------
     # Table Name Resolution
     # ----------------------------------------------------------------------
-    def _resolve_table_name(self, identifier):
-        """
-        Resolves a table identifier to its canonical name.
+    # def _resolve_table_name(self, identifier):
+    #     """
+    #     Resolves a table identifier to its canonical name.
 
-        Accepts either dataset_title or dataset_id for resource tables.
+    #     Accepts either dataset_title or dataset_id for resource tables.
 
-        Parameters
-        ----------
-        `identifier` : str
-            Table name (dataset_title) or dataset ID
+    #     Parameters
+    #     ----------
+    #     `identifier` : str
+    #         Table name (dataset_title) or dataset ID
 
-        Returns
-        -------
-        str
-            Canonical table name (dataset_title)
+    #     Returns
+    #     -------
+    #     str
+    #         Canonical table name (dataset_title)
             
-        Raises
-        ------
-        ValueError
-            If the identifier cannot be resolved to a table
-        """
-        if identifier in self._cache:
-            return identifier
+    #     Raises
+    #     ------
+    #     ValueError
+    #         If the identifier cannot be resolved to a table
+    #     """
+    #     if identifier in self._cache:
+    #         return identifier
 
-        if identifier in self._dataset_id_map:
-            return self._dataset_id_map[identifier]
+    #     if identifier in self._dataset_id_map:
+    #         return self._dataset_id_map[identifier]
 
-        available_titles = [name for name in self._resource_tables]
+    #     available_titles = [name for name in self._resource_tables]
         
-        error_msg = f"Table '{identifier}' not found.\n"
+    #     error_msg = f"Table '{identifier}' not found.\n"
         
-        if available_titles:
-            error_msg += "\nAvailable dataset titles:\n"
-            for title in available_titles[:5]:
-                dataset_id = self._dataset_title_map.get(title, "N/A")
-                error_msg += f"  - '{title}' (ID: {dataset_id})\n"
-            if len(available_titles) > 5:
-                error_msg += f"  ... and {len(available_titles) - 5} more\n"
+    #     if available_titles:
+    #         error_msg += "\nAvailable dataset titles:\n"
+    #         for title in available_titles[:5]:
+    #             dataset_id = self._dataset_title_map.get(title, "N/A")
+    #             error_msg += f"  - '{title}' (ID: {dataset_id})\n"
+    #         if len(available_titles) > 5:
+    #             error_msg += f"  ... and {len(available_titles) - 5} more\n"
         
-        if "datasets" in self._cache:
-            error_msg += "\nOr use 'datasets' to view all datasets."
+    #     if "datasets" in self._cache:
+    #         error_msg += "\nOr use 'datasets' to view all datasets."
         
-        raise ValueError(error_msg)
+    #     raise ValueError(error_msg)
     
     # ----------------------------------------------------------------------
     # API Helpers
@@ -1029,48 +992,93 @@ class NDP(Webserver):
 
         return self._cache
 
-
-    # ----------------------------------------------------------------------
-    # URL Validation
-    # ----------------------------------------------------------------------
     def validate_urls(self):
         """
-        Validates resource URLs across all resource tables.
-        Adds 'url_valid' column to each resource table.
+        Validates resource URLs in the unified resources table.
+        Adds 'url_valid' column to resources table.
         """
+        # Only validate the unified resources table
+        if "resources" not in self._cache:
+            print("No resources table found")
+            return
+        
+        table = self._cache.get("resources", {})
+        urls = table.get("url", [])
+        
+        if not urls:
+            print("No URLs found in resources table")
+            return
+        
         headers = {"User-Agent": "NDP-Validator"}
-
-        for table_name in self._resource_tables:
-            table = self._cache.get(table_name, {})
-            urls = table.get("url", [])
-
-            valid_list = []
-
-            for url in urls:
-                try:
-                    r = requests.head(
+        valid_list = []
+        
+        for url in urls:
+            try:
+                r = requests.head(
+                    url,
+                    allow_redirects=True,
+                    headers=headers,
+                    timeout=10,
+                    verify=self.verify_ssl
+                )
+                
+                if r.status_code == 405:
+                    r = requests.get(
                         url,
-                        allow_redirects=True,
+                        stream=True,
                         headers=headers,
                         timeout=10,
                         verify=self.verify_ssl
                     )
+                
+                valid_list.append(200 <= r.status_code < 400)
+            
+            except Exception:
+                valid_list.append(False)
+        
+        table["url_valid"] = valid_list
 
-                    if r.status_code == 405:
-                        r = requests.get(
-                            url,
-                            stream=True,
-                            headers=headers,
-                            timeout=10,
-                            verify=self.verify_ssl
-                        )
+    # # ----------------------------------------------------------------------
+    # # URL Validation
+    # # ----------------------------------------------------------------------
+    # def validate_urls(self):
+    #     """
+    #     Validates resource URLs across all resource tables.
+    #     Adds 'url_valid' column to each resource table.
+    #     """
+    #     headers = {"User-Agent": "NDP-Validator"}
 
-                    valid_list.append(200 <= r.status_code < 400)
+    #     for table_name in self._resource_tables:
+    #         table = self._cache.get(table_name, {})
+    #         urls = table.get("url", [])
 
-                except Exception:
-                    valid_list.append(False)
+    #         valid_list = []
 
-            table["url_valid"] = valid_list
+    #         for url in urls:
+    #             try:
+    #                 r = requests.head(
+    #                     url,
+    #                     allow_redirects=True,
+    #                     headers=headers,
+    #                     timeout=10,
+    #                     verify=self.verify_ssl
+    #                 )
+
+    #                 if r.status_code == 405:
+    #                     r = requests.get(
+    #                         url,
+    #                         stream=True,
+    #                         headers=headers,
+    #                         timeout=10,
+    #                         verify=self.verify_ssl
+    #                     )
+
+    #                 valid_list.append(200 <= r.status_code < 400)
+
+    #             except Exception:
+    #                 valid_list.append(False)
+
+    #         table["url_valid"] = valid_list
 
 
     # ----------------------------------------------------------------------
@@ -1656,7 +1664,6 @@ class NDP(Webserver):
         """
 
         self._cache = OrderedDict()
-        self._resource_tables = []
         self._dataset_id_map = {}
         self._dataset_title_map = {}
         self._loaded = False
