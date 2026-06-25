@@ -534,10 +534,21 @@ class Sync():
             signal.signal(signal.SIGALRM, alarm_handler)
             signal.alarm(10)
 
+            result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
+            if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
+                raise RuntimeError("Conduit not available in this environment")
+            
+            result = subprocess.run(["bash", "-lc", "type conduit"], capture_output=True, text=True)
+            conduit_cmd = str(result.stdout).split()
+            for idx, s in enumerate(conduit_cmd):
+                if "/" in s:
+                    conduit_cmd = conduit_cmd[idx:idx+3]
+                    break
+
             try:
                 if self.verbose:
                     print("Testing Conduit: conduit get")
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','get']
+                cmd = conduit_cmd.append("get")
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
                 if "TRANSFER_ID" in stdout and self.verbose:
@@ -548,7 +559,7 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','cp','-r']
+                base_cmd = conduit_cmd.extend(['cp','-r'])
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + self.remote_location)
