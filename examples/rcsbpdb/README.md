@@ -259,7 +259,7 @@ Table fields are a subset of the following properties:
 | endpoint_variables    | Endpoint parameters |
 | notes                 | Error details       |
 
-An empty `errors` table indicates that all lookups succeeded.
+If no lookup errors occur, the `errors` table may contain a single blank placeholder row so the table schema can be written safely during SQLite processing.
 
 Example error row:
 
@@ -427,6 +427,6 @@ This example demonstrates:
 * Multiple resource rows may exist for a single dataset.
 * Resource rows describe downloadable file-based or file-specific metadata associated with each dataset. Files are not downloaded automatically during metadata retrieval; use the `download_url` values for explicit download workflows.
 * Full API metadata is preserved in the `raw_metadata` field.
-* Empty `errors` tables typically indicate successful lookups.
+* If no lookup errors occur, the `errors` table may be empty or may contain a single blank placeholder row for SQLite compatibility.
 * RCSB-style DOI values are automatically converted into PDB IDs when possible.
 * Curated tables provide simplified access while preserving the complete original metadata.

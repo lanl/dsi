@@ -1247,6 +1247,10 @@ class RCSBPDB(Webserver):
 
         for table_name, rows in extracted.items():
             schema = self.schemas[table_name]
+
+            if table_name == "errors" and not rows:
+                rows = [{column: "" for column in schema}]
+
             table = self._rows_to_table(rows, schema)
 
             self.tables[table_name] = table
