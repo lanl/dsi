@@ -1525,10 +1525,10 @@ class NDP(Webserver):
         Parameters
         ----------
         `table_name` : str
-            Name of the table to display ('datasets' or 'resources')
+            Name of the table to display
         `num_rows` : int, default 25
             Number of rows to display
-        `display_cols` : list of str, optional
+        `display_cols` : list of str or 'all', optional
             Subset of columns to display. Options:
             - None: Shows smart default columns for the table
             - 'all': Shows all columns except raw_*
@@ -1541,7 +1541,27 @@ class NDP(Webserver):
         """
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot display empty backend.")
-
+        
+        # Validate table_name type
+        if not isinstance(table_name, str):
+            raise TypeError("display() ERROR: Input 'table_name' must be a string")
+        
+        # Validate display_cols type - allow None, list, or 'all'
+        if display_cols is not None and display_cols != 'all' and not isinstance(display_cols, list):
+            raise TypeError("display() ERROR: Input 'display_cols' must be a list of column names or 'all'")
+        
+        # If display_cols is a list, validate it contains strings
+        if isinstance(display_cols, list):
+            if not all(isinstance(col, str) for col in display_cols):
+                raise TypeError("display() ERROR: All elements in 'display_cols' must be strings")
+        
+        # Validate num_rows type
+        if num_rows is not None and not isinstance(num_rows, int):
+            raise TypeError("display() ERROR: Input 'num_rows' must be an integer or None")
+        
+        if num_rows is not None and num_rows <= 0:
+            raise ValueError("display() ERROR: Input 'num_rows' must be positive")
+        
         # Direct lookup - no resolution needed
         if table_name not in self._cache:
             raise ValueError(

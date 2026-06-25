@@ -1130,9 +1130,11 @@ class Terminal():
             raise TypeError("Input 'table_name' must be a string")
         if not isinstance(num_rows, int):
             raise TypeError("Input 'num_rows' must be a integer")
-        if display_cols is not None and not isinstance(display_cols, list):
-            raise TypeError("Input 'display_cols' must be a list of string column names")
-        
+        # Validate display_cols type - allow None, list, or 'all'
+        if display_cols is not None and display_cols != 'all' and not isinstance(display_cols, list):
+            raise TypeError("Input 'display_cols' must be a list of column names or 'all'")
+                
+                
         try:
             output = backend.display(table_name, num_rows, display_cols)
         except Exception as e:
