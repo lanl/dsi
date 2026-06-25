@@ -87,7 +87,7 @@ def test_ndp():
     """Test NDP backend"""
     print_separator("NDP BACKEND OUTPUTS", "=")
     
-    ndp_dsi = DSI(backend_name='ndp', params={"keyword": "climate", "limit": 3})
+    ndp_dsi = DSI(backend_name='ndp', params={"keyword": "water", "limit": 3})
     print("Created an instance of DSI with NDP backend")
     
     # # 1. list() - Default (prints)

@@ -278,6 +278,7 @@ class NDP(Webserver):
        
         self._loaded = True
         
+        
     def _slugify(self, value):
         """
         Convert a value to CKAN-compatible slug format.
@@ -299,6 +300,7 @@ class NDP(Webserver):
             return str(value).lower()
         
         return value.lower().replace(" ", "-")
+
 
     def _quote_if_needed(self, value):
         """
@@ -325,6 +327,7 @@ class NDP(Webserver):
         
         return value
 
+
     def _get_dataset_by_id(self, dataset_id):
         """
         Retrieve a single dataset by ID or name using package_show.
@@ -345,6 +348,7 @@ class NDP(Webserver):
         except Exception as e:
             print(f"Warning: Could not retrieve dataset '{dataset_id}': {e}")
             return None
+
 
     def _run_single_query(self, params):
         """
@@ -435,6 +439,7 @@ class NDP(Webserver):
         
         return self._request("package_search", query_params)
 
+
     def _deduplicate_datasets(self, datasets):
         """
         Remove duplicate datasets based on ID.
@@ -466,54 +471,6 @@ class NDP(Webserver):
         
         return unique_datasets
 
-
-    # ----------------------------------------------------------------------
-    # Table Name Resolution
-    # ----------------------------------------------------------------------
-    # def _resolve_table_name(self, identifier):
-    #     """
-    #     Resolves a table identifier to its canonical name.
-
-    #     Accepts either dataset_title or dataset_id for resource tables.
-
-    #     Parameters
-    #     ----------
-    #     `identifier` : str
-    #         Table name (dataset_title) or dataset ID
-
-    #     Returns
-    #     -------
-    #     str
-    #         Canonical table name (dataset_title)
-            
-    #     Raises
-    #     ------
-    #     ValueError
-    #         If the identifier cannot be resolved to a table
-    #     """
-    #     if identifier in self._cache:
-    #         return identifier
-
-    #     if identifier in self._dataset_id_map:
-    #         return self._dataset_id_map[identifier]
-
-    #     available_titles = [name for name in self._resource_tables]
-        
-    #     error_msg = f"Table '{identifier}' not found.\n"
-        
-    #     if available_titles:
-    #         error_msg += "\nAvailable dataset titles:\n"
-    #         for title in available_titles[:5]:
-    #             dataset_id = self._dataset_title_map.get(title, "N/A")
-    #             error_msg += f"  - '{title}' (ID: {dataset_id})\n"
-    #         if len(available_titles) > 5:
-    #             error_msg += f"  ... and {len(available_titles) - 5} more\n"
-        
-    #     if "datasets" in self._cache:
-    #         error_msg += "\nOr use 'datasets' to view all datasets."
-        
-    #     raise ValueError(error_msg)
-    
     
     # ----------------------------------------------------------------------
     # API Helpers
@@ -552,6 +509,7 @@ class NDP(Webserver):
 
         return data["result"]
 
+
     def _extract_from_extras(self, dataset, key):
         """
         Extract a value from CKAN dataset extras by key.
@@ -573,6 +531,7 @@ class NDP(Webserver):
             if extra.get("key") == key:
                 return extra.get("value")
         return None
+    
     
     def _extract_tables(self, datasets):
         """
@@ -622,6 +581,7 @@ class NDP(Webserver):
                 "organization": (ds.get("organization") or {}).get("title"),
                 "creator": creator_name,
                 "creator_email": creator_email,
+                "group": ",".join(g["name"] for g in ds.get("groups", [])),
                 "license": ds.get("license_title"),
                 "created": ds.get("metadata_created"),
                 "modified": ds.get("metadata_modified"),
@@ -644,6 +604,7 @@ class NDP(Webserver):
                 })
         
         return dataset_rows, all_resource_rows, id_map
+
 
     def _rows_to_table(self, rows):
         """
@@ -697,6 +658,7 @@ class NDP(Webserver):
         first_col = next(iter(datasets_table.values()), [])
         return len(first_col)
 
+
     def num_tables(self):
         """
         Returns the number of tables currently loaded.
@@ -730,6 +692,7 @@ class NDP(Webserver):
             table_count += 1
         
         print(f"{table_count} tables loaded")
+
 
     def get_table(self, table_name, dict_return=False):
         """
@@ -1010,6 +973,7 @@ class NDP(Webserver):
 
         return self._cache
 
+
     def validate_urls(self):
         """
         Validates resource URLs in the unified resources table.
@@ -1055,6 +1019,7 @@ class NDP(Webserver):
                 valid_list.append(False)
         
         table["url_valid"] = valid_list
+
 
     # # ----------------------------------------------------------------------
     # # URL Validation
@@ -1349,76 +1314,6 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Utility / Display
     # ----------------------------------------------------------------------
-
-
-    # def summary(self, table_name=None):
-    #     """
-    #     Returns numerical metadata for tables.
-
-    #     For resource tables, includes dataset_id information.
-
-    #     Parameters
-    #     ----------
-    #     `table_name` : str, optional
-    #         If provided, returns summary for a single table.
-    #         Can be either dataset_title or dataset_id.
-    #         If None, returns summary for all tables in expected format.
-
-    #     Returns
-    #     -------
-    #     pandas.DataFrame or list
-    #         - If table_name is None: returns [table_names_list, df1, df2, ...]
-    #         - If table_name provided: returns single DataFrame
-    #     """
-
-    #     if not self._loaded:
-    #         return pd.DataFrame()
-
-    #     if table_name:
-    #         # Single table - return DataFrame
-    #         resolved_name = self._resolve_table_name(table_name)
-    #         table = self._cache.get(resolved_name)
-            
-    #         if not table:
-    #             raise ValueError(f"Table '{resolved_name}' is empty")
-            
-    #         df = pd.DataFrame(table)
-            
-    #         summary_dict = {
-    #             "table_name": resolved_name,
-    #             "num_rows": len(df),
-    #             "num_columns": len(df.columns),
-    #             "columns": list(df.columns)
-    #         }
-            
-    #         if resolved_name in self._resource_tables:
-    #             summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
-            
-    #         return pd.DataFrame([summary_dict])
-        
-    #     # Multiple tables - return list format [table_names, df1, df2, ...]
-    #     table_names = []
-    #     summary_dfs = []
-        
-    #     for name, table in self._cache.items():
-    #         df = pd.DataFrame(table)
-            
-    #         summary_dict = {
-    #             "table_name": name,
-    #             "num_rows": len(df),
-    #             "num_columns": len(df.columns),
-    #             "columns": list(df.columns)
-    #         }
-            
-    #         if name in self._resource_tables:
-    #             summary_dict["dataset_id"] = self._dataset_title_map.get(name, "N/A")
-            
-    #         table_names.append(name)
-    #         summary_dfs.append(pd.DataFrame([summary_dict]))
-        
-    #     # Return as [table_names_list, df1, df2, ...]
-    #     return [table_names] + summary_dfs
-    
     def list(self, collection=False):
         """
         Lists tables or prints metadata in SQLite-compatible format.
@@ -1444,155 +1339,7 @@ class NDP(Webserver):
             print(f"  - num of columns: {len(df.columns)}")
             print(f"  - num of rows: {len(df)}")
             print()
-            
-    # def summary(self, table_name=None, collection=False):
-    #     """
-    #     Returns numerical metadata for tables in SQLite-compatible format.
-
-    #     Parameters
-    #     ----------
-    #     table_name : str, optional
-    #         If provided, returns summary for that table only.
-    #         If None, returns summary for all tables.
-        
-    #     collection : bool, default False
-    #         If True, returns pandas DataFrame(s) with column statistics.
-    #         If False, prints the summary.
-
-    #     Returns
-    #     -------
-    #     pandas.DataFrame or list or None
-    #         - If table_name specified & collection=True: single DataFrame
-    #         - If table_name=None & collection=True: list of DataFrames
-    #         - If collection=False: None (prints to console)
-    #     """
-    #     if not self._loaded:
-    #         if collection:
-    #             return pd.DataFrame()
-    #         print("No tables loaded")
-    #         return
-
-    #     def get_column_stats(df):
-    #         """Generate column-level statistics matching SQLite format"""
-    #         stats = []
-            
-    #         for col in df.columns:
-    #             col_data = df[col]
-    #             col_type = str(col_data.dtype).upper()
-                
-    #             # Convert pandas dtypes to SQL-like types
-    #             if 'int' in col_type.lower():
-    #                 col_type = 'INTEGER'
-    #             elif 'float' in col_type.lower():
-    #                 col_type = 'REAL'
-    #             elif 'object' in col_type.lower() or 'str' in col_type.lower():
-    #                 col_type = 'VARCHAR'
-    #             elif 'bool' in col_type.lower():
-    #                 col_type = 'BOOLEAN'
-    #             elif 'datetime' in col_type.lower():
-    #                 col_type = 'TIMESTAMP'
-                
-    #             stat = {
-    #                 'column': col,
-    #                 'type': col_type,
-    #                 'unique': col_data.nunique()
-    #             }
-                
-    #             # Add numeric statistics if applicable
-    #             if pd.api.types.is_numeric_dtype(col_data):
-    #                 stat['min'] = col_data.min()
-    #                 stat['max'] = col_data.max()
-    #                 stat['avg'] = col_data.mean()
-    #                 stat['std_dev'] = col_data.std()
-    #             else:
-    #                 stat['min'] = None
-    #                 stat['max'] = None
-    #                 stat['avg'] = None
-    #                 stat['std_dev'] = None
-                
-    #             stats.append(stat)
-            
-    #         return pd.DataFrame(stats)
-
-    #     if table_name:
-    #         # Single table summary
-    #         resolved_name = self._resolve_table_name(table_name)
-    #         table = self._cache.get(resolved_name)
-            
-    #         if not table:
-    #             raise ValueError(f"Table '{resolved_name}' is empty")
-            
-    #         df = pd.DataFrame(table)
-    #         stats_df = get_column_stats(df)
-            
-    #         if collection:
-    #             return stats_df
-    #         else:
-    #             # Print summary in SQLite format
-    #             print(f"\nTable: {resolved_name}\n")
-                
-    #             # Format table
-    #             headers = stats_df.columns.tolist()
-    #             rows = stats_df.values.tolist()
-                
-    #             # Calculate column widths
-    #             col_widths = [len(h) for h in headers]
-    #             for row in rows:
-    #                 for i, val in enumerate(row):
-    #                     val_str = str(val) if val is not None else 'None'
-    #                     col_widths[i] = max(col_widths[i], len(val_str))
-                
-    #             # Print header
-    #             header_line = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths))
-    #             print(header_line)
-    #             print("-" * len(header_line))
-                
-    #             # Print rows
-    #             for row in rows:
-    #                 row_strs = [str(val) if val is not None else 'None' for val in row]
-    #                 print(" | ".join(s.ljust(w) for s, w in zip(row_strs, col_widths)))
-                
-    #             print()
-    #             return
-        
-    #     # All tables summary
-    #     if collection:
-    #         # Return list of DataFrames (one per table)
-    #         return [get_column_stats(pd.DataFrame(table)) 
-    #                 for table in self._cache.values() if table]
-    #     else:
-    #         # Print summary for all tables
-    #         for name, table in self._cache.items():
-    #             if not table:
-    #                 continue
-                
-    #             df = pd.DataFrame(table)
-    #             stats_df = get_column_stats(df)
-                
-    #             print(f"\nTable: {name}\n")
-                
-    #             # Format table
-    #             headers = stats_df.columns.tolist()
-    #             rows = stats_df.values.tolist()
-                
-    #             # Calculate column widths
-    #             col_widths = [len(h) for h in headers]
-    #             for row in rows:
-    #                 for i, val in enumerate(row):
-    #                     val_str = str(val) if val is not None else 'None'
-    #                     col_widths[i] = max(col_widths[i], len(val_str))
-                
-    #             # Print header
-    #             header_line = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths))
-    #             print(header_line)
-    #             print("-" * len(header_line))
-                
-    #             # Print rows
-    #             for row in rows:
-    #                 row_strs = [str(val) if val is not None else 'None' for val in row]
-    #                 print(" | ".join(s.ljust(w) for s, w in zip(row_strs, col_widths)))
-                
-    #             print()
+    
     
     def summary(self, table_name=None, collection=False):
         """
@@ -1619,11 +1366,6 @@ class NDP(Webserver):
         - For OBJECT columns: min/max are lexicographic (alphabetical) for short text
         - Skips min/max for: long text (>80 chars), URLs, metadata, complex values
         - Numeric columns get full statistics: min, max, avg, std_dev
-        
-        Examples
-        --------
-        >>> dsi.summary("datasets")  # Single table
-        >>> dsi.summary()  # All tables
         """
         def is_complex_value(value):
             """Check if value is a complex type (dict, list, etc.)"""
@@ -1771,87 +1513,14 @@ class NDP(Webserver):
             summary_dfs.append(summary_df)
         
         return [table_names] + summary_dfs
-            
-    # def summary(self, table_name=None, collection=False):
-    #     """
-    #     Returns numerical metadata for tables in SQLite-compatible format.
-        
-    #     Parameters
-    #     ----------
-    #     `table_name` : str, optional
-    #         If provided, returns summary for that table.
-    #         Must be 'datasets' or 'resources'.
-    #     `collection` : bool, default False
-    #         If True, returns data as DataFrame(s).
-    #         If False, returns list format for Terminal to print.
-        
-    #     Returns
-    #     -------
-    #     pandas.DataFrame or list
-    #         - If collection=True and table_name specified: returns single DataFrame
-    #         - If collection=True and table_name=None: returns list [table_names, df1, df2, ...]
-    #         - If collection=False: returns list [table_names, df1, df2, ...] for Terminal
-    #     """
-    #     if not self._loaded:
-    #         if collection:
-    #             return pd.DataFrame()
-    #         else:
-    #             return [[], pd.DataFrame()]
-        
-    #     if table_name:
-    #         # Single table
-    #         if table_name not in self._cache:
-    #             raise ValueError(
-    #                 f"Table '{table_name}' not found. "
-    #                 f"Available tables: {list(self._cache.keys())}"
-    #             )
-            
-    #         table = self._cache.get(table_name)
-            
-    #         if not table:
-    #             raise ValueError(f"Table '{table_name}' is empty")
-            
-    #         df = pd.DataFrame(table)
-            
-    #         summary_dict = {
-    #             "table_name": table_name,
-    #             "num_rows": len(df),
-    #             "num_columns": len(df.columns),
-    #             "columns": list(df.columns)
-    #         }
-            
-    #         summary_df = pd.DataFrame([summary_dict])
-            
-    #         if collection:
-    #             return summary_df
-    #         else:
-    #             return [[table_name], summary_df]
-        
-    #     # Multiple tables
-    #     table_names = []
-    #     summary_dfs = []
-        
-    #     for name, table in self._cache.items():
-    #         df = pd.DataFrame(table)
-            
-    #         summary_dict = {
-    #             "table_name": name,
-    #             "num_rows": len(df),
-    #             "num_columns": len(df.columns),
-    #             "columns": list(df.columns)
-    #         }
-            
-    #         table_names.append(name)
-    #         summary_dfs.append(pd.DataFrame([summary_dict]))
-        
-    #     return [table_names] + summary_dfs
+    
 
     def display(self, table_name, num_rows=25, display_cols=None):
         """
         Displays rows from a specified table.
 
-        Raw metadata columns (raw_*) are excluded by default for readability.
-        Use display_cols to explicitly include them.
+        By default, shows a curated subset of columns for readability.
+        Raw metadata columns (raw_*) are always excluded unless explicitly requested.
 
         Parameters
         ----------
@@ -1860,7 +1529,10 @@ class NDP(Webserver):
         `num_rows` : int, default 25
             Number of rows to display
         `display_cols` : list of str, optional
-            Subset of columns to display. If None, shows all columns except raw_*.
+            Subset of columns to display. Options:
+            - None: Shows smart default columns for the table
+            - 'all': Shows all columns except raw_*
+            - [...]: Shows specific columns you list
 
         Returns
         -------
@@ -1884,23 +1556,41 @@ class NDP(Webserver):
 
         df = pd.DataFrame(table)
 
-        # Filter columns
-        if display_cols:
-            # User explicitly chose columns - respect their choice
+        # Define default columns for each table
+        default_display_cols = {
+            'datasets': ['id', 'name', 'title', 'organization', 'num_resources'],
+            'resources': ['resource_id', 'resource_name', 'format', 'url', 'dataset_title']
+        }
+
+        # Determine which columns to display
+        if display_cols == 'all':
+            # Show all non-raw columns
+            cols_to_show = [col for col in df.columns if not col.startswith('raw_')]
+        elif display_cols:
+            # User specified exact columns
             missing_cols = set(display_cols) - set(df.columns)
             if missing_cols:
                 raise ValueError(
                     f"Columns not found in '{table_name}': {missing_cols}\n"
                     f"Available columns: {list(df.columns)}"
                 )
-            df = df[display_cols]
+            cols_to_show = display_cols
         else:
-            # Auto-exclude raw_* columns for readability
-            display_columns = [col for col in df.columns if not col.startswith('raw_')]
-            if not display_columns:
-                # If only raw columns exist, show first one
-                display_columns = df.columns[:1].tolist()
-            df = df[display_columns]
+            # Use smart defaults for this table
+            default_cols = default_display_cols.get(table_name, [])
+            
+            # Filter to only columns that exist in the dataframe
+            cols_to_show = [col for col in default_cols if col in df.columns]
+            
+            # Fallback: if no defaults defined or none exist, show non-raw columns
+            if not cols_to_show:
+                cols_to_show = [col for col in df.columns if not col.startswith('raw_')]
+            
+            # Ultimate fallback: show first column at minimum
+            if not cols_to_show:
+                cols_to_show = df.columns[:1].tolist()
+
+        df = df[cols_to_show]
 
         # Limit rows
         total_rows = len(df)
@@ -1946,60 +1636,6 @@ class NDP(Webserver):
         
         print()
 
-    # def display(self, table_name, num_rows=25, display_cols=None):
-    #     """
-    #     Displays rows from a specified table.
-
-    #     Accepts either dataset_title or dataset_id for resource tables.
-
-    #     Parameters
-    #     ----------
-    #     `table_name` : str
-    #         Title or ID of the table to display
-    #     `num_rows` : int, default 25
-    #         Number of rows to display
-    #     `display_cols` : list of str, optional
-    #         Subset of columns to display
-
-    #     Returns
-    #     -------
-    #     pandas.DataFrame
-    #         Displayed table data with long strings truncated
-    #     """
-
-    #     if not self._loaded:
-    #         raise RuntimeError("No data loaded. Cannot display empty backend.")
-
-    #     resolved_name = self._resolve_table_name(table_name)
-
-    #     table = self._cache.get(resolved_name)
-
-    #     if not table:
-    #         raise ValueError(f"Table '{resolved_name}' is empty")
-
-    #     df = pd.DataFrame(table)
-
-    #     if display_cols:
-    #         missing_cols = set(display_cols) - set(df.columns)
-    #         if missing_cols:
-    #             raise ValueError(
-    #                 f"Columns not found in '{resolved_name}': {missing_cols}\n"
-    #                 f"Available columns: {list(df.columns)}"
-    #             )
-    #         df = df[display_cols]
-
-    #     # Set max_rows before limiting rows
-    #     df.attrs["max_rows"] = len(df)
-        
-    #     if num_rows:
-    #         df = df.head(num_rows)
-
-    #     # Truncate long strings for display using df.map() (pandas 2.1.0+)
-    #     df = df.map(
-    #         lambda x: (str(x)[:60] + '...') if isinstance(x, str) and len(str(x)) > 60 else x
-    #     )
-
-    #     return df
 
     def notebook(self, **kwargs):
         """

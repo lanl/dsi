@@ -12,6 +12,7 @@ def main(verbose=False):
         params={
             "keywords": "tree state park",
             "organization": "BurnPro3D",
+            "group": "data_hub_cc_wstc",
             "tags": ["boundaries", "burn-units"],
             "formats": ["GeoJSON"],
             "limit": 15
