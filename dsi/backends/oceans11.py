@@ -38,12 +38,12 @@ class ValueObject:
     type : str
         {'table', 'column', 'cell'}
     """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
+    def __init__(self, t_name, c_name, row_num, value, type):
+        self.t_name = t_name # ""
+        self.c_name = c_name #[]
+        self.row_num = row_num # None
+        self.value = value # None
+        self.type = type # ""
 
 # ----------------------------------------------------------------------
 # Oceans11 Backend (Webserver - Read only)
@@ -163,6 +163,7 @@ class Oceans11(Webserver):
                     path=self.base_url,
                     abs_path_workspace_folder=self.workspace,
                     username="",
+                    download_limit=1024**5
                 )
 
             if info is None:
@@ -402,7 +403,8 @@ class Oceans11(Webserver):
             location=full_url,
             path=full_url,
             abs_path_workspace_folder=self.workspace,
-            host_username=""
+            username="",
+            download_limit=1024**5
         )
 
         if info is None or not info.get("local_path"):
@@ -813,45 +815,13 @@ class Oceans11(Webserver):
         if not self._loaded:
             return []
 
-        results = []
+        query_str = str(query_object).lower()
 
-        for table_name, table in self._cache.items():
-
-            columns = list(table.keys())
-
-            if not columns:
-                continue
-
-            num_rows = len(table[columns[0]])
-
-            for row_idx in range(num_rows):
-
-                row_values = []
-
-                matched = False
-
-                for col in columns:
-
-                    value = table[col][row_idx]
-                    row_values.append(value)
-
-                    if query_object is None:
-                        continue
-
-                    if value is not None and str(query_object).lower() in str(value).lower():
-                        matched = True
-
-                if matched:
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=columns,
-                            row_num=row_idx + 1,
-                            value=row_values,
-                        )
-                    )
-
-        return results
+        return (
+            self.find_table(query_str) +
+            self.find_column(query_str) +
+            self.find_cell(query_object)
+        )
     
     def find_table(self, query_object, **kwargs):
         """
