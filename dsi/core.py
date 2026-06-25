@@ -1385,12 +1385,16 @@ class Terminal():
     def valid_backend(self, backend):
         parent_name = backend.__class__.__bases__[0].__name__
         if parent_name == "Filesystem":
-            if backend.__class__.__name__ == "Sqlite" and os.path.getsize(backend.filename) > 100:
-                return True
+            if backend.__class__.__name__ == "Sqlite":
+                if os.path.getsize(backend.filename) > 100:
+                    return True
+                return False
             if backend.__class__.__name__ == "Gufi":
                 return True
-            if backend.__class__.__name__ == "DuckDB" and os.path.getsize(backend.filename) > 13000:
-                return True
+            if backend.__class__.__name__ == "DuckDB":
+                if os.path.getsize(backend.filename) > 13000:
+                    return True
+                return False
         elif parent_name == "Webserver":
             if backend.__class__.__name__ == "NDP":
                     # NDP is valid if data is loaded and connection works
@@ -1428,7 +1432,7 @@ class Terminal():
                     backend.catalog_path is not None
                     and os.path.isfile(backend.catalog_path)
                 )
-        return False
+        return True
 
     # Internal function that returns if a user can create a file/db in a specified location
     def can_create_file_here(self, dir = "."):
