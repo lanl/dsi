@@ -1299,35 +1299,6 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Utility / Display
     # ----------------------------------------------------------------------
-    # def list(self, collection=False):
-    #     """
-    #     Lists tables or prints metadata.
-
-    #     For resource tables, displays both dataset_title and dataset_id.
-
-    #     Parameters
-    #     ----------
-    #     `collection` : bool, default False
-    #         If True, return list of table names.
-    #         If False, print table names with dimensions and dataset IDs.
-
-    #     Returns
-    #     -------
-    #     dict_keys or None
-    #         Table names if collection=True, otherwise None
-    #     """
-
-    #     if collection:
-    #         return self._cache.keys()
-
-    #     for name, table in self._cache.items():
-    #         df = pd.DataFrame(table)
-            
-    #         if name in self._resource_tables:
-    #             dataset_id = self._dataset_title_map.get(name, "N/A")
-    #             print(f"{name} (ID: {dataset_id}): ({len(df)} rows, {len(df.columns)} cols)")
-    #         else:
-    #             print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
 
 
     # def summary(self, table_name=None):
