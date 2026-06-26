@@ -2134,11 +2134,11 @@ def test_close_ndp_backend():
 
 
 # def test_ndp_schema():
-#     """Test schema() on NDP backend"""
-#     dsi = DSI(backend_name="NDP", params={"keywords": "climate", "limit": 5})
+    # """Test schema() on NDP backend"""
+    # dsi = DSI(backend_name="NDP", params={"keywords": "climate", "limit": 5})
     
-#     schema = dsi.schema()
-#     assert isinstance(schema, str)
-#     assert "NDP" in schema
+    # schema = dsi.schema()
+    # assert isinstance(schema, str)
+    # assert "NDP" in schema
     
-#     dsi.close()
+    # dsi.close()
