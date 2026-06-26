@@ -714,7 +714,12 @@ class DSI():
                 ending_ind = warn_msg.find("in this database")
                 warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
             print("\n"+warn_msg.replace("database", "backend"))
-            return
+            return [] if not collection else pd.DataFrame()
+        
+        # Handle empty results
+        if not find_data or len(find_data) == 0:
+            print(f"No matches found for '{query}'")
+            return []
 
         table_name = None
         output_df = None
@@ -728,10 +733,11 @@ class DSI():
 
         if not collection:
             print(f'\nTable: {table_name}')
-            self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
+            if output_df is not None:
+                self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
             print()
         else:
-            if update:
+            if update and output_df is not None:
                 output_df.insert(0, "dsi_row_index", row_list)
                 output_df.insert(0, "dsi_table_name", table_name)
                 first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"

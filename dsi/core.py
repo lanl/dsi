@@ -886,7 +886,7 @@ class Terminal():
                 self.logger.warning(return_object)
             print("WARNING:", return_object)
             return_object = None
-        elif isinstance(return_object, list) and isinstance(return_object[0], str):
+        elif isinstance(return_object, list) and return_object and isinstance(return_object[0], str):
             err_msg = f"'{column_name}' appeared in more than one table. Can only find if '{column_name}' is in one table"
             if self.debug_level != 0:
                 self.logger.warning(err_msg)
@@ -1354,34 +1354,103 @@ class Terminal():
             parts.append(buffer.strip())
 
         return parts
-
-    # Internal function used to manually print a table cleanly
-    def table_print_helper(self, headers, rows, max_rows, num_rows=25):
-        # Determine max width for each column
-        col_widths = [
-            max(
-                len(str(h)),
-                max((len(str(r[i])) for r in rows if i < len(r)), default=0)
+    
+    def table_print_helper(self, headers, rows, max_rows, num_rows=25, max_col_width=50):
+        """
+        Print table with:
+        - Truncated long values
+        - Cleaned escape characters
+        - Limited column widths
+        """
+        
+        def clean_and_truncate(value, max_width=50):
+            """Clean escape chars and truncate long text"""
+            if value is None:
+                return ''
+            
+            val_str = str(value)
+            
+            # Clean escape sequences
+            val_str = val_str.replace('\\r\\n', ' ')  # Line breaks
+            val_str = val_str.replace('\\n', ' ')     # Newlines
+            val_str = val_str.replace('\\r', ' ')     # Carriage returns
+            val_str = val_str.replace("\\'", "'")     # Escaped quotes
+            val_str = val_str.replace('\\"', '"')     # Escaped double quotes
+            
+            # Remove unicode escape sequences like \x89
+            import re
+            val_str = re.sub(r'\\x[0-9a-fA-F]{2}', '', val_str)
+            
+            # Collapse multiple spaces
+            val_str = ' '.join(val_str.split())
+            
+            # Truncate if too long
+            if len(val_str) > max_width:
+                val_str = val_str[:max_width-3] + '...'
+            
+            return val_str
+        
+        # Process all rows first (clean and truncate)
+        cleaned_rows = []
+        for row in rows:
+            cleaned_row = [clean_and_truncate(val, max_col_width) for val in row]
+            cleaned_rows.append(cleaned_row)
+        
+        # Determine max width for each column (capped at max_col_width)
+        col_widths = []
+        for i, h in enumerate(headers):
+            header_len = len(str(h))
+            max_data_len = max(
+                (len(str(r[i])) for r in cleaned_rows if i < len(r)), 
+                default=0
             )
-            for i, h in enumerate(headers)
-        ]
-
+            # Cap at max_col_width
+            col_widths.append(min(max(header_len, max_data_len), max_col_width))
+        
         # Print header
         header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
         print("\n" + header_row)
         print("-" * len(header_row))
-
+        
         # Print each row
         count = 0
-        for row in rows:
+        for row in cleaned_rows:
             print(" | ".join(
                 f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
             ))
-
+            
             count += 1
             if count == num_rows:
                 print(f"  ... showing {num_rows} of {max_rows} rows")
                 break
+
+    # # Internal function used to manually print a table cleanly
+    # def table_print_helper(self, headers, rows, max_rows, num_rows=25):
+    #     # Determine max width for each column
+    #     col_widths = [
+    #         max(
+    #             len(str(h)),
+    #             max((len(str(r[i])) for r in rows if i < len(r)), default=0)
+    #         )
+    #         for i, h in enumerate(headers)
+    #     ]
+
+    #     # Print header
+    #     header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
+    #     print("\n" + header_row)
+    #     print("-" * len(header_row))
+
+    #     # Print each row
+    #     count = 0
+    #     for row in rows:
+    #         print(" | ".join(
+    #             f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
+    #         ))
+
+    #         count += 1
+    #         if count == num_rows:
+    #             print(f"  ... showing {num_rows} of {max_rows} rows")
+    #             break
 
     # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
     def trace_function(self, frame, event, arg):

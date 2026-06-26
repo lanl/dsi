@@ -1,57 +1,47 @@
+# examples/ndp/ndp_user/7.display_advanced.py
 """
-Using display() with custom columns.
-Shows how to customize which fields are displayed.
+Advanced display options with custom column selection.
 """
 
 from dsi.dsi import DSI
 
 def main(verbose=False):
+    # Initialize with earth datasets
     dsi = DSI(
         backend_name="NDP",
-        params={
-            "keywords": "earth element",
-            "limit": 10
-        }
+        params={"keywords": "earth element", "limit": 10}
     )
     
-    # ============================================
-    # Display with specific columns (datasets)
-    # ============================================
-    
-    # Minimal view - just essential info
+    # Minimal dataset view
     if verbose:
-        print("\n=== Datasets - Minimal Columns ===")
+        print("\nDatasets (Minimal):")
     dsi.display('datasets', display_cols=['id', 'name', 'title', 'organization'])
     
-    # Extended view - more metadata
+    # Extended dataset view with metadata
     if verbose:
-        print("\n=== Datasets - Extended Columns ===")
+        print("\nDatasets (Extended):")
     dsi.display('datasets', display_cols=['id', 'title', 'organization', 'creator', 
                                           'created', 'modified', 'num_resources'])
     
-    # All columns (except raw_*)
+    # All dataset columns
     if verbose:
-        print("\n=== Datasets - All Columns ===")
+        print("\nDatasets (All Columns):")
     dsi.display('datasets', display_cols='all')
-    
-    # ============================================
-    # Display with specific columns (resources)
-    # ============================================
     
     # Minimal resource view
     if verbose:
-        print("\n=== Resources - Minimal Columns ===")
+        print("\nResources (Minimal):")
     dsi.display('resources', display_cols=['resource_id', 'resource_name', 'format', 'url'])
     
-    # Resource with metadata focus
+    # Resource view with metadata
     if verbose:
-        print("\n=== Resources - Metadata Focus ===")
+        print("\nResources (With Metadata):")
     dsi.display('resources', display_cols=['resource_id', 'resource_name', 'format', 
                                           'size', 'issue_date', 'dataset_title'])
     
     # All resource columns
     if verbose:
-        print("\n=== Resources - All Columns ===")
+        print("\nResources (All Columns):")
     dsi.display('resources', display_cols='all', num_rows=5)
     
     dsi.close()

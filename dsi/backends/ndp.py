@@ -692,22 +692,24 @@ class NDP(Webserver):
             table_count += 1
         
         print(f"{table_count} tables loaded")
-
-
+        
+        
     def get_table(self, table_name, dict_return=False):
         """
         Returns all data from a specified table.
         
         Parameters
         ----------
-        `table_name` : str
+        table_name : str
             Must be 'datasets' or 'resources'
-        `dict_return` : bool, default False
-            If True, returns OrderedDict. If False, returns DataFrame.
+        dict_return : bool, default False
+            If True, returns OrderedDict (raw collection).
+            If False (default), returns pandas DataFrame.
         
         Returns
         -------
         OrderedDict or pandas.DataFrame
+            Depends on dict_return parameter
         """
         if not self._loaded:
             raise RuntimeError("No data loaded")
@@ -723,9 +725,44 @@ class NDP(Webserver):
         if not table:
             raise ValueError(f"Table '{table_name}' is empty")
         
+        # ✅ CORRECTED: dict_return=True returns OrderedDict
         if dict_return:
-            return table
-        return pd.DataFrame(table)
+            return table  # Return OrderedDict
+        else:
+            return pd.DataFrame(table)  # Return DataFrame (default)
+    
+    # def get_table(self, table_name, collection=False):
+    #     """
+    #     Returns all data from a specified table.
+        
+    #     Parameters
+    #     ----------
+    #     `table_name` : str
+    #         Must be 'datasets' or 'resources'
+    #     `collection` : bool, default False
+    #         If True, returns OrderedDict. If False, returns DataFrame.
+        
+    #     Returns
+    #     -------
+    #     OrderedDict or pandas.DataFrame
+    #     """
+    #     if not self._loaded:
+    #         raise RuntimeError("No data loaded")
+        
+    #     if table_name not in self._cache:
+    #         raise ValueError(
+    #             f"Table '{table_name}' not found. "
+    #             f"Available tables: {list(self._cache.keys())}"
+    #         )
+        
+    #     table = self._cache.get(table_name)
+        
+    #     if not table:
+    #         raise ValueError(f"Table '{table_name}' is empty")
+        
+    #     if collection:
+    #         return table
+    #     return pd.DataFrame(table)
 
     
     def get_schema(self):
@@ -826,6 +863,206 @@ class NDP(Webserver):
             "  # Find rows matching a condition\n"
             "  dsi.find('organization == \"Oceans11 - LANL\"')\n"
         )
+
+
+    def find_relation(self, column_name, relation, **kwargs):
+        """
+        Find rows where column matches relation (e.g., 'num_resources > 5').
+        """
+        if not self._loaded:
+            return []
+        
+        operator, value = self._parse_relation(relation)
+        matches = []
+        
+        for table_name in self.list(collection=True):
+            df = self.get_table(table_name, dict_return=False)
+            
+            if column_name not in df.columns:
+                continue
+            
+            # Convert to numeric for numeric comparisons
+            if operator in {'>', '<', '>=', '<=', 'range'}:
+                df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+                df = df.dropna(subset=[column_name])
+            
+            # Apply filter
+            filtered = self._apply_pandas_filter(df, column_name, operator, value)
+            
+            # Convert to ValueObjects
+            for idx, row in filtered.iterrows():
+                vo = ValueObject()
+                vo.t_name = table_name
+                vo.c_name = list(df.columns)
+                vo.row_num = int(idx) + 1
+                vo.value = row.tolist()
+                vo.type = "cell"
+                matches.append(vo)
+        
+        return matches
+
+
+    def _apply_pandas_filter(self, df, column, operator, value):
+        """Apply comparison filter using pandas."""
+        if operator == '>':
+            return df[df[column] > value]
+        elif operator == '<':
+            return df[df[column] < value]
+        elif operator == '>=':
+            return df[df[column] >= value]
+        elif operator == '<=':
+            return df[df[column] <= value]
+        elif operator == '==':
+            return df[df[column] == value]
+        elif operator == '!=':
+            return df[df[column] != value]
+        elif operator == 'contains':
+            return df[df[column].astype(str).str.contains(str(value), case=False, na=False)]
+        elif operator == 'range':
+            min_val, max_val = value
+            return df[(df[column] >= min_val) & (df[column] <= max_val)]
+        return pd.DataFrame()
+    
+    
+    def _parse_relation(self, relation):
+        """
+        Parse relation string into operator and value.
+        
+        Examples:
+            '> 5' -> ('>', 5)
+            '<= 10' -> ('<=', 10)
+            '== 3' -> ('==', 3)
+            "(2, 5)" -> ('range', (2, 5))
+            "~~ 'climate'" -> ('contains', 'climate')
+        """
+        relation = relation.strip()
+        
+        # Two-character operators (must check first!)
+        if relation.startswith('>='):
+            return '>=', self._parse_value(relation[2:])
+        elif relation.startswith('<='):
+            return '<=', self._parse_value(relation[2:])
+        elif relation.startswith('=='):
+            return '==', self._parse_value(relation[2:])
+        elif relation.startswith('!='):
+            return '!=', self._parse_value(relation[2:])
+        elif relation.startswith('~~'):  # Partial match (contains)
+            return 'contains', self._parse_value(relation[2:])
+        
+        # Single-character operators
+        elif relation.startswith('>'):
+            return '>', self._parse_value(relation[1:])
+        elif relation.startswith('<'):
+            return '<', self._parse_value(relation[1:])
+        
+        # Range: (2, 5)
+        elif relation.startswith('(') and relation.endswith(')'):
+            parts = relation[1:-1].split(',')
+            if len(parts) == 2:
+                return 'range', (self._parse_value(parts[0]), self._parse_value(parts[1]))
+        
+        raise ValueError(f"Unknown relation format: {relation}")
+
+
+    def _parse_value(self, value_str):
+        """Convert string to appropriate Python type"""
+        value_str = str(value_str).strip()
+        
+        # Remove quotes if present (but DON'T return yet!)
+        if (value_str.startswith("'") and value_str.endswith("'")) or \
+        (value_str.startswith('"') and value_str.endswith('"')):
+            value_str = value_str[1:-1]  # Remove quotes, CONTINUE processing
+        
+        # Try to convert to number
+        try:
+            # Try int first
+            if '.' not in value_str:
+                return int(value_str)
+            # Then float
+            return float(value_str)
+        except ValueError:
+            # Return as string if conversion fails
+            return value_str
+
+        
+    # def find_relation(self, column_name, relation, **kwargs):
+    #     """
+    #     Finds all rows across all tables where a column relation is satisfied.
+        
+    #     DSI core calls this with parsed query components.
+        
+    #     Parameters
+    #     ----------
+    #     column_name : str
+    #         The column to query (e.g., "num_resources")
+    #     relation : str
+    #         The relation/operator (e.g., "< 2", "> 5", "== 'value'")
+    #     **kwargs : dict
+    #         Additional keyword arguments
+        
+    #     Returns
+    #     -------
+    #     list of ValueObject
+    #         List of ValueObjects representing matching rows
+    #     """
+        
+    #     if not self._loaded:
+    #         return []
+        
+    #     # Reconstruct pandas query from column_name and relation
+    #     query = f"{column_name} {relation}"
+        
+    #     matches = []
+        
+    #     for table_name, table in self._cache.items():
+    #         df = pd.DataFrame(table)
+            
+    #         if df.empty:
+    #             continue
+            
+    #         # Check if column exists in this table
+    #         if column_name not in df.columns:
+    #             continue
+            
+    #         try:
+    #             # Reset index to ensure 0-based indexing
+    #             df = df.reset_index(drop=True)
+                
+    #             # **FIX: Ensure numeric columns are actually numeric**
+    #             # Convert column to numeric if the relation uses numeric operators
+    #             numeric_operators = ['>', '<', '>=', '<=']
+    #             if any(op in relation for op in numeric_operators):
+    #                 df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+    #                 # Drop rows where conversion failed (NaN)
+    #                 df = df.dropna(subset=[column_name])
+    #                 df = df.reset_index(drop=True)
+                
+    #             # Use pandas query to filter rows
+    #             result_df = df.query(query, engine="python")
+                
+    #             if result_df.empty:
+    #                 continue
+                
+    #             # Convert matching rows to ValueObjects
+    #             for idx, row in result_df.iterrows():
+    #                 val = ValueObject()
+    #                 val.t_name = table_name
+    #                 val.c_name = list(df.columns)
+    #                 val.row_num = idx + 1  # 1-indexed row numbers
+    #                 val.value = row.tolist()
+    #                 val.type = "cell"
+                    
+    #                 matches.append(val)
+                    
+    #         except pd.errors.UndefinedVariableError:
+    #             # Column doesn't exist in this table - skip it
+    #             continue
+    #         except Exception as e:
+    #             # **FIX: Print error instead of silently skipping**
+    #             print(f"Warning: Query '{query}' failed on table '{table_name}': {e}")
+    #             continue
+        
+    #     return matches
     
     # def find_relation(self, query, dict_return=True, **kwargs):
     #     """
@@ -875,76 +1112,6 @@ class NDP(Webserver):
     #         raise ValueError(f"Query returned no results: '{query}'")
 
     #     return results
-
-    def find_relation(self, column_name, relation, **kwargs):
-        """
-        Finds all rows across all tables where a column relation is satisfied.
-        
-        DSI core calls this with parsed query components.
-        
-        Parameters
-        ----------
-        column_name : str
-            The column to query (e.g., "num_resources")
-        relation : str
-            The relation/operator (e.g., "< 2", "> 5", "== 'value'")
-        **kwargs : dict
-            Additional keyword arguments
-        
-        Returns
-        -------
-        list of ValueObject
-            List of ValueObjects representing matching rows
-        """
-        
-        if not self._loaded:
-            return []
-        
-        # Reconstruct pandas query from column_name and relation
-        query = f"{column_name} {relation}"
-        
-        matches = []
-        
-        for table_name, table in self._cache.items():
-            df = pd.DataFrame(table)
-            
-            if df.empty:
-                continue
-            
-            # Check if column exists in this table
-            if column_name not in df.columns:
-                continue
-            
-            try:
-                # Reset index to ensure 0-based indexing
-                df = df.reset_index(drop=True)
-                
-                # Use pandas query to filter rows
-                result_df = df.query(query, engine="python")
-                
-                if result_df.empty:
-                    continue
-                
-                # Convert matching rows to ValueObjects
-                for idx, row in result_df.iterrows():
-                    val = ValueObject()
-                    val.t_name = table_name
-                    val.c_name = list(df.columns)
-                    val.row_num = idx + 1  # 1-indexed row numbers
-                    val.value = row.tolist()
-                    val.type = "cell"
-                    
-                    matches.append(val)
-                    
-            except pd.errors.UndefinedVariableError:
-                # Column doesn't exist in this table - skip it
-                continue
-            except Exception:
-                # Query failed for this table - skip it
-                continue
-        
-        return matches
-
 
     # ----------------------------------------------------------------------
     # Artifact Processing (tiered table construction)

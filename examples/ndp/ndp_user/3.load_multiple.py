@@ -42,7 +42,6 @@ def main(verbose=False):
     if verbose:
         print("\n=== Query Results ===")
         dsi.list()
-        print()
         dsi.summary()
         
         # Show unique datasets

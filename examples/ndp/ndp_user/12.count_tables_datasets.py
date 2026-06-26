@@ -1,4 +1,4 @@
-# examples/ndp/ndp_user/6.count_tables_datasets.py
+# examples/ndp/ndp_user/12.count_tables_datasets.py
 """
 Demonstrates num_tables() vs num_datasets() in NDP backend.
 """

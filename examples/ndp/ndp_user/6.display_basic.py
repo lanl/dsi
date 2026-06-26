@@ -1,11 +1,12 @@
+# examples/ndp/ndp_user/6.display_basic.py
 """
-Using display() to show detailed information from tables.
-Shows how to view data from datasets and resources tables.
+Using display() to view table data.
 """
 
 from dsi.dsi import DSI
 
 def main(verbose=False):
+    # Initialize with forest datasets
     dsi = DSI(
         backend_name="NDP",
         params={
@@ -15,36 +16,24 @@ def main(verbose=False):
         }
     )
     
-    # ============================================
-    # Display datasets table (default view)
-    # ============================================
-    
+    # Display datasets table
     if verbose:
-        print("\n=== Datasets Table (Default View) ===")
+        print("\nDatasets Table:")
     dsi.display('datasets')
     
-    # ============================================
-    # Display with limited rows and specific columns
-    # ============================================
-    
+    # Display with specific columns
     if verbose:
-        print("\n=== Datasets Table (First 3 Rows) ===")
+        print("\nDatasets (Selected Columns):")
     dsi.display('datasets', num_rows=3, display_cols=["name", "title", "tags"])
     
-    # ============================================
     # Display resources table
-    # ============================================
-    
     if verbose:
-        print("\n=== Resources Table (Default View) ===")
+        print("\nResources Table:")
     dsi.display('resources')
     
-    # ============================================
-    # Display with limited rows and specific columns
-    # ============================================
-    
+    # Display resources with specific columns
     if verbose:
-        print("\n=== Resources Table (First 5 Rows) ===")
+        print("\nResources (Selected Columns):")
     dsi.display('resources', num_rows=5, display_cols=["resource_name", "dataset_title", "url"])
     
     dsi.close()

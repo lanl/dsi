@@ -1,8 +1,6 @@
-# examples/ndp/ndp_user/list_and_summary.py
-
+# examples/ndp/ndp_user/5.list_and_summary.py
 """
-Using list() and summary() methods.
-Shows overview and statistics of cached data.
+Using list() and summary() methods to view cached data.
 """
 
 from dsi.dsi import DSI
@@ -11,64 +9,40 @@ def main(verbose=False):
     # Initialize with a search query
     dsi = DSI(
         backend_name="NDP",
-        params={
-            "keywords": "space",
-            "limit": 10
-        }
+        params={"keywords": "space", "limit": 10}
     )
     
-    # ============================================
-    # LIST: Quick tabular overview
-    # ============================================
-    
-    # Print list (shows table names and dimensions)
+    # Show table list
     if verbose:
-        print("\n=== Dataset List (prints) ===")
+        print("\nTable List:")
     dsi.list()
     
     # Get list as collection (returns list of table names)
     if verbose:
-        print("\n=== Dataset List (collection) ===")
-    result = dsi.list(collection=True)
-    if verbose:
+        print("\nTable List (collection):")
+        result = dsi.list(collection=True)
         print(f"Type: {type(result)}")
         print(f"Contents: {result}")
     
-    # ============================================
-    # SUMMARY: Statistical overview
-    # ============================================
-    
-    # Print summary of all tables
+    # Show summary of all tables
     if verbose:
-        print("\n=== Summary of All Tables (prints) ===")
+        print("\nSummary of All Tables:")
     dsi.summary()
     
-    # Summary of single table (datasets)
+    # Summary of specific tables
     if verbose:
-        print("\n=== Summary of datasets Table ===")
-    dsi.summary(table_name='datasets')
+        print("\nDatasets Table Summary:")
+        dsi.summary(table_name='datasets')
+        
+        print("\nResources Table Summary:")
+        dsi.summary(table_name='resources')
     
-    # Summary of single table (resources)
+    # Get summary as collection
     if verbose:
-        print("\n=== Summary of resources Table ===")
-    dsi.summary(table_name='resources')
-    
-    # Get summary as collection (returns DataFrame or list of DataFrames)
-    if verbose:
-        print("\n=== Summary as Collection ===")
-    result = dsi.summary(collection=True)
-    if verbose:
+        print("\nDatasets Summary (collection):")
+        result = dsi.summary(table_name='datasets', collection=True)
         print(f"Type: {type(result)}")
-        if isinstance(result, list):
-            print(f"Length: {len(result)}")
-    
-    # Get summary of specific table as collection
-    if verbose:
-        print("\n=== Summary of datasets as DataFrame ===")
-    result = dsi.summary(table_name='datasets', collection=True)
-    if verbose:
-        print(f"Type: {type(result)}")
-        print(result.head() if hasattr(result, 'head') else result)
+        print(result)
     
     dsi.close()
 
