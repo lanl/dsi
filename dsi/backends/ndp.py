@@ -719,6 +719,7 @@ class NDP(Webserver):
         if not table:
             raise ValueError(f"Table '{table_name}' is empty")
         
+        # ✅ CORRECTED: dict_return=True returns OrderedDict
         if dict_return:
             return table
         else:
