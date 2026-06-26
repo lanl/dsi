@@ -17,46 +17,48 @@ def main(verbose=False):
         params={"keywords": "deep water", "limit": 10}
     )
     
-    if verbose:
-        print("\nAvailable tables:")
-        dsi.list()
+    # Get list of available tables
+    table_list = dsi.list(collection=True)
     
-    # Query for PDF resources
-    try:
-        # Get all resources
-        resources_df = dsi.resources
-        print(f"\nFound {len(resources_df)} total resources")
-        
-        # Show format distribution
-        if 'format' in resources_df.columns:
-            formats = resources_df['format'].value_counts()
-            print("\nResource formats:")
-            for fmt, count in formats.items():
-                print(f"  {fmt}: {count}")
-        
-        # Query for PDFs using DSI-style filtering
-        pdf_query = resources_df.query("format.str.upper() == 'PDF'")
-        
-        if pdf_query.empty:
-            print("\n❌ No PDF resources found")
-            dsi.close()
-            return
-        
-        print(f"\n✓ Found {len(pdf_query)} PDF(s)")
-        
-        # Get first PDF's info
-        pdf_info = pdf_query.iloc[0]
-        pdf_name = pdf_info['resource_name']
-        pdf_url = pdf_info['url']
-        dataset = pdf_info['dataset_title']
-        
-        print(f"  Name: {pdf_name}")
-        print(f"  Dataset: {dataset}")
-        
-    except Exception as e:
-        print(f"Error querying resources: {e}")
+    if not table_list:
+        print("No tables found")
         dsi.close()
         return
+    
+    print(f"Found tables: {', '.join(table_list)}")
+    
+    # Get resources table
+    if 'resources' not in table_list:
+        print("No resources table found")
+        dsi.close()
+        return
+    
+    resources_df = dsi.get_table('resources', collection=True)
+    print(f"\nFound {len(resources_df)} resources")
+    
+    # Display available formats
+    if 'format' in resources_df.columns:
+        formats = resources_df['format'].value_counts()
+        print("\nAvailable resource formats:")
+        for fmt, count in formats.items():
+            print(f"  {fmt}: {count}")
+    
+    # Find PDF resources
+    pdf_resources = resources_df[resources_df['format'].str.upper() == 'PDF']
+    
+    if pdf_resources.empty:
+        print("\n❌ No PDF resources found")
+        dsi.close()
+        return
+    
+    # Select first PDF
+    pdf_info = pdf_resources.iloc[0]
+    pdf_name = pdf_info['resource_name']
+    pdf_url = pdf_info['url']
+    dataset = pdf_info['dataset_title']
+    
+    print(f"\n✓ Found PDF: {pdf_name}")
+    print(f"  Dataset: {dataset}")
     
     # Validate URL
     print(f"\nValidating URL: {pdf_url[:60]}...")
@@ -132,7 +134,7 @@ def main(verbose=False):
     # Show related resources
     if verbose:
         print(f"\nAll resources in '{dataset}':")
-        related = resources_df.query(f"dataset_title == '{dataset}'")
+        related = resources_df[resources_df['dataset_title'] == dataset]
         for _, row in related.iterrows():
             print(f"  - {row['resource_name']} ({row['format']})")
         
