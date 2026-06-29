@@ -1658,6 +1658,7 @@ class NDP(Webserver):
                 raise ValueError(f"Table '{table_name}' is empty")
             
             df = pd.DataFrame(table)
+            df = df.infer_objects()
             summary_df = summarize_dataframe(df)
             
             if collection:
@@ -1674,6 +1675,7 @@ class NDP(Webserver):
                 continue
                 
             df = pd.DataFrame(table)
+            df = df.infer_objects()
             summary_df = summarize_dataframe(df)
             
             table_names.append(name)
