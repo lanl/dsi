@@ -4,6 +4,12 @@ The RCSBPDB backend is a read-only DSI backend for retrieving metadata from the 
 
 RCSB PDB is the primary public repository for experimentally determined three-dimensional structures of proteins, nucleic acids, and biological macromolecular complexes. This backend retrieves metadata through the RCSB REST APIs, normalizes the returned information, and exposes it as DSI-compatible tables.
 
+Useful RCSB PDB resources:
+
+- [RCSB PDB](https://www.rcsb.org/): Main structure catalog for searching, viewing, and downloading experimentally determined 3D biological macromolecular structures.
+- [RCSB PDB Data API](https://data.rcsb.org/): API documentation for retrieving structure, assembly, entity, citation, and related metadata.
+- [RCSB PDB Web APIs Overview](https://www.rcsb.org/docs/programmatic-access/web-apis-overview): Overview of programmatic access, including Search API and Data API workflows.
+
 > **Note:** This backend is read-only. It retrieves and organizes metadata but does not modify remote RCSB data.
 
 ---
@@ -44,7 +50,7 @@ dsi.close()
 
 ## Supported Search and Lookup Parameters
 
-The backend supports a single `params` interface regardless of how users search.
+The backend supports a single `params` interface.
 
 ### Keyword Search
 
