@@ -673,7 +673,7 @@ class NDP(Webserver):
             Prints the count to console
         """
         if not self._loaded:
-            print("0 tables loaded")
+            print("Database now has 0 tables")
             return
         
         # Count actual tables in cache
@@ -691,7 +691,7 @@ class NDP(Webserver):
         if "errors" in self._cache and self._cache["errors"]:
             table_count += 1
         
-        print(f"{table_count} tables loaded")
+        print(f"Database now has {table_count} tables")
         
         
     def get_table(self, table_name, dict_return=False):
