@@ -1,0 +1,16 @@
+feedparser
+requests
+rich
+beautifulsoup4
+ipython
+typing-extensions
+langchain-core
+langchain-openai
+langchain-experimental
+langgraph
+langgraph-checkpoint-sqlite
+jupyterlab
+mcp
+langchain-mcp-adapters
+langchain-mcp-tools
+nest_asyncio
