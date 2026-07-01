@@ -265,7 +265,7 @@ class DSIExplorer:
         now = datetime.now()
         datetime_str = now.strftime("%Y_%m_%d__%H_%M")
         workspace_name = "dsi_explorer_agent__" +  datetime_str
-        absolute_workspace_path = os.path.abspath(workspace_name)
+        absolute_workspace_path = os.path.abspath(os.path.join(self.run_path, workspace_name))
         print(f"Creating workspace at: {absolute_workspace_path}")
 
         # Create the woking directory and switch to it
