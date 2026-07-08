@@ -6,6 +6,7 @@
 
 - **Full metadata capture**: permissions, ownership, ACLs, extended attributes, and SELinux contexts
 - **Rsync-based snapshots**: efficient storage with hard-link deduplication
+- **Merkle commit chain**: SHA-256 commit IDs with per-path Merkle nodes for pruning unchanged subtrees
 - **SQLite database**: structured metadata storage for querying and diffing
 - **Complete file history**: MD5 hashes, file stats, and all metadata changes tracked
 
@@ -276,7 +277,10 @@ dsi.version("diff")
 | ------------- | ---------- | --------------------------- |
 | id            | INTEGER PK | Auto-increment ID           |
 | root_folder   | TEXT       | Repository root path        |
-| commit_hash   | TEXT       | UUID4 hex (32 chars)        |
+| commit_hash   | TEXT       | SHA-256 Merkle commit hash  |
+| root_tree_hash | TEXT      | SHA-256 hash of root tree   |
+| parent_commit_hash | TEXT | Previous commit hash        |
+| hash_algorithm | TEXT      | Merkle format identifier    |
 | committed_at  | TEXT       | ISO-8601 timestamp          |
 | owner_name    | TEXT       | Username of the committer   |
 | message       | TEXT       | Optional commit message     |
@@ -306,6 +310,24 @@ Stores metadata for each file in each commit.
 | xattrs           | TEXT       | JSON dict of extended attributes |
 | security_context | TEXT       | SELinux context                  |
 | symlink_target   | TEXT       | Target of symlink                |
+
+### `merkle_nodes` Table
+
+Stores the content-addressed tree node for each committed path, including the synthetic root path `.`.
+
+| Column              | Type       | Description                       |
+| ------------------- | ---------- | --------------------------------- |
+| id                  | INTEGER PK | Auto-increment                    |
+| version_id          | INTEGER FK | References versions(id)           |
+| root_folder         | TEXT       | Partition key                     |
+| relative_path       | TEXT       | Path relative to root             |
+| file_type           | TEXT       | file/dir/symlink/etc              |
+| node_hash           | TEXT       | SHA-256 hash for this path node   |
+| metadata_hash       | TEXT       | SHA-256 hash of stable metadata   |
+| content_hash_sha256 | TEXT       | SHA-256 file content hash         |
+| subtree_file_count  | INTEGER    | File count below this node        |
+| subtree_total_bytes | INTEGER    | File bytes below this node        |
+| child_count         | INTEGER    | Direct child count for this node  |
 
 ### `staging` Table
 
