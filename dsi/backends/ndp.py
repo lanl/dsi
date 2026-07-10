@@ -1688,8 +1688,8 @@ class NDP(Webserver):
         """
         Displays rows from a specified table.
 
-        By default, shows a curated subset of columns for readability.
-        Raw metadata columns (raw_*) are always excluded unless explicitly requested.
+        By default, shows ALL columns (including raw_* columns).
+        You can optionally specify a subset of columns to display.
 
         Parameters
         ----------
@@ -1697,11 +1697,8 @@ class NDP(Webserver):
             Name of the table to display
         `num_rows` : int, default 25
             Number of rows to display
-        `display_cols` : list of str or 'all', optional
-            Subset of columns to display. Options:
-            - None: Shows smart default columns for the table
-            - 'all': Shows all columns except raw_*
-            - [...]: Shows specific columns you list
+        `display_cols` : list of str, optional
+            Specific columns to display. If None, shows all columns.
 
         Returns
         -------
@@ -1715,9 +1712,9 @@ class NDP(Webserver):
         if not isinstance(table_name, str):
             raise TypeError("display() ERROR: Input 'table_name' must be a string")
         
-        # Validate display_cols type - allow None, list, or 'all'
-        if display_cols is not None and display_cols != 'all' and not isinstance(display_cols, list):
-            raise TypeError("display() ERROR: Input 'display_cols' must be a list of column names or 'all'")
+        # Validate display_cols type - allow None or list
+        if display_cols is not None and not isinstance(display_cols, list):
+            raise TypeError("display() ERROR: Input 'display_cols' must be a list of column names or None")
         
         # If display_cols is a list, validate it contains strings
         if isinstance(display_cols, list):
@@ -1745,17 +1742,8 @@ class NDP(Webserver):
 
         df = pd.DataFrame(table)
 
-        # Define default columns for each table
-        default_display_cols = {
-            'datasets': ['id', 'name', 'title', 'organization', 'num_resources'],
-            'resources': ['resource_id', 'resource_name', 'format', 'url', 'dataset_title']
-        }
-
         # Determine which columns to display
-        if display_cols == 'all':
-            # Show all non-raw columns
-            cols_to_show = [col for col in df.columns if not col.startswith('raw_')]
-        elif display_cols:
+        if display_cols:
             # User specified exact columns
             missing_cols = set(display_cols) - set(df.columns)
             if missing_cols:
@@ -1765,19 +1753,8 @@ class NDP(Webserver):
                 )
             cols_to_show = display_cols
         else:
-            # Use smart defaults for this table
-            default_cols = default_display_cols.get(table_name, [])
-            
-            # Filter to only columns that exist in the dataframe
-            cols_to_show = [col for col in default_cols if col in df.columns]
-            
-            # Fallback: if no defaults defined or none exist, show non-raw columns
-            if not cols_to_show:
-                cols_to_show = [col for col in df.columns if not col.startswith('raw_')]
-            
-            # Ultimate fallback: show first column at minimum
-            if not cols_to_show:
-                cols_to_show = df.columns[:1].tolist()
+            # Show ALL columns by default (including raw_* columns)
+            cols_to_show = df.columns.tolist()
 
         df = df[cols_to_show]
 
