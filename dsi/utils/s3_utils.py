@@ -2,9 +2,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 import getpass
 import os
-import importlib.util
 
-if importlib.util.find_spec("duckdb") is not None:
+try:
     import boto3
     from botocore import UNSIGNED
     from botocore.config import Config
@@ -14,6 +13,11 @@ if importlib.util.find_spec("duckdb") is not None:
         NoCredentialsError,
         PartialCredentialsError,
     )
+except ModuleNotFoundError:
+    boto3 = None
+    UNSIGNED = Config = None
+    BotoCoreError = ClientError = ImportError
+    NoCredentialsError = PartialCredentialsError = ImportError
 
 
 def get_s3_client(
@@ -43,6 +47,9 @@ def get_s3_client(
     Returns:
         boto3 S3 client
     """
+    if boto3 is None:
+        raise ImportError("S3 support requires the optional boto3 dependency.")
+
     region = (
         region_name
         or os.environ.get("AWS_DEFAULT_REGION")
