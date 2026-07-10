@@ -5,50 +5,41 @@ Advanced display options with custom column selection.
 
 from dsi.dsi import DSI
 
-def main(verbose=False):
+def main():
     # Initialize with earth datasets
     dsi = DSI(
         backend_name="NDP",
         params={"keywords": "earth element", "limit": 10}
     )
     
+    # Display all columns (default behavior)
+    print("\nDatasets (All Columns - Default):")
+    dsi.display('datasets', num_rows=3)
+    
     # Minimal dataset view
-    if verbose:
-        print("\nDatasets (Minimal):")
+    print("\nDatasets (Minimal - Custom Selection):")
     dsi.display('datasets', display_cols=['id', 'name', 'title', 'organization'])
     
     # Extended dataset view with metadata
-    if verbose:
-        print("\nDatasets (Extended):")
+    print("\nDatasets (Extended - Custom Selection):")
     dsi.display('datasets', display_cols=['id', 'title', 'organization', 'creator', 
                                           'created', 'modified', 'num_resources'])
     
-    # All dataset columns
-    if verbose:
-        print("\nDatasets (All Columns):")
-    dsi.display('datasets', display_cols='all')
+    # Display all resource columns (default behavior)
+    print("\nResources (All Columns - Default):")
+    dsi.display('resources', num_rows=3)
     
     # Minimal resource view
-    if verbose:
-        print("\nResources (Minimal):")
+    print("\nResources (Minimal - Custom Selection):")
     dsi.display('resources', display_cols=['resource_id', 'resource_name', 'format', 'url'])
     
     # Resource view with metadata
-    if verbose:
-        print("\nResources (With Metadata):")
+    print("\nResources (With Metadata - Custom Selection):")
     dsi.display('resources', display_cols=['resource_id', 'resource_name', 'format', 
-                                          'size', 'issue_date', 'dataset_title'])
-    
-    # All resource columns
-    if verbose:
-        print("\nResources (All Columns):")
-    dsi.display('resources', display_cols='all', num_rows=5)
+                                          'size', 'issue_date', 'dataset_title'], 
+                              num_rows=5)
     
     dsi.close()
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-    main(verbose=args.verbose)
+    main()

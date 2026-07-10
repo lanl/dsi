@@ -5,7 +5,7 @@ Using display() to view table data.
 
 from dsi.dsi import DSI
 
-def main(verbose=False):
+def main():
     # Initialize with forest datasets
     dsi = DSI(
         backend_name="NDP",
@@ -16,31 +16,23 @@ def main(verbose=False):
         }
     )
     
-    # Display datasets table
-    if verbose:
-        print("\nDatasets Table:")
+    # Display datasets table (all columns by default)
+    print("\nDatasets Table (All Columns):")
     dsi.display('datasets')
     
-    # Display with specific columns
-    if verbose:
-        print("\nDatasets (Selected Columns):")
+    # Display with specific columns only
+    print("\nDatasets (Selected Columns):")
     dsi.display('datasets', num_rows=3, display_cols=["name", "title", "tags"])
     
-    # Display resources table
-    if verbose:
-        print("\nResources Table:")
+    # Display resources table (all columns by default)
+    print("\nResources Table (All Columns):")
     dsi.display('resources')
     
-    # Display resources with specific columns
-    if verbose:
-        print("\nResources (Selected Columns):")
+    # Display resources with specific columns only
+    print("\nResources (Selected Columns):")
     dsi.display('resources', num_rows=5, display_cols=["resource_name", "dataset_title", "url"])
     
     dsi.close()
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-    main(verbose=args.verbose)
+    main()
