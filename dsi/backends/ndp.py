@@ -1688,7 +1688,7 @@ class NDP(Webserver):
         """
         Displays rows from a specified table.
 
-        By default, shows ALL columns (including raw_* columns).
+        By default, shows ALL columns (including raw_* columns) with FULL content.
         You can optionally specify a subset of columns to display.
 
         Parameters
@@ -1696,7 +1696,7 @@ class NDP(Webserver):
         `table_name` : str
             Name of the table to display
         `num_rows` : int, default 25
-            Number of rows to display
+            Number of rows to display. Set to None to show all rows.
         `display_cols` : list of str, optional
             Specific columns to display. If None, shows all columns.
 
@@ -1762,39 +1762,15 @@ class NDP(Webserver):
         total_rows = len(df)
         display_df = df.head(num_rows) if num_rows else df
 
-        # Truncate long values for display
-        def truncate_value(x):
-            if isinstance(x, (dict, list)):
-                x = str(x)
-            if isinstance(x, str) and len(x) > 50:
-                return x[:50] + '...'
-            return x
-        
-        display_df = display_df.map(truncate_value)
-
         # Print header
-        print(f"\nTable: {table_name}\n")
+        print(f"\nTable: {table_name}")
         
-        # Format and print table
-        headers = display_df.columns.tolist()
-        rows = display_df.values.tolist()
-        
-        # Calculate column widths
-        col_widths = [len(h) for h in headers]
-        for row in rows:
-            for i, val in enumerate(row):
-                val_str = str(val) if val is not None else 'None'
-                col_widths[i] = max(col_widths[i], len(val_str))
-        
-        # Print header row
-        header_line = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths))
-        print(header_line)
-        print("-" * len(header_line))
-        
-        # Print data rows
-        for row in rows:
-            row_strs = [str(val) if val is not None else 'None' for val in row]
-            print(" | ".join(s.ljust(w) for s, w in zip(row_strs, col_widths)))
+        # Display with NO limits (SQL-like behavior - shows everything)
+        with pd.option_context('display.max_rows', None,
+                            'display.max_columns', None,
+                            'display.width', None,
+                            'display.max_colwidth', None):
+            print(display_df.to_string(index=False))
         
         # Print row count info
         if num_rows and total_rows > num_rows:

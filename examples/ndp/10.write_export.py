@@ -1,11 +1,11 @@
-# examples/ndp/ndp_user/10.write_export.py
+# examples/ndp/10.write_export.py
 """
 Using write() to export NDP data to CSV and Parquet formats.
 """
 
 from dsi.dsi import DSI
 
-def main(verbose=False):
+def main():
     # Initialize NDP backend
     dsi = DSI(
         backend_name="NDP",
@@ -17,7 +17,7 @@ def main(verbose=False):
     datasets = dsi.find('num_resources >= 3', collection=True)
     print(f"Found {len(datasets)} datasets with 3+ resources")
     
-    if verbose and len(datasets) > 0:
+    if len(datasets) > 0:
         print("\nDataset titles:")
         for idx, row in datasets.head(3).iterrows():
             print(f"  - {row['title']}")
@@ -70,8 +70,4 @@ def main(verbose=False):
     print("\n✓ All exports complete! Check your directory for output files.")
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-    main(verbose=args.verbose)
+    main()

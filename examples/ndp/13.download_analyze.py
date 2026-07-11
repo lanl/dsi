@@ -1,4 +1,4 @@
-# examples/ndp/ndp_user/download_analyze.py
+# examples/ndp/13.download_analyze.py
 """
 Download and analyze PDF documentation from NDP deep water datasets.
 """
@@ -7,7 +7,7 @@ import os
 import requests
 from dsi.dsi import DSI
 
-def main(verbose=False):
+def main():
     """Download PDF documentation from NDP and extract metadata."""
     
     # Query NDP for deep water datasets
@@ -121,7 +121,7 @@ def main(verbose=False):
             if metadata.author:
                 print(f"  Author: {metadata.author}")
         
-        if verbose and len(reader.pages) > 0:
+        if len(reader.pages) > 0:
             print(f"\nFirst page preview:")
             text = reader.pages[0].extract_text()
             print(text[:500] + "..." if len(text) > 500 else text)
@@ -132,25 +132,17 @@ def main(verbose=False):
         print(f"Could not read PDF: {e}")
     
     # Show related resources
-    if verbose:
-        print(f"\nAll resources in '{dataset}':")
-        related = resources_df[resources_df['dataset_title'] == dataset]
-        for _, row in related.iterrows():
-            print(f"  - {row['resource_name']} ({row['format']})")
-        
-        print(f"\nData summary:")
-        dsi.summary()
+    print(f"\nAll resources in '{dataset}':")
+    related = resources_df[resources_df['dataset_title'] == dataset]
+    for _, row in related.iterrows():
+        print(f"  - {row['resource_name']} ({row['format']})")
+    
+    print(f"\nData summary:")
+    dsi.summary()
     
     print(f"\n✓ Complete. File saved to: {filepath}")
     
     dsi.close()
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Download PDF documentation from NDP deep water datasets"
-    )
-    parser.add_argument("--verbose", action="store_true",
-                       help="Show detailed output")
-    args = parser.parse_args()
-    main(verbose=args.verbose)
+    main()

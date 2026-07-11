@@ -1,4 +1,4 @@
-# examples/ndp/ndp_user/7.display_advanced.py
+# examples/ndp/7.display_advanced.py
 """
 Advanced display options with custom column selection.
 """

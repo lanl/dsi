@@ -1,4 +1,4 @@
-# examples/ndp/ndp_user/3.load_multiple.py
+# examples/ndp/3.load_multiple.py
 """
 Multiple NDP queries with automatic deduplication.
 Demonstrates ALL available NDP query parameters.
@@ -6,7 +6,7 @@ Demonstrates ALL available NDP query parameters.
 
 from dsi.dsi import DSI
 
-def main(verbose=False):
+def main():
     # Define multiple search queries with various parameter combinations
     search_params = [
         # Query 1: Basic keyword search
@@ -39,22 +39,16 @@ def main(verbose=False):
         params=search_params
     )
     
-    if verbose:
-        print("\n=== Query Results ===")
-        dsi.list()
-        dsi.summary()
-        
-        # Show unique datasets
-        datasets = dsi.get_table("datasets", collection=True)
-        resources = dsi.get_table("resources", collection=True)
-        print(f"\n=== Retrieved {len(datasets)} unique datasets ===")
-        print(datasets[['title', 'organization', 'creator']].to_string())
-         
+    print("\n=== Query Results ===")
+    dsi.list()
+    dsi.summary()
+    
+    # Show unique datasets
+    datasets = dsi.get_table("datasets", collection=True)
+    print(f"\n=== Retrieved {len(datasets)} unique datasets ===")
+    print(datasets[['title', 'organization', 'creator']].to_string())
+     
     dsi.close()
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-    main(verbose=args.verbose)
+    main()

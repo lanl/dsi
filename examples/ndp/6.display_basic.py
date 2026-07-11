@@ -1,4 +1,4 @@
-# examples/ndp/ndp_user/6.display_basic.py
+# examples/ndp/6.display_basic.py
 """
 Using display() to view table data.
 """

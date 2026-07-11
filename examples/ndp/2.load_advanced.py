@@ -1,11 +1,11 @@
-# examples/ndp/ndp_user/2.load_advanced.py
+# examples/ndp/2.load_advanced.py
 """
 Advanced NDP search with multiple filter parameters.
 """
 
 from dsi.dsi import DSI
 
-def main(verbose=False):
+def main():
     # Initialize NDP backend with advanced search parameters
     dsi = DSI(
         backend_name="NDP",
@@ -19,21 +19,16 @@ def main(verbose=False):
         }
     )
     
-    if verbose:
-        print("\nTable List:")
-        dsi.list()
-        
-        print("\nTable Summary:")
-        dsi.summary()
-        
-        # Show just the formats and resource names
-        dsi.display("resources", display_cols=["resource_name", "format"])
+    print("\nTable List:")
+    dsi.list()
+    
+    print("\nTable Summary:")
+    dsi.summary()
+    
+    # Display resources table (shows all columns and content)
+    dsi.display("resources")
     
     dsi.close()
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-    main(verbose=args.verbose)
+    main()
