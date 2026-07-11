@@ -264,23 +264,24 @@ class DSI():
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.\n")            
         print()
-
+        
     def schema(self, filename = None):
         """
         Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
 
         `filename` : str, optional
-            Path to a JSON file describing the relationships of the tables in a database.
-            The schema should follow the format described in :ref:`user_schema_example_label`
+            - If ends with .json -> loads relational schema file
+            - If matches a table name -> returns CREATE TABLE for that table only
+            - If None -> returns CREATE TABLE for all tables
         
-        `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
+        `return` : If filename = None, returns the structural schema of this backend - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
         """
-        if self.main_backend_obj.__class__.__name__ == "NDP":
-            raise RuntimeError("schema() ERROR: NDP is a read-only backend and does not support schema operations.")
         if self.main_backend_obj.__class__.__name__ == "OSTI":
-            raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
-        if filename:
+            raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")
+        
+        if filename and filename.endswith('.json'):
+            # This is a schema file load operation
             if not os.path.exists(filename):
                 raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
             if "dsi_relations" in self.t.active_metadata:
@@ -292,7 +293,7 @@ class DSI():
             fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] is not None)
             all_schema_tables = pk_tables.union(fk_tables)
             
-            has_data = self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__)
+            has_data = self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__())
             if has_data and all_schema_tables.issubset(set(self.list(True))):
                 try:
                     self.t.artifact_handler(interaction_type='ingest')
@@ -310,10 +311,84 @@ class DSI():
 
             msg = f"Successfully loaded the schema file: {filename}"
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+        
         else:
+            # This is a schema viewing operation (all tables or specific table)
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
-                return self.t.get_schema()
+                schema_str = self.t.get_schema()
+            
+            # If filename provided (and not .json), filter for that table
+            if filename:
+                # Extract only the CREATE TABLE for the specified table
+                table_pattern = f"CREATE TABLE {filename} ("
+                if table_pattern in schema_str:
+                    # Find start and end of this table's definition
+                    start_idx = schema_str.index(table_pattern)
+                    
+                    # Find the closing ");
+                    end_idx = schema_str.index(");", start_idx) + 2
+                    
+                    # Extract just this table
+                    table_schema = schema_str[start_idx:end_idx]
+                    
+                    return table_schema
+                else:
+                    raise ValueError(
+                        f"schema() ERROR: Table '{filename}' not found in backend. "
+                        f"Available tables: {self.list(collection=True)}"
+                    )
+            
+            # Return full schema
+            return schema_str
+
+    # def schema(self, filename = None):
+    #     """
+    #     Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
+
+    #     `filename` : str, optional
+    #         Path to a JSON file describing the relationships of the tables in a database.
+    #         The schema should follow the format described in :ref:`user_schema_example_label`
+        
+    #     `return` : If filename = None, returns the structural schema of this database - table/col names and their units.
+    #     **If loading a relational schema, this function must be called before reading in any associated data files**
+    #     """
+    #     if self.main_backend_obj.__class__.__name__ == "OSTI":
+    #         raise RuntimeError("schema() ERROR: OSTI is a read-only backend and does not support schema operations.")        
+    #     if filename:
+    #         if not os.path.exists(filename):
+    #             raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+    #         if "dsi_relations" in self.t.active_metadata:
+    #             raise RuntimeError("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
+
+    #         self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+
+    #         pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
+    #         fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] is not None)
+    #         all_schema_tables = pk_tables.union(fk_tables)
+            
+    #         has_data = self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__)
+    #         if has_data and all_schema_tables.issubset(set(self.list(True))):
+    #             try:
+    #                 self.t.artifact_handler(interaction_type='ingest')
+    #             except Exception as e:
+    #                 if e.args:
+    #                     e.args = (f'schema() ERROR: {str(e.args[0])}',) + e.args[1:]
+    #                 raise
+    #             self.t.active_metadata = OrderedDict()
+    #             self.schema_read = False
+    #             self.schema_tables = set()
+    #             self.loaded_tables = set()
+    #         else:
+    #             self.schema_read = True
+    #             self.schema_tables = all_schema_tables
+
+    #         msg = f"Successfully loaded the schema file: {filename}"
+    #         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+    #     else:
+    #         fnull = open(os.devnull, 'w')
+    #         with redirect_stdout(fnull):
+    #             return self.t.get_schema()
 
     def list_readers(self):
         """

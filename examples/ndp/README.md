@@ -1,10 +1,29 @@
 # NDP Backend for DSI
 
-The NDP backend is a read-only DSI backend for retrieving metadata from NDP (National Data Platform) CKAN-based data catalogs.
+A read-only backend for accessing NDP catalogs via the CKAN API. Metadata is retrieved and exposed as DSI-compatible tables: datasets and resources.
 
-NDP provides open access to datasets from government agencies, research institutions, and other organizations. This backend retrieves metadata through the CKAN API, normalizes the returned information, and exposes it as DSI-compatible tables.
+The National Data Platform (NDP) is a comprehensive data catalog providing open access to datasets from government agencies, research institutions, and other organizations. NDP uses CKAN (Comprehensive Knowledge Archive Network) software to organize and publish diverse datasets with rich metadata. This backend retrieves metadata through the CKAN API, normalizes the returned information, and exposes it as DSI-compatible tables.
+
+Useful NDP resources:
+
+- [National Data Platform](https://nationaldataplatform.org/): Main catalog for searching, browsing, and accessing datasets from various organizations.
+- [NDP Catalog Search](https://nationaldataplatform.org/catalog): Browse and search the complete dataset catalog.
+- [CKAN API Documentation](https://docs.ckan.org/en/2.9/api/index.html): Official API reference for querying and retrieving dataset metadata.
 
 > **Note:** This backend is read-only. It retrieves and organizes metadata but does not modify remote NDP data.
+
+---
+
+## API Reference
+
+For developers, the backend uses the CKAN API:
+
+- Base URL: `https://nationaldataplatform.org/catalog`
+- API version: 3
+- Main endpoint: `/api/3/action/package_search`
+- Dataset lookup: `/api/3/action/package_show`
+
+Query parameters are automatically formatted and validated by the backend.
 
 ---
 
@@ -68,7 +87,7 @@ dsi = DSI(
 )
 ```
 
-**Note:** Organization names with spaces are automatically handled. Use the exact organization name as it appears in NDP.
+> **Note:** Organization names with spaces are automatically handled. Use the exact organization name as it appears in NDP.
 
 ### Tag Filter
 
@@ -323,127 +342,103 @@ print(filtered[['title', 'num_resources']])
 
 The following example scripts demonstrate common workflows with the NDP backend.
 
-### **Basic Examples**
+### 1. load_basic.py
 
-#### **1. load_basic.py**
 Initialize the NDP backend with a simple keyword search and view available tables.
 
 - Basic query with `keywords` parameter
 - List tables with `dsi.list()`
 - Introduction to NDP backend structure
 
----
+### 2. load_advanced.py
 
-#### **2. load_advanced.py**
 Advanced query with multiple filter parameters combined.
 
 - Use multiple parameters: `keywords`, `organization`, `tags`, `formats`
 - Filter datasets with complex criteria
 - View filtered results
 
----
+### 3. load_multiple.py
 
-#### **3. load_multiple.py**
 Run multiple independent queries and combine results.
 
 - Execute multiple queries in one DSI initialization
 - Automatic deduplication by dataset ID
 - View combined results from different search criteria
 
----
+### 4. load_by_id.py
 
-#### **4. load_by_id.py**
 Load a specific dataset using its ID or name.
 
 - Direct dataset lookup using `id` parameter
 - Access specific dataset without searching
 - Useful when you know the exact dataset you need
 
----
+### 5. list_and_summary.py
 
-### **Data Exploration**
-
-#### **5. list_and_summary.py**
 Explore table structure and get statistical summaries.
 
 - Use `dsi.list()` to see available tables
 - Use `dsi.summary()` to get column statistics
 - View data types, unique values, min/max, averages
 
----
+### 6. display_basic.py
 
-#### **6. display_basic.py**
 Preview table data with basic display options.
 
 - Use `dsi.display()` to see table contents
 - Control number of rows displayed
 - View default columns for each table
 
----
+### 7. display_advanced.py
 
-#### **7. display_advanced.py**
 Advanced display options for customized table views.
 
 - Specify exact columns to display
 - Show all columns with `display_cols='all'`
 - Control output formatting for specific needs
 
----
+### 8. find_basic.py
 
-### **Search and Filter**
-
-#### **8. find_basic.py**
 Use `find()` to filter rows based on conditions.
 
 - Find rows where a condition is true
 - Use operators: `>`, `<`, `>=`, `<=`, `==`, `!=`
 - Filter numeric and text columns
 
----
+### 9. search_tables.py
 
-#### **9. search_tables.py**
 Search for specific values across all tables.
 
 - Use `dsi.search()` to find a value anywhere
 - Search in table names, column names, and cell values
 - View results organized by match type
 
----
+### 10. write_export.py
 
-### **Data Export and Processing**
-
-#### **10. write_export.py**
 Export NDP data to external formats.
 
 - Write datasets table to CSV
 - Export resources to Parquet
 - Save filtered data to local files
 
----
+### 11. process_to_local.py
 
-#### **11. process_to_local.py**
 Process NDP metadata into a local Sqlite/DuckDB database.
 
 - Convert read-only NDP data to writable local backend
 - Enable SQL queries on downloaded metadata
 - Persist data for offline analysis
 
----
+### 12. count_tables.py
 
-### **Utility Scripts**
-
-#### **12. count_tables_datasets.py**
-Count tables and datasets in the current backend.
+Count tables in the current backend.
 
 - Use `dsi.num_tables()` to count loaded tables
-- Use `dsi.num_datasets()` to count datasets
-- Quick summary of loaded data
+- Quick summary of table structure
 
----
+### 13. download_example.py
 
-### **Advanced Workflows**
-
-#### **13. download_example.py** ⭐ NEW
 Download and analyze resources from NDP datasets.
 
 - Query NDP for datasets with specific resources
@@ -633,19 +628,6 @@ print(formats)
 
 ---
 
-## API Reference
-
-For developers, the backend uses the CKAN API:
-
-- Base URL: `https://nationaldataplatform.org/catalog`
-- API version: 3
-- Main endpoint: `/api/3/action/package_search`
-- Dataset lookup: `/api/3/action/package_show`
-
-Query parameters are automatically formatted and validated by the backend.
-
----
-
 ## Advanced Features
 
 ### Validate Resource URLs
@@ -658,6 +640,15 @@ dsi.validate_urls()
 # Access url_valid column
 resources_df = dsi.get_table("resources", collection=True)
 valid_resources = resources_df[resources_df['url_valid'] == True]
+```
+
+### Count Datasets
+
+Count the number of datasets loaded:
+
+```python
+num_datasets = dsi.num_datasets()
+print(f"Loaded {num_datasets} datasets")
 ```
 
 ### Process to Writable Backend
