@@ -47,7 +47,7 @@ def main():
     pdf_resources = resources_df[resources_df['format'].str.upper() == 'PDF']
     
     if pdf_resources.empty:
-        print("\n❌ No PDF resources found")
+        print("\nNo PDF resources found")
         dsi.close()
         return
     

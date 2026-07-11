@@ -838,7 +838,7 @@ class NDP(Webserver):
         Query not supported for NDP backend (non-SQL backend).
         
         NDP is a read-only metadata backend that does not support SQL queries.
-        Use find() or find_relation() for searching data instead.
+        Use find(), search(), or find_relation() for searching data instead.
 
         Parameters
         ----------
@@ -855,13 +855,11 @@ class NDP(Webserver):
             Always raised as NDP does not support SQL queries
         """
         raise NotImplementedError(
-            "query() is not supported for NDP backend - it is a non-SQL backend.\n"
-            "Please use find() or find_relation() instead for searching data.\n\n"
-            "Examples:\n"
-            "  # Search for a value across all tables\n"
-            "  dsi.find('num_resources > 5')\n\n"
-            "  # Find rows matching a condition\n"
-            "  dsi.find('organization == \"Oceans11 - LANL\"')\n"
+            "query() is not supported for NDP backend - it is a non-SQL backend.\n\n"
+            "Use these methods instead:\n"
+            "  dsi.find('num_resources > 5')           # Query with conditions\n"
+            "  dsi.search('NASA')                      # Search across all tables\n"
+            "  dsi.find_relation('datasets', 'resources')  # Query relationships\n"
         )
 
 
