@@ -9,16 +9,9 @@ class TestS3OptionalDependency(unittest.TestCase):
     def test_s3_module_imports_without_boto3(self):
         script = textwrap.dedent(
             """
-            import builtins
+            import sys
 
-            real_import = builtins.__import__
-
-            def block_boto3(name, *args, **kwargs):
-                if name == "boto3" or name.startswith("botocore"):
-                    raise ModuleNotFoundError(name)
-                return real_import(name, *args, **kwargs)
-
-            builtins.__import__ = block_boto3
+            sys.modules["boto3"] = sys.modules["botocore"] = None
             from dsi.utils.s3_utils import get_s3_client
 
             try:
