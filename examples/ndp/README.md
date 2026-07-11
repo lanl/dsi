@@ -517,7 +517,7 @@ Initialize the NDP backend with a simple keyword search and view available table
 - Use `summary()` to view table statistics
 - Introduction to NDP backend structure
 
----
+### 2. load_advanced.py
 
 ### 2. inspect_by_id.py
 
@@ -529,7 +529,7 @@ Load a specific dataset using its ID and inspect it using `list()`, `summary()`,
 - Use `display()` with custom column selection
 - View dataset details and associated resources
 
----
+### 6. display_basic.py
 
 ### 3. display_tables.py
 

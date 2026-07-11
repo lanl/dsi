@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from collections import OrderedDict
 from typing import Optional
+from typing import Optional
 from urllib.parse import urlparse
 
 from dsi.backends.webserver import Webserver
@@ -723,43 +724,154 @@ class NDP(Webserver):
         if dict_return:
             return table
         else:
-            return pd.DataFrame(table)
-
+            return pd.DataFrame(table)  # Return DataFrame (default)
     
-    def get_schema(self):
-        """
-        Return a lightweight schema description of cached tables from CKAN.
+    # def get_table(self, table_name, collection=False):
+    #     """
+    #     Returns all data from a specified table.
+        
+    #     Parameters
+    #     ----------
+    #     `table_name` : str
+    #         Must be 'datasets' or 'resources'
+    #     `collection` : bool, default False
+    #         If True, returns OrderedDict. If False, returns DataFrame.
+        
+    #     Returns
+    #     -------
+    #     OrderedDict or pandas.DataFrame
+    #     """
+    #     if not self._loaded:
+    #         raise RuntimeError("No data loaded")
+        
+    #     if table_name not in self._cache:
+    #         raise ValueError(
+    #             f"Table '{table_name}' not found. "
+    #             f"Available tables: {list(self._cache.keys())}"
+    #         )
+        
+    #     table = self._cache.get(table_name)
+        
+    #     if not table:
+    #         raise ValueError(f"Table '{table_name}' is empty")
+        
+    #     if collection:
+    #         return table
+    #     return pd.DataFrame(table)
 
-        Return : str
-            Each table's structural schema is combined into one large string.
+
+    def get_schema(self, table_name: Optional[str] = None):
         """
+        Returns schema information for all tables or a specific table in SQLite CREATE TABLE format.
+        
+        Shows table structure with column names and types (INTEGER, REAL, TEXT, OBJECT, etc.)
+        similar to SQL backends.
+        
+        Parameters
+        ----------
+        table_name : str, optional
+            If provided, returns schema for only that table.
+            If None (default), returns schema for all tables.
+        
+        Returns
+        -------
+        str
+            SQL-style CREATE TABLE statements
+        """
+        if not self._loaded or not self._cache:
+            return "-- No tables loaded\n"
+        
+        # If specific table requested
+        if table_name is not None:
+            if table_name not in self._cache:
+                return f"-- Table '{table_name}' not found\n"
+            
+            table_data = self._cache.get(table_name)
+            if not table_data:
+                return f"-- Table '{table_name}' is empty\n"
+            
+            # Generate schema for single table
+            df = pd.DataFrame(table_data)
+            
+            schema_lines = []
+            schema_lines.append(f"CREATE TABLE {table_name} (")
+            
+            column_defs = []
+            for column in df.columns:
+                pandas_dtype = str(df[column].dtype).lower()
+                
+                # Map pandas dtype to SQL-style type
+                if 'int' in pandas_dtype:
+                    sql_type = 'INTEGER'
+                elif 'float' in pandas_dtype:
+                    sql_type = 'REAL'
+                elif pandas_dtype == 'bool':
+                    sql_type = 'BOOLEAN'
+                elif pandas_dtype == 'datetime64[ns]':
+                    sql_type = 'DATETIME'
+                elif pandas_dtype == 'object':
+                    non_null = df[column].dropna()
+                    if non_null.empty:
+                        sql_type = 'TEXT'
+                    elif all(isinstance(x, str) for x in non_null):
+                        sql_type = 'TEXT'
+                    else:
+                        sql_type = 'OBJECT'
+                else:
+                    sql_type = 'OBJECT'
+                
+                column_defs.append(f"    {column} {sql_type}")
+            
+            schema_lines.append(",\n".join(column_defs))
+            schema_lines.append(");")
+            
+            return "\n".join(schema_lines)
+        
+        # Return all table schemas (default behavior)
         schema_lines = []
-        for table_name, table in self._cache.items():
-            cols = []
-            for col_name, values in table.items():
-                dtype = "TEXT"
-                for v in values:
-                    if v is None:
-                        continue
-
-                    if isinstance(v, bool):
-                        dtype = "BOOLEAN"
-                    elif isinstance(v, int):
-                        dtype = "INTEGER"
-                    elif isinstance(v, float):
-                        dtype = "REAL"
-                    break
-
-                cols.append(f"    {col_name} {dtype}")
-
-            create_stmt = (
-                f"CREATE TABLE {table_name} (\n"
-                + ",\n".join(cols)
-                + "\n);"
-            )
-            schema_lines.append(create_stmt)
-
-        return "\n\n".join(schema_lines)
+        schema_lines.append("-- NDP Backend Schema")
+        schema_lines.append("-- (Read-only CKAN metadata backend)")
+        schema_lines.append("")
+        
+        for table_name, table_data in self._cache.items():
+            if not table_data:
+                continue
+            
+            df = pd.DataFrame(table_data)
+            
+            schema_lines.append(f"CREATE TABLE {table_name} (")
+            
+            column_defs = []
+            for column in df.columns:
+                pandas_dtype = str(df[column].dtype).lower()
+                
+                # Map pandas dtype to SQL-style type
+                if 'int' in pandas_dtype:
+                    sql_type = 'INTEGER'
+                elif 'float' in pandas_dtype:
+                    sql_type = 'REAL'
+                elif pandas_dtype == 'bool':
+                    sql_type = 'BOOLEAN'
+                elif pandas_dtype == 'datetime64[ns]':
+                    sql_type = 'DATETIME'
+                elif pandas_dtype == 'object':
+                    non_null = df[column].dropna()
+                    if non_null.empty:
+                        sql_type = 'TEXT'
+                    elif all(isinstance(x, str) for x in non_null):
+                        sql_type = 'TEXT'
+                    else:
+                        sql_type = 'OBJECT'
+                else:
+                    sql_type = 'OBJECT'
+                
+                column_defs.append(f"    {column} {sql_type}")
+            
+            schema_lines.append(",\n".join(column_defs))
+            schema_lines.append(");")
+            schema_lines.append("")
+        
+        return "\n".join(schema_lines)
 
 
     def get_table_names(self, query):
@@ -1203,21 +1315,20 @@ class NDP(Webserver):
             - Exact match for all data types
             - Case-insensitive partial match for strings
             - String representation match for complex objects (dict, list)
+        Matching behavior:
+            - Exact match for all data types
+            - Case-insensitive partial match for strings
+            - String representation match for complex objects (dict, list)
 
         `query_object` : int, float, or str
             The value to search for within table cells
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return : list of ValueObject
-            One ValueObject per matching cell
-
-        ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List with the matched column name
-            - row_num : (int) Row index of the match
-            - value :   (any) Matched cell value
-            - type :    (str) 'cell'
+        Returns
+        -------
+        list of ValueObject
+            One ValueObject per matching cell, containing full row data
         """
         matches = []
 
@@ -1231,7 +1342,11 @@ class NDP(Webserver):
 
             cols = list(table_data.keys())
             df = pd.DataFrame(table_data)  # Convert to DataFrame for easier access
+            df = pd.DataFrame(table_data)  # Convert to DataFrame for easier access
 
+            for row_idx, row in df.iterrows():
+                for col in cols:
+                    cell = row[col]
             for row_idx, row in df.iterrows():
                 for col in cols:
                     cell = row[col]
@@ -1240,7 +1355,15 @@ class NDP(Webserver):
 
                     # Handle None/NaN
                     if pd.isna(cell) and pd.isna(query_object):
+                    # Handle None/NaN
+                    if pd.isna(cell) and pd.isna(query_object):
                         match = True
+                    
+                    # Exact match for simple types
+                    elif query_object == cell:
+                        match = True
+
+                    # String partial match
                     
                     # Exact match for simple types
                     elif query_object == cell:
@@ -1259,18 +1382,102 @@ class NDP(Webserver):
                         cell_str = str(cell).lower()
                         if query_lower in cell_str:
                             match = True
+                        match = True
+                    
+                    # Handle complex objects (dict, list) by string representation
+                    elif is_str_query and isinstance(cell, (dict, list, tuple)):
+                        cell_str = str(cell).lower()
+                        if query_lower in cell_str:
+                            match = True
 
                     if match:
                         val = ValueObject()
                         val.t_name = table_name
                         val.c_name = cols
+                        val.c_name = cols
                         val.row_num = row_idx
+                        val.value = row.tolist()
                         val.value = row.tolist()
                         val.type = "cell"
 
                         matches.append(val)
 
         return matches
+
+
+    # def find_cell(self, query_object, **kwargs):
+    #     """
+    #     Finds all cells that match the given query_object.
+
+    #     Matching behavior:
+    #         - Exact match for all data types
+    #         - Case-insensitive partial match for strings
+
+    #     Parameters
+    #     ----------
+    #     `query_object` : int, float, or str
+    #         The value to search for within table cells
+    #     `**kwargs` : dict
+    #         Additional keyword arguments
+
+    #     Returns
+    #     -------
+    #     list of ValueObject
+    #         One ValueObject per matching cell
+
+    #     Notes
+    #     -----
+    #     ValueObject Structure:
+    #         - t_name : str
+    #             Table name
+    #         - c_name : list
+    #             List containing the matched column name
+    #         - row_num : int
+    #             Row index of the match
+    #         - value : any
+    #             Matched cell value
+    #         - type : 'cell'
+    #     """
+
+    #     matches = []
+
+    #     is_str_query = isinstance(query_object, str)
+    #     query_lower = query_object.lower() if is_str_query else None
+
+    #     for table_name, table_data in self._cache.items():
+
+    #         if not table_data:
+    #             continue
+
+    #         cols = list(table_data.keys())
+    #         rows = zip(*table_data.values())
+
+    #         for row_idx, row in enumerate(rows):
+    #             for col_idx, cell in enumerate(row):
+
+    #                 match = False
+
+    #                 if query_object == cell:
+    #                     match = True
+
+    #                 elif (
+    #                     is_str_query and
+    #                     isinstance(cell, str) and
+    #                     query_lower in cell.lower()
+    #                 ):
+    #                     match = True
+
+    #                 if match:
+    #                     val = ValueObject()
+    #                     val.t_name = table_name
+    #                     val.c_name = [cols[col_idx]]
+    #                     val.row_num = row_idx
+    #                     val.value = cell
+    #                     val.type = "cell"
+
+    #                     matches.append(val)
+
+    #     return matches
 
 
     # def find_relation(self, column_name, relation, **kwargs):
@@ -1475,15 +1682,16 @@ class NDP(Webserver):
                 elif pandas_dtype == 'object':
                     non_null = original_series.dropna()
                     if non_null.empty:
-                        dtype = 'TEXT'
+                        dtype = 'TEXT'  # Assume TEXT for empty columns
                     elif all(isinstance(x, str) for x in non_null):
-                        dtype = 'TEXT'
+                        dtype = 'TEXT'  # Pure string column
                     else:
-                        dtype = 'OBJECT'
+                        dtype = 'OBJECT'  # Contains dicts, lists, or mixed types
                 else:
                     dtype = 'OBJECT'
                 
                 unique = int(safe_series.nunique()) if not safe_series.empty else 0
+        
         
                 row = {
                     "column": column,
