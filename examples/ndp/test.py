@@ -137,23 +137,65 @@ def test_summary_types():
     
     # Test collection mode to validate types
     print("\n4b. Validating type mapping:")
-    summary_dfs = dsi.summary(collection=True)
+    summary_result = dsi.summary(collection=True)
     
-    for df in summary_dfs:
-        print(f"\nTable summary types:")
-        print(df[['column', 'type']].to_string(index=False))
+    print(f"DEBUG 4b: Type of summary_result: {type(summary_result)}")
+    print(f"DEBUG 4b: Length: {len(summary_result) if hasattr(summary_result, '__len__') else 'N/A'}")
+    
+    # ✅ Handle the list format: [table_names, df1, df2, ...]
+    if isinstance(summary_result, list):
+        print(f"DEBUG 4b: First element type: {type(summary_result[0])}")
+        print(f"DEBUG 4b: First element value: {summary_result[0]}")
         
-        # Validate type names
-        types = df['type'].unique()
-        valid_types = {'TEXT', 'INTEGER', 'REAL', 'OBJECT', 'BOOLEAN', 'DATETIME'}
+        table_names = summary_result[0]
+        summary_dfs = summary_result[1:]
         
-        assert all(t in valid_types for t in types), \
-            f"Invalid types found: {set(types) - valid_types}"
+        print(f"DEBUG 4b: Number of DataFrames: {len(summary_dfs)}")
+        
+        for idx, (table_name, df) in enumerate(zip(table_names, summary_dfs)):
+            print(f"\nDEBUG 4b: Processing table {idx}: {table_name}")
+            print(f"DEBUG 4b: DataFrame type: {type(df)}")
+            print(f"DEBUG 4b: DataFrame shape: {df.shape if isinstance(df, pd.DataFrame) else 'Not a DataFrame'}")
+            
+            print(f"\n{table_name} table summary types:")
+            print(df[['column', 'type']].to_string(index=False))
+            
+            # Validate type names
+            types = df['type'].unique()
+            valid_types = {'TEXT', 'INTEGER', 'REAL', 'OBJECT', 'BOOLEAN', 'DATETIME'}
+            
+            assert all(t in valid_types for t in types), \
+                f"Invalid types found: {set(types) - valid_types}"
     
     # Test single table summary
     print("\n4c. Datasets table summary:")
     datasets_summary = dsi.summary(table_name='datasets', collection=True)
-    print(datasets_summary[['column', 'type', 'unique']].to_string(index=False))
+    
+    print(f"DEBUG 4c: Type returned: {type(datasets_summary)}")
+    print(f"DEBUG 4c: Is DataFrame? {isinstance(datasets_summary, pd.DataFrame)}")
+    print(f"DEBUG 4c: Is list? {isinstance(datasets_summary, list)}")
+    
+    if isinstance(datasets_summary, list):
+        print(f"DEBUG 4c: List length: {len(datasets_summary)}")
+        print(f"DEBUG 4c: List element types: {[type(x) for x in datasets_summary]}")
+        print(f"DEBUG 4c: First element: {datasets_summary[0]}")
+        
+        # If it returns [[table_name], df], extract the DataFrame
+        if len(datasets_summary) == 2 and isinstance(datasets_summary[1], pd.DataFrame):
+            print("DEBUG 4c: Extracting DataFrame from list...")
+            datasets_summary = datasets_summary[1]
+        else:
+            # Unexpected format
+            raise ValueError(f"Unexpected summary format: list with structure {[type(x) for x in datasets_summary]}")
+    
+    # Now datasets_summary should be a DataFrame
+    if isinstance(datasets_summary, pd.DataFrame):
+        print(f"DEBUG 4c: DataFrame shape: {datasets_summary.shape}")
+        print(f"DEBUG 4c: DataFrame columns: {list(datasets_summary.columns)}")
+        print("\nDatasets table summary:")
+        print(datasets_summary[['column', 'type', 'unique']].to_string(index=False))
+    else:
+        raise TypeError(f"Expected DataFrame at this point, but got {type(datasets_summary)}")
     
     dsi.close()
     print("\nSUMMARY TEST: PASSED")
