@@ -96,7 +96,7 @@ Filter datasets by one or more tags:
 ```python
 dsi = DSI(
     backend_name="NDP",
-    params={"tags": ["hydrology", "water"], "limit": 10}
+    params={"tags": ["USFS", "lidar"], "limit": 10}
 )
 ```
 
@@ -122,9 +122,9 @@ dsi = DSI(
     backend_name="NDP",
     params={
         "keywords": "climate",
-        "organization": "J. Willard Marriott Library",
-        "tags": ["temperature", "ocean"],
-        "formats": ["CSV"],
+        "organization": "California Landscape Metrics",
+        "tags": ["climate refugia"],
+        "formats": ["GeoTiff"],
         "limit": 25
     }
 )
