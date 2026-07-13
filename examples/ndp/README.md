@@ -12,6 +12,20 @@ Useful NDP resources:
 
 > **Note:** This backend is read-only. It retrieves and organizes metadata but does not modify remote NDP data.
 
+<details>
+<summary><b>API Reference (for developers)</b></summary>
+
+The backend uses the CKAN API with the following endpoints:
+
+- Base URL: `https://nationaldataplatform.org/catalog`
+- API version: 3
+- Main endpoint: `/api/3/action/package_search`
+- Dataset lookup: `/api/3/action/package_show`
+
+Query parameters are automatically formatted and validated by the backend.
+
+</details>
+
 ---
 
 ### API Reference
@@ -118,7 +132,7 @@ Filter datasets by license type:
 ```python
 dsi = DSI(
     backend_name="NDP",
-    params={"license": "Creative Commons Attribution", "limit": 10}
+    params={"license": "CC0-1.0", "limit": 10}
 )
 ```
 
@@ -335,7 +349,7 @@ Table: resources
 dsi.summary()  # Shows SQL-style types: INTEGER, TEXT, OBJECT
 ```
 
-**Output displays:**
+**Output Displays:**
 - Column names and data types (INTEGER, TEXT, OBJECT)
 - Unique value counts
 - Min/max values for numeric columns
@@ -390,23 +404,15 @@ Supports operators: `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~` (contains)
 ### Display Table Preview
 
 ```python
-dsi.display("datasets", num_rows=5)  # Shows ALL columns by default
-dsi.display("resources", num_rows=10)  # Shows ALL columns by default
+dsi.display("datasets", num_rows=5)
+dsi.display("resources", num_rows=10)
 ```
 
-**Note:** `display()` now shows ALL columns by default. Use `display_cols` parameter to limit columns:
+**Note:** `display()` shows ALL columns by default. Use `display_cols` parameter to limit columns:
 
 ```python
 # Show only specific columns
 dsi.display("datasets", num_rows=5, display_cols=["title", "organization", "creator"])
-```
-
-### Filter with Pandas
-
-```python
-datasets_df = dsi.get_table("datasets", collection=True)
-filtered = datasets_df[datasets_df['num_resources'] > 5]
-print(filtered[['title', 'num_resources']])
 ```
 
 ---
@@ -653,7 +659,7 @@ dsi = DSI(
 ## Notes
 
 - The backend is **metadata-first** and **read-only**
-- Two primary tables: `datasets` (metadata) and `resources` (files)
+- Two tables: `datasets` (metadata) and `resources` (files)
 - Multiple resource rows may exist for a single dataset
 - Resource rows contain metadata and download URLs (files are not downloaded automatically)
 - Full API responses are preserved in `raw_dataset` and `raw_resource` fields
