@@ -14,7 +14,7 @@ Useful NDP resources:
 
 ---
 
-## API Reference
+### API Reference
 
 For developers, the backend uses the CKAN API:
 
@@ -76,7 +76,7 @@ dsi = DSI(
 )
 ```
 
-### Organization Filter
+### Organization Search
 
 Filter datasets by publishing organization:
 
@@ -89,9 +89,42 @@ dsi = DSI(
 
 > **Note:** Organization names with spaces are automatically handled. Use the exact organization name as it appears in NDP.
 
-### Tag Filter
+### Creator Search
 
-Filter datasets by one or more tags:
+Filter datasets by creator/author name:
+
+```python
+dsi = DSI(
+    backend_name="NDP",
+    params={"creator": "Ritambhara Dubey", "limit": 5}
+)
+```
+
+### Groups Search
+
+Filter datasets by collection/group names:
+
+```python
+dsi = DSI(
+    backend_name="NDP",
+    params={"group": "data_hub_cc_wstc", "limit": 10}
+)
+```
+
+### License Search
+
+Filter datasets by license type:
+
+```python
+dsi = DSI(
+    backend_name="NDP",
+    params={"license": "Creative Commons Attribution", "limit": 10}
+)
+```
+
+### Tag Search
+
+Filter datasets by one or more tags (uses AND logic - datasets must have ALL specified tags):
 
 ```python
 dsi = DSI(
@@ -100,7 +133,7 @@ dsi = DSI(
 )
 ```
 
-### Format Filter
+### Format Search
 
 Filter datasets by resource file formats:
 
@@ -115,7 +148,7 @@ Common formats include: `CSV`, `JSON`, `GeoJSON`, `XML`, `PDF`, `ZIP`, `SHP` (sh
 
 ### Combined Parameters
 
-Combine multiple search criteria:
+Combine multiple search criteria (uses AND logic - datasets must match ALL specified criteria):
 
 ```python
 dsi = DSI(
@@ -132,7 +165,7 @@ dsi = DSI(
 
 ### Multiple Independent Queries
 
-Run multiple queries and combine results (deduplicates by dataset ID):
+Run multiple queries and combine results (uses OR logic - returns datasets matching ANY query, deduplicates by dataset ID):
 
 ```python
 dsi = DSI(
@@ -159,20 +192,19 @@ dsi = DSI(
 | `formats` | list[str] | Filter by resource file formats (OR logic) |
 | `license` | str | Filter by license name |
 | `limit` | int | Maximum number of datasets to retrieve per query (default: 100) |
-| `params` | dict or list[dict] | Dictionary or list of query parameter dicts (enables multi-query) |
 
 ---
 
 ## Tables
 
-The backend returns two primary DSI tables:
+The backend returns two DSI tables:
 
 1. **datasets** - Dataset metadata (one row per dataset)
 2. **resources** - Resource files (combined from all datasets)
 
 ---
 
-### datasets Table
+### datasets Table:
 
 The `datasets` table contains one row per NDP dataset.
 
@@ -202,9 +234,11 @@ print(datasets_df[["title", "organization", "num_resources"]])
 
 ---
 
-### resources Table
+### resources Table:
 
-The unified `resources` table contains all downloadable files from all datasets.
+The `resources` table contains downloadable file-based or file-specific metadata associated with each dataset. Each row corresponds to a single downloadable resource. The backend does not download files automatically during metadata retrieval; it follows a search-then-retrieval workflow.
+
+Table fields are a subset of the following properties:
 
 | Column | Description |
 |--------|-------------|
@@ -239,7 +273,7 @@ The `id` field in `datasets` matches `dataset_id` in the `resources` table.
 
 ---
 
-## Metadata Storage
+## Metadata
 
 ### Curated Metadata
 
