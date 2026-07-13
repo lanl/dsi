@@ -538,12 +538,15 @@ class Sync():
             if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
-            result = subprocess.run(["bash", "-lc", "type conduit"], capture_output=True, text=True)
-            conduit_cmd = str(result.stdout).split()
-            for idx, s in enumerate(conduit_cmd):
-                if "/" in s:
-                    conduit_cmd = conduit_cmd[idx:idx+3]
-                    break
+            try:
+                result = subprocess.run(["bash", "-lc", "type conduit"], capture_output=True, text=True)
+                conduit_cmd = str(result.stdout).split()
+                for idx, s in enumerate(conduit_cmd):
+                    if "/" in s:
+                        conduit_cmd = conduit_cmd[idx:idx+3]
+                        break
+            except Exception as e:
+                raise ValueError("Conduit not available in this environment: " + str(e))
 
             try:
                 if self.verbose:
