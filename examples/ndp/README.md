@@ -173,9 +173,28 @@ Run multiple queries and combine results (uses OR logic - returns datasets match
 dsi = DSI(
     backend_name="NDP",
     params=[
-        {"keywords": "earthquake", "limit": 10},
-        {"organization": "OpenTopography", "limit": 10},
-        {"tags": ["seismic"], "limit": 10}
+        # Query 1: Basic keyword search with format filters
+        {
+            "keywords": "wildfire california",
+            "formats": ["WMS", "WFS", "HTML"],
+            "limit": 8
+        },
+        
+        # Query 2: Multiple filters (organization + tags)
+        {
+            "keywords": "meadows",
+            "organization": "California Landscape Metrics",
+            "tags": ["sierra nevada"],
+            "limit": 2
+        },
+        
+        # Query 3: Author and organization filters
+        {
+            "keywords": "Salton Sea",  # Fixed: was "keyword" (singular)
+            "creator": "Binayak Parida",
+            "organization": "UCR Earth and Planetary Sciences",
+            "limit": 2
+        }
     ]
 )
 ```

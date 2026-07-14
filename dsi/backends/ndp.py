@@ -726,44 +726,10 @@ class NDP(Webserver):
         if not table:
             raise ValueError(f"Table '{table_name}' is empty")
         
-        # ✅ CORRECTED: dict_return=True returns OrderedDict
         if dict_return:
-            return table  # Return OrderedDict
+            return table
         else:
-            return pd.DataFrame(table)  # Return DataFrame (default)
-    
-    # def get_table(self, table_name, collection=False):
-    #     """
-    #     Returns all data from a specified table.
-        
-    #     Parameters
-    #     ----------
-    #     `table_name` : str
-    #         Must be 'datasets' or 'resources'
-    #     `collection` : bool, default False
-    #         If True, returns OrderedDict. If False, returns DataFrame.
-        
-    #     Returns
-    #     -------
-    #     OrderedDict or pandas.DataFrame
-    #     """
-    #     if not self._loaded:
-    #         raise RuntimeError("No data loaded")
-        
-    #     if table_name not in self._cache:
-    #         raise ValueError(
-    #             f"Table '{table_name}' not found. "
-    #             f"Available tables: {list(self._cache.keys())}"
-    #         )
-        
-    #     table = self._cache.get(table_name)
-        
-    #     if not table:
-    #         raise ValueError(f"Table '{table_name}' is empty")
-        
-    #     if collection:
-    #         return table
-    #     return pd.DataFrame(table)
+            return pd.DataFrame(table)
 
 
     def get_schema(self, table_name: Optional[str] = None):
