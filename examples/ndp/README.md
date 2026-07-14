@@ -283,7 +283,31 @@ datasets.id
 resources.dataset_id
 ```
 
-The `id` field in `datasets` matches `dataset_id` in the `resources` table.
+The `id` field in the `datasets` table matches the `dataset_id` field in the `resources` table.
+
+This creates a one-to-many relationship: each dataset can have multiple resources (different formats, APIs, files, etc.), but each resource belongs to exactly one dataset.
+
+**Example:**
+
+```text
+datasets
+---------
+Biomass Power Plants
+California Electric Power Plants
+
+resources
+---------
+Biomass Power Plants -> [WMS] Biomass Power Plants
+Biomass Power Plants -> [WFS] Biomass Power Plants
+Biomass Power Plants -> [DATA] Biomass Power Plants
+Biomass Power Plants -> California Landscape Metrics Website
+California Electric Power Plants -> ArcGIS Hub Dataset
+California Electric Power Plants -> Esri Rest API
+California Electric Power Plants -> GeoJSON
+California Electric Power Plants -> CSV
+California Electric Power Plants -> KML
+California Electric Power Plants -> Shapefile
+```
 
 ---
 
