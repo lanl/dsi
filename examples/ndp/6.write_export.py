@@ -1,4 +1,4 @@
-# examples/ndp/10.write_export.py
+# examples/ndp/6.write_export.py
 """
 Using write() to export NDP data to CSV and Parquet formats.
 """
