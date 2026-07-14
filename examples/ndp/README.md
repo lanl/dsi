@@ -210,6 +210,8 @@ The backend returns two DSI tables:
 
 The `datasets` table contains one row per NDP dataset.
 
+Table fields include:
+
 | Column | Description |
 |--------|-------------|
 | id | Unique dataset identifier (CKAN package ID) |
