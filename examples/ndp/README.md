@@ -28,19 +28,6 @@ Query parameters are automatically formatted and validated by the backend.
 
 ---
 
-### API Reference
-
-For developers, the backend uses the CKAN API:
-
-- Base URL: `https://nationaldataplatform.org/catalog`
-- API version: 3
-- Main endpoint: `/api/3/action/package_search`
-- Dataset lookup: `/api/3/action/package_show`
-
-Query parameters are automatically formatted and validated by the backend.
-
----
-
 ## Quick Start
 
 ### Initialize the Backend
@@ -114,6 +101,17 @@ dsi = DSI(
 )
 ```
 
+### Tag Search
+
+Filter datasets by one or more tags (uses AND logic - datasets must have ALL specified tags):
+
+```python
+dsi = DSI(
+    backend_name="NDP",
+    params={"tags": ["USFS", "lidar"], "limit": 10}
+)
+```
+
 ### Groups Search
 
 Filter datasets by collection/group names:
@@ -125,27 +123,6 @@ dsi = DSI(
 )
 ```
 
-### License Search
-
-Filter datasets by license type:
-
-```python
-dsi = DSI(
-    backend_name="NDP",
-    params={"license": "CC0-1.0", "limit": 10}
-)
-```
-
-### Tag Search
-
-Filter datasets by one or more tags (uses AND logic - datasets must have ALL specified tags):
-
-```python
-dsi = DSI(
-    backend_name="NDP",
-    params={"tags": ["USFS", "lidar"], "limit": 10}
-)
-```
 
 ### Format Search
 
@@ -159,6 +136,17 @@ dsi = DSI(
 ```
 
 Common formats include: `CSV`, `JSON`, `GeoJSON`, `XML`, `PDF`, `ZIP`, `SHP` (shapefile)
+
+### License Search
+
+Filter datasets by license type:
+
+```python
+dsi = DSI(
+    backend_name="NDP",
+    params={"license": "CC0-1.0", "limit": 10}
+)
+```
 
 ### Combined Parameters
 
