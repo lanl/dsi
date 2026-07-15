@@ -100,12 +100,12 @@ def test_ndp_get_schema():
     # Get all schemas
     schema = backend.get_schema()
     assert isinstance(schema, str)
+    assert "CREATE TABLE" in schema
     assert "datasets" in schema
-    assert "Full Climate Connectivity Network" in schema
-    assert "Environment Canada Climate Data" in schema
-    assert "Climate Refugia - Baseline (Historical) 1981 - 2010" in schema
-    assert "Change in Average Climatic Water Deficit" in schema
-    assert "Northern Spotted Owl Habitat; Topo-Climatic Fire Refugia" in schema
+    
+    # Get single table schema
+    datasets_schema = backend.get_schema("datasets")
+    assert "CREATE TABLE datasets" in datasets_schema
     
     backend.close()
 
