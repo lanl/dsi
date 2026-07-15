@@ -190,7 +190,6 @@ class DSI():
                     if e.args:
                         e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                     raise                
-                    raise                
                         
             # Handle file-based backends (Sqlite, DuckDB)
             else:

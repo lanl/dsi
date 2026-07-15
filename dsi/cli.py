@@ -106,11 +106,6 @@ class DSI_cli:
         if backend.lower() == "ndp":
             keywords = input("Enter NDP search keywords (e.g., climate, temperature): ").strip()
             
-        
-        keywords = None
-        if backend.lower() == "ndp":
-            keywords = input("Enter NDP search keywords (e.g., climate, temperature): ").strip()
-            
         try:
             with redirect_stdout(fnull):
                 if backend=="duckdb":
@@ -129,12 +124,6 @@ class DSI_cli:
                     print("Use Python API: t.load_module('backend', 'OSTI', 'back-read', params={...})")
                     backend = "OSTI"
                     self.exit_cli([])
-                elif backend.lower() == "osti":
-                    # PLACEHOLDER for future implement
-                    # OSTI requires params dict for initialization
-                    print("OSTI backend requires configuration.")
-                    print("Use Python API: t.load_module('backend', 'OSTI', 'back-read', params={...})")
-                    self.exit_cli([])                    
                 else:
                     backend = "Sqlite"
                     self.t.load_module('backend','Sqlite','back-write', filename = self.db_path)
