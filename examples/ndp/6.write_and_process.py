@@ -29,7 +29,7 @@ def main():
         backend_name="Sqlite",
         filename="water_data.db"
     )
-    print("✓ Saved NDP data to water_data.db")
+    print("Saved NDP data to water_data.db")
     
     # Close the NDP instance
     dsi.close()

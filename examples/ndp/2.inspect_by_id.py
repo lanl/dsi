@@ -22,10 +22,6 @@ def main():
     print("\nDatasets Table Summary:")
     dsi.summary(table_name='datasets')
     
-    print("\nDatasets Table Summary (collection):")
-    result = dsi.summary(table_name='datasets', collection=True)
-    print(result)
-    
     print("\nDataset Details (Selected Columns):")
     dsi.display('datasets', display_cols=['id', 'title', 'organization', 'creator', 'num_resources'])
     

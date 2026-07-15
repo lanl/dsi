@@ -1652,7 +1652,7 @@ class NDP(Webserver):
             print()
     
     
-    def summary(self, table_name=None, collection=False):
+    def summary(self, table_name=None):
         """
         Returns detailed column-level statistics for tables.
         
@@ -1661,16 +1661,12 @@ class NDP(Webserver):
         table_name : str, optional
             If provided, returns summary for that table.
             Must be 'datasets', 'resources', or 'tags'.
-        collection : bool, default False
-            If True, returns data as DataFrame(s).
-            If False, returns list format for Terminal to print.
         
         Returns
         -------
         pandas.DataFrame or list
-            - If collection=True and table_name specified: returns single DataFrame
-            - If collection=True and table_name=None: returns list [table_names, df1, df2, ...]
-            - If collection=False: returns list [table_names, df1, df2, ...] for Terminal
+            - If table_name specified: single DataFrame
+            - If table_name=None: [table_names, df1, df2, ...]
         
         Notes
         -----
@@ -1736,11 +1732,11 @@ class NDP(Webserver):
                 elif pandas_dtype == 'object':
                     non_null = original_series.dropna()
                     if non_null.empty:
-                        dtype = 'TEXT'  # Assume TEXT for empty columns
+                        dtype = 'TEXT'
                     elif all(isinstance(x, str) for x in non_null):
-                        dtype = 'TEXT'  # Pure string column
+                        dtype = 'TEXT'
                     else:
-                        dtype = 'OBJECT'  # Contains dicts, lists, or mixed types
+                        dtype = 'OBJECT'
                 else:
                     dtype = 'OBJECT'
                 
@@ -1772,12 +1768,11 @@ class NDP(Webserver):
                     and not is_url_or_metadata_column(column)
                     and not is_long_text_series(non_null)
                 ):
-                    # Short text column - show min/max (lexicographic/alphabetical)
+                    # Short text column - show min/max (lexicographic)
                     try:
                         row["min"] = safe_to_python(non_null.min())
                         row["max"] = safe_to_python(non_null.max())
                     except TypeError:
-                        # In case min/max fail for some reason
                         row["min"] = None
                         row["max"] = None
                 
@@ -1803,10 +1798,7 @@ class NDP(Webserver):
         
         # Check if backend is loaded
         if not self._loaded:
-            if collection:
-                return pd.DataFrame()
-            else:
-                return [[], pd.DataFrame()]
+            return [[], pd.DataFrame()]
         
         # Single table summary
         if table_name:
@@ -1825,10 +1817,7 @@ class NDP(Webserver):
             df = df.infer_objects()
             summary_df = summarize_dataframe(df)
             
-            if collection:
-                return summary_df
-            else:
-                return [[table_name], summary_df]
+            return summary_df
         
         # Multiple tables summary
         table_names = []
