@@ -119,7 +119,7 @@ Filter datasets by collection/group names:
 ```python
 dsi = DSI(
     backend_name="NDP",
-    params={"groups": "data_hub_cc_wstc", "limit": 10}
+    params={"group": "data_hub_cc_wstc", "limit": 10}
 )
 ```
 
@@ -209,7 +209,7 @@ dsi = DSI(
 | `organization` | str | Filter by publishing organization name |
 | `creator` | str | Filter by dataset creator/author name |
 | `tags` | list[str] | Filter by one or more tags (AND logic) |
-| `groups` | list[str] | Filter by collection/group names |
+| `group` | list[str] | Filter by collection/group names |
 | `formats` | list[str] | Filter by resource file formats (OR logic) |
 | `license` | str | Filter by license name |
 | `limit` | int | Maximum number of datasets to retrieve per query (default: 100) |
@@ -391,7 +391,7 @@ dsi.summary()  # Shows SQL-style types: INTEGER, TEXT, OBJECT
 ### View Table Schema
 
 ```python
-dsi.schema("datasets")  # Shows SQL CREATE TABLE format
+print(dsi.schema("datasets"))  # Shows SQL CREATE TABLE format
 ```
 
 **Output:**
@@ -710,7 +710,7 @@ If your query returns no datasets:
 
 ```python
 dsi.list()  # Check if tables exist
-# Output: datasets: (0 rows, 13 cols)
+# Output: datasets: (0 rows, 14 cols)
 ```
 
 Try:

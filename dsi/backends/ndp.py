@@ -73,7 +73,7 @@ class NDP(Webserver):
                 - organization : str - Organization name filter (auto-slugified)
                 - license : str - License filter
                 - tags : list - List of tags to filter by
-                - groups : list - List of groups/collections to filter by (auto-slugified)
+                - group : list - List of groups/collections to filter by (auto-slugified)
                 - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
                 - limit : int - Maximum number of datasets to retrieve (default: 100)
         `**kwargs` : dict
@@ -234,7 +234,7 @@ class NDP(Webserver):
                 - organization : str - Organization filter (auto-slugified)
                 - license : str - License filter
                 - tags : list - List of tags
-                - groups : list - List of groups/collections (auto-slugified)
+                - group : list - List of groups/collections (auto-slugified)
                 - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
                 - limit : int - Maximum number of datasets (default: 100)
         """
@@ -374,7 +374,7 @@ class NDP(Webserver):
                     License filter (quoted if spaces)
                 - tags : list of str
                     Tag filters (each quoted if spaces)
-                - groups : list of str
+                - group : list of str
                     Group/collection filters (each slugified)
                 - formats : list of str
                     Resource format filters (each quoted if spaces)
@@ -418,8 +418,12 @@ class NDP(Webserver):
                 fq_parts.append(f"tags:{tag_value}")
         
         # Groups filter (slugify each)
-        if params.get("groups"):
-            for group in params["groups"]:
+        if params.get("group"):
+            groups = params["group"]
+            # Convert string to list
+            if isinstance(groups, str):
+                groups = [groups]
+            for group in groups:
                 group_value = self._slugify(group)
                 fq_parts.append(f"groups:{group_value}")
         
@@ -582,7 +586,7 @@ class NDP(Webserver):
                 "organization": (ds.get("organization") or {}).get("title"),
                 "creator": creator_name,
                 "creator_email": creator_email,
-                "groups": ",".join(g["name"] for g in ds.get("groups", [])),
+                "group": ",".join(g["name"] for g in ds.get("groups", [])),
                 "license": ds.get("license_title"),
                 "created": ds.get("metadata_created"),
                 "modified": ds.get("metadata_modified"),

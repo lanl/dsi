@@ -51,7 +51,7 @@ def main():
     
     local_dsi.close()
     
-    print("\n✓ Complete! Data saved locally for offline analysis.")
+    print("\nComplete! Data saved locally for offline analysis.")
 
 if __name__ == "__main__":
     main()
