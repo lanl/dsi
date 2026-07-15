@@ -1682,11 +1682,11 @@ class NDP(Webserver):
                 elif pandas_dtype == 'object':
                     non_null = original_series.dropna()
                     if non_null.empty:
-                        dtype = 'TEXT'  # Assume TEXT for empty columns
+                        dtype = 'TEXT'
                     elif all(isinstance(x, str) for x in non_null):
-                        dtype = 'TEXT'  # Pure string column
+                        dtype = 'TEXT'
                     else:
-                        dtype = 'OBJECT'  # Contains dicts, lists, or mixed types
+                        dtype = 'OBJECT'
                 else:
                     dtype = 'OBJECT'
                 
