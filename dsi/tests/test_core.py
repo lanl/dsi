@@ -987,10 +987,6 @@ def test_test_sanitize_input():
 # NDP BACKEND TESTS
 # =============================================================================
 
-# =============================================================================
-# NDP BACKEND TESTS
-# =============================================================================
-
 def test_terminal_load_ndp():
     """Test Terminal can load NDP backend successfully."""
     a = Terminal()
@@ -999,7 +995,7 @@ def test_terminal_load_ndp():
         "backend",
         "NDP",
         "back-read",
-        params={"keywords": "climate", "limit": 5}  # FIXED: Use params dict
+        params={"keywords": "climate", "limit": 5}
     )
     
     backend = a.active_modules["back-read"][0]
@@ -1017,7 +1013,7 @@ def test_terminal_load_ndp_multiple_queries():
         "backend",
         "NDP",
         "back-read",
-        params=[  # NEW: Multiple queries
+        params=[
             {"keywords": "climate", "limit": 3},
             {"keywords": "ocean", "limit": 3}
         ]
@@ -1026,12 +1022,11 @@ def test_terminal_load_ndp_multiple_queries():
     backend = a.active_modules["back-read"][0]
     assert backend._loaded is True
     
-    # Verify deduplication
     a.artifact_handler(interaction_type="process")
     datasets = a.active_metadata.get("datasets", {})
     if datasets and "id" in datasets:
         ids = datasets["id"]
-        assert len(ids) == len(set(ids))  # No duplicates
+        assert len(ids) == len(set(ids))
     
     a.close()
 
@@ -1040,7 +1035,6 @@ def test_terminal_load_ndp_direct_id():
     """Test Terminal can load NDP with direct dataset ID."""
     a = Terminal()
     
-    # First get a valid ID
     a.load_module(
         "backend",
         "NDP",
@@ -1053,13 +1047,12 @@ def test_terminal_load_ndp_direct_id():
         dataset_id = backend._cache["datasets"]["id"][0]
         a.close()
         
-        # Now load by ID
         a = Terminal()
         a.load_module(
             "backend",
             "NDP",
             "back-read",
-            params={"id": dataset_id}  # NEW: Direct ID lookup
+            params={"id": dataset_id}
         )
         
         backend2 = a.active_modules["back-read"][0]
@@ -1098,7 +1091,6 @@ def test_terminal_process_ndp():
     
     a.artifact_handler(interaction_type="process")
     
-    # Verify data is in active_metadata
     assert len(a.active_metadata) > 0
     assert "datasets" in a.active_metadata
     assert isinstance(a.active_metadata["datasets"], OrderedDict)
@@ -1117,15 +1109,11 @@ def test_terminal_query_ndp():
         params={"keywords": "climate", "limit": 10}
     )
     
-    # FIXED: NDP doesn't support SQL queries
-    try:
+    with pytest.raises(NotImplementedError):
         a.artifact_handler(
             interaction_type="query",
             query="SELECT * FROM datasets"
         )
-        assert False  # Should not reach here
-    except NotImplementedError:
-        assert True
     
     a.close()
 
@@ -1141,11 +1129,9 @@ def test_terminal_get_table_ndp():
         params={"keywords": "climate", "limit": 5}
     )
     
-    # Get as DataFrame
     df = a.get_table("datasets", dict_return=False)
     assert isinstance(df, pd.DataFrame)
     
-    # Get as OrderedDict
     dict_data = a.get_table("datasets", dict_return=True)
     assert isinstance(dict_data, OrderedDict)
     
@@ -1180,7 +1166,6 @@ def test_terminal_num_tables_ndp():
         params={"keywords": "climate", "limit": 5}
     )
     
-    # Should not raise exception
     f = io.StringIO()
     with redirect_stdout(f):
         a.num_tables()
@@ -1201,11 +1186,9 @@ def test_terminal_summary_ndp():
         params={"keywords": "climate", "limit": 5}
     )
     
-    # Get summary for all tables
     summary_list = a.summary(collection=True)
     assert isinstance(summary_list, list)
     
-    # Get summary for specific table
     summary_df = a.summary(table_name="datasets", collection=True)
     assert isinstance(summary_df, pd.DataFrame)
     
@@ -1314,15 +1297,12 @@ def test_terminal_find_relation_ndp():
         params={"keywords": "data", "limit": 20}
     )
     
-    # Test inequality
     results = a.find_relation("num_resources > 0")
     assert isinstance(results, list)
     
-    # Test equality
     results2 = a.find_relation("num_resources == 0")
     assert isinstance(results2, list)
     
-    # Test range
     results3 = a.find_relation("num_resources (0, 5)")
     assert isinstance(results3, list)
     
@@ -1340,7 +1320,6 @@ def test_terminal_ingest_ndp_fails():
         params={"keywords": "climate", "limit": 5}
     )
     
-    # NDP is read-only
     with pytest.raises(NotImplementedError):
         a.artifact_handler(interaction_type="ingest")
     
@@ -1391,7 +1370,7 @@ def test_terminal_ndp_organization_filter():
         "NDP",
         "back-read",
         params={
-            "organization": "California Landscape Metrics",  # Auto-slugified
+            "organization": "California Landscape Metrics",
             "limit": 10
         }
     )
@@ -1457,13 +1436,10 @@ def test_terminal_ndp_close():
     
     backend = a.active_modules["back-read"][0]
     
-    # Before close
     assert backend._loaded is True
     assert len(backend._cache) > 0
     
-    # Close terminal
     a.close()
     
-    # After close
     assert backend._loaded is False
     assert len(backend._cache) == 0

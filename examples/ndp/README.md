@@ -119,7 +119,7 @@ Filter datasets by collection/group names:
 ```python
 dsi = DSI(
     backend_name="NDP",
-    params={"group": "data_hub_cc_wstc", "limit": 10}
+    params={"groups": "data_hub_cc_wstc", "limit": 10}
 )
 ```
 
@@ -240,7 +240,7 @@ Table fields include:
 | organization | Publishing organization name |
 | creator | Dataset creator/author name |
 | creator_email | Creator email address |
-| group | Comma-separated list of groups/collections |
+| groups | Comma-separated list of groups/collections |
 | license | License title |
 | created | Dataset creation date |
 | modified | Last modification date |
@@ -467,7 +467,7 @@ Initialize the NDP backend with a simple keyword search and view available table
 
 Advanced query with multiple filter parameters combined.
 
-- Use multiple parameters: `keywords`, `organization`, `group`, `tags`, `formats`
+- Use multiple parameters: `keywords`, `organization`, `groups`, `tags`, `formats`
 - Filter datasets with complex criteria
 - Display resources table with all columns
 - View filtered results

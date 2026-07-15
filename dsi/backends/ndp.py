@@ -582,7 +582,7 @@ class NDP(Webserver):
                 "organization": (ds.get("organization") or {}).get("title"),
                 "creator": creator_name,
                 "creator_email": creator_email,
-                "group": ",".join(g["name"] for g in ds.get("groups", [])),
+                "groups": ",".join(g["name"] for g in ds.get("groups", [])),
                 "license": ds.get("license_title"),
                 "created": ds.get("metadata_created"),
                 "modified": ds.get("metadata_modified"),
