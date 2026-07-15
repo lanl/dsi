@@ -1014,7 +1014,7 @@ def test_terminal_load_ndp():
 
 
 def test_terminal_load_ndp_multiple_queries():
-    """Test Terminal can load NDP with multiple queries."""
+    """Test Terminal can load NDP with multiple queries and deduplication."""
     a = Terminal()
     
     a.load_module(
@@ -1023,7 +1023,7 @@ def test_terminal_load_ndp_multiple_queries():
         "back-read",
         params=[  # NEW: Multiple queries
             {"keywords": "climate", "limit": 3},
-            {"keywords": "ocean", "limit": 3}
+            {"organization": "USGS", "limit": 3}
         ]
     )
     
@@ -1109,8 +1109,8 @@ def test_terminal_process_ndp():
     a.close()
 
 
-def test_terminal_query_ndp():
-    """Test Terminal query fails appropriately with NDP."""
+def test_terminal_query_not_supported():
+    """Test that SQL queries and write operations fail with NDP."""
     a = Terminal()
     
     a.load_module(
@@ -1166,6 +1166,7 @@ def test_terminal_list_and_summary_ndp():
         params={"keywords": "climate", "limit": 5}
     )
     
+    # Test list
     table_list = a.list(collection=True)
     assert "datasets" in table_list
     
@@ -1226,6 +1227,7 @@ def test_terminal_display_and_schema_ndp():
         params={"keywords": "climate", "limit": 5}
     )
     
+    # Test display
     f = io.StringIO()
     with redirect_stdout(f):
         a.display("datasets", num_rows=5)
@@ -1285,28 +1287,15 @@ def test_terminal_find_relation_ndp():
     results = a.find_column("title")
     assert isinstance(results, list)
     
-    a.close()
-
-
-def test_terminal_find_cell_ndp():
-    """Test Terminal.find_cell() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    results = a.find_cell("climate")
-    assert isinstance(results, list)
+    # Test find_cell
+    cells = a.find_cell("climate")
+    assert isinstance(cells, list)
     
     a.close()
 
 
 def test_terminal_find_relation_ndp():
-    """Test Terminal.find_relation() with NDP backend."""
+    """Test Terminal find_relation with various operators."""
     a = Terminal()
     
     a.load_module(
@@ -1331,11 +1320,11 @@ def test_terminal_find_relation_ndp():
     a.close()
 
 
-def test_terminal_ingest_ndp_fails():
-    """Test that Terminal.artifact_handler('ingest') fails with NDP."""
-    a = Terminal()
-    
-    a.load_module(
+def test_terminal_ndp_filters():
+    """Test Terminal loading NDP with various filters."""
+    # Organization filter
+    a1 = Terminal()
+    a1.load_module(
         "backend",
         "NDP",
         "back-read",
@@ -1432,11 +1421,8 @@ def test_terminal_ndp_format_filter():
             "limit": 10
         }
     )
-    
-    backend = a.active_modules["back-read"][0]
-    assert backend._loaded is True
-    
-    a.close()
+    assert a3.active_modules["back-read"][0]._loaded is True
+    a3.close()
 
 
 def test_terminal_ndp_close():
