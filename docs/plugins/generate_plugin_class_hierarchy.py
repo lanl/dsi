@@ -8,7 +8,7 @@ import graphviz
 sys.path.insert(0, sys.argv[1])
 modules = []
 for module in os.listdir(sys.argv[1]):
-    if module[-3:] == ".py" and module != "ml_emulator.py":
+    if module[-3:] == ".py" and module not in ["ml_emulator.py", "dashboard.py"]:
         modules.append(module[:-3])
         __import__(module[:-3], locals(), globals())
 print("Imported the following modules to find class hierarchy:",
@@ -36,7 +36,7 @@ class ClassTreeNode:
         def process_children(r):
             # print(r.clas.__name__)
             for ch in r.subclasses:
-                if ch.clas.__name__ == "Environment" or (r.clas.__name__ == "FileReader" and ch.clas.__name__ not in ["Csv", "JSON", "Schema", "YAML1", "TOML1"]):
+                if ch.clas.__name__ == "Environment" or (r.clas.__name__ == "FileReader" and ch.clas.__name__ not in ["Csv", "JSON", "Schema", "YAML", "TOML"]):
                     continue
                 dot.node(ch.clas.__name__)
                 dot.edge(r.clas.__name__, ch.clas.__name__)

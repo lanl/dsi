@@ -78,3 +78,5 @@ docs/_build
 dsi.egg-info/
 *.egg-info/
 .DS_Store
+_tmp*
+dsi_data/

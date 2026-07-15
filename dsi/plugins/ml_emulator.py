@@ -14,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.model_selection import GridSearchCV #, StratifiedKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              mean_squared_error, root_mean_squared_error, mean_absolute_error, r2_score)
 
@@ -25,9 +25,7 @@ db_type = sys.argv[2]
 
 @st.cache_resource(show_spinner=False)
 def get_db():
-    fnull = open(os.devnull, 'w')
-    with redirect_stdout(fnull):
-        return DSI(filename=db_filepath, backend_name=db_type, check_same_thread=False)
+    return DSI(filename=db_filepath, backend_name=db_type, check_same_thread=False, silence_messages = True)
 
 st.set_page_config(page_title="DSI ML Emulator", layout="wide")
 st.title("DSI ML Emulator")
@@ -41,7 +39,7 @@ pattern = re.compile(r"Table:\s*(?P<table>\w+).*?- num of rows:\s*(?P<rows>\d+)"
 tables = [m.group("table") for m in pattern.finditer(output) if int(m.group("rows")) > 5]
 
 if len(tables) == 0:
-    st.warning("Emulator requires tables with at least 5 rows. Please try again with a larger dataset.")
+    st.warning("Emulator requires at least 1 table with more than 5 rows. Please try again with a larger dataset.")
     st.stop()
 
 sel_key = "selected_table"

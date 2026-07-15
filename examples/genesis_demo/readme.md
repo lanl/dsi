@@ -21,7 +21,7 @@ python -m venv venv_dsi_genesis        # create a virtual environment
 source venv_dsi_genesis/bin/activate   # activate it
 ```
 
-First let's install the dependecies of DSI
+First let's install the dependencies of DSI
 ```bash
 python -m pip install -r requirements.txt           # installs the basic requirements     
 python -m pip install -r requirements.extras.txt    # installs extra dependencies

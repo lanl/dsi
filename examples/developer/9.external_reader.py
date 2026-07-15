@@ -3,9 +3,9 @@ from dsi.core import Terminal
 
 term = Terminal()
 
-# Second input is name of the python file where the Reader/Writer is stored
+# Second input is name of the Python class containing the reader/writer
 # Third input is full filepath to the python file 
-term.add_external_python_module('plugin', 'text_file_reader', '../test/text_file_reader.py')
+term.add_external_python_module('plugin', 'TextFile', '../test/text_file_reader.py')
 
 print(term.list_available_modules('plugin')) # includes TextFile at end of list
 

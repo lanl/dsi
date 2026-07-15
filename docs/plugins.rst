@@ -16,6 +16,7 @@ Any contributed Readers/Writers, or extension of one, should include unit tests 
     :alt: Figure depicting the current Readers/Writers class hierarchy.
     :class: with-shadow
     :scale: 70%
+    :align: center
 
     Figure depicts prominent portion of the current DSI Readers/Writers class hierarchy.
 
@@ -84,7 +85,7 @@ Environment Plugins
 Optional Plugin Type Enforcement
 --------------------------------
 
-Plugins take data in an arbitrary format, and transform it into metadata which is queriable in DSI. 
+Plugins take data in an arbitrary format, and transform it into metadata which is queryable in DSI. 
 Plugins may enforce types, but they are not required to enforce types. 
 
 Plugin type enforcement can be static, like the Hostname default plugin. 

@@ -1,131 +1,81 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
+from dsi.backends import Backend
 
-
-class Backend(metaclass=ABCMeta):
+class Filesystem(Backend, ABC):
     @abstractmethod
-    def __init__(self, filename) -> None:
+    def __init__(self, filename, **kwargs) -> None:
         pass
 
-    @property
+    # Can raise NotImplementedError for a read-only backend
     @abstractmethod
-    def git_commit_sha(self):
-        pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE ingest_artifacts()
-    @abstractmethod
-    def put_artifacts(self, artifacts, kwargs) -> None:
+    def ingest_artifacts(self, artifacts, **kwargs) -> None:
         pass
     
     @abstractmethod
-    def ingest_artifacts(self, artifacts, kwargs) -> None:
-        pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE query_artifacts()
-    @abstractmethod
-    def get_artifacts(self, query, kwargs):
+    def query_artifacts(self, query, **kwargs):
         pass
 
     @abstractmethod
-    def query_artifacts(self, query, kwargs):
-        pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE notebook()
-    @abstractmethod
-    def inspect_artifacts(self, kwargs):
+    def get_table(self, table_name, **kwargs):
         pass
 
     @abstractmethod
-    def notebook(self, kwargs):
-        pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE process_artifacts()
-    @abstractmethod
-    def read_to_artifacts(self, kwargs):
+    def get_table_names(self,query):
         pass
 
     @abstractmethod
-    def process_artifacts(self, kwargs):
+    def notebook(self, **kwargs):
         pass
 
     @abstractmethod
-    def find(self, query_object, kwargs):
+    def process_artifacts(self, **kwargs):
         pass
 
     @abstractmethod
-    def find_table(self, query_object, kwargs):
+    def get_schema(self):
+        pass
+    
+    @abstractmethod
+    def find(self, query_object, **kwargs):
+        pass
+    
+    @abstractmethod
+    def find_table(self, query_object, **kwargs):
         pass
 
     @abstractmethod
-    def find_column(self, query_object, kwargs):
+    def find_column(self, query_object, **kwargs):
+        pass
+    
+    @abstractmethod
+    def find_cell(self, query_object, **kwargs):
         pass
 
     @abstractmethod
-    def find_cell(self, query_object, kwargs):
+    def find_relation(self, column_name, relation, **kwargs):
         pass
 
     @abstractmethod
-    def close(self):
+    def list(self, **kwargs):
         pass
 
-class Filesystem(Backend):
-    git_commit_sha = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
-    # Declare named types
-    DOUBLE = "DOUBLE"
-    STRING = "VARCHAR"
-    FLOAT = "FLOAT"
-    INT = "INT"
-
-    # Declare store types
-    GUFI_STORE = "gufi"
-    SQLITE_STORE = "sqlite"
-
-    # Declare comparison types
-    GT = ">"
-    LT = "<"
-    EQ = "="
-
-    def __init__(self, filename) -> None:
+    @abstractmethod
+    def num_tables(self, **kwargs):
         pass
 
-    # DEPRECATING IN FUTURE DSI RELEASE. USE ingest_artifacts()
-    def put_artifacts(self, artifacts, kwargs) -> None:
+    @abstractmethod
+    def display(self, table_name, **kwargs):
         pass
 
-    def ingest_artifacts(self, artifacts, kwargs) -> None:
+    @abstractmethod
+    def summary(self, table_name, **kwargs):
         pass
 
-    # DEPRECATING IN FUTURE DSI RELEASE. USE query_artifacts()
-    def get_artifacts(self, query, kwargs):
+    # Can raise NotImplementedError for a read-only backend
+    @abstractmethod
+    def overwrite_table(self, table_name, collection, **kwargs):
         pass
 
-    def query_artifacts(self, query, kwargs):
-        pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE notebook()
-    def inspect_artifacts(self, kwargs):
-        pass
-
-    def notebook(self, kwargs):
-        pass
-
-    # DEPRECATING IN FUTURE DSI RELEASE. USE process_artifacts()
-    def read_to_artifacts(self, kwargs):
-        pass
-
-    def process_artifacts(self, kwargs):
-        pass
-
-    def find(self, query_object, kwargs):
-        pass
-
-    def find_table(self, query_object, kwargs):
-        pass
-
-    def find_column(self, query_object, kwargs):
-        pass
-
-    def find_cell(self, query_object, kwargs):
-        pass
-
+    @abstractmethod
     def close(self):
         pass

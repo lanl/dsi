@@ -13,6 +13,7 @@ The Data Science Infrastructure Project (DSI)
    installation
    python_api
    cli
+   federation
    examples
    contributors
 
