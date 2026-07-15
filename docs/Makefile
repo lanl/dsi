@@ -26,7 +26,7 @@ html:
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 	@echo
 
-	codespell ../ --skip="../docs/_build,*.ipynb,*.pdf,*.html,*.csv,*.yml,*.yaml" --ignore-words-list=hsi,Softwares
+	codespell ../ --skip="../docs/_build,*.ipynb,*.pdf,*.html,*.csv,*.yml,*.yaml" --ignore-words-list=hsi,Softwares,ND
 
 
 # This creates a git repository and commits generated html docs.

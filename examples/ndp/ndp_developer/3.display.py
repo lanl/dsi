@@ -1,4 +1,4 @@
-# examples/ndp/ndp_developer/3.disply.py
+# examples/ndp/ndp_developer/3.display.py
 from dsi.core import Terminal
 
 def main(verbose=False):

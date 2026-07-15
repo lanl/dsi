@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
-import matplotlib.cm as cm
+from matplotlib import colormaps
 
 DIRECTORIES = sys.argv[1:]
 
@@ -349,7 +349,7 @@ for name, b, _ in final:
     values.append(b)
 
 # darker colors from tab20
-cmap = cm.get_cmap("tab20")
+cmap = colormaps.get_cmap("tab20")
 palette = [cmap(i) for i in range(0, 20, 2)]  # use darker half only
 
 colors = []
