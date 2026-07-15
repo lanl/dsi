@@ -1,6 +1,6 @@
-# examples/ndp/6.write_export.py
+# examples/ndp/6.write_and_process.py
 """
-Using write() to export NDP data to CSV and Parquet formats.
+Export NDP data and process to local database for offline analysis.
 """
 
 from dsi.dsi import DSI
@@ -12,62 +12,46 @@ def main():
         params={"keywords": "water quality", "limit": 20}
     )
     
-    # Step 1: Find datasets of interest
-    print("\n=== Step 1: Find datasets ===")
-    datasets = dsi.find('num_resources >= 3', collection=True)
-    print(f"Found {len(datasets)} datasets with 3+ resources")
+    print("\n=== Step 1: View NDP data ===")
+    dsi.summary()
     
-    if len(datasets) > 0:
-        print("\nDataset titles:")
-        for idx, row in datasets.head(3).iterrows():
-            print(f"  - {row['title']}")
+    # Export datasets to CSV
+    print("\n=== Step 2: Export datasets to CSV ===")
+    dsi.write(
+        filename="water_datasets.csv",
+        writer_name="Csv",
+        table_name="datasets"
+    )
     
-    # Step 2: Export datasets to CSV
-    if len(datasets) > 0:
-        print("\n=== Step 2: Export to CSV ===")
-        dsi.write(
-            filename="water_quality_datasets.csv",
-            writer_name="Csv",
-            table_name="datasets"
-        )
-        print("✓ Exported datasets table to CSV")
-        
-        # Step 3: Export to Parquet
-        print("\n=== Step 3: Export to Parquet ===")
-        dsi.write(
-            filename="water_quality_datasets.pq",
-            writer_name="Parquet",
-            table_name="datasets"
-        )
-        print("✓ Exported datasets table to Parquet")
-        
-        # Step 4: Export resources table
-        print("\n=== Step 4: Export resources ===")
-        resources = dsi.get_table("resources", collection=True)
-        
-        if len(resources) > 0:
-            dsi.write(
-                filename="water_quality_resources.csv",
-                writer_name="Csv",
-                table_name="resources"
-            )
-            print(f"✓ Exported {len(resources)} resources to CSV")
-        
-        # Step 5: Export filtered data using collection
-        print("\n=== Step 5: Export filtered collection ===")
-        csv_resources = resources[resources['format'] == 'CSV']
-        
-        if len(csv_resources) > 0:
-            dsi.write(
-                filename="csv_resources_only.csv",
-                writer_name="Csv",
-                collection=csv_resources
-            )
-            print(f"✓ Exported {len(csv_resources)} CSV resources")
+    # Process NDP data to local Sqlite database
+    print("\n=== Step 3: Process to local database ===")
+    dsi.process(
+        backend_name="Sqlite",
+        filename="water_data.db"
+    )
+    print("✓ Saved NDP data to water_data.db")
     
+    # Close the NDP instance
     dsi.close()
     
-    print("\n✓ All exports complete! Check your directory for output files.")
+    # Load the newly created database
+    print("\n=== Step 4: Load local database ===")
+    local_dsi = DSI(
+        backend_name="Sqlite",
+        filename="water_data.db"
+    )
+    
+    print("\n=== Step 5: Query local database ===")
+    local_datasets = local_dsi.query(
+        "SELECT title, organization FROM datasets LIMIT 5",
+        collection=True
+    )
+    print(f"\nQueried {len(local_datasets)} datasets from local database:")
+    print(local_datasets[['title', 'organization']])
+    
+    local_dsi.close()
+    
+    print("\n✓ Complete! Data saved locally for offline analysis.")
 
 if __name__ == "__main__":
     main()
