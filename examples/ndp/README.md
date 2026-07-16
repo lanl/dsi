@@ -448,6 +448,49 @@ dsi.display("resources", num_rows=10)
 dsi.display("datasets", num_rows=5, display_cols=["title", "organization", "creator"])
 ```
 
+### Process to Writable Backend
+
+Convert read-only NDP data to a local database:
+
+```python
+# Query from NDP
+dsi = DSI(
+    backend_name="NDP",
+    params={"keywords": "climate", "limit": 10}
+)
+
+# Process NDP data to local SQLite database
+dsi.process(
+    backend_name="Sqlite",
+    filename="climate_data.db"
+)
+dsi.close()
+
+# Load the newly created database
+local_dsi = DSI(
+    backend_name="Sqlite",
+    filename="climate_data.db"
+)
+
+# Query the local database
+datasets = local_dsi.get_table("datasets", collection=True)
+print(f"Loaded {len(datasets)} datasets from local database")
+local_dsi.close()
+```
+
+### Export Data
+
+Write tables to external formats:
+
+```python
+# Export datasets to CSV
+dsi.write(
+    filename="datasets.csv",
+    writer_name="Csv",
+    table_name="datasets"
+)
+```
+
 ---
 
 ## Example Scripts
@@ -690,56 +733,6 @@ Count the number of datasets loaded:
 ```python
 num_datasets = dsi.num_datasets()
 print(f"Loaded {num_datasets} datasets")
-```
-
-### Process to Writable Backend
-
-Convert read-only NDP data to a local database:
-
-```python
-# Query from NDP
-dsi = DSI(
-    backend_name="NDP",
-    params={"keywords": "climate", "limit": 10}
-)
-
-# Process NDP data to local SQLite database
-dsi.process(
-    backend_name="Sqlite",
-    filename="climate_data.db"
-)
-dsi.close()
-
-# Load the newly created database
-local_dsi = DSI(
-    backend_name="Sqlite",
-    filename="climate_data.db"
-)
-
-# Query the local database
-datasets = local_dsi.get_table("datasets", collection=True)
-print(f"Loaded {len(datasets)} datasets from local database")
-local_dsi.close()
-```
-
-### Export Data
-
-Write tables to external formats:
-
-```python
-# Export datasets to CSV
-dsi.write(
-    filename="datasets.csv",
-    writer_name="Csv",
-    table_name="datasets"
-)
-
-# Export resources to Parquet
-dsi.write(
-    filename="resources.pq",
-    writer_name="Parquet",
-    table_name="resources"
-)
 ```
 
 ---
