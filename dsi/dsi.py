@@ -1373,6 +1373,38 @@ class DSI():
         else:
             # Fall back to num_tables for other backends
             self.num_tables()
+            
+    def validate_urls(self): # ADDED NEW
+        """
+        Validates URLs in the resources table (NDP backend only).
+        
+        Adds a 'url_valid' boolean column indicating URL accessibility.
+        
+        Raises
+        ------
+        RuntimeError
+            If called on a non-NDP backend
+        """
+        if self.main_backend_obj.__class__.__name__ != "NDP":
+            raise RuntimeError(
+                "validate_urls() ERROR: This method is only available for the NDP backend.\n"
+                f"Current backend: {self.main_backend_obj.__class__.__name__}"
+            )
+        
+        if not hasattr(self.main_backend_obj, 'validate_urls'):
+            raise RuntimeError(
+                "validate_urls() ERROR: NDP backend does not have validate_urls() method. "
+                "Please update your DSI installation."
+            )
+        
+        try:
+            self.main_backend_obj.validate_urls()
+            msg = "Validated all resource URLs"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+        except Exception as e:
+            if e.args:
+                e.args = (f'validate_urls() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
         
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
