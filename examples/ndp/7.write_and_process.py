@@ -1,4 +1,4 @@
-# examples/ndp/6.write_and_process.py
+# examples/ndp/7.write_and_process.py
 """
 Export NDP data and process to local database for offline analysis.
 """

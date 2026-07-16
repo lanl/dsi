@@ -1,8 +1,13 @@
 from dsi.dsi import DSI
 
+# dsi = DSI(
+#     backend_name="NDP",
+#     params={"group": "data_hub_cc_wstc", "limit": 10}
+# )
+
 dsi = DSI(
     backend_name="NDP",
-    params={"group": "data_hub_cc_wstc", "limit": 10}
+    params={"keywords": "space", "limit": 10}
 )
 
 dsi.list()
