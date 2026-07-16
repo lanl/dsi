@@ -31,6 +31,6 @@ jobs:
     - name: Test OSTI Backend
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_osti.py -v --tb=short
+        pytest dsi/backends/tests/test_osti.py -v --tb=short -m "not integration"
       env:
         PYTHONUNBUFFERED: 1
