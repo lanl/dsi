@@ -12,7 +12,10 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS versions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     root_folder     TEXT    NOT NULL,
-    commit_hash     TEXT    NOT NULL,           -- UUID4, stored as 32-char hex
+    commit_hash     TEXT    NOT NULL,           -- SHA-256 Merkle commit hash
+    root_tree_hash  TEXT    NOT NULL,
+    parent_commit_hash TEXT,
+    hash_algorithm  TEXT    NOT NULL,
     committed_at    TEXT    NOT NULL,           -- ISO-8601 timestamp
     owner_name      TEXT    NOT NULL,           -- Username of the committer
     message         TEXT,
@@ -64,6 +67,27 @@ CREATE INDEX IF NOT EXISTS idx_file_entries_root
 
 CREATE INDEX IF NOT EXISTS idx_file_entries_path
     ON file_entries(root_folder, relative_path);
+
+CREATE TABLE IF NOT EXISTS merkle_nodes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    version_id          INTEGER NOT NULL REFERENCES versions(id) ON DELETE CASCADE,
+    root_folder         TEXT    NOT NULL,
+    relative_path       TEXT    NOT NULL,
+    file_type           TEXT    NOT NULL,
+    node_hash           TEXT    NOT NULL,
+    metadata_hash       TEXT    NOT NULL,
+    content_hash_sha256 TEXT,
+    subtree_file_count  INTEGER NOT NULL,
+    subtree_total_bytes INTEGER NOT NULL,
+    child_count         INTEGER NOT NULL,
+    UNIQUE(version_id, relative_path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_merkle_nodes_root_path
+    ON merkle_nodes(root_folder, version_id, relative_path);
+
+CREATE INDEX IF NOT EXISTS idx_merkle_nodes_hash
+    ON merkle_nodes(root_folder, node_hash);
 
 CREATE TABLE IF NOT EXISTS staging (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -6,10 +6,7 @@
 
 - **Full metadata capture**: permissions, ownership, ACLs, extended attributes, and SELinux contexts
 - **Rsync-based snapshots**: efficient storage with hard-link deduplication
-<<<<<<< HEAD
-=======
 - **Merkle commit chain**: SHA-256 commit IDs with per-path Merkle nodes for pruning unchanged subtrees
->>>>>>> upstream/versioning-update
 - **SQLite database**: structured metadata storage for querying and diffing
 - **Complete file history**: MD5 hashes, file stats, and all metadata changes tracked
 
@@ -280,14 +277,10 @@ dsi.version("diff")
 | ------------- | ---------- | --------------------------- |
 | id            | INTEGER PK | Auto-increment ID           |
 | root_folder   | TEXT       | Repository root path        |
-<<<<<<< HEAD
-| commit_hash   | TEXT       | UUID4 hex (32 chars)        |
-=======
 | commit_hash   | TEXT       | SHA-256 Merkle commit hash  |
 | root_tree_hash | TEXT      | SHA-256 hash of root tree   |
 | parent_commit_hash | TEXT | Previous commit hash        |
 | hash_algorithm | TEXT      | Merkle format identifier    |
->>>>>>> upstream/versioning-update
 | committed_at  | TEXT       | ISO-8601 timestamp          |
 | owner_name    | TEXT       | Username of the committer   |
 | message       | TEXT       | Optional commit message     |
@@ -318,8 +311,6 @@ Stores metadata for each file in each commit.
 | security_context | TEXT       | SELinux context                  |
 | symlink_target   | TEXT       | Target of symlink                |
 
-<<<<<<< HEAD
-=======
 ### `merkle_nodes` Table
 
 Stores the content-addressed tree node for each committed path, including the synthetic root path `.`.
@@ -338,7 +329,6 @@ Stores the content-addressed tree node for each committed path, including the sy
 | subtree_total_bytes | INTEGER    | File bytes below this node        |
 | child_count         | INTEGER    | Direct child count for this node  |
 
->>>>>>> upstream/versioning-update
 ### `staging` Table
 
 Temporary storage for files to be committed.
