@@ -6,12 +6,22 @@ Mirrors structure of test_sqlite.py
 """
 
 import pytest
+import time
 import pandas as pd
 from collections import OrderedDict
 from dsi.backends.osti import OSTI
 
 # Open one shared OSTI backend for tests that use the default climate dataset.
 backend = OSTI(params={"q": "climate", "rows": 10})
+
+# =============================================================================
+# 0) pytest initialization to avoid 429 Client Error
+# =============================================================================
+
+@pytest.fixture(autouse=True)
+def rate_limit_delay():
+    yield
+    time.sleep(2)  # Pauses for 2 seconds after each test finishes
 
 # =============================================================================
 # 1) Basic Backend Initialization
