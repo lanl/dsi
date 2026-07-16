@@ -270,7 +270,7 @@ class NDP(Webserver):
         # Tier 1: datasets
         self._cache["datasets"] = self._rows_to_table(dataset_rows)
         
-        # Tier 2: resources (ONE table for ALL resources)
+        # Tier 2: resources (One table for ALL resources)
         if all_resource_rows:
             self._cache["resources"] = self._rows_to_table(all_resource_rows)
         
@@ -466,7 +466,7 @@ class NDP(Webserver):
             dataset_id = ds.get("id")
             
             if dataset_id is None:
-                # Keep datasets without IDs (shouldn't happen in practice)
+                # Keep datasets without IDs
                 unique_datasets.append(ds)
                 continue
             
@@ -692,7 +692,7 @@ class NDP(Webserver):
         if "resources" in self._cache and self._cache["resources"]:
             table_count += 1
         
-        # Check for errors table (if implemented)
+        # Check for errors table
         if "errors" in self._cache and self._cache["errors"]:
             table_count += 1
         
@@ -943,7 +943,10 @@ class NDP(Webserver):
         Find rows where column matches relation (e.g., 'num_resources > 5').
         """
         if not self._loaded:
-            return []
+            raise RuntimeError(
+                "find_relation() ERROR: Cannot search an empty backend. "
+                "Ensure data is loaded first."
+            )
         
         operator, value = self._parse_relation(relation)
         matches = []
@@ -1041,17 +1044,15 @@ class NDP(Webserver):
         """Convert string to appropriate Python type"""
         value_str = str(value_str).strip()
         
-        # Remove quotes if present (but DON'T return yet!)
+        # Remove quotes if present
         if (value_str.startswith("'") and value_str.endswith("'")) or \
         (value_str.startswith('"') and value_str.endswith('"')):
-            value_str = value_str[1:-1]  # Remove quotes, CONTINUE processing
+            value_str = value_str[1:-1]  # Remove quotes
         
         # Try to convert to number
         try:
-            # Try int first
             if '.' not in value_str:
                 return int(value_str)
-            # Then float
             return float(value_str)
         except ValueError:
             # Return as string if conversion fails
@@ -1093,15 +1094,13 @@ class NDP(Webserver):
         """
         # Only validate the unified resources table
         if "resources" not in self._cache:
-            print("No resources table found")
-            return
+            raise RuntimeError("validate_urls() ERROR: No resources table found. Cannot validate URLs.")
         
         table = self._cache.get("resources", {})
         urls = table.get("url", [])
         
         if not urls:
-            print("No URLs found in resources table")
-            return
+            raise RuntimeError("validate_urls() ERROR: No URLs found in resources table.")
         
         headers = {"User-Agent": "NDP-Validator"}
         valid_list = []
@@ -1213,7 +1212,10 @@ class NDP(Webserver):
         """
 
         if not isinstance(query_object, str):
-            return []
+            raise RuntimeError(
+                "find_table() ERROR: Cannot search an empty backend. "
+                "Ensure data is loaded first."
+            )
 
         matches = []
 
@@ -1262,7 +1264,10 @@ class NDP(Webserver):
         """
 
         if not isinstance(query_object, str):
-            return []
+            raise RuntimeError(
+                "find_column() ERROR: Cannot search an empty backend. "
+                "Ensure data is loaded first."
+            )
 
         matches = []
 
@@ -1615,7 +1620,7 @@ class NDP(Webserver):
         if num_rows is not None and num_rows <= 0:
             raise ValueError("display() ERROR: Input 'num_rows' must be positive")
         
-        # Direct lookup - no resolution needed
+        # Direct lookup 
         if table_name not in self._cache:
             raise ValueError(
                 f"Table '{table_name}' not found. "
@@ -1652,7 +1657,7 @@ class NDP(Webserver):
         # Print header
         print(f"\nTable: {table_name}")
         
-        # Display with NO limits (SQL-like behavior - shows everything)
+        # Display with no limits
         with pd.option_context('display.max_rows', None,
                             'display.max_columns', None,
                             'display.width', None,
