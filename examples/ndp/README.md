@@ -697,14 +697,29 @@ print(f"Loaded {num_datasets} datasets")
 Convert read-only NDP data to a local database:
 
 ```python
-# Load NDP data
-dsi = DSI(backend_name="NDP", params={"keywords": "climate", "limit": 20})
+# Query from NDP
+dsi = DSI(
+    backend_name="NDP",
+    params={"keywords": "climate", "limit": 10}
+)
 
-# Process to local Sqlite database
-dsi.process(backend_name="Sqlite", filename="ndp_cache.db")
+# Process NDP data to local SQLite database
+dsi.process(
+    backend_name="Sqlite",
+    filename="climate_data.db"
+)
+dsi.close()
 
-# Now you can query with SQL
-result = dsi.query("SELECT * FROM datasets WHERE num_resources > 10", collection=True)
+# Load the newly created database
+local_dsi = DSI(
+    backend_name="Sqlite",
+    filename="climate_data.db"
+)
+
+# Query the local database
+datasets = local_dsi.get_table("datasets", collection=True)
+print(f"Loaded {len(datasets)} datasets from local database")
+local_dsi.close()
 ```
 
 ### Export Data
