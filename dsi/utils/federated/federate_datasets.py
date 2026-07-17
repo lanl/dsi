@@ -5,6 +5,7 @@ import paramiko
 import argparse
 from pathlib import Path
 import subprocess
+import os
 import shutil
 
 
@@ -50,7 +51,7 @@ def confirm_large_download(filesize: int, download_limit: int) -> bool:
 
 
 
-def make_db_info(location_type:str, path:str, folder_hash:str, local_path:str, db_name:str) -> dict:
+def make_db_info(location_type:str, path:str, folder_hash:str, local_path:str, db_name:str="") -> dict:
     """Creates a dictionary containing information about a database, including its original location type, original path, local path, and name.
     
     Args:
@@ -86,7 +87,7 @@ def get_file_size_and_download(hostname, username, password, remote_path, local_
     Returns:
         tuple: (filesize in bytes, success boolean), or (None, False) on error
     """
-    print(f"hostname {hostname}, username: {username}, password: {password}, remote_path: {remote_path}")
+    print(f"hostname {hostname}, username: {username}, len(password): {len(password)}, remote_path: {remote_path}")
     
     # Get the filename from remote path
     filename = os.path.basename(remote_path)
@@ -348,96 +349,9 @@ def pull_data(location_type: str,
             print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
             return None
 
-        db_info = make_db_info(location, path, file_path, filename)
+        db_info = make_db_info(location, path, folder_hash, file_path, filename)
         return db_info
 
-
-    # elif cleaned_location_type == "hpc":
-
-    #     # Ask for username if we don't have it for this host yet
-    #     if username == "":
-    #         try:
-    #             username = input(f" -- Enter the username for {location}: ")
-    #         except KeyboardInterrupt:
-    #             print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
-    #             return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-
-    #     # can now download data from HPC
-    #     if path.endswith("/"):
-    #         try:
-    #             abs_path_workspace_folder = abs_path_workspace_folder if abs_path_workspace_folder.endswith("/") else abs_path_workspace_folder + "/"
-    #             subprocess.run(["rsync", "-av", f"{username}@{location}:{path}", abs_path_workspace_folder], check=True)
-    #             print(f"\n - Downloaded all data to {abs_path_workspace_folder}")
-    #             return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-    #         except KeyboardInterrupt:
-    #             print(f" -- Interrupted while downloading data from {location}:{path}")
-    #             return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-    #         except Exception as e:
-    #             print(f" -- Error {e} downloading data from HPC.")
-    #             return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-
-    #     # Check if the file exists and get its size
-    #     filesize = 0
-    #     try:
-    #         filesize = ssh_remote_size_bytes_interactive(
-    #             remote=f"{username}@{location}",
-    #             remote_path=path
-    #         )
-    #     except KeyboardInterrupt:
-    #         print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-    #         return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-    #     except FileNotFoundError as e:
-    #         print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-    #         return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-    #     except Exception as e:
-    #         print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
-    #         return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-
-
-    #     # Check if the file already exists and has the same hash as the remote file
-    #     if md5_file_hash != "":
-
-    #         need_redownload = True
-    #         try:
-    #             need_redownload = should_download(
-    #                 remote=f"{username}@{location}",
-    #                 remote_path=path,
-    #                 stored_md5=md5_file_hash
-    #             )
-    #         except KeyboardInterrupt:
-    #             print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-    #             return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-    #         except Exception as e:
-    #             print(f" -- Failed to get remote hash for {location}:{path}: {e}")
-    #             print(" -- Will proceed to download the file to ensure we have the correct version.")
-    #         if not need_redownload:
-    #             print(" -- Local file is up to date with the remote file. Skipping download.")
-    #             db_info = make_db_info(location, path, folder_hash, file_path, filename)
-    #             return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
-
-    #     # Confirm for sizes above a limit
-    #     if not confirm_large_download(filesize, download_limit):
-    #         print(" -- Skipping this database.")
-    #         return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-
-    #     # Download the file
-    #     try:
-    #         rsync_download_interactive(
-    #             remote=f"{username}@{location}",
-    #             remote_path=path,
-    #             local_path=abs_path_db_folder
-    #         )
-
-    #         db_info = make_db_info(location, path, folder_hash, file_path, filename)
-    #         return (db_info | {"new_db_folder": abs_path_db_folder}, username) if internal_use else db_info
-
-    #     except KeyboardInterrupt:
-    #         print(f" -- Interrupted while checking {location}:{path}. Skipping this database.")
-    #         return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-    #     except Exception as e:
-    #         print(f" -- Error {e} downloading file from HPC. Skipping this database.")
-    #         return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
-        
 
     elif cleaned_location_type == "url":
 
