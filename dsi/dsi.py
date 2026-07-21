@@ -1317,14 +1317,14 @@ class DSI():
         if hasattr(self.main_backend_obj, 'num_datasets'):
             try:
                 count = self.main_backend_obj.num_datasets()
-                print(f"{count} datasets loaded")
+                return count
             except Exception as e:
                 if e.args:
                     e.args = (f'num_datasets() ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
         else:
             # Fall back to num_tables for other backends
-            self.num_tables()
+           return self.num_tables()
             
     def validate_urls(self): # ADDED NEW
         """

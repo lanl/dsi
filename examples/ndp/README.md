@@ -368,7 +368,7 @@ dsi.list()
 **Output:**
 ```
 Table: datasets
-  - num of columns: 13
+  - num of columns: 14
   - num of rows: 10
 
 Table: resources
@@ -417,7 +417,13 @@ resources_df = dsi.get_table("resources", collection=True)
 ### Search Loaded Metadata
 
 ```python
-dsi.search("CSV")  # Prints ALL cells from rows containing "CSV"
+# dsi = DSI(
+#     backend_name="NDP",
+#     params={"keywords": "wildfire", "limit": 25}
+# )
+
+# Prints ALL cells from rows containing "CSV"
+dsi.search("CSV")
 ```
 
 **Note:** `search()` displays complete matching rows (all columns), not just matched cells. Searches across:
@@ -428,8 +434,13 @@ dsi.search("CSV")  # Prints ALL cells from rows containing "CSV"
 ### Filter Data
 
 ```python
-# Find rows where condition is met
-results = dsi.find("num_resources > 5")
+# dsi = DSI(
+#     backend_name="NDP",
+#     params={"keywords": "environmental", "limit": 25}
+# )
+
+# Find datasets with more than 3 resources
+results = dsi.find("num_resources > 3")
 ```
 
 Supports operators: `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~` (contains)
@@ -495,7 +506,7 @@ dsi.write(
 
 ## Example Scripts
 
-The following example scripts demonstrate common workflows with the NDP backend.
+The following example scripts demonstrate common workflows with the NDP backend. All scripts are in `examples/ndp/`.
 
 ### 1. load_basic.py
 
@@ -506,127 +517,94 @@ Initialize the NDP backend with a simple keyword search and view available table
 - Use `summary()` to view table statistics
 - Introduction to NDP backend structure
 
-### 2. load_advanced.py
+**Use Case:** First-time users exploring the NDP backend
 
-Advanced query with multiple filter parameters combined.
+---
 
-- Use multiple parameters: `keywords`, `organization`, `groups`, `tags`, `formats`
-- Filter datasets with complex criteria
-- Display resources table with all columns
-- View filtered results
+### 2. inspect_by_id.py
 
-### 3. load_multiple.py
-
-Run multiple independent queries and combine results.
-
-- Execute multiple queries in one DSI initialization
-- Demonstrates ALL available NDP query parameters
-- Automatic deduplication by dataset ID
-- View combined results from different search criteria
-
-### 4. load_by_id.py
-
-Load a specific dataset using its ID or name.
+Load a specific dataset using its ID and inspect it using `list()`, `summary()`, and `display()`.
 
 - Direct dataset lookup using `id` parameter
 - Access specific dataset without searching
+- Use `summary()` with specific table names
+- Use `display()` with custom column selection
 - View dataset details and associated resources
-- Useful when you know the exact dataset you need
 
-### 5. list_and_summary.py
+**Use Case:** You know the exact dataset ID and want to inspect its metadata and resources
 
-Explore table structure and get statistical summaries.
+---
 
-- Use `dsi.list()` to see available tables
-- Get list as collection (returns list of table names)
-- Use `dsi.summary()` to get column statistics with SQL-style types
-- View data types (INTEGER, TEXT, OBJECT), unique values, min/max, averages
+### 3. display_tables.py
 
-### 6. display_basic.py
+Preview table data with different column configurations using `display()`.
 
-Preview table data with basic display options.
-
-- Use `dsi.display()` to see table contents (shows ALL columns by default)
-- Control number of rows displayed
+- Default behavior shows ALL columns (including raw_* fields)
 - Use `display_cols` parameter to select specific columns
+- Create minimal, standard, and extended views
+- Control output formatting for specific needs
 - View both datasets and resources tables
 
-### 7. display_advanced.py
+**Use Case:** You want to preview table data with specific columns, avoiding information overload
 
-Advanced display options for customized table views.
+---
 
-- Show all columns with default behavior
-- Specify exact columns to display with custom selection
-- Create minimal, extended, and metadata-rich views
-- Control output formatting for specific needs
+### 4. find_basic.py
 
-### 8. find_basic.py
+Use `find()` to filter rows based on conditions with practical string-based queries.
 
-Use `find()` to filter rows based on conditions.
-
-- Find rows where a condition is true
-- Use operators: `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~`
-- Filter numeric and text columns
+- Exact match with `==` operator
+- Partial string match with `~~` (contains) operator
 - Return results as DataFrame with `collection=True`
-- Range queries and partial string matching
+- Filter text columns (organization, tags)
+- Practical queries users commonly need
 
-### 9. search_tables.py
+**Supported operators:** `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~` (contains)
 
-Search for specific values across all tables and use search with query operations.
+**Use Case:** Filter datasets based on specific field values after initial search
 
-- Use `dsi.search()` to find values anywhere (prints ALL cells of matching rows)
-- Search in table names, column names, and cell values
-- **Demonstrates search functionality with `query()` operations**
+---
+
+### 5. search_tables.py
+
+Search for specific values across all tables using `search()`.
+
+- Use `dsi.search()` to find values anywhere in loaded data
+- Search operates on table names, column names, and cell values
+- **Important:** `search()` returns complete matching rows (ALL columns), not just matched cells
 - Get results as collection for analysis
-- View results organized by match type
+- View results organized by table type
 
-### 10. write_export.py
+**Use Case:** You want to find all occurrences of a value (e.g., "NASA") anywhere in your loaded data
 
-Export NDP data to external formats.
+---
 
-- Use `find()` to filter datasets of interest
-- Write datasets table to CSV
-- Export resources to Parquet
-- Export filtered data collections
-- Save specific subsets (e.g., CSV resources only)
+### 6. explore_metadata.py
 
-### 11. schema_inspection.py
+Discover available organizations, tags, and formats before making targeted queries.
 
-Use schema() to inspect table structure and column types.
+- Load sample datasets with broad query
+- Use pandas operations on DSI tables (`value_counts()`, etc.)
+- Discover available organizations, tags, and formats
+- "Exploration first" workflow pattern
+- Use discovered values in subsequent targeted queries
 
-- View full database schema in SQL CREATE TABLE format
-- View specific table schemas (datasets, resources)
-- Shows SQL-style column types (INTEGER, TEXT, OBJECT)
-- Demonstrates how schema informs query writing
-- Examples of type-appropriate queries based on schema
+**Use Case:** You want to filter by organization but don't know which organizations exist in NDP. Start with broad query, explore results, then make targeted queries with discovered values.
 
-### 12. count_tables_datasets.py
+---
 
-Demonstrates `num_tables()` vs `num_datasets()` in NDP backend.
+### 7. write_and_process.py
 
-- Use `dsi.num_tables()` to count logical tables (datasets + resources)
-- Use `dsi.num_datasets()` to count actual datasets retrieved
-- Quick summary of table structure
-- View detailed breakdown with `list()`
+Export NDP data to CSV and convert to local database for offline analysis.
 
-### 13. download_analyze.py
+- Query data from NDP (read-only)
+- Export datasets to CSV format
+- Convert read-only NDP data to writable Sqlite backend
+- Load newly created local database
+- Query local database with SQL (not supported in NDP backend)
+- Offline analysis workflow
 
-Download and analyze resources from NDP datasets.
-
-- Query NDP for datasets with specific keywords
-- Filter resources by format (PDF, CSV, etc.)
-- Validate resource URLs before downloading
-- Download resource files using URLs
-- Extract and analyze file metadata (e.g., PDF pages, author)
-- Practical example of working with resource URLs
-
-**Demonstrates:**
-- Accessing the `resources` table
-- Filtering by resource format
-- URL validation with HEAD/GET requests
-- Downloading files with `requests`
-- Extracting metadata from downloaded files using PyPDF2
-- Viewing related resources from the same dataset
+**Use Case:** You want to run SQL queries on NDP data, modify tables, or work offline. Query NDP once, save locally, then work with the local copy.
 
 ---
 
