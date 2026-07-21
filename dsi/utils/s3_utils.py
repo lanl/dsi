@@ -4,7 +4,7 @@ import getpass
 import os
 import importlib.util
 
-if importlib.util.find_spec("duckdb") is not None:
+if importlib.util.find_spec("boto3") is not None:
     import boto3
     from botocore import UNSIGNED
     from botocore.config import Config
@@ -14,6 +14,10 @@ if importlib.util.find_spec("duckdb") is not None:
         NoCredentialsError,
         PartialCredentialsError,
     )
+else:
+    boto3 = None
+    UNSIGNED = Config = None
+    BotoCoreError = ClientError = NoCredentialsError = PartialCredentialsError = None
 
 
 def get_s3_client(
@@ -43,6 +47,9 @@ def get_s3_client(
     Returns:
         boto3 S3 client
     """
+    if boto3 is None:
+        raise ImportError("boto3 is required for S3 federation.")
+
     region = (
         region_name
         or os.environ.get("AWS_DEFAULT_REGION")
