@@ -517,8 +517,6 @@ Initialize the NDP backend with a simple keyword search and view available table
 - Use `summary()` to view table statistics
 - Introduction to NDP backend structure
 
-**Use Case:** First-time users exploring the NDP backend
-
 ---
 
 ### 2. inspect_by_id.py
@@ -531,8 +529,6 @@ Load a specific dataset using its ID and inspect it using `list()`, `summary()`,
 - Use `display()` with custom column selection
 - View dataset details and associated resources
 
-**Use Case:** You know the exact dataset ID and want to inspect its metadata and resources
-
 ---
 
 ### 3. display_tables.py
@@ -544,8 +540,6 @@ Preview table data with different column configurations using `display()`.
 - Create minimal, standard, and extended views
 - Control output formatting for specific needs
 - View both datasets and resources tables
-
-**Use Case:** You want to preview table data with specific columns, avoiding information overload
 
 ---
 
@@ -561,8 +555,6 @@ Use `find()` to filter rows based on conditions with practical string-based quer
 
 **Supported operators:** `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~` (contains)
 
-**Use Case:** Filter datasets based on specific field values after initial search
-
 ---
 
 ### 5. search_tables.py
@@ -575,8 +567,6 @@ Search for specific values across all tables using `search()`.
 - Get results as collection for analysis
 - View results organized by table type
 
-**Use Case:** You want to find all occurrences of a value (e.g., "NASA") anywhere in your loaded data
-
 ---
 
 ### 6. explore_metadata.py
@@ -588,8 +578,6 @@ Discover available organizations, tags, and formats before making targeted queri
 - Discover available organizations, tags, and formats
 - "Exploration first" workflow pattern
 - Use discovered values in subsequent targeted queries
-
-**Use Case:** You want to filter by organization but don't know which organizations exist in NDP. Start with broad query, explore results, then make targeted queries with discovered values.
 
 ---
 
@@ -604,8 +592,6 @@ Export NDP data to CSV and convert to local database for offline analysis.
 - Query local database with SQL (not supported in NDP backend)
 - Offline analysis workflow
 
-**Use Case:** You want to run SQL queries on NDP data, modify tables, or work offline. Query NDP once, save locally, then work with the local copy.
-
 ---
 
 ## Working with Resources
@@ -615,6 +601,11 @@ Resource tables contain downloadable file metadata. The backend does not automat
 ### Access Resource URLs
 
 ```python
+# dsi = DSI(
+#     backend_name="NDP",
+#     params={"keywords": "soil", "limit": 2}
+# )
+
 # Get resources table
 resources_df = dsi.get_table("resources", collection=True)
 
@@ -633,6 +624,11 @@ for idx, row in csv_resources.iterrows():
 ```python
 import requests
 
+# dsi = DSI(
+#     backend_name="NDP",
+#     params={"keywords": "vegetation", "formats": ["CSV"], "limit": 2}
+# )
+
 resources_df = dsi.get_table("resources", collection=True)
 
 for idx, row in resources_df.iterrows():
@@ -646,14 +642,16 @@ for idx, row in resources_df.iterrows():
 ### Filter Resources by Format
 
 ```python
-# Get all PDF resources
-pdf_resources = resources_df[resources_df['format'].str.upper() == 'PDF']
-print(f"Found {len(pdf_resources)} PDF resources")
+# dsi = DSI(
+#     backend_name="NDP",
+#     params={"keywords": "plant", "limit": 50}
+# )
 
-# Get resources from specific dataset
-dataset_resources = resources_df[
-    resources_df['dataset_title'] == 'My Dataset Title'
-]
+resources_df = dsi.get_table("resources", collection=True)
+
+# Get all TXT resources
+txt_resources = resources_df[resources_df['format'].str.upper() == 'TXT']
+print(f"Found {len(txt_resources)} PDF resources")
 ```
 
 ---
