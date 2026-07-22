@@ -498,6 +498,17 @@ def pull_data(location_type: str,
     return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else None
 
     
+def get_data_endpoints(default_endpoints_prefix=['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']):
+    endpoints = {
+        key: value 
+        for key, value in os.environ.items() 
+        if key.startswith(default_endpoints_prefix)
+    }
+
+    print(endpoints)
+
+    return endpoints      
+
 
 
 def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) -> list[dict[str, str]]:
