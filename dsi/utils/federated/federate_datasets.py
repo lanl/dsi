@@ -140,6 +140,168 @@ def get_file_size_and_download(hostname, username, password, remote_path, local_
             pass
 
 
+# def just_pull_data(location_type: str, 
+#               location: str, 
+#               path: str, 
+#               abs_path_workspace_folder: str, 
+#               username: str,
+#               password: str,
+#               download_limit: int = 10485760) -> bool:
+#     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
+#     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
+#     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
+
+#     Args:
+#         location_type (str): The type of the original location (e.g., "github", "HPC", "HPC-kerberos", "URL", "local").
+#         location (str): The location of the database (e.g., hostname for HPC, URL for web).
+#         path (str): The path to the data or database at the original location.
+#         abs_path_workspace_folder (str): The absolute path to the workspace folder where the data or database will be stored.
+#         username (str): username for hpc systems
+#         pass
+#         download_limit (int): The maximum size of a file that can be downloaded without confirmation.
+#         internal_use (bool): Determines if returned object is a dict or a tuple of (dict, username)
+#     Returns:
+#         dict | tuple[dict, str]: A dict of data/db info or a tuple of (data/db information, username). Second case if internal_use = True
+#     """
+
+#     cleaned_location_type = location_type.strip().lower()
+
+#     if cleaned_location_type == "hpc":
+
+#         # Ask for username if we don't have it for this host yet
+#         if username == "":
+#             try:
+#                 username = input(f" -- Enter the username for {location}: ")
+#             except KeyboardInterrupt:
+#                 print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+#                 return False
+
+#         # Get file size and download in one connection (TOTP passwords can only be used once!)
+#         try:
+#             filesize, success = get_file_size_and_download(
+#                 hostname=location,
+#                 username=username,
+#                 password=password,
+#                 remote_path=path,
+#                 local_folder=abs_path_workspace_folder
+#             )
+            
+#             if not success or filesize is None:
+#                 print(f" -- Could not access or download the file at {location}:{path}. Skipping this database.")
+#                 return False
+
+#             # Note: We get the size but don't check download_limit until after download
+#             # because TOTP can't be reused. If you want to check first, you'll need
+#             # to prompt for a new TOTP code.
+#             if filesize > download_limit:
+#                 print(f" -- Downloaded file is {filesize} bytes (above {download_limit} byte limit)")
+#                 print(" -- Note: File was already downloaded due to one-time password limitation")
+#                 return False
+             
+#             return True
+           
+#         except KeyboardInterrupt:
+#             print(f" -- Interrupted while accessing {location}:{path}. Skipping this database.")
+#             return False
+#         except Exception as e:
+#             print(f" -- Could not access the file at {location}:{path}; error: {e}. Skipping this database.")
+#             return False
+
+#     else:
+#         return False
+    
+
+def just_pull_data(
+    location_type: str,
+    location: str,
+    path: str,
+    abs_path_workspace_folder: str,
+    username: str = "",
+    password: str = "",
+    download_limit: int = 10_485_760,
+) -> bool:
+    """Download a file from an HPC system.
+
+    The remote file size and file contents are retrieved using one connection
+    because a one-time password may not be reusable.
+
+    Args:
+        location_type: Source type. Currently only ``"hpc"`` is supported.
+        location: HPC hostname.
+        path: Absolute path to the remote file.
+        abs_path_workspace_folder: Local destination directory.
+        username: HPC username. If empty, the user is prompted.
+        password: HPC password or one-time authentication code.
+        download_limit: Size threshold used to report large downloads, in bytes.
+
+    Returns:
+        True if the file was downloaded successfully; otherwise False.
+    """
+    cleaned_location_type = location_type.strip().lower()
+
+    if cleaned_location_type != "hpc":
+        print(f" -- Unsupported location type: {location_type}")
+        return False
+
+    if not username:
+        try:
+            username = input(f" -- Enter the username for {location}: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print(
+                f"\n -- Interrupted while entering username for "
+                f"{location}. Skipping this database."
+            )
+            return False
+
+        if not username:
+            print(f" -- No username provided for {location}.")
+
+    if not password:
+        print(f" -- No password or authentication code provided for {location}.")
+
+    try:
+        filesize, success = get_file_size_and_download(
+            hostname=location,
+            username=username,
+            password=password,
+            remote_path=path,
+            local_folder=abs_path_workspace_folder,
+        )
+
+        if not success or filesize is None:
+            print(
+                f" -- Could not access or download the file at "
+                f"{location}:{path}. Skipping this database."
+            )
+            return False
+
+        if filesize > download_limit:
+            print(
+                f" -- Downloaded file is {filesize} bytes "
+                f"(above the {download_limit}-byte threshold)."
+            )
+            print(
+                " -- The file was already downloaded because the one-time "
+                "password could not be reused."
+            )
+
+        return True
+
+    except KeyboardInterrupt:
+        print(
+            f" -- Interrupted while accessing {location}:{path}. "
+            "Skipping this database."
+        )
+        return False
+    except Exception as exc:
+        print(
+            f" -- Could not access the file at {location}:{path}; "
+            f"error: {exc}. Skipping this database."
+        )
+        return False
+    
+    
+
 def pull_data(location_type: str, 
               location: str, 
               path: str, 
