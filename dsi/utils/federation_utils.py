@@ -1,6 +1,8 @@
 import csv
 import hashlib
 import json
+import shutil
+import pandas as pd
 import shlex
 import subprocess
 
@@ -57,7 +59,7 @@ def deduplicate_keep_latest(records: list[dict]) -> list[dict]:
 
 
 
-def create_folder_from_path(s: str, base_dir: str) -> tuple[str, str]:
+def create_hashed_folder_from_path(s: str, base_dir: str) -> tuple[str, str]:
     """Generates a folder name from a given path or URL by taking the last part of the path and hashing it to create a unique identifier.
     
     Arg:
@@ -78,6 +80,55 @@ def create_folder_from_path(s: str, base_dir: str) -> tuple[str, str]:
 
     return folder_name, str(out_dir)
 
+
+
+def create_folder(folder_name: str, delete_if_exists: bool = False) -> None:
+    """ Create a new folder, optionally deleting it first if it already exists.
+    
+    Args:
+        folder_name: Path to the folder to create (relative or absolute).
+                    Parent directories are created automatically if needed.
+        delete_if_exists: If True, deletes the folder and all its contents if it exists.
+                         If False, does nothing if folder already exists.
+                         Default: False (safer default - won't delete existing data)
+    
+    Warning:
+        When delete_if_exists=True, permanently deletes the folder and all its contents. 
+    """
+    
+    folder_path = Path(folder_name)
+    
+    # Delete if exists and delete_if_exists is True
+    if delete_if_exists and folder_path.exists():
+        shutil.rmtree(folder_path)
+    
+    # Create the folder (exist_ok=True means no error if already exists)
+    folder_path.mkdir(parents=True, exist_ok=True)
+
+
+def combine_csv(folder_path: str, output_csv: str) -> list:
+    """ Combine all CSV files in a folder into a single CSV and return as records.
+    
+    Args:
+        folder_path: Path to folder containing CSV files to combine.
+        output_csv: Path where the combined CSV file will be saved.
+    
+    Returns:
+        list: List of dictionaries, where each dictionary represents a row
+              from the combined data. """
+    
+    csv_files = Path(folder_path).glob("*.csv")
+    
+    dfs = []
+    for file in csv_files:
+        df = pd.read_csv(file)
+        df['source_file'] = file.name  # Add column with source filename
+        dfs.append(df)
+    
+    combined_df = pd.concat(dfs, ignore_index=True)
+    combined_df.to_csv(output_csv, index=False)
+
+    return combined_df.to_dict('records')
 
 
 def get_last_part(s: str) -> str:

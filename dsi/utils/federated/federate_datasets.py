@@ -6,19 +6,24 @@ import argparse
 from pathlib import Path
 import subprocess
 import os
+import json
+import pandas as pd
+import getpass
 import shutil
-
+from typing import Tuple, List, Dict, Any
 
 from dsi.utils.federation_utils import (
     compute_md5, 
     create_directory, 
-    create_folder_from_path, 
+    create_hashed_folder_from_path, 
     csv_to_list_of_dicts, 
     deduplicate_keep_latest, 
     get_last_part, 
     human_readable_size, 
     should_download, 
-    upsert_records
+    upsert_records,
+    combine_csv,
+    create_folder
 )
 
 from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
@@ -26,6 +31,7 @@ from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_by
 from dsi.utils.web_utils import download_web_file, get_url_file_size
 from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3, get_s3_client
 from dsi.utils.hpc_kerberos import ssh_k_remote_size_bytes, scp_k_copy_from
+
 
 
 def confirm_large_download(filesize: int, download_limit: int) -> bool:
@@ -334,9 +340,9 @@ def pull_data(location_type: str,
     # Create folder for data
     abs_path_workspace_folder = str(Path(abs_path_workspace_folder).resolve())
     if parent_hash:
-        folder_hash, abs_path_db_folder = create_folder_from_path(parent_hash, abs_path_workspace_folder)
+        folder_hash, abs_path_db_folder = create_hashed_folder_from_path(parent_hash, abs_path_workspace_folder)
     else:
-        folder_hash, abs_path_db_folder = create_folder_from_path(path, abs_path_workspace_folder)
+        folder_hash, abs_path_db_folder = create_hashed_folder_from_path(path, abs_path_workspace_folder)
 
     # Get the absolute path to the file to be downloaded
     file_path = Path(abs_path_db_folder) / filename
@@ -771,6 +777,206 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
     print(f"\nFinished gathering databases. Successfully downloaded {success_counter} databases to {abs_path_workspace_folder}.")
 
     return federation_dbs
+
+
+def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> list:
+    """ Pull database files from remote HPC endpoints.
+    
+    Args:
+        hpc_name: Name of the HPC system to connect to.
+        remote_dsi: Dictionary mapping endpoint names to their database paths.
+        temp_db_storage: Local path where downloaded databases will be stored.
+    
+    Returns:
+        list: Database information objects for each successfully pulled endpoint. """
+    
+    db_infos = []
+    for key, value in remote_dsi.items():
+        endpoint_name = key
+        endpoint_db_path = value
+        print(f"Retreiving data for {endpoint_name} at {endpoint_db_path}")
+    
+        username = input("Username: ")
+        password = getpass.getpass("Password: ")  # Hidden input!
+    
+        db_info = just_pull_data(location_type="hpc",
+                      location=hpc_name,
+                      path=endpoint_db_path,
+                      abs_path_workspace_folder=temp_db_storage,
+                      username=username,
+                      password=password)
+        db_infos.append(db_info)
+    return db_infos
+
+
+def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[str, Any]], int]:
+    """ Read and pull data sources from CSV records, prompting for credentials when needed.
+    
+    Args:
+        csv_data: List of dictionaries containing source information with keys:
+                 'location_type', 'location', 'path', 'submitter_name'.
+        workspace_folder: Path to workspace folder for storing pulled data and metadata.
+    
+    Returns:
+        tuple: (database_info, success_counter) where:
+            - database_info: List of database information dictionaries for successfully pulled sources.
+            - success_counter: Number of successfully pulled data sources. """
+    
+    database_info = []
+    federation_dbs = []
+    success_counter = 0
+    for row in csv_data:
+        username = ""
+        password = ""
+        if row['location_type'].strip().lower() == "hpc":
+            print(f"\n{'='*60}")
+            print(f"Enter credentials for data at {row['location']} : {row['path']}")
+            username = input("Username: ")
+            password = getpass.getpass("Password: ")  # Hidden input!
+    
+        db_info = pull_data(location_type=row['location_type'],
+                  location=row['location'],
+                  path=row['path'],
+                  abs_path_workspace_folder=workspace_folder,
+                  username=username,
+                  password=password,
+                  internal_use=False)
+        
+        if db_info:
+            database_info.append(db_info)
+            combined = {k: row[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name", "folder_hash"]}
+            combined["workspace_folder"] = workspace_folder
+            federation_dbs.append(combined)
+            success_counter += 1
+
+    # Save databases information to a JSON file
+    upsert_records(f"{workspace_folder}/dsi_database_list.json", database_info, key="original_path")
+
+    return database_info, success_counter
+
+
+
+
+
+def get_remote_endpoints(hostname: str, username: str, password: str, 
+                         script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
+                         prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']) -> dict:
+    """ Source bash script on remote server and retrieve environment variables matching specified prefixes.
+    
+    Args:
+        hostname: Remote server hostname or IP address.
+        username: SSH username for authentication.
+        password: SSH password for authentication.
+        script_path: Path to bash script on remote server that sets endpoint variables.
+                    Default: '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
+        prefixes: List of environment variable prefixes to match (e.g., 'DSI_ENDPOINT_').
+                 Default: ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']
+    
+    Returns:
+        dict: Dictionary mapping endpoint variable names to their values.
+              Returns empty dict if connection fails or no endpoints found."""
+    # Convert prefixes list to a format safe for bash
+    prefixes_str = ','.join(f'"{p}"' for p in prefixes)
+    
+    # Use heredoc to avoid quote escaping issues
+    command = f"""
+source {script_path} && python3 << 'PYTHON_EOF'
+import os
+import json
+
+# The prefixes we're looking for
+prefixes = [{prefixes_str}]
+prefix_tuple = tuple(prefixes)
+
+# Get matching environment variables
+endpoints = {{
+    key: value 
+    for key, value in os.environ.items() 
+    if key.startswith(prefix_tuple)
+}}
+
+# Output as JSON so we can parse it easily
+print(json.dumps(endpoints))
+PYTHON_EOF
+"""
+    
+    print(f"Connecting to {hostname}...")
+    
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        ssh.connect(hostname, username=username, password=password, timeout=30)
+        
+        print(f"Sourcing {script_path} and reading endpoints...")
+        stdin, stdout, stderr = ssh.exec_command(command)
+        
+        stdout_text = stdout.read().decode('utf-8').strip()
+        stderr_text = stderr.read().decode('utf-8').strip()
+        exit_code = stdout.channel.recv_exit_status()
+        
+        if exit_code != 0:
+            print(f"✗ Command failed with exit code {exit_code}")
+            if stderr_text:
+                print(f"Error: {stderr_text}")
+            return {}
+        
+        # Parse the JSON output
+        endpoints = json.loads(stdout_text)
+        
+        print(f"✓ Found {len(endpoints)} endpoints:")
+        for key, value in endpoints.items():
+            print(f"  {key} = {value}")
+        
+        return endpoints
+        
+    except json.JSONDecodeError as e:
+        print(f"✗ Failed to parse output: {e}")
+        print(f"Raw output: {stdout_text}")
+        return {}
+    except Exception as e:
+        print(f"!!!! !!!! !!! Error: {e}")
+        return {}
+    finally:
+        try:
+            ssh.close()
+        except:
+            pass
+
+
+
+def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folder: str) -> Tuple[List[Dict[str, Any]], int]:
+    """ Pull data from multiple remote endpoints by downloading metadata CSVs and fetching the actual data.
+    
+    Args:
+        endpoints_location: Dictionary mapping endpoint names to their remote CSV paths.
+        hpc_name: Name of the HPC system to connect to.
+        workspace_folder: Path to workspace folder for storing pulled data and metadata.
+    
+    Returns:
+        tuple: (database_info, success_counter) from read_data_sources containing:
+            - database_info: List of database information dictionaries.
+            - success_counter: Number of successfully pulled data sources.
+    
+    Note:
+        Creates temporary folder '.test_00' for intermediate CSV files and
+        generates 'output_csv.csv' with combined metadata. """
+    
+    # create a temporaty folder to store the csv files to be downloaded
+    temp_db_storage = ".test_00"
+    create_folder(temp_db_storage, delete_if_exists=True)
+
+    # download them
+    pull_remote_db(hpc_name, endpoints_location, temp_db_storage)
+
+    # combine them to output_csv and the dictionary csv_data_sources
+    output_csv = "output_csv.csv"
+    csv_data_sources = combine_csv(temp_db_storage, output_csv)
+
+    # Pull the data from the CSV file, return a dictionary, and output the dictionaty to workspace_folder
+    database_info = read_data_sources(csv_data_sources, workspace_folder)
+
+    return database_info
 
 
 def main():
