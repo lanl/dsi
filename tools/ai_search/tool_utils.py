@@ -6,6 +6,7 @@ import requests
 import smtplib
 import feedparser
 import logging
+import time
 
 
 from contextlib import redirect_stdout, redirect_stderr
@@ -25,6 +26,84 @@ from dsi.dsi import DSI
 
 _NULL = io.StringIO()  # to hide DSI outputs
 logger = logging.getLogger(__name__)
+
+########################################################################
+#### DSI Python API call logging (https://lanl.github.io/dsi/python_api.html)
+#
+# Every DSI(...) instance used internally by this module is a LoggedDSI, which
+# records each call (method, args, kwargs, timing, error) to _dsi_call_log.
+# This lets benchmark/eval code see exactly which DSI API calls (query, list,
+# schema, close, ...) the agent triggered per task -- distinct from the
+# LangChain tool_calls, which only show the wrapper tool name/args.
+
+_dsi_call_log: List[Dict[str, Any]] = []
+
+_DSI_LOGGED_METHODS = (
+    "list", "list_backends", "list_readers", "list_writers", "num_tables",
+    "display", "find", "get_table", "process", "query", "read", "schema",
+    "search", "summary", "update", "write", "close",
+)
+
+
+def reset_dsi_call_log() -> None:
+    """Clear the recorded DSI Python API call log. Call before each benchmark task."""
+    _dsi_call_log.clear()
+
+
+def get_dsi_call_log() -> List[Dict[str, Any]]:
+    """Return a copy of all DSI Python API calls recorded since the last reset."""
+    return list(_dsi_call_log)
+
+
+def _record_dsi_call(
+    method: str, args: tuple, kwargs: dict, elapsed: float, error: Optional[BaseException] = None
+) -> None:
+    entry: Dict[str, Any] = {
+        "method": method,
+        "args": [repr(a) for a in args],
+        "kwargs": {k: repr(v) for k, v in kwargs.items()},
+        "elapsed_sec": round(elapsed, 4),
+    }
+    if error is not None:
+        entry["error"] = str(error)
+    _dsi_call_log.append(entry)
+
+
+class LoggedDSI(DSI):
+    """DSI subclass that records every public API call (method, args, timing) to _dsi_call_log."""
+
+    def __init__(self, *args, **kwargs):
+        start = time.time()
+        try:
+            super().__init__(*args, **kwargs)
+        except Exception as e:
+            _record_dsi_call("__init__", args, kwargs, time.time() - start, error=e)
+            raise
+        _record_dsi_call("__init__", args, kwargs, time.time() - start)
+
+
+def _make_logged_dsi_method(name: str):
+    base_method = getattr(DSI, name)
+
+    def wrapper(self, *args, **kwargs):
+        start = time.time()
+        try:
+            result = base_method(self, *args, **kwargs)
+        except Exception as e:
+            _record_dsi_call(name, args, kwargs, time.time() - start, error=e)
+            raise
+        _record_dsi_call(name, args, kwargs, time.time() - start)
+        return result
+
+    wrapper.__name__ = name
+    return wrapper
+
+
+for _dsi_method_name in _DSI_LOGGED_METHODS:
+    if hasattr(DSI, _dsi_method_name):
+        setattr(LoggedDSI, _dsi_method_name, _make_logged_dsi_method(_dsi_method_name))
+del _dsi_method_name
+
 
 ########################################################################
 #### Utility functions
@@ -67,7 +146,7 @@ def check_db_valid(db_path: str) -> bool:
     else:
         try:
             with redirect_stdout(_NULL), redirect_stderr(_NULL):
-                temp_store = DSI(db_path, check_same_thread=False)
+                temp_store = LoggedDSI(db_path, check_same_thread=False)
                 temp_tables = temp_store.list(True) # force things to fail if the table is empty
                 temp_store.close()
                     
@@ -99,7 +178,7 @@ def get_db_info(db_path: str) -> tuple[list, dict, str]:
     
     try:
         with redirect_stdout(_NULL), redirect_stderr(_NULL):
-            _dsi_store = DSI(db_path, check_same_thread=False)
+            _dsi_store = LoggedDSI(db_path, check_same_thread=False)
             tables = _dsi_store.list(True)
             schema = _dsi_store.schema()
             desc = load_db_description(db_path)
@@ -222,7 +301,7 @@ def query_dsi(query_str: str, db_path: str) ->dict:
         # with open(os.devnull, "w") as fnull:
         #     with redirect_stdout(fnull), redirect_stderr(fnull):
         with redirect_stdout(_NULL), redirect_stderr(_NULL):
-            _store = DSI(db_path, check_same_thread=False)
+            _store = LoggedDSI(db_path, check_same_thread=False)
             df = _store.query(query_str, collection=True)
                 
         if df is None:
