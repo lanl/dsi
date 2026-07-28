@@ -32,6 +32,7 @@ Search parameters
     -> PDB IDs
     -> RCSB Data API
     -> datasets, resources, and errors tables
+```
 
 </details>
 
