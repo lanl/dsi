@@ -174,11 +174,18 @@ class Terminal():
 
                 if mod_function == "reader":
                     try:
-                        obj = class_(**kwargs)
-                    except Exception:
+                        # Handle readers that expect 'filenames' or 'filename' as first positional arg
+                        if 'filenames' in kwargs or 'filename' in kwargs:
+                            # Extract the filenames/filename argument
+                            first_arg = kwargs.pop('filenames', None) or kwargs.pop('filename', None)
+                            obj = class_(first_arg, **kwargs)
+                        else:
+                            obj = class_(**kwargs)
+                    except Exception as e:
                         if self.debug_level != 0:
                             self.logger.error(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                            self.logger.error(f'Original error: {str(e)}')
+                        raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again') from e
 
                     run_start = datetime.now()
                     if self.debug_level != 0:
@@ -1357,7 +1364,7 @@ class Terminal():
         def clean_and_truncate(value, max_width=50):
             """Clean escape chars and truncate long text"""
             if value is None:
-                return ''
+                return 'None'
             
             val_str = str(value)
             
