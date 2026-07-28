@@ -209,7 +209,7 @@ dsi = DSI(
 | `organization` | str | Filter by publishing organization name |
 | `creator` | str | Filter by dataset creator/author name |
 | `tags` | list[str] | Filter by one or more tags (AND logic) |
-| `group` | list[str] | Filter by collection/group names |
+| `group` | str | Filter by collection/group names |
 | `formats` | list[str] | Filter by resource file formats (OR logic) |
 | `license` | str | Filter by license name |
 | `limit` | int | Maximum number of datasets to retrieve per query (default: 100) |
