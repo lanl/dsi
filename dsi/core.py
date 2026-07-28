@@ -1,23 +1,24 @@
+import logging
+import os
+import re
+import shutil
+import sys
+import tempfile
+from collections import OrderedDict
+from datetime import datetime, timezone
 from importlib import import_module
 from importlib.machinery import SourceFileLoader
-from collections import OrderedDict
 from itertools import product
-import os
-import shutil
 from pathlib import Path
-import logging
-from datetime import datetime
-import sys
+
 import pandas as pd
-import re
-import tempfile
 from packaging import version
 
 # temporary check since pandas 3.0+ has unstable releases
 if version.parse(pd.__version__) >= version.parse("3.0.0"):
     raise ImportError("Pandas 3.0+ is not compatible with DSI due to unstable releases.")
 
-class Terminal():
+class Terminal:
     """
     An instantiated Terminal is the DSI human/machine interface.
 
@@ -137,7 +138,7 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"Loading {mod_name} {mod_function} {mod_type}")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         if mod_type not in ["plugin", "backend"]:
             if self.debug_level != 0:
                 self.logger.error("Your module type was not a 'plugin' or 'backend'")
@@ -184,10 +185,10 @@ class Terminal():
                     except Exception as e:
                         if self.debug_level != 0:
                             self.logger.error(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                            self.logger.error(f'Original error: {str(e)}')
+                            self.logger.error(f'Original error: {e!s}')
                         raise ValueError(f'The kwargs for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again') from e
 
-                    run_start = datetime.now()
+                    run_start = datetime.now(timezone.utc)
                     if self.debug_level != 0:
                         self.logger.info("   Activating this reader in load_module")
 
@@ -200,10 +201,10 @@ class Terminal():
                         obj.add_rows()
                     except Exception as e:
                         if self.debug_level != 0:
-                            self.logger.error(f'   {obj.__class__.__name__} reader error: {str(e)}')
+                            self.logger.error(f'   {obj.__class__.__name__} reader error: {e!s}')
                         if not self.user_wrapper:
                             if e.args:
-                                e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
+                                e.args = (f'Error in {original_file} @ line {return_line_number}: {e.args[0]!s}', *e.args[1:])
                             else:
                                 e.args = (f'Error in {original_file} @ line {return_line_number}',)
                         raise e from None
@@ -250,7 +251,7 @@ class Terminal():
                                             self.logger.error(f"   Cannot have a different set of units for column {c_name} in {t_name}")
                                         raise TypeError(f"Cannot have a different set of units for column {c_name} in {t_name}")
                                     visited[key] = unit
-                    run_end = datetime.now()
+                    run_end = datetime.now(timezone.utc)
                     if self.debug_level != 0:
                         self.logger.info(f"   Activated this reader with runtime: {run_end-run_start}")
 
@@ -264,9 +265,7 @@ class Terminal():
                                 has_runTable = False
                                 # if to-be-loaded backend has data and runTable in its tables, turn global runTable off
                                 if os.path.isfile(backend_filename):
-                                    if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100:
-                                        has_data = True
-                                    elif class_.__name__ == "DuckDB" and os.path.getsize(backend_filename) > 13000:
+                                    if class_.__name__ == "Sqlite" and os.path.getsize(backend_filename) > 100 or class_.__name__ == "DuckDB" and os.path.getsize(backend_filename) > 13000:
                                         has_data = True
                                 if has_data:
                                     with open(backend_filename, 'rb') as fb:
@@ -298,7 +297,7 @@ class Terminal():
                         print(f'{mod_name} {mod_function} {mod_type} loaded successfully.')
                     else:
                         print(f'{mod_name} {mod_type} {mod_function} loaded successfully.')
-                end = datetime.now()
+                end = datetime.now(timezone.utc)
                 if self.debug_level != 0:
                     self.logger.info(f"{mod_name} {mod_function} {mod_type} loaded successfully.")
                     self.logger.info(f"Runtime: {end-start}")
@@ -320,7 +319,7 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"Unloading {mod_name} {mod_function} {mod_type}")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         if mod_type not in ["plugin", "backend"]:
             if self.debug_level != 0:
@@ -345,7 +344,7 @@ class Terminal():
                 self.loaded_backends.pop(loaded_index)
             self.active_modules[mod_function].pop(last_loaded)
             print(f"{mod_name} {mod_type} {mod_function} unloaded successfully.")
-            end = datetime.now()
+            end = datetime.now(timezone.utc)
             if self.debug_level != 0:
                 self.logger.info(f"{mod_name} {mod_function} {mod_type} unloaded successfully.")
                 self.logger.info(f"Runtime: {end-start}")
@@ -387,7 +386,7 @@ class Terminal():
         for obj in self.active_modules['writer']:
             self.logger.info("-------------------------------------")
             self.logger.info(f"Transloading {obj.__class__.__name__} {'writer'}")
-            start = datetime.now()
+            start = datetime.now(timezone.utc)
 
             tester = 0
             if sys.gettrace() is None:
@@ -398,10 +397,10 @@ class Terminal():
                 obj.get_rows(self.active_metadata, **kwargs)
             except Exception as e:
                 if self.debug_level != 0:
-                    self.logger.error(f'   {obj.__class__.__name__} writer error: {str(e)}')
+                    self.logger.error(f'   {obj.__class__.__name__} writer error: {e!s}')
                 if not self.user_wrapper:
                     if e.args:
-                        e.args = (f'Error in {original_file} @ line {return_line_number}: {str(e.args[0])}', *e.args[1:])
+                        e.args = (f'Error in {original_file} @ line {return_line_number}: {e.args[0]!s}', *e.args[1:])
                     else:
                         e.args = (f'Error in {original_file} @ line {return_line_number}',)
                 raise e from None
@@ -410,7 +409,7 @@ class Terminal():
                 sys.settrace(None) # ends trace to prevent large overhead
 
             used_writers.append(obj)
-            end = datetime.now()
+            end = datetime.now(timezone.utc)
             self.logger.info(f"Runtime: {end-start}")
         unused_writers = list(set(self.active_modules["writer"]) - set(used_writers))
         if len(unused_writers) > 0:
@@ -463,16 +462,16 @@ class Terminal():
                 if self.debug_level != 0:
                     self.logger.info("-------------------------------------")
                     self.logger.info(f"{obj.__class__.__name__} backend - {interaction_type.upper()} the data")
-                start = datetime.now()
+                start = datetime.now(timezone.utc)
                 parent_class = obj.__class__.__bases__[0].__name__
                 if self.backup_db and parent_class == "Filesystem" and os.path.getsize(obj.filename) > 100:
                     if self.debug_level != 0:
                         self.logger.info(f"   Creating backup file before ingesting data into the {obj.__class__.__name__} backend")
-                    backup_start = datetime.now()
-                    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                    backup_start = datetime.now(timezone.utc)
+                    timestamp = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H_%M_%S")
                     backup_file = obj.filename[:obj.filename.rfind('.')] + f".backup_{timestamp}" + obj.filename[obj.filename.rfind('.'):]
                     shutil.copyfile(obj.filename, backup_file)
-                    backup_end = datetime.now()
+                    backup_end = datetime.now(timezone.utc)
                     if self.debug_level != 0:
                         self.logger.info(f"   Backup file runtime: {backup_end-backup_start}")
 
@@ -484,17 +483,17 @@ class Terminal():
                     obj.ingest_artifacts(collection = self.active_metadata, **kwargs)
                 except Exception as e:
                     if self.debug_level != 0:
-                        self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e)}")
+                        self.logger.error(f"Error ingesting data in {original_file} @ line {return_line_number} - {e!s}")
                     if self.user_wrapper:
                         if not (isinstance(e.args[0], str) and str(e.args[0]).startswith("A complex schema")):
-                            e.args = (f"Error ingesting data - {str(e.args[0])}",  *e.args[1:])
+                            e.args = (f"Error ingesting data - {e.args[0]!s}",  *e.args[1:])
                     else:
-                        e.args = (f"Error ingesting data in {original_file} @ line {return_line_number} - {str(e.args[0])}",  *e.args[1:])
+                        e.args = (f"Error ingesting data in {original_file} @ line {return_line_number} - {e.args[0]!s}",  *e.args[1:])
                     raise e from None
                 if tester == 1:
                     sys.settrace(None) # ends trace to prevent large overhead
                 operation_success = True
-                end = datetime.now()
+                end = datetime.now(timezone.utc)
                 self.logger.info(f"Runtime: {end-start}")
         if interaction_type in ['ingest'] and len(self.active_modules['back-read']) > 0:
             backread_active = True
@@ -505,7 +504,7 @@ class Terminal():
         if interaction_type not in ['ingest', "process"] and self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info(f"{first_backend.__class__.__name__} backend - {interaction_type.upper()} the data")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         if interaction_type in ['query']:
             # TODO query all backends together
             if self.valid_backend(first_backend):
@@ -520,7 +519,7 @@ class Terminal():
                     query_data = first_backend.query_artifacts(**kwargs)
                 except Exception as e:
                     if self.debug_level != 0:
-                        self.logger.error((str(e)))
+                        self.logger.error(str(e))
                     if not self.user_wrapper:
                         e.args = (f"Caught error in {original_file} @ line {return_line_number}: " + e.args[0], *e.args[1:])
                     raise e from None
@@ -560,7 +559,7 @@ class Terminal():
                 raise RuntimeError("First loaded backend needs to have data to be able to process data to DSI")
 
         if operation_success:
-            end = datetime.now()
+            end = datetime.now(timezone.utc)
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
             if interaction_type in ['query'] and query_data is not None:
@@ -598,16 +597,16 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to get a table")
             raise RuntimeError("First loaded backend needs to have data to be able to get a table")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         
         try:
             output = backend.get_table(table_name, dict_return)
         except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Get_Table() Error: {str(e)}")
+                self.logger.error(f"Get_Table() Error: {e!s}")
             raise
         
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -633,11 +632,11 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to get its structural schema")
             raise RuntimeError("First loaded backend needs to have data to get its structural schema")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         output = backend.get_schema()
 
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -668,7 +667,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("Error in find all function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find all function: First loaded backend needs to have data to be able to find data from it")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
 
@@ -697,7 +696,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("Error in find table function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find table function: First loaded backend needs to have data to be able to find data from it")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
 
@@ -731,7 +730,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("Error in find column function: First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("Error in find column function: First loaded backend needs to have data to be able to find data from it")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         return_object = backend.find_column(query_object, range=range)
         return self.find_helper(query_object, return_object, start, "column ")
 
@@ -765,7 +764,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         return_object = backend.find_cell(query_object, row=row)
         return self.find_helper(query_object, return_object, start, "cell ")
 
@@ -783,7 +782,7 @@ class Terminal():
                 self.logger.warning(return_object)
             print("WARNING:", return_object)
             return_object = None
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
@@ -815,7 +814,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to find data from it")
             raise RuntimeError("First loaded backend needs to have data to be able to find data from it")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         if not isinstance(query_object, str):
             raise TypeError("`query_object` must be a string")
@@ -878,7 +877,7 @@ class Terminal():
             return_object = backend.find_relation(column_name, relation)
         except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Error finding data with this condition due to {str(e)}")
+                self.logger.error(f"Error finding data with this condition due to {e!s}")
             raise
         if isinstance(return_object, str):
             if self.debug_level != 0:
@@ -895,7 +894,7 @@ class Terminal():
             for cond_query in return_object:
                 print(f" - {cond_query}")
             return_object = None
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
@@ -935,7 +934,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to overwrite its data")
             raise RuntimeError("First loaded backend needs to have data to be able to overwrite its data")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         list_names = isinstance(table_name, list) and all(isinstance(name, str) for name in table_name)
         if not isinstance(table_name, str) and not list_names:
@@ -960,12 +959,12 @@ class Terminal():
         if backup:
             if self.debug_level != 0:
                 self.logger.info(f"   Creating backup file before overwriting data in the {backend.__class__.__name__} backend")
-            backup_start = datetime.now()
+            backup_start = datetime.now(timezone.utc)
             extension = backend.filename.rfind('.')
-            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H_%M_%S")
             backup_file = backend.filename[:extension] + f".backup_{timestamp}" + backend.filename[extension:]
             shutil.copyfile(backend.filename, backup_file)
-            backup_end = datetime.now()
+            backup_end = datetime.now(timezone.utc)
             if self.debug_level != 0:
                 self.logger.info(f"   Backup file creation runtime: {backup_end-backup_start}")
 
@@ -973,10 +972,10 @@ class Terminal():
             backend.overwrite_table(table_name, collection)
         except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Overwrite_table() error: {str(e)}")
+                self.logger.error(f"Overwrite_table() error: {e!s}")
             raise
         
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -1000,11 +999,11 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to list its data")
             raise RuntimeError("First loaded backend needs to have data to be able to list its data")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         table_list = backend.list(collection)
 
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -1039,16 +1038,16 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to summarize its data")
             raise RuntimeError("First loaded backend needs to have data to be able to summarize its data")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         try:
             output = backend.summary(table_name)
         except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Summary error: {str(e)}")
+                self.logger.error(f"Summary error: {e!s}")
             raise
 
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -1087,11 +1086,11 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to get its number of tables")
             raise RuntimeError("First loaded backend needs to have data to be able to get its number of tables")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         backend.num_tables()
 
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -1122,7 +1121,7 @@ class Terminal():
             if self.debug_level != 0:
                 self.logger.error("First loaded backend needs to have data to be able to display its data")
             raise RuntimeError("First loaded backend needs to have data to be able to display its data")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         if not isinstance(table_name, str):
             raise TypeError("Input 'table_name' must be a string")
@@ -1137,10 +1136,10 @@ class Terminal():
             output = backend.display(table_name, num_rows, display_cols)
         except Exception as e:
             if self.debug_level != 0:
-                self.logger.error(f"Display error: {str(e)}")
+                self.logger.error(f"Display error: {e!s}")
             raise
 
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -1167,16 +1166,16 @@ class Terminal():
                 self.logger.error('Need to load a valid backend to be able to identify table names in a query for that backend')
             raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query for that backend')
         backend = self.loaded_backends[0]
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
 
         try:
             output = backend.get_table_names(query)
         except Exception as e:
             if self.debug_level != 0:
-                self.logger.info(f"Error getting table names {str(e)}")
+                self.logger.info(f"Error getting table names {e!s}")
             raise
         
-        end = datetime.now()
+        end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
@@ -1204,18 +1203,18 @@ class Terminal():
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.info("Returning current abstraction")
-        start = datetime.now()
+        start = datetime.now(timezone.utc)
         if table_name is not None and table_name not in self.active_metadata.keys():
             if self.debug_level != 0:
                 self.logger.error(f"{table_name} not in current abstraction")
             raise ValueError(f"{table_name} not in current abstraction")
         if table_name is not None:
-            end = datetime.now()
+            end = datetime.now(timezone.utc)
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
             return self.active_metadata[table_name]
         else:
-            end = datetime.now()
+            end = datetime.now(timezone.utc)
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
             return self.active_metadata
@@ -1414,7 +1413,7 @@ class Terminal():
         count = 0
         for row in cleaned_rows:
             print(" | ".join(
-                f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
+                f"{row[i]!s:<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
             ))
             
             count += 1
@@ -1485,7 +1484,7 @@ class Terminal():
                     except (ConnectionError, RuntimeError) as e:
                         if self.debug_level != 0:
                             self.logger.warning(
-                                f"NDP backend connection validation failed: {str(e)}"
+                                f"NDP backend connection validation failed: {e!s}"
                             )
                         return False
             if backend.__class__.__name__ == "OSTI":
@@ -1499,7 +1498,7 @@ class Terminal():
                     except (ConnectionError, RuntimeError) as e:
                         if self.debug_level != 0:
                             self.logger.warning(
-                                f"OSTI backend connection validation failed: {str(e)}"
+                                f"OSTI backend connection validation failed: {e!s}"
                             )
                         return False
             if backend.__class__.__name__ == "Oceans11":
