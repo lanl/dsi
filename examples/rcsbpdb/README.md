@@ -12,6 +12,27 @@ Useful RCSB PDB resources:
 
 > **Note:** This backend is read-only. It retrieves and organizes metadata but does not modify remote RCSB data.
 
+<details>
+<summary><b>API Reference (for developers)</b></summary>
+
+The backend uses the RCSB Search API to discover PDB entries and the RCSB Data API to retrieve metadata for each resolved PDB ID.
+
+- Search API endpoint: `https://search.rcsb.org/rcsbsearch/v2/query`
+- Data API base URL: `https://data.rcsb.org/rest/v1/core`
+- Entry metadata endpoint: `/entry/{pdb_id}`
+- Structure landing page: `https://www.rcsb.org/structure/{pdb_id}`
+- Search request method: `POST`
+- Entry metadata request method: `GET`
+
+Search-driven workflow:
+
+```text
+Search parameters
+    -> RCSB Search API
+    -> PDB IDs
+    -> RCSB Data API
+    -> datasets, resources, and errors tables
+
 ---
 
 ## Quick Start
@@ -54,6 +75,8 @@ The backend supports a single `params` interface.
 
 ### Keyword Search
 
+Search RCSB PDB metadata using a full-text keyword and limit the number of returned entries.
+
 ```python
 dsi = DSI(
     backend_name="RCSBPDB",
@@ -62,6 +85,8 @@ dsi = DSI(
 ```
 
 ### Author Search
+
+Search for structures associated with a specific primary-citation author.
 
 ```python
 dsi = DSI(
@@ -72,6 +97,8 @@ dsi = DSI(
 
 ### Experimental Method Search
 
+Filter structures by an exact experimental method.
+
 ```python
 dsi = DSI(
     backend_name="RCSBPDB",
@@ -80,6 +107,8 @@ dsi = DSI(
 ```
 
 ### PDB ID Lookup
+
+Retrieve metadata and available resources for a specific four-character PDB ID.
 
 ```python
 dsi = DSI(
@@ -90,6 +119,8 @@ dsi = DSI(
 
 ### DOI Lookup
 
+Resolve an RCSB-style DOI to its PDB ID and retrieve the corresponding structure metadata.
+
 ```python
 dsi = DSI(
     backend_name="RCSBPDB",
@@ -98,6 +129,8 @@ dsi = DSI(
 ```
 
 ### Multiple Identifiers
+
+Retrieve multiple structures in one request using a combination of PDB IDs and RCSB-style DOIs.
 
 ```python
 dsi = DSI(
