@@ -136,12 +136,35 @@ class DSI():
 
                 if backend_name.lower() == "ndp":
                     backend_name = "NDP"
-                    query_params = {}
-                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    correct_backend = True
+                
+                    # NDP only accepts params dict or list of dicts format
+                    if 'params' not in kwargs:
+                        raise ValueError(
+                            "NDP backend requires a 'params' dictionary or list of dictionaries.\n"
+                            "Single query example: DSI(backend_name='NDP', params={'keywords': 'temperature', 'limit': 5})\n"
+                            "Multiple queries example: DSI(backend_name='NDP', params=[{'keywords': 'temp'}, {'organization': 'NASA'}])"
+                        )
                     
-                    for key in ndp_param_keys:
-                        if key in kwargs:
-                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                    query_params = kwargs.pop('params')
+                    
+                    # Validate params is a dict or list of dicts
+                    if isinstance(query_params, dict):
+                        # Single query - valid
+                        pass
+                    elif isinstance(query_params, list):
+                        # Multiple queries - validate each is a dict
+                        if not all(isinstance(p, dict) for p in query_params):
+                            raise TypeError(
+                                "'params' list must contain only dictionaries.\n"
+                                "Example: params=[{'keywords': 'temperature'}, {'organization': 'NASA'}]"
+                            )
+                    else:
+                        raise TypeError(
+                            "'params' must be a dictionary or a list of dictionaries.\n"
+                            "Single query example: params={'keywords': 'temperature', 'limit': 5}\n"
+                            "Multiple queries example: params=[{'keywords': 'temp'}, {'organization': 'NASA'}]"
+                        )
                 elif backend_name.lower() == "osti":
                     backend_name = "OSTI"
                     query_params = kwargs.pop("params", {})
