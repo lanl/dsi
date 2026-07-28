@@ -5,16 +5,15 @@ Read-only backend that pulls metadata from CKAN-based NDP instances
 and exposes it as in-memory DSI tables: datasets and resources.
 """
 
-import requests
-import pandas as pd
-import numpy as np
 from collections import OrderedDict
-from typing import Optional
 from urllib.parse import urlparse
 
+import numpy as np
+import pandas as pd
+import requests
+import urllib3
 from dsi.backends.webserver import Webserver
 
-import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -686,15 +685,15 @@ class NDP(Webserver):
         table_count = 0
         
         # Check for datasets table
-        if "datasets" in self._cache and self._cache["datasets"]:
+        if self._cache.get("datasets"):
             table_count += 1
         
         # Check for resources table
-        if "resources" in self._cache and self._cache["resources"]:
+        if self._cache.get("resources"):
             table_count += 1
         
         # Check for errors table
-        if "errors" in self._cache and self._cache["errors"]:
+        if self._cache.get("errors"):
             table_count += 1
         
         print(f"Database now has {table_count} tables")
@@ -737,7 +736,7 @@ class NDP(Webserver):
             return pd.DataFrame(table)
 
 
-    def get_schema(self, table_name: Optional[str] = None):
+    def get_schema(self, table_name: str | None = None):
         """
         Returns schema information for all tables or a specific table in SQLite CREATE TABLE format.
         
@@ -788,9 +787,7 @@ class NDP(Webserver):
                     sql_type = 'DATETIME'
                 elif pandas_dtype == 'object':
                     non_null = df[column].dropna()
-                    if non_null.empty:
-                        sql_type = 'TEXT'
-                    elif all(isinstance(x, str) for x in non_null):
+                    if non_null.empty or all(isinstance(x, str) for x in non_null):
                         sql_type = 'TEXT'
                     else:
                         sql_type = 'OBJECT'
@@ -833,9 +830,7 @@ class NDP(Webserver):
                     sql_type = 'DATETIME'
                 elif pandas_dtype == 'object':
                     non_null = df[column].dropna()
-                    if non_null.empty:
-                        sql_type = 'TEXT'
-                    elif all(isinstance(x, str) for x in non_null):
+                    if non_null.empty or all(isinstance(x, str) for x in non_null):
                         sql_type = 'TEXT'
                     else:
                         sql_type = 'OBJECT'
@@ -1328,15 +1323,7 @@ class NDP(Webserver):
                     match = False
 
                     # Handle None/NaN
-                    if pd.isna(cell) and pd.isna(query_object):
-                        match = True
-                    
-                    # Exact match for simple types
-                    elif query_object == cell:
-                        match = True
-
-                    # String partial match
-                    elif (
+                    if pd.isna(cell) and pd.isna(query_object) or query_object == cell or (
                         is_str_query and
                         isinstance(cell, str) and
                         query_lower in cell.lower()
@@ -1471,9 +1458,7 @@ class NDP(Webserver):
                     dtype = 'DATETIME'
                 elif pandas_dtype == 'object':
                     non_null = original_series.dropna()
-                    if non_null.empty:
-                        dtype = 'TEXT'
-                    elif all(isinstance(x, str) for x in non_null):
+                    if non_null.empty or all(isinstance(x, str) for x in non_null):
                         dtype = 'TEXT'
                     else:
                         dtype = 'OBJECT'
@@ -1685,7 +1670,6 @@ class NDP(Webserver):
         -------
         None
         """
-        pass
 
 
     # ----------------------------------------------------------------------
