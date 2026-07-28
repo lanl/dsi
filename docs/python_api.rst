@@ -47,7 +47,6 @@ DSI is expanding its support of several dataset metadata standards. Currently su
       - `Dublin Core <https://www.dublincore.org/resources/metadata-basics/>`_
       - `Schema.org's Dataset object <https://schema.org/Dataset>`_
       - `Google Data Cards Playbook <https://sites.research.google/datacardsplaybook/>`_
-      - `Oceans11 DSI Data Server <https://oceans11.lanl.gov/>`_
 
 Template file structures can be found and copied in ``examples/test/``.
 
@@ -59,7 +58,6 @@ The supported datacards can be read into DSI by creating an instance of DSI() an
       - ``read("file/path/to/datacard.XML", 'DublinCoreDatacard')``
       - ``read("file/path/to/datacardh.JSON", 'SchemaOrgDatacard')``
       - ``read("file/path/to/datacard.YAML", 'GoogleDatacard')``
-      - ``read("file/path/to/datacard.YAML", 'Oceans11Datacard')``
 
 Examples of each data card standard for the Wildfire dataset can be found in ``examples/wildfire/``
 

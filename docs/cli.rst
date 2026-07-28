@@ -13,7 +13,7 @@ The CLI actions and example workflows are shown below.
 
 CLI Setup and Actions
 ---------------------
-Once a user has successfully installed DSI, they can active the CLI environment by entering ``dsi`` in their command line.
+Once a user has successfully installed DSI, they can activate the CLI environment by entering ``dsi`` in their command line.
 This automatically creates a hidden Sqlite database that users can interact with.
 
 However, if a user wants to use DuckDB instead, they should activate the CLI with ``dsi -b duckdb`` in their command line.

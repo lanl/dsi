@@ -1,5 +1,3 @@
-# examples/osti/osti_user/2.search_title.py
-
 from dsi.dsi import DSI
 
 # Search OSTI records by title field

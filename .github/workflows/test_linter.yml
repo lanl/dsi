@@ -11,7 +11,7 @@ on:
 
 jobs:
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     strategy:
       matrix:
         python-version: ["3.11"]
@@ -27,4 +27,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff codespell
       - name: Run Ruff
-        run: ruff check dsi/ --ignore E701
+        run: ruff check dsi/ --ignore E402,E701

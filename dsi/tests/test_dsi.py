@@ -48,7 +48,6 @@ def test_read_sqlite_backend():
     test.read(data_sources="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
     test.read(data_sources=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
 
-    test.read(data_sources=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
     test.read(data_sources="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
     test.read(data_sources="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
     test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')
@@ -939,7 +938,6 @@ def test_read_duckdb_backend():
     test.read(data_sources="examples/test/wildfiredata.csv", reader_name='Ensemble', table_name = "wildfire") # makes a sim table automatically
     test.read(data_sources=['examples/test/bueno1.data', 'examples/test/bueno2.data'], reader_name='Bueno')
 
-    test.read(data_sources=['examples/wildfire/wildfire_oceans11.yml', 'examples/pennant/pennant_oceans11.yml'], reader_name='Oceans11Datacard')
     test.read(data_sources="examples/wildfire/wildfire_dublin_core.xml", reader_name='DublinCoreDatacard')
     test.read(data_sources="examples/wildfire/wildfire_schema_org.json", reader_name='SchemaOrgDatacard')
     test.read(data_sources="examples/wildfire/wildfire_google.yml", reader_name='GoogleDatacard')

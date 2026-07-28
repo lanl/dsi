@@ -10,5 +10,6 @@ Contributor Resources
    custom_writer
    backends
    core
+   sync
    development
    cr_examples

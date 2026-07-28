@@ -2,155 +2,167 @@ import re
 import subprocess
 import os
 
-from dsi.backends.filesystem import Backend
+from dsi.backends.backend import Backend
 from collections import OrderedDict
 
 # HPSS backend class
 class HPSS(Backend):
-   def __init__(self, hpss_files):
-      """
-      Initializes an HPSS backend
-      
-      `hpss_files`: list with hpss file paths
-
-      """
-      self.hpss_info = OrderedDict()
-      for hpss_file in hpss_files.keys():
-         self.hpss_info[hpss_file] = {
-            'local_path': hpss_files[hpss_file],
-            'hpss_hash': None, 
-         }
-         stdout, stderr, _ = self.run_hsi("hashlist", [hpss_file])
-         hpss_hash = self.parse_hpss_hash(stdout, stderr)
-         self.hpss_info[hpss_file]['hpss_hash'] = hpss_hash
-
-   def create_hpss_hash(self, hpss_file) -> str:
-      """
-      Creates and HPSS hash
-      """
-
-      stdout, stderr, returncode = self.run_hsi("hashcreate", [hpss_file])
-      if returncode != 0:
-         print(stderr)
-         return None
-     
-      hash = self.parse_hpss_hash(stdout, stderr)
-      return hash
-
-   def put(self, local_file, hpss_dest) -> bool:
-      """
-      Puts a local file on HPSS
-      """
-
-      cwd = os.getcwd()
-      new_dir = None
-      file_to_put = local_file
-      if '/' in local_file:
-         new_dir = '/'.join(local_file.split('/')[:-1])
-         os.chdir(new_dir)
-         file_to_put = local_file.split('/')[-1]
-
-      stdout, stderr, returncode = self.run_hsi("put", [file_to_put])
-      if new_dir is not None:
-         os.chdir(cwd)
-
-      if returncode == 0:
-         self.create_hpss_hash(file_to_put)
-         return True
-      
-      return False
-
-   def get(self, hpss_file, tmp_dir) -> bool:
-      """
-      Gets an HPSS file and puts it in the tmp_dir
-      """
-      cwd = os.getcwd()
-      try:
-         os.chdir(tmp_dir)
-      except Exception:
-         print("Error changing to temp dir: %s" % tmp_dir)
-         return False
-
-      stdout, stderr, returncode = self.run_hsi("get", hpss_file)
-      try:
-         os.chdir(cwd)
-      except Exception:
-         print("Error changing to dir: %s" % cwd)
+    read_only = False
+    
+    def __init__(self, hpss_files):
+        """
+        Initializes an HPSS backend
         
-      if returncode == 0:
-         return True
+        `hpss_files`: list with hpss file paths
 
-      return False
-   
-   def parse_hpss_hash(self, stdout, stderr) -> str:
-      """
-      Parses the result of an HPSS hash command
-      """
+        """
+        self.hpss_info = OrderedDict()
+        for hpss_file in hpss_files.keys():
+            self.hpss_info[hpss_file] = {
+                'local_path': hpss_files[hpss_file],
+                'hpss_hash': None, 
+            }
+            stdout, stderr, _ = self.run_hsi("hashlist", [hpss_file])
+            hpss_hash = self.parse_hpss_hash(stdout, stderr)
+            self.hpss_info[hpss_file]['hpss_hash'] = hpss_hash
 
-      output = stdout + stderr
-      hash = None
-      for line in output.splitlines():
-         if " md5" not in line:
-            continue
+    def create_hpss_hash(self, hpss_file) -> str:
+        """
+        Creates and HPSS hash
+        """
+        stdout, stderr, returncode = self.run_hsi("hashcreate", [hpss_file])
+        if returncode != 0:
+            print(stderr)
+            return None
+        
+        hash = self.parse_hpss_hash(stdout, stderr)
+        return hash
 
-         line = line.strip()
-         matches = re.search(r'(\S+)\s+(\S+)\s+(\S+).*', line)
-         if not matches:
-            continue
+    def put(self, local_file, hpss_dest) -> bool:
+        """
+        Puts a local file on HPSS
+        """
+        cwd = os.getcwd()
+        new_dir = None
+        file_to_put = local_file
+        if '/' in local_file:
+            new_dir = '/'.join(local_file.split('/')[:-1])
+            os.chdir(new_dir)
+            file_to_put = local_file.split('/')[-1]
 
-         if len(matches.groups()) == 3:
-            hash = matches.group(1)
-            break
+        stdout, stderr, returncode = self.run_hsi("put", [file_to_put])
+        if new_dir is not None:
+            os.chdir(cwd)
+
+        if returncode == 0:
+            self.create_hpss_hash(file_to_put)
+            return True
+        
+        return False
+
+    def get(self, hpss_file, tmp_dir) -> bool:
+        """
+        Gets an HPSS file and puts it in the tmp_dir
+        """
+        cwd = os.getcwd()
+        try:
+            os.chdir(tmp_dir)
+        except Exception:
+            print("Error changing to temp dir: %s" % tmp_dir)
+            return False
+
+        stdout, stderr, returncode = self.run_hsi("get", hpss_file)
+        try:
+            os.chdir(cwd)
+        except Exception:
+            print("Error changing to dir: %s" % cwd)
             
-      return hash
-  
+        if returncode == 0:
+            return True
 
-   def ingest_artifacts(self, collection, isVerbose=False):
-      for f in self.hpss_info.keys():
-          self.put(self.hpss_info[f]['local_path'], f)
+        return False
+   
+    def parse_hpss_hash(self, stdout, stderr) -> str:
+        """
+        Parses the result of an HPSS hash command
+        """
+        output = stdout + stderr
+        hash = None
+        for line in output.splitlines():
+            if " md5" not in line:
+                continue
 
-   def query_artifacts(self, query, kwargs):
-      pass
+            line = line.strip()
+            matches = re.search(r'(\S+)\s+(\S+)\s+(\S+).*', line)
+            if not matches:
+                continue
 
-   def notebook(self, kwargs):
-      pass
+            if len(matches.groups()) == 3:
+                hash = matches.group(1)
+                break
+                
+        return hash
+    
+    def run_hsi(self, subcmd, arg_list):
+        """
+        Runs hsi with the supplied subcmd and arguments
+        """
+        command = ["hsi", subcmd]
+        command += arg_list
+        
+        stdout = ""
+        stderr = ""
+        returncode = -1
+        try:
+            process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
+            
+            stdout, stderr = process.communicate()
+            returncode = process.communicate()
+        except FileNotFoundError as e:
+            print("Error running hsi: %s" % e)
+            
+        return stdout, stderr, returncode
 
-   def process_artifacts(self, kwargs):
-      pass
 
-   def find(self, query_object, kwargs):
-      pass
+    def ingest_artifacts(self, collection, isVerbose=False):
+        for f in self.hpss_info.keys():
+            self.put(self.hpss_info[f]['local_path'], f)
 
-   def find_table(self, query_object, kwargs):
-      pass
+    def query_artifacts(self, query, **kwargs):
+        pass
 
-   def find_column(self, query_object, kwargs):
-      pass
+    def notebook(self, **kwargs):
+        pass
 
-   def find_cell(self, query_object, kwargs):
-      pass
+    def process_artifacts(self, **kwargs):
+        pass
 
-   def close(self):
-      pass
+    def get_schema(self):
+        pass
 
-   def run_hsi(self, subcmd, arg_list):
-      """
-      Runs hsi with the supplied subcmd and arguments
-      """
+    def find(self, query_object, **kwargs):
+        pass
 
-      command = ["hsi", subcmd]
-      command += arg_list
-      
-      stdout = ""
-      stderr = ""
-      returncode = -1
-      try:
-         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
-         
-         stdout, stderr = process.communicate()
-         returncode = process.communicate()
-      except FileNotFoundError as e:
-         print("Error running hsi: %s" % e)
-         
-      return stdout, stderr, returncode
+    def find_table(self, query_object, **kwargs):
+        pass
 
+    def find_column(self, query_object, **kwargs):
+        pass
+
+    def find_cell(self, query_object, **kwargs):
+        pass
+
+    def find_relation(self, column_name, relation, **kwargs):
+        pass
+
+    def list(self, **kwargs):
+        pass
+
+    def display(self, table_name, **kwargs):
+        pass
+
+    def summary(self, table_name, **kwargs):
+        pass
+
+    def close(self):
+        pass

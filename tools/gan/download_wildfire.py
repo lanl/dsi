@@ -32,7 +32,7 @@ with open(gan_yaml, "w") as f:
 s = Sync()
 try:
     s.get(gan_yaml, federated_folder)
-except Exception as e:
+except Exception:
     raise RuntimeError("Error accessing remote server. Try again later.")
 
 
@@ -45,6 +45,9 @@ hostname = f"{username}@{host}:"
 
 # Open db, create list of files to download, and download those files
 data = json.load(open(f"{federated_folder}/dsi_database_list.json"))
+if not data:
+    raise RuntimeError("Could not download wildfire metadata database for GAN")
+
 gan_db = data[0]["local_path"]
 
 store = DSI(gan_db)

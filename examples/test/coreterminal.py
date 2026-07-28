@@ -17,7 +17,6 @@ a.load_module('plugin', 'YAML1', 'reader', filenames=["student_test1.yml", "stud
 # a.load_module('plugin', 'Ensemble', 'reader', filenames="wildfiredata.csv")
 # a.load_module('plugin', 'Cloverleaf', 'reader', folder_path="../clover3d/")
 
-# a.load_module('plugin', 'Oceans11Datacard', 'reader', filenames=['../wildfire/wildfire_oceans11.yml', '../pennant/pennant_oceans11.yml'])
 # a.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames="../wildfire/wildfire_dublin_core.xml")
 # a.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames="../wildfire/wildfire_schema_org.json")
 # a.load_module('plugin', 'GoogleDatacard', 'reader', filenames="../wildfire/wildfire_google.yml")
