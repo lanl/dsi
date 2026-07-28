@@ -33,6 +33,8 @@ Search parameters
     -> RCSB Data API
     -> datasets, resources, and errors tables
 
+</details>
+
 ---
 
 ## Quick Start
