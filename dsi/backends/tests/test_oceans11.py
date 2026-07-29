@@ -11,6 +11,7 @@ from pathlib import Path
 from collections import OrderedDict
 from dsi.backends.oceans11 import Oceans11
 
+pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
 @pytest.fixture
 def backend(tmp_path):

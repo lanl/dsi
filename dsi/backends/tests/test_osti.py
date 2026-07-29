@@ -11,6 +11,8 @@ import pandas as pd
 from collections import OrderedDict
 from dsi.backends.osti import OSTI
 
+pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
+
 # Open one shared OSTI backend for tests that use the default climate dataset.
 backend = OSTI(params={"q": "climate", "rows": 10})
 
