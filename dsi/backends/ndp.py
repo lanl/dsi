@@ -1523,7 +1523,12 @@ class NDP(Webserver):
         
         # Check if backend is loaded
         if not self._loaded:
-            return [[], pd.DataFrame()]
+            if table_name:
+                # For single table, return empty DataFrame
+                return pd.DataFrame()
+            else:
+                # For all tables, return list format
+                return [[], pd.DataFrame()]
         
         # Single table summary
         if table_name:
