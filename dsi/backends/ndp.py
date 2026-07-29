@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import requests
 import urllib3
+
 from dsi.backends.webserver import Webserver
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -346,7 +347,7 @@ class NDP(Webserver):
         try:
             result = self._request("package_show", {"id": dataset_id})
             return result
-        except Exception as e:
+        except (requests.exceptions.RequestException, RuntimeError, ValueError) as e:
             print(f"Warning: Could not retrieve dataset '{dataset_id}': {e}")
             return None
 
@@ -807,13 +808,13 @@ class NDP(Webserver):
         schema_lines.append("-- (Read-only CKAN metadata backend)")
         schema_lines.append("")
         
-        for table_name, table_data in self._cache.items():
+        for tbl_name, table_data in self._cache.items():
             if not table_data:
                 continue
             
             df = pd.DataFrame(table_data)
             
-            schema_lines.append(f"CREATE TABLE {table_name} (")
+            schema_lines.append(f"CREATE TABLE {tbl_name} (")
             
             column_defs = []
             for column in df.columns:
@@ -1122,7 +1123,7 @@ class NDP(Webserver):
                 
                 valid_list.append(200 <= r.status_code < 400)
             
-            except Exception:
+            except (requests.exceptions.RequestException, requests.exceptions.Timeout):
                 valid_list.append(False)
         
         table["url_valid"] = valid_list
@@ -1208,9 +1209,8 @@ class NDP(Webserver):
         """
 
         if not isinstance(query_object, str):
-            raise RuntimeError(
-                "find_table() ERROR: Cannot search an empty backend. "
-                "Ensure data is loaded first."
+            raise TypeError(
+                "find_table() ERROR: query_object must be a string"
             )
 
         matches = []
@@ -1260,9 +1260,8 @@ class NDP(Webserver):
         """
 
         if not isinstance(query_object, str):
-            raise RuntimeError(
-                "find_column() ERROR: Cannot search an empty backend. "
-                "Ensure data is loaded first."
+            raise TypeError(
+                "find_column() ERROR: query_object must be a string"
             )
 
         matches = []
@@ -1600,9 +1599,8 @@ class NDP(Webserver):
             raise TypeError("display() ERROR: Input 'display_cols' must be a list of column names or None")
         
         # If display_cols is a list, validate it contains strings
-        if isinstance(display_cols, list):
-            if not all(isinstance(col, str) for col in display_cols):
-                raise TypeError("display() ERROR: All elements in 'display_cols' must be strings")
+        if isinstance(display_cols, list) and not all(isinstance(col, str) for col in display_cols):
+            raise TypeError("display() ERROR: All elements in 'display_cols' must be strings")
         
         # Validate num_rows type
         if num_rows is not None and not isinstance(num_rows, int):
