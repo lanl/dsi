@@ -14,9 +14,8 @@ CREATE TABLE IF NOT EXISTS versions (
     root_folder     TEXT    NOT NULL,
     commit_hash     TEXT    NOT NULL,           -- SHA-256 Merkle commit hash
     root_tree_hash  TEXT    NOT NULL,
-    parent_commit_hash TEXT,
     hash_algorithm  TEXT    NOT NULL,
-    committed_at    TEXT    NOT NULL,           -- ISO-8601 timestamp
+    committed_at    INTEGER NOT NULL,           -- UTC timestamp (seconds since epoch)
     owner_name      TEXT    NOT NULL,           -- Username of the committer
     message         TEXT,
     snapshot_path   TEXT    NOT NULL,           -- path to rsync copy
@@ -89,14 +88,25 @@ CREATE INDEX IF NOT EXISTS idx_merkle_nodes_root_path
 CREATE INDEX IF NOT EXISTS idx_merkle_nodes_hash
     ON merkle_nodes(root_folder, node_hash);
 
-CREATE TABLE IF NOT EXISTS staging (
+CREATE TABLE IF NOT EXISTS branches (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     root_folder     TEXT    NOT NULL,
-    absolute_path   TEXT    NOT NULL UNIQUE,            -- absolute path must be unique in staging
-    action          TEXT    NOT NULL DEFAULT 'add',
-    added_at        TEXT    NOT NULL,                   -- ISO-8601 timestamp
-    UNIQUE(root_folder, absolute_path)
+    branch_name     TEXT    NOT NULL,
+    head_commit_hash TEXT    NOT NULL,
+    is_latest       INTEGER NOT NULL DEFAULT 0,
+    created_at      INTEGER NOT NULL,
+    UNIQUE(root_folder, branch_name)
 );
+
+CREATE TABLE IF NOT EXISTS branch_links (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_commit_hash  TEXT    DEFAULT NULL,
+    child_commit_hash   TEXT    NOT NULL,
+    child_branch_name   TEXT    NOT NULL,
+    created_at          INTEGER NOT NULL,
+    UNIQUE(parent_commit_hash, child_commit_hash, child_branch_name)
+);
+
 """
 
 

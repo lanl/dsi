@@ -26,7 +26,21 @@ def main():
     p_commit = sub.add_parser("commit", help="Snapshot and commit staged paths")
     p_commit.add_argument("message", nargs="?", default="Committed at " + datetime.datetime.now().isoformat())
 
-    sub.add_parser("log", help="List all commits")
+    p_branch = sub.add_parser("branch", help="Create a branch")
+    p_branch.add_argument("branch_name")
+    p_branch.add_argument("start_point", nargs="?", default=None)
+
+    p_merge = sub.add_parser("merge", help="Merge a branch into the current HEAD")
+    p_merge.add_argument("branch_name")
+    p_merge.add_argument("target_commit", nargs="?", default=None)
+
+    sub.add_parser("list-branch", help="List all branches")
+
+    p_switch = sub.add_parser("switch", help="Switch to a branch")
+    p_switch.add_argument("branch_name")
+
+    p_log = sub.add_parser("log", help="List all commits")
+    p_log.add_argument("branch_name", nargs="?", default=None)
 
     p_diff = sub.add_parser("diff", help="Diff two commits")
     p_diff.add_argument("c1", nargs="?", default=None)
@@ -53,12 +67,24 @@ def main():
     elif args.command == "commit":
         vcs = Version(os.getcwd())
         vcs.cmd_commit(args.message)
+    elif args.command == "branch":
+        vcs = Version(os.getcwd())
+        vcs.cmd_branch(args.branch_name, args.start_point)
+    elif args.command == "merge":
+        vcs = Version(os.getcwd())
+        vcs.cmd_merge(args.branch_name, args.target_commit)
+    elif args.command == "list-branch":
+        vcs = Version(os.getcwd())
+        vcs.cmd_list_branch()
+    elif args.command == "switch":
+        vcs = Version(os.getcwd())
+        vcs.cmd_switch(args.branch_name)
     elif args.command == "diff":
         vcs = Version(os.getcwd())
         vcs.cmd_diff(args.c1, args.c2)
     elif args.command == "log":
         vcs = Version(os.getcwd())
-        vcs.cmd_log()
+        vcs.cmd_log(args.branch_name)
     elif args.command == "restore":
         vcs = Version(os.getcwd())
         vcs.cmd_restore(args.version)

@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 
 HASH_ALGORITHM = "sha256-merkle-v1"
-
+PREV_RECORD_HASH = "0" * 64  # default previous hash for the first record
 
 def _canonical_json(data: dict[str, Any]) -> bytes:
     return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -13,6 +13,14 @@ def _canonical_json(data: dict[str, Any]) -> bytes:
 
 def hash_payload(data: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical_json(data)).hexdigest()
+
+def compute_record_hash(
+    metadata_payload: dict[str, Any],
+    prev_record_hash: Optional[str],
+) -> str:
+    payload = dict(metadata_payload)
+    payload["prev_record_hash"] = prev_record_hash or PREV_RECORD_HASH
+    return hash_payload(payload)
 
 
 def sha256_file(path: str, chunk_size: int = 1 << 20) -> Optional[str]:

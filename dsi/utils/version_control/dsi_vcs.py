@@ -31,7 +31,9 @@ from typing import Optional
 
 from .vcs_db import DB_NAME, SNAPSHOTS_DIR, open_db
 from .vcs_metadata_helper import collect_metadata, collect_tree_metadata, owner_name
-from .merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
+from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
+from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
+from .repolog.repository_log import RepositoryLog
 
 # ─────────────────────────── RSYNC SNAPSHOT ──────────────────────────────────
 
@@ -90,6 +92,34 @@ def apply_snapshot_deletes(snapshot_path: str, root_folder: str, staged_deletes:
             os.unlink(target)
 
 
+def rsync_path_to_snapshot(
+    root_folder: str,
+    snapshot_path: str,
+    abs_path: str,
+) -> bool:
+    rel_path = os.path.relpath(abs_path, root_folder)
+    if rel_path in ("", "."):
+        return True
+
+    target = snapshot_target(snapshot_path, rel_path)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+
+    cmd = ["rsync", "-aAXH"]
+    if sys.platform == "darwin":
+        cmd = ["rsync", "-aEH"]
+
+    if os.path.isdir(abs_path):
+        cmd += [abs_path.rstrip("/") + "/", target.rstrip("/") + "/"]
+    else:
+        cmd += [abs_path, target]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode not in (0, 24):
+        print(f"[rsync error] {result.stderr.strip()}", file=sys.stderr)
+        return False
+    return True
+
+
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
 class Version():
 
@@ -100,9 +130,47 @@ class Version():
 
         conn = open_db(self.root_folder)
         conn.close()
+        self.repo_log = RepositoryLog(
+            os.path.join(self.root_folder, SNAPSHOTS_DIR),
+            repository_id="repo-123",
+        )
         print(f"Initialized dsi-vcs repository in: {self.root_folder}")
         print(f"  Snapshots: {self.root_folder}/{SNAPSHOTS_DIR}/")
 
+    def _load_pending_stage_entries(self) -> dict[str, tuple[object, str]]:
+        pending: dict[str, tuple[object, str]] = {}
+        for _, record in self.repo_log.iter_records(self.repo_log.latest_commit_location or 0):
+            if record.kind == RecordKind.COMMIT:
+                pending.clear()
+                continue
+            if record.kind != RecordKind.DATA or not record.file_path:
+                continue
+
+            metadata = record.extra_metadata or {}
+            if metadata.get("staging_op") == "remove":
+                pending.pop(record.file_path, None)
+                continue
+
+            action = metadata.get("staging_action")
+            if action == "delete" or record.operation == OperationType.FILE_DELETE:
+                pending[record.file_path] = (record, "delete")
+            else:
+                pending[record.file_path] = (record, "add")
+
+        return pending
+
+    def _print_staged_paths(self) -> None:
+        staged = self._load_pending_stage_entries()
+        if not staged:
+            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
+            return
+
+        print(f"Staged paths ({len(staged)}):")
+        for rel_path, (_record, action) in sorted(
+            ((os.path.relpath(path, self.root_folder), entry) for path, entry in staged.items()),
+            key=lambda item: item[0],
+        ):
+            print(f"  {rel_path} [{action}]")
 
     def cmd_add(self, paths: list[str]):
         """
@@ -117,11 +185,10 @@ class Version():
         if not os.path.isfile(db_path):
             sys.exit("No dsi-vcs repo found. Run 'init' first.")
 
-        conn = open_db(self.root_folder)
-        cur  = conn.cursor()
-        added_at   = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        staged     = 0
+        staged = 0
         skip_names = {DB_NAME, SNAPSHOTS_DIR}
+        stage_entries = []
+        txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         def stage_path(abs_path: str):
             nonlocal staged
@@ -131,13 +198,16 @@ class Version():
                 print(f"  [skip] {abs_path}: path does not exist")
                 return
 
-            cur.execute(
-                "INSERT OR REPLACE INTO staging (root_folder, absolute_path, action, added_at) "
-                "VALUES (?, ?, ?, ?)",
-                (self.root_folder, abs_path, "add", added_at)
+            stage_entries.append(
+                {
+                    "file_path": abs_path,
+                    "operation": OperationType.FILE_ADD,
+                    "chunk_hash": None,
+                    "chunk_ref": None,
+                    "extra_metadata": {"staging_action": "add"},
+                }
             )
-            if cur.rowcount:
-                staged += 1
+            staged += 1
 
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
@@ -154,27 +224,11 @@ class Version():
             else:
                 stage_path(abs_path)
 
-        conn.commit()
-        conn.close()
+        if stage_entries:
+            self.repo_log.append_many(stage_entries, transaction_id=txn_id)
+
         print(f"  {staged} path(s) added to staging.")
-        """Show files currently in the staging area."""
-        root_folder = os.path.abspath(self.root_folder)
-        conn = open_db(root_folder)
-        rows = conn.execute(
-            "SELECT absolute_path, action, added_at FROM staging "
-            "WHERE root_folder=? ORDER BY absolute_path",
-            (root_folder,)
-        ).fetchall()
-        conn.close()
-
-        if not rows:
-            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
-            return
-
-        print(f"Staged paths ({len(rows)}):")
-        for r in rows:
-            rel = os.path.relpath(r["absolute_path"], root_folder)
-            print(f"  {rel} [{r['action']}]")
+        self._print_staged_paths()
 
     def cmd_delete(self, paths: list[str]):
         """Stage path(s) for deletion in the next commit."""
@@ -182,42 +236,28 @@ class Version():
         if not os.path.isfile(db_path):
             sys.exit("No dsi-vcs repo found. Run 'init' first.")
 
-        conn = open_db(self.root_folder)
-        cur = conn.cursor()
-        added_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         staged = 0
+        stage_entries = []
+        txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
-            cur.execute(
-                "INSERT OR REPLACE INTO staging (root_folder, absolute_path, action, added_at) "
-                "VALUES (?, ?, ?, ?)",
-                (self.root_folder, abs_path, "delete", added_at)
+            stage_entries.append(
+                {
+                    "file_path": abs_path,
+                    "operation": OperationType.FILE_DELETE,
+                    "chunk_hash": None,
+                    "chunk_ref": None,
+                    "extra_metadata": {"staging_action": "delete"},
+                }
             )
-            if cur.rowcount:
-                staged += 1
+            staged += 1
 
-        conn.commit()
-        conn.close()
+        if stage_entries:
+            self.repo_log.append_many(stage_entries, transaction_id=txn_id)
+
         print(f"  {staged} path(s) staged for deletion.")
-        """Show files currently in the staging area."""
-        root_folder = os.path.abspath(self.root_folder)
-        conn = open_db(root_folder)
-        rows = conn.execute(
-            "SELECT absolute_path, action, added_at FROM staging "
-            "WHERE root_folder=? ORDER BY absolute_path",
-            (root_folder,)
-        ).fetchall()
-        conn.close()
-
-        if not rows:
-            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
-            return
-
-        print(f"Staged paths ({len(rows)}):")
-        for r in rows:
-            rel = os.path.relpath(r["absolute_path"], root_folder)
-            print(f"  {rel} [{r['action']}]")
+        self._print_staged_paths()
 
     def cmd_remove(self, paths: list[str]):
         """Remove path(s) from the staging area without touching the actual files."""
@@ -226,45 +266,122 @@ class Version():
         if not os.path.isfile(db_path):
             sys.exit("No dsi-vcs repo found. Run 'init' first.")
 
-        conn = open_db(self.root_folder)
-        cur  = conn.cursor()
         removed = 0
+        stage_entries = []
+        txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(root_folder, raw))
-            cur.execute(
-                "DELETE FROM staging WHERE root_folder=? AND absolute_path=?",
-                (root_folder, abs_path)
+            stage_entries.append(
+                {
+                    "file_path": abs_path,
+                    "operation": OperationType.FILE_REMOVE,
+                    "chunk_hash": None,
+                    "chunk_ref": None,
+                    "extra_metadata": {"staging_action": "remove", "staging_op": "remove"},
+                }
             )
-            if cur.rowcount:
-                rel = os.path.relpath(abs_path, root_folder)
-                print(f"  Unstaged: {rel}")
-                removed += 1
-            else:
-                rel = os.path.relpath(abs_path, root_folder)
-                print(f"  [not staged] {rel}")
+            removed += 1
 
+        if stage_entries:
+            self.repo_log.append_many(stage_entries, transaction_id=txn_id)
+
+        print(f"  {removed} path(s) removed from staging.")
+        self._print_staged_paths()
+
+    def _get_latest_branch_name(self, conn) -> Optional[str]:
+        row = conn.execute(
+            "SELECT branch_name FROM branches WHERE root_folder=? AND is_latest=1 LIMIT 1",
+            (self.root_folder,),
+        ).fetchone()
+        return row["branch_name"] if row else None
+
+    def cmd_branch(self, branch_name: str, start_point: Optional[str] = None):
+        """Create a branch at the specified commit or latest commit."""
+        conn = open_db(self.root_folder)
+        cur = conn.cursor()
+
+        if not branch_name or not branch_name.strip():
+            conn.close()
+            sys.exit("Branch name is required.")
+
+        target_commit = start_point or "latest"
+        if target_commit == "latest":
+            row = cur.execute(
+                "SELECT commit_hash FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
+                (self.root_folder,),
+            ).fetchone()
+        else:
+            row = cur.execute(
+                "SELECT commit_hash FROM versions WHERE root_folder=? AND commit_hash LIKE ?",
+                (self.root_folder, target_commit + "%"),
+            ).fetchone()
+
+        if not row:
+            conn.close()
+            sys.exit(f"Commit '{target_commit}' not found.")
+
+        commit_hash = row["commit_hash"]
+        now = _utcnow()
+        latest_branch_name = self._get_latest_branch_name(conn)
+        if latest_branch_name != branch_name:
+            conn.execute(
+                "UPDATE branches SET is_latest=0 WHERE root_folder=? AND branch_name<>?",
+                (self.root_folder, latest_branch_name),
+            )
+            cur.execute(
+                "INSERT OR IGNORE INTO branches (root_folder, branch_name, head_commit_hash, is_latest, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (self.root_folder, branch_name, commit_hash, 1, now),
+            )
         conn.commit()
         conn.close()
-        print(f"  {removed} path(s) removed from staging.")
-        """Show files currently in the staging area."""
-        root_folder = os.path.abspath(root_folder)
-        conn = open_db(root_folder)
-        rows = conn.execute(
-            "SELECT absolute_path, action, added_at FROM staging "
-            "WHERE root_folder=? ORDER BY absolute_path",
-            (root_folder,)
-        ).fetchall()
+        print(f"Created branch '{branch_name}' at {commit_hash[:12]}")
+
+
+    def cmd_merge(self, branch_name: str, target_commit: Optional[str] = None):
+        """Merge the named branch into the current HEAD by recording a parent-child link."""
+        conn = open_db(self.root_folder)
+        cur = conn.cursor()
+
+        branch_row = cur.execute(
+            "SELECT head_commit_hash FROM branches WHERE root_folder=? AND branch_name=?",
+            (self.root_folder, branch_name),
+        ).fetchone()
+        if not branch_row:
+            conn.close()
+            sys.exit(f"Branch '{branch_name}' not found.")
+
+        if target_commit is None or target_commit == "latest":
+            head_row = cur.execute(
+                "SELECT commit_hash FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
+                (self.root_folder,),
+            ).fetchone()
+        else:
+            head_row = cur.execute(
+                "SELECT commit_hash FROM versions WHERE root_folder=? AND commit_hash LIKE ?",
+                (self.root_folder, target_commit + "%"),
+            ).fetchone()
+
+        if not head_row:
+            conn.close()
+            sys.exit(f"Commit '{target_commit or 'latest'}' not found.")
+
+        parent_commit_hash = branch_row["head_commit_hash"]
+        child_commit_hash = head_row["commit_hash"]
+        now = _utcnow()
+        cur.execute(
+            "INSERT OR IGNORE INTO branch_links (parent_commit_hash, child_commit_hash, child_branch_name, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (parent_commit_hash, child_commit_hash, branch_name, now),
+        )
+        cur.execute(
+            "UPDATE branches SET head_commit_hash=?, created_at=? WHERE root_folder=? AND branch_name=?",
+            (child_commit_hash, now, self.root_folder, branch_name),
+        )
+        conn.commit()
         conn.close()
-
-        if not rows:
-            print("Nothing staged. Use 'add <path>...' or 'delete <path>...' to stage paths.")
-            return
-
-        print(f"Staged paths ({len(rows)}):")
-        for r in rows:
-            rel = os.path.relpath(r["absolute_path"], root_folder)
-            print(f"  {rel} [{r['action']}]")
+        print(f"Merged branch '{branch_name}' into {child_commit_hash[:12]}")
 
     def cmd_commit(self, message: str = ""):
         db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
@@ -274,18 +391,14 @@ class Version():
         conn = open_db(self.root_folder)
         cur = conn.cursor()
 
-        # ── Load staged paths ────────────────────────────────────────────────────
-        staged_rows = cur.execute(
-            "SELECT absolute_path, action FROM staging WHERE root_folder = ? ORDER BY absolute_path",
-            (self.root_folder,)
-        ).fetchall()
-
-        if not staged_rows:
+        # ── Load staged paths from the repository log ─────────────────────────
+        pending_entries = self._load_pending_stage_entries()
+        if not pending_entries:
             conn.close()
             sys.exit("Nothing staged. Use 'add' or 'delete' before committing.")
 
-        staged_adds = [r["absolute_path"] for r in staged_rows if r["action"] == "add"]
-        staged_deletes = [r["absolute_path"] for r in staged_rows if r["action"] == "delete"]
+        staged_adds = [path for path, (_record, action) in pending_entries.items() if action == "add"]
+        staged_deletes = [path for path, (_record, action) in pending_entries.items() if action == "delete"]
 
         # ── Previous snapshot for hard-link deduplication ────────────────────────
         prev_row = cur.execute(
@@ -296,12 +409,12 @@ class Version():
         prev_snapshot = prev_row["snapshot_path"] if prev_row else None
         parent_commit_hash = prev_row["commit_hash"] if prev_row else None
 
-        committed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        committed_at = _utcnow()
         running_user = owner_name(os.getuid())
         snapshots_root = os.path.join(self.root_folder, SNAPSHOTS_DIR)
 
         # ── Validate staged paths before creating the snapshot ─────────────────
-        print(f"Validating {len(staged_rows)} staged path(s)…")
+        print(f"Validating {len(staged_adds) + len(staged_deletes)} staged path(s)…")
         valid_staged = len(staged_deletes)
         for abs_path in staged_adds:
             e = collect_metadata(abs_path, self.root_folder)
@@ -314,15 +427,24 @@ class Version():
             conn.close()
             sys.exit("No readable staged paths — commit aborted.")
 
-        # ── Create a complete snapshot of the current repository tree ───────────
+        # ── Create a snapshot from the previous commit and overlay staged paths ─
         tmp_snapshot_path = tempfile.mkdtemp(prefix=".tmp-", dir=snapshots_root)
         print(f"  Creating rsync snapshot → {tmp_snapshot_path}")
 
-        ok = rsync_snapshot(self.root_folder, tmp_snapshot_path, prev_snapshot)
+        if prev_snapshot and os.path.isdir(prev_snapshot):
+            ok = rsync_snapshot(prev_snapshot, tmp_snapshot_path)
+        else:
+            ok = True
         if not ok:
             conn.close()
             shutil.rmtree(tmp_snapshot_path, ignore_errors=True)
             sys.exit("rsync failed — commit aborted.")
+
+        for abs_path in staged_adds:
+            if not rsync_path_to_snapshot(self.root_folder, tmp_snapshot_path, abs_path):
+                conn.close()
+                shutil.rmtree(tmp_snapshot_path, ignore_errors=True)
+                sys.exit("rsync failed — commit aborted.")
 
         try:
             apply_snapshot_deletes(tmp_snapshot_path, self.root_folder, staged_deletes)
@@ -358,10 +480,10 @@ class Version():
         # ── Insert version row ───────────────────────────────────────────────────
         cur.execute(
             """INSERT INTO versions
-            (root_folder, commit_hash, root_tree_hash, parent_commit_hash, hash_algorithm,
+            (root_folder, commit_hash, root_tree_hash, hash_algorithm,
                 committed_at, owner_name, message, snapshot_path, file_count, total_bytes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (self.root_folder, commit_hash, root_tree_hash, parent_commit_hash, HASH_ALGORITHM,
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (self.root_folder, commit_hash, root_tree_hash, HASH_ALGORITHM,
             committed_at, running_user, message, snapshot_path, file_count, total_bytes)
         )
         version_id = cur.lastrowid
@@ -411,9 +533,38 @@ class Version():
             ]
         )
 
-        # ── Clear staging after a successful commit ──────────────────────────────
-        cur.execute("DELETE FROM staging WHERE root_folder=?", (self.root_folder,))
+        commit_records = [record for record, _action in sorted(
+            pending_entries.values(), key=lambda item: item[0].sequence
+        )]
+        self.repo_log.commit(commit_records)
 
+        branch_name = self._get_latest_branch_name(conn) or "main"
+        branch_row = conn.execute(
+            "SELECT 1 FROM branches WHERE root_folder=? LIMIT 1",
+            (self.root_folder,),
+        ).fetchone()
+        if not branch_row:
+            conn.execute(
+                "INSERT INTO branches (root_folder, branch_name, head_commit_hash, is_latest, created_at) VALUES (?, ?, ?, ?, ?)",
+                (self.root_folder, branch_name, commit_hash, 1, committed_at),
+            )
+            conn.execute(
+                "INSERT INTO branch_links (parent_commit_hash, child_commit_hash, child_branch_name, created_at) VALUES (?, ?, ?, ?)",
+                (None, commit_hash, branch_name, committed_at),
+            )
+        else:
+            conn.execute(
+                "UPDATE branches SET is_latest=0 WHERE root_folder=? AND branch_name<>?",
+                (self.root_folder, branch_name),
+            )
+            conn.execute(
+                "UPDATE branches SET is_latest=1, head_commit_hash=?, created_at=? WHERE root_folder=? AND branch_name=?",
+                (commit_hash, committed_at, self.root_folder, branch_name),
+            )
+            conn.execute(
+                "INSERT INTO branch_links (parent_commit_hash, child_commit_hash, child_branch_name, created_at) VALUES (?, ?, ?, ?)",
+                (parent_commit_hash, commit_hash, branch_name, committed_at),
+            )
         conn.commit()
         conn.close()
 
@@ -424,25 +575,132 @@ class Version():
             print(f"  Message    : {message}")
 
 
-    def cmd_log(self):
+    def cmd_list_branch(self):
+        """List all known branches and their current head commit."""
+        conn = open_db(self.root_folder)
+        rows = conn.execute(
+            "SELECT branch_name, head_commit_hash, created_at FROM branches WHERE root_folder=? ORDER BY branch_name",
+            (self.root_folder,),
+        ).fetchall()
+        conn.close()
+
+        if not rows:
+            print("No branches yet.")
+            return
+
+        print("Branches:")
+        for row in rows:
+            short_hash = row["head_commit_hash"][:12] if row["head_commit_hash"] else "(none)"
+            print(f"  - {row['branch_name']} @ {short_hash}  ({row['created_at']})")
+
+    def cmd_switch(self, branch_name: str):
+        """Switch the working tree to the named branch's latest snapshot."""
+        conn = open_db(self.root_folder)
+        branch_row = conn.execute(
+            "SELECT branch_name, head_commit_hash FROM branches WHERE root_folder=? AND branch_name=?",
+            (self.root_folder, branch_name),
+        ).fetchone()
+
+        if not branch_row:
+            conn.close()
+            sys.exit(f"Branch '{branch_name}' not found.")
+
+        old_branch = self._get_latest_branch_name(conn)
+        if old_branch == branch_name:
+            conn.close()
+            print(f"Already on branch '{branch_name}'. No switch needed.")
+            return
+        
+        conn.execute(
+            "UPDATE branches SET is_latest=0 WHERE root_folder=? AND branch_name<>?",
+            (self.root_folder, old_branch),
+        )
+        conn.execute(
+            "UPDATE branches SET is_latest=1 WHERE root_folder=? AND branch_name=?",
+            (self.root_folder, branch_name),
+        )
+        conn.commit()
+
+        # current_commit_hash = branch_row["head_commit_hash"]
+        # while True:
+        #     link_row = conn.execute(
+        #         "SELECT child_commit_hash FROM branch_links WHERE root_folder=? AND parent_commit_hash=? AND child_branch_name=? ORDER BY id DESC LIMIT 1",
+        #         (self.root_folder, current_commit_hash, branch_name),
+        #     ).fetchone()
+        #     if not link_row:
+        #         break
+        #     current_commit_hash = link_row["child_commit_hash"]
+
+        # version_row = conn.execute(
+        #     "SELECT commit_hash, snapshot_path FROM versions WHERE root_folder=? AND commit_hash=? ORDER BY id DESC LIMIT 1",
+        #     (self.root_folder, current_commit_hash),
+        # ).fetchone()
+        version_row = conn.execute(
+            "SELECT commit_hash, snapshot_path FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
+            (self.root_folder,),
+        ).fetchone()
+        conn.close()
+
+        if not version_row:
+            sys.exit(f"No commit found for branch '{branch_name}'.")
+
+        snapshot = version_row["snapshot_path"]
+        if not os.path.isdir(snapshot):
+            sys.exit(f"Snapshot directory missing: {snapshot}")
+
+        print(f"Switching to branch '{branch_name}' at {version_row['commit_hash'][:12]}")
+        cmd = ["rsync", "-aAXH", "--delete", "--exclude", DB_NAME, "--exclude", SNAPSHOTS_DIR]
+        if sys.platform == "darwin":
+            cmd = ["rsync", "-aEH", "--delete", "--exclude", DB_NAME, "--exclude", SNAPSHOTS_DIR]
+
+        cmd += [snapshot.rstrip("/") + "/", self.root_folder.rstrip("/") + "/"]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode not in (0, 24):
+            sys.exit(f"rsync switch failed:\n{result.stderr}")
+
+        print(f"Restored branch snapshot into {self.root_folder}")
+
+    def cmd_log(self, branch_name: str = None):
         root_folder = os.path.abspath(self.root_folder)
         conn = open_db(root_folder)
+
+        if branch_name is None:
+            branch_name = self._get_latest_branch_name(conn)
+
+        branch_row = conn.execute(
+            "SELECT head_commit_hash FROM branches WHERE root_folder=? AND branch_name=?",
+            (root_folder, branch_name),
+        ).fetchone()
+        if not branch_row:
+            conn.close()
+            sys.exit(f"Branch '{branch_name}' not found.")
         rows = conn.execute(
             "SELECT commit_hash, committed_at, owner_name, message, file_count, total_bytes "
-            "FROM versions WHERE root_folder=? ORDER BY id",
-            (root_folder,)
+            "FROM versions, branch_links ON versions.commit_hash = branch_links.child_commit_hash "
+            "WHERE branch_links.child_branch_name=? ORDER BY versions.committed_at DESC",
+            (branch_name,),
         ).fetchall()
+
         conn.close()
 
         if not rows:
             print("No versions yet. Run 'commit' first.")
             return
 
-        print(f"{'COMMIT HASH':<66} {'OWNER':<16} {'DATE/TIME (UTC)':<28} {'FILES':>7} {'BYTES':>15}  MESSAGE")
-        print("─" * 132)
+        if branch_name:
+            print(f"Branch log: {branch_name}")
+        elif branch_row:
+            print(f"Branch log: {branch_row['branch_name']}")
+        else:
+            print("Branch log: default/latest")
+
+        print("─" * 90)
+        print(f"{'COMMIT HASH':<14} {'OWNER':<12} {'DATE/TIME (UTC)':<28} {'FILES':>7} {'BYTES':>15}  MESSAGE")
+        print("─" * 90)
         for r in rows:
             msg = (r["message"] or "")[:35]
-            print(f"{r['commit_hash']:<66} {r['owner_name']:<16} {r['committed_at']:<28}"
+            ctime = ns_to_datetime_parts(r["committed_at"]).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+            print(f"{r['commit_hash'][:12]:<14} {r['owner_name']:<12} {ctime:<28}"
                 f"{r['file_count']:>7} {r['total_bytes']:>15,}  {msg}")
 
 

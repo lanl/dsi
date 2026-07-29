@@ -1290,6 +1290,10 @@ class DSI():
           -  remove                          # remove file(s) from the staging area without touching the actual files
           -  delete                          # delete file(s) from the staging area for the next commit
           -  commit                          # commit a new version with the staged file(s) and an optional message describing the version
+          -  branch                          # create a new branch with an optional starting point (commit hash)
+          -  merge                           # merge a branch into the current branch with an optional target commit hash
+          -  list-branch                     # list all branches in the versioning repository
+          -  switch                          # switch to a different branch in the versioning repository
           -  log                             # list versions
           -  diff                            # diff between two versions. If no version is provided, diff the current version with the previous version
           -  restore                         # restore a version with commit hash
@@ -1300,6 +1304,10 @@ class DSI():
           -  remove: A required argument with the file(s) to remove from the staging area without touching the actual files, specified as a space-separated string or list of file paths.
           -  delete: A required argument with the file(s) to delete from the staging area for the next commit, specified as a space-separated string or list of file paths.
           -  commit: An optional message describing the version being committed, specified as a string.
+          -  branch: An optional argument to specify the name of the new branch, specified as a string.
+          -  merge: An optional argument to specify the branch to merge into the current branch, specified as a string.
+          -  list-branch: No additional arguments are required for this command.
+          -  switch: A required argument to specify the branch to switch to, specified as a string.
           -  log: An optional argument to specify the number of recent versions to display, specified as an integer. If not provided, recent 5 versions are displayed.
           -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
           -  restore: A required argument to specify the version to restore, specified by its commit hash.
@@ -1312,7 +1320,6 @@ class DSI():
         elif command == "add" and self.vcs is not None:
             if args is None:
                 raise RuntimeError("version() ERROR: 'add' command requires a 'files' argument specifying the file(s) to add to the staging area for the next commit.")
-            print("-->" + self.vcs.root_folder)
             self.vcs.cmd_add(args.split())
         elif command == "remove" and self.vcs is not None:
             if args is None:
@@ -1324,6 +1331,26 @@ class DSI():
             self.vcs.cmd_delete(args.split())
         elif command == "commit" and self.vcs is not None:
             self.vcs.cmd_commit(args)
+        elif command == "branch" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'branch' command requires a 'branch_name' argument.")
+            arg_list = args.split(maxsplit=1)
+            branch_name = arg_list[0]
+            start_point = arg_list[1] if len(arg_list) > 1 else None
+            self.vcs.cmd_branch(branch_name, start_point)
+        elif command == "merge" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'merge' command requires a 'branch_name' argument.")
+            arg_list = args.split(maxsplit=1)
+            branch_name = arg_list[0]
+            target_commit = arg_list[1] if len(arg_list) > 1 else None
+            self.vcs.cmd_merge(branch_name, target_commit)
+        elif command == "list-branch" and self.vcs is not None:
+            self.vcs.cmd_list_branch()
+        elif command == "switch" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'switch' command requires a 'branch_name' argument.")
+            self.vcs.cmd_switch(args)
         elif command == "diff" and self.vcs is not None:
             c1 = None
             c2 = None
@@ -1337,7 +1364,8 @@ class DSI():
                     raise RuntimeError("version() ERROR: 'diff' command requires zero, one, or two commit hashes as arguments.")
             self.vcs.cmd_diff(c1, c2)
         elif command == "log" and self.vcs is not None:
-            self.vcs.cmd_log()
+            self.vcs.cmd_log(args)
+            print("---->", args)
         elif command == "restore" and self.vcs is not None:
             if args is None:
                 raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
