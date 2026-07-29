@@ -91,8 +91,8 @@ class Gufi(Filesystem):
             con.enable_load_extension(False)
 
             dsi_column_names = ",".join(self.dsi_columns)
-            gufi_column_names = ",".join((["rpath(sname, sroll, name) AS fullpath"] + self.gufi_columns[1:]
-                                    if self.gufi_columns[0] == "fullpath" else self.gufi_columns))
+            gufi_column_names = ",".join(["rpath(sname, sroll, name) AS fullpath"] + self.gufi_columns[1:]
+                                    if self.gufi_columns[0] == "fullpath" else self.gufi_columns)
             query=f"""
             CREATE VIRTUAL TABLE uview USING gufi_vt(
                 threads=64,

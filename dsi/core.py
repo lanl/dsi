@@ -116,10 +116,9 @@ class Terminal:
         # "DSI Modules" are Python Classes
         class_collector = []
         # Below, "module" refers to Python modules,
-        for python_module, classlist in self.module_collection[mod_type].items():
+        for classlist in self.module_collection[mod_type].values():
             # In the next line, both "class" and VALID_MODULES refer to DSI modules.
-            class_collector.extend(
-                [x for x in dir(classlist) if x in self.VALID_MODULES])
+            class_collector.extend([x for x in dir(classlist) if x in self.VALID_MODULES])
         return (class_collector)
 
     def load_module(self, mod_type, mod_name, mod_function, **kwargs):
@@ -226,7 +225,7 @@ class Terminal:
                                         str_list.append(f'{val}')
                                     table_metadata[colName] = str_list
                         if table_name == "dsi_units":
-                            incorrect_cols = set(["table_name", "column_name", "unit"]).issubset(table_metadata.keys())
+                            incorrect_cols = {"table_name", "column_name", "unit"}.issubset(table_metadata)
                             if len(table_metadata.keys()) != 3 or not incorrect_cols:
                                 if self.debug_level != 0:
                                     self.logger.error("   'dsi_units' table columns MUST be: 'table_name', 'column_name', 'unit'")

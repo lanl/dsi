@@ -164,7 +164,7 @@ class ER_Diagram(FileWriter):
             try:
                 dot.render(self.output_filename, cleanup=True)
             except Exception:
-                raise EnvironmentError("Graphviz executable must be downloaded to global environment using sudo or homebrew.")
+                raise OSError("Graphviz executable must be downloaded to global environment using sudo or homebrew.")
 
 class Csv_Writer(FileWriter):
     """
@@ -280,8 +280,7 @@ class Table_Plot(FileWriter):
             if not any(isinstance(item, str) for item in colData):
                 all_num_col = [0 if item is None else item for item in colData]
                 unit = ""
-                if "dsi_units" in collection.keys(): 
-                    if self.table_name in collection["dsi_units"].keys() and colName in collection["dsi_units"][self.table_name].keys():
+                if colName in collection.get("dsi_units", {}).get(self.table_name, {}):
                         unit = collection["dsi_units"][self.table_name][colName]
                         unit = f" ({unit})"
                 numeric_cols.append((colName + unit, all_num_col))

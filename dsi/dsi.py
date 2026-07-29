@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 logger = logging.getLogger(__name__)
 
-class DSI():
+class DSI:
     '''
     A user-facing interface for DSI's Core middleware.
 
@@ -126,7 +126,7 @@ class DSI():
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
             try:
-                self.read_only_flag = getattr(backend_class, "read_only")
+                self.read_only_flag = backend_class.read_only
             except AttributeError:
                 raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
             
@@ -136,7 +136,6 @@ class DSI():
 
                 if backend_name.lower() == "ndp":
                     backend_name = "NDP"
-                    correct_backend = True
                 
                     # NDP only accepts params dict or list of dicts format
                     if 'params' not in kwargs:
@@ -687,7 +686,7 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         if not isinstance(query, str):
-            raise RuntimeError("find() ERROR: Input must be a string.")
+            raise TypeError("find() ERROR: Input must be a string.")
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if not any(op in query for op in operators):
             raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
@@ -852,7 +851,7 @@ class DSI():
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         if not isinstance(collection, pd.DataFrame):
-            raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
+            raise TypeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
             raise RuntimeError("update() ERROR: The 'dsi_table_name' column was not found. Ensure you set 'update'=True in the function that returned this collection")
         elif 'dsi_table_name' in collection.columns:

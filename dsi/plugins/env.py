@@ -71,9 +71,7 @@ class GitInfo(Environment):
             from git import Repo
             self.repo = Repo(git_repo_path, search_parent_directories=True)
         except git.exc.InvalidGitRepositoryError:
-            raise Exception(f"Git could not find .git/ in {git_repo_path}, " +
-                            "GitInfo Plugin must be given a repo base path " +
-                            "(default is working dir)")
+            raise Exception(f"Git could not find .git/ in {git_repo_path}. GitInfo must be given a repo base path (default is working dir)")
         self.git_info = {
             "git_remote": lambda: self.repo.git.remote("-v"),
             "git_commit": lambda: self.repo.git.rev_parse("--short", "HEAD")
@@ -207,7 +205,7 @@ class SystemKernel(Environment):
         sep = "END MODINFO"
         modinfo_command = ["/sbin/modinfo $(lsmod | tail -n +2 | awk '{print $1}' | \
                            sed 's/nvidia_/nvidia-current-/g' | \
-                           sed 's/^nvidia$/nvidia-current/g') | "
+                           sed 's/^nvidia$/nvidia-current/g') | ",
                            f"sed -e 's/filename:/{sep}filename:/g'"]
         modinfos = self.get_cmd_output(
             modinfo_command, ignore_stderr=True).split("\n" + sep)
