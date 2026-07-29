@@ -117,6 +117,25 @@ def test_commit_records_active_branch_name_in_branch_links(tmp_path):
     assert rows[1]["child_branch_name"] == "feature"
 
 
+def test_chunking_persists_chunks_to_disk(tmp_path):
+    require_rsync()
+    repo = Version(str(tmp_path))
+
+    data = "A" * (2 * 1024 * 1024 + 7)
+    (tmp_path / "big.bin").write_bytes(data.encode("utf-8"))
+    repo.cmd_add(["big.bin"])
+    repo.cmd_commit("chunked")
+
+    with connect_repo(tmp_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT chunk_hash, chunk_path FROM chunk_store").fetchall()
+
+    assert rows
+    for row in rows:
+        assert Path(row["chunk_path"]).exists()
+        assert Path(row["chunk_path"]).stat().st_size > 0
+
+
 def test_switch_restores_branch_snapshot(tmp_path):
     require_rsync()
     repo = Version(str(tmp_path))

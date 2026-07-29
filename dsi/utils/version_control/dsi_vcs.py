@@ -25,6 +25,7 @@ import sys
 import subprocess
 import json
 import datetime
+import hashlib
 import shutil
 import tempfile
 from typing import Optional
@@ -34,8 +35,32 @@ from .vcs_metadata_helper import collect_metadata, collect_tree_metadata, owner_
 from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
 from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
 from .repolog.repository_log import RepositoryLog
+from .repolog.chunking import CHUNK_STORAGE_DIR, chunk_file
 
 # ─────────────────────────── RSYNC SNAPSHOT ──────────────────────────────────
+def store_chunks_for_snapshot(snapshot_path: str, conn, chunk_root: str, commit_hash: str) -> None:
+    chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    for dirpath, dirnames, filenames in os.walk(snapshot_path, followlinks=False):
+        dirnames[:] = [d for d in dirnames if d not in {DB_NAME, SNAPSHOTS_DIR}]
+        for filename in filenames:
+            if filename in {DB_NAME, SNAPSHOTS_DIR}:
+                continue
+            file_path = os.path.join(dirpath, filename)
+            if not os.path.isfile(file_path):
+                continue
+
+            for i, chunk in enumerate(chunk_file(file_path)):
+                chunk_path = os.path.join(chunk_dir, chunk['sha256'])
+                if not os.path.exists(chunk_path):
+                    with open(chunk_path, "wb") as handle:
+                        handle.write(chunk['data'])
+                conn.execute(
+                    "INSERT OR IGNORE INTO chunk_store "
+                    "(chunk_hash, chunk_size, created_at, commit_hash, relative_file_path, chunk_index) VALUES (?, ?, ?, ?, ?, ?)",
+                    (chunk['sha256'], chunk['size'], _utcnow(), commit_hash, os.path.relpath(file_path, snapshot_path), i),
+                )
 
 def rsync_snapshot(
     root_folder: str,
@@ -487,6 +512,8 @@ class Version():
             committed_at, running_user, message, snapshot_path, file_count, total_bytes)
         )
         version_id = cur.lastrowid
+
+        store_chunks_for_snapshot(snapshot_path, conn, snapshots_root, commit_hash)
 
         # ── Bulk-insert file entries ─────────────────────────────────────────────
         cols = [

@@ -107,6 +107,16 @@ CREATE TABLE IF NOT EXISTS branch_links (
     UNIQUE(parent_commit_hash, child_commit_hash, child_branch_name)
 );
 
+CREATE TABLE IF NOT EXISTS chunk_store (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    chunk_hash           TEXT    NOT NULL UNIQUE,
+    chunk_size           INTEGER NOT NULL,
+    created_at           INTEGER NOT NULL,
+    commit_hash          TEXT NOT NULL,
+    relative_file_path   TEXT NOT NULL,
+    chunk_index          INTEGER NOT NULL
+);
+
 """
 
 
