@@ -15,6 +15,7 @@ import pytest
 
 from dsi.backends.ndp import NDP
 
+pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
 # =============================================================================
 # Fixtures

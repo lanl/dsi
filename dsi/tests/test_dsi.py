@@ -8,6 +8,8 @@ from collections import OrderedDict
 import hashlib
 import pytest
 
+pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
+
 def test_list_functions():
     test = DSI()
     test.list_backends()
@@ -2041,9 +2043,5 @@ def test_ndp_schema(ndp_dsi_basic):
 
 def test_ndp_num_datasets(ndp_dsi_basic):
     """Test num_datasets() on NDP backend"""
-    f = io.StringIO()
-    with redirect_stdout(f):
-        ndp_dsi_basic.num_datasets()
-    output = f.getvalue()
-    
-    assert "datasets" in output.lower() or "10" in output or "loaded" in output.lower() or len(output) > 0
+    num_datasets = ndp_dsi_basic.num_datasets()
+    assert num_datasets > 0

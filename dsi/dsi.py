@@ -246,7 +246,9 @@ class DSI:
         if n.validate_connection(only_validate=True):
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
         print()
-        
+
+
+
     def schema(self, filename = None):
         """
         Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
@@ -299,6 +301,8 @@ class DSI:
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 return self.t.get_schema()
+
+
 
     def list_readers(self):
         """
@@ -718,12 +722,7 @@ class DSI:
                 ending_ind = warn_msg.find("in this database")
                 warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
             print("\n"+warn_msg.replace("database", "backend"))
-            return [] if not collection else pd.DataFrame()
-        
-        # Handle empty results
-        if not find_data or len(find_data) == 0:
-            print(f"No matches found for '{query}'")
-            return []
+            return None
 
         table_name = None
         output_df = None
@@ -1240,7 +1239,9 @@ class DSI:
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-    
+
+
+
     def num_datasets(self): # ADDED NEW
         """
         Prints the number of datasets in the active backend.
@@ -1248,7 +1249,7 @@ class DSI:
         For NDP backend: returns the count of rows in the datasets table.
         For other backends: equivalent to num_tables().
         """
-        if not self.t.valid_backend(self.main_backend_obj, self.main_backend_obj.__class__.__bases__[0].__name__):
+        if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot call num_datasets() on an empty backend. Please ensure there is data in it.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call num_datasets() until all associated data is loaded after a complex schema")
@@ -1265,7 +1266,9 @@ class DSI:
         else:
             # Fall back to num_tables for other backends
            return self.num_tables()
-            
+
+
+
     def validate_urls(self): # ADDED NEW
         """
         Validates URLs in the resources table (NDP backend only).
@@ -1297,7 +1300,9 @@ class DSI:
             if e.args:
                 e.args = (f'validate_urls() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-        
+
+
+
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Prints data from a specified table in the active backend.
