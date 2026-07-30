@@ -2034,11 +2034,6 @@ def test_ndp_schema(ndp_dsi_basic):
     assert isinstance(schema, str)
     assert "CREATE TABLE" in schema
     assert "datasets" in schema
-    
-    dataset_schema = ndp_dsi_basic.schema(filename="datasets")
-    assert isinstance(dataset_schema, str)
-    assert "CREATE TABLE datasets" in dataset_schema
-    assert "title" in dataset_schema
 
 
 def test_ndp_num_datasets(ndp_dsi_basic):

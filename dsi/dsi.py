@@ -136,16 +136,7 @@ class DSI:
 
                 if backend_name.lower() == "ndp":
                     backend_name = "NDP"
-                
-                    # NDP only accepts params dict or list of dicts format
-                    if 'params' not in kwargs:
-                        raise ValueError(
-                            "NDP backend requires a 'params' dictionary or list of dictionaries.\n"
-                            "Single query example: DSI(backend_name='NDP', params={'keywords': 'temperature', 'limit': 5})\n"
-                            "Multiple queries example: DSI(backend_name='NDP', params=[{'keywords': 'temp'}, {'organization': 'NASA'}])"
-                        )
-                    
-                    query_params = kwargs.pop('params')
+                    query_params = kwargs.pop('params', None)
                     
                     # Validate params is a dict or list of dicts
                     if isinstance(query_params, dict):
@@ -254,9 +245,8 @@ class DSI:
         Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
 
         `filename` : str, optional
-            - If ends with .json -> loads relational schema file
-            - If matches a table name -> returns CREATE TABLE for that table only
-            - If None -> returns CREATE TABLE for all tables
+            Path to a JSON file describing the relationships of the tables in a database.
+            The schema should follow the format described in :ref:`user_schema_example_label`
         
         `return` : If filename = None, returns the structural schema of this backend - table/col names and their units.
         **If loading a relational schema, this function must be called before reading in any associated data files**
@@ -295,9 +285,7 @@ class DSI:
 
             msg = f"Successfully loaded the schema file: {filename}"
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-        
         else:
-            # This is a schema viewing operation (all tables or specific table)
             fnull = open(os.devnull, 'w')
             with redirect_stdout(fnull):
                 return self.t.get_schema()
@@ -1266,40 +1254,6 @@ class DSI:
         else:
             # Fall back to num_tables for other backends
            return self.num_tables()
-
-
-
-    def validate_urls(self): # ADDED NEW
-        """
-        Validates URLs in the resources table (NDP backend only).
-        
-        Adds a 'url_valid' boolean column indicating URL accessibility.
-        
-        Raises
-        ------
-        RuntimeError
-            If called on a non-NDP backend
-        """
-        if self.main_backend_obj.__class__.__name__ != "NDP":
-            raise RuntimeError(
-                "validate_urls() ERROR: This method is only available for the NDP backend.\n"
-                f"Current backend: {self.main_backend_obj.__class__.__name__}"
-            )
-        
-        if not hasattr(self.main_backend_obj, 'validate_urls'):
-            raise RuntimeError(
-                "validate_urls() ERROR: NDP backend does not have validate_urls() method. "
-                "Please update your DSI installation."
-            )
-        
-        try:
-            self.main_backend_obj.validate_urls()
-            msg = "Validated all resource URLs"
-            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-        except Exception as e:
-            if e.args:
-                e.args = (f'validate_urls() ERROR: {str(e.args[0])}',) + e.args[1:]
-            raise
 
 
 
