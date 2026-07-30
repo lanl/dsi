@@ -1,4 +1,7 @@
 import hashlib
+import os
+from typing import Any, Optional
+from .log_record import _utcnow
 
 # -----------------------------
 # Rolling hash parameters
@@ -81,6 +84,33 @@ def chunk_file(path):
 
     return chunks
 
+# ─────────────────────────── CHUNK-BASED STORAGE ───────────────────────────
+def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any]]) -> tuple[dict[str, str], set]:
+    chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
+    os.makedirs(chunk_dir, exist_ok=True)
+    file_hashes = {}
+    chunk_hashes = set()
+    for entry in entries:
+
+        file_path = entry['absolute_path']
+        if not os.path.isfile(file_path):
+            continue
+
+        h = hashlib.sha256()
+        for i, chunk in enumerate(chunk_file(file_path)):
+            chunk_path = os.path.join(chunk_dir, chunk['sha256'])
+            h.update(chunk['sha256'].encode('utf-8'))
+            if not os.path.exists(chunk_path):
+                with open(chunk_path, "wb") as handle:
+                    handle.write(chunk['data'])
+            conn.execute(
+                "INSERT OR IGNORE INTO chunk_store "
+                "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index) VALUES (?, ?, ?, ?, ?)",
+                (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i),
+            )
+            chunk_hashes.add(chunk['sha256'])
+        file_hashes[entry['relative_path']] = h.hexdigest()
+    return file_hashes, chunk_hashes
 
 if __name__ == "__main__":
     chunks = chunk_file("tests/wildfiredata.csv")

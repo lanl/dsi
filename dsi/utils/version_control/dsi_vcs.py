@@ -35,67 +35,7 @@ from .vcs_metadata_helper import collect_metadata, collect_tree_metadata, owner_
 from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
 from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
 from .repolog.repository_log import RepositoryLog
-from .repolog.chunking import CHUNK_STORAGE_DIR, chunk_file
-
-# ─────────────────────────── RSYNC SNAPSHOT ──────────────────────────────────
-def store_chunks_for_snapshot(snapshot_path: str, conn, chunk_root: str, commit_hash: str) -> None:
-    chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
-    os.makedirs(chunk_dir, exist_ok=True)
-
-    for dirpath, dirnames, filenames in os.walk(snapshot_path, followlinks=False):
-        dirnames[:] = [d for d in dirnames if d not in {DB_NAME, SNAPSHOTS_DIR}]
-        for filename in filenames:
-            if filename in {DB_NAME, SNAPSHOTS_DIR}:
-                continue
-            file_path = os.path.join(dirpath, filename)
-            if not os.path.isfile(file_path):
-                continue
-
-            for i, chunk in enumerate(chunk_file(file_path)):
-                chunk_path = os.path.join(chunk_dir, chunk['sha256'])
-                if not os.path.exists(chunk_path):
-                    with open(chunk_path, "wb") as handle:
-                        handle.write(chunk['data'])
-                conn.execute(
-                    "INSERT OR IGNORE INTO chunk_store "
-                    "(chunk_hash, chunk_size, created_at, commit_hash, relative_file_path, chunk_index) VALUES (?, ?, ?, ?, ?, ?)",
-                    (chunk['sha256'], chunk['size'], _utcnow(), commit_hash, os.path.relpath(file_path, snapshot_path), i),
-                )
-
-def rsync_snapshot(
-    root_folder: str,
-    dest_path: str,
-    prev_snapshot: Optional[str] = None,
-) -> bool:
-    """
-    Copy the full root_folder tree to dest_path using rsync hard-link deduplication.
-    If prev_snapshot is provided, unchanged files are hard-linked (saves disk).
-    """
-    os.makedirs(dest_path, exist_ok=True)
-    cmd = ["rsync", "-aAXH"] # for linux
-    if sys.platform == "darwin":
-        cmd = ["rsync", "-aEH"] # for macOS
-
-    if prev_snapshot and os.path.isdir(prev_snapshot):
-        cmd += ["--link-dest", os.path.abspath(prev_snapshot)]
-
-    cmd += [
-        "--delete",
-        "--exclude", DB_NAME,
-        "--exclude", SNAPSHOTS_DIR,
-    ]
-
-    cmd += [
-        root_folder.rstrip("/") + "/",
-        dest_path.rstrip("/") + "/",
-    ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode not in (0, 24):   # 24 = some files vanished (ok)
-        print(f"[rsync error] {result.stderr.strip()}", file=sys.stderr)
-        return False
-    return True
-
+from .repolog.chunking import CHUNK_STORAGE_DIR, store_chunks_for_snapshot
 
 def snapshot_target(snapshot_path: str, relative_path: str) -> str:
     target = os.path.abspath(os.path.join(snapshot_path, relative_path))
@@ -104,45 +44,62 @@ def snapshot_target(snapshot_path: str, relative_path: str) -> str:
         raise ValueError(f"Snapshot path escapes snapshot root: {relative_path}")
     return target
 
-
-def apply_snapshot_deletes(snapshot_path: str, root_folder: str, staged_deletes: list[str]) -> None:
-    for abs_path in staged_deletes:
-        rel_path = os.path.relpath(abs_path, root_folder)
-        if rel_path in ("", "."):
-            raise ValueError("Refusing to stage repository root for deletion.")
-        target = snapshot_target(snapshot_path, rel_path)
-        if os.path.isdir(target) and not os.path.islink(target):
-            shutil.rmtree(target)
-        elif os.path.lexists(target):
-            os.unlink(target)
-
-
-def rsync_path_to_snapshot(
-    root_folder: str,
-    snapshot_path: str,
-    abs_path: str,
-) -> bool:
+def copy_path_into_snapshot(root_folder: str, snapshot_path: str, abs_path: str) -> None:
     rel_path = os.path.relpath(abs_path, root_folder)
     if rel_path in ("", "."):
-        return True
+        return
 
     target = snapshot_target(snapshot_path, rel_path)
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-
-    cmd = ["rsync", "-aAXH"]
-    if sys.platform == "darwin":
-        cmd = ["rsync", "-aEH"]
-
-    if os.path.isdir(abs_path):
-        cmd += [abs_path.rstrip("/") + "/", target.rstrip("/") + "/"]
+    if os.path.isdir(abs_path) and not os.path.islink(abs_path):
+        shutil.copytree(abs_path, target, dirs_exist_ok=True, symlinks=True)
     else:
-        cmd += [abs_path, target]
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy2(abs_path, target)
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode not in (0, 24):
-        print(f"[rsync error] {result.stderr.strip()}", file=sys.stderr)
-        return False
-    return True
+
+def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tree: str) -> None:
+    if not commit_hash:
+        os.makedirs(target_tree, exist_ok=True)
+        return
+
+    chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
+    rows = conn.execute(
+        "SELECT chunk_hash, relative_file_path, chunk_index FROM chunk_store "
+        "WHERE commit_hash=? ORDER BY relative_file_path, chunk_index",
+        (commit_hash,),
+    ).fetchall()
+
+    grouped: dict[str, list[tuple[str, int]]] = {}
+    for row in rows:
+        grouped.setdefault(row["relative_file_path"], []).append((row["chunk_hash"], row["chunk_index"]))
+
+    for rel_path, chunks in grouped.items():
+        data = bytearray()
+        for chunk_hash, _chunk_index in sorted(chunks, key=lambda item: item[1]):
+            chunk_path = os.path.join(chunk_dir, chunk_hash)
+            if not os.path.exists(chunk_path):
+                continue
+            with open(chunk_path, "rb") as handle:
+                data.extend(handle.read())
+        if not data:
+            continue
+        target_path = snapshot_target(target_tree, rel_path)
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        with open(target_path, "wb") as handle:
+            handle.write(data)
+
+
+def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
+    # for entry in os.listdir(root_folder):
+    #     if entry in {DB_NAME, SNAPSHOTS_DIR}:
+    #         continue
+    #     path = os.path.join(root_folder, entry)
+    #     if os.path.isdir(path) and not os.path.islink(path):
+    #         shutil.rmtree(path)
+    #     elif os.path.lexists(path):
+    #         os.unlink(path)
+
+    rebuild_tree_from_chunks(conn, commit_hash, chunk_root, root_folder)
 
 
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
@@ -217,7 +174,7 @@ class Version():
 
         def stage_path(abs_path: str):
             nonlocal staged
-            abs_path = os.path.abspath(abs_path)
+            rel_path = os.path.relpath(abs_path)
 
             if not os.path.lexists(abs_path):
                 print(f"  [skip] {abs_path}: path does not exist")
@@ -225,7 +182,7 @@ class Version():
 
             stage_entries.append(
                 {
-                    "file_path": abs_path,
+                    "file_path": rel_path,
                     "operation": OperationType.FILE_ADD,
                     "chunk_hash": None,
                     "chunk_ref": None,
@@ -321,6 +278,22 @@ class Version():
         ).fetchone()
         return row["branch_name"] if row else None
 
+    def _get_latest_commit_of_branch(self, conn, branch_name: str) -> Optional[str]:
+        row = conn.execute(
+            "SELECT child_commit_hash FROM branch_links WHERE child_branch_name=? ORDER BY created_at DESC LIMIT 1",
+            (branch_name,),
+        ).fetchone()
+        return row["child_commit_hash"] if row else None
+    
+    def _get_entries_in_commit(self, conn, commit_hash: str) -> list[dict]:
+        rows = conn.execute(
+            "SELECT relative_path, file_type, node_hash "
+            "FROM merkle_nodes, versions "
+            "WHERE merkle_nodes.version_id = versions.id AND versions.root_folder = ? AND versions.commit_hash = ? AND merkle_nodes.relative_path <> '.'",
+            (self.root_folder, commit_hash),
+        ).fetchall()
+        return [row['relative_path'] for row in rows]
+
     def cmd_branch(self, branch_name: str, start_point: Optional[str] = None):
         """Create a branch at the specified commit or latest commit."""
         conn = open_db(self.root_folder)
@@ -332,9 +305,11 @@ class Version():
 
         target_commit = start_point or "latest"
         if target_commit == "latest":
+            current_branch_name = self._get_latest_branch_name(conn)
+            parent_commit_hash = self._get_latest_commit_of_branch(conn, current_branch_name)
             row = cur.execute(
-                "SELECT commit_hash FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
-                (self.root_folder,),
+                "SELECT commit_hash FROM versions WHERE root_folder=? AND commit_hash=?",
+                (self.root_folder, parent_commit_hash),
             ).fetchone()
         else:
             row = cur.execute(
@@ -378,9 +353,11 @@ class Version():
             sys.exit(f"Branch '{branch_name}' not found.")
 
         if target_commit is None or target_commit == "latest":
+            current_branch_name = self._get_latest_branch_name(conn)
+            parent_commit_hash = self._get_latest_commit_of_branch(conn, current_branch_name)
             head_row = cur.execute(
-                "SELECT commit_hash FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
-                (self.root_folder,),
+                "SELECT commit_hash FROM versions WHERE root_folder=? AND commit_hash=?",
+                (self.root_folder, parent_commit_hash),
             ).fetchone()
         else:
             head_row = cur.execute(
@@ -425,18 +402,13 @@ class Version():
         staged_adds = [path for path, (_record, action) in pending_entries.items() if action == "add"]
         staged_deletes = [path for path, (_record, action) in pending_entries.items() if action == "delete"]
 
-        # ── Previous snapshot for hard-link deduplication ────────────────────────
-        prev_row = cur.execute(
-            "SELECT commit_hash, snapshot_path FROM versions "
-            "WHERE root_folder=? ORDER BY id DESC LIMIT 1",
-            (self.root_folder,)
-        ).fetchone()
-        prev_snapshot = prev_row["snapshot_path"] if prev_row else None
-        parent_commit_hash = prev_row["commit_hash"] if prev_row else None
+        current_branch_name = self._get_latest_branch_name(conn)
+        parent_commit_hash = self._get_latest_commit_of_branch(conn, current_branch_name)
 
         committed_at = _utcnow()
         running_user = owner_name(os.getuid())
         snapshots_root = os.path.join(self.root_folder, SNAPSHOTS_DIR)
+        entries_in_last_commit = set(self._get_entries_in_commit(conn, parent_commit_hash) if parent_commit_hash else [])
 
         # ── Validate staged paths before creating the snapshot ─────────────────
         print(f"Validating {len(staged_adds) + len(staged_deletes)} staged path(s)…")
@@ -452,40 +424,25 @@ class Version():
             conn.close()
             sys.exit("No readable staged paths — commit aborted.")
 
-        # ── Create a snapshot from the previous commit and overlay staged paths ─
-        tmp_snapshot_path = tempfile.mkdtemp(prefix=".tmp-", dir=snapshots_root)
-        print(f"  Creating rsync snapshot → {tmp_snapshot_path}")
+        for added_paths in staged_adds:
+            entries_in_last_commit.add(added_paths)
+        for deleted_paths in staged_deletes:
+            entries_in_last_commit.remove(deleted_paths)
 
-        if prev_snapshot and os.path.isdir(prev_snapshot):
-            ok = rsync_snapshot(prev_snapshot, tmp_snapshot_path)
-        else:
-            ok = True
-        if not ok:
-            conn.close()
-            shutil.rmtree(tmp_snapshot_path, ignore_errors=True)
-            sys.exit("rsync failed — commit aborted.")
+        # ── Build a temporary view of the committed tree from the current worktree ─
+        ## TODO: Remove the need for a temporary snapshot directory by building the Merkle tree directly from the staged entries and the previous commit's Merkle tree.
 
-        for abs_path in staged_adds:
-            if not rsync_path_to_snapshot(self.root_folder, tmp_snapshot_path, abs_path):
-                conn.close()
-                shutil.rmtree(tmp_snapshot_path, ignore_errors=True)
-                sys.exit("rsync failed — commit aborted.")
-
-        try:
-            apply_snapshot_deletes(tmp_snapshot_path, self.root_folder, staged_deletes)
-        except ValueError as e:
-            conn.close()
-            shutil.rmtree(tmp_snapshot_path, ignore_errors=True)
-            sys.exit(str(e))
-
-        # ── Collect metadata for the complete committed tree ───────────────────
-        entries = collect_tree_metadata(tmp_snapshot_path, self.root_folder)
+        # # ── Collect metadata for the complete committed tree ───────────────────
+        entries = []
+        for rel_path in entries_in_last_commit:
+            entries.append(collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder))
 
         total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
         file_count  = sum(1 for e in entries if e.get("file_type") == "file")
         print(f"  {file_count} file(s), {total_bytes:,} bytes")
 
-        root_tree_hash, merkle_nodes = build_merkle_tree(entries, tmp_snapshot_path)
+        file_hashes, chunk_hashes = store_chunks_for_snapshot(conn, snapshots_root, entries)
+        root_tree_hash, merkle_nodes = build_merkle_tree(entries, file_hashes)
         commit_hash = merkle_commit_hash(
             root_tree_hash=root_tree_hash,
             parent_commit_hash=parent_commit_hash,
@@ -495,49 +452,22 @@ class Version():
             file_count=file_count,
             total_bytes=total_bytes,
         )
-        snapshot_path = os.path.join(snapshots_root, commit_hash[:12])
-        if os.path.exists(snapshot_path):
-            conn.close()
-            shutil.rmtree(tmp_snapshot_path, ignore_errors=True)
-            sys.exit(f"Snapshot path already exists for commit prefix: {snapshot_path}")
-        os.rename(tmp_snapshot_path, snapshot_path)
 
+        # ── update chunk store with commit hash ──────────────────────────────────
+        cur.execute(
+            f"UPDATE chunk_store SET commit_hash=? WHERE chunk_hash IN ({','.join('?' for _ in chunk_hashes)})",
+            [commit_hash] + list(chunk_hashes),
+        )
         # ── Insert version row ───────────────────────────────────────────────────
         cur.execute(
             """INSERT INTO versions
             (root_folder, commit_hash, root_tree_hash, hash_algorithm,
-                committed_at, owner_name, message, snapshot_path, file_count, total_bytes)
-            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                committed_at, owner_name, message, file_count, total_bytes)
+            VALUES (?,?,?,?,?,?,?,?,?)""",
             (self.root_folder, commit_hash, root_tree_hash, HASH_ALGORITHM,
-            committed_at, running_user, message, snapshot_path, file_count, total_bytes)
+            committed_at, running_user, message, file_count, total_bytes)
         )
         version_id = cur.lastrowid
-
-        store_chunks_for_snapshot(snapshot_path, conn, snapshots_root, commit_hash)
-
-        # ── Bulk-insert file entries ─────────────────────────────────────────────
-        cols = [
-            "version_id", "root_folder", "relative_path", "absolute_path",
-            "file_name", "file_type", "md5_hash",
-            "lstat",
-            "permissions_int", "owner_name", "group_name",
-            "acl_text", "xattrs", "security_context", "symlink_target",
-        ]
-        placeholders = ",".join("?" * len(cols))
-        col_str      = ",".join(cols)
-
-        cur.executemany(
-            f"INSERT INTO file_entries ({col_str}) VALUES ({placeholders})",
-            [
-                tuple(
-                    version_id  if c == "version_id"  else
-                    self.root_folder if c == "root_folder" else
-                    e.get(c)
-                    for c in cols
-                )
-                for e in entries
-            ]
-        )
 
         merkle_cols = [
             "version_id", "root_folder", "relative_path", "file_type",
@@ -640,7 +570,7 @@ class Version():
         
         conn.execute(
             "UPDATE branches SET is_latest=0 WHERE root_folder=? AND branch_name<>?",
-            (self.root_folder, old_branch),
+            (self.root_folder, branch_name),
         )
         conn.execute(
             "UPDATE branches SET is_latest=1 WHERE root_folder=? AND branch_name=?",
@@ -648,43 +578,22 @@ class Version():
         )
         conn.commit()
 
-        # current_commit_hash = branch_row["head_commit_hash"]
-        # while True:
-        #     link_row = conn.execute(
-        #         "SELECT child_commit_hash FROM branch_links WHERE root_folder=? AND parent_commit_hash=? AND child_branch_name=? ORDER BY id DESC LIMIT 1",
-        #         (self.root_folder, current_commit_hash, branch_name),
-        #     ).fetchone()
-        #     if not link_row:
-        #         break
-        #     current_commit_hash = link_row["child_commit_hash"]
+        latest_commit_hash = self._get_latest_commit_of_branch(conn, branch_name)
+        if not latest_commit_hash:
+            conn.close()
+            sys.exit(f"No commit found for branch '{branch_name}'.")
 
-        # version_row = conn.execute(
-        #     "SELECT commit_hash, snapshot_path FROM versions WHERE root_folder=? AND commit_hash=? ORDER BY id DESC LIMIT 1",
-        #     (self.root_folder, current_commit_hash),
-        # ).fetchone()
         version_row = conn.execute(
-            "SELECT commit_hash, snapshot_path FROM versions WHERE root_folder=? ORDER BY id DESC LIMIT 1",
-            (self.root_folder,),
+            "SELECT commit_hash FROM versions WHERE root_folder=? AND commit_hash=? ORDER BY id DESC LIMIT 1",
+            (self.root_folder, latest_commit_hash),
         ).fetchone()
-        conn.close()
 
         if not version_row:
             sys.exit(f"No commit found for branch '{branch_name}'.")
 
-        snapshot = version_row["snapshot_path"]
-        if not os.path.isdir(snapshot):
-            sys.exit(f"Snapshot directory missing: {snapshot}")
-
         print(f"Switching to branch '{branch_name}' at {version_row['commit_hash'][:12]}")
-        cmd = ["rsync", "-aAXH", "--delete", "--exclude", DB_NAME, "--exclude", SNAPSHOTS_DIR]
-        if sys.platform == "darwin":
-            cmd = ["rsync", "-aEH", "--delete", "--exclude", DB_NAME, "--exclude", SNAPSHOTS_DIR]
-
-        cmd += [snapshot.rstrip("/") + "/", self.root_folder.rstrip("/") + "/"]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode not in (0, 24):
-            sys.exit(f"rsync switch failed:\n{result.stderr}")
-
+        materialize_commit_to_worktree(conn, version_row["commit_hash"], os.path.join(self.root_folder, SNAPSHOTS_DIR), self.root_folder)
+        conn.close()
         print(f"Restored branch snapshot into {self.root_folder}")
 
     def cmd_log(self, branch_name: str = None):
@@ -756,14 +665,16 @@ class Version():
 
         def get_version(chash):
             if chash == "latest":
+                current_branch_name = self._get_latest_branch_name(conn)
+                parent_commit_hash = self._get_latest_commit_of_branch(conn, current_branch_name)
                 row = conn.execute(
-                    "SELECT id, commit_hash, snapshot_path, root_tree_hash FROM versions "
-                    "WHERE root_folder=? ORDER BY id DESC LIMIT 1",
-                    (root_folder,)
+                    "SELECT id, commit_hash, root_tree_hash FROM versions "
+                    "WHERE root_folder=? AND commit_hash=?",
+                    (root_folder, parent_commit_hash)
                 ).fetchone()
             else:
                 row = conn.execute(
-                    "SELECT id, commit_hash, snapshot_path, root_tree_hash FROM versions "
+                    "SELECT id, commit_hash, root_tree_hash FROM versions "
                     "WHERE root_folder = ? AND commit_hash LIKE ?",
                     (root_folder, chash + "%")
                 ).fetchone()
@@ -776,36 +687,19 @@ class Version():
             vid = get_version(chash)
             return get_files_for_version(vid)
 
-        def get_files_for_version(version, only_paths: Optional[set[str]] = None):
-            path_filter = None if only_paths is None else sorted(only_paths)
-            if path_filter == []:
-                return {}
-
-            rows = []
-            base_sql = (
-                "SELECT relative_path, absolute_path, file_type, md5_hash, permissions_int, "
-                "       owner_name, group_name, lstat "
-                "FROM file_entries WHERE version_id=?"
-            )
-            if path_filter is None:
-                rows = conn.execute(base_sql, (version["id"],)).fetchall()
-            else:
-                for i in range(0, len(path_filter), 500):
-                    chunk = path_filter[i:i + 500]
-                    placeholders = ",".join("?" * len(chunk))
-                    rows.extend(
-                        conn.execute(
-                            f"{base_sql} AND relative_path IN ({placeholders})",
-                            (version["id"], *chunk),
-                        ).fetchall()
-                    )
-
-            snapshot_path = version["snapshot_path"]
+        def get_files_for_version(vid, only_paths: Optional[set[str]] = None):
             result = {}
-            for r in rows:
+            
+            entries_in_commit = self._get_entries_in_commit(conn, vid["commit_hash"])
+            entries = []
+            for rel_path in entries_in_commit:
+                if rel_path in (only_paths if only_paths is not None else entries_in_commit):
+                    entries.append(collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder))
+
+            result = {}
+            for r in entries:
                 rec = dict(r)
-                # Unpack the lstat JSON so callers can access st_size, st_mtime, etc.
-                rec["absolute_path"] = snapshot_target(snapshot_path, r["relative_path"])
+                rec["absolute_path"] = r["absolute_path"]
                 rec["lstat"] = json.loads(r["lstat"]) if r["lstat"] else {}
                 result[r["relative_path"]] = rec
             return result
@@ -880,8 +774,8 @@ class Version():
         files1 = files2 = {}
         unchanged = 0
         if c1 is None and c2 is None:
-            files1 = get_files_in_root_folder()
-            files2 = get_files("latest")
+            files2 = get_files_in_root_folder()
+            files1 = get_files("latest")
         elif c1 is None:
             files1 = get_files_in_root_folder()
             files2 = get_files(c2)
@@ -900,6 +794,8 @@ class Version():
         all_paths = sorted(set(files1) | set(files2))
         added = deleted = modified = 0
 
+        c1 = "working tree" if c1 is None else c1
+        c2 = "latest" if c2 is None else c2
         print(f"Diff {c1} → {c2}  ({root_folder})\n")
         print(f"{'STATUS':<10} {'PATH'}")
         print("─" * 70)
@@ -951,25 +847,13 @@ class Version():
             "WHERE root_folder = ? AND commit_hash LIKE ?",
             (root_folder, commit_hash + "%")
         ).fetchone()
-        conn.close()
 
         if not row:
+            conn.close()
             sys.exit(f"Commit '{commit_hash}' not found.")
 
         full_hash = row["commit_hash"]
-        snapshot = row["snapshot_path"]
-        if not os.path.isdir(snapshot):
-            sys.exit(f"Snapshot directory missing: {snapshot}")
-
-        print(f"Restoring {commit_hash} from {snapshot} → {root_folder}")
-        cmd = [
-            "rsync", "-aAXH", "--delete",
-            "--exclude", DB_NAME,
-            "--exclude", SNAPSHOTS_DIR,
-            snapshot.rstrip("/") + "/",
-            root_folder.rstrip("/") + "/",
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode not in (0, 24):
-            sys.exit(f"rsync restore failed:\n{result.stderr}")
+        print(f"Restoring {commit_hash} from chunk store → {root_folder}")
+        materialize_commit_to_worktree(conn, full_hash, os.path.join(root_folder, SNAPSHOTS_DIR), root_folder)
+        conn.close()
         print(f" Restored to {full_hash}")

@@ -229,7 +229,7 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
         "symlink_target":   os.readlink(abs_path) if ftype == "symlink" else None,
 
         # content hash — regular files only
-        "md5_hash": md5_hash(abs_path) if ftype == "file" else None,
+        "md5_hash": None,
 
         # convenience shortcut used by walk_folder aggregation (not stored)
         "_st_size": s.st_size,

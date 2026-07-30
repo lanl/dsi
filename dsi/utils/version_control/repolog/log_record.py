@@ -167,7 +167,7 @@ class LogRecord(BaseModel):
     kind: RecordKind
 
     # DATA-kind fields -----------------------------------------------------
-    file_path: Optional[str] = None
+    file_path: Optional[str] = None # this is relative path
     chunk_ref: Optional[str] = Field(
         default=None,
         description="Affected chunk or byte-range/region identifier within the file.",

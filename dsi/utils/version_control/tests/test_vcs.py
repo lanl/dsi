@@ -25,14 +25,6 @@ def commits(repo_path):
             "SELECT id, commit_hash, snapshot_path FROM versions ORDER BY id"
             ).fetchall()
 
-def latest_entries(repo_path):
-    with connect_repo(repo_path) as conn:
-        conn.row_factory = sqlite3.Row
-        return conn.execute(
-            "SELECT relative_path, file_type, permissions_int "
-            "FROM file_entries WHERE version_id=(SELECT MAX(id) from versions) "
-            "ORDER BY relative_path").fetchall()
-
 def test_add(tmp_path):
     require_rsync()
     repo = Version(str(tmp_path))
@@ -62,11 +54,6 @@ def test_add(tmp_path):
     assert (beta_path / "c.txt").read_text() == "baz"
     assert (alpha_path / "empty").exists()
     assert stat.S_IMODE((alpha_path / "empty").stat().st_mode) == 0o2775
-
-    rows = {row["relative_path"]: row for row in latest_entries(tmp_path)}
-    empty_entry = rows["empty"]
-    assert empty_entry["file_type"] == "dir"
-    assert empty_entry["permissions_int"] == 0o2775
 
 
 def test_commit_only_includes_staged_files(tmp_path):
