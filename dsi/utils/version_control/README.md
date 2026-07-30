@@ -1,8 +1,8 @@
-# dsi-vcs: rsync-based File Version Control with Full Linux Metadata
+# dsi-vcs: Content Version Control with Full Linux Metadata
 
 ## Overview
 
-**dsi-vcs** is a lightweight file version control system designed for capturing and preserving complete Linux file metadata. Unlike traditional VCS tools, dsi-vcs focuses on:
+**dsi-vcs** is a lightweight content (Large data file, code) version control system designed for capturing and preserving complete Linux file metadata. Unlike traditional VCS tools, dsi-vcs focuses on:
 
 - **Full metadata capture**: permissions, ownership, ACLs, extended attributes, and SELinux contexts
 - **Rolling hash chunking**: Uses a rolling hash for efficient file chunking and deduplication
@@ -125,22 +125,22 @@ Example output:
 
 ```shell
 Diff f826177ae78f4e48a8c08054e2bb9a71 → latest  (./root_folder)  
-                                                    
-STATUS     PATH                                     
+                                                  
+STATUS     PATH                                   
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                        
-MODIFIED   file_schema.json  [owner]                
-diff result: 2c2                                    
-<    "genesis_datacard": {                          
----                                                 
->    2"genesis_datacard": {                         
-26c26                                               
-< }                                                 
-\ No newline at end of file                         
----                                                 
-> }                                                 
-MODIFIED   schema2.json  [content, size]            
-                                                    
+MODIFIED   file_new  [owner]                      
+MODIFIED   file_schema.json  [owner]              
+diff result: 2c2                                  
+<    "genesis_datacard": {                        
+---                                               
+>    2"genesis_datacard": {                       
+26c26                                             
+< }                                               
+\ No newline at end of file                       
+---                                               
+> }                                               
+MODIFIED   schema2.json  [content, size]          
+                                                  
 Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged 
 ```
 
@@ -370,27 +370,26 @@ dsi.version("diff")
 
 ## Database Schema
 
-
 ### `versions` Table
 
 Stores metadata for each committed version.
 
-| Column          | Type       | Description                                  |
-| --------------- | ---------- | -------------------------------------------- |
-| id              | INTEGER PK | Auto-increment ID                            |
-| root_folder     | TEXT       | Repository root path                         |
-| commit_hash     | TEXT       | SHA-256 Merkle commit hash                   |
-| root_tree_hash  | TEXT       | SHA-256 hash of root tree                    |
-| hash_algorithm  | TEXT       | Merkle format identifier                     |
-| committed_at    | INTEGER    | UTC timestamp (seconds since epoch)          |
-| owner_name      | TEXT       | Username of the committer                    |
-| message         | TEXT       | Optional commit message                      |
-| file_count      | INTEGER    | Number of files in commit                    |
-| total_bytes     | INTEGER    | Total size in bytes                          |
+| Column         | Type       | Description                         |
+| -------------- | ---------- | ----------------------------------- |
+| id             | INTEGER PK | Auto-increment ID                   |
+| root_folder    | TEXT       | Repository root path                |
+| commit_hash    | TEXT       | SHA-256 Merkle commit hash          |
+| root_tree_hash | TEXT       | SHA-256 hash of root tree           |
+| hash_algorithm | TEXT       | Merkle format identifier            |
+| committed_at   | INTEGER    | UTC timestamp (seconds since epoch) |
+| owner_name     | TEXT       | Username of the committer           |
+| message        | TEXT       | Optional commit message             |
+| file_count     | INTEGER    | Number of files in commit           |
+| total_bytes    | INTEGER    | Total size in bytes                 |
 
 **Constraints:**
-- `UNIQUE(root_folder, commit_hash)`
 
+- `UNIQUE(root_folder, commit_hash)`
 
 ### `merkle_nodes` Table
 
@@ -399,7 +398,7 @@ Stores the content-addressed tree node for each committed path, including the sy
 | Column              | Type       | Description                                        |
 | ------------------- | ---------- | -------------------------------------------------- |
 | id                  | INTEGER PK | Auto-increment                                     |
-| version_id          | INTEGER FK | References `versions(id)` ON DELETE CASCADE        |
+| version_id          | INTEGER FK | References `versions(id)` ON DELETE CASCADE      |
 | root_folder         | TEXT       | Partition key                                      |
 | relative_path       | TEXT       | Path relative to root                              |
 | file_type           | TEXT       | file/dir/symlink/etc                               |
@@ -411,9 +410,11 @@ Stores the content-addressed tree node for each committed path, including the sy
 | child_count         | INTEGER    | For directories: immediate children; Files: chunks |
 
 **Constraints:**
+
 - `UNIQUE(version_id, relative_path)`
 
 **Indexes:**
+
 - `idx_merkle_nodes_root_path` ON `(root_folder, version_id, relative_path)`
 - `idx_merkle_nodes_hash` ON `(root_folder, node_hash)`
 
@@ -423,16 +424,17 @@ Stores the content-addressed tree node for each committed path, including the sy
 
 Tracks branch information and their HEAD commits.
 
-| Column           | Type       | Description                           |
-| ---------------- | ---------- | ------------------------------------- |
-| id               | INTEGER PK | Auto-increment ID                     |
-| root_folder      | TEXT       | Repository root path                  |
-| branch_name      | TEXT       | Name of the branch                    |
-| head_commit_hash | TEXT       | Commit hash at the HEAD of the branch |
+| Column           | Type       | Description                                |
+| ---------------- | ---------- | ------------------------------------------ |
+| id               | INTEGER PK | Auto-increment ID                          |
+| root_folder      | TEXT       | Repository root path                       |
+| branch_name      | TEXT       | Name of the branch                         |
+| head_commit_hash | TEXT       | Commit hash at the HEAD of the branch      |
 | is_latest        | INTEGER    | Flag indicating if this is latest (0 or 1) |
-| created_at       | INTEGER    | UTC timestamp (seconds since epoch)   |
+| created_at       | INTEGER    | UTC timestamp (seconds since epoch)        |
 
 **Constraints:**
+
 - `UNIQUE(root_folder, branch_name)`
 
 ---
@@ -450,6 +452,7 @@ Stores parent-child relationships between commits across branches.
 | created_at         | INTEGER    | UTC timestamp (seconds since epoch)   |
 
 **Constraints:**
+
 - `UNIQUE(parent_commit_hash, child_commit_hash, child_branch_name)`
 
 ---
@@ -458,20 +461,22 @@ Stores parent-child relationships between commits across branches.
 
 Stores content-addressable chunks for deduplicated file storage.
 
-| Column             | Type       | Description                                    |
-| ------------------ | ---------- | ---------------------------------------------- |
-| id                 | INTEGER PK | Auto-increment ID                              |
-| chunk_hash         | TEXT       | Hash of the chunk content                      |
-| chunk_size         | INTEGER    | Size of the chunk in bytes                     |
-| created_at         | INTEGER    | UTC timestamp (seconds since epoch)            |
-| commit_hash        | TEXT       | Commit hash (NULL until commit is finalized)   |
-| relative_file_path | TEXT       | Relative path of the file this chunk belongs to|
-| chunk_index        | INTEGER    | Index of this chunk within the file            |
+| Column             | Type       | Description                                     |
+| ------------------ | ---------- | ----------------------------------------------- |
+| id                 | INTEGER PK | Auto-increment ID                               |
+| chunk_hash         | TEXT       | Hash of the chunk content                       |
+| chunk_size         | INTEGER    | Size of the chunk in bytes                      |
+| created_at         | INTEGER    | UTC timestamp (seconds since epoch)             |
+| commit_hash        | TEXT       | Commit hash (NULL until commit is finalized)    |
+| relative_file_path | TEXT       | Relative path of the file this chunk belongs to |
+| chunk_index        | INTEGER    | Index of this chunk within the file             |
 
 **Constraints:**
+
 - `UNIQUE(chunk_hash, commit_hash)`
 
 **Indexes:**
+
 - `idx_chunk_store_commit_file` ON `(commit_hash, relative_file_path, chunk_index)`
 
 ---
@@ -493,21 +498,25 @@ root_folder/
 ## Features
 
 ### Content-Addressable Storage
+
 - Files are chunked using rolling hash algorithm
 - Chunks are stored once and referenced by hash
 - Deduplication across commits and files
 
 ### Merkle Tree Structure
+
 - Each file and directory has a Merkle node
 - Changes propagate up the tree
 - One Merkle tree per version
 
 ### Branch Management
+
 - Support for multiple branches per repository
 - Track parent-child relationships between commits
 - Branch HEAD pointers maintained automatically
 
 ### Metadata Preservation
+
 - Complete Linux file metadata captured
 - Permissions, ownership, ACLs
 - Extended attributes (xattrs)
