@@ -5,10 +5,11 @@
 **dsi-vcs** is a lightweight file version control system designed for capturing and preserving complete Linux file metadata. Unlike traditional VCS tools, dsi-vcs focuses on:
 
 - **Full metadata capture**: permissions, ownership, ACLs, extended attributes, and SELinux contexts
-- **Rsync-based snapshots**: efficient storage with hard-link deduplication
+- **Rolling hash chunking**: Uses a rolling hash for efficient file chunking and deduplication
 - **Merkle commit chain**: SHA-256 commit IDs with per-path Merkle nodes for pruning unchanged subtrees
+- **Branch support**: Multiple branches with parent-child commit relationships
 - **SQLite database**: structured metadata storage for querying and diffing
-- **Complete file history**: MD5 hashes, file stats, and all metadata changes tracked
+- **Complete file history**: Chunk-based content addressing with full metadata tracking
 
 ---
 
@@ -53,21 +54,55 @@ dsi-vcs commit
 dsi-vcs commit "Initial data import"
 ```
 
+### Branch Management
+
+**Create a new branch:**
+
+```bash
+dsi-vcs branch <branch_name> [<start_point>]
+dsi-vcs branch feature-branch
+dsi-vcs branch hotfix abc123def456
+```
+
+**List all branches:**
+
+```bash
+dsi-vcs list-branch
+```
+
+**Switch to a branch:**
+
+```bash
+dsi-vcs switch <branch_name>
+dsi-vcs switch main
+dsi-vcs switch feature-branch
+```
+
+**Merge a branch:**
+
+```bash
+dsi-vcs merge <branch_name> [<target_commit>]
+dsi-vcs merge feature-branch
+dsi-vcs merge feature-branch abc123def456
+```
+
 ### View History
 
 List all commits:
 
 ```bash
 dsi-vcs log
+dsi-vcs log feature-branch
 ```
 
 Example output:
 
 ```shell
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 COMMIT HASH                        OWNER            DATE/TIME (UTC)                FILES           BYTES  MESSAGE
-────────────────────────────────────────────────────────────────────────────────────────────────────
-f826177ae78f4e48a8c08054e2bb9a71   owner1           2026-04-28T21:10:05.339321+00:00      7          15,557  first commit
-4af9e3d4dc854d699b96b5a84f913ac0   owner2           2026-04-28T21:19:47.167081+00:00      7          15,559  second commit
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+f826177ae78f4e48a8c08054e2bb9a71   owner1           2026-04-28 21:10:05.000 UTC      7          15,557  first commit
+4af9e3d4dc854d699b96b5a84f913ac0   owner2           2026-04-28 21:19:47.000 UTC      7          15,559  second commit
 ```
 
 ### Compare Versions
@@ -89,23 +124,23 @@ dsi-vcs diff f826177ae78f4e48a8c08054e2bb9a71
 Example output:
 
 ```shell
-Diff f826177ae78f4e48a8c08054e2bb9a71 → None  (./root_folder)  
-                                                      
-STATUS     PATH                                       
+Diff f826177ae78f4e48a8c08054e2bb9a71 → latest  (./root_folder)  
+                                                    
+STATUS     PATH                                     
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                          
-MODIFIED   file_schema.json  [owner]                  
-diff result: 2c2                                      
-<    "genesis_datacard": {                            
----                                                   
->    2"genesis_datacard": {                           
-26c26                                                 
-< }                                                   
-\ No newline at end of file                           
----                                                   
-> }                                                   
-MODIFIED   schema2.json  [content, size]              
-                                                      
+MODIFIED   file_new  [owner]                        
+MODIFIED   file_schema.json  [owner]                
+diff result: 2c2                                    
+<    "genesis_datacard": {                          
+---                                                 
+>    2"genesis_datacard": {                         
+26c26                                               
+< }                                                 
+\ No newline at end of file                         
+---                                                 
+> }                                                 
+MODIFIED   schema2.json  [content, size]            
+                                                    
 Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged 
 ```
 
@@ -198,13 +233,64 @@ obj.version("commit")                      # without message
 
 ---
 
+### `branch`
+
+Creates a new branch from a specified commit or current HEAD.
+
+```python
+obj.version("branch", "feature-branch")                    # from current HEAD
+obj.version("branch", "hotfix abc123def456")              # from specific commit
+```
+
+**Args (required):** Branch name, optionally followed by a space and start point commit hash.
+
+---
+
+### `merge`
+
+Merges a branch into the current HEAD.
+
+```python
+obj.version("merge", "feature-branch")                     # merge entire branch
+obj.version("merge", "feature-branch abc123def456")       # merge up to specific commit
+```
+
+**Args (required):** Branch name to merge, optionally followed by a space and target commit hash.
+
+---
+
+### `list-branch`
+
+Lists all branches in the repository.
+
+```python
+obj.version("list-branch")
+```
+
+**Args:** None.
+
+---
+
+### `switch`
+
+Switches to a different branch.
+
+```python
+obj.version("switch", "main")
+obj.version("switch", "feature-branch")
+```
+
+**Args (required):** Name of the branch to switch to.
+
+---
+
 ### `log`
 
 Lists recent committed versions.
 
 ```python
-obj.version("log")       # shows last 5 versions (default)
-obj.version("log", "10") # shows last 10 versions
+obj.version("log")            # shows logs in descending date order
+obj.version("log", "feature") # shows logs from feature branch only
 ```
 
 **Args (optional):** Number of recent versions to display. Defaults to `5`.
@@ -253,7 +339,7 @@ dsi = DSI()
 dsi.version("init", "/data/archive")
 
 # Stage files
-dsi.version("add", ["./documents", "config.json"])
+dsi.version("add", "./documents config.json")
 
 # Commit
 dsi.version("commit", "Initial archive")
@@ -261,9 +347,22 @@ dsi.version("commit", "Initial archive")
 # View history
 dsi.version("log")
 
+# Create a new branch
+dsi.version("branch", "feature-work")
+
+# Switch to the new branch
+dsi.version("switch", "feature-work")
+
 # Modify files and commit again
-dsi.version(["./documents"])
+dsi.version("add", "./documents")
 dsi.version("commit", "Updated documents")
+
+# List all branches
+dsi.version("list-branch")
+
+# Switch back to main and merge
+dsi.version("switch", "main")
+dsi.version("merge", "feature-work")
 
 # Compare two versions
 dsi.version("diff")
@@ -271,75 +370,109 @@ dsi.version("diff")
 
 ## Database Schema
 
+
 ### `versions` Table
 
-| Column        | Type       | Description                 |
-| ------------- | ---------- | --------------------------- |
-| id            | INTEGER PK | Auto-increment ID           |
-| root_folder   | TEXT       | Repository root path        |
-| commit_hash   | TEXT       | SHA-256 Merkle commit hash  |
-| root_tree_hash | TEXT      | SHA-256 hash of root tree   |
-| parent_commit_hash | TEXT | Previous commit hash        |
-| hash_algorithm | TEXT      | Merkle format identifier    |
-| committed_at  | TEXT       | ISO-8601 timestamp          |
-| owner_name    | TEXT       | Username of the committer   |
-| message       | TEXT       | Optional commit message     |
-| snapshot_path | TEXT       | Path to rsync snapshot copy |
-| file_count    | INTEGER    | Number of files in commit   |
-| total_bytes   | INTEGER    | Total size in bytes         |
+Stores metadata for each committed version.
 
-### `file_entries` Table
+| Column          | Type       | Description                                  |
+| --------------- | ---------- | -------------------------------------------- |
+| id              | INTEGER PK | Auto-increment ID                            |
+| root_folder     | TEXT       | Repository root path                         |
+| commit_hash     | TEXT       | SHA-256 Merkle commit hash                   |
+| root_tree_hash  | TEXT       | SHA-256 hash of root tree                    |
+| hash_algorithm  | TEXT       | Merkle format identifier                     |
+| committed_at    | INTEGER    | UTC timestamp (seconds since epoch)          |
+| owner_name      | TEXT       | Username of the committer                    |
+| message         | TEXT       | Optional commit message                      |
+| file_count      | INTEGER    | Number of files in commit                    |
+| total_bytes     | INTEGER    | Total size in bytes                          |
 
-Stores metadata for each file in each commit.
+**Constraints:**
+- `UNIQUE(root_folder, commit_hash)`
 
-| Column           | Type       | Description                      |
-| ---------------- | ---------- | -------------------------------- |
-| id               | INTEGER PK | Auto-increment                   |
-| version_id       | INTEGER FK | References versions(id)          |
-| root_folder      | TEXT       | Partition key                    |
-| relative_path    | TEXT       | Path relative to root            |
-| absolute_path    | TEXT       | Full path                        |
-| file_name        | TEXT       | Filename only                    |
-| file_type        | TEXT       | file/dir/symlink/etc             |
-| md5_hash         | TEXT       | Content hash (files only)        |
-| lstat            | TEXT       | JSON of os.lstat() result        |
-| permissions_int  | INTEGER    | e.g. 755                         |
-| owner_name       | TEXT       | Username                         |
-| group_name       | TEXT       | Group name                       |
-| acl_text         | TEXT       | Raw getfacl output               |
-| xattrs           | TEXT       | JSON dict of extended attributes |
-| security_context | TEXT       | SELinux context                  |
-| symlink_target   | TEXT       | Target of symlink                |
 
 ### `merkle_nodes` Table
 
 Stores the content-addressed tree node for each committed path, including the synthetic root path `.`.
 
-| Column              | Type       | Description                       |
-| ------------------- | ---------- | --------------------------------- |
-| id                  | INTEGER PK | Auto-increment                    |
-| version_id          | INTEGER FK | References versions(id)           |
-| root_folder         | TEXT       | Partition key                     |
-| relative_path       | TEXT       | Path relative to root             |
-| file_type           | TEXT       | file/dir/symlink/etc              |
-| node_hash           | TEXT       | SHA-256 hash for this path node   |
-| metadata_hash       | TEXT       | SHA-256 hash of stable metadata   |
-| content_hash_sha256 | TEXT       | SHA-256 file content hash         |
-| subtree_file_count  | INTEGER    | File count below this node        |
-| subtree_total_bytes | INTEGER    | File bytes below this node        |
-| child_count         | INTEGER    | Direct child count for this node  |
+| Column              | Type       | Description                                        |
+| ------------------- | ---------- | -------------------------------------------------- |
+| id                  | INTEGER PK | Auto-increment                                     |
+| version_id          | INTEGER FK | References `versions(id)` ON DELETE CASCADE        |
+| root_folder         | TEXT       | Partition key                                      |
+| relative_path       | TEXT       | Path relative to root                              |
+| file_type           | TEXT       | file/dir/symlink/etc                               |
+| node_hash           | TEXT       | SHA-256 hash for this path node                    |
+| metadata_hash       | TEXT       | SHA-256 hash of stable metadata                    |
+| content_hash_sha256 | TEXT       | SHA-256 file content hash (NULL for directories)   |
+| subtree_file_count  | INTEGER    | File count below this node                         |
+| subtree_total_bytes | INTEGER    | Total bytes below this node                        |
+| child_count         | INTEGER    | For directories: immediate children; Files: chunks |
 
-### `staging` Table
+**Constraints:**
+- `UNIQUE(version_id, relative_path)`
 
-Temporary storage for files to be committed.
+**Indexes:**
+- `idx_merkle_nodes_root_path` ON `(root_folder, version_id, relative_path)`
+- `idx_merkle_nodes_hash` ON `(root_folder, node_hash)`
 
-| Column        | Type       | Description             |
-| ------------- | ---------- | ----------------------- |
-| id            | INTEGER PK | Auto-increment          |
-| root_folder   | TEXT       | Partition key           |
-| absolute_path | TEXT       | Full file path (UNIQUE) |
-| action        | TEXT       | "add" or "delete"       |
-| added_at      | TEXT       | ISO-8601 timestamp      |
+---
+
+### `branches` Table
+
+Tracks branch information and their HEAD commits.
+
+| Column           | Type       | Description                           |
+| ---------------- | ---------- | ------------------------------------- |
+| id               | INTEGER PK | Auto-increment ID                     |
+| root_folder      | TEXT       | Repository root path                  |
+| branch_name      | TEXT       | Name of the branch                    |
+| head_commit_hash | TEXT       | Commit hash at the HEAD of the branch |
+| is_latest        | INTEGER    | Flag indicating if this is latest (0 or 1) |
+| created_at       | INTEGER    | UTC timestamp (seconds since epoch)   |
+
+**Constraints:**
+- `UNIQUE(root_folder, branch_name)`
+
+---
+
+### `branch_links` Table
+
+Stores parent-child relationships between commits across branches.
+
+| Column             | Type       | Description                           |
+| ------------------ | ---------- | ------------------------------------- |
+| id                 | INTEGER PK | Auto-increment ID                     |
+| parent_commit_hash | TEXT       | Hash of parent commit (NULL for root) |
+| child_commit_hash  | TEXT       | Hash of child commit                  |
+| child_branch_name  | TEXT       | Branch name of the child commit       |
+| created_at         | INTEGER    | UTC timestamp (seconds since epoch)   |
+
+**Constraints:**
+- `UNIQUE(parent_commit_hash, child_commit_hash, child_branch_name)`
+
+---
+
+### `chunk_store` Table
+
+Stores content-addressable chunks for deduplicated file storage.
+
+| Column             | Type       | Description                                    |
+| ------------------ | ---------- | ---------------------------------------------- |
+| id                 | INTEGER PK | Auto-increment ID                              |
+| chunk_hash         | TEXT       | Hash of the chunk content                      |
+| chunk_size         | INTEGER    | Size of the chunk in bytes                     |
+| created_at         | INTEGER    | UTC timestamp (seconds since epoch)            |
+| commit_hash        | TEXT       | Commit hash (NULL until commit is finalized)   |
+| relative_file_path | TEXT       | Relative path of the file this chunk belongs to|
+| chunk_index        | INTEGER    | Index of this chunk within the file            |
+
+**Constraints:**
+- `UNIQUE(chunk_hash, commit_hash)`
+
+**Indexes:**
+- `idx_chunk_store_commit_file` ON `(commit_hash, relative_file_path, chunk_index)`
 
 ---
 
@@ -347,9 +480,36 @@ Temporary storage for files to be committed.
 
 ```
 root_folder/
-└── .dsi_vcs_snapshots/      # rsync snapshot directory
+└── .dsi_vcs_snapshots/      # Snapshot and metadata directory
     ├── .dsi_vcs.db          # SQLite metadata database
-    ├── abc123def456/        # Snapshot for commit abc123def456
-    ├── xyz789abc123/        # Snapshot for commit xyz789abc123
-    └── ...
+    ├── .dsi_vcs_chunks/     # Deduplicated chunk storage (content-addressed)
+    │   ├── ab235232452.     # Chunk file named by hash
+    │   └── de2453453...
+    └── repo-123.log	     # Repository log file maintains append only records
 ```
+
+---
+
+## Features
+
+### Content-Addressable Storage
+- Files are chunked using rolling hash algorithm
+- Chunks are stored once and referenced by hash
+- Deduplication across commits and files
+
+### Merkle Tree Structure
+- Each file and directory has a Merkle node
+- Changes propagate up the tree
+- One Merkle tree per version
+
+### Branch Management
+- Support for multiple branches per repository
+- Track parent-child relationships between commits
+- Branch HEAD pointers maintained automatically
+
+### Metadata Preservation
+- Complete Linux file metadata captured
+- Permissions, ownership, ACLs
+- Extended attributes (xattrs)
+- SELinux security contexts
+- Symbolic link targets
