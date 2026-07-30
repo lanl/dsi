@@ -395,7 +395,7 @@ class Sqlite(Filesystem):
         else:
             raise RuntimeError("Can only run SELECT, PRAGMA, UPDATE, or ALTER queries on the data")
 
-        primary_table = self.get_table_names(query)
+        primary_table = self.get_sql_query_table_name(query)
         if primary_table is None:
             raise ValueError("Query must reference at least one table")
 
@@ -428,7 +428,7 @@ class Sqlite(Filesystem):
 
 
 
-    def get_table_names(self, query):
+    def get_sql_query_table_name(self, query):
         """
         Extracts all table names from a SQL query. Helper function for `query_artifacts()` that users should not call
 
