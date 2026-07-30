@@ -570,7 +570,7 @@ class DSI:
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
             if update:
-                df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+                df.insert(0, "dsi_table_name", df.attrs["table_name"])
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df

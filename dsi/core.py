@@ -1152,36 +1152,7 @@ class Terminal:
             self.table_print_helper(headers, rows, max_rows, num_rows)
             print()
 
-    def get_table_names(self, query):
-        """
-        Extracts and returns all table names referenced in a given query.
 
-        `query` : str
-            A query string written in a database language (typically SQL).
-        """
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.error(f'Getting all table names from the query: {query}')
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend to be able to identify table names in a query for that backend')
-            raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query for that backend')
-        backend = self.loaded_backends[0]
-        start = datetime.now(timezone.utc)
-
-        try:
-            output = backend.get_table_names(query)
-        except Exception as e:
-            if self.debug_level != 0:
-                self.logger.info(f"Error getting table names {e!s}")
-            raise
-        
-        end = datetime.now(timezone.utc)
-        if self.debug_level != 0:
-            self.logger.info(f"Runtime: {end-start}")
-
-        if output is not None and isinstance(output, list):
-            return output
 
     def get_current_abstraction(self, table_name = None):
         """

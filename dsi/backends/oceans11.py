@@ -760,15 +760,10 @@ class Oceans11(Webserver):
 
         return "\n\n".join(schema_lines)
 
-    def get_table_names(self, query):
-        """SQL table-name extraction is not supported for Oceans11."""
-        raise NotImplementedError(
-            "Oceans11 backend has not implemented get_table_names"
-        )
 
-    # ------------------------------------------------------------------
-    # Query Interface
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------
+    # Query Interface (in-memory)
+    # ----------------------------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
         Public query() is not supported for Oceans11 because it is non-SQL.

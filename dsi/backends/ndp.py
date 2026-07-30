@@ -828,38 +828,6 @@ class NDP(Webserver):
         return "\n".join(schema_lines)
 
 
-    def get_table_names(self, query):
-        """
-        Extracts table/dataset names mentioned in a query string.
-        
-        Parameters
-        ----------
-        `query` : str
-            Query string to parse
-        
-        Returns
-        -------
-        list
-            List of dataset names/IDs found in query
-        """
-        if not self._loaded:
-            return []
-        
-        import re
-        
-        pattern = r'\b[a-zA-Z_][a-zA-Z0-9_-]*\b'
-        words = re.findall(pattern, query)
-        
-        found_tables = []
-        for word in words:
-            if word in self._cache:
-                found_tables.append(word)
-            elif word in self._dataset_id_map:
-                found_tables.append(self._dataset_id_map[word])
-        
-        return list(set(found_tables))
-
-
     def overwrite_table(self, table_name, collection):
         """
         Not supported - NDP backend is read-only.

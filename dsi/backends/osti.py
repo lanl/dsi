@@ -587,18 +587,6 @@ class OSTI(Webserver):
         return "\n\n".join(schema_lines)
 
 
-    def get_table_names(self, query):
-        """
-        Extracts table/dataset names mentioned in a query string.
-        
-        `query` : str
-            Query string to parse
-        
-        Return : list
-            List of dataset names/IDs found in query
-        """
-        raise NotImplementedError("OSTI backend has not implemented get_table_names")
-
     # ---------------------------------------------------
     # Query Interface (in-memory)
     # ---------------------------------------------------
