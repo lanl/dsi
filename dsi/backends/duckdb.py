@@ -438,16 +438,19 @@ class DuckDB(Filesystem):
                 raise
         else:
             raise RuntimeError("Can only run SELECT, PRAGMA, UPDATE, or ALTER queries on the data")
-        
+
+        primary_table = self.get_table_names(query)
+        if primary_table is None:
+                    raise ValueError("Query must reference at least one table")
+
         if dict_return:
-            tables = self.get_table_names(query)
-            if len(tables) > 1:
-                raise RuntimeError("Can only return ordered dictionary if querying one table")
-            
             return OrderedDict(data.to_dict(orient='list'))
         else:
+            data.attrs["table_name"] = primary_table
             return data
-    
+
+
+
     def get_table(self, table_name, dict_return = False):
         """
         Retrieves all data from a specified table without requiring knowledge of SQL.
@@ -466,7 +469,9 @@ class DuckDB(Filesystem):
             - If `dict_return` is True: returns an OrderedDict
         """
         return self.query_artifacts(query=f"SELECT * FROM {table_name}", dict_return=dict_return)
-    
+
+
+
     def get_table_names(self, query):
         """
         Extracts all table names from a SQL query. Helper function for `query_artifacts()` that users do not need to call
@@ -477,10 +482,20 @@ class DuckDB(Filesystem):
         Return: list of str
             List of table names referenced in the query.
         """
-        all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
-        tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
-        return tables
-    
+        try:
+            from sqlglot import parse_one, exp
+            tree = parse_one(query, dialect="duckdb")
+            cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
+            query_tables = [table.name for table in tree.find_all(exp.Table) if table.name not in cte_names]
+
+        except ModuleNotFoundError:
+            all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
+            query_tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
+
+        return query_tables[0] if query_tables else None
+
+
+
     def get_schema(self):
         """
         Returns the structural schema of this database in the form of CREATE TABLE statements.
@@ -490,12 +505,14 @@ class DuckDB(Filesystem):
         """
         schema_stmts = self.query_artifacts(query="SELECT sql FROM duckdb_tables where sql NOT NULL ")
         return schema_stmts["sql"].str.cat(sep="\n")
-    
-    
+
+
+
     def notebook(self, interactive=False):
         pass
 
-    
+
+
     def process_artifacts(self, only_units_relations = False):
         """
         Reads data from the DuckDB database into a nested OrderedDict.
