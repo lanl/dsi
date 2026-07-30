@@ -61,7 +61,7 @@ def _stable_metadata(entry: dict[str, Any], relative_path: str) -> dict[str, Any
     }
 
 
-def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]) -> tuple[str, list[dict[str, Any]]]:
+def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str], chunk_length: dict[str, int]) -> tuple[str, list[dict[str, Any]]]:
     entries_by_path = {entry["relative_path"]: entry for entry in entries}
     children_by_parent: dict[str, list[tuple[str, str]]] = {".": []}
 
@@ -137,7 +137,7 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
             "content_hash_sha256": content_hash,
             "subtree_file_count": subtree_file_count,
             "subtree_total_bytes": subtree_total_bytes,
-            "child_count": len(child_rows),
+            "child_count": len(child_rows) if file_type == "dir" else chunk_length.get(relative_path, 0),
         }
         nodes[relative_path] = node
         return node

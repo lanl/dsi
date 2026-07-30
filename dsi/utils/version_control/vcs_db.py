@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS merkle_nodes (
     content_hash_sha256 TEXT,
     subtree_file_count  INTEGER NOT NULL,
     subtree_total_bytes INTEGER NOT NULL,
-    child_count         INTEGER NOT NULL,
+    child_count         INTEGER NOT NULL,       -- for directory, number of immediate children, for files total chunk count
     UNIQUE(version_id, relative_path)
 );
 

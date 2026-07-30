@@ -441,8 +441,8 @@ class Version():
         file_count  = sum(1 for e in entries if e.get("file_type") == "file")
         print(f"  {file_count} file(s), {total_bytes:,} bytes")
 
-        file_hashes, chunk_hashes = store_chunks_for_snapshot(conn, snapshots_root, entries)
-        root_tree_hash, merkle_nodes = build_merkle_tree(entries, file_hashes)
+        file_hashes, chunk_hashes, chunk_length = store_chunks_for_snapshot(conn, snapshots_root, entries)
+        root_tree_hash, merkle_nodes = build_merkle_tree(entries, file_hashes, chunk_length)
         commit_hash = merkle_commit_hash(
             root_tree_hash=root_tree_hash,
             parent_commit_hash=parent_commit_hash,
@@ -771,6 +771,39 @@ class Version():
             ).fetchone()
             return row["count"] if row else 0
 
+        def compare_file_contents(commit1, file_entry1, commit2, file_entry2):
+            first_file = file_entry1["absolute_path"]
+            second_file = file_entry2["absolute_path"]
+            current_branch_name = self._get_latest_branch_name(conn)
+            f1_hash = f2_hash = None
+            if commit1 == "working tree":
+                commit1 = self._get_latest_commit_of_branch(conn, current_branch_name)
+            if commit1 != "latest":
+                rows = conn.execute(
+                    "SELECT content_hash_sha256 "
+                    "FROM merkle_nodes, versions "
+                    "WHERE merkle_nodes.version_id = versions.id AND versions.root_folder = ? AND versions.commit_hash LIKE ? "
+                    "AND merkle_nodes.relative_path = ?",
+                    (self.root_folder, commit1 + "%", file_entry1["relative_path"]),
+                ).fetchone()
+                f1_hash = rows['content_hash_sha256'] if rows else None
+            
+            if commit2 == "working tree":
+                commit2 = self._get_latest_commit_of_branch(conn, current_branch_name)
+            if commit2 != "latest":
+                rows = conn.execute(
+                    "SELECT content_hash_sha256 "
+                    "FROM merkle_nodes, versions "
+                    "WHERE merkle_nodes.version_id = versions.id AND versions.root_folder = ? AND versions.commit_hash LIKE ? "
+                    "AND merkle_nodes.relative_path = ?",
+                    (self.root_folder, commit2 + "%", file_entry2["relative_path"]),
+                ).fetchone()
+                f2_hash = rows['content_hash_sha256'] if rows else None
+            if f1_hash == f2_hash:
+                return True
+            
+
+
         files1 = files2 = {}
         unchanged = 0
         if c1 is None and c2 is None:
@@ -789,7 +822,6 @@ class Version():
             unchanged = unchanged_count_from_merkle(version1, version2)
             files1 = get_files_for_version(version1, changed_paths)
             files2 = get_files_for_version(version2, changed_paths)
-        conn.close()
 
         all_paths = sorted(set(files1) | set(files2))
         added = deleted = modified = 0
@@ -835,7 +867,8 @@ class Version():
                     modified += 1
                 else:
                     unchanged += 1
-
+        
+        conn.close()
         print(f"\nSummary: +{added} added  -{deleted} deleted  ~{modified} modified  ={unchanged} unchanged")
 
 
