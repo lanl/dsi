@@ -1,0 +1,830 @@
+{
+  "_fixture_label": "doc_url",
+  "_view_name": "ap_1096_data_all",
+  "_db_name": "dataportal",
+  "_http_status": 200,
+  "_fetched_at": "2026-07-28T19:48:02Z",
+  "_source_env": "dev",
+  "response": {
+    "id": 54138,
+    "name": "ap_1096_data_all",
+    "databaseName": "dataportal",
+    "schema": [
+      {
+        "name": "last_update_date",
+        "logicalName": null,
+        "type": "timestamp",
+        "description": "Standard Who column - date when a user last updated this row.",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": false,
+        "sourceType": "TIMESTAMP",
+        "typeSize": 7,
+        "typeDecimal": 0
+      },
+      {
+        "name": "last_updated_by",
+        "logicalName": null,
+        "type": "decimal",
+        "description": "Standard who column - user who last updated this row (foreign key to FND_USER.USER_ID).",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": false,
+        "sourceType": "DECIMAL",
+        "typeSize": 38,
+        "typeDecimal": 20
+      },
+      {
+        "name": "number_of_documents",
+        "logicalName": null,
+        "type": "decimal",
+        "description": "Number of documents created in last 1099 run",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": true,
+        "sourceType": "DECIMAL",
+        "typeSize": 38,
+        "typeDecimal": 20
+      },
+      {
+        "name": "total_withheld",
+        "logicalName": null,
+        "type": "decimal",
+        "description": "Not currently used",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": true,
+        "sourceType": "DECIMAL",
+        "typeSize": 38,
+        "typeDecimal": 20
+      },
+      {
+        "name": "total_reported",
+        "logicalName": null,
+        "type": "decimal",
+        "description": "Total amount reported on last 1099 run",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": true,
+        "sourceType": "DECIMAL",
+        "typeSize": 38,
+        "typeDecimal": 20
+      },
+      {
+        "name": "tax_entity_id",
+        "logicalName": null,
+        "type": "decimal",
+        "description": "Identifier for tax reporting entity on last 1099 run",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": false,
+        "sourceType": "DECIMAL",
+        "typeSize": 38,
+        "typeDecimal": 20
+      },
+      {
+        "name": "org_id",
+        "logicalName": null,
+        "type": "long",
+        "description": "Organization identifier",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": true,
+        "sourceType": "BIGINT",
+        "typeSize": 15,
+        "typeDecimal": 0
+      },
+      {
+        "name": "return_type_code",
+        "logicalName": null,
+        "type": "text",
+        "description": "",
+        "descriptionType": null,
+        "inLocal": true,
+        "tags": null,
+        "primaryKey": false,
+        "nullable": true,
+        "sourceType": "VARCHAR",
+        "typeSize": 30,
+        "typeDecimal": 0
+      }
+    ],
+    "totalFields": 8,
+    "inIndex": false,
+    "readPermission": false,
+    "inLocal": true,
+    "inVDP": true,
+    "tags": [
+      {
+        "id": 4093,
+        "name": "Supplier",
+        "description": "",
+        "descriptionType": "TEXT",
+        "vdpTag": false
+      },
+      {
+        "id": 4220,
+        "name": "payments",
+        "description": "",
+        "descriptionType": "TEXT",
+        "vdpTag": false
+      },
+      {
+        "id": 4233,
+        "name": "summary",
+        "description": "",
+        "descriptionType": "TEXT",
+        "vdpTag": false
+      },
+      {
+        "id": 7511,
+        "name": "ACCOUNTS PAYABLE",
+        "description": "pending",
+        "descriptionType": "RICH_TEXT",
+        "vdpTag": false
+      },
+      {
+        "id": 7698,
+        "name": "SUPPLIERS",
+        "description": "pending",
+        "descriptionType": "RICH_TEXT",
+        "vdpTag": false
+      }
+    ],
+    "categories": [
+      {
+        "id": 626,
+        "name": "Core Financials",
+        "description": "string",
+        "descriptionType": "RICH_TEXT",
+        "path": [],
+        "parentId": 625
+      }
+    ],
+    "endorsements": [],
+    "warnings": [],
+    "deprecations": [],
+    "description": "AP_1096_DATA_ALL contains summary payment information for 1099 type suppliers. The Internal Revenue Service requires that you report this summary information for any qualifying payments to 1099 suppliers. Your Oracle Payables application updates this table when you submit the 1099 Forms Report. Your Oracle Payables application uses the summary payment information for the 1096 Report. This table contains one record per tax entity ID. It has no primary key.Source: https://etrm.live/etrm-12.2.2/etrm.oracle.com/pls/trm1222/etrm_pnav2a0d.html?c_name&#61;AP_1096_DATA_ALL&amp;c_owner&#61;AP&amp;c_type&#61;TABLE",
+    "descriptionType": "RICH_TEXT",
+    "showStatistics": false,
+    "statistics": [],
+    "association": {
+      "associations": [],
+      "associationsToOne": [],
+      "associationsToMany": []
+    },
+    "searchForm": {
+      "database": "dataportal",
+      "view": "ap_1096_data_all",
+      "type": "view",
+      "simpleConditions": [],
+      "groupByEnabled": false,
+      "groupByFields": [],
+      "orderByFields": [],
+      "outputFields": [
+        {
+          "field": "last_update_date",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "last_updated_by",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "number_of_documents",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "total_withheld",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "total_reported",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "tax_entity_id",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "org_id",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        },
+        {
+          "field": "return_type_code",
+          "alias": null,
+          "expression": null,
+          "aggregated": false,
+          "visible": true,
+          "expandFields": [],
+          "role": null,
+          "dataExpandedFieldFrom": null,
+          "dataExpandedField": null,
+          "db": null,
+          "operation": null,
+          "multiple": false,
+          "rolesToExpand": []
+        }
+      ],
+      "id": null,
+      "name": null,
+      "description": null,
+      "sharedQuery": false,
+      "path": null,
+      "vqlShellQuery": null,
+      "allFields": false
+    },
+    "field": {
+      "allFields": [
+        {
+          "role": null,
+          "name": "last_update_date",
+          "typeName": "timestamp",
+          "description": "Standard Who column - date when a user last updated this row.",
+          "operation": null,
+          "type": 93,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "last_update_date",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "last_updated_by",
+          "typeName": "decimal",
+          "description": "Standard who column - user who last updated this row (foreign key to FND_USER.USER_ID).",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "last_updated_by",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "number_of_documents",
+          "typeName": "decimal",
+          "description": "Number of documents created in last 1099 run",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "number_of_documents",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "total_withheld",
+          "typeName": "decimal",
+          "description": "Not currently used",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "total_withheld",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "total_reported",
+          "typeName": "decimal",
+          "description": "Total amount reported on last 1099 run",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "total_reported",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "tax_entity_id",
+          "typeName": "decimal",
+          "description": "Identifier for tax reporting entity on last 1099 run",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "tax_entity_id",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "org_id",
+          "typeName": "long",
+          "description": "Organization identifier",
+          "operation": null,
+          "type": -5,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "org_id",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "return_type_code",
+          "typeName": "text",
+          "description": "",
+          "operation": null,
+          "type": 12,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "return_type_code",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        }
+      ],
+      "mandatoryFields": [],
+      "expandedFields": [],
+      "mandatoryExpandedFields": [],
+      "fieldsWithPrivileges": [
+        {
+          "role": null,
+          "name": "last_update_date",
+          "typeName": "timestamp",
+          "description": "Standard Who column - date when a user last updated this row.",
+          "operation": null,
+          "type": 93,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "last_update_date",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "last_updated_by",
+          "typeName": "decimal",
+          "description": "Standard who column - user who last updated this row (foreign key to FND_USER.USER_ID).",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "last_updated_by",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "number_of_documents",
+          "typeName": "decimal",
+          "description": "Number of documents created in last 1099 run",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "number_of_documents",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "total_withheld",
+          "typeName": "decimal",
+          "description": "Not currently used",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "total_withheld",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "total_reported",
+          "typeName": "decimal",
+          "description": "Total amount reported on last 1099 run",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "total_reported",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "tax_entity_id",
+          "typeName": "decimal",
+          "description": "Identifier for tax reporting entity on last 1099 run",
+          "operation": null,
+          "type": 3,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "tax_entity_id",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "org_id",
+          "typeName": "long",
+          "description": "Organization identifier",
+          "operation": null,
+          "type": -5,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "org_id",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        },
+        {
+          "role": null,
+          "name": "return_type_code",
+          "typeName": "text",
+          "description": "",
+          "operation": null,
+          "type": 12,
+          "mandatory": false,
+          "fieldCapabilities": {
+            "fieldName": "return_type_code",
+            "operators": null,
+            "multiplicity": null
+          },
+          "input": false,
+          "output": false,
+          "matchName": 1,
+          "matchDesc": 1
+        }
+      ]
+    },
+    "propertyInfo": {
+      "summaryPropertyMap": {
+        "Details": [
+          {
+            "propertyId": 304,
+            "propertyName": "Business Unit:",
+            "propertyDescription": "Which Business Unit does this table belong to?",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "ENUMERATION",
+            "propertyPossibleValues": [
+              "AccessIT",
+              "Human Resources",
+              "Pending",
+              "Utrain"
+            ],
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "Finance",
+            "searchValue": null,
+            "visualValueToEdit": "Finance"
+          },
+          {
+            "propertyId": 307,
+            "propertyName": "Data Classification",
+            "propertyDescription": "What is the sensitivity of the information",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "ENUMERATION",
+            "propertyPossibleValues": [
+              "Business Sensitive",
+              "Highly Sensitive",
+              "Non-Sensitive",
+              "Pending Classification",
+              "Restricted"
+            ],
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "Business Sensitive",
+            "searchValue": null,
+            "visualValueToEdit": "Business Sensitive"
+          },
+          {
+            "propertyId": 305,
+            "propertyName": "Data Source",
+            "propertyDescription": "See Data Lineage.\nWhat database is the data sourced from.",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "LONG_TEXT",
+            "propertyPossibleValues": null,
+            "propertyInterpolable": true,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "Core Financials",
+            "searchValue": null,
+            "visualValueToEdit": "Core Financials"
+          },
+          {
+            "propertyId": 308,
+            "propertyName": "Update Frequency",
+            "propertyDescription": "How often the data source is updated",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "ENUMERATION",
+            "propertyPossibleValues": [
+              "Don't Know",
+              "Frequently (Daily, Weekly)",
+              "Infrequently / Ad hoc basis",
+              "Not in Use"
+            ],
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "TBD",
+            "searchValue": null,
+            "visualValueToEdit": "TBD"
+          },
+          {
+            "propertyId": 309,
+            "propertyName": "Primary Point of Contact",
+            "propertyDescription": "Have questions about the data?",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "RICH_TEXT",
+            "propertyPossibleValues": null,
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "<p><strong> <a href=\"REDACTED_PERSON_URL\">Cisneros, Veronica Elaine</a></strong></p>",
+            "searchValue": null,
+            "visualValueToEdit": "<p><strong> <a href=\"REDACTED_PERSON_URL\">Cisneros, Veronica Elaine</a></strong></p>"
+          },
+          {
+            "propertyId": 310,
+            "propertyName": "Secondary Point of Contact",
+            "propertyDescription": null,
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "RICH_TEXT",
+            "propertyPossibleValues": null,
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "ddortiz&#64;lanl.gov;",
+            "searchValue": null,
+            "visualValueToEdit": "ddortiz&#64;lanl.gov;"
+          },
+          {
+            "propertyId": 311,
+            "propertyName": "Data Owner",
+            "propertyDescription": "The team or person responsible for this data.",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "RICH_TEXT",
+            "propertyPossibleValues": null,
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "<p><strong> <a href=\"REDACTED_PERSON_URL\">TBD</a></strong></p>",
+            "searchValue": null,
+            "visualValueToEdit": "<p><strong> <a href=\"REDACTED_PERSON_URL\">TBD</a></strong></p>"
+          },
+          {
+            "propertyId": 322,
+            "propertyName": "Access Role Name",
+            "propertyDescription": null,
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "RICH_TEXT",
+            "propertyPossibleValues": null,
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "FIN_PROC_SUPPORT",
+            "searchValue": null,
+            "visualValueToEdit": "FIN_PROC_SUPPORT"
+          },
+          {
+            "propertyId": 321,
+            "propertyName": "Access Role Request",
+            "propertyDescription": "How to gain access to the Access Role",
+            "propertySearchDescription": null,
+            "propertyDescriptionType": "TEXT",
+            "propertyType": "RICH_TEXT",
+            "propertyPossibleValues": null,
+            "propertyInterpolable": false,
+            "propertyDefaultValue": null,
+            "groupId": 82,
+            "groupName": "Details",
+            "placeToShowGroup": "SUMMARY_TAB",
+            "groupDescription": null,
+            "visualValue": "<p><strong>Contact <a href=\"datacatalog-support&#64;lanl.gov\">datacatalog-support&#64;lanl.gov</a> for access</strong></p>",
+            "searchValue": null,
+            "visualValueToEdit": "<p><strong>Contact <a href=\"datacatalog-support&#64;lanl.gov\">datacatalog-support&#64;lanl.gov</a> for access</strong></p>"
+          }
+        ]
+      },
+      "generalTabPropertyMap": {},
+      "customTabPropertyMap": {}
+    },
+    "viewStatisticsInfo": {
+      "databaseName": null,
+      "name": null,
+      "rowsNumber": null,
+      "lastUpdated": null,
+      "fieldStatisticsList": []
+    },
+    "savedQuery": null,
+    "connectionUris": {
+      "jdbc-connection-url": "jdbc:vdb://localhost:9999/dataportal?user=REDACTED_UID&password=<Your_Password_Here>",
+      "odbc-connection-string-32bits": "DRIVER={DenodoODBC Unicode};DATABASE=dataportal;SERVER=localhost;PORT=9996;UID=<Your_UID_Here>;PWD=<Your_Password_Here>",
+      "odbc-connection-string-64bits": "DRIVER={DenodoODBC Unicode(x64)};DATABASE=dataportal;SERVER=localhost;PORT=9996;UID=<Your_UID_Here>;PWD=<Your_Password_Here>",
+      "rest-connection-url": "https://localhost:9443/denodo-restfulws/dataportal/views/ap_1096_data_all",
+      "odata-connection-url": "https://localhost:9443/denodo-odata4-service/denodo-odata.svc/dataportal/ap_1096_data_all",
+      "intro-text-connect": "This tab shows the connection URLs to the database and/or view using different protocols. The parts surrounded by angled brackets ('<' and '>') represent variables that should be substituted for the appropriate values.",
+      "graphQl-connection-url": "https://localhost:9443/denodo-graphql-service/graphql/dataportal"
+    },
+    "hasRequests": false
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "_fixture_label": "error_500",
+  "_view_name": "vlanlchangerequesttask",
+  "_db_name": "dataportal",
+  "_http_status": 500,
+  "_fetched_at": "2026-07-28T20:15:13Z",
+  "_source_env": "dev",
+  "_synthetic": true,
+  "_synthetic_reason": "Pre-migration 12-view HTTP-500 cohort no longer reproduces on post-migration dev (all 30 prod-origin vlanl*task views return 200, 2026-07-28 diagnostic). Retained synthetically per contract rev 10 b to keep the fetch_status='error' code path under test.",
+  "response": null,
+  "_error_body": "Internal Server Error (synthetic placeholder -- see _synthetic_reason)"
+}

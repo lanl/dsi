@@ -1,0 +1,160 @@
+{
+  "plain": {
+    "view_name": "inventory_daily_balance_fact",
+    "db": "dataportal",
+    "selection_method": "re-selected 2026-07-28: original 'access_area_type' returns HTTP 404 on post-migration dev (absent from current list); re-selection intersected probe zero-signal views with the live list and verified HTTP 200",
+    "hits": [],
+    "n_signals": 0
+  },
+  "doc_url": {
+    "view_name": "ap_1096_data_all",
+    "db": "dataportal",
+    "hits": [
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Primary Point of Contact",
+        "evidence": "https://pbplus.lanl.gov/search/vep@lanl.gov"
+      },
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Data Owner",
+        "evidence": "https://pbplus.lanl.gov/search/datacatalog-support@lanl.gov"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "description",
+        "evidence": "https://etrm.live/etrm-12.2.2/etrm.oracle.com/pls/trm1222/etrm_pnav2a0d.html?c_name=AP_1096_DATA_ALL&c_owner=AP&c_type=TABLE"
+      }
+    ],
+    "n_signals": 3
+  },
+  "access_role": {
+    "view_name": "affiliation_type_fvts",
+    "db": "dataportal",
+    "hits": [
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Primary Point of Contact",
+        "evidence": "https://pbplus.lanl.gov/search/hbsaenz@lanl.gov"
+      },
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Data Owner",
+        "evidence": "https://pbplus.lanl.gov/search/txn@lanl.gov"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "Details/Access Role Request",
+        "evidence": "https://accessit.lanl.gov"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "Details/Access Role Request",
+        "evidence": "https://accessit.lanl.gov"
+      }
+    ],
+    "n_signals": 4
+  },
+  "ods_link": {
+    "view_name": "announcement",
+    "db": "dataportal",
+    "hits": [
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Primary Point of Contact",
+        "evidence": "https://pbplus.lanl.gov/search/bakera@lanl.gov"
+      },
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Data Owner",
+        "evidence": "https://pbplus.lanl.gov/search/ronnieg@lanl.gov"
+      },
+      {
+        "signal_type": "resource_named_property",
+        "property_name": "ODS Details/ODS DB Link",
+        "evidence": "FVTS_LINK"
+      }
+    ],
+    "n_signals": 3
+  },
+  "error_500": {
+    "view_name": "vlanlchangerequesttask",
+    "db": "dataportal",
+    "selection_method": "SYNTHETIC as of 2026-07-28: the pre-migration 12-view HTTP-500 cohort no longer reproduces (post-migration dev lists 30 prod-origin vlanl*task views, all 200). Fixture is generated until a live failure is observed again (contract rev 10 b).",
+    "synthetic": true,
+    "hits": [],
+    "n_signals": 0
+  },
+  "resource_rich": {
+    "view_name": "ben_prtn_elig_prfl_f",
+    "db": "dataportal",
+    "hits": [
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Primary Point of Contact",
+        "evidence": "https://pbplus.lanl.gov/search/datacatalog-support@lanl.gov"
+      },
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Data Owner",
+        "evidence": "https://pbplus.lanl.gov/search/datacatalog-support@lanl.gov"
+      },
+      {
+        "signal_type": "resource_named_property",
+        "property_name": "ODS Details/ODS DB Link",
+        "evidence": "EBS_LINK"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "AI Portal/A.I. Summary",
+        "evidence": "https://etrm.live/search?q=ben_prtn_elig_prfl_f"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "AI Portal/A.I. Summary",
+        "evidence": "https://docs.oracle.com/en/cloud/saas/hcm-cloud-classic/"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "AI Portal/A.I. Summary",
+        "evidence": "https://apexapps.oracle.com/pls/apex/f?p=4650:37:0::NO:RP,37,3240299782321941893,3240299783034875677"
+      }
+    ],
+    "n_signals": 6
+  },
+  "custom_tab": {
+    "view_name": "admin_option_type_fvts",
+    "db": "dataportal",
+    "selection_method": "manual (2026-07-27 Additional-Tab test)",
+    "hits": [
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Primary Point of Contact",
+        "evidence": "https://pbplus.lanl.gov/search/hbsaenz@lanl.gov"
+      },
+      {
+        "signal_type": "person_link",
+        "property_name": "Details/Data Owner",
+        "evidence": "https://pbplus.lanl.gov/search/txn@lanl.gov"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "Additional Information/More Help for Web Services",
+        "evidence": "https://collaborate.lanl.gov/x/tYV4Cw"
+      },
+      {
+        "signal_type": "resource_url",
+        "property_name": "Additional Information/More Help for Web Services",
+        "evidence": "https://collaborate.lanl.gov/x/tYV4Cw"
+      }
+    ],
+    "n_signals": 4
+  },
+  "second_vdb": {
+    "view_name": "i_ods_pa_cpnt_evthst",
+    "db": "ops_core_publication",
+    "selection_method": "manual 2026-07-28: first empirically observed second VDB on post-migration dev (4 views, all HTTP 200); proves non-dataportal db_name handling (contract rev 10 c/d). Not in probe_results.db.",
+    "hits": [],
+    "n_signals": 0
+  }
+}
