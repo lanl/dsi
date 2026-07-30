@@ -35,7 +35,7 @@ from .vcs_metadata_helper import collect_metadata, collect_tree_metadata, owner_
 from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
 from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
 from .repolog.repository_log import RepositoryLog
-from .repolog.chunking import CHUNK_STORAGE_DIR, store_chunks_for_snapshot
+from .repolog.chunking import CHUNK_STORAGE_DIR, store_chunks_for_snapshot, rebuild_file_from_chunks
 
 def snapshot_target(snapshot_path: str, relative_path: str) -> str:
     target = os.path.abspath(os.path.join(snapshot_path, relative_path))
@@ -455,7 +455,7 @@ class Version():
 
         # ── update chunk store with commit hash ──────────────────────────────────
         cur.execute(
-            f"UPDATE chunk_store SET commit_hash=? WHERE chunk_hash IN ({','.join('?' for _ in chunk_hashes)})",
+            f"UPDATE chunk_store SET commit_hash=? WHERE commit_hash = 'UPDATE' AND chunk_hash IN ({','.join('?' for _ in chunk_hashes)})",
             [commit_hash] + list(chunk_hashes),
         )
         # ── Insert version row ───────────────────────────────────────────────────
@@ -772,6 +772,7 @@ class Version():
             return row["count"] if row else 0
 
         def compare_file_contents(commit1, file_entry1, commit2, file_entry2):
+            tmpdir = tempfile.mkdtemp()
             first_file = file_entry1["absolute_path"]
             second_file = file_entry2["absolute_path"]
             current_branch_name = self._get_latest_branch_name(conn)
@@ -799,9 +800,54 @@ class Version():
                     (self.root_folder, commit2 + "%", file_entry2["relative_path"]),
                 ).fetchone()
                 f2_hash = rows['content_hash_sha256'] if rows else None
+            compare_latest = False
+            if commit2 == "latest" and \
+                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry1["relative_path"], commit1, tmpdir) is True:
+                first_file = os.path.join(tmpdir, file_entry1["relative_path"])
+                compare_latest = True
+            if commit1 == "latest" and \
+                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry2["relative_path"], commit2, tmpdir) is True:
+                second_file = os.path.join(tmpdir, file_entry2["relative_path"])
+                compare_latest = True
+            
+            if compare_latest is True:
+                result = subprocess.run(['diff', first_file, second_file], capture_output=True, text=True)
+                if result.returncode == 0:
+                    shutil.rmtree(tmpdir)
+                    return True
+                print(f"diff result: {result.stdout.strip()}")
+                shutil.rmtree(tmpdir)
+                return False
+
+            shutil.rmtree(tmpdir)
             if f1_hash == f2_hash:
                 return True
-            
+            rows = conn.execute(
+                "SELECT "
+                "    COALESCE(a.chunk_index, b.chunk_index) AS chunk_index, "
+                "    a.chunk_hash AS old_hash, "
+                "    b.chunk_hash AS new_hash "
+                "FROM "
+                "    (SELECT chunk_index, chunk_hash FROM chunk_store "
+                "     WHERE commit_hash LIKE ? AND relative_file_path = ?) a "
+                "FULL OUTER JOIN "
+                "    (SELECT chunk_index, chunk_hash FROM chunk_store "
+                "     WHERE commit_hash LIKE ? AND relative_file_path = ?) b "
+                "    ON a.chunk_index = b.chunk_index "
+                "WHERE "
+                "    a.chunk_hash IS NOT b.chunk_hash OR "
+                "    (a.chunk_hash IS NULL AND b.chunk_hash IS NOT NULL) OR "
+                "    (a.chunk_hash IS NOT NULL AND b.chunk_hash IS NULL);",
+                (commit1 + "%", file_entry1["relative_path"], commit2 + "%", file_entry2["relative_path"])
+            ).fetchall()
+
+            for row in rows:
+                first_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, row['old_hash'])
+                second_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, row['new_hash'])
+                result = subprocess.run(['diff', first_file, second_file], capture_output=True, text=True)
+                print(f"diff result: {result.stdout.strip()}")
+            return len(rows) == 0
+
 
 
         files1 = files2 = {}
@@ -850,12 +896,8 @@ class Version():
                 changes = []
                 if f1["file_type"] != f2["file_type"]:
                     changes.append("type")
-                if f1["md5_hash"] != f2["md5_hash"]:
-                    if f1["md5_hash"] or f2["md5_hash"]:
-                        changes.append("content")
-                    if f1["md5_hash"] and f2["md5_hash"]:
-                        result = subprocess.run(['diff', f1["absolute_path"], f2["absolute_path"]], capture_output=True, text=True)
-                        print(f"diff result: {result.stdout.strip()}")
+                if compare_file_contents(c1, f1, c2, f2) is False:
+                    changes.append("content")
                 if f1["permissions_int"] != f2["permissions_int"]:
                     changes.append("perms")
                 if f1["owner_name"] != f2["owner_name"] or f1["group_name"] != f2["group_name"]:

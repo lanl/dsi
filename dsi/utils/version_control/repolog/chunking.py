@@ -103,17 +103,41 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
             chunk_path = os.path.join(chunk_dir, chunk['sha256'])
             h.update(chunk['sha256'].encode('utf-8'))
             if not os.path.exists(chunk_path):
-                chunk_hashes.add(chunk['sha256'])
                 with open(chunk_path, "wb") as handle:
                     handle.write(chunk['data'])
             conn.execute(
-                "INSERT OR IGNORE INTO chunk_store "
-                "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index) VALUES (?, ?, ?, ?, ?)",
-                (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i),
+                "INSERT INTO chunk_store "
+                "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) VALUES (?, ?, ?, ?, ?, ?)",
+                (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, "UPDATE"),
             )
+            chunk_hashes.add(chunk['sha256'])
         file_hashes[entry['relative_path']] = h.hexdigest()
         chunk_length[entry['relative_path']] = len(all_chunks)
     return file_hashes, chunk_hashes, chunk_length
+
+def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_hash: str, output_path: str) -> bool:
+    chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
+    rows = conn.execute(
+        "SELECT chunk_hash, chunk_size FROM chunk_store WHERE relative_file_path = ? AND commit_hash LIKE ? ORDER BY chunk_index",
+        (relative_path, commit_hash + "%")
+    ).fetchall()
+    chunk_hashes = [row['chunk_hash'] for row in rows]
+    # print(f"Rebuilding {relative_path} from chunks: {chunk_hashes} commit_hash={commit_hash}")
+    try:
+        os.makedirs(os.path.dirname(os.path.join(output_path, relative_path)), exist_ok=True)
+        with open(os.path.join(output_path, relative_path), "wb") as out_file:
+            for chunk_hash in chunk_hashes:
+                chunk_path = os.path.join(chunk_dir, chunk_hash)
+                # print(f"===={chunk_path}====")
+                if not os.path.exists(chunk_path):
+                    return False
+                with open(chunk_path, "rb") as in_file:
+                    content = in_file.read()
+                    out_file.write(content)
+                    # print(content)
+        return True
+    except Exception:
+        return False
 
 if __name__ == "__main__":
     chunks = chunk_file("tests/wildfiredata.csv")

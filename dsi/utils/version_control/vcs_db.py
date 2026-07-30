@@ -65,13 +65,17 @@ CREATE TABLE IF NOT EXISTS branch_links (
 
 CREATE TABLE IF NOT EXISTS chunk_store (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    chunk_hash           TEXT    NOT NULL UNIQUE,
+    chunk_hash           TEXT    NOT NULL,
     chunk_size           INTEGER NOT NULL,
     created_at           INTEGER NOT NULL,
     commit_hash          TEXT DEFAULT NULL,   -- allow default null as commit hash may not be known at the time of chunk creation
     relative_file_path   TEXT NOT NULL,
-    chunk_index          INTEGER NOT NULL
+    chunk_index          INTEGER NOT NULL,
+    UNIQUE(chunk_hash, commit_hash)
 );
+
+CREATE INDEX IF NOT EXISTS idx_chunk_store_commit_file
+    ON chunk_store (commit_hash, relative_file_path, chunk_index);
 
 """
 
