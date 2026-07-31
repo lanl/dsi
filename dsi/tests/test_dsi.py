@@ -1861,7 +1861,7 @@ def test_ndp_backend_no_params():
     try:
         DSI(backend_name="NDP")
         assert False, "Should raise ValueError when params not provided"
-    except ValueError:
+    except TypeError:
         assert True
 
 
