@@ -29,9 +29,10 @@ class Terminal:
     BACKEND_PREFIX = ['dsi.backends']
     BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11', 'rcsbpdb']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader', 'vtk_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'Ensemble', 'Cloverleaf', 'Dictionary', 'Dataframe']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'Ensemble', 
+                     'Cloverleaf', 'Dictionary', 'Dataframe', "VTK_Reader"]
     VALID_DATACARDS = ['DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS

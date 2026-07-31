@@ -311,6 +311,7 @@ class DSI:
         print("TOML                 : Loads data from standard TOML files that can have one or multiple tables per file")
         print("TOML1                : Loads data from TOML files of a certain structure")
         print("JSON                 : Loads single-table data from JSON files")
+        print("VTK                  : Loads metadata from VTK/VTI/VTM files")
         print("Ensemble             : Loads a CSV file where each row is a simulation run; creates a simulation table")
         print("Cloverleaf           : Loads data from a directory with subfolders for each simulation run's input and output data")
         print("Bueno                : Loads performance data from Bueno (github.com/lanl/bueno) (.data text file format)")
@@ -339,6 +340,7 @@ class DSI:
                 - "TOML"                 → .toml
                 - "TOML1"                → .toml
                 - "JSON"                 → .json
+                - "VTK"                  → .vtk or .vti or .vtm
                 - "Ensemble"             → .csv
                 - "Cloverleaf"           → /path/to/data/directory/
                 - "Bueno"                → .data
@@ -360,7 +362,7 @@ class DSI:
 
             Required when using the `Collection` reader to load an dictionary or pandas DataFrame representing only one table.
             
-            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
+            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, `VTK`, or `Ensemble` reader.
         """
         if self.read_only_flag:
             backend_name = self.main_backend_obj.__class__.__name__
@@ -459,6 +461,8 @@ class DSI:
                     self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "json":
                     self.t.load_module('plugin', 'JSON', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "vtk":
+                    self.t.load_module('plugin', 'VTK_Reader', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "cloverleaf":
                     self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
                 elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
