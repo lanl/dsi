@@ -643,43 +643,35 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Terminal Methods
     # ----------------------------------------------------------------------
-    def num_datasets(self):
+    def num_tables(self, **kwargs):
         """
-        Returns the number of datasets (rows in the datasets table).
-        
-        Returns
-        -------
-        int
-            Number of datasets loaded
-        """
-        if not self._loaded:
-            return 0
-        
-        datasets_table = self._cache.get("datasets", {})
-        
-        if not datasets_table:
-            return 0
-        
-        # Get length of first column to determine row count
-        first_col = next(iter(datasets_table.values()), [])
-        return len(first_col)
-
-
-    def num_tables(self):
-        """
-        Returns the number of tables currently loaded.
+        Prints the number of tables currently loaded OR returns number of datasets (rows in the datasets table).
         
         NDP backend has 2 main tables:
-            - datasets: Dataset metadata
+            - datasets: Dataset metadata. Each row is a different dataset retrieved from NDP
             - resources: Combined resources from all datasets
         
         Returns
         -------
-        None
-            Prints the count to console
+        - If kwargs is empty: None
+        - If kwargs has key 'table_name' with value 'datasets: returns num datasets retrieved by NDP as an int
         """
+        table_name = kwargs.get("table_name")
+        if isinstance(table_name, str) and table_name.strip().lower() == "datasets":
+            if not self._loaded:
+                return 0
+
+            datasets_table = self._cache.get("datasets", {})
+
+            if not datasets_table:
+                return 0
+            
+            # Get length of first column to determine row count
+            first_col = next(iter(datasets_table.values()), [])
+            return len(first_col)
+
         if not self._loaded:
-            print("Database now has 0 tables")
+            print("NDP Backend has 0 tables")
             return
         
         # Count actual tables in cache
@@ -698,8 +690,8 @@ class NDP(Webserver):
             table_count += 1
         
         print(f"Database now has {table_count} tables")
-        
-        
+
+
     def get_table(self, table_name, dict_return=False):
         """
         Returns all data from a specified table.

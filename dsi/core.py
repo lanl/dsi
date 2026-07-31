@@ -1069,7 +1069,7 @@ class Terminal:
         else:
             raise ValueError("Returned object from the first loaded backend's summary() is incorrectly structured")
 
-    def num_tables(self):
+    def num_tables(self, **kwargs):
         """
         Prints number of tables in the first loaded backend
         """
@@ -1087,11 +1087,13 @@ class Terminal:
             raise RuntimeError("First loaded backend needs to have data to be able to get its number of tables")
         start = datetime.now(timezone.utc)
 
-        backend.num_tables()
+        count = backend.num_tables(**kwargs)
 
         end = datetime.now(timezone.utc)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
+
+        return count
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """

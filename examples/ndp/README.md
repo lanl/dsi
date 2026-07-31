@@ -707,7 +707,7 @@ valid_resources = resources_df[resources_df['url_valid'] == True]
 Count the number of datasets loaded:
 
 ```python
-num_datasets = dsi.num_datasets()
+num_datasets = dsi.num_tables(table_name="datasets")
 print(f"Loaded {num_datasets} datasets")
 ```
 

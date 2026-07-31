@@ -2037,6 +2037,6 @@ def test_ndp_schema(ndp_dsi_basic):
 
 
 def test_ndp_num_datasets(ndp_dsi_basic):
-    """Test num_datasets() on NDP backend"""
-    num_datasets = ndp_dsi_basic.num_datasets()
+    """Get num datasets using overloaded num_tables() on NDP backend"""
+    num_datasets = ndp_dsi_basic.num_tables(table_name="datasets")
     assert num_datasets > 0
