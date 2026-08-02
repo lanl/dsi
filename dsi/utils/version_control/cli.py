@@ -49,6 +49,9 @@ def main():
     p_restore = sub.add_parser("restore", help="Restore a version")
     p_restore.add_argument("version")
 
+    p_clone = sub.add_parser("clone", help="Clone a remote repo")
+    p_clone.add_argument("repo_url")
+    
     args = parser.parse_args(args=None if sys.argv[1:] else ["-h"])
 
     # parser.print_help()
@@ -88,6 +91,9 @@ def main():
     elif args.command == "restore":
         vcs = Version(os.getcwd())
         vcs.cmd_restore(args.version)
+    elif args.command == "clone":
+        vcs = Version(os.getcwd())
+        vcs.cmd_clone(args.repo_url, os.getcwd())
 
 if __name__ == "__main__":
     # print("\n=== dsi-vcs: rsync-based file version control ===\n")

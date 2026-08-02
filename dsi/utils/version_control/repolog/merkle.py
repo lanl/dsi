@@ -1,4 +1,5 @@
 import hashlib
+import base64
 import json
 import os
 from typing import Any, Optional
@@ -78,10 +79,11 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
 
         entry = entries_by_path.get(relative_path, {})
         file_type = "dir" if relative_path == "." else entry.get("file_type")
+        metadata = json.dumps(_stable_metadata(entry, relative_path))
         metadata_hash = hash_payload(
             {
                 "object": "dsi-vcs-metadata-v1",
-                "metadata": _stable_metadata(entry, relative_path),
+                "metadata": metadata,
             }
         )
         child_rows = sorted(children_by_parent.get(relative_path, []))
@@ -133,7 +135,7 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
             "relative_path": relative_path,
             "file_type": file_type,
             "node_hash": node_hash,
-            "metadata_hash": metadata_hash,
+            "metadata": metadata,
             "content_hash_sha256": content_hash,
             "subtree_file_count": subtree_file_count,
             "subtree_total_bytes": subtree_total_bytes,

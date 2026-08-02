@@ -28,10 +28,11 @@ import datetime
 import hashlib
 import shutil
 import tempfile
+from turtle import mode
 from typing import Optional
 
 from .vcs_db import DB_NAME, SNAPSHOTS_DIR, open_db
-from .vcs_metadata_helper import collect_metadata, collect_tree_metadata, owner_name
+from .vcs_metadata_helper import collect_metadata, owner_name, check_access_permission, set_acl
 from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
 from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
 from .repolog.repository_log import RepositoryLog
@@ -70,8 +71,18 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
     ).fetchall()
 
     grouped: dict[str, list[tuple[str, int]]] = {}
+    access_checked = dict[str, str]()
     for row in rows:
-        grouped.setdefault(row["relative_file_path"], []).append((row["chunk_hash"], row["chunk_index"]))
+        if row["relative_file_path"] not in access_checked:
+            metadata = check_access_permission(conn, target_tree, commit_hash, row["relative_file_path"], "read")
+            if metadata is not None:
+                print(f"---> access granted: {row['relative_file_path']}")
+            else:
+                print(f"---> access denied: {row['relative_file_path']}")
+            access_checked[row["relative_file_path"]] = metadata
+        if access_checked[row["relative_file_path"]] is not None:    
+            grouped.setdefault(row["relative_file_path"], []).append((row["chunk_hash"], row["chunk_index"]))
+        
 
     for rel_path, chunks in grouped.items():
         data = bytearray()
@@ -87,6 +98,18 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
         with open(target_path, "wb") as handle:
             handle.write(data)
+
+    # update acl text
+    for rel_path in access_checked:
+        metadata = access_checked[rel_path]
+        if metadata is not None:
+            acl_text = metadata.get("acl_text")
+            permissions_int = int(metadata.get("permissions_int", 0))
+            target_path = snapshot_target(target_tree, rel_path)
+            if acl_text is not None and acl_text != "":
+                set_acl(target_path, acl_text)
+            if owner_name(os.getuid()) == metadata.get("owner_name"):
+                os.chmod(target_path, permissions_int)
 
 
 def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
@@ -284,6 +307,13 @@ class Version():
             (branch_name,),
         ).fetchone()
         return row["child_commit_hash"] if row else None
+
+    def _get_tracked_commit_of_branch(self, conn, branch_name: str) -> Optional[str]:
+        row = conn.execute(
+            "SELECT tracked_commit_hash FROM branches WHERE branch_name=?",
+            (branch_name,),
+        ).fetchone()
+        return row["tracked_commit_hash"] if row else None
     
     def _get_entries_in_commit(self, conn, commit_hash: str) -> list[dict]:
         rows = conn.execute(
@@ -330,9 +360,9 @@ class Version():
                 (self.root_folder, latest_branch_name),
             )
             cur.execute(
-                "INSERT OR IGNORE INTO branches (root_folder, branch_name, head_commit_hash, is_latest, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (self.root_folder, branch_name, commit_hash, 1, now),
+                "INSERT OR IGNORE INTO branches (root_folder, branch_name, head_commit_hash, tracked_commit_hash, is_latest, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (self.root_folder, branch_name, commit_hash, commit_hash, 1, now),
             )
         conn.commit()
         conn.close()
@@ -377,10 +407,6 @@ class Version():
             "VALUES (?, ?, ?, ?)",
             (parent_commit_hash, child_commit_hash, branch_name, now),
         )
-        cur.execute(
-            "UPDATE branches SET head_commit_hash=?, created_at=? WHERE root_folder=? AND branch_name=?",
-            (child_commit_hash, now, self.root_folder, branch_name),
-        )
         conn.commit()
         conn.close()
         print(f"Merged branch '{branch_name}' into {child_commit_hash[:12]}")
@@ -403,31 +429,31 @@ class Version():
         staged_deletes = [path for path, (_record, action) in pending_entries.items() if action == "delete"]
 
         current_branch_name = self._get_latest_branch_name(conn)
-        parent_commit_hash = self._get_latest_commit_of_branch(conn, current_branch_name)
+        parent_commit_hash = self._get_tracked_commit_of_branch(conn, current_branch_name)
 
         committed_at = _utcnow()
         running_user = owner_name(os.getuid())
         snapshots_root = os.path.join(self.root_folder, SNAPSHOTS_DIR)
         entries_in_last_commit = set(self._get_entries_in_commit(conn, parent_commit_hash) if parent_commit_hash else [])
 
-        # ── Validate staged paths before creating the snapshot ─────────────────
-        print(f"Validating {len(staged_adds) + len(staged_deletes)} staged path(s)…")
-        valid_staged = len(staged_deletes)
-        for abs_path in staged_adds:
-            e = collect_metadata(abs_path, self.root_folder)
-            if "error" in e:
-                print(f"  [skip] {e['relative_path']}: {e['error']}")
-            else:
-                valid_staged += 1
+        # # ── Validate staged paths before creating the snapshot ─────────────────
+        # print(f"Validating {len(staged_adds) + len(staged_deletes)} staged path(s)…")
+        # valid_staged = len(staged_deletes)
+        # for abs_path in staged_adds:
+        #     e = collect_metadata(abs_path, self.root_folder)
+        #     if "error" in e:
+        #         print(f"  [skip] {e['relative_path']}: {e['error']}")
+        #     else:
+        #         valid_staged += 1
 
-        if valid_staged == 0:
-            conn.close()
-            sys.exit("No readable staged paths — commit aborted.")
+        # if valid_staged == 0:
+        #     conn.close()
+        #     sys.exit("No readable staged paths — commit aborted.")
 
         for added_paths in staged_adds:
-            entries_in_last_commit.add(added_paths)
+            entries_in_last_commit.add(os.path.relpath(added_paths, start=self.root_folder))
         for deleted_paths in staged_deletes:
-            entries_in_last_commit.remove(deleted_paths)
+            entries_in_last_commit.remove(os.path.relpath(deleted_paths, start=self.root_folder))
 
         # ── Build a temporary view of the committed tree from the current worktree ─
         ## TODO: Remove the need for a temporary snapshot directory by building the Merkle tree directly from the staged entries and the previous commit's Merkle tree.
@@ -435,7 +461,11 @@ class Version():
         # # ── Collect metadata for the complete committed tree ───────────────────
         entries = []
         for rel_path in entries_in_last_commit:
-            entries.append(collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder))
+            e = collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder)
+            if "error" in e:
+                print(f"  [skip] {e['relative_path']}: {e['error']}")
+            else:
+                entries.append(e)
 
         total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
         file_count  = sum(1 for e in entries if e.get("file_type") == "file")
@@ -471,7 +501,7 @@ class Version():
 
         merkle_cols = [
             "version_id", "root_folder", "relative_path", "file_type",
-            "node_hash", "metadata_hash", "content_hash_sha256",
+            "node_hash", "metadata", "content_hash_sha256",
             "subtree_file_count", "subtree_total_bytes", "child_count",
         ]
         merkle_placeholders = ",".join("?" * len(merkle_cols))
@@ -502,8 +532,8 @@ class Version():
         ).fetchone()
         if not branch_row:
             conn.execute(
-                "INSERT INTO branches (root_folder, branch_name, head_commit_hash, is_latest, created_at) VALUES (?, ?, ?, ?, ?)",
-                (self.root_folder, branch_name, commit_hash, 1, committed_at),
+                "INSERT INTO branches (root_folder, branch_name, head_commit_hash, tracked_commit_hash, is_latest, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (self.root_folder, branch_name, commit_hash, commit_hash, 1, committed_at),
             )
             conn.execute(
                 "INSERT INTO branch_links (parent_commit_hash, child_commit_hash, child_branch_name, created_at) VALUES (?, ?, ?, ?)",
@@ -515,8 +545,8 @@ class Version():
                 (self.root_folder, branch_name),
             )
             conn.execute(
-                "UPDATE branches SET is_latest=1, head_commit_hash=?, created_at=? WHERE root_folder=? AND branch_name=?",
-                (commit_hash, committed_at, self.root_folder, branch_name),
+                "UPDATE branches SET is_latest=1, tracked_commit_hash=? WHERE root_folder=? AND branch_name=?",
+                (commit_hash, self.root_folder, branch_name),
             )
             conn.execute(
                 "INSERT INTO branch_links (parent_commit_hash, child_commit_hash, child_branch_name, created_at) VALUES (?, ?, ?, ?)",
@@ -666,7 +696,7 @@ class Version():
         def get_version(chash):
             if chash == "latest":
                 current_branch_name = self._get_latest_branch_name(conn)
-                parent_commit_hash = self._get_latest_commit_of_branch(conn, current_branch_name)
+                parent_commit_hash = self._get_tracked_commit_of_branch(conn, current_branch_name)
                 row = conn.execute(
                     "SELECT id, commit_hash, root_tree_hash FROM versions "
                     "WHERE root_folder=? AND commit_hash=?",
@@ -778,7 +808,7 @@ class Version():
             current_branch_name = self._get_latest_branch_name(conn)
             f1_hash = f2_hash = None
             if commit1 == "working tree":
-                commit1 = self._get_latest_commit_of_branch(conn, current_branch_name)
+                commit1 = self._get_tracked_commit_of_branch(conn, current_branch_name)
             if commit1 != "latest":
                 rows = conn.execute(
                     "SELECT content_hash_sha256 "
@@ -790,7 +820,7 @@ class Version():
                 f1_hash = rows['content_hash_sha256'] if rows else None
             
             if commit2 == "working tree":
-                commit2 = self._get_latest_commit_of_branch(conn, current_branch_name)
+                commit2 = self._get_tracked_commit_of_branch(conn, current_branch_name)
             if commit2 != "latest":
                 rows = conn.execute(
                     "SELECT content_hash_sha256 "
@@ -918,7 +948,7 @@ class Version():
         root_folder = os.path.abspath(self.root_folder)
         conn = open_db(root_folder)
         row = conn.execute(
-            "SELECT commit_hash, snapshot_path FROM versions "
+            "SELECT commit_hash FROM versions "
             "WHERE root_folder = ? AND commit_hash LIKE ?",
             (root_folder, commit_hash + "%")
         ).fetchone()
@@ -930,5 +960,76 @@ class Version():
         full_hash = row["commit_hash"]
         print(f"Restoring {commit_hash} from chunk store → {root_folder}")
         materialize_commit_to_worktree(conn, full_hash, os.path.join(root_folder, SNAPSHOTS_DIR), root_folder)
+
+        branch_name = "latest"
+        row = conn.execute(
+            "SELECT child_branch_name FROM branch_links "
+            "WHERE child_commit_hash = ?",
+            (full_hash,)
+        ).fetchone()
+        if row and row["child_branch_name"] is not None:
+            branch_name = row["child_branch_name"]
+            print(f"updating restoring {full_hash} to branch {branch_name}")
+            conn.execute(
+                "UPDATE branches SET is_latest=1, tracked_commit_hash=? WHERE branch_name=?",
+                (full_hash, branch_name),
+            )
+            conn.commit()
         conn.close()
-        print(f" Restored to {full_hash}")
+        print(f" Restored to {full_hash} in branch '{branch_name}'")
+
+    def cmd_clone(self, source_repo_path: str, target_repo_path: str):
+        """Clone a dsi-vcs repository from source to target."""
+        source_repo_path = os.path.abspath(source_repo_path)
+        target_repo_path = os.path.abspath(target_repo_path)
+
+        if not os.path.isdir(source_repo_path):
+            sys.exit(f"Source repository '{source_repo_path}' does not exist.")
+
+        def safe_copytree(src, dst):
+            errors = []
+            for root, dirs, files in os.walk(src, onerror=lambda e: errors.append(str(e))):
+                rel = os.path.relpath(root, src)
+                target_dir = os.path.join(dst, rel) if rel != "." else dst
+                try:
+                    os.makedirs(target_dir, exist_ok=True)
+                except PermissionError as e:
+                    errors.append(f"{root}: {e}")
+                    dirs[:] = []  # don't descend further into this branch
+                    continue
+
+                for f in files:
+                    s = os.path.join(root, f)
+                    d = os.path.join(target_dir, f)
+                    try:
+                        shutil.copy2(s, d)
+                    except PermissionError as e:
+                        errors.append(f"{s}: {e}")
+
+            return errors
+
+        errors = safe_copytree(source_repo_path, target_repo_path)
+        if errors:
+            print(f"{len(errors)} items skipped:")
+            for e in errors:
+                print(" ", e)
+
+        # shutil.copytree(source_repo_path, target_repo_path, dirs_exist_ok=True, ignore_errors=True)
+
+        root_folder = os.path.abspath(self.root_folder)
+        conn = open_db(root_folder)
+        conn.execute(
+            "UPDATE versions SET root_folder=?",
+            (target_repo_path,),
+        )
+        conn.execute(
+            "UPDATE merkle_nodes SET root_folder=?",
+            (target_repo_path,),
+        )
+        conn.execute(
+            "UPDATE branches SET root_folder=?",
+            (target_repo_path,),
+        )
+        conn.commit()
+        conn.close()
+        print(f"Cloned repository from '{source_repo_path}' to '{target_repo_path}'")

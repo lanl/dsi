@@ -286,3 +286,222 @@ def collect_tree_metadata(scan_root: str, identity_root: str) -> list[dict]:
 #             entries.append(collect_metadata(abs_path, root_folder))
 
 #     return entries
+
+
+# def parse_acl(path):
+#     output = subprocess.check_output(
+#         ["getfacl", "-cp", path],
+#         text=True
+#     )
+
+#     acl = {
+#         "owner": None,
+#         "group": None,
+#         "user_obj": "",
+#         "group_obj": "",
+#         "other": "",
+#         "mask": None,
+#         "named_users": {},
+#         "named_groups": {}
+#     }
+
+#     for line in output.splitlines():
+#         line = line.strip()
+
+#         if not line or line.startswith("#"):
+#             if line.startswith("# owner:"):
+#                 acl["owner"] = line.split(":", 1)[1].strip()
+
+#             elif line.startswith("# group:"):
+#                 acl["group"] = line.split(":", 1)[1].strip()
+
+#             continue
+
+#         parts = line.split(":")
+
+#         if parts[0] == "user":
+#             if parts[1] == "":
+#                 acl["user_obj"] = parts[2]
+#             else:
+#                 acl["named_users"][parts[1]] = parts[2]
+
+#         elif parts[0] == "group":
+#             if parts[1] == "":
+#                 acl["group_obj"] = parts[2]
+#             else:
+#                 acl["named_groups"][parts[1]] = parts[2]
+
+#         elif parts[0] == "mask":
+#             acl["mask"] = parts[2]
+
+#         elif parts[0] == "other":
+#             acl["other"] = parts[2]
+
+#     return acl
+
+
+def has_read_permission(fmeta: dict, uid: int, gid: int) -> bool:
+    # acl = parse_acl(fmeta["absolute_path"])
+
+    user = pwd.getpwuid(uid)
+    username = user.pw_name
+
+    primary_gid = user.pw_gid
+
+    groups = {grp.getgrgid(primary_gid).gr_name}
+
+    for g in grp.getgrall():
+        if username in g.gr_mem:
+            groups.add(g.gr_name)
+
+    mask = acl["mask"]
+
+    def can_read(perms):
+        return "r" in perms
+
+    #
+    # 1. Owner
+    #
+    if username == acl["owner"]:
+        return can_read(acl["user_obj"])
+
+    #
+    # 2. Named user
+    #
+    if username in acl["named_users"]:
+        perms = acl["named_users"][username]
+
+        if mask is not None:
+            return can_read(perms) and can_read(mask)
+
+        return can_read(perms)
+
+    #
+    # 3. Groups
+    #
+    group_perms = []
+
+    if acl["group"] in groups:
+        group_perms.append(acl["group_obj"])
+
+    for g in groups:
+        if g in acl["named_groups"]:
+            group_perms.append(acl["named_groups"][g])
+
+    if group_perms:
+        effective = any(can_read(p) for p in group_perms)
+
+        if mask is not None:
+            effective = effective and can_read(mask)
+
+        return effective
+
+    #
+    # 4. Other
+    #
+    return can_read(acl["other"])
+
+# None if permission denined, acl text if permission granted, or empty string if no acl text available
+def check_access_permission(conn, root_folder: str, commit_hash: str, relative_path: str, access: str = "read") -> dict:
+    row = conn.execute(
+        "SELECT "
+        "    mn.metadata AS metadata "
+        "FROM versions v "
+        "JOIN merkle_nodes mn "
+        "    ON mn.version_id = v.id "
+        "WHERE v.root_folder    = ? "
+        "AND v.commit_hash    = ? "
+        "AND mn.relative_path = ?",
+        (root_folder, commit_hash, relative_path),
+    ).fetchone()
+    if row is None:
+        return None
+    metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+    acl_text = metadata.get("acl_text")
+    owner_name = metadata.get("owner_name")
+    group_name = metadata.get("group_name")
+    permissions_int = metadata.get("permissions_int")
+    if owner_name is None or group_name is None or permissions_int is None:
+        return None
+
+    access = access.lower()
+    if access not in {"read", "write"}:
+        raise ValueError("access must be 'read' or 'write'")
+
+    try:
+        current_user = pwd.getpwuid(os.geteuid())
+        username = current_user.pw_name
+    except KeyError:
+        return None
+
+    current_groups = set()
+    try:
+        current_groups.add(grp.getgrgid(os.getegid()).gr_name)
+    except KeyError:
+        pass
+    for gid in os.getgroups():
+        try:
+            current_groups.add(grp.getgrgid(gid).gr_name)
+        except KeyError:
+            pass
+
+    # If acl_text is available (Darwin format like "username allow read,write"
+    # entries separated by ';'), check it first for explicit allows for the
+    # current user or any of the user's groups.
+    if acl_text:
+        for entry in acl_text.split(";"):
+            entry = entry.strip()
+            if not entry:
+                continue
+            # Expect formats like "username allow read,write" or
+            # "groupname allow read". Be tolerant of prefixes like "user:foo".
+            parts = entry.split(None, 2)
+            if len(parts) < 2:
+                continue
+            principal = parts[0]
+            action = parts[1].lower()
+            perms = ""
+            if len(parts) >= 3:
+                perms = parts[2]
+
+            # Normalize principal (drop "user:" or "group:" prefixes)
+            if ":" in principal:
+                principal = principal.split(":", 1)[1]
+
+            # Only handle allow entries here
+            if action != "allow":
+                continue
+
+            # Check user principal
+            if principal == username:
+                permitted = {p.strip() for p in perms.split(",") if p}
+                if access in permitted or (access == "read" and "write" in permitted):
+                    return metadata
+                # explicit allow for this user did not include requested access
+                continue
+
+            # Check group principal
+            if principal in current_groups:
+                permitted = {p.strip() for p in perms.split(",") if p}
+                if access in permitted or (access == "read" and "write" in permitted):
+                    return metadata
+                continue
+    else:
+        acl_text = ""
+
+    if access == "read":
+        owner_bit = stat.S_IRUSR | stat.S_IWUSR
+        group_bit = stat.S_IRGRP | stat.S_IWGRP
+        other_bit = stat.S_IROTH | stat.S_IWOTH
+    else:
+        owner_bit = stat.S_IWUSR
+        group_bit = stat.S_IWGRP
+        other_bit = stat.S_IWOTH
+
+    if username == owner_name:
+        return None if bool(permissions_int & owner_bit) is False else metadata
+
+    if group_name in current_groups:
+        return None if bool(permissions_int & group_bit) is False else metadata
+
+    return None if bool(permissions_int & other_bit) is False else metadata

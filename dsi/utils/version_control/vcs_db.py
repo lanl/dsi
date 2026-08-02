@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS merkle_nodes (
     relative_path       TEXT    NOT NULL,
     file_type           TEXT    NOT NULL,
     node_hash           TEXT    NOT NULL,
-    metadata_hash       TEXT    NOT NULL,
+    metadata            TEXT    DEFAULT NULL,
     content_hash_sha256 TEXT,
     subtree_file_count  INTEGER NOT NULL,
     subtree_total_bytes INTEGER NOT NULL,
@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS branches (
     root_folder     TEXT    NOT NULL,
     branch_name     TEXT    NOT NULL,
     head_commit_hash TEXT    NOT NULL,
+    tracked_commit_hash TEXT    NOT NULL,   -- latest commit or switched commit hash for this branch
     is_latest       INTEGER NOT NULL DEFAULT 0,
     created_at      INTEGER NOT NULL,
     UNIQUE(root_folder, branch_name)

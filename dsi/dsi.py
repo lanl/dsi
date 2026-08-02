@@ -1297,6 +1297,7 @@ class DSI():
           -  log                             # list versions
           -  diff                            # diff between two versions. If no version is provided, diff the current version with the previous version
           -  restore                         # restore a version with commit hash
+          -  clone                           # clone a remote versioning repository
 
         `args` : str        
           -  init: A required argument with the name of the root folder for the versioning repository.
@@ -1311,6 +1312,7 @@ class DSI():
           -  log: An optional argument to specify the number of recent versions to display, specified as an integer. If not provided, recent 5 versions are displayed.
           -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
           -  restore: A required argument to specify the version to restore, specified by its commit hash.
+          -  clone: A required argument to specify the path of the remote repository to clone.
         """
         if command == "init":
             if args is None:
@@ -1370,5 +1372,9 @@ class DSI():
             if args is None:
                 raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
             self.vcs.cmd_restore(args)
+        elif command == "clone" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'clone' command requires a 'remote_path' argument specifying the path of the remote repository to clone.")
+            self.vcs.cmd_clone(args)
         else:
             raise RuntimeError("version() ERROR: Invalid command or versioning repository not initialized. Please check the command and ensure 'init' has been called with a root folder argument.")
