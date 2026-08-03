@@ -155,8 +155,8 @@ class RCSBPDB(Webserver):
         ),
     }
 
-    DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
-    RCSBPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.I)
+    DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.IGNORECASE)
+    RCSBPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.IGNORECASE)
     PDB_ID_REGEX = re.compile(r"^[A-Za-z0-9]{4}$")
 
     DATASET_SCHEMA = [
@@ -1569,41 +1569,37 @@ class RCSBPDB(Webserver):
             Specific columns to display.
         """
         if table_name is None:
-            print(
+            raise ValueError(
                 "display() requires a table_name. "
                 f"Available tables: {self.get_table_names()}"
             )
-            return None
 
         resolved = self._resolve_table_name(table_name)
 
         if resolved not in self.schemas:
-            print(
+            raise ValueError(
                 f"display() could not find table '{table_name}'. "
                 f"Available tables: {self.get_table_names()}"
             )
-            return None
 
         df = self.get_table(resolved)
 
         if df.empty:
-            print(f"Table '{resolved}' is empty.")
-            return None
+            raise ValueError(f"Table '{resolved}' is empty.")
 
         if display_cols is not None:
             missing_cols = [col for col in display_cols if col not in df.columns]
 
             if missing_cols:
-                print(
+                raise ValueError(
                     f"display() could not find column(s) {missing_cols} "
                     f"in table '{resolved}'. Available columns: {list(df.columns)}"
                 )
-                return None
 
             df = df[display_cols]
 
         print(df.head(num_rows).to_string(index=False))
-        return None
+
 
     def summary(self, table_name=None, *args, **kwargs):
         def is_complex_value(value):
