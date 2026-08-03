@@ -291,8 +291,7 @@ class Sqlite(Filesystem):
             
             self.ingest_table_helper(types, foreign_query)
             
-            # TODO: move this check to schema reader by allowing users to just create table without data
-            if not all(v == [""] for v in tableData.values()): # if table is just one row of empty strings, don't insert
+            if not all(v == [] for v in tableData.values()): # if table is empty (empty list as value) skip insert
                 col_names = ', '.join(types.properties.keys())
                 placeholders = ', '.join('?' * len(types.properties))
 
