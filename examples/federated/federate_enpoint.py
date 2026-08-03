@@ -8,10 +8,12 @@ from dsi.utils.federated.federate_datasets import (
 
 hpc_name = input("Enter the name of the HPC: ")
 username = input("Enter username: ")
-password = getpass.getpass("Enter password: ")
+#password = getpass.getpass("Enter password: ")
+script_path = input("Enter script path: ")
+
 
 # currently a script setting environment variables but should be load module in the future
-script_path='/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh' 
+#script_path='/lustre/roscratch1/pascalgrosset/dsi_test/load_dsi_endpoints.sh' 
 
 # prefix of the endpoints; environment variables to search for
 prefixes=['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'] 
@@ -21,7 +23,7 @@ endpoints_location = get_remote_endpoints_ssh(hpc_name, username, script_path, p
 
 
 # Federate the data in specified folder
-rel_wrks_folder = input("Enter the name of the folder to federate to: ") #"test_federate_07"
+rel_wrks_folder = input("Enter the name of the folder (on your computer) to federate to: ") #"test_federate_07"
 workspace_folder = str(Path(rel_wrks_folder).resolve())
 
 database_info = pull_data_endpoints(endpoints_location, hpc_name, workspace_folder)
