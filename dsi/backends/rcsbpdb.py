@@ -1454,12 +1454,9 @@ class RCSBPDB(Webserver):
 
     def find_cell(self, query_object, **kwargs):
         """
-        Search loaded row values for DSI search() calls.
-
-        find() remains column-condition based.
-        find_cell()/search() are row-value based.
+        Alias for find() to support DSI cell-style lookup calls.
         """
-        return self.search(query_object, collection=True, **kwargs)
+        return self.find(query_object, **kwargs)
 
     def find_relation(self, query, relation=None, **kwargs):
         """
