@@ -317,7 +317,7 @@ class RCSBPDB(Webserver):
             response.raise_for_status()
             return True
 
-        except Exception:  # noqa: BLE001
+        except: # noqa: E722
             # Need to silent exit to continue external workflows
             return False
 

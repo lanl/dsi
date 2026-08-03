@@ -47,10 +47,11 @@ class DSI:
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
-            Name of the backend to activate. 
+            Name of the backend to activate.
 
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", or "RCSBPDB".            
-            If using an external backend, provide the relative path to the Python module with the backend. 
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", or "RCSBPDB".
+
+            If using an external backend, provide the relative path to the Python module with the backend.
         """
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True

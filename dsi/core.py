@@ -1484,9 +1484,7 @@ class Terminal:
                         return True
                     except (ConnectionError, RuntimeError) as e:
                         if self.debug_level != 0:
-                            self.logger.warning(
-                                f"NDP backend connection validation failed: {e!s}"
-                            )
+                            self.logger.warning(f"NDP backend connection validation failed: {e!s}")
                         return False
             if backend.__class__.__name__ == "OSTI":
                     # OSTI is valid if data is loaded and connection works
@@ -1498,13 +1496,18 @@ class Terminal:
                         return True
                     except (ConnectionError, RuntimeError) as e:
                         if self.debug_level != 0:
-                            self.logger.warning(
-                                f"OSTI backend connection validation failed: {e!s}"
-                            )
+                            self.logger.warning(f"OSTI backend connection validation failed: {e!s}")
                         return False 
             if backend.__class__.__name__ == "RCSBPDB":
                     # RCSBPDB is valid if data is loaded and RCSB connection works
                     if not backend._loaded:
+                        return False
+
+                    if backend.validate_connection():
+                        return True
+                    else:
+                        if self.debug_level != 0:
+                            self.logger.warning(f"RCSBPDB backend connection validation failed: {e!s}")
                         return False
             if backend.__class__.__name__ == "Oceans11":
                 if not backend._loaded:
