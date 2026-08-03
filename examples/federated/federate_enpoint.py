@@ -2,8 +2,8 @@ import getpass
 from pathlib import Path
 
 from dsi.utils.federated.federate_datasets import (
-    get_remote_endpoints,
-    pull_data_endpoints
+    get_remote_endpoints_ssh,
+    pull_data_endpoints,
 )
 
 hpc_name = input("Enter the name of the HPC: ")
@@ -16,7 +16,7 @@ script_path='/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
 # prefix of the endpoints; environment variables to search for
 prefixes=['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'] 
 
-endpoints_location = get_remote_endpoints(hpc_name, username, password, script_path, prefixes)
+endpoints_location = get_remote_endpoints_ssh(hpc_name, username, script_path, prefixes)
 
 
 
