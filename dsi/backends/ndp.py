@@ -5,14 +5,16 @@ Read-only backend that pulls metadata from CKAN-based NDP instances
 and exposes it as in-memory DSI tables: datasets and resources.
 """
 
-import requests
-import pandas as pd
 from collections import OrderedDict
 from urllib.parse import urlparse
 
+import numpy as np
+import pandas as pd
+import requests
+import urllib3
+
 from dsi.backends.webserver import Webserver
 
-import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -52,6 +54,7 @@ class NDP(Webserver):
     CKAN-based web backend for querying NDP metadata in-memory
     """
     read_only = True
+
     # ----------------------------------------------------------------------
     # Initialization
     # ----------------------------------------------------------------------
@@ -59,33 +62,35 @@ class NDP(Webserver):
         """
         Initialize backend and optionally load data from CKAN API.
 
+        Parameters
+        ----------
         `url` : str, optional
             Base CKAN URL. If None, a default CKAN endpoint is used.
-
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from CKAN.
-            
             Supported keys:
-                - keywords : str - Search keywords
-                - organization : str - Organization name filter
+                - keywords : str - Full-text search
+                - creator : str - Creator name filter (from extras.creatorName)
+                - organization : str - Organization name filter (auto-slugified)
+                - license : str - License filter
                 - tags : list - List of tags to filter by
+                - group : list - List of groups/collections to filter by (auto-slugified)
                 - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
                 - limit : int - Maximum number of datasets to retrieve (default: 100)
-        
         `**kwargs` : dict
-            Additional keyword arguments.
-
-            - api_key : str, optional
-                API key for authentication
-            - verify_ssl : bool, optional
-                Toggle SSL verification (default False)
+            Additional keyword arguments:
+                - api_key : str, optional
+                    API key for authentication
+                - verify_ssl : bool, optional
+                    Toggle SSL verification (default False)
         """
+
         DEFAULT_URL = "https://nationaldataplatform.org/catalog"
 
         base_url = url or DEFAULT_URL
 
         # ----------------------------------------------------------------------
-        # Auth / connection config
+        # Auth / Connection Config
         # ----------------------------------------------------------------------
         self.api_key = kwargs.get("api_key")
         self.verify_ssl = kwargs.get("verify_ssl", False)
@@ -103,14 +108,13 @@ class NDP(Webserver):
         # Data storage (tiered structure)
         # Tier 1: datasets, Tier 2: per-dataset resource tables
         self._cache = OrderedDict()
-        self._resource_tables = []
         self._dataset_id_map = {}
         self._dataset_title_map = {}
 
         self._loaded = False
         self.params = params or {}
 
-        # Validate connection FIRST before attempting to load data
+        # Validate connection before attempting to load data
         try:
             self.validate_connection()
         except (ConnectionError, RuntimeError):
@@ -121,12 +125,12 @@ class NDP(Webserver):
         if self.params:
             try:
                 self._load_initial_data(self.params)
-                self._loaded = True  # Data successfully loaded
+                self._loaded = True
             except Exception as e:
                 self._loaded = False
                 raise RuntimeError(f"Failed to load initial data: {e}") from e
         else:
-            self._loaded = True  # Backend ready, no initial data to load
+            self._loaded = True
 
 
     # ----------------------------------------------------------------------
@@ -134,13 +138,22 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def validate_connection(self):
         """
-        Validates the connection to the base CKAN URL is reachable and CKAN API is responsive.
+        Validates that the base CKAN URL is accessible and functional.
         
-        Raises: 
-            - **ConnectionError** : If the URL cannot be reached
-            - **RuntimeError** : If the CKAN API returns an error response
+        This method tests the connection by making a simple API call to verify:
+            - The URL is reachable
+            - The CKAN API is responding
         
-        Return : bool
+        Raises
+        ------
+        ConnectionError
+            If the URL cannot be reached
+        RuntimeError
+            If the CKAN API returns an error response
+        
+        Returns
+        -------
+        bool
             True if connection is valid
         """
         try:
@@ -200,107 +213,270 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def _load_initial_data(self, params):
         """
-        Fetch datasets/resources from CKAN API and store in memory.
-
+        Loads data from NDP API based on query parameters.
+        
+        Supports:
+            - Single query (dict)
+            - Multiple queries (list of dicts)
+            - Direct ID lookup (id parameter)
+        
+        Results are deduplicated by dataset ID and stored in a unified structure:
+            - Tier 1: datasets table (one row per dataset)
+            - Tier 2: resources table (combined resources from ALL datasets)
+        
         Parameters
         ----------
-        `params` : dict
-            Query parameters including:
-                - keywords : str, optional
-                - organization : str, optional
-                - tags : list, optional
-                - formats : list, optional
-                - limit : int, optional
+        params : dict or list of dict
+            Query parameters or list of query parameter dicts.
+            Each dict can contain:
+                - id : str - Direct dataset ID lookup
+                - keywords : str - Full-text search
+                - creator : str - Creator name filter (from extras.creatorName)
+                - organization : str - Organization filter (auto-slugified)
+                - license : str - License filter
+                - tags : list - List of tags
+                - group : list - List of groups/collections (auto-slugified)
+                - formats : list - List of resource formats (e.g., ['CSV', 'JSON'])
+                - limit : int - Maximum number of datasets (default: 100)
         """
-        query_params = {"rows": params.get("limit", 100)}
-
-        q_parts, fq_parts = [], []
-
-        if params.get("keywords"):
-            q_parts.append(params["keywords"])
-
-        if params.get("organization"):
-            fq_parts.append(f"organization:{params['organization']}")
-
-        if params.get("tags"):
-            fq_parts += [f"tags:{t}" for t in params["tags"]]
-
-        if params.get("formats"):
-            fq_parts.append("(" + " OR ".join(
-                [f"res_format:{f}" for f in params["formats"]]) + ")")
-
-        if q_parts:
-            query_params["q"] = " ".join(q_parts)
-
-        if fq_parts:
-            query_params["fq"] = " AND ".join(fq_parts)
-
-        result = self._request("package_search", query_params)
-
-        dataset_rows, resource_map, id_map = self._extract_tables(result.get("results", []))
-
+        
+        # Normalize params to list
+        if isinstance(params, dict):
+            query_list = [params]
+        elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
+            query_list = params
+        else:
+            raise TypeError("params must be a dict or a list of dicts")
+        
+        # Collect all datasets from all queries
+        all_datasets = []
+        
+        for query_params in query_list:
+            # Check if this is a direct ID lookup
+            if "id" in query_params:
+                dataset = self._get_dataset_by_id(query_params["id"])
+                if dataset:
+                    all_datasets.append(dataset)
+            else:
+                # Standard search query
+                result = self._run_single_query(query_params)
+                all_datasets.extend(result.get("results", []))
+        
+        # Deduplicate by dataset ID
+        unique_datasets = self._deduplicate_datasets(all_datasets)
+        
+        # Extract tables from deduplicated datasets
+        dataset_rows, all_resource_rows, id_map = self._extract_tables(unique_datasets)
+        
         # Tier 1: datasets
         self._cache["datasets"] = self._rows_to_table(dataset_rows)
         
+        # Tier 2: resources (One table for ALL resources)
+        if all_resource_rows:
+            self._cache["resources"] = self._rows_to_table(all_resource_rows)
+        
         self._dataset_id_map = id_map
         self._dataset_title_map = {v: k for k, v in id_map.items()}
-
-        # Tier 2: per-dataset resource tables
-        self._resource_tables = []
-        for dataset_title, rows in resource_map.items():
-            table_name = dataset_title
-            self._cache[table_name] = self._rows_to_table(rows)
-            self._resource_tables.append(table_name)
-
+       
         self._loaded = True
-
-
-    # ----------------------------------------------------------------------
-    # Table Name Resolution
-    # ----------------------------------------------------------------------
-    def _resolve_table_name(self, identifier):
+        
+        
+    def _slugify(self, value):
         """
-        Resolves a table identifier to its canonical name.
-
-        Accepts either dataset_title or dataset_id for resource tables.
-
+        Convert a value to CKAN-compatible slug format.
+        
+        CKAN stores organization and group names as lowercase slugs
+        with spaces replaced by hyphens.
+        
         Parameters
         ----------
-        `identifier` : str
-            Table name (dataset_title) or dataset ID
-
+        value : str
+            Value to slugify
+            
         Returns
         -------
         str
-            Canonical table name (dataset_title)
-            
-        Raises
-        ------
-        ValueError
-            If the identifier cannot be resolved to a table
+            Slugified value
         """
-        if identifier in self._cache:
-            return identifier
+        if not isinstance(value, str):
+            return str(value).lower()
+        
+        return value.lower().replace(" ", "-")
 
-        if identifier in self._dataset_id_map:
-            return self._dataset_id_map[identifier]
 
-        available_titles = [name for name in self._resource_tables]
+    def _quote_if_needed(self, value):
+        """
+        Quote a value if it contains spaces or special Solr characters.
         
-        error_msg = f"Table '{identifier}' not found.\n"
+        Parameters
+        ----------
+        value : str
+            Value to potentially quote
+            
+        Returns
+        -------
+        str
+            Quoted or unquoted value
+        """
+        if not isinstance(value, str):
+            return str(value)
         
-        if available_titles:
-            error_msg += "\nAvailable dataset titles:\n"
-            for title in available_titles[:5]:
-                dataset_id = self._dataset_title_map.get(title, "N/A")
-                error_msg += f"  - '{title}' (ID: {dataset_id})\n"
-            if len(available_titles) > 5:
-                error_msg += f"  ... and {len(available_titles) - 5} more\n"
+        # Quote if contains spaces
+        if ' ' in value:
+            # Escape any existing quotes within the value
+            value = value.replace('"', '\\"')
+            return f'"{value}"'
         
-        if "datasets" in self._cache:
-            error_msg += "\nOr use 'datasets' to view all datasets."
+        return value
+
+
+    def _get_dataset_by_id(self, dataset_id):
+        """
+        Retrieve a single dataset by ID or name using package_show.
         
-        raise ValueError(error_msg)
+        Parameters
+        ----------
+        dataset_id : str
+            Dataset ID or name
+            
+        Returns
+        -------
+        dict or None
+            Dataset dict if found, None otherwise
+        """
+        try:
+            result = self._request("package_show", {"id": dataset_id})
+            return result
+        except (requests.exceptions.RequestException, RuntimeError, ValueError) as e:
+            print(f"Warning: Could not retrieve dataset '{dataset_id}': {e}")
+            return None
+
+
+    def _run_single_query(self, params):
+        """
+        Execute a single CKAN query with proper value normalization.
+        
+        Handles:
+            - Slugification for organization and groups (lowercase + hyphens)
+            - Quoting for values with spaces (tags, creator, license)
+            - Multiple filter combinations
+        
+        Parameters
+        ----------
+        params : dict
+            Query parameters. Supported keys:
+                - keywords : str
+                    Full-text search (no normalization)
+                - creator : str
+                    Creator name filter (quoted if spaces)
+                - organization : str
+                    Organization name filter (slugified: lowercase, spaces → hyphens)
+                - license : str
+                    License filter (quoted if spaces)
+                - tags : list of str
+                    Tag filters (each quoted if spaces)
+                - group : list of str
+                    Group/collection filters (each slugified)
+                - formats : list of str
+                    Resource format filters (each quoted if spaces)
+                - limit : int, default 100
+                    Maximum number of results
+        
+        Returns
+        -------
+        dict
+            CKAN API response containing:
+                - success : bool
+                - result : dict with 'results' list
+        """
+        query_params = {"rows": params.get("limit", 100)}
+        
+        q_parts, fq_parts = [], []
+        
+        # Keywords search
+        if params.get("keywords"):
+            q_parts.append(params["keywords"])
+        
+        # Creator filter (searches extras.creatorName)
+        if params.get("creator"):
+            creator_value = self._quote_if_needed(params["creator"])
+            fq_parts.append(f"creatorName:{creator_value}")
+        
+        # Organization filter (slugify)
+        if params.get("organization"):
+            org_value = self._slugify(params["organization"])
+            fq_parts.append(f"organization:{org_value}")
+        
+        # License filter (quote if has spaces)
+        if params.get("license"):
+            license_value = self._quote_if_needed(params["license"])
+            fq_parts.append(f"license_id:{license_value}")
+        
+        # Tags filter (quote each if has spaces)
+        if params.get("tags"):
+            for tag in params["tags"]:
+                tag_value = self._quote_if_needed(tag)
+                fq_parts.append(f"tags:{tag_value}")
+        
+        # Groups filter (slugify each)
+        if params.get("group"):
+            groups = params["group"]
+            # Convert string to list
+            if isinstance(groups, str):
+                groups = [groups]
+            for group in groups:
+                group_value = self._slugify(group)
+                fq_parts.append(f"groups:{group_value}")
+        
+        # Format filter (quote each if has spaces)
+        if params.get("formats"):
+            format_parts = []
+            for fmt in params["formats"]:
+                fmt_value = self._quote_if_needed(fmt)
+                format_parts.append(f"res_format:{fmt_value}")
+            fq_parts.append("(" + " OR ".join(format_parts) + ")")
+        
+        # Build final query params
+        if q_parts:
+            query_params["q"] = " ".join(q_parts)
+        
+        if fq_parts:
+            query_params["fq"] = " AND ".join(fq_parts)
+        
+        return self._request("package_search", query_params)
+
+
+    def _deduplicate_datasets(self, datasets):
+        """
+        Remove duplicate datasets based on ID.
+        
+        Parameters
+        ----------
+        datasets : list
+            List of dataset dicts from CKAN API
+            
+        Returns
+        -------
+        list
+            Deduplicated list of datasets
+        """
+        seen_ids = set()
+        unique_datasets = []
+        
+        for ds in datasets:
+            dataset_id = ds.get("id")
+            
+            if dataset_id is None:
+                # Keep datasets without IDs
+                unique_datasets.append(ds)
+                continue
+            
+            if dataset_id not in seen_ids:
+                seen_ids.add(dataset_id)
+                unique_datasets.append(ds)
+        
+        return unique_datasets
+
     
     # ----------------------------------------------------------------------
     # API Helpers
@@ -321,6 +497,7 @@ class NDP(Webserver):
         dict
             Result data from CKAN API response
         """
+
         url = f"{self.base_url}/api/3/action/{endpoint}"
 
         r = requests.get(
@@ -339,30 +516,57 @@ class NDP(Webserver):
         return data["result"]
 
 
+    def _extract_from_extras(self, dataset, key):
+        """
+        Extract a value from CKAN dataset extras by key.
+        
+        Parameters
+        ----------
+        dataset : dict
+            CKAN dataset dictionary
+        key : str
+            The extras key to extract (e.g., 'creatorName')
+        
+        Returns
+        -------
+        str or None
+            The value if found, None otherwise
+        """
+        extras = dataset.get("extras", [])
+        for extra in extras:
+            if extra.get("key") == key:
+                return extra.get("value")
+        return None
+    
+    
     def _extract_tables(self, datasets):
         """
-        Flatten CKAN dataset JSON into dataset and resource tables.
-
+        Flatten CKAN dataset JSON into datasets and resources tables.
+        
+        Creates:
+            - datasets: One row per dataset
+            - resources: Combined resources from ALL datasets
+        
         Parameters
         ----------
         `datasets` : list
             List of dataset dictionaries from CKAN API
-
+        
         Returns
         -------
         tuple
-            (dataset_rows, resource_map, id_map) where:
+            (dataset_rows, all_resource_rows, id_map) where:
                 - dataset_rows : list of dict
                     Flattened dataset metadata
-                - resource_map : dict
-                    Maps dataset_name to list of resource rows
+                - all_resource_rows : list of dict
+                    Combined resources from all datasets
                 - id_map : dict
                     Maps dataset_id to dataset_title
         """
         dataset_rows = []
-        resource_map = {}
+        all_resource_rows = []
         id_map = {}
-
+        
         for ds in datasets:
             dataset_id = ds.get("id")
             dataset_name = ds.get("name") or dataset_id
@@ -370,35 +574,42 @@ class NDP(Webserver):
             
             if dataset_id and dataset_title:
                 id_map[dataset_id] = dataset_title
-
+                
+            # Extract creator from extras
+            creator_name = self._extract_from_extras(ds, "creatorName")
+            creator_email = self._extract_from_extras(ds, "creatorEmail")
+            
             dataset_rows.append({
                 "id": dataset_id,
                 "name": dataset_name,
                 "title": dataset_title,
                 "notes": ds.get("notes"),
                 "organization": (ds.get("organization") or {}).get("title"),
-                "author": ds.get("author"),
+                "creator": creator_name,
+                "creator_email": creator_email,
+                "group": ",".join(g["name"] for g in ds.get("groups", [])),
                 "license": ds.get("license_title"),
                 "created": ds.get("metadata_created"),
                 "modified": ds.get("metadata_modified"),
                 "tags": ",".join(t["name"] for t in ds.get("tags", [])),
-                "num_resources": ds.get("num_resources", 0)
+                "num_resources": ds.get("num_resources", 0),
+                "raw_dataset": ds
             })
-
-            resource_map.setdefault(dataset_title, [])
             
             for r in ds.get("resources", []):
-                resource_map[dataset_title].append({
+                all_resource_rows.append({
                     "resource_id": r.get("id"),
                     "resource_name": r.get("name"),
+                    "issue_date": r.get("issueDate"),
                     "format": r.get("format"),
                     "size": r.get("size"),
                     "url": r.get("url"),
                     "dataset_id": dataset_id,
-                    "dataset_title": dataset_title
+                    "dataset_title": dataset_title,
+                    "raw_resource": r
                 })
-
-        return dataset_rows, resource_map, id_map
+        
+        return dataset_rows, all_resource_rows, id_map
 
 
     def _rows_to_table(self, rows):
@@ -415,6 +626,7 @@ class NDP(Webserver):
         OrderedDict
             Column-oriented table structure
         """
+
         if not rows:
             return OrderedDict()
 
@@ -431,88 +643,214 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Terminal Methods
     # ----------------------------------------------------------------------
-    def num_tables(self):
+    def num_tables(self, **kwargs):
         """
-        Prints the number of tables (datasets) loaded.
+        Prints the number of tables currently loaded OR returns number of datasets (rows in the datasets table).
+        
+        NDP backend has 2 main tables:
+            - datasets: Dataset metadata. Each row is a different dataset retrieved from NDP
+            - resources: Combined resources from all datasets
+        
+        Returns
+        -------
+        - If kwargs is empty: None
+        - If kwargs has key 'table_name' with value 'datasets: returns num datasets retrieved by NDP as an int
         """
+        table_name = kwargs.get("table_name")
+        if isinstance(table_name, str) and table_name.strip().lower() == "datasets":
+            if not self._loaded:
+                return 0
+
+            datasets_table = self._cache.get("datasets", {})
+
+            if not datasets_table:
+                return 0
+            
+            # Get length of first column to determine row count
+            first_col = next(iter(datasets_table.values()), [])
+            return len(first_col)
+
         if not self._loaded:
-            print("0 tables loaded")
+            print("NDP Backend has 0 tables")
             return
         
-        num = len(self._cache) - (1 if "datasets" in self._cache else 0)
-        print(f"{num} tables loaded")
+        # Count actual tables in cache
+        table_count = 0
+        
+        # Check for datasets table
+        if self._cache.get("datasets"):
+            table_count += 1
+        
+        # Check for resources table
+        if self._cache.get("resources"):
+            table_count += 1
+        
+        # Check for errors table
+        if self._cache.get("errors"):
+            table_count += 1
+        
+        print(f"Database now has {table_count} tables")
 
 
     def get_table(self, table_name, dict_return=False):
         """
         Returns all data from a specified table.
         
-        `table_name` : str
-            Dataset title or ID
-        `dict_return` : bool, default False
-            If True, returns OrderedDict. 
-            If False, returns DataFrame.
+        Parameters
+        ----------
+        table_name : str
+            Must be 'datasets' or 'resources'
+        dict_return : bool, default False
+            If True, returns OrderedDict (raw collection).
+            If False (default), returns pandas DataFrame.
         
-        **Return : OrderedDict or pandas.DataFrame**
+        Returns
+        -------
+        OrderedDict or pandas.DataFrame
+            Depends on dict_return parameter
         """
         if not self._loaded:
-            raise RuntimeError("No data loaded. Call load_datasets() first.")
+            raise RuntimeError("No data loaded")
         
-        resolved_name = self._resolve_table_name(table_name)
-        table = self._cache.get(resolved_name)
+        if table_name not in self._cache:
+            raise ValueError(
+                f"Table '{table_name}' not found. "
+                f"Available tables: {list(self._cache.keys())}"
+            )
+        
+        table = self._cache.get(table_name)
         
         if not table:
-            raise ValueError(f"Table '{resolved_name}' is empty")
+            raise ValueError(f"Table '{table_name}' is empty")
         
         if dict_return:
             return table
-        return pd.DataFrame(table)
+        else:
+            return pd.DataFrame(table)
 
-    
-    def get_schema(self):
-        """
-        Return a lightweight schema description of cached tables from CKAN.
 
-        Return : str
-            Each table's structural schema is combined into one large string.
+    def get_schema(self, table_name: str | None = None):
         """
+        Returns schema information for all tables or a specific table in SQLite CREATE TABLE format.
+        
+        Shows table structure with column names and types (INTEGER, REAL, TEXT, OBJECT, etc.)
+        similar to SQL backends.
+        
+        Parameters
+        ----------
+        table_name : str, optional
+            If provided, returns schema for only that table.
+            If None (default), returns schema for all tables.
+        
+        Returns
+        -------
+        str
+            SQL-style CREATE TABLE statements
+        """
+        if not self._loaded or not self._cache:
+            return "-- No tables loaded\n"
+        
+        # If specific table requested
+        if table_name is not None:
+            if table_name not in self._cache:
+                return f"-- Table '{table_name}' not found\n"
+            
+            table_data = self._cache.get(table_name)
+            if not table_data:
+                return f"-- Table '{table_name}' is empty\n"
+            
+            # Generate schema for single table
+            df = pd.DataFrame(table_data)
+            
+            schema_lines = []
+            schema_lines.append(f"CREATE TABLE {table_name} (")
+            
+            column_defs = []
+            for column in df.columns:
+                pandas_dtype = str(df[column].dtype).lower()
+                
+                # Map pandas dtype to SQL-style type
+                if 'int' in pandas_dtype:
+                    sql_type = 'INTEGER'
+                elif 'float' in pandas_dtype:
+                    sql_type = 'REAL'
+                elif pandas_dtype == 'bool':
+                    sql_type = 'BOOLEAN'
+                elif pandas_dtype == 'datetime64[ns]':
+                    sql_type = 'DATETIME'
+                elif pandas_dtype == 'object':
+                    non_null = df[column].dropna()
+                    if non_null.empty or all(isinstance(x, str) for x in non_null):
+                        sql_type = 'TEXT'
+                    else:
+                        sql_type = 'OBJECT'
+                else:
+                    sql_type = 'OBJECT'
+                
+                column_defs.append(f"    {column} {sql_type}")
+            
+            schema_lines.append(",\n".join(column_defs))
+            schema_lines.append(");")
+            
+            return "\n".join(schema_lines)
+        
+        # Return all table schemas (default behavior)
         schema_lines = []
-        for table_name, table in self._cache.items():
-            cols = []
-            for col_name, values in table.items():
-                dtype = "TEXT"
-                for v in values:
-                    if v is None:
-                        continue
-
-                    if isinstance(v, bool):
-                        dtype = "BOOLEAN"
-                    elif isinstance(v, int):
-                        dtype = "INTEGER"
-                    elif isinstance(v, float):
-                        dtype = "REAL"
-                    break
-
-                cols.append(f"    {col_name} {dtype}")
-
-            create_stmt = (
-                f"CREATE TABLE {table_name} (\n"
-                + ",\n".join(cols)
-                + "\n);"
-            )
-            schema_lines.append(create_stmt)
-
-        return "\n\n".join(schema_lines)
+        schema_lines.append("-- NDP Backend Schema")
+        schema_lines.append("-- (Read-only CKAN metadata backend)")
+        schema_lines.append("")
+        
+        for tbl_name, table_data in self._cache.items():
+            if not table_data:
+                continue
+            
+            df = pd.DataFrame(table_data)
+            
+            schema_lines.append(f"CREATE TABLE {tbl_name} (")
+            
+            column_defs = []
+            for column in df.columns:
+                pandas_dtype = str(df[column].dtype).lower()
+                
+                # Map pandas dtype to SQL-style type
+                if 'int' in pandas_dtype:
+                    sql_type = 'INTEGER'
+                elif 'float' in pandas_dtype:
+                    sql_type = 'REAL'
+                elif pandas_dtype == 'bool':
+                    sql_type = 'BOOLEAN'
+                elif pandas_dtype == 'datetime64[ns]':
+                    sql_type = 'DATETIME'
+                elif pandas_dtype == 'object':
+                    non_null = df[column].dropna()
+                    if non_null.empty or all(isinstance(x, str) for x in non_null):
+                        sql_type = 'TEXT'
+                    else:
+                        sql_type = 'OBJECT'
+                else:
+                    sql_type = 'OBJECT'
+                
+                column_defs.append(f"    {column} {sql_type}")
+            
+            schema_lines.append(",\n".join(column_defs))
+            schema_lines.append(");")
+            schema_lines.append("")
+        
+        return "\n".join(schema_lines)
 
 
     def get_table_names(self, query):
         """
         Extracts table/dataset names mentioned in a query string.
         
+        Parameters
+        ----------
         `query` : str
             Query string to parse
         
-        Return : list
+        Returns
+        -------
+        list
             List of dataset names/IDs found in query
         """
         if not self._loaded:
@@ -533,121 +871,254 @@ class NDP(Webserver):
         return list(set(found_tables))
 
 
+    def overwrite_table(self, table_name, collection):
+        """
+        Not supported - NDP backend is read-only.
+        
+        Parameters
+        ----------
+        `table_name` : str or list
+            Table name(s)
+        `collection` : DataFrame or list
+            Data
+        
+        Raises
+        ------
+        NotImplementedError
+            Always raised as NDP is read-only
+        """
+        raise NotImplementedError(
+            "NDP backend is read-only. Cannot overwrite tables. "
+            "To modify data, use artifact_handler('process') to load into "
+            "a writable backend (Sqlite/DuckDB), make changes, then query."
+        )
+
+
     # ----------------------------------------------------------------------
     # Query Interface (in-memory)
     # ----------------------------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
-        Query all tables using a pandas query string.
-
-        `query` : str
-            Pandas query string for filtering data
-        `dict_return` : bool, optional, default True
-            If True, returns dict format.
-            If False, returns pandas DataFrames.
+        Query not supported for NDP backend (non-SQL backend).
         
-        `**kwargs` : dict
-            Additional keyword arguments
+        NDP is a read-only metadata backend that does not support SQL queries.
+        Use find(), search(), or find_relation() for searching data instead.
 
-        Return : dict
-            Dictionary mapping table names to query results
+        Parameters
+        ----------
+        `query` : str
+            Query string (unused)
+        `dict_return` : bool, default True
+            Return format flag (unused)
+        `**kwargs` : dict
+            Additional keyword arguments (unused)
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised as NDP does not support SQL queries
+        """
+        raise NotImplementedError(
+            "query() is not supported for NDP backend - it is a non-SQL backend.\n\n"
+            "Use these methods instead:\n"
+            "  dsi.find('num_resources > 5')           # Query with conditions\n"
+            "  dsi.search('NASA')                      # Search across all tables\n"
+            "  dsi.find_relation('datasets', 'resources')  # Query relationships\n"
+        )
+
+
+    def find_relation(self, column_name, relation, **kwargs):
+        """
+        Find rows where column matches relation (e.g., 'num_resources > 5').
         """
         if not self._loaded:
-            raise RuntimeError("No data loaded. Cannot query empty backend.")
-
-        results = {}
-
-        for t_name, table in self._cache.items():
-            df = pd.DataFrame(table)
-
-            if df.empty:
+            raise RuntimeError(
+                "find_relation() ERROR: Cannot search an empty backend. "
+                "Ensure data is loaded first."
+            )
+        
+        operator, value = self._parse_relation(relation)
+        matches = []
+        
+        for table_name in self.list(collection=True):
+            df = self.get_table(table_name, dict_return=False)
+            
+            if column_name not in df.columns:
                 continue
+            
+            # Convert to numeric for numeric comparisons
+            if operator in {'>', '<', '>=', '<=', 'range'}:
+                df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+                df = df.dropna(subset=[column_name])
+            
+            # Apply filter
+            filtered = self._apply_pandas_filter(df, column_name, operator, value)
+            
+            # Convert to ValueObjects
+            for idx, row in filtered.iterrows():
+                vo = ValueObject()
+                vo.t_name = table_name
+                vo.c_name = list(df.columns)
+                vo.row_num = int(idx) + 1
+                vo.value = row.tolist()
+                vo.type = "cell"
+                matches.append(vo)
+        
+        return matches
 
-            try:
-                result_df = df.query(query, engine="python")
 
-                if not result_df.empty:
-                    results[t_name] = (
-                        result_df.to_dict(orient="list")
-                        if dict_return else result_df
-                    )
-            except pd.errors.UndefinedVariableError:
-                continue
-            except Exception as e:
-                raise ValueError(f"Query error in {t_name}: {e}")
+    def _apply_pandas_filter(self, df, column, operator, value):
+        """Apply comparison filter using pandas."""
+        if operator == '>':
+            return df[df[column] > value]
+        elif operator == '<':
+            return df[df[column] < value]
+        elif operator == '>=':
+            return df[df[column] >= value]
+        elif operator == '<=':
+            return df[df[column] <= value]
+        elif operator == '==':
+            return df[df[column] == value]
+        elif operator == '!=':
+            return df[df[column] != value]
+        elif operator == 'contains':
+            return df[df[column].astype(str).str.contains(str(value), case=False, na=False)]
+        elif operator == 'range':
+            min_val, max_val = value
+            return df[(df[column] >= min_val) & (df[column] <= max_val)]
+        return pd.DataFrame()
+    
+    
+    def _parse_relation(self, relation):
+        """
+        Parse relation string into operator and value.
+        
+        Examples:
+            '> 5' -> ('>', 5)
+            '<= 10' -> ('<=', 10)
+            '== 3' -> ('==', 3)
+            "(2, 5)" -> ('range', (2, 5))
+            "~~ 'climate'" -> ('contains', 'climate')
+        """
+        relation = relation.strip()
+        
+        # Two-character operators (must check first!)
+        if relation.startswith('>='):
+            return '>=', self._parse_value(relation[2:])
+        elif relation.startswith('<='):
+            return '<=', self._parse_value(relation[2:])
+        elif relation.startswith('=='):
+            return '==', self._parse_value(relation[2:])
+        elif relation.startswith('!='):
+            return '!=', self._parse_value(relation[2:])
+        elif relation.startswith('~~'):  # Partial match (contains)
+            return 'contains', self._parse_value(relation[2:])
+        
+        # Single-character operators
+        elif relation.startswith('>'):
+            return '>', self._parse_value(relation[1:])
+        elif relation.startswith('<'):
+            return '<', self._parse_value(relation[1:])
+        
+        # Range: (2, 5)
+        elif relation.startswith('(') and relation.endswith(')'):
+            parts = relation[1:-1].split(',')
+            if len(parts) == 2:
+                return 'range', (self._parse_value(parts[0]), self._parse_value(parts[1]))
+        
+        raise ValueError(f"Unknown relation format: {relation}")
 
-        if not results:
-            raise ValueError(f"Query returned no results: '{query}'")
 
-        return results
-
+    def _parse_value(self, value_str):
+        """Convert string to appropriate Python type"""
+        value_str = str(value_str).strip()
+        
+        # Remove quotes if present
+        if (value_str.startswith("'") and value_str.endswith("'")) or \
+        (value_str.startswith('"') and value_str.endswith('"')):
+            value_str = value_str[1:-1]  # Remove quotes
+        
+        # Try to convert to number
+        try:
+            if '.' not in value_str:
+                return int(value_str)
+            return float(value_str)
+        except ValueError:
+            # Return as string if conversion fails
+            return value_str
+        
 
     # ----------------------------------------------------------------------
     # Artifact Processing (tiered table construction)
     # ----------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Returns all cached tables in tiered format::
+        Returns all cached tables in tiered format.
 
+        Structure:
             {
                 "datasets": <dataset table>,
                 "<dataset_name>": <resource table>,
                 ...
             }
 
-        Useful for exporting or writing data to external formats.
+        Useful for exporting or writing to external systems.
 
-        Return : OrderedDict
+        Returns
+        -------
+        OrderedDict
             All cached tables in tiered structure
         """
+
         if not self._loaded:
             return {}
 
         return self._cache
 
 
-    # ----------------------------------------------------------------------
-    # URL Validation
-    # ----------------------------------------------------------------------
     def validate_urls(self):
         """
-        Validates resource URLs across all resource tables.
-
-        Adds 'url_valid' boolean column to each resource table.
+        Validates resource URLs in the unified resources table.
+        Adds 'url_valid' column to resources table.
         """
+        # Only validate the unified resources table
+        if "resources" not in self._cache:
+            raise RuntimeError("validate_urls() ERROR: No resources table found. Cannot validate URLs.")
+        
+        table = self._cache.get("resources", {})
+        urls = table.get("url", [])
+        
+        if not urls:
+            raise RuntimeError("validate_urls() ERROR: No URLs found in resources table.")
+        
         headers = {"User-Agent": "NDP-Validator"}
-
-        for table_name in self._resource_tables:
-            table = self._cache.get(table_name, {})
-            urls = table.get("url", [])
-
-            valid_list = []
-
-            for url in urls:
-                try:
-                    r = requests.head(
+        valid_list = []
+        
+        for url in urls:
+            try:
+                r = requests.head(
+                    url,
+                    allow_redirects=True,
+                    headers=headers,
+                    timeout=10,
+                    verify=self.verify_ssl
+                )
+                
+                if r.status_code == 405:
+                    r = requests.get(
                         url,
-                        allow_redirects=True,
+                        stream=True,
                         headers=headers,
                         timeout=10,
                         verify=self.verify_ssl
                     )
-
-                    if r.status_code == 405:
-                        r = requests.get(
-                            url,
-                            stream=True,
-                            headers=headers,
-                            timeout=10,
-                            verify=self.verify_ssl
-                        )
-
-                    valid_list.append(200 <= r.status_code < 400)
-
-                except Exception:
-                    valid_list.append(False)
-
-            table["url_valid"] = valid_list
+                
+                valid_list.append(200 <= r.status_code < 400)
+            
+            except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+                valid_list.append(False)
+        
+        table["url_valid"] = valid_list
 
 
     # ----------------------------------------------------------------------
@@ -655,26 +1126,40 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def find(self, query_object, **kwargs):
         """
-        Searches for all instances of `query_object` across the table, column, and cell levels.
+        Searches for all instances of query_object across all tables.
 
+        Searches at the table, column, and cell levels.
+
+        Parameters
+        ----------
         `query_object` : int, float, or str
             The value to search for across all tables in the backend
-        
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return : list of ValueObjects representing matches across:
-            - table names
-            - column names
-            - cell values
+        Returns
+        -------
+        list of ValueObject
+            A list of ValueObjects representing matches across:
+                - table names
+                - column names
+                - cell values
 
+        Notes
+        -----
         ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) Column name(s)
-            - row_num : (int or None) Row index
-            - value :   (any) Matched value or data
-            - type :    (str) {'table', 'column', 'cell'}
+            - t_name : str
+                Table name
+            - c_name : list
+                Column name(s)
+            - row_num : int or None
+                Row index
+            - value : any
+                Matched value or data
+            - type : str
+                {'table', 'column', 'cell'}
         """
+        
         query_str = str(query_object).lower()
 
         return (
@@ -686,25 +1171,39 @@ class NDP(Webserver):
 
     def find_table(self, query_object, **kwargs):
         """
-        Finds all tables whose names contain the given query_object. Search is case-insensitive.
+        Finds all tables whose names contain the given query_object.
 
+        Search is case-insensitive.
+
+        Parameters
+        ----------
         `query_object` : str
             The string to match against table names
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return : list of ValueObject
+        Returns
+        -------
+        list of ValueObject
             One ValueObject per matching table
 
+        Notes
+        -----
         ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List of all columns in the table
-            - value :   (dict) Full table data (dict of columns)
-            - row_num : (None)
-            - type :    (str) 'table'
+            - t_name : str
+                Table name
+            - c_name : list
+                List of all columns in the table
+            - value : dict
+                Full table data (dict of columns)
+            - row_num : None
+            - type : 'table'
         """
+
         if not isinstance(query_object, str):
-            return []
+            raise TypeError(
+                "find_table() ERROR: query_object must be a string"
+            )
 
         matches = []
 
@@ -723,25 +1222,39 @@ class NDP(Webserver):
 
     def find_column(self, query_object, **kwargs):
         """
-        Finds all columns whose names contain the given query_object. Search is case-insensitive.
+        Finds all columns whose names contain the given query_object.
 
+        Search is case-insensitive.
+
+        Parameters
+        ----------
         `query_object` : str
             The string to match against column names
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return : list of ValueObject
+        Returns
+        -------
+        list of ValueObject
             One ValueObject per matching column
 
+        Notes
+        -----
         ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List with the matched column name
-            - value :   (list) Full column data
-            - row_num : (None)
-            - type :    (str) 'column'
+            - t_name : str
+                Table name
+            - c_name : list
+                List containing the matched column name
+            - value : list
+                Full column data
+            - row_num : None
+            - type : 'column'
         """
+
         if not isinstance(query_object, str):
-            return []
+            raise TypeError(
+                "find_column() ERROR: query_object must be a string"
+            )
 
         matches = []
 
@@ -764,22 +1277,22 @@ class NDP(Webserver):
         """
         Finds all cells that match the given query_object.
         
-        Exact match for all data types, plus case-insensitive partial match for strings.
+        Matching behavior:
+            - Exact match for all data types
+            - Case-insensitive partial match for strings
+            - String representation match for complex objects (dict, list)
 
+        Parameters
+        ----------
         `query_object` : int, float, or str
             The value to search for within table cells
         `**kwargs` : dict
             Additional keyword arguments
 
-        Return : list of ValueObject
-            One ValueObject per matching cell
-
-        ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List with the matched column name
-            - row_num : (int) Row index of the match
-            - value :   (any) Matched cell value
-            - type :    (str) 'cell'
+        Returns
+        -------
+        list of ValueObject
+            One ValueObject per matching cell, containing full row data
         """
         matches = []
 
@@ -792,29 +1305,34 @@ class NDP(Webserver):
                 continue
 
             cols = list(table_data.keys())
-            rows = zip(*table_data.values())
+            df = pd.DataFrame(table_data)  # Convert to DataFrame for easier access
 
-            for row_idx, row in enumerate(rows):
-                for col_idx, cell in enumerate(row):
+            for row_idx, row in df.iterrows():
+                for col in cols:
+                    cell = row[col]
 
                     match = False
 
-                    if query_object == cell:
-                        match = True
-
-                    elif (
+                    # Handle None/NaN
+                    if pd.isna(cell) and pd.isna(query_object) or query_object == cell or (
                         is_str_query and
                         isinstance(cell, str) and
                         query_lower in cell.lower()
                     ):
                         match = True
+                    
+                    # Handle complex objects (dict, list) by string representation
+                    elif is_str_query and isinstance(cell, (dict, list, tuple)):
+                        cell_str = str(cell).lower()
+                        if query_lower in cell_str:
+                            match = True
 
                     if match:
                         val = ValueObject()
                         val.t_name = table_name
-                        val.c_name = [cols[col_idx]]
+                        val.c_name = cols
                         val.row_num = row_idx
-                        val.value = cell
+                        val.value = row.tolist()
                         val.type = "cell"
 
                         matches.append(val)
@@ -822,158 +1340,331 @@ class NDP(Webserver):
         return matches
 
 
-    def find_relation(self, column_name, relation, **kwargs):
-        """
-        **NDP is a read-only metadata backend and does not support relational queries on columns.**
-        """
-        raise NotImplementedError("NDP Backend does not support find_relation")
-
-
     # ----------------------------------------------------------------------
     # Utility / Display
     # ----------------------------------------------------------------------
     def list(self, collection=False):
         """
-        Lists tables or prints each table's dimensions.
-
-        For resource tables, displays both dataset_title and dataset_id.
-
+        Lists tables or prints metadata in SQLite-compatible format.
+        
+        Parameters
+        ----------
         `collection` : bool, default False
-            - If True, return list of table names.
-            - If False, print table names with dimensions and dataset IDs.
-
-        Return : list or None
+            If True, return list of table names.
+            If False, print table names with dimensions.
+        
+        Returns
+        -------
+        list or None
             Table names if collection=True, otherwise None
         """
         if collection:
             return list(self._cache.keys())
-
+        
+        # Print in SQLite-compatible format
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
-            
-            if name in self._resource_tables:
-                dataset_id = self._dataset_title_map.get(name, "N/A")
-                print(f"{name} (ID: {dataset_id}): ({len(df)} rows, {len(df.columns)} cols)")
-            else:
-                print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
-
-
+            print(f"Table: {name}")
+            print(f"  - num of columns: {len(df.columns)}")
+            print(f"  - num of rows: {len(df)}")
+            print()
+    
+    
     def summary(self, table_name=None):
         """
-        Returns numerical metadata for tables. For resource tables, includes dataset_id information.
-
-        `table_name` : str, optional
-            If provided, returns summary for a single table. Either dataset_title or dataset_id.
-            If None, returns summary for all tables in expected format.
-
-        Return : pandas.DataFrame or list
-            - If table_name is None: returns [table_names_list, df1, df2, ...]
-            - If table_name provided: returns single DataFrame
+        Returns detailed column-level statistics for tables.
+        
+        Parameters
+        ----------
+        table_name : str, optional
+            If provided, returns summary for that table.
+            Must be 'datasets', 'resources', or 'tags'.
+        
+        Returns
+        -------
+        pandas.DataFrame or list
+            - If table_name specified: single DataFrame
+            - If table_name=None: [table_names, df1, df2, ...]
+        
+        Notes
+        -----
+        - For OBJECT columns: min/max are lexicographic (alphabetical) for short text
+        - Skips min/max for: long text (>80 chars), URLs, metadata, complex values
+        - Numeric columns get full statistics: min, max, avg, std_dev
         """
+        def is_complex_value(value):
+            """Check if value is a complex type (dict, list, etc.)"""
+            return isinstance(value, (dict, list, tuple, set))
+        
+        def is_url_or_metadata_column(column):
+            """Check if column contains URLs or metadata that shouldn't have min/max"""
+            return column.lower() in {
+                "raw_metadata", "landing_page", "metadata_url", 
+                "download_url", "url", "href", "link", "raw_dataset"
+            }
+        
+        def is_long_text_series(series):
+            """Check if series contains long text (> 80 chars)"""
+            non_null = series.dropna()
+            if non_null.empty:
+                return False
+            string_series = non_null.astype(str)
+            return string_series.str.len().max() > 80
+        
+        def safe_to_python(value):
+            """Convert pandas/numpy types to Python native types, NaN to None"""
+            if pd.isna(value):
+                return None
+            if isinstance(value, (np.integer, np.floating)):
+                return value.item()
+            return value
+        
+        def summarize_dataframe(df):
+            """Generate column-level statistics for a DataFrame"""
+            rows = []
+            
+            for column in df.columns:
+                original_series = df[column]
+                non_null = original_series.dropna()
+                
+                # Check if column has complex values
+                has_complex_values = (
+                    non_null.apply(is_complex_value).any()
+                    if not non_null.empty
+                    else False
+                )
+                
+                # Convert complex values to strings for counting
+                safe_series = non_null.astype(str) if has_complex_values else non_null
+                
+                pandas_dtype = str(original_series.dtype).lower()
+                
+                if 'int' in pandas_dtype:
+                    dtype = 'INTEGER'
+                elif 'float' in pandas_dtype:
+                    dtype = 'REAL'
+                elif pandas_dtype == 'bool':
+                    dtype = 'BOOLEAN'
+                elif pandas_dtype == 'datetime64[ns]':
+                    dtype = 'DATETIME'
+                elif pandas_dtype == 'object':
+                    non_null = original_series.dropna()
+                    if non_null.empty or all(isinstance(x, str) for x in non_null):
+                        dtype = 'TEXT'
+                    else:
+                        dtype = 'OBJECT'
+                else:
+                    dtype = 'OBJECT'
+                
+                unique = int(safe_series.nunique()) if not safe_series.empty else 0
+        
+                row = {
+                    "column": column,
+                    "type": dtype,
+                    "unique": unique,
+                    "min": None,
+                    "max": None,
+                    "avg": None,
+                    "std_dev": None,
+                }
+                
+                # Try numeric stats first
+                numeric_series = pd.to_numeric(non_null, errors="coerce").dropna()
+                
+                if not non_null.empty and len(numeric_series) == len(non_null):
+                    # Fully numeric column
+                    row["min"] = safe_to_python(numeric_series.min())
+                    row["max"] = safe_to_python(numeric_series.max())
+                    row["avg"] = safe_to_python(numeric_series.mean())
+                    row["std_dev"] = safe_to_python(numeric_series.std())
+                
+                elif (
+                    not non_null.empty
+                    and not has_complex_values
+                    and not is_url_or_metadata_column(column)
+                    and not is_long_text_series(non_null)
+                ):
+                    # Short text column - show min/max (lexicographic)
+                    try:
+                        row["min"] = safe_to_python(non_null.min())
+                        row["max"] = safe_to_python(non_null.max())
+                    except TypeError:
+                        row["min"] = None
+                        row["max"] = None
+                
+                rows.append(row)
+            
+            summary_df = pd.DataFrame(
+                rows,
+                columns=[
+                    "column",
+                    "type",
+                    "unique",
+                    "min",
+                    "max",
+                    "avg",
+                    "std_dev",
+                ],
+            )
+            
+            # Replace NaN with None for cleaner output
+            summary_df = summary_df.replace({np.nan: None})
+            
+            return summary_df
+        
+        # Check if backend is loaded
         if not self._loaded:
-            return pd.DataFrame()
-
+            if table_name:
+                # For single table, return empty DataFrame
+                return pd.DataFrame()
+            else:
+                # For all tables, return list format
+                return [[], pd.DataFrame()]
+        
+        # Single table summary
         if table_name:
-            # Single table - return DataFrame
-            resolved_name = self._resolve_table_name(table_name)
-            table = self._cache.get(resolved_name)
+            if table_name not in self._cache:
+                raise ValueError(
+                    f"Table '{table_name}' not found. "
+                    f"Available tables: {list(self._cache.keys())}"
+                )
+            
+            table = self._cache.get(table_name)
             
             if not table:
-                raise ValueError(f"Table '{resolved_name}' is empty")
+                raise ValueError(f"Table '{table_name}' is empty")
             
             df = pd.DataFrame(table)
+            df = df.infer_objects()
+            summary_df = summarize_dataframe(df)
             
-            summary_dict = {
-                "table_name": resolved_name,
-                "num_rows": len(df),
-                "num_columns": len(df.columns),
-                "columns": list(df.columns)
-            }
-            
-            if resolved_name in self._resource_tables:
-                summary_dict["dataset_id"] = self._dataset_title_map.get(resolved_name, "N/A")
-            
-            return pd.DataFrame([summary_dict])
+            return summary_df
         
-        # Multiple tables - return list format [table_names, df1, df2, ...]
+        # Multiple tables summary
         table_names = []
         summary_dfs = []
         
         for name, table in self._cache.items():
+            if not table:
+                continue
+                
             df = pd.DataFrame(table)
-            
-            summary_dict = {
-                "table_name": name,
-                "num_rows": len(df),
-                "num_columns": len(df.columns),
-                "columns": list(df.columns)
-            }
-            
-            if name in self._resource_tables:
-                summary_dict["dataset_id"] = self._dataset_title_map.get(name, "N/A")
+            df = df.infer_objects()
+            summary_df = summarize_dataframe(df)
             
             table_names.append(name)
-            summary_dfs.append(pd.DataFrame([summary_dict]))
+            summary_dfs.append(summary_df)
         
-        # Return as [table_names_list, df1, df2, ...]
         return [table_names] + summary_dfs
-
+    
 
     def display(self, table_name, num_rows=25, display_cols=None):
         """
         Displays rows from a specified table.
 
-        Accepts either dataset_title or dataset_id for resource tables.
+        By default, shows ALL columns (including raw_* columns) with FULL content.
+        You can optionally specify a subset of columns to display.
 
+        Parameters
+        ----------
         `table_name` : str
-            Title or ID of the table to display
+            Name of the table to display
         `num_rows` : int, default 25
-            Number of rows to display
+            Number of rows to display. Set to None to show all rows.
         `display_cols` : list of str, optional
-            Subset of columns to display
+            Specific columns to display. If None, shows all columns.
 
-        Return : pandas.DataFrame
-            Displayed table data with long strings truncated
+        Returns
+        -------
+        None
+            Prints formatted table to console
         """
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot display empty backend.")
+        
+        # Validate table_name type
+        if not isinstance(table_name, str):
+            raise TypeError("display() ERROR: Input 'table_name' must be a string")
+        
+        # Validate display_cols type - allow None or list
+        if display_cols is not None and not isinstance(display_cols, list):
+            raise TypeError("display() ERROR: Input 'display_cols' must be a list of column names or None")
+        
+        # If display_cols is a list, validate it contains strings
+        if isinstance(display_cols, list) and not all(isinstance(col, str) for col in display_cols):
+            raise TypeError("display() ERROR: All elements in 'display_cols' must be strings")
+        
+        # Validate num_rows type
+        if num_rows is not None and not isinstance(num_rows, int):
+            raise TypeError("display() ERROR: Input 'num_rows' must be an integer or None")
+        
+        if num_rows is not None and num_rows <= 0:
+            raise ValueError("display() ERROR: Input 'num_rows' must be positive")
+        
+        # Direct lookup 
+        if table_name not in self._cache:
+            raise ValueError(
+                f"Table '{table_name}' not found. "
+                f"Available tables: {list(self._cache.keys())}"
+            )
 
-        resolved_name = self._resolve_table_name(table_name)
-
-        table = self._cache.get(resolved_name)
+        table = self._cache.get(table_name)
 
         if not table:
-            raise ValueError(f"Table '{resolved_name}' is empty")
+            raise ValueError(f"Table '{table_name}' is empty")
 
         df = pd.DataFrame(table)
 
+        # Determine which columns to display
         if display_cols:
+            # User specified exact columns
             missing_cols = set(display_cols) - set(df.columns)
             if missing_cols:
                 raise ValueError(
-                    f"Columns not found in '{resolved_name}': {missing_cols}\n"
+                    f"Columns not found in '{table_name}': {missing_cols}\n"
                     f"Available columns: {list(df.columns)}"
                 )
-            df = df[display_cols]
+            cols_to_show = display_cols
+        else:
+            # Show ALL columns by default (including raw_* columns)
+            cols_to_show = df.columns.tolist()
 
-        # Set max_rows before limiting rows
-        df.attrs["max_rows"] = len(df)
+        df = df[cols_to_show]
+
+        # Limit rows
+        total_rows = len(df)
+        display_df = df.head(num_rows) if num_rows else df
+
+        # Print header
+        print(f"\nTable: {table_name}")
         
-        if num_rows:
-            df = df.head(num_rows)
+        # Display with no limits
+        with pd.option_context('display.max_rows', None,
+                            'display.max_columns', None,
+                            'display.width', None,
+                            'display.max_colwidth', None):
+            print(display_df.to_string(index=False))
+        
+        # Print row count info
+        if num_rows and total_rows > num_rows:
+            print(f"\n... showing {num_rows} of {total_rows} rows")
+        
+        print()
 
-        # Truncate long strings for display using df.map() (pandas 2.1.0+)
-        df = df.map(
-            lambda x: (str(x)[:60] + '...') if isinstance(x, str) and len(str(x)) > 60 else x
-        )
-
-        return df
 
     def notebook(self, **kwargs):
         """
-        **Notebook generation not supported for NDP backend.**
+        Notebook generation not supported for NDP backend.
+
+        Parameters
+        ----------
+        `**kwargs` : dict
+            Additional keyword arguments (unused)
+
+        Returns
+        -------
+        None
         """
-        pass
 
 
     # ----------------------------------------------------------------------
@@ -983,8 +1674,8 @@ class NDP(Webserver):
         """
         Resets backend state and clears all cached data.
         """
+
         self._cache = OrderedDict()
-        self._resource_tables = []
         self._dataset_id_map = {}
         self._dataset_title_map = {}
         self._loaded = False
@@ -995,7 +1686,23 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         """
-        **Not supported - NDP backend is read-only**
+        Ingest not supported for NDP backend (read-only).
+
+        Parameters
+        ----------
+        `artifacts` : any
+            Artifacts to ingest (unused)
+        `**kwargs` : dict
+            Additional keyword arguments (unused)
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised as NDP backend is read-only
         """
         raise NotImplementedError("NDP backend is read-only")
     

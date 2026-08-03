@@ -71,7 +71,6 @@ class DSI_cli:
     def __init__(self):
         self.name = None
         self.start_dir = os.getcwd() + "/"
-        return
 
 
     def viewers_check(self):

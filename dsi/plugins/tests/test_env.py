@@ -68,7 +68,7 @@ def test_git_plugin_adds_rows():
     plug.add_rows()
     plug.add_rows()
 
-    for key, val in plug.output_collector["GitInfo"].items():
+    for val in plug.output_collector["GitInfo"].values():
         assert len(val) == 2
 
     # 2 Git cols + 4 inherited Env cols

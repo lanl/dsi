@@ -24,7 +24,7 @@ def test_bueno_plugin_adds_rows():
     plug = Bueno(filenames=[path1, path2])
     plug.add_rows()
 
-    for key, val in plug.output_collector["Bueno"].items():
+    for val in plug.output_collector["Bueno"].values():
         assert len(val) == 2  # two lists of length 4
 
     # 4 Bueno cols
@@ -53,7 +53,7 @@ def test_csv_plugin_adds_rows():
     plug = Csv(filenames=path)
     plug.add_rows()
 
-    for key, val in plug.output_collector["Csv"].items():
+    for val in plug.output_collector["Csv"].values():
         assert len(val) == 4
 
     # 11 Csv cols
@@ -66,7 +66,7 @@ def test_csv_plugin_adds_rows_multiple_files():
     plug = Csv(filenames=[path1, path2])
     plug.add_rows()
 
-    for key, val in plug.output_collector["Csv"].items():
+    for val in plug.output_collector["Csv"].values():
         assert len(val) == 8
 
     # 13 Csv cols
@@ -92,15 +92,14 @@ def test_csv_plugin_leaves_active_metadata_wellformed():
     term.transload()
 
     columns = list(term.active_metadata["Csv"].values())
-    assert all([len(columns[0]) == len(col)
-               for col in columns])  # all same length
+    assert all(len(columns[0]) == len(col) for col in columns)  # all same length
 
 def test_yaml_reader():
     a=Terminal()
     a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_google.yml'], table_name = "wildfire_google_dc")
 
     assert len(a.active_metadata.keys()) == 1 # 1 table - wildfire_google_dc
-    for name, tableData in a.active_metadata.items():
+    for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         print(len(tableData.keys()))
         assert len(tableData.keys()) == 36
@@ -110,7 +109,7 @@ def test_yaml_reader_v1_2():
     a.load_module('plugin', 'YAML', 'reader', filenames=['examples/wildfire/wildfire_google.yml'], table_name = "wildfire_google_dc", yaml_version = "1.2")
 
     assert len(a.active_metadata.keys()) == 1 # 1 table - wildfire_google_dc
-    for name, tableData in a.active_metadata.items():
+    for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         assert len(tableData.keys()) == 36
 
@@ -131,7 +130,7 @@ def test_toml_reader():
     a.load_module('plugin', 'TOML', 'reader', filenames="examples/test/example.toml")
 
     assert len(a.active_metadata.keys()) == 1 # 2 tables - people and dsi_units
-    for name, tableData in a.active_metadata.items():
+    for tableData in a.active_metadata.values():
         assert isinstance(tableData, OrderedDict)
         assert len(tableData.keys()) == 2
 

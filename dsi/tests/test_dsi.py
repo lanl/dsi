@@ -6,6 +6,9 @@ import textwrap
 from pandas import DataFrame
 from collections import OrderedDict
 import hashlib
+import pytest
+
+pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
 def test_list_functions():
     test = DSI()
@@ -1796,73 +1799,244 @@ def test_fail_overwrite_schema_duckdb_backend():
         expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
         assert str(e) == expected
         
-        
-# NDP
-# NDP
-# NDP
+# =============================================================================
+# NDP BACKEND TESTS
+# =============================================================================
+
+@pytest.fixture(scope="module")
+def ndp_dsi_basic():
+    """Shared NDP DSI instance for basic tests"""
+    dsi = DSI(backend_name="NDP", params={"keywords": "climate", "limit": 10})
+    yield dsi
+    dsi.close()
+
+@pytest.fixture(scope="module")
+def ndp_dsi_multiple():
+    """Shared NDP DSI instance with multiple queries"""
+    dsi = DSI(
+        backend_name="NDP",
+        params=[
+            {"keywords": "climate", "limit": 5},
+            {"keywords": "ocean", "limit": 5}
+        ]
+    )
+    yield dsi
+    dsi.close()
+
+@pytest.fixture(scope="module")
+def ndp_dsi_organization():
+    """Shared NDP DSI instance with organization filter"""
+    dsi = DSI(
+        backend_name="NDP",
+        params={
+            "organization": "California Landscape Metrics",
+            "limit": 5
+        }
+    )
+    yield dsi
+    dsi.close()
+
+@pytest.fixture(scope="module")
+def ndp_dsi_format():
+    """Shared NDP DSI instance with format filter"""
+    dsi = DSI(
+        backend_name="NDP",
+        params={
+            "formats": ["CSV", "JSON"],
+            "limit": 10
+        }
+    )
+    yield dsi
+    dsi.close()
 
 def test_ndp_backend():
     """Test basic NDP connection"""
-    dsi = DSI(backend_name="NDP", keywords="test", limit=3)
+    dsi = DSI(backend_name="NDP", params={"keywords": "test", "limit": 3})
     dsi.close()
     assert True
 
-def test_list_ndp_backend():
-    """Test listing NDP tables"""
-    dsi = DSI(backend_name="NDP", keywords="climate", limit=5)
-    
-    tables = dsi.list(collection=True)
-    tables_list = list(tables)  # Convert odict_keys to list
-    assert isinstance(tables_list, list)
-    assert len(tables_list) > 0
-    assert "datasets" in tables_list
-    
-    dsi.close()
 
-def test_get_table_ndp_backend():
-    """Test getting tables from NDP"""
-    dsi = DSI(backend_name="NDP", keywords="ocean", limit=10)
-    
-    # Test display output
+def test_ndp_backend_no_params():
+    """Test NDP backend initialization without params raises error"""
+    try:
+        DSI(backend_name="NDP")
+        assert False, "Should raise ValueError when params not provided"
+    except TypeError:
+        assert True
+
+
+def test_list_ndp_backend(ndp_dsi_basic):
+    """Test listing NDP tables"""
+    tables = ndp_dsi_basic.list(collection=True)
+    assert isinstance(tables, list)
+    assert len(tables) > 0
+    assert "datasets" in tables
+
+
+def test_list_ndp_backend_print(ndp_dsi_basic):
+    """Test list() prints table information"""
     f = io.StringIO()
     with redirect_stdout(f):
-        dsi.get_table(table_name="datasets")
+        ndp_dsi_basic.list()
+    output = f.getvalue()
+    
+    assert "datasets" in output.lower() or "table" in output.lower()
+    assert "num of columns" in output.lower() or "columns" in output
+    assert "num of rows" in output.lower() or "rows" in output
+
+
+def test_get_table_ndp_backend(ndp_dsi_basic):
+    """Test getting tables from NDP"""
+    f = io.StringIO()
+    with redirect_stdout(f):
+        ndp_dsi_basic.get_table(table_name="datasets")
     output = f.getvalue()
     assert len(output) > 0
     
-    # Test collection
-    df = dsi.get_table(table_name="datasets", collection=True)
+    df = ndp_dsi_basic.get_table(table_name="datasets", collection=True)
     assert isinstance(df, DataFrame)
     assert len(df) > 0
     assert 'title' in df.columns
     assert 'num_resources' in df.columns
-    
-    dsi.close()
 
-def test_search_ndp_backend():
-    """Test searching in NDP backend"""
-    dsi = DSI(backend_name="NDP", keywords="data", limit=5)
+
+def test_get_table_resources_ndp(ndp_dsi_basic):
+    """Test getting unified resources table from NDP"""
+    tables = ndp_dsi_basic.list(collection=True)
     
-    # Test display output
+    if "resources" in tables:
+        df = ndp_dsi_basic.get_table(table_name="resources", collection=True)
+        assert isinstance(df, DataFrame)
+        assert 'resource_id' in df.columns
+        assert 'url' in df.columns
+        assert 'format' in df.columns
+        assert 'dataset_id' in df.columns
+        assert 'dataset_title' in df.columns
+
+
+def test_search_ndp_backend(ndp_dsi_basic):
+    """Test searching in NDP backend"""
     f = io.StringIO()
     with redirect_stdout(f):
-        dsi.search(query="CSV")
+        ndp_dsi_basic.search(query="CSV")
     output = f.getvalue()
     assert "Searching for all instances of 'CSV' in the active backend" in output
     
-    # Test collection
-    results = dsi.search(query="CSV", collection=True)
+    results = ndp_dsi_basic.search(query="CSV", collection=True)
     assert isinstance(results, list)
+
+
+def test_find_ndp_backend(ndp_dsi_basic):
+    """Test find() with inequality on NDP"""
+    results = ndp_dsi_basic.find("num_resources > 0", collection=True)
     
-    dsi.close()
+    if results is not None and not results.empty:
+        assert isinstance(results, DataFrame)
+        assert all(results['num_resources'] > 0)
+
+
+def test_summary_ndp_backend(ndp_dsi_basic):
+    """Test summary() on NDP backend"""
+    f = io.StringIO()
+    with redirect_stdout(f):
+        ndp_dsi_basic.summary()
+    output = f.getvalue()
+    
+    assert len(output) > 0
+    assert "datasets" in output or "column" in output
+
+
+def test_display_ndp_backend(ndp_dsi_basic):
+    """Test display() on NDP backend"""
+    f = io.StringIO()
+    with redirect_stdout(f):
+        ndp_dsi_basic.display("datasets", num_rows=3)
+    output = f.getvalue()
+    
+    assert len(output) > 0
+    assert "datasets" in output.lower() or "table" in output.lower()
+
+
+def test_ndp_organization_filter(ndp_dsi_organization):
+    """Test NDP with organization filter"""
+    df = ndp_dsi_organization.get_table("datasets", collection=True)
+    assert len(df) >= 0
+
+
+def test_ndp_format_filter(ndp_dsi_format):
+    """Test NDP with format filter"""
+    tables = ndp_dsi_format.list(collection=True)
+    
+    if "resources" in tables:
+        df = ndp_dsi_format.get_table("resources", collection=True)
+        if len(df) > 0:
+            formats = df['format'].dropna().unique()
+            assert any(fmt in ["CSV", "JSON"] for fmt in formats)
+
+
+def test_ndp_multiple_queries(ndp_dsi_multiple):
+    """Test NDP with multiple queries"""
+    df = ndp_dsi_multiple.get_table("datasets", collection=True)
+    assert isinstance(df, DataFrame)
+    
+    if 'id' in df.columns and len(df) > 0:
+        assert len(df['id']) == len(df['id'].unique())
+
+
+def test_query_ndp_not_supported(ndp_dsi_basic):
+    """Test that query() is not supported on NDP backend"""
+    try:
+        ndp_dsi_basic.query("SELECT * FROM datasets")
+        assert False, "Should raise NotImplementedError"
+    except NotImplementedError:
+        assert True
+
 
 def test_close_ndp_backend():
     """Test connection management"""
-    # Test multiple open/close cycles
     for i in range(3):
-        dsi = DSI(backend_name="NDP", keywords="test", limit=2)
+        dsi = DSI(backend_name="NDP", params={"keywords": "test", "limit": 2})
         df = dsi.get_table("datasets", collection=True)
         assert df is not None
         dsi.close()
     
     assert True
+
+
+def test_ndp_empty_results():
+    """Test NDP with query that returns no results"""
+    dsi = DSI(
+        backend_name="NDP",
+        params={
+            "keywords": "zzzzznonexistentkeywordzzzzz",
+            "limit": 10
+        }
+    )
+    
+    tables = dsi.list(collection=True)
+    
+    if "datasets" in tables:
+        try:
+            df = dsi.get_table("datasets", collection=True)
+            assert isinstance(df, DataFrame)
+            assert len(df) == 0
+        except ValueError as e:
+            assert "empty" in str(e).lower()
+    else:
+        assert "datasets" not in tables
+    
+    dsi.close()
+
+
+def test_ndp_schema(ndp_dsi_basic):
+    """Test schema() on NDP backend returns CREATE TABLE statements"""
+    schema = ndp_dsi_basic.schema()
+    assert isinstance(schema, str)
+    assert "CREATE TABLE" in schema
+    assert "datasets" in schema
+
+
+def test_ndp_num_datasets(ndp_dsi_basic):
+    """Get num datasets using overloaded num_tables() on NDP backend"""
+    num_datasets = ndp_dsi_basic.num_tables(table_name="datasets")
+    assert num_datasets > 0
