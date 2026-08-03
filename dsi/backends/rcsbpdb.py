@@ -249,11 +249,9 @@ class RCSBPDB(Webserver):
         self._loaded = False
 
         if self.validate_on_init:
-            try:
-                self.validate_connection()
-            except Exception as exc:
+            if not self.validate_connection():
                 self._loaded = False
-                raise RuntimeError(f"rcsbpdb connection validation failed: {exc}") from exc
+                raise RuntimeError("rcsbpdb connection validation failed.")
 
         if self.auto_load:
             try:
@@ -300,10 +298,28 @@ class RCSBPDB(Webserver):
         return session
 
     def validate_connection(self) -> bool:
-        test_url = self.ENDPOINTS["entry"].format(pdb_id="1CBS")
-        response = self.session.get(test_url, timeout=self.timeout, verify=self.verify)
-        response.raise_for_status()
-        return True
+        """
+        Validate that the RCSB Data API is reachable and responsive.
+
+        Return
+        ------
+        bool
+            True if connection is valid, False otherwise.
+        """
+        try:
+            test_url = self.ENDPOINTS["entry"].format(pdb_id="1CBS")
+
+            response = self.session.get(
+                test_url,
+                timeout=self.timeout,
+                verify=self.verify,
+            )
+            response.raise_for_status()
+            return True
+
+        except Exception:  # noqa: BLE001
+            # Need to silent exit to continue external workflows
+            return False
 
     def _request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
