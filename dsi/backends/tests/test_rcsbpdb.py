@@ -1000,9 +1000,11 @@ def test_rcsbpdb_display_returns_none(mocked_rcsb):
 
 
 def test_rcsbpdb_display_missing_table_returns_none(backend):
-    result = backend.display("missing_table")
-
-    assert result is None
+    try:
+        backend.display("missing_table")
+        assert False # should raise Error
+    except ValueError:
+        assert True # should be error
 
 
 def test_rcsbpdb_display_missing_column_returns_none(mocked_rcsb):
@@ -1013,9 +1015,11 @@ def test_rcsbpdb_display_missing_column_returns_none(mocked_rcsb):
         validate_resource_urls=False,
     )
 
-    result = backend.display("datasets", display_cols=["missing_column"])
-
-    assert result is None
+    try:
+        backend.display("datasets", display_cols=["missing_column"])
+        assert False # should raise Error
+    except ValueError:
+        assert True # should be error
 
     backend.close()
 
