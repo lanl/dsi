@@ -26,6 +26,8 @@ def pick_asset():
         if machine in ("arm64", "aarch64"):
             return "pelican_Darwin_arm64.tar.gz"
         return "pelican_Darwin_x86_64.tar.gz"
+    if system == "Windows":
+        return "pelican_Windows_x86_64.zip"
     sys.exit(f"Unsupported OS: {system}. Install pelican manually.")
 
 
@@ -35,26 +37,37 @@ def main():
     url = (f"https://github.com/PelicanPlatform/pelican/releases/"
            f"download/v{VERSION}/{asset}")
     tarball = "/tmp/pelican.tar.gz"
+    if ".zip" in asset:
+        tarball = "C:/tmp/pelican.zip"
 
     print(f"Downloading {url}")
     # curl follows redirects (-L) and handles TLS without Python's cert issues.
     subprocess.run(["curl", "-L", "-o", tarball, url], check=True)
 
     print("Extracting...")
-    subprocess.run(["tar", "-xzf", tarball, "-C", "/tmp"], check=True)
+    if ".zip" in tarball:
+        subprocess.run(["tar", "-xzf", tarball, "-C", "C:/tmp"], check=True)
+    else:
+        subprocess.run(["tar", "-xzf", tarball, "-C", "/tmp"], check=True)
 
-    matches = glob.glob("/tmp/pelican-*/pelican")
+    if ".zip" in asset:
+        matches = glob.glob("C:/tmp/pelican-*/pelican.exe")
+        osDEST = DEST+".exe"
+    else:
+        matches = glob.glob("/tmp/pelican-*/pelican")
+        osDEST = DEST
     if not matches:
         sys.exit("Could not find the pelican binary after extraction.")
-    shutil.copy(matches[0], DEST)
-    os.chmod(DEST, 0o755)
-    print(f"Installed to {DEST}")
+    
+    shutil.copy(matches[0], osDEST)
+    os.chmod(osDEST, 0o755)
+    print(f"Installed to {osDEST}")
 
     # --- Verify: must print a version and list "get" as a valid command ---
-    ver = subprocess.run([DEST, "--version"], capture_output=True, text=True)
+    ver = subprocess.run([osDEST, "--version"], capture_output=True, text=True)
     print("\n--version:\n" + (ver.stdout or ver.stderr))
 
-    help_ = subprocess.run([DEST, "object", "get", "--help"],
+    help_ = subprocess.run([osDEST, "object", "get", "--help"],
                            capture_output=True, text=True)
     ok = help_.returncode == 0 or "object" in (help_.stdout + help_.stderr)
     if ok:
