@@ -499,14 +499,14 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
         (root_folder, commit_hash, relative_path),
     ).fetchone()
     if row is None:
-        return None
+        return {}
     metadata = json.loads(row["metadata"]) if row["metadata"] else {}
     acl_text = metadata.get("acl_text")
     owner_name = metadata.get("owner_name")
     group_name = metadata.get("group_name")
     permissions_int = metadata.get("permissions_int")
     if owner_name is None or group_name is None or permissions_int is None:
-        return None
+        return {}
 
     access = access.lower()
     if access not in {"read", "write"}:
@@ -516,7 +516,7 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
         current_user = pwd.getpwuid(os.geteuid())
         username = current_user.pw_name
     except KeyError:
-        return None
+        return {}
 
     current_groups = set()
     try:

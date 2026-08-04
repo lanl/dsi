@@ -485,11 +485,14 @@ class Version():
                 continue
 
             temp_meta = collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder)
-            if running_user == e["owner_name"]: # only owner can update metadata
+            if "owner_name" in e and running_user == e["owner_name"]: # only owner can update metadata
                 e = temp_meta
             else:
                 e["absolute_path"] = temp_meta["absolute_path"]
                 e["_st_size"] = temp_meta["_st_size"]
+                e["file_type"] = temp_meta["file_type"]
+                e["relative_path"] = temp_meta["relative_path"]
+                e["file_name"] = temp_meta["file_name"]
             if "error" in e:
                 print(f"  [skip] {e['relative_path']}: {e['error']}")
             else:
