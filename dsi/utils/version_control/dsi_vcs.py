@@ -28,6 +28,8 @@ import datetime
 import hashlib
 import shutil
 import tempfile
+import pwd
+import grp
 from turtle import mode
 from typing import Optional
 
@@ -99,7 +101,7 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         with open(target_path, "wb") as handle:
             handle.write(data)
 
-    # update acl text
+    # update acl text, owner, group, and permissions
     for rel_path in access_checked:
         metadata = access_checked[rel_path]
         if metadata is not None:
@@ -108,8 +110,41 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
             target_path = snapshot_target(target_tree, rel_path)
             if acl_text is not None and acl_text != "":
                 set_acl(target_path, acl_text)
-            if owner_name(os.getuid()) == metadata.get("owner_name"):
+
+            owner = metadata.get("owner_name")
+            group = metadata.get("group_name")
+            if owner or group:
+                uid = os.getuid()
+                gid = os.getgid()
+                if owner:
+                    try:
+                        uid = pwd.getpwnam(owner).pw_uid
+                    except KeyError:
+                        uid = os.getuid()
+                if group:
+                    try:
+                        gid = grp.getgrnam(group).gr_gid
+                    except KeyError:
+                        gid = os.getgid()
+                # If not running as root, we cannot chown to arbitrary users/groups.
+                # Ensure we don't attempt to set owner/group to someone else when
+                # the process lacks privilege — fall back to current user/group.
+                if os.geteuid() != 0:
+                    # cannot set arbitrary owner/group as non-root; assign to current user/group
+                    uid = os.getuid()
+                    gid = os.getgid()
+                try:
+                    os.chown(target_path, uid, gid)
+                except PermissionError:
+                    # as a last resort, try to ensure the file is owned by current user
+                    try:
+                        os.chown(target_path, os.getuid(), os.getgid())
+                    except PermissionError:
+                        pass
+
+            if os.geteuid() == 0 or owner_name(os.getuid()) == metadata.get("owner_name"):
                 os.chmod(target_path, permissions_int)
+
 
 
 def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
@@ -1028,5 +1063,7 @@ class Version():
             (target_repo_path,),
         )
         conn.commit()
+        c_hash = self._get_latest_commit_of_branch(conn, "main")
         conn.close()
+        self.cmd_restore(c_hash)
         print(f"Cloned repository from '{source_repo_path}' to '{target_repo_path}'")
