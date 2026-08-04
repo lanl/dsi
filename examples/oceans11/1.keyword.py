@@ -1,6 +1,5 @@
 import os
 import shutil
-import pandas as pd
 from dsi.dsi import DSI
 
 path = "./keyword/"

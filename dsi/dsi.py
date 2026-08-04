@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 logger = logging.getLogger(__name__)
 
-class DSI():
+class DSI:
     '''
     A user-facing interface for DSI's Core middleware.
 
@@ -128,7 +128,7 @@ class DSI():
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
             try:
-                self.read_only_flag = getattr(backend_class, "read_only")
+                self.read_only_flag = backend_class.read_only
             except AttributeError:
                 raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
             
@@ -138,12 +138,25 @@ class DSI():
 
                 if backend_name.lower() == "ndp":
                     backend_name = "NDP"
-                    query_params = {}
-                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    query_params = kwargs.pop('params', None)
                     
-                    for key in ndp_param_keys:
-                        if key in kwargs:
-                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                    # Validate params is a dict or list of dicts
+                    if isinstance(query_params, dict):
+                        # Single query - valid
+                        pass
+                    elif isinstance(query_params, list):
+                        # Multiple queries - validate each is a dict
+                        if not all(isinstance(p, dict) for p in query_params):
+                            raise TypeError(
+                                "'params' list must contain only dictionaries.\n"
+                                "Example: params=[{'keywords': 'temperature'}, {'organization': 'NASA'}]"
+                            )
+                    else:
+                        raise TypeError(
+                            "'params' must be a dictionary or a list of dictionaries.\n"
+                            "Single query example: params={'keywords': 'temperature', 'limit': 5}\n"
+                            "Multiple queries example: params=[{'keywords': 'temp'}, {'organization': 'NASA'}]"
+                        )
                 elif backend_name.lower() == "osti":
                     backend_name = "OSTI"
                     query_params = kwargs.pop("params", {})
@@ -667,7 +680,7 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         if not isinstance(query, str):
-            raise RuntimeError("find() ERROR: Input must be a string.")
+            raise TypeError("find() ERROR: Input must be a string.")
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if not any(op in query for op in operators):
             raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
@@ -699,7 +712,7 @@ class DSI():
                 ending_ind = warn_msg.find("in this database")
                 warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
             print("\n"+warn_msg.replace("database", "backend"))
-            return
+            return None
 
         table_name = None
         output_df = None
@@ -713,10 +726,11 @@ class DSI():
 
         if not collection:
             print(f'\nTable: {table_name}')
-            self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
+            if output_df is not None:
+                self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
             print()
         else:
-            if update:
+            if update and output_df is not None:
                 output_df.insert(0, "dsi_row_index", row_list)
                 output_df.insert(0, "dsi_table_name", table_name)
                 first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
@@ -826,7 +840,7 @@ class DSI():
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         if not isinstance(collection, pd.DataFrame):
-            raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
+            raise TypeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
             raise RuntimeError("update() ERROR: The 'dsi_table_name' column was not found. Ensure you set 'update'=True in the function that returned this collection")
         elif 'dsi_table_name' in collection.columns:
@@ -1201,7 +1215,7 @@ class DSI():
 
 
 
-    def num_tables(self):
+    def num_tables(self, **kwargs):
         """
         Prints the number of tables in the active backend.
         """
@@ -1210,7 +1224,9 @@ class DSI():
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
         try:
-            self.t.num_tables()
+            count = self.t.num_tables(**kwargs)
+            if count is not None:
+                return count
         except Exception as e:
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]

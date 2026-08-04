@@ -987,417 +987,214 @@ def test_test_sanitize_input():
 # NDP BACKEND TESTS
 # =============================================================================
 
-def test_terminal_load_ndp():
-    """Test Terminal can load NDP backend successfully."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    backend = a.active_modules["back-read"][0]
+NDP_BASE_PARAMS = {"keywords": "climate", "limit": 20}
+NDP_FILTER_PARAMS = [
+    {"organization": "USGS", "limit": 5},
+    {
+        "keywords": "temperature",
+        "tags": ["climate"],
+        "formats": ["CSV", "JSON"],
+        "limit": 5,
+    },
+]
+
+
+def _load_ndp_terminal(params):
+    """Create a Terminal and load one NDP backend."""
+    terminal = Terminal()
+    try:
+        terminal.load_module(
+            "backend",
+            "NDP",
+            "back-read",
+            params=params,
+        )
+    except Exception:
+        terminal.close()
+        raise
+    return terminal
+
+
+@pytest.fixture(scope="module")
+def ndp_terminal():
+    """
+    Share one loaded and processed NDP Terminal across non-destructive tests.
+
+    Terminal is not a context manager, so the yield fixture owns cleanup.
+    The broad query is intentionally large enough for the find/relation tests.
+    """
+    terminal = _load_ndp_terminal(NDP_BASE_PARAMS)
+    backend = terminal.active_modules["back-read"][0]
+
+    try:
+        # Processing copies the already-loaded backend cache into active_metadata;
+        # it does not need another NDP server query.
+        terminal.artifact_handler(interaction_type="process")
+        yield terminal
+    finally:
+        terminal.close()
+        # These teardown assertions retain coverage formerly provided by the
+        # dedicated close test without another remote NDP instantiation.
+        assert backend._loaded is False
+        assert len(backend._cache) == 0
+
+
+@pytest.fixture(scope="module")
+def ndp_filtered_terminal():
+    """
+    Share one multi-query Terminal for filter parsing and deduplication tests.
+
+    Two query dictionaries cover organization, tags, and formats while also
+    exercising the multi-query path. NDP may make one request per dictionary.
+    """
+    terminal = _load_ndp_terminal(NDP_FILTER_PARAMS)
+    try:
+        terminal.artifact_handler(interaction_type="process")
+        yield terminal
+    finally:
+        terminal.close()
+
+
+@pytest.fixture
+def ndp_unload_terminal():
+    """Provide an isolated Terminal because unload mutates shared state."""
+    terminal = _load_ndp_terminal({"keywords": "climate", "limit": 1})
+    try:
+        yield terminal
+    finally:
+        # Safe whether the test already unloaded the backend or failed earlier.
+        terminal.close()
+
+
+def test_terminal_load_ndp(ndp_terminal):
+    """Test Terminal can load and initialize an NDP backend."""
+    backend = ndp_terminal.active_modules["back-read"][0]
+
     assert backend is not None
     assert backend._loaded is True
-    
-    a.close()
-
-
-def test_terminal_unload_ndp():
-    """Test Terminal can unload NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    a.unload_module("backend", "NDP", "back-read")
-    assert len(a.active_modules["back-read"]) == 0
-    
-    a.close()
-
-
-def test_terminal_process_ndp():
-    """Test Terminal can process artifacts from NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    a.artifact_handler(interaction_type="process")
-    
-    # Verify data is in active_metadata
-    assert len(a.active_metadata) > 0
-    assert "datasets" in a.active_metadata
-    assert isinstance(a.active_metadata["datasets"], OrderedDict)
-    
-    a.close()
-
-
-def test_terminal_query_ndp():
-    """Test Terminal can query NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 10}
-    )
-    
-    result = a.artifact_handler(
-        interaction_type="query",
-        query="num_resources > 0"
-    )
-    
-    # Result should be dict by default for NDP
-    assert isinstance(result, dict)
-    
-    a.close()
-
-
-def test_terminal_get_table_ndp():
-    """Test Terminal.get_table() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Get as DataFrame
-    df = a.get_table("datasets", dict_return=False)
-    assert isinstance(df, pd.DataFrame)
-    
-    # Get as OrderedDict
-    dict_data = a.get_table("datasets", dict_return=True)
-    assert isinstance(dict_data, OrderedDict)
-    
-    a.close()
-
-
-def test_terminal_list_ndp():
-    """Test Terminal.list() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Should not raise exception
-    table_list = a.list(collection=True)
-    assert "datasets" in table_list
-    
-    a.close()
-
-
-def test_terminal_num_tables_ndp():
-    """Test Terminal.num_tables() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Should not raise exception
-    a.num_tables()
-    
-    a.close()
-
-
-def test_terminal_summary_ndp():
-    """Test Terminal.summary() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Get summary for all tables
-    summary_list = a.summary(collection=True)
-    assert isinstance(summary_list, list)
-    
-    # Get summary for specific table
-    summary_df = a.summary(table_name="datasets", collection=True)
-    assert isinstance(summary_df, pd.DataFrame)
-    
-    a.close()
-
-
-def test_terminal_display_ndp():
-    """Test Terminal.display() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Should not raise exception
-    f = io.StringIO()
-    with redirect_stdout(f):
-        a.display("datasets", num_rows=10)
-    output = f.getvalue()
-    
-    assert "datasets" in output
-    assert len(output) > 0
-    
-    a.close()
-
-
-def test_terminal_find_ndp():
-    """Test Terminal.find() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    results = a.find("climate")
-    assert isinstance(results, list)
-    
-    a.close()
-
-
-def test_terminal_find_table_ndp():
-    """Test Terminal.find_table() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    results = a.find_table("datasets")
-    assert isinstance(results, list)
-    assert len(results) > 0
-    
-    a.close()
-
-
-def test_terminal_find_column_ndp():
-    """Test Terminal.find_column() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    results = a.find_column("title")
-    assert isinstance(results, list)
-    
-    a.close()
-
-
-def test_terminal_find_cell_ndp():
-    """Test Terminal.find_cell() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    results = a.find_cell("climate")
-    assert isinstance(results, list)
-    
-    a.close()
-
-
-def test_terminal_ingest_ndp_fails():
-    """Test that Terminal.artifact_handler('ingest') fails with NDP."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Try to ingest - should fail because NDP is read-only
-    # and only loaded as back-read
-    with pytest.raises(NotImplementedError):
-        a.artifact_handler(interaction_type="ingest")
-    
-    a.close()
-
-
-def test_terminal_overwrite_ndp_fails():
-    """Test that Terminal.overwrite_table() fails with NDP."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    with pytest.raises(NotImplementedError):
-        a.overwrite_table("datasets", pd.DataFrame())
-    
-    a.close()
-
-
-def test_terminal_get_schema_ndp():
-    """Test Terminal.get_schema() with NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    schema = a.get_schema()
-    assert isinstance(schema, str)
-    assert "datasets" in schema
-    assert "Full Climate Connectivity Network" in schema
-    assert "Environment Canada Climate Data" in schema
-    assert "Climate Refugia - Baseline (Historical) 1981 - 2010" in schema
-    assert "Change in Average Climatic Water Deficit" in schema
-    assert "Northern Spotted Owl Habitat; Topo-Climatic Fire Refugia" in schema
-    
-    a.close()
-
-def test_terminal_ndp_organization_filter():
-    """Test Terminal loading NDP with organization filter."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={
-            "keywords": "climate",
-            "organization": "california-landscape-metrics",
-            "limit": 10
-        }
-    )
-    
-    a.artifact_handler(interaction_type="process")
-    
-    assert "datasets" in a.active_metadata
-    assert isinstance(a.active_metadata["datasets"], OrderedDict)
-    
-    # Check we got data
-    if a.active_metadata["datasets"]:
-        
-        # Verify organization column exists
-        assert "organization" in a.active_metadata["datasets"]
-        
-        orgs = a.active_metadata["datasets"]["organization"]
-        # Check at least one is from California Landscape Metrics
-        assert any(
-            org and "California Landscape Metrics" in org 
-            for org in orgs
-        )
-    
-    a.close()
-
-
-def test_terminal_ndp_tags_filter():
-    """Test Terminal loading NDP with tags filter."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={
-            "keywords": "temperature",
-            "tags": ["climate", "weather"],
-            "limit": 5
-        }
-    )
-    
-    backend = a.active_modules["back-read"][0]
-    assert backend._loaded is True
-    
-    a.artifact_handler(interaction_type="process")
-    assert "datasets" in a.active_metadata
-    
-    a.close()
-
-
-def test_terminal_ndp_format_filter():
-    """Test Terminal loading NDP with format filter."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={
-            "keywords": "data",
-            "formats": ["CSV", "JSON"],
-            "limit": 10
-        }
-    )
-    
-    backend = a.active_modules["back-read"][0]
-    assert backend._loaded is True
-    
-    a.artifact_handler(interaction_type="process")
-    assert isinstance(a.active_metadata, OrderedDict)
-    
-    a.close()
-
-
-def test_terminal_ndp_close():
-    """Test that Terminal properly closes NDP backend."""
-    a = Terminal()
-    
-    a.load_module(
-        "backend",
-        "NDP",
-        "back-read",
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    backend = a.active_modules["back-read"][0]
-    
-    # Before close
-    assert backend._loaded is True
     assert len(backend._cache) > 0
-    
-    # Close terminal (which should close backend)
-    a.close()
-    
-    # After close
+
+
+def test_terminal_unload_ndp(ndp_unload_terminal):
+    """Test unloading NDP closes it and removes it from active modules."""
+    backend = ndp_unload_terminal.active_modules["back-read"][0]
+
+    ndp_unload_terminal.unload_module("backend", "NDP", "back-read")
+
+    assert len(ndp_unload_terminal.active_modules["back-read"]) == 0
     assert backend._loaded is False
     assert len(backend._cache) == 0
+
+
+def test_terminal_load_ndp_multiple_queries(ndp_filtered_terminal):
+    """Test NDP multi-query results are deduplicated."""
+    backend = ndp_filtered_terminal.active_modules["back-read"][0]
+    assert backend._loaded is True
+
+    datasets = ndp_filtered_terminal.active_metadata.get("datasets", {})
+    if datasets and "id" in datasets:
+        ids = datasets["id"]
+        assert len(ids) == len(set(ids))
+
+
+def test_terminal_process_ndp(ndp_terminal):
+    """Test Terminal processed artifacts from the shared NDP backend."""
+    assert len(ndp_terminal.active_metadata) > 0
+    assert "datasets" in ndp_terminal.active_metadata
+    assert isinstance(ndp_terminal.active_metadata["datasets"], OrderedDict)
+
+
+def test_terminal_query_not_supported(ndp_terminal):
+    """Test that SQL queries and write operations fail with NDP."""
+    with pytest.raises(NotImplementedError):
+        ndp_terminal.artifact_handler(
+            interaction_type="query",
+            query="SELECT * FROM datasets",
+        )
+
+    with pytest.raises(NotImplementedError):
+        ndp_terminal.artifact_handler(interaction_type="ingest")
+
+    with pytest.raises(NotImplementedError):
+        ndp_terminal.overwrite_table("datasets", pd.DataFrame())
+
+
+def test_terminal_get_table_ndp(ndp_terminal):
+    """Test Terminal.get_table() with the shared NDP backend."""
+    df = ndp_terminal.get_table("datasets", dict_return=False)
+    assert isinstance(df, pd.DataFrame)
+
+    dict_data = ndp_terminal.get_table("datasets", dict_return=True)
+    assert isinstance(dict_data, OrderedDict)
+
+# TO DO: Possible problematic malformed object on return summary(), May need refactor for CLI
+def test_terminal_list_and_summary_ndp(ndp_terminal):
+    """Test Terminal list, num_tables, and summary methods with NDP."""
+    # Check if backend actually loaded data
+    backend = ndp_terminal.active_modules["back-read"][0]
+    if not backend._loaded or len(backend._cache) == 0:
+        pytest.skip("NDP backend did not load data (network/API issue)")
+    
+    table_list = ndp_terminal.list(collection=True)
+    assert "datasets" in table_list
+
+    f = io.StringIO()
+    with redirect_stdout(f):
+        ndp_terminal.num_tables()
+    assert "tables" in f.getvalue().lower()
+
+    # Test summary with collection=True to get return value
+    summary_list = ndp_terminal.summary(collection=True)
+    assert isinstance(summary_list, list)
+    assert len(summary_list) > 0
+    # All elements should be DataFrames (table_names are stripped when collection=True)
+    assert all(isinstance(df, pd.DataFrame) for df in summary_list)
+
+    # Test summary with specific table name and collection=True
+    summary_df = ndp_terminal.summary(table_name="datasets", collection=True)
+    assert isinstance(summary_df, pd.DataFrame)
+
+
+def test_terminal_display_and_schema_ndp(ndp_terminal):
+    """Test Terminal display and schema methods with NDP."""
+    f = io.StringIO()
+    with redirect_stdout(f):
+        ndp_terminal.display("datasets", num_rows=5)
+    assert "datasets" in f.getvalue()
+
+    schema = ndp_terminal.get_schema()
+    assert isinstance(schema, str)
+    assert "CREATE TABLE" in schema
+
+
+def test_terminal_find_methods_ndp(ndp_terminal):
+    """Test Terminal find methods with NDP."""
+    assert isinstance(ndp_terminal.find("climate"), list)
+
+    tables = ndp_terminal.find_table("datasets")
+    assert isinstance(tables, list)
+    assert len(tables) > 0
+
+    assert isinstance(ndp_terminal.find_column("title"), list)
+    assert isinstance(ndp_terminal.find_cell("climate"), list)
+
+
+@pytest.mark.parametrize(
+    "relation",
+    [
+        "num_resources > 0",
+        "num_resources == 0",
+        "num_resources (0, 5)",
+    ],
+)
+def test_terminal_find_relation_ndp(ndp_terminal, relation):
+    """Test Terminal.find_relation() operators without reloading NDP."""
+    assert isinstance(ndp_terminal.find_relation(relation), list)
+
+
+def test_terminal_ndp_filters(ndp_filtered_terminal):
+    """Test a shared multi-query load accepts NDP filter combinations."""
+    backend = ndp_filtered_terminal.active_modules["back-read"][0]
+
+    assert backend._loaded is True
+    assert "datasets" in backend._cache

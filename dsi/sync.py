@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from dsi.core import Terminal
 from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
 
-class Sync():
+class Sync:
     """
     A class defined to assist in data management activities for DSI
 
@@ -489,7 +489,7 @@ class Sync():
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # File movement
-            self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
+            self.local_location = self.local_location.removesuffix("/")
             cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {path_part} && rsync", self.local_location, self.remote_location]
             if self.verbose:
                 print(*cmd)
@@ -534,10 +534,24 @@ class Sync():
             signal.signal(signal.SIGALRM, alarm_handler)
             signal.alarm(10)
 
+            result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
+            if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
+                raise RuntimeError("Conduit not available in this environment")
+            
+            try:
+                result = subprocess.run(["bash", "-lc", "type conduit"], capture_output=True, text=True)
+                conduit_cmd = str(result.stdout).split()
+                for idx, s in enumerate(conduit_cmd):
+                    if "/" in s:
+                        conduit_cmd = conduit_cmd[idx:idx+3]
+                        break
+            except Exception as e:
+                raise ValueError("Conduit not available in this environment: " + str(e))
+
             try:
                 if self.verbose:
                     print("Testing Conduit: conduit get")
-                cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','get']
+                cmd = conduit_cmd.append("get")
                 stdout = self.execute_cmd(cmd, "Testing conduit get")
 
                 if "TRANSFER_ID" in stdout and self.verbose:
@@ -548,7 +562,7 @@ class Sync():
                 signal.alarm(0)
 
             try:
-                base_cmd = ['/usr/projects/systems/conduit/bin/conduit-cli','--config','/usr/projects/systems/conduit/conf/conduit-cli-config.yaml','cp','-r']
+                base_cmd = conduit_cmd.extend(['cp','-r'])
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + self.remote_location)
@@ -609,7 +623,6 @@ class Sync():
                 raise RuntimeError(f"pfcp failed with error: {str(e)} ")
         
         elif tool.lower() == "ftp":
-            pass
             # delete temp columns from filesystem table -- do after data has been moved
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
@@ -617,7 +630,6 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
 
         elif tool.lower() == "git":
-            pass
             # delete temp columns from filesystem table -- do after data has been moved
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
@@ -831,54 +843,56 @@ class Sync():
 
 
 
-class TarFile():
-  def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
-    self.tar_name = tar_name
-    self.local_tmp_dir = local_tmp_dir
-    self.local_files = local_files
-    self.create_tar(self.local_files)
+class TarFile:
+    def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
+        self.tar_name = tar_name
+        self.local_tmp_dir = local_tmp_dir
+        self.local_files = local_files
+        self.create_tar(self.local_files)
 
-  def create_tar(self, local_files=[]):
-    """
-    Creates a tar file and returns the index
+    def create_tar(self, local_files=[]):
+        """
+        Creates a tar file and returns the index
 
-    tar_name: name of the tar file to create with .tar.gz as the extension
-    local_files: a list of files with full paths to include
+        tar_name: name of the tar file to create with .tar.gz as the extension
+        local_files: a list of files with full paths to include
 
-    The tar file will be created in the local_tmp_dir directory
-    """
+        The tar file will be created in the local_tmp_dir directory
+        """
 
-    if not os.path.exists(self.local_tmp_dir):
-        try:
-            os.mkdir(self.local_tmp_dir)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+        if not os.path.exists(self.local_tmp_dir):
+            try:
+                os.mkdir(self.local_tmp_dir)
+            except Exception as err:
+                print(f"Unexpected {err=}, {type(err)=}")
 
-    self.tar_path = self.local_tmp_dir + "/" + self.tar_name
-    tar = tarfile.open(self.tar_path, "w:gz")
-    for f in local_files:
-        tar.add(f)
-    tar.close()
+        self.tar_path = self.local_tmp_dir + "/" + self.tar_name
+        tar = tarfile.open(self.tar_path, "w:gz")
+        for f in local_files:
+            tar.add(f)
+        tar.close()
 
-    # Create an index. Taken from: https://stackoverflow.com/questions/2018512/reading-tar-file-contents-without-untarring-it-in-python-script
-    tar = tarfile.open(self.tar_path)
-    index = {i.name: i for i in tar.getmembers()}
-    self.tar_index = ""
-    for file_name in index.keys():
-      self.tar_index += "%s : %d\n" % (file_name, index[file_name].size)
+        # Create an index. Taken from: https://stackoverflow.com/questions/2018512/reading-tar-file-contents-without-untarring-it-in-python-script
+        tar = tarfile.open(self.tar_path)
+        index = {i.name: i for i in tar.getmembers()}
+        self.tar_index = ""
+        for file_name, file_data in index.items():
+            self.tar_index += "%s : %d\n" % (file_name, file_data.size)
 
-    return True
+        return True
 
-  def get_index(self):
-    return self.tar_index
+    def get_index(self):
+        return self.tar_index
 
-  def get_full_path(self):
-      return self.tar_path
+    def get_full_path(self):
+        return self.tar_path
 
-  def get_name(self):
-      return self.tar_name
+    def get_name(self):
+        return self.tar_name
 
-class HPSSSync():
+
+
+class HPSSSync:
     """
     A class defined to assist in HPSS data management activities for DSI
 

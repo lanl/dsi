@@ -6,7 +6,6 @@ from dsi.dsi import DSI
 from urllib.parse import urlparse
 # from dsi.utils.web_utils import download_web_file
 from dsi.utils.federated.federate_datasets import pull_data
-from dsi.utils.federation_utils import create_directory, upsert_records
 
 # import ssl
 # import urllib3

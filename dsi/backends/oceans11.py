@@ -1256,7 +1256,6 @@ class Oceans11(Webserver):
         """
         **Notebook generation not supported for Oceans11 backend.**
         """
-        pass
 
 
     # # ----------------------------------------------------------------------
