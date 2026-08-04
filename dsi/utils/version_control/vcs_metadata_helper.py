@@ -63,42 +63,95 @@ def group_name(gid: int) -> str:
 
 
 def get_acl(path: str) -> Optional[str]:
-    """Return raw getfacl output, or None if unavailable."""
+    """
+    Return ACL info as a normalized ';'-separated string, or None if unavailable.
+    """
+
+    if sys.platform == "darwin":
+        return _get_acl_darwin(path)
+    elif sys.platform == "linux":
+        return _get_acl_linux(path)
+    print(f"Unsupported platform for ACL read: {sys.platform}")
+    return None
+
+
+def _get_acl_darwin(path: str) -> Optional[str]:
+    """Read ACLs on macOS via `ls -le`."""
     try:
-        if sys.platform == "darwin":
-            result = subprocess.run(
-                # ["getfacl", "--omit-header", "--absolute-names", path],
-                ["ls", "-le", path],
-                capture_output=True, text=True, timeout=5
-            )
-            lines = result.stdout.splitlines()
+        result = subprocess.run(
+            ["ls", "-le", path],
+            capture_output=True, text=True, timeout=5
+        )
+        lines = result.stdout.splitlines()
 
-            acl_entries = []
+        acl_entries = []
 
-            for line in lines:
-                line = line.strip()
-                if line.startswith(tuple(str(i) + ":" for i in range(10))):
-                    # Example line: "0: user:azad allow read,write"
-                    parts = line.split("user:")
-                    if len(parts) > 1:
-                        acl_part = parts[1].strip()
-                        acl_entries.append(acl_part)
+        for line in lines:
+            line = line.strip()
+            if line.startswith(tuple(str(i) + ":" for i in range(10))):
+                # Example line: "0: user:azad allow read,write"
+                parts = line.split("user:")
+                if len(parts) > 1:
+                    acl_part = parts[1].strip()
+                    acl_entries.append(acl_part)
 
-            return ";".join(acl_entries) if acl_entries else None
-        elif sys.platform == "linux":
-            result = subprocess.run(
-                ["getfacl", "--omit-header", "--absolute-names", path],
-                capture_output=True, text=True, timeout=5
-            )
-            return result.stdout.strip() or None
-        else:
-            return None
+        return ";".join(acl_entries) if acl_entries else None
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
-    
 
-def set_acl(path: str, acl_string: str) -> Optional[str]:
-    """Return raw getfacl output, or None if unavailable."""
+
+def _get_acl_linux(path: str) -> Optional[str]:
+    """Read ACLs on Linux via `getfacl`."""
+    try:
+        result = subprocess.run(
+            ["getfacl", "--omit-header", "--absolute-names", path],
+            capture_output=True, text=True, timeout=5
+        )
+        lines = result.stdout.splitlines()
+
+        acl_entries = []
+
+        for line in lines:
+            line = line.strip()
+            # Only handle named user entries, e.g. "user:azad:rwx"
+            # (skip the owning-user default entry "user::rwx")
+            if line.startswith("user:") and not line.startswith("user::"):
+                parts = line.split(":")
+                if len(parts) >= 3:
+                    name = parts[1].strip()
+                    # getfacl can append "#effective:r--" when a mask
+                    # restricts permissions -- strip that off.
+                    perm_bits = parts[2].split("#")[0].strip()
+
+                    perms = []
+                    if "r" in perm_bits:
+                        perms.append("read")
+                    if "w" in perm_bits:
+                        perms.append("write")
+                    if "x" in perm_bits:
+                        perms.append("execute")
+
+                    if name and perms:
+                        acl_entries.append(f"{name} allow {','.join(perms)}")
+
+        return ";".join(acl_entries) if acl_entries else None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
+def set_acl(path: str, acl_string: str) -> None:
+    """
+    Apply ACL entries described by acl_string (as produced by get_acl).
+    """
+    if sys.platform == "darwin":
+        _set_acl_darwin(path, acl_string)
+    elif sys.platform == "linux":
+        _set_acl_linux(path, acl_string)
+    print(f"Unsupported platform for ACL write: {sys.platform}")
+
+
+def _set_acl_darwin(path: str, acl_string: str) -> None:
+    """Write ACLs on macOS via `chmod +a`."""
     acl_list = acl_string.split(";")
     for acl_entry in acl_list:
         try:
@@ -115,6 +168,37 @@ def set_acl(path: str, acl_string: str) -> Optional[str]:
                 print(f"Failed to set ACL entry '{acl_entry}' on {path}: {result.stderr}")
         except Exception as e:
             print(f"Error setting ACL entry '{acl_entry}' on {path}: {e}")
+
+
+def _set_acl_linux(path: str, acl_string: str) -> None:
+    """Write ACLs on Linux via `setfacl`."""
+    acl_list = acl_string.split(";")
+    for acl_entry in acl_list:
+        try:
+            if len(acl_entry) == 0:
+                continue
+            acls = acl_entry.split()
+            username = acls[0]
+            perms = acls[2].split(",") if len(acls) > 2 else []
+
+            r = "r" if "read" in perms else "-"
+            w = "w" if "write" in perms else "-"
+            x = "x" if "execute" in perms else "-"
+            rule = f"u:{username}:{r}{w}{x}"
+            print(rule)
+
+            result = subprocess.run(
+                ["setfacl", "-m", rule, path],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                print(f"Failed to set ACL entry '{acl_entry}' on {path}: {result.stderr}")
+        except Exception as e:
+            print(f"Error setting ACL entry '{acl_entry}' on {path}: {e}")
+
+
+
+
 
 
 def get_xattrs(path: str) -> Optional[str]:
