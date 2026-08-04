@@ -134,11 +134,11 @@ def detect_valid_db_with_data(path: str) -> tuple[str | None, bool, str]:
     Returns:
         A tuple (db_type, is_valid, message) where:
     """
-    ok, msg = is_valid_sqlite_with_data(path)
+    ok, _ = is_valid_sqlite_with_data(path)
     if ok:
         return "sqlite", True
 
-    ok2, msg2 = is_valid_duckdb_with_data(path)
+    ok2, _ = is_valid_duckdb_with_data(path)
     if ok2:
         return "duckdb", True
 

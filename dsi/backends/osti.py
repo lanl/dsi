@@ -180,7 +180,7 @@ class OSTI(Webserver):
 
             return True
 
-        except Exception:  # noqa: E722
+        except Exception:
             # Silent failure to allow external workflows to continue
             return False
 
@@ -1011,7 +1011,6 @@ class OSTI(Webserver):
         """
         **Notebook generation not supported for OSTI backend.**
         """
-        pass
 
 
     # ----------------------------------------------------------------------

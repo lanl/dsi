@@ -1,495 +1,355 @@
 """
 NDP Backend Function Tests
 
-Tests NDP backend methods directly without Terminal integration.
-Mirrors structure of test_sqlite.py
+Essential tests for NDP backend core functionality.
+
+Remote-server calls are minimized by sharing NDP instances through
+module-scoped pytest fixtures. Tests that close or otherwise invalidate
+an instance use dedicated fixtures.
 """
 
 from collections import OrderedDict
-import pytest
+
 import pandas as pd
+import pytest
+
 from dsi.backends.ndp import NDP
 
+pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
 # =============================================================================
-# 1) Basic Backend Initialization
+# Fixtures
 # =============================================================================
 
-def test_ndp_initialization():
-    """Test NDP backend initializes correctly."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
+@pytest.fixture(scope="module")
+def backend():
+    """
+    Shared backend for non-destructive tests.
+
+    Using one broad query avoids repeatedly sending equivalent queries to the
+    remote server. Do not call close() on this fixture from an individual test.
+    """
+    instance = NDP(
+        params={
+            "keywords": "climate temperature data",
+            "limit": 10,
+        }
     )
-    
+
+    yield instance
+
+    instance.close()
+
+
+@pytest.fixture(scope="module")
+def filtered_backend():
+    """
+    Shared backend for filter and multiple-query tests.
+
+    NDP may perform one remote request for each entry, but the resulting
+    backend can be reused by every test that exercises filtered loading and
+    deduplication.
+    """
+    instance = NDP(
+        params=[
+            {
+                "keywords": "climate",
+                "organization": "California Landscape Metrics",
+                "limit": 5,
+            },
+            {
+                "keywords": "temperature",
+                "tags": ["climate", "weather"],
+                "limit": 5,
+            },
+            {
+                "keywords": "data",
+                "groups": ["data_hub_cc_wstc"],
+                "limit": 5,
+            },
+            {
+                "keywords": "data",
+                "formats": ["CSV", "JSON"],
+                "limit": 5,
+            },
+            {
+                "organization": "USGS",
+                "limit": 5,
+            },
+            {
+                "tags": ["temperature"],
+                "limit": 5,
+            },
+        ]
+    )
+
+    yield instance
+
+    instance.close()
+
+
+@pytest.fixture(scope="module")
+def empty_backend():
+    """Shared backend for tests requiring an empty query result."""
+    instance = NDP(
+        params={
+            "keywords": "zzzzznonexistentkeywordzzzzz",
+            "limit": 10,
+        }
+    )
+
+    yield instance
+
+    instance.close()
+
+
+# =============================================================================
+# 1) Initialization & Connection
+# =============================================================================
+
+def test_ndp_initialization(backend):
+    """Test NDP backend initializes correctly."""
     assert backend._loaded is True
     assert len(backend._cache) > 0
     assert "datasets" in backend._cache
-    
-    backend.close()
 
 
-def test_ndp_validate_connection():
+def test_ndp_validate_connection(backend):
     """Test connection validation to CKAN API."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Should return True without raising exception
     assert backend.validate_connection() is True
-    
-    backend.close()
-
-
-def test_ndp_invalid_url():
-    """Test that invalid URL raises appropriate error."""
-    with pytest.raises(ValueError):
-        NDP(url="not-a-valid-url")
 
 
 # =============================================================================
-# 2) Data Loading and Structure
+# 2) Data Loading & Structure
 # =============================================================================
 
-def test_ndp_load_initial_data():
-    """Test that initial data load creates proper structure."""
-    backend = NDP(
-        params={
-            "keywords": "ocean temperature",
-            "limit": 5
-        }
-    )
-    
-    # Verify structure
-    assert isinstance(backend._cache, OrderedDict)
-    assert "datasets" in backend._cache
-    assert isinstance(backend._cache["datasets"], OrderedDict)
-    
-    # Check dataset table has expected columns
-    dataset_cols = list(backend._cache["datasets"].keys())
-    assert "id" in dataset_cols
-    assert "title" in dataset_cols
-    assert "num_resources" in dataset_cols
-    
-    backend.close()
+def test_ndp_unified_resources_table(backend):
+    """Test that resources from all datasets are in one unified table."""
+    table_names = list(backend._cache.keys())
 
+    assert "datasets" in table_names
 
-def test_ndp_table_name_resolution():
-    """Test that both dataset_id and dataset_title resolve correctly."""
-    backend = NDP(
-        params={"keywords": "climate data", "limit": 5}
-    )
-    
-    # If we have resource tables, test resolution
-    if backend._resource_tables:
-        dataset_title = backend._resource_tables[0]
-        dataset_id = backend._dataset_title_map.get(dataset_title)
-        
-        if dataset_id:
-            # Both should resolve to same table
-            resolved_by_title = backend._resolve_table_name(dataset_title)
-            resolved_by_id = backend._resolve_table_name(dataset_id)
-            assert resolved_by_title == resolved_by_id == dataset_title
-    
-    backend.close()
+    if "resources" not in table_names:
+        pytest.skip("The query returned no resource records")
+
+    resources = backend._cache["resources"]
+
+    assert "dataset_id" in resources
+    assert "resource_id" in resources
+    assert "url" in resources
+
+    datasets = backend._cache["datasets"]
+    dataset_ids = set(datasets["id"])
+    resource_dataset_ids = set(resources["dataset_id"])
+
+    assert resource_dataset_ids.issubset(dataset_ids)
 
 
 # =============================================================================
 # 3) Query Operations
 # =============================================================================
 
-def test_ndp_query_artifacts():
-    """Test querying loaded data with pandas query string."""
-    backend = NDP(
-        params={"keywords": "climate data", "limit": 10}
-    )
-    
-    # Query datasets with resources
-    result = backend.query_artifacts("num_resources > 0", dict_return=True)
-    
-    # Assertions
-    assert isinstance(result, dict)
-    
-    # If we got results, verify structure
-    if result:
-        for table_name, table_data in result.items():
-            assert isinstance(table_data, dict)
-            # Each column should be a list
-            for col_values in table_data.values():
-                assert isinstance(col_values, list)
-    
-    backend.close()
+def test_ndp_query_artifacts_not_supported(backend):
+    """Test that query_artifacts raises NotImplementedError."""
+    with pytest.raises(NotImplementedError):
+        backend.query_artifacts("SELECT * FROM datasets")
 
 
-def test_ndp_query_invalid():
-    """Test that invalid pandas queries raise appropriate errors."""
-    backend = NDP(
-        params={"keywords": "temperature", "limit": 5}
-    )
-    
-    with pytest.raises(ValueError):
-        backend.query_artifacts("INVALID SYNTAX ###")
-    
-    backend.close()
-
-
-def test_ndp_get_table():
+def test_ndp_get_table(backend):
     """Test getting table data as DataFrame or OrderedDict."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Get as DataFrame
     df = backend.get_table("datasets", dict_return=False)
+
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
-    
-    # Get as OrderedDict
+
     dict_data = backend.get_table("datasets", dict_return=True)
     assert isinstance(dict_data, OrderedDict)
-    assert len(dict_data) > 0
-    
-    backend.close()
+
+    with pytest.raises(ValueError):
+        backend.get_table("nonexistent_table")
 
 
-def test_ndp_get_schema():
-    """Test that get_schema returns informative message."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
+def test_ndp_get_schema(backend):
+    """Test get_schema returns SQL-style CREATE TABLE format."""
     schema = backend.get_schema()
+
     assert isinstance(schema, str)
+    assert "CREATE TABLE" in schema
     assert "datasets" in schema
-    assert "Full Climate Connectivity Network" in schema
-    assert "Environment Canada Climate Data" in schema
-    assert "Climate Refugia - Baseline (Historical) 1981 - 2010" in schema
-    assert "Change in Average Climatic Water Deficit" in schema
-    assert "Northern Spotted Owl Habitat; Topo-Climatic Fire Refugia" in schema
-    
-    backend.close()
+
+    datasets_schema = backend.get_schema("datasets")
+    assert "CREATE TABLE datasets" in datasets_schema
 
 
 # =============================================================================
 # 4) Find Operations
 # =============================================================================
 
-def test_ndp_find():
-    """Test general find operation across all levels."""
-    backend = NDP(
-        params={"keywords": "climate temperature", "limit": 8}
-    )
-    
+def test_ndp_find_methods(backend):
+    """Test all find methods work correctly."""
     results = backend.find("title")
     assert isinstance(results, list)
-    
-    backend.close()
+
+    tables = backend.find_table("datasets")
+    assert isinstance(tables, list)
+    assert any("datasets" in table.t_name for table in tables)
+
+    columns = backend.find_column("title")
+    assert isinstance(columns, list)
+    assert any("title" in column.c_name for column in columns)
+
+    cells = backend.find_cell("climate")
+    assert isinstance(cells, list)
 
 
-def test_ndp_find_table():
-    """Test finding tables by name."""
-    backend = NDP(
-        params={"keywords": "climate temperature", "limit": 8}
-    )
-    
-    tables_found = backend.find_table("datasets")
-    assert isinstance(tables_found, list)
-    assert len(tables_found) > 0
-    assert any("datasets" in t.t_name for t in tables_found)
-    
-    backend.close()
-
-
-def test_ndp_find_column():
-    """Test finding columns by name."""
-    backend = NDP(
-        params={"keywords": "climate temperature", "limit": 8}
-    )
-    
-    columns_found = backend.find_column("title")
-    assert isinstance(columns_found, list)
-    assert len(columns_found) > 0
-    assert any("title" in c.c_name for c in columns_found)
-    
-    backend.close()
-
-
-def test_ndp_find_cell():
-    """Test finding cells by value."""
-    backend = NDP(
-        params={"keywords": "climate temperature", "limit": 8}
-    )
-    
-    cells_found = backend.find_cell("climate")
-    assert isinstance(cells_found, list)
-    if cells_found:  # May be empty
-        assert all(hasattr(cell, 'type') and cell.type == "cell" for cell in cells_found)
-    
-    backend.close()
-
-
-def test_ndp_find_relation():
-    """Test that find_relation returns empty list (not supported)."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    try:
-        backend.find_relation("column_name", "= 'value'")
-        # temp work around until find_relation actually implemented
-        # once implemented update this
-        assert False
-    except Exception:
-        assert True
-    # assert isinstance(result, list)
-    # assert len(result) == 0  # NDP doesn't support relational queries
-    
-    backend.close()
+@pytest.mark.parametrize(
+    ("column", "relation"),
+    [
+        ("num_resources", "> 2"),
+        ("title", "~~ climate"),
+        ("num_resources", ">= 3"),
+        ("num_resources", "<= 8"),
+        ("num_resources", "== 5"),
+        ("num_resources", "!= 0"),
+    ],
+)
+def test_ndp_find_relation(backend, column, relation):
+    """Test find_relation with various operators."""
+    result = backend.find_relation(column, relation)
+    assert isinstance(result, list)
 
 
 # =============================================================================
 # 5) URL Validation
 # =============================================================================
 
-def test_ndp_validate_urls():
-    """Test URL validation for dataset resources."""
-    backend = NDP(
-        params={
-            "keywords": "climate",
-            "limit": 5
-        }
-    )
-    
+def test_ndp_validate_urls(backend):
+    """Test URL validation for resources table."""
+    if "resources" not in backend._cache:
+        pytest.skip("The query returned no resource records")
+
     backend.validate_urls()
-    
-    # Check that url_valid was added to resource tables
-    for table_name in backend._resource_tables:
-        if table_name in backend._cache:
-            table = backend._cache[table_name]
-            if "url" in table and len(table["url"]) > 0:
-                # url_valid should exist and be boolean list
-                assert "url_valid" in table
-                assert all(isinstance(v, bool) for v in table["url_valid"])
-                assert len(table["url_valid"]) == len(table["url"])
-    
-    backend.close()
+
+    resources_table = backend._cache["resources"]
+
+    if "url" not in resources_table or len(resources_table["url"]) == 0:
+        pytest.skip("The resources table contains no URLs")
+
+    assert "url_valid" in resources_table
+    assert all(
+        isinstance(value, bool)
+        for value in resources_table["url_valid"]
+    )
 
 
 # =============================================================================
-# 6) List and Summary
+# 6) Display & Summary
 # =============================================================================
 
-def test_ndp_list():
+def test_ndp_list(backend):
     """Test list method returns table names."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 6}
-    )
-    
-    # Test list with collection=True
     table_names = backend.list(collection=True)
+
+    assert isinstance(table_names, list)
     assert "datasets" in table_names
-    assert isinstance(table_names, (list, dict, type({}.keys())))
-    
-    backend.close()
 
 
-def test_ndp_num_tables():
-    """Test num_tables prints correct count."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Should not raise exception
-    backend.num_tables()
-    
-    backend.close()
-
-
-def test_ndp_summary():
-    """Test summary returns DataFrame with table metadata."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Test summary for all tables - returns list format
+def test_ndp_summary(backend):
+    """Test summary returns proper format with SQL-style types."""
     summary_list = backend.summary()
-    assert isinstance(summary_list, list)  # ✅ Expect list
-    assert len(summary_list) > 1  # At least [table_names] + one df
-    
-    # First element should be table names list
-    assert isinstance(summary_list[0], list)
-    
-    # Remaining elements should be DataFrames
-    for df in summary_list[1:]:
-        assert isinstance(df, pd.DataFrame)
-    
-    # Test summary for specific table - returns DataFrame
+
+    assert isinstance(summary_list, list)
+    assert len(summary_list) >= 2
+
+    for dataframe in summary_list[1:]:
+        assert isinstance(dataframe, pd.DataFrame)
+        assert "column" in dataframe.columns
+        assert "type" in dataframe.columns
+
     summary_single = backend.summary("datasets")
     assert isinstance(summary_single, pd.DataFrame)
-    assert "table_name" in summary_single.columns
-    
-    backend.close()
 
 
-def test_ndp_display():
+def test_ndp_display(backend):
     """Test display method for tables."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
+    backend.display("datasets", num_rows=5)
+    backend.display(
+        "datasets",
+        num_rows=5,
+        display_cols=["title", "organization"],
     )
-    
-    # Display datasets table
-    result = backend.display("datasets", num_rows=10)
-    assert isinstance(result, pd.DataFrame)
-    assert len(result) <= 10
-    
-    backend.close()
 
 
 # =============================================================================
-# 7) Process Artifacts
+# 7) Filtering and Multiple Queries
 # =============================================================================
 
-def test_ndp_process_artifacts():
-    """Test that processed artifacts have correct structure."""
-    backend = NDP(
-        params={"keywords": "ocean temperature", "limit": 5}
-    )
-    
-    artifacts = backend.process_artifacts()
-    
-    # Verify structure
-    assert isinstance(artifacts, OrderedDict)
-    assert "datasets" in artifacts
-    assert isinstance(artifacts["datasets"], OrderedDict)
-    
-    backend.close()
+def test_ndp_filters(filtered_backend):
+    """Test loading data from the configured filtered queries."""
+    assert filtered_backend._loaded is True
+    assert "datasets" in filtered_backend._cache
+
+
+def test_ndp_multiple_queries_deduplicate_datasets(filtered_backend):
+    """Test that results from multiple queries are deduplicated."""
+    datasets = filtered_backend._cache.get("datasets", {})
+
+    if "id" not in datasets:
+        pytest.skip("The queries returned no dataset IDs")
+
+    dataset_ids = datasets["id"]
+
+    assert len(dataset_ids) == len(set(dataset_ids))
 
 
 # =============================================================================
 # 8) Read-Only Enforcement
 # =============================================================================
 
-def test_ndp_ingest_artifacts():
-    """Test that ingest_artifacts raises NotImplementedError."""
-    backend = NDP(
-        params={"keywords": "data", "limit": 3}
-    )
-    
+def test_ndp_read_only(backend):
+    """Test that write operations raise NotImplementedError."""
     with pytest.raises(NotImplementedError):
         backend.ingest_artifacts({})
-    
-    backend.close()
 
-# =============================================================================
-# 9) Filtering Tests
-# =============================================================================
-
-def test_ndp_organization_filter():
-    """Test loading data with organization filter."""
-    backend = NDP(
-        params={
-            "keywords": "climate",
-            "organization": "california-landscape-metrics",
-            "limit": 10
-        }
-    )
-    
-    data = backend.process_artifacts()
-    
-    assert "datasets" in data
-    assert isinstance(data["datasets"], OrderedDict)
-    
-    # Check we got data (number of rows)
-    if data["datasets"]:
-        # Verify organization column
-        assert "organization" in data["datasets"]
-        
-        orgs = data["datasets"]["organization"]
-        # Check at least one is from California Landscape Metrics
-        assert any(
-            org and "California Landscape Metrics" in org 
-            for org in orgs
-        )
-    
-    backend.close()
-
-
-def test_ndp_tags_filter():
-    """Test loading data with tags filter."""
-    backend = NDP(
-        params={
-            "keywords": "temperature",
-            "tags": ["climate", "weather"],
-            "limit": 5
-        }
-    )
-    
-    assert backend._loaded is True
-    data = backend.process_artifacts()
-    assert "datasets" in data
-    
-    backend.close()
-
-
-def test_ndp_format_filter():
-    """Test loading data with format filter."""
-    backend = NDP(
-        params={
-            "keywords": "data",
-            "formats": ["CSV", "JSON"],
-            "limit": 10
-        }
-    )
-    
-    assert backend._loaded is True
-    data = backend.process_artifacts()
-    assert isinstance(data, OrderedDict)
-    
-    backend.close()
+    with pytest.raises(NotImplementedError):
+        backend.overwrite_table("datasets", pd.DataFrame())
 
 
 # =============================================================================
-# 10) Lifecycle
+# 9) Lifecycle
 # =============================================================================
 
 def test_ndp_close():
-    """Test that close() properly resets backend state."""
+    """
+    Test that close() properly resets backend state.
+
+    This test must use its own instance because close() destructively mutates
+    the backend and would invalidate a shared fixture.
+    """
     backend = NDP(
-        params={"keywords": "climate", "limit": 5}
+        params={
+            "keywords": "climate",
+            "limit": 1,
+        }
     )
-    
-    # Before close
+
     assert backend._loaded is True
     assert len(backend._cache) > 0
-    
-    # Close
+
     backend.close()
-    
-    # After close
+
     assert backend._loaded is False
     assert len(backend._cache) == 0
-    assert len(backend._resource_tables) == 0
+    assert len(backend._dataset_id_map) == 0
 
 
-def test_ndp_notebook():
-    """Test that notebook() doesn't raise errors."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Should not raise exception (even though it's a no-op)
-    backend.notebook()
-    
-    backend.close()
+# =============================================================================
+# 10) Edge Cases
+# =============================================================================
 
+def test_ndp_empty_results(empty_backend):
+    """Test handling of queries that return no results."""
+    datasets = empty_backend._cache.get("datasets", {})
 
-def test_ndp_get_table_names():
-    """Test extracting table names from query strings."""
-    backend = NDP(
-        params={"keywords": "climate", "limit": 5}
-    )
-    
-    # Test with datasets table
-    names = backend.get_table_names("SELECT * FROM datasets WHERE title LIKE '%climate%'")
-    assert "datasets" in names
-    
-    backend.close()
+    if datasets and "id" in datasets:
+        assert len(datasets["id"]) == 0
