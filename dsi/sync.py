@@ -813,7 +813,7 @@ class Sync:
             remote_files = t2.get_table("filesystem")["file_remote"]
             parent_url = os.path.commonprefix(remote_files.tolist())
             for remote_url in remote_files:
-                # Downloading each file from fileystem
+                # Downloading each file from filesystem
                 db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_url, 
                                             workspace_folder, username, internal_use=True, parent_hash=parent_url)
                 new_folder = Path(db_info.pop("new_db_folder"))
