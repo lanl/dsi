@@ -1,0 +1,4 @@
+# NDP Salton Sea Study packages
+obspy>=1.4,<2
+cartopy>=0.24,<0.26
+jupyterlab>=4.4,<5
