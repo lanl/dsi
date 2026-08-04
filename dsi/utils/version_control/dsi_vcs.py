@@ -436,32 +436,25 @@ class Version():
         snapshots_root = os.path.join(self.root_folder, SNAPSHOTS_DIR)
         entries_in_last_commit = set(self._get_entries_in_commit(conn, parent_commit_hash) if parent_commit_hash else [])
 
-        # # ── Validate staged paths before creating the snapshot ─────────────────
-        # print(f"Validating {len(staged_adds) + len(staged_deletes)} staged path(s)…")
-        # valid_staged = len(staged_deletes)
-        # for abs_path in staged_adds:
-        #     e = collect_metadata(abs_path, self.root_folder)
-        #     if "error" in e:
-        #         print(f"  [skip] {e['relative_path']}: {e['error']}")
-        #     else:
-        #         valid_staged += 1
-
-        # if valid_staged == 0:
-        #     conn.close()
-        #     sys.exit("No readable staged paths — commit aborted.")
-
         for added_paths in staged_adds:
             entries_in_last_commit.add(os.path.relpath(added_paths, start=self.root_folder))
         for deleted_paths in staged_deletes:
             entries_in_last_commit.remove(os.path.relpath(deleted_paths, start=self.root_folder))
 
-        # ── Build a temporary view of the committed tree from the current worktree ─
-        ## TODO: Remove the need for a temporary snapshot directory by building the Merkle tree directly from the staged entries and the previous commit's Merkle tree.
-
-        # # ── Collect metadata for the complete committed tree ───────────────────
+        # ── Collect metadata for the complete committed tree ───────────────────
         entries = []
         for rel_path in entries_in_last_commit:
-            e = collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder)
+            e = check_access_permission(conn, self.root_folder, parent_commit_hash, rel_path, "write")
+            if e is None:
+                print(f"  [skip] {rel_path}: write access denied")
+                continue
+
+            temp_meta = collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder)
+            if running_user == e["owner_name"]: # only owner can update metadata
+                e = temp_meta
+            else:
+                e["absolute_path"] = temp_meta["absolute_path"]
+                e["_st_size"] = temp_meta["_st_size"]
             if "error" in e:
                 print(f"  [skip] {e['relative_path']}: {e['error']}")
             else:
@@ -470,6 +463,10 @@ class Version():
         total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
         file_count  = sum(1 for e in entries if e.get("file_type") == "file")
         print(f"  {file_count} file(s), {total_bytes:,} bytes")
+
+        if len(entries) == 0:
+            conn.close()
+            sys.exit("No files to commit after filtering for access permissions.")
 
         file_hashes, chunk_hashes, chunk_length = store_chunks_for_snapshot(conn, snapshots_root, entries)
         root_tree_hash, merkle_nodes = build_merkle_tree(entries, file_hashes, chunk_length)
