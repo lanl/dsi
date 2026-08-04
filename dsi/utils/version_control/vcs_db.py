@@ -71,8 +71,7 @@ CREATE TABLE IF NOT EXISTS chunk_store (
     created_at           INTEGER NOT NULL,
     commit_hash          TEXT DEFAULT NULL,   -- allow default null as commit hash may not be known at the time of chunk creation
     relative_file_path   TEXT NOT NULL,
-    chunk_index          INTEGER NOT NULL,
-    UNIQUE(chunk_hash, commit_hash)
+    chunk_index          INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_chunk_store_commit_file
