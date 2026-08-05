@@ -188,7 +188,13 @@ class DSI:
                 if filename == ".temp_dsi.db" and os.path.exists(filename):
                     os.remove(filename)
 
-                if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                if filename != ".temp_dsi.db" and os.path.exists(filename):
+                    backend_type = self.t.identify_backend(filename)
+                    if backend_type is not None:
+                        backend_name = backend_type
+                    else:
+                        raise RuntimeError(f"Cannot initialize DSI with the file: {filename}. It is not a valid DSI backend.")
+                elif filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
                     file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
                     if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                         filename += ".db"
@@ -210,6 +216,8 @@ class DSI:
                     raise
         
         self.main_backend_obj = self.t.loaded_backends[0]
+        if backend_name.lower() == "duckdb":
+            backend_name = "DuckDB"
 
         if self.read_only_flag:
             msg = f"Created an instance of DSI with the {backend_name} read-only backend"
