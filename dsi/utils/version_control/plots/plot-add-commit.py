@@ -80,6 +80,7 @@ def read_results(csv_path: Path, dataset: str, tool: str) -> pd.DataFrame:
             runs=("run", "count"),
         )
     )
+    summary[["add_ms", "commit_ms", "total_ms"]] /= 1000.0
     summary["dataset"] = dataset
     summary["tool"] = tool
     return summary
@@ -155,7 +156,7 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int) -> None:
         add_value_labels(ax, commit_bars, commit_values)
 
     ax.set_title(title, pad=14, fontweight="bold")
-    ax.set_ylabel("Mean runtime (ms)")
+    ax.set_ylabel("Mean runtime (s)")
     ax.set_xticks(x_positions)
     ax.set_xticklabels(dataset_order)
     ax.grid(axis="y", linestyle="--", alpha=0.35)
