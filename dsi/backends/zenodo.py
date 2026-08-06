@@ -689,7 +689,7 @@ class Zenodo(Webserver):
         if num_rows:
             df = df.head(num_rows)
 
-        return df.applymap(lambda x: self._truncate_cell(x, max_chars=80))
+        return df.map(lambda x: self._truncate_cell(x, max_chars=80))
 
     def summary(self, table_name=None, **kwargs):
         if not self._loaded:
