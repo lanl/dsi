@@ -116,7 +116,7 @@ def test_oceans11_query_artifacts(backend):
     assert isinstance(result, dict)
     assert "records" in result
 
-    for table_name, table_data in result.items():
+    for table_data in result.values():
         assert isinstance(table_data, dict)
         for col_values in table_data.values():
             assert isinstance(col_values, list)

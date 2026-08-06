@@ -181,7 +181,7 @@ class OSTI(Webserver):
 
             return True
 
-        except requests.RequestException as exc: # noqa: E722
+        except requests.RequestException as exc:
             # Silent failure to allow external workflows to continue
             print(
                 f"Unable to connect to OSTI API at {test_url}: "
