@@ -226,6 +226,11 @@ class RCSBPDB(Webserver):
         self.url = (url or self.DATA_CORE_URL).rstrip("/")
         self.identifiers = list(dict.fromkeys(identifiers or []))
         self.params = params or {}
+        self.validate_error_msg = None
+
+        # skip data retrieval if only checking connection to oceans11
+        if kwargs.get("only_validate", False):
+            return
 
         self.timeout = kwargs.get("timeout", 60)
         self.verify = kwargs.get("verify_ssl", kwargs.get("verify", True))
@@ -251,7 +256,7 @@ class RCSBPDB(Webserver):
         if self.validate_on_init:
             if not self.validate_connection():
                 self._loaded = False
-                raise RuntimeError("rcsbpdb connection validation failed.")
+                raise ConnectionError(self.validate_error_msg or "RCSBPDB connection validation failed.")
 
         if self.auto_load:
             try:
@@ -317,8 +322,8 @@ class RCSBPDB(Webserver):
             response.raise_for_status()
             return True
 
-        except: # noqa: E722
-            # Need to silent exit to continue external workflows
+        except Exception as e:
+            self.validate_error_msg = f"Unable to connect to RCSB Data API: {e}"
             return False
 
     def _request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

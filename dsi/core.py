@@ -1507,7 +1507,7 @@ class Terminal:
                         return True
                     else:
                         if self.debug_level != 0:
-                            self.logger.warning("RCSBPDB backend connection validation failed.")
+                            self.logger.warning("RCSBPDB backend connection failed.")
                         return False
             if backend.__class__.__name__ == "Oceans11":
                 if not backend._loaded:

@@ -236,7 +236,7 @@ class DSI:
         n = OSTI()
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
-        n = RCSBPDB(auto_load=False)
+        n = RCSBPDB(only_validate=True)
         if n.validate_connection():
             print("RCSBPDB : Read-only metadata backend for discovering and querying RCSBPDB/RCSB structure metadata.")
         n = Oceans11(only_validate=True)
