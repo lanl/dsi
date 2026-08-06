@@ -408,11 +408,20 @@ def test_osti_fulltext_filter():
 # 10) Lifecycle
 # =============================================================================
 
+def test_osti_notebook():
+    """Test that notebook() doesn't raise errors."""
+    backend.notebook()
+
+
+def test_osti_get_table_names():
+    """Test extracting table names from query strings."""
+    # Test with records table
+    names = backend.get_table_names("SELECT * FROM records WHERE title LIKE '%climate%'")
+    assert "records" in names
+
+
 def test_osti_close():
     """Test that close() properly resets backend state."""
-    backend = OSTI(
-        params={"q": "climate", "rows": 5}
-    )
 
     assert backend._loaded is True
     assert len(backend._cache) > 0
@@ -421,16 +430,3 @@ def test_osti_close():
 
     assert backend._loaded is False
     assert len(backend._cache) == 0
-
-
-def test_osti_notebook():
-    """Test that notebook() doesn't raise errors."""
-    backend.notebook()
-
-
-
-def test_osti_get_table_names():
-    """Test extracting table names from query strings."""
-    # Test with records table
-    names = backend.get_table_names("SELECT * FROM records WHERE title LIKE '%climate%'")
-    assert "records" in names
