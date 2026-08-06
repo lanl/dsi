@@ -113,13 +113,12 @@ class Oceans11(Webserver):
         self._loaded = False
         self.catalog_path = None # the local path for the T1 catalog. 
         self.params = params or {}
+        self.validate_error_msg = None
 
         # Validate connection FIRST before attempting to load data
-        try:
-            self.catalog_path = self.validate_connection()
-        except (ConnectionError, RuntimeError):
+        if not self.validate_connection():
             self._loaded = False
-            raise
+            raise ConnectionError(self.validate_error_msg or "Failed to connect to Oceans11 catalog")
 
         # Initial data load (only if connection is valid and params provided)
         if self.params:
@@ -128,7 +127,7 @@ class Oceans11(Webserver):
                 self._loaded = True  # Data successfully loaded
             except Exception as e:
                 self._loaded = False
-                raise RuntimeError(f"Failed to load initial data: {e}") from e
+                raise ConnectionError(self.validate_error_msg or f"Failed to load initial data: {e}") from e
         else:
             self._loaded = True  # Backend ready, no initial data to load
 
@@ -167,28 +166,25 @@ class Oceans11(Webserver):
                 )
 
             if info is None:
-                if kwargs.get("only_validate", False):
-                    return False
-                raise ConnectionError(f"Failed to download catalog from {self.base_url}")
+                self.validate_error_msg = f"Failed to download catalog from {self.base_url}"
+                return False
 
             local_path = info.get("local_path")
             if not local_path or not Path(local_path).is_file():
-                if kwargs.get("only_validate", False):
-                    return False
-                raise RuntimeError("Downloaded catalog file is invalid or missing")
+                self.validate_error_msg = "Downloaded catalog file is invalid or missing"
+                return False
 
             # skip data retrieval if only checking connection to oceans11
             if kwargs.get("only_validate", False):
                 import shutil
                 shutil.rmtree(info["folder_hash"] + "/")
-                return True
 
-            return local_path
+            self.catalog_path = local_path
+            return True
 
         except Exception as e:
-            if kwargs.get("only_validate", False):
-                return False
-            raise ConnectionError(f"Unable to access Oceans11 catalog: {e}") from e
+            self.validate_error_msg = f"Unable to access Oceans11 catalog: {e}"
+            return False
 
     # ---------------------------------------------------
     # Initial Data Load

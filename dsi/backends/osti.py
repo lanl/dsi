@@ -121,16 +121,21 @@ class OSTI(Webserver):
         if self.api_key:
             self.headers["Authorization"] = self.api_key
 
+        # skip data retrieval if only checking connection to oceans11
+        if kwargs.get("only_validate", False):
+            return
+
         # In-memory storage (DSI format)
         self._cache = OrderedDict()
 
         self._loaded = False
         self.params = params or {}
+        self.validate_error_msg = None
 
         # Validate connection FIRST before attempting to load data
         if not self.validate_connection():
             self._loaded = False
-            raise ConnectionError(f"Unable to connect to OSTI API at {self.base_url}")
+            raise ConnectionError(self.validate_error_msg or f"Unable to connect to OSTI API at {self.base_url}")
 
         # Initial data load (only if connection is valid and params provided)
         if self.params:
@@ -177,17 +182,17 @@ class OSTI(Webserver):
 
             # OSTI returns a list of records for /records
             if not isinstance(data, list):
+                self.validate_error_msg = "OSTI connection error: response is not a list of records"
                 return False
 
             return True
 
         except requests.RequestException as exc:
-            # Silent failure to allow external workflows to continue
-            print(
-                f"Unable to connect to OSTI API at {test_url}: "
-                f"{type(exc).__name__}: {exc}"
-            )
+            self.validate_error_msg = f"OSTI connection error: {exc}"
             return False
+        except Exception as exc:
+                self.validate_error_msg = f"OSTI connection error: {exc}"
+                return False
 
     # ---------------------------------------------------
     # Initial Data Load

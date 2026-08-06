@@ -38,12 +38,13 @@ def test_oceans11_initialization(backend):
 
 def test_oceans11_validate_connection(tmp_path):
     """Test connection validation to Oceans11 catalog."""
-    backend = Oceans11(workspace=str(tmp_path))
+    backend = Oceans11(workspace=str(tmp_path), only_validate=True) # skips downloading other dbs with only_validate=True
 
-    catalog_path = backend.validate_connection()
+    valid_connection = backend.validate_connection()
 
-    assert isinstance(catalog_path, str)
-    assert Path(catalog_path).is_file()
+    assert valid_connection is True
+    assert isinstance(backend.catalog_path, str)
+    assert Path(backend.catalog_path).is_file()
 
     backend.close()
 
