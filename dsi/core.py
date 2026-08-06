@@ -1483,7 +1483,7 @@ class Terminal:
                     return True
                 else:
                     if self.debug_level != 0:
-                        self.logger.warning(f"NDP backend connection failed")
+                        self.logger.warning("NDP backend connection failed")
                     return False
             if backend.__class__.__name__ == "OSTI":
                 # OSTI is valid if data is loaded and connection works
@@ -1494,7 +1494,7 @@ class Terminal:
                     return True
                 else:
                     if self.debug_level != 0:
-                        self.logger.warning(f"OSTI backend connection failed")
+                        self.logger.warning("OSTI backend connection failed")
                     return False
             if backend.__class__.__name__ == "RCSBPDB":
                 # RCSBPDB is valid if data is loaded and RCSB connection works
@@ -1515,7 +1515,7 @@ class Terminal:
                     return True
                 else:
                     if self.debug_level != 0:
-                        self.logger.warning(f"Oceans11 backend connection failed")
+                        self.logger.warning("Oceans11 backend connection failed")
                     return False
         return True
 
