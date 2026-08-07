@@ -19,6 +19,7 @@ extensions = ['sphinx_rtd_theme', 'sphinx.ext.autodoc', 'sphinx.ext.autosectionl
 
 # Make sure the target is unique
 autosectionlabel_prefix_document = True
+autosectionlabel_maxdepth = 3
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.rst']

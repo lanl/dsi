@@ -1,6 +1,7 @@
 from dsi.core import Terminal #, Sync
 from dsi.backends.ndp import NDP
 from dsi.backends.osti import OSTI
+from dsi.backends.rcsbpdb import RCSBPDB
 from dsi.backends.oceans11 import Oceans11
 from collections import OrderedDict
 import numpy as np
@@ -42,14 +43,15 @@ class DSI:
                 - If backend_name = "DuckDB" → .duckdb, .db
                 - If backend_name = "NDP" → No filename input (read-only backend)
                 - If backend_name = "OSTI" → No filename input (read-only backend)
+                - If backend_name = "RCSBPDB" → No filename input (read-only backend)
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
-            Name of the backend to activate. 
-            
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI" or "Oceans11".
-            
-            If using an external backend, provide the relative path to the Python module with the backend. 
+            Name of the backend to activate.
+
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", or "RCSBPDB".
+
+            If using an external backend, provide the relative path to the Python module with the backend.
         """
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
@@ -121,7 +123,7 @@ class DSI:
             backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
             if backend_module is None:
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB")
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
@@ -139,11 +141,9 @@ class DSI:
                     query_params = kwargs.pop('params', None)
                     
                     # Validate params is a dict or list of dicts
-                    if isinstance(query_params, dict):
-                        # Single query - valid
+                    if isinstance(query_params, dict): # Single query
                         pass
-                    elif isinstance(query_params, list):
-                        # Multiple queries - validate each is a dict
+                    elif isinstance(query_params, list): # Multiple queries - validate each is a dict
                         if not all(isinstance(p, dict) for p in query_params):
                             raise TypeError(
                                 "'params' list must contain only dictionaries.\n"
@@ -161,8 +161,11 @@ class DSI:
                 elif backend_name.lower() == "oceans11":
                     backend_name = "Oceans11"
                     query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "rcsbpdb":
+                    backend_name = "RCSBPDB"
+                    query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, and Oceans11")
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB and Oceans11")
                 
                 try:
                     # Pass query params as 'params' argument
@@ -209,7 +212,7 @@ class DSI:
         self.main_backend_obj = self.t.loaded_backends[0]
 
         if self.read_only_flag:
-            msg = f"Created an instance of DSI with the {backend_name} read-only backend"            
+            msg = f"Created an instance of DSI with the {backend_name} read-only backend"
         elif filename != ".temp_dsi.db":
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
@@ -233,6 +236,9 @@ class DSI:
         n = OSTI()
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
+        n = RCSBPDB(only_validate=True)
+        if n.validate_connection():
+            print("RCSBPDB : Read-only metadata backend for discovering and querying RCSBPDB/RCSB structure metadata.")
         n = Oceans11(only_validate=True)
         if n.validate_connection(only_validate=True):
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
