@@ -399,8 +399,7 @@ def test_oceans11_keyword_filter(tmp_path):
 
     backend.close()
 
-@pytest.mark.integration
-@pytest.mark.slow
+
 def test_oceans11_download_all(tmp_path):
     """Test loading all records with download_all."""
     backend = Oceans11(

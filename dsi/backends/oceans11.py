@@ -99,10 +99,6 @@ class Oceans11(Webserver):
 
         self.base_url = base_url.rstrip("/")
 
-        # skip data retrieval if only checking connection to oceans11
-        if kwargs.get("only_validate", False):
-            return
-
         # Data storage (tiered structure)
         # Tier 1: datasets, Tier 2: per-dataset resource tables
         self._cache = OrderedDict()
@@ -114,6 +110,10 @@ class Oceans11(Webserver):
         self.catalog_path = None # the local path for the T1 catalog. 
         self.params = params or {}
         self.validate_error_msg = None
+
+        # skip data retrieval if only checking connection to oceans11
+        if kwargs.get("only_validate", False):
+            return
 
         # Validate connection FIRST before attempting to load data
         if not self.validate_connection():
@@ -127,7 +127,7 @@ class Oceans11(Webserver):
                 self._loaded = True  # Data successfully loaded
             except Exception as e:
                 self._loaded = False
-                raise ConnectionError(self.validate_error_msg or f"Failed to load initial data: {e}") from e
+                raise RuntimeError(f"Failed to load initial data: {e}") from e
         else:
             self._loaded = True  # Backend ready, no initial data to load
 
