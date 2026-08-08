@@ -519,10 +519,11 @@ class Version():
         )
 
         # ── update chunk store with commit hash ──────────────────────────────────
-        cur.execute(
-            f"UPDATE chunk_store SET commit_hash=? WHERE commit_hash = 'UPDATE' AND chunk_hash IN ({','.join('?' for _ in chunk_hashes)})",
-            [commit_hash] + list(chunk_hashes),
-        )
+        batch_size = 32000
+        update_sql = "UPDATE chunk_store SET commit_hash=? WHERE commit_hash = 'UPDATE' AND chunk_hash = ?"
+        update_params = [(commit_hash, chunk_hash) for chunk_hash in chunk_hashes]
+        for i in range(0, len(update_params), batch_size):
+            cur.executemany(update_sql, update_params[i:i + batch_size])
         # ── Insert version row ───────────────────────────────────────────────────
         cur.execute(
             """INSERT INTO versions
