@@ -196,7 +196,6 @@ class Version():
                 pending[record.file_path] = (record, "delete")
             else:
                 pending[record.file_path] = (record, "add")
-
         return pending
 
     def _print_staged_paths(self) -> None:
@@ -281,10 +280,10 @@ class Version():
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         for raw in paths:
-            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
+            rel_path = raw
             stage_entries.append(
                 {
-                    "file_path": abs_path,
+                    "file_path": rel_path,
                     "operation": OperationType.FILE_DELETE,
                     "chunk_hash": None,
                     "chunk_ref": None,
@@ -311,10 +310,10 @@ class Version():
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         for raw in paths:
-            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(root_folder, raw))
+            rel_path = raw
             stage_entries.append(
                 {
-                    "file_path": abs_path,
+                    "file_path": rel_path,
                     "operation": OperationType.FILE_REMOVE,
                     "chunk_hash": None,
                     "chunk_ref": None,

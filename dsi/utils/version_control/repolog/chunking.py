@@ -1,7 +1,7 @@
 import hashlib
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from .log_record import _utcnow
 from .npy_chunking import NPY_MAGIC, chunk_npy_file
 
@@ -254,7 +254,7 @@ def _find_fastcdc_cut(
 
 
 def chunk_file_fastcdc(
-    path: Union[str, PathLike[str]],
+    path: Union[str, os.PathLike[str]],
 ) -> list[dict[str, object]]:
     """
     Split a file into FastCDC chunks.
