@@ -164,6 +164,7 @@ class OSTI(Webserver):
 
             response = requests.get(
                 test_url,
+                stream=True,
                 headers=self.headers,
                 verify=self.verify_ssl,
                 timeout=2,
@@ -441,8 +442,7 @@ class OSTI(Webserver):
                 "format": rec.get("format"), 
                 "report_number": rec.get("report_number"),
                 "doe_contract_number": rec.get("doe_contract_number"),
-                "nsa_number": rec.get("doe_contract_number"), 
-
+                "nsa_number": rec.get("nsa_number"),
                 "authors": self._flatten_list(rec.get("authors", []) or [], key="name"),
                 "subjects": self._flatten_list(rec.get("subjects", []) or []),
                 "sponsor_org": self._flatten_list(rec.get("sponsor_org", []) or [], key="name"),
@@ -499,14 +499,14 @@ class OSTI(Webserver):
     # ----------------------------------------------------------------------
     def num_tables(self):
         """
-        Prints the number of tables (datasets) loaded.
+        Prints the number of tables in this backend.
         """
-        if not self._loaded:
-            print("0 tables loaded")
-            return
-        
-        num = len(self._cache) - (1 if "datasets" in self._cache else 0)
-        print(f"{num} tables loaded")
+        table_count = len(self._cache)
+
+        if table_count != 1:
+            print(f"Database now has {table_count} tables")
+        else:
+            print(f"Database now has {table_count} table")
     
 
     def get_table(self, table_name="records", dict_return=False):
@@ -556,6 +556,11 @@ class OSTI(Webserver):
                         dtype = "INTEGER"
                     elif isinstance(v, float):
                         dtype = "REAL"
+                    elif isinstance(v, (dict, list, tuple, set)):
+                        dtype = "OBJECT"
+                    else:
+                        dtype = "TEXT"
+
                     break
 
                 cols.append(f"    {col_name} {dtype}")
@@ -587,50 +592,32 @@ class OSTI(Webserver):
     # ---------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
-        Query all tables using pandas.query()
+        Query not supported for OSTI backend (non-SQL backend).
 
+        OSTI is a read-only metadata backend that does not support SQL queries.
+        Use find(), search(), or find_relation() for searching data instead.
+
+        Parameters
+        ----------
         `query` : str
-            Pandas query string for filtering data
-        `dict_return` : bool, optional, default True
-            If True, returns dict format.
-            If False, returns pandas DataFrames.
-        
+            Query string (unused)
+        `dict_return` : bool, default True
+            Return format flag (unused)
         `**kwargs` : dict
-            Additional keyword arguments
+            Additional keyword arguments (unused)
 
-        Return : dict
-            Dictionary mapping table names to query results
+        Raises
+        ------
+        NotImplementedError
+            Always raised as OSTI does not support SQL queries.
         """
-        if not self._loaded:
-            raise RuntimeError("No metadata loaded. Cannot query empty backend.")
+        raise NotImplementedError(
+            "query() is not supported for OSTI backend - it is a non-SQL backend.\n\n"
+            "Use these methods instead:\n"
+            "  dsi.find(...)             # Search for values\n"
+            "  dsi.search(...)           # Search across backend data\n"
+        )
 
-        if "records" not in self._cache:
-            raise RuntimeError("No records table loaded.")
-
-        df = pd.DataFrame(self._cache["records"])
-
-        if df.empty:
-            raise ValueError(f"Query returned no results: '{query}'")
-
-        try:
-            result_df = df.query(query, engine="python")
-
-            if result_df.empty:
-                raise ValueError(f"Query returned no results: '{query}'")
-
-            if dict_return:
-                return OrderedDict(result_df.to_dict(orient="list"))
-
-            return result_df
-
-        except pd.errors.UndefinedVariableError:
-            raise ValueError(f"Query references an unknown column: '{query}'") from None
-
-        except ValueError:
-            raise
-
-        except Exception as e:
-            raise ValueError(f"Query error in records: {e}") from e
 
     # ----------------------------------------------------------------------
     # Artifact Processing (tiered table construction)
@@ -718,8 +705,10 @@ class OSTI(Webserver):
             df[f"{field}_valid"] = validity
 
         # write back to cache
-        self._cache["records"] = df.to_dict(orient="list")
-
+        self._cache["records"] = OrderedDict(
+            (column, df[column].tolist())
+            for column in df.columns
+        )
 
     # ----------------------------------------------------------------------
     # Find Methods
@@ -831,26 +820,38 @@ class OSTI(Webserver):
         return matches
 
 
-    def find_cell(self, query_object, **kwargs):
+    def find_cell(self, query_object, row=False, **kwargs):
         """
         Finds all cells that match the given query_object.
-        
-        Exact match for all data types, plus case-insensitive partial match for strings.
+
+        Exact match for all data types, plus case-insensitive partial
+        match for strings.
 
         `query_object` : int, float, or str
-            The value to search for within table cells
+            The value to search for within table cells.
+
+        `row` : bool, optional, default=False
+            If True, return the entire row containing the matching cell.
+            If False, return only the matching cell.
+
         `**kwargs` : dict
-            Additional keyword arguments
+            Additional keyword arguments.
 
         Return : list of ValueObject
-            One ValueObject per matching cell
+            One ValueObject per matching cell.
 
         ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List with the matched column name
-            - row_num : (int) Row index of the match
-            - value :   (any) Matched cell value
-            - type :    (str) 'cell'
+            - t_name : table name
+            - c_name :
+                - row=False: list containing matched column name
+                - row=True: list of all column names
+            - row_num : row index of match
+            - value :
+                - row=False: matched cell value
+                - row=True: full row of values
+            - type :
+                - row=False: 'cell'
+                - row=True: 'row'
         """
         if not self._loaded:
             return []
@@ -867,8 +868,8 @@ class OSTI(Webserver):
             cols = list(table_data.keys())
             rows = zip(*table_data.values())
 
-            for row_idx, row in enumerate(rows):
-                for col_idx, cell in enumerate(row):
+            for row_idx, row_data in enumerate(rows):
+                for col_idx, cell in enumerate(row_data):
                     match = False
 
                     if query_object == cell:
@@ -881,13 +882,27 @@ class OSTI(Webserver):
                     ):
                         match = True
 
+                    elif (
+                        is_str_query
+                        and isinstance(cell, (dict, list, tuple))
+                        and query_lower in str(cell).lower()
+                    ):
+                        match = True
+
                     if match:
                         val = ValueObject()
                         val.t_name = table_name
-                        val.c_name = [cols[col_idx]]
                         val.row_num = row_idx
-                        val.value = cell
-                        val.type = "cell"
+
+                        if row:
+                            val.c_name = cols
+                            val.value = list(row_data)
+                            val.type = "row"
+                        else:
+                            val.c_name = [cols[col_idx]]
+                            val.value = cell
+                            val.type = "cell"
+
                         matches.append(val)
 
         return matches
@@ -895,65 +910,409 @@ class OSTI(Webserver):
 
     def find_relation(self, column_name, relation, **kwargs):
         """
-        Relation finding is not supported for the OSTI backend.
-        """
-        raise NotImplementedError("OSTI Backend does not support find_relation")
+        Finds all rows in the records table that satisfy a relation
+        applied to the given column.
 
+        `column_name` : str
+            Name of the column to apply the relation to.
+
+        `relation` : str
+            Operator and value to apply to the column.
+            Ex: >4, <4, =4, >=4, <=4, ==4, !=4,
+            (4,5), ~4, ~~4
+
+        Return : list of ValueObject
+            One ValueObject per matching row.
+
+        ValueObject Structure:
+            - t_name : table name
+            - c_name : list of all columns
+            - value : full row of values
+            - row_num : 1-based row index
+            - type : 'relation'
+        """
+        if not self._loaded or "records" not in self._cache:
+            raise RuntimeError(
+                "find_relation() ERROR: Cannot search an empty backend."
+            )
+
+        df = pd.DataFrame(self._cache["records"])
+
+        if column_name not in df.columns:
+            return (
+                f"'{column_name}' is not a column in this database. "
+                "Ensure the column is written first."
+            )
+
+        operator, value = self._parse_relation(relation)
+
+        filtered = self._apply_pandas_filter(
+            df,
+            column_name,
+            operator,
+            value
+        )
+
+        if filtered.empty:
+            return (
+                f"Could not find any rows where "
+                f" {column_name} {relation}  in this database."
+            )
+
+        matches = []
+
+        for idx, row in filtered.iterrows():
+            val = ValueObject()
+            val.t_name = "records"
+            val.c_name = list(df.columns)
+            val.row_num = int(idx) + 1
+            val.value = row.tolist()
+            val.type = "relation"
+            matches.append(val)
+
+        return matches
+
+
+    def _apply_pandas_filter(self, df, column, operator, value):
+        """
+        Apply a parsed DSI relation to a DataFrame column.
+        """
+        series = df[column]
+
+        # Partial string match
+        if operator == "contains":
+            mask = (
+                series.astype(str)
+                .str.contains(str(value), case=False, na=False)
+            )
+            return df[mask]
+
+        # Range comparison
+        if operator == "range":
+            min_val, max_val = value
+
+            if (
+                isinstance(min_val, (int, float))
+                and not isinstance(min_val, bool)
+                and isinstance(max_val, (int, float))
+                and not isinstance(max_val, bool)
+            ):
+                numeric = pd.to_numeric(series, errors="coerce")
+                mask = numeric.between(min_val, max_val)
+            else:
+                text = series.astype("string")
+                mask = (
+                    (text >= str(min_val))
+                    & (text <= str(max_val))
+                )
+
+            return df[mask.fillna(False)]
+
+        # Equality / inequality with null
+        if value is None:
+            if operator == "==":
+                return df[series.isna()]
+
+            if operator == "!=":
+                return df[series.notna()]
+
+        # Boolean comparison
+        if isinstance(value, bool):
+            if operator == "==":
+                return df[series == value]
+
+            if operator == "!=":
+                return df[series != value]
+
+        # Equality should preserve the stored column type.
+        # This is important for OSTI fields such as osti_id, which
+        # may contain numeric-looking values stored as strings.
+        if operator in {"==", "!="}:
+            if pd.api.types.is_numeric_dtype(series):
+                compare_value = value
+            else:
+                compare_value = str(value)
+                series = series.astype("string")
+
+            if operator == "==":
+                mask = series == compare_value
+            else:
+                mask = series != compare_value
+
+            return df[mask.fillna(False)]
+
+        # Ordering comparisons.
+        # Use numeric comparison when the query value is numeric;
+        # otherwise use string comparison.
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            compare_series = pd.to_numeric(series, errors="coerce")
+        else:
+            compare_series = series.astype("string")
+            value = str(value)
+
+        if operator == ">":
+            mask = compare_series > value
+        elif operator == "<":
+            mask = compare_series < value
+        elif operator == ">=":
+            mask = compare_series >= value
+        elif operator == "<=":
+            mask = compare_series <= value
+        else:
+            raise ValueError(f"Unsupported relation operator: {operator}")
+
+        return df[mask.fillna(False)]
+
+
+    def _parse_relation(self, relation):
+        """
+        Parse a DSI relation into an operator and value.
+        """
+        relation = relation.strip()
+
+        # Two-character operators must be checked first.
+        if relation.startswith(">="):
+            return ">=", self._parse_value(relation[2:])
+
+        if relation.startswith("<="):
+            return "<=", self._parse_value(relation[2:])
+
+        if relation.startswith("=="):
+            return "==", self._parse_value(relation[2:])
+
+        if relation.startswith("!="):
+            return "!=", self._parse_value(relation[2:])
+
+        if relation.startswith("~~"):
+            return "contains", self._parse_value(relation[2:])
+
+        # Single-character operators
+        if relation.startswith(">"):
+            return ">", self._parse_value(relation[1:])
+
+        if relation.startswith("<"):
+            return "<", self._parse_value(relation[1:])
+
+        if relation.startswith("="):
+            return "==", self._parse_value(relation[1:])
+
+        if relation.startswith("~"):
+            return "contains", self._parse_value(relation[1:])
+
+        # Range
+        if relation.startswith("(") and relation.endswith(")"):
+            values = relation[1:-1].split(",")
+
+            if len(values) == 2:
+                return (
+                    "range",
+                    (
+                        self._parse_value(values[0]),
+                        self._parse_value(values[1]),
+                    ),
+                )
+
+        raise ValueError(f"Unknown relation format: {relation}")
+
+
+    def _parse_value(self, value):
+        """
+        Convert a DSI relation value to an appropriate Python value.
+        """
+        value = str(value).strip()
+
+        if (
+            (value.startswith("'") and value.endswith("'"))
+            or
+            (value.startswith('"') and value.endswith('"'))
+        ):
+            value = value[1:-1]
+
+        # DSI escapes apostrophes for SQL using doubled quotes.
+        value = value.replace("''", "'")
+
+        if value.lower() == "true":
+            return True
+
+        if value.lower() == "false":
+            return False
+
+        if value.lower() in {"none", "null"}:
+            return None
+
+        try:
+            if "." not in value:
+                return int(value)
+
+            return float(value)
+
+        except ValueError:
+            return value
+
+
+    
     # ----------------------------------------------------------------------
     # Utility / Display
     # ----------------------------------------------------------------------
     def list(self, collection=False):
         """
-        Lists tables or prints each table's dimensions.
+        Return a list of all tables and their dimensions from this OSTI backend.
 
-
-        `collection` : bool, default False
-            - If True, return list of table names.
-            - If False, print table names with dimensions.
-
-        Return : list or None
-            Table names if collection=True, otherwise None
+        `collection` : bool, optional, default=False
+            - If True, returns the list of table names.
+            - If False (default), prints metadata of all tables:
+            table names and dimensions.
         """
         if collection:
             return list(self._cache.keys())
 
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
-            print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
+
+            print(f"\nTable: {name}")
+            print(f"  - num of columns: {len(df.columns)}")
+            print(f"  - num of rows: {len(df)}")
+
+        print()
 
 
     def summary(self, table_name=None):
         """
-        Returns numerical metadata for the cached 'records' table.
+        Returns numerical metadata for the cached OSTI records table.
 
         `table_name` : str, optional
-            If provided or not, returns summary for the 'records' table.
+            If specified, only the numerical metadata for that table is
+            returned as a Pandas DataFrame.
 
-        Return : pandas.DataFrame or list
-            - If table_name is None: returns [['records'], records_df]
-            - If table_name provided: returns single DataFrame for records table
+            If None (default), names of all tables and metadata for each
+            table are returned as a list:
+            [table_name_list, table1_df, table2_df, ...]
         """
-        if not self._loaded or "records" not in self._cache:
-            return pd.DataFrame()
+        if table_name is not None:
+            if table_name not in self._cache:
+                raise ValueError(
+                    f"Table '{table_name}' not found. "
+                    f"Available tables: {list(self._cache.keys())}"
+                )
 
-        if table_name and table_name != "records":
-            raise ValueError("OSTI backend only contains the 'records' table")
+            if not self._cache[table_name]:
+                raise ValueError(f"Table '{table_name}' is empty")
 
-        df = pd.DataFrame(self._cache["records"])
+            return self._summary_helper(table_name)
 
-        summary_dict = {
-            "table_name": "records",
-            "num_rows": len(df),
-            "num_columns": len(df.columns),
-            "columns": list(df.columns),
+        table_names = []
+        summary_dfs = []
+
+        for name, table in self._cache.items():
+            if not table:
+                continue
+
+            table_names.append(name)
+            summary_dfs.append(self._summary_helper(name))
+
+        return [table_names] + summary_dfs
+
+
+    def _summary_helper(self, table_name):
+        """
+        Internal helper for generating column-level summary metadata.
+        """
+        df = pd.DataFrame(self._cache[table_name]).infer_objects()
+
+        headers = [
+            "column",
+            "type",
+            "unique",
+            "min",
+            "max",
+            "avg",
+            "std_dev",
+        ]
+
+        skip_min_max = {
+            "raw_record",
+            "citation_url",
+            "citation_doe_pages_url",
+            "fulltext_url",
         }
 
-        summary_df = pd.DataFrame([summary_dict])
+        rows = []
 
-        if table_name:
-            return summary_df
+        for column in df.columns:
+            series = df[column]
+            non_null = series.dropna()
 
-        return [["records"], summary_df]
+            # Determine DSI-compatible column type
+            if pd.api.types.is_bool_dtype(series):
+                column_type = "BOOLEAN"
+            elif pd.api.types.is_integer_dtype(series):
+                column_type = "INTEGER"
+            elif pd.api.types.is_float_dtype(series):
+                column_type = "REAL"
+            elif pd.api.types.is_datetime64_any_dtype(series):
+                column_type = "DATETIME"
+            elif non_null.empty or all(isinstance(value, str) for value in non_null):
+                column_type = "TEXT"
+            else:
+                column_type = "OBJECT"
+
+            # Complex values such as raw_record dictionaries are not hashable.
+            has_complex_values = (
+                non_null.apply(
+                    lambda value: isinstance(value, (dict, list, tuple, set))
+                ).any()
+                if not non_null.empty
+                else False
+            )
+
+            if has_complex_values:
+                unique_vals = int(non_null.astype(str).nunique())
+            else:
+                unique_vals = int(non_null.nunique())
+
+            min_val = None
+            max_val = None
+            avg_val = None
+            std_dev = None
+
+            # Calculate numerical statistics when the entire column is numeric.
+            numeric_series = pd.to_numeric(non_null, errors="coerce").dropna()
+
+            if not non_null.empty and len(numeric_series) == len(non_null):
+                min_val = numeric_series.min()
+                max_val = numeric_series.max()
+                avg_val = numeric_series.mean()
+                std_dev = numeric_series.std()
+
+                if pd.isna(std_dev):
+                    std_dev = None
+
+            # For short text columns, provide lexicographic min/max.
+            elif (
+                not non_null.empty
+                and not has_complex_values
+                and column.lower() not in skip_min_max
+                and non_null.astype(str).str.len().max() <= 80
+            ):
+                try:
+                    min_val = non_null.min()
+                    max_val = non_null.max()
+                except TypeError:
+                    pass
+
+            rows.append([
+                column,
+                column_type,
+                unique_vals,
+                min_val,
+                max_val,
+                avg_val,
+                std_dev,
+            ])
+
+        return pd.DataFrame(rows, columns=headers, dtype=object)
+
+
 
 
     def display(self, table_name="records", num_rows=25, display_cols=None):
