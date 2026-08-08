@@ -749,7 +749,7 @@ class Sync:
                     self.t.artifact_handler(interaction_type='ingest')
 
 
-    def get_data(self, db_name: str, workspace_folder: str | None = None):
+    def get_data(self, db_name: str, workspace_folder: str | None = None, subset_remote_files: list | None = None):
         curr_tables = self.t.list(True)
         if "federation" not in curr_tables or self.t.get_table("federation").empty:
             raise RuntimeError("Must first download DSI databases with the get() function")
@@ -810,8 +810,14 @@ class Sync:
                 return False
 
         if is_url(remote_loc):
-            remote_files = t2.get_table("filesystem")["file_remote"]
-            parent_url = os.path.commonprefix(remote_files.tolist())
+            remote_files = t2.get_table("filesystem")["file_remote"].tolist()
+            if subset_remote_files is not None:
+                select_files = list(set(remote_files) & set(subset_remote_files))
+                remote_files = select_files
+                if len(subset_remote_files) != len(select_files):
+                    missing_files = list(set(subset_remote_files) - set(select_files))
+                    print("WARNING: These remote files do not exist:", ", ".join(missing_files))
+            parent_url = os.path.commonprefix(remote_files)
             for remote_url in remote_files:
                 # Downloading each file from filesystem
                 db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_url, 
@@ -819,13 +825,26 @@ class Sync:
                 new_folder = Path(db_info.pop("new_db_folder"))
                 if new_folder.is_dir() and not any(new_folder.iterdir()):
                     new_folder.rmdir()
-        else:        
-            # Currently pulling all referenced data -- eventually allow user to download certain data
-            db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
-                                        workspace_folder, username, internal_use=True)
-            new_folder = Path(db_info.pop("new_db_folder"))
-            if new_folder.is_dir() and not any(new_folder.iterdir()):
-                new_folder.rmdir()
+        else:
+            if subset_remote_files is not None:
+                remote_files = t2.get_table("filesystem")["file_remote"]
+                select_files = list(set(remote_files) & set(subset_remote_files))
+                if len(subset_remote_files) != len(select_files):
+                    missing_files = list(set(subset_remote_files) - set(select_files))
+                    print("WARNING: These remote files do not exist:", ", ".join(missing_files))
+                for remote_file in select_files:
+                    db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_file, 
+                                                workspace_folder, username, internal_use=True)
+                    new_folder = Path(db_info.pop("new_db_folder"))
+                    if new_folder.is_dir() and not any(new_folder.iterdir()):
+                        new_folder.rmdir()
+            else:
+                # Currently pulling all referenced data -- eventually allow user to download certain data
+                db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
+                                            workspace_folder, username, internal_use=True)
+                new_folder = Path(db_info.pop("new_db_folder"))
+                if new_folder.is_dir() and not any(new_folder.iterdir()):
+                    new_folder.rmdir()
 
 
     def gen_uuid(self, st):
