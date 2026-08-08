@@ -564,14 +564,16 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
                     permitted = {p.strip() for p in perms.split(",") if p}
                     if access in permitted or (access == "read" and "write" in permitted):
                         return metadata
-                    continue
+                    else:
+                        return None
 
                 # Check group principal
                 if principal in current_groups:
                     permitted = {p.strip() for p in perms.split(",") if p}
                     if access in permitted or (access == "read" and "write" in permitted):
                         return metadata
-                    continue
+                    else:
+                        return None
         elif sys.platform == "linux":
             for entry in acl_text.replace(";", "\n").splitlines():
                 entry = entry.strip()
@@ -598,13 +600,15 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
                         permitted = {p.strip() for p in perms.split(",") if p}
                         if access in permitted or (access == "read" and "write" in permitted):
                             return metadata
-                        continue
+                        else:
+                            return None
 
                     if principal in current_groups:
                         permitted = {p.strip() for p in perms.split(",") if p}
                         if access in permitted or (access == "read" and "write" in permitted):
                             return metadata
-                        continue
+                        else:
+                            return None
 
                 if entry.startswith("user:") and not entry.startswith("user::"):
                     parts = entry.split(":", 3)
@@ -621,7 +625,8 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
                     if principal == username:
                         if access in permitted or (access == "read" and "write" in permitted):
                             return metadata
-                        continue
+                        else:
+                            return None
 
                 if entry.startswith("group:") and not entry.startswith("group::"):
                     parts = entry.split(":", 3)
@@ -638,7 +643,8 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
                     if principal in current_groups:
                         if access in permitted or (access == "read" and "write" in permitted):
                             return metadata
-                        continue
+                        else:
+                            return None
         else:
             acl_text = ""
     else:

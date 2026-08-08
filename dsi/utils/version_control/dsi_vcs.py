@@ -484,7 +484,7 @@ class Version():
                 continue
 
             temp_meta = collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder)
-            if "owner_name" in e and running_user == e["owner_name"]: # only owner can update metadata
+            if len(e) == 0 or ("owner_name" in e and running_user == e["owner_name"]): # only owner can update metadata
                 e = temp_meta
             else:
                 e["absolute_path"] = temp_meta["absolute_path"]
