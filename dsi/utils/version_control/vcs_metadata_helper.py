@@ -529,47 +529,118 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
         except KeyError:
             pass
 
-    # If acl_text is available (Darwin format like "username allow read,write"
-    # entries separated by ';'), check it first for explicit allows for the
-    # current user or any of the user's groups.
+    # If acl_text is available, check it first for explicit allows for the
+    # current user or any of the user's groups. On Darwin, acl_text is expected
+    # to be normalized as "username allow read,write" entries separated by ';'.
+    # On Linux, acl_text may be in raw getfacl form like "user:foo:rwx" or in
+    # the same normalized allow form.
     if acl_text:
-        for entry in acl_text.split(";"):
-            entry = entry.strip()
-            if not entry:
-                continue
-            # Expect formats like "username allow read,write" or
-            # "groupname allow read". Be tolerant of prefixes like "user:foo".
-            parts = entry.split(None, 2)
-            if len(parts) < 2:
-                continue
-            principal = parts[0]
-            action = parts[1].lower()
-            perms = ""
-            if len(parts) >= 3:
-                perms = parts[2]
+        if sys.platform == "darwin":
+            for entry in acl_text.split(";"):
+                entry = entry.strip()
+                if not entry:
+                    continue
+                # Expect formats like "username allow read,write" or
+                # "groupname allow read". Be tolerant of prefixes like "user:foo".
+                parts = entry.split(None, 2)
+                if len(parts) < 2:
+                    continue
+                principal = parts[0]
+                action = parts[1].lower()
+                perms = ""
+                if len(parts) >= 3:
+                    perms = parts[2]
 
-            # Normalize principal (drop "user:" or "group:" prefixes)
-            if ":" in principal:
-                principal = principal.split(":", 1)[1]
+                # Normalize principal (drop "user:" or "group:" prefixes)
+                if ":" in principal:
+                    principal = principal.split(":", 1)[1]
 
-            # Only handle allow entries here
-            if action != "allow":
-                continue
+                # Only handle allow entries here
+                if action != "allow":
+                    continue
 
-            # Check user principal
-            if principal == username:
-                permitted = {p.strip() for p in perms.split(",") if p}
-                if access in permitted or (access == "read" and "write" in permitted):
-                    return metadata
-                # explicit allow for this user did not include requested access
-                continue
+                # Check user principal
+                if principal == username:
+                    permitted = {p.strip() for p in perms.split(",") if p}
+                    if access in permitted or (access == "read" and "write" in permitted):
+                        return metadata
+                    continue
 
-            # Check group principal
-            if principal in current_groups:
-                permitted = {p.strip() for p in perms.split(",") if p}
-                if access in permitted or (access == "read" and "write" in permitted):
-                    return metadata
-                continue
+                # Check group principal
+                if principal in current_groups:
+                    permitted = {p.strip() for p in perms.split(",") if p}
+                    if access in permitted or (access == "read" and "write" in permitted):
+                        return metadata
+                    continue
+        elif sys.platform == "linux":
+            for entry in acl_text.replace(";", "\n").splitlines():
+                entry = entry.strip()
+                if not entry:
+                    continue
+
+                if " allow " in entry:
+                    parts = entry.split(None, 2)
+                    if len(parts) < 2:
+                        continue
+                    principal = parts[0]
+                    action = parts[1].lower()
+                    perms = ""
+                    if len(parts) >= 3:
+                        perms = parts[2]
+
+                    if ":" in principal:
+                        principal = principal.split(":", 1)[1]
+
+                    if action != "allow":
+                        continue
+
+                    if principal == username:
+                        permitted = {p.strip() for p in perms.split(",") if p}
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        continue
+
+                    if principal in current_groups:
+                        permitted = {p.strip() for p in perms.split(",") if p}
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        continue
+
+                if entry.startswith("user:") and not entry.startswith("user::"):
+                    parts = entry.split(":", 3)
+                    if len(parts) < 3:
+                        continue
+                    principal = parts[1].strip()
+                    perm_bits = parts[2].split("#")[0].strip()
+                    permitted = set()
+                    if "r" in perm_bits:
+                        permitted.add("read")
+                    if "w" in perm_bits:
+                        permitted.add("write")
+
+                    if principal == username:
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        continue
+
+                if entry.startswith("group:") and not entry.startswith("group::"):
+                    parts = entry.split(":", 3)
+                    if len(parts) < 3:
+                        continue
+                    principal = parts[1].strip()
+                    perm_bits = parts[2].split("#")[0].strip()
+                    permitted = set()
+                    if "r" in perm_bits:
+                        permitted.add("read")
+                    if "w" in perm_bits:
+                        permitted.add("write")
+
+                    if principal in current_groups:
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        continue
+        else:
+            acl_text = ""
     else:
         acl_text = ""
 
