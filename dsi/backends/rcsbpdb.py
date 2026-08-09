@@ -1154,9 +1154,6 @@ class RCSBPDB(Webserver):
         resolved = self._resolve_table_name(table_name)
         return self.schemas.get(resolved, [])
 
-    def get_table_names(self) -> List[str]:
-        return list(self.tables.keys())
-
     def num_tables(self):
         table_count = len(self.tables)
 
@@ -1167,14 +1164,6 @@ class RCSBPDB(Webserver):
 
         return table_count
 
-    def overwrite_table(self, table_name: str, rows: List[Dict[str, Any]]) -> None:
-        resolved = self._resolve_table_name(table_name)
-        schema = self.schemas.get(resolved, list(rows[0].keys()) if rows else [])
-        self.tables[resolved] = self._rows_to_table(
-            self._apply_schema(rows, schema),
-            schema,
-        )
-        self.schemas[resolved] = schema
 
     def validate_urls(self, table_name: str = "resources", url_column: str = "download_url", **kwargs):
         rows = self.get_table(table_name)
@@ -1236,23 +1225,10 @@ class RCSBPDB(Webserver):
     # ------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         raise NotImplementedError("rcsbpdb backend is read-only.")
-    
-    def write(self, *args, **kwargs):
-        raise NotImplementedError("rcsbpdb backend is read-only.")
-
-    def update(self, *args, **kwargs):
-        raise NotImplementedError("rcsbpdb backend is read-only.")
 
     def query_artifacts(self, query, **kwargs):
         raise NotImplementedError(
             "query() is not implemented for RCSBPDB because it is not a SQL backend."
-        )
-
-    def query(self, statement, collection=False, update=False, **kwargs):
-        raise NotImplementedError(
-            "query() is not implemented for RCSBPDB because it is not a SQL backend. "
-            "Use get_table(), display(), find(), search(), summary(), or process() "
-            "to convert the data into a SQL backend first."
         )
 
     def notebook(self, **kwargs):
@@ -1313,13 +1289,13 @@ class RCSBPDB(Webserver):
             if resolved_table not in self.tables:
                 print(
                     f"search() could not find table '{table_name}'. "
-                    f"Available tables: {self.get_table_names()}"
+                    f"Available tables: {self.list(True)}"
                 )
                 return []
 
             table_names = [resolved_table]
         else:
-            table_names = self.get_table_names()
+            table_names = self.list(True)
 
         matches: List[ValueObject] = []
 
@@ -1418,7 +1394,7 @@ class RCSBPDB(Webserver):
         column_name, op, target_value = parsed
         matches: List[ValueObject] = []
 
-        for table_name in self.get_table_names():
+        for table_name in self.list(True):
             df = self.get_table(table_name)
 
             if df.empty or column_name not in df.columns:
@@ -1548,7 +1524,7 @@ class RCSBPDB(Webserver):
         raise TypeError("find_relation() expects None, str, list, or dict.")
     
     def list(self, collection=False, **kwargs):
-        table_names = self.get_table_names()
+        table_names = list(self.tables.keys())
 
         if collection:
             return table_names
@@ -1576,7 +1552,7 @@ class RCSBPDB(Webserver):
         if table_name is None:
             raise ValueError(
                 "display() requires a table_name. "
-                f"Available tables: {self.get_table_names()}"
+                f"Available tables: {self.list(True)}"
             )
 
         resolved = self._resolve_table_name(table_name)
@@ -1584,7 +1560,7 @@ class RCSBPDB(Webserver):
         if resolved not in self.schemas:
             raise ValueError(
                 f"display() could not find table '{table_name}'. "
-                f"Available tables: {self.get_table_names()}"
+                f"Available tables: {self.list(True)}"
             )
 
         df = self.get_table(resolved)
@@ -1697,7 +1673,7 @@ class RCSBPDB(Webserver):
             df = self.get_table(resolved)
             return summarize_dataframe(df)
 
-        table_names = self.get_table_names()
+        table_names = self.list(True)
         summary_tables = []
 
         for name in table_names:

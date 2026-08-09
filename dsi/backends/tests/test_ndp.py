@@ -311,9 +311,6 @@ def test_ndp_read_only(backend):
     with pytest.raises(NotImplementedError):
         backend.ingest_artifacts({})
 
-    with pytest.raises(NotImplementedError):
-        backend.overwrite_table("datasets", pd.DataFrame())
-
 
 # =============================================================================
 # 9) Lifecycle

@@ -173,7 +173,7 @@ def test_rcsbpdb_initialization_no_auto_load(mocked_rcsb):
     )
 
     assert backend._loaded is True
-    assert backend.get_table_names() == []
+    assert backend.list(True) == []
     assert backend.get_schema("datasets") == RCSBPDB.DATASET_SCHEMA
     assert backend.get_schema("resources") == RCSBPDB.RESOURCE_SCHEMA
     assert backend.get_schema("errors") == RCSBPDB.ERROR_SCHEMA
@@ -190,8 +190,8 @@ def test_rcsbpdb_initialization_with_identifiers(mocked_rcsb):
     )
 
     assert backend._loaded is True
-    assert "datasets" in backend.get_table_names()
-    assert "resources" in backend.get_table_names()
+    assert "datasets" in backend.list(True)
+    assert "resources" in backend.list(True)
 
     datasets = backend.get_table("datasets")
     assert isinstance(datasets, pd.DataFrame)
@@ -384,23 +384,6 @@ def test_rcsbpdb_get_schema(backend):
     assert error_schema == RCSBPDB.ERROR_SCHEMA
 
 
-def test_rcsbpdb_get_table_names(mocked_rcsb):
-    backend = RCSBPDB(
-        identifiers=TEST_DOIS,
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    names = backend.get_table_names()
-
-    assert isinstance(names, list)
-    assert "datasets" in names
-    assert "resources" in names
-
-    backend.close()
-
-
 def test_rcsbpdb_table_name_resolution(backend):
     assert backend._resolve_table_name("dataset") == "datasets"
     assert backend._resolve_table_name("datasets") == "datasets"
@@ -480,8 +463,8 @@ def test_rcsbpdb_load_from_params_keyword_search(backend):
     backend._load_from_params({"keywords": "hemoglobin", "limit": 5})
 
     assert backend.identifiers == ["1CBS", "4HHB"]
-    assert "datasets" in backend.get_table_names()
-    assert "resources" in backend.get_table_names()
+    assert "datasets" in backend.list(True)
+    assert "resources" in backend.list(True)
 
     datasets = backend.get_table("datasets")
     assert len(datasets) == 2
@@ -504,7 +487,7 @@ def test_rcsbpdb_init_with_params(mocked_rcsb):
     )
 
     assert backend._loaded is True
-    assert "datasets" in backend.get_table_names()
+    assert "datasets" in backend.list(True)
 
     datasets = backend.get_table("datasets")
     assert len(datasets) == 2
@@ -1028,34 +1011,6 @@ def test_rcsbpdb_display_missing_column_returns_none(mocked_rcsb):
 # 10) Mutating Helpers and Lifecycle
 # =============================================================================
 
-def test_rcsbpdb_overwrite_table(backend):
-    new_rows = [
-        {
-            "dataset_id": "TEST1",
-            "doi": "10.2210/pdbtest/pdb",
-            "title": "Test Entry",
-            "description": "Test Description",
-            "landing_page": "https://example.org",
-            "metadata_url": "https://example.org/meta",
-            "experimental_method": "X-RAY DIFFRACTION",
-            "release_date": "2020-01-01",
-            "revision_date": "2021-01-01",
-            "resource_count": 0,
-            "raw_metadata": {},
-            "notes": None,
-        }
-    ]
-
-    backend.overwrite_table("datasets", new_rows)
-
-    datasets = backend.get_table("datasets")
-
-    assert isinstance(datasets, pd.DataFrame)
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "TEST1"
-    assert list(datasets.columns) == RCSBPDB.DATASET_SCHEMA
-
-
 def test_rcsbpdb_close(mocked_rcsb):
     backend = RCSBPDB(
         identifiers=["1CBS"],
@@ -1065,7 +1020,7 @@ def test_rcsbpdb_close(mocked_rcsb):
     )
 
     assert backend._loaded is True
-    assert backend.get_table_names()
+    assert backend.list(True)
 
     backend.close()
 
@@ -1084,7 +1039,7 @@ def test_rcsbpdb_context_manager(mocked_rcsb):
         validate_on_init=False,
         validate_resource_urls=False,
     ) as backend:
-        assert "datasets" in backend.get_table_names()
+        assert "datasets" in backend.list(True)
 
     assert backend._loaded is False
 
