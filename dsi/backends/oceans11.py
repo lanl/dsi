@@ -1,96 +1,72 @@
 """
 Oceans11 Webserver Backend for DSI
 
-Read-only backend that pulls metadata from DSI-based https://oceans11.lanl.gov
-data catalog and exposes it as in-memory DSI tables: datasets and resources.
+Read-only backend that pulls metadata from the DSI-based
+https://oceans11.lanl.gov data catalog and exposes it as in-memory DSI tables.
 """
 
-import re
-import operator
-import pandas as pd
-from pathlib import Path
 from collections import OrderedDict
-from urllib.parse import urlparse
+from pathlib import Path
+import re
+from urllib.parse import urljoin, urlparse
+
+import pandas as pd
+import urllib3
 
 from dsi.backends.webserver import Webserver
 
-import urllib3
-from urllib.parse import urljoin
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 # ----------------------------------------------------------------------
 # Value Object (used for search results)
 # ----------------------------------------------------------------------
 class ValueObject:
-    """
-    Container for search results returned by find* methods
+    """Container for search results returned by find* methods."""
 
-    Attributes
-    ----------
-    t_name : str
-        Table name
-    c_name : list
-        Column name(s)
-    row_num : int or None
-        Row index (if applicable)
-    value : any
-        Matched value
-    type : str
-        {'table', 'column', 'cell'}
-    """
-    def __init__(self, t_name, c_name, row_num, value, type):
-        self.t_name = t_name # ""
-        self.c_name = c_name #[]
-        self.row_num = row_num # None
-        self.value = value # None
-        self.type = type # ""
+    def __init__(self):
+        self.t_name = ""
+        self.c_name = []
+        self.row_num = None
+        self.value = None
+        self.type = ""
+
 
 # ----------------------------------------------------------------------
-# Oceans11 Backend (Webserver - Read only)
+# Oceans11 Backend (Webserver - read only)
 # ----------------------------------------------------------------------
 class Oceans11(Webserver):
-    """
-    DSI-based web backend for querying Oceans11 metadata in-memory
-    """
+    """DSI-based web backend for querying Oceans11 metadata in memory."""
+
     read_only = True
-    # ----------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
     # Initialization
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     def __init__(self, url=None, params=None, **kwargs):
         """
-        Initialize backend and optionally load data from DSI databases.
+        Initialize the backend and optionally load data from Oceans11.
 
-        `url` : str, optional
-            Base Oceans11 URL.
-        
-        `params` : dict, optional
-            Dictionary of initial query parameters used to fetch data from OSTI.
+        Parameters
+        ----------
+        url : str, optional
+            Base Oceans11 catalog URL.
+        params : dict or list[dict], optional
+            Initial Tier-1 search parameters. Supported search keys include
+            q, keyword, osti_id, title, author/authors, subject/subjects,
+            doi, report_number, rows, and download_all.
+        workspace : str, optional
+            Directory where downloaded catalog/Tier-2 files are stored.
+        only_validate : bool, optional
+            Used by backend discovery. If True, validate local constructor
+            configuration only and return without contacting Oceans11.
+        """
+        default_url = "https://oceans11.lanl.gov/dataCatalog/oceans11.db"
+        base_url = url or default_url
 
-            Supported keys:
-                - "q",
-                - "keyword",
-                - "osti_id",
-                - "title",
-                - "authors",
-                - "doi",
-                - "report_number",
-                - "rows"
-        
-        `**kwargs` : dict
-            Additional keyword arguments:
-            
-            - workspace : str, optional
-                    
-        """         
-        DEFAULT_URL = "https://oceans11.lanl.gov/dataCatalog/oceans11.db"
-        base_url = url or DEFAULT_URL
-
-        # ----------------------------------------------------------------------
-        # Auth / connection config
-        # ----------------------------------------------------------------------
         self.workspace = kwargs.get(
             "workspace",
-            str(Path("./").expanduser()) #where the downloaded file will be saved
+            str(Path("./").expanduser()),
         )
 
         parsed = urlparse(base_url)
@@ -99,121 +75,123 @@ class Oceans11(Webserver):
 
         self.base_url = base_url.rstrip("/")
 
-        # Data storage (tiered structure)
-        # Tier 1: datasets, Tier 2: per-dataset resource tables
-        self._cache = OrderedDict()
-        self._resource_tables = []
-        self._dataset_id_map = {}
-        self._dataset_title_map = {}
-
-        self._loaded = False
-        self.catalog_path = None # the local path for the T1 catalog. 
-        self.params = params or {}
-        self.validate_error_msg = None
-
-        # skip data retrieval if only checking connection to oceans11
+        # Backend discovery/configuration check.  This mirrors the behavior
+        # used by the other web backends and intentionally performs no I/O.
         if kwargs.get("only_validate", False):
             return
 
-        # Validate connection FIRST before attempting to load data
-        if not self.validate_connection():
-            self._loaded = False
-            raise ConnectionError(self.validate_error_msg or "Failed to connect to Oceans11 catalog")
+        # Tier 1 is stored as records. Tier 2 tables are loaded separately.
+        self._cache = OrderedDict()
+        self._tier1_tables = []
+        self._resource_tables = []
+        self._dataset_id_map = {}
+        self._dataset_title_map = {}
+        self._dataset_table_map = {}
 
-        # Initial data load (only if connection is valid and params provided)
+        self._loaded = False
+        self.catalog_path = None
+        self.params = params or {}
+
+        # Normal construction validates the live catalog by downloading it.
+        try:
+            self.catalog_path = self.validate_connection()
+        except (ConnectionError, RuntimeError):
+            self._loaded = False
+            raise
+
         if self.params:
             try:
                 self._load_initial_data(self.params)
-                self._loaded = True  # Data successfully loaded
-            except Exception as e:
+                self._loaded = True
+            except Exception as exc:
                 self._loaded = False
-                raise RuntimeError(f"Failed to load initial data: {e}") from e
+                raise RuntimeError(f"Failed to load initial data: {exc}") from exc
         else:
-            self._loaded = True  # Backend ready, no initial data to load
+            self._loaded = True
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Connection Validation
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     def validate_connection(self, **kwargs):
         """
-        Validates that the base Oceans11 URL is accessible and functional.
-        
-        Tests the connection by calling DSI Federated's pull_data() to:
-            - Download the oceans11.db catalog from https://oceans11.lanl.gov/dataCatalog/
-            - Set `self.catalog_path` to the download location
-        
-        Raises:
-            - **ConnectionError** : If online catalog is inaccessible or pull_data failed
-            - **RuntimeError** : If the downloaded catalog is corrupt or inaccessible
-        
-        Return : bool
-            True if connection is valid
-        """                
-        try:
-            from dsi.utils.federated.federate_datasets import pull_data
-            import os
-            from contextlib import redirect_stdout
+        Validate that the Oceans11 catalog is accessible and usable.
 
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                info = pull_data(
-                    location_type="url",
-                    location=self.base_url,
-                    path=self.base_url,
-                    abs_path_workspace_folder=self.workspace,
-                    username="",
-                    download_limit=1024**5
-                )
+        Normal use returns the downloaded local catalog path. If this method
+        is called explicitly with ``only_validate=True``, it returns a bool
+        and removes the temporary downloaded validation folder.
+        """
+        try:
+            from contextlib import redirect_stdout
+            import os
+            import shutil
+
+            from dsi.utils.federated.federate_datasets import pull_data
+
+            with open(os.devnull, "w", encoding="utf-8") as fnull:
+                with redirect_stdout(fnull):
+                    info = pull_data(
+                        location_type="url",
+                        location=self.base_url,
+                        path=self.base_url,
+                        abs_path_workspace_folder=self.workspace,
+                        username="",
+                    )
 
             if info is None:
-                self.validate_error_msg = f"Failed to download catalog from {self.base_url}"
-                return False
+                if kwargs.get("only_validate", False):
+                    return False
+                raise ConnectionError(
+                    f"Failed to download catalog from {self.base_url}"
+                )
 
             local_path = info.get("local_path")
             if not local_path or not Path(local_path).is_file():
-                self.validate_error_msg = "Downloaded catalog file is invalid or missing"
-                return False
+                if kwargs.get("only_validate", False):
+                    return False
+                raise RuntimeError("Downloaded catalog file is invalid or missing")
 
-            # skip data retrieval if only checking connection to oceans11
             if kwargs.get("only_validate", False):
-                import shutil
-                shutil.rmtree(info["folder_hash"] + "/")
+                folder_hash = info.get("folder_hash")
+                if folder_hash:
+                    shutil.rmtree(folder_hash, ignore_errors=True)
+                return True
 
-            self.catalog_path = local_path
-            return True
+            return local_path
 
-        except Exception as e:
-            self.validate_error_msg = f"Unable to access Oceans11 catalog: {e}"
-            return False
+        except Exception as exc:
+            if kwargs.get("only_validate", False):
+                return False
+            raise ConnectionError(
+                f"Unable to access Oceans11 catalog: {exc}"
+            ) from exc
 
-    # ---------------------------------------------------
+    # ------------------------------------------------------------------
     # Initial Data Load
-    # ---------------------------------------------------
+    # ------------------------------------------------------------------
     def _load_initial_data(self, params):
         """
-        Fetch datasets/resources from downloaded oceans11.db and store in memory.
+        Fetch datasets/resources from the downloaded Oceans11 catalog.
 
-        params can be:
-            dict       -> one Oceans11 request
-            list[dict] -> multiple Oceans11 requests merged into one records table
-        """        
+        ``params`` may be a dict for one Tier-1 query or a list of dicts for
+        multiple Tier-1 queries whose results are merged and deduplicated.
+        """
         if isinstance(params, dict):
             query_list = [params]
-        elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
+        elif isinstance(params, list) and all(
+            isinstance(query, dict) for query in params
+        ):
             query_list = params
         else:
             raise TypeError("params must be a dict or a list of dicts")
 
         from dsi.dsi import DSI
 
-        # load the local DSI db 
         self._catalog_dsi = DSI(
             filename=self.catalog_path,
             backend_name="Sqlite",
             silence_messages=True,
         )
 
-        # If any query requests download_all, load every T1 record.
         download_all = any(
             bool(query_params.get("download_all", False))
             for query_params in query_list
@@ -222,75 +200,168 @@ class Oceans11(Webserver):
         if download_all:
             unique_records = self._run_all_records_query()
         else:
-            # collate results over multiple queries for T1
             all_records = []
-            for query_params in query_list:
-                records = self._run_single_query(query_params)
-                all_records.extend(records)
 
-            # remove any multiple entries that may arise from merge
+            for query_params in query_list:
+                all_records.extend(
+                    self._run_single_query(query_params)
+                )
+
             unique_records = self._deduplicate_records(all_records)
 
+        # ---------------------------------------------------
+        # Tier 1
+        # ---------------------------------------------------
 
+        # Selected records are the primary Tier-1 table.
+        self._cache["records"] = self._rows_to_table(unique_records)
 
-        url_column = "t2db_url"
-        # Download/load T2 DBs only for selected records
+        # Load only the filesystem rows associated with the
+        # selected records. Preserve the actual catalog table name.
+        filesystem_name, filesystem_data = (
+            self._load_filesystem_table(unique_records)
+        )
+
+        self._cache[filesystem_name] = filesystem_data
+
+        # ---------------------------------------------------
+        # Tier 2
+        # ---------------------------------------------------
+
+        # Load Tier-2 databases in the same order that their
+        # corresponding rows appear in records.
         for record in unique_records:
-            t2db_url = record.get(url_column)
+            t2db_url = record.get("t2db_url")
 
             if not t2db_url:
                 continue
 
             t2db_path = self._download_t2_db(t2db_url)
+
             record["t2db_path"] = t2db_path
+            record["t2db_name"] = self._derive_t2_db_name(
+                record,
+                t2db_path,
+            )
 
-            self._load_t2_tables(record, t2db_path)
+            self._load_t2_tables(
+                record,
+                t2db_path,
+            )
 
-        # Tier 1: selected rows only
+        # Rebuild records so the T2 path/name information added above
+        # is included. Reassigning an existing OrderedDict key does
+        # not move it, so records remains first.
         self._cache["records"] = self._rows_to_table(unique_records)
 
         self._dataset_id_map = {
-            row.get("osti_id"): row
+            str(row.get("osti_id")): row
             for row in unique_records
             if row.get("osti_id") is not None
         }
 
         self._dataset_title_map = {
-            row.get("title"): row
+            str(row.get("title")): row
             for row in unique_records
             if row.get("title") is not None
         }
 
         self._loaded = True
 
-    # ---------------------------------------------------
-    # Data Load Helpers - T1
-    # ---------------------------------------------------
-    def _run_all_records_query(self):
-        """Return every record from the local Oceans11 Tier 1 catalog DB."""
-        df = self._catalog_dsi.query("SELECT * FROM records", collection=True)
 
+
+    # ------------------------------------------------------------------
+    # Data Load Helpers - Tier 1
+    # ------------------------------------------------------------------
+    def _load_filesystem_table(self, records):
+        """Load filesystem rows associated with selected Oceans11 records."""
+
+        tables = self._catalog_dsi.query(
+            "SELECT name FROM sqlite_master WHERE type='table'",
+            collection=True,
+        )
+
+        if isinstance(tables, pd.DataFrame):
+            table_names = tables["name"].tolist()
+        else:
+            table_names = tables["name"]
+
+        # Find the real table name without renaming it.
+        fs_table = next(
+            (
+                name
+                for name in table_names
+                if re.sub(r"[^a-z0-9]", "", str(name).lower()) == "filesystem"
+            ),
+            None,
+        )
+
+        if fs_table is None:
+            raise RuntimeError(
+                f"Could not find filesystem table. "
+                f"Available tables: {table_names}"
+            )
+
+        safe_table = fs_table.replace('"', '""')
+
+        df = self._catalog_dsi.query(
+            f'SELECT * FROM "{safe_table}"',
+            collection=True,
+        )
+
+        if not isinstance(df, pd.DataFrame):
+            df = pd.DataFrame(df)
+
+        # T2 database filenames associated with selected records.
+        selected_db_names = set()
+
+        for record in records:
+            t2db_url = record.get("t2db_url")
+
+            if not t2db_url:
+                continue
+
+            db_name = Path(urlparse(t2db_url).path).name
+
+            if db_name:
+                selected_db_names.add(db_name.lower())
+
+        # filesystem.file_origin maps to names such as "cloverleaf.db".
+        if "file_origin" in df.columns:
+            df = df[
+                df["file_origin"]
+                .astype(str)
+                .str.lower()
+                .isin(selected_db_names)
+            ]
+
+        return fs_table, self._rows_to_table(
+            df.to_dict(orient="records")
+        )
+
+
+    def _run_all_records_query(self):
+        """Return every record from the local Oceans11 Tier-1 catalog DB."""
+        df = self._catalog_dsi.query("SELECT * FROM records", collection=True)
         if df is None or df.empty:
             return []
-
         return df.to_dict(orient="records")
 
-
     def _run_single_query(self, params):
-        """
-        Run one query against the local Oceans11 Tier 1 catalog DB.
-        """
-        # supported search params to enter 
+        """Run one query against the local Oceans11 Tier-1 catalog DB."""
         supported_params = {
             "q",
             "keyword",
             "osti_id",
             "title",
+            "author",
             "authors",
+            "subject",
+            "subjects",
             "doi",
             "report_number",
             "rows",
-            "download_all"
+            "download_all",
         }
 
         unknown = set(params) - supported_params
@@ -300,11 +371,12 @@ class Oceans11(Webserver):
             )
 
         rows = int(params.get("rows", 20))
+        if rows < 1:
+            raise ValueError("rows must be greater than zero")
 
         clauses = []
 
-        # supported fields to search over
-        KEYWORD_SEARCH_FIELDS = [
+        keyword_search_fields = [
             "title",
             "authors",
             "subjects",
@@ -315,64 +387,64 @@ class Oceans11(Webserver):
 
         q = params.get("q") or params.get("keyword")
         if q:
-            clauses.append(
-                self._or_like_clause(q, KEYWORD_SEARCH_FIELDS)
-            )
+            clauses.append(self._or_like_clause(q, keyword_search_fields))
 
-        exact_fields = ["osti_id", "doi", "report_number"]
-        like_fields = ["title", "authors"]
-
-        for field in exact_fields:
+        for field in ("osti_id", "doi", "report_number"):
             value = params.get(field)
             if value is not None:
                 clauses.append(f"{field} = '{self._escape_sql(value)}'")
 
-        for field in like_fields:
-            value = params.get(field)
+        # Partial-match fields. Singular names are aliases for consistency
+        # with OSTI's public request vocabulary.
+        field_aliases = (
+            ("title", "title"),
+            ("authors", "authors"),
+            ("author", "authors"),
+            ("subjects", "subjects"),
+            ("subject", "subjects"),
+        )
+        for param_name, column_name in field_aliases:
+            value = params.get(param_name)
             if value is not None:
-                clauses.append(f"{field} LIKE '%{self._escape_sql(value)}%'")
+                clauses.append(
+                    f"{column_name} LIKE '%{self._escape_sql(value)}%'"
+                )
 
         query = "SELECT * FROM records"
-
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-
         query += f" LIMIT {rows}"
 
         df = self._catalog_dsi.query(query, collection=True)
-
         if df is None or df.empty:
             return []
-
         return df.to_dict(orient="records")
-    
+
     def _deduplicate_records(self, records):
-        """
-        Deduplicate Oceans11 records using osti_id when available.
-        """
+        """Deduplicate Tier-1 records using OSTI ID, DOI, or title."""
         seen = set()
         unique_records = []
 
-        for rec in records:
-            if not isinstance(rec, dict):
+        for record in records:
+            if not isinstance(record, dict):
                 continue
 
             key = (
-                rec.get("osti_id")
-                or rec.get("doi")
-                or rec.get("title")
+                record.get("osti_id")
+                or record.get("doi")
+                or record.get("title")
             )
 
             if key is None:
-                unique_records.append(rec)
+                unique_records.append(record)
                 continue
 
             if key not in seen:
                 seen.add(key)
-                unique_records.append(rec)
+                unique_records.append(record)
 
         return unique_records
-    
+
     def _or_like_clause(self, value, fields):
         value = self._escape_sql(value)
         parts = [f"{field} LIKE '%{value}%'" for field in fields]
@@ -381,17 +453,14 @@ class Oceans11(Webserver):
     def _escape_sql(self, value):
         return str(value).replace("'", "''")
 
-    # ---------------------------------------------------
-    # Data Load Helpers - T2
-    # ---------------------------------------------------
+    # ------------------------------------------------------------------
+    # Data Load Helpers - Tier 2
+    # ------------------------------------------------------------------
     def _download_t2_db(self, t2db_url):
-        """
-        Download the T2 DBs identified from the search 
-        """        
+        """Download one Tier-2 database selected by a Tier-1 record."""
         from dsi.utils.federated.federate_datasets import pull_data
 
         base_url = "https://oceans11.lanl.gov/dataCatalog/"
-
         full_url = urljoin(base_url, t2db_url)
 
         info = pull_data(
@@ -400,842 +469,861 @@ class Oceans11(Webserver):
             path=full_url,
             abs_path_workspace_folder=self.workspace,
             username="",
-            download_limit=1024**5
         )
 
         if info is None or not info.get("local_path"):
             raise RuntimeError(f"Failed to download T2 DB: {full_url}")
 
         return info["local_path"]
-    
+
+    def _derive_t2_db_name(self, record, t2db_path):
+        """Return a stable, human-readable prefix for a Tier-2 database.
+
+        Oceans11 downloads can be stored locally under an OSTI-ID filename
+        such as ``2571471.db`` even when the remote catalog path identifies
+        the database as ``heat``. Prefer the meaningful remote path component
+        and only fall back to the dataset title when the URL is numeric-only.
+        """
+        t2db_url = str(record.get("t2db_url") or "")
+        url_path = Path(urlparse(t2db_url).path)
+
+        stem = url_path.stem if url_path.name else ""
+        osti_id = str(record.get("osti_id") or "")
+
+        def meaningful(value):
+            value = str(value or "").strip()
+            if not value or value.isdigit() or value == osti_id:
+                return False
+            return value.lower() not in {
+                "datacatalog", "data", "db", "database", "databases",
+                "download", "downloads"
+            }
+
+        # A nonnumeric remote filename is the most literal database name.
+        if meaningful(stem):
+            candidate = stem
+        else:
+            # Numeric files are commonly stored beneath a meaningful dataset
+            # directory, e.g. ``heat/2571471.db`` -> ``heat``.
+            parent = url_path.parent.name
+            if meaningful(parent):
+                candidate = parent
+            else:
+                # Final fallback: use the Tier-1 dataset title rather than an
+                # opaque numeric local filename.
+                candidate = str(record.get("title") or Path(t2db_path).stem)
+
+        candidate = re.sub(r"[^0-9A-Za-z]+", "_", candidate).strip("_")
+        return candidate.lower() or Path(t2db_path).stem.lower()
+
     def _load_t2_tables(self, record, t2db_path):
         """
-        Load the downloaded T2 DBs to memory and link with the T1 db
-        """        
+        Load one downloaded Tier-2 database into the in-memory cache.
+
+        Tier-2 table names are prefixed with a human-readable database name
+        derived from the Tier-1 ``t2db_url``. Table names are normalized before
+        being added to the cache so they can be safely processed into SQLite
+        later.
+        """
         from dsi.dsi import DSI
 
         t2_dsi = DSI(
             filename=t2db_path,
             backend_name="Sqlite",
-            silence_messages=True
+            silence_messages=True,
         )
+
+        db_name = self._derive_t2_db_name(record, t2db_path)
+        record["t2db_name"] = db_name
 
         table_names = t2_dsi.list(collection=True)
-
-        dataset_key = (
-            record.get("osti_id")
-            or record.get("title")
-        )
+        loaded_tables = []
 
         for table_name in table_names:
+            # Keep the original SQLite-safe table name when reading the
+            # source Tier-2 database.
             df = t2_dsi.get_table(table_name, collection=True)
 
             if df is None or df.empty:
                 continue
 
-            cache_table_name = f"{dataset_key}_{table_name}"
+            # Sqlite.list() may return quoted identifiers for reserved words,
+            # for example '"view"'. Remove those outer quotes before creating
+            # the Oceans11 cached table name.
+            clean_table_name = str(table_name)
+
+            if (
+                len(clean_table_name) >= 2
+                and clean_table_name.startswith('"')
+                and clean_table_name.endswith('"')
+            ):
+                clean_table_name = clean_table_name[1:-1]
+
+            # Normalize any remaining characters that could produce an invalid
+            # identifier when this cache is later processed into SQLite.
+            clean_table_name = re.sub(
+                r"[^0-9A-Za-z_]+",
+                "_",
+                clean_table_name,
+            ).strip("_")
+
+            if not clean_table_name:
+                continue
+
+            cache_table_name = f"{db_name}_{clean_table_name}"
 
             self._cache[cache_table_name] = self._rows_to_table(
                 df.to_dict(orient="records")
             )
 
-            self._resource_tables.append(cache_table_name)    
+            if cache_table_name not in self._resource_tables:
+                self._resource_tables.append(cache_table_name)
 
-    # ----------------------------------------------------------------------
+            loaded_tables.append(cache_table_name)
+
+        # Explicitly link each Tier-1 identifier to the tables loaded from
+        # its downloaded Tier-2 database.
+        for identifier in (
+            record.get("osti_id"),
+            record.get("title"),
+            db_name,
+        ):
+            if identifier is not None:
+                self._dataset_table_map[str(identifier)] = list(loaded_tables)
+
+        return loaded_tables
+
+    # ------------------------------------------------------------------
     # Table Name Resolution
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     def _resolve_table_name(self, identifier):
-        """
-        Resolves a table identifier to its canonical name.
+        """Resolve a cached table name or an unambiguous dataset identifier."""
+        identifier_str = str(identifier)
 
-        Accepts either dataset_title or dataset_id for resource tables.
+        if identifier_str in self._cache:
+            return identifier_str
 
-        Parameters
-        ----------
-        `identifier` : str
-            Table name (dataset_title) or dataset ID
+        matches = list(self._dataset_table_map.get(identifier_str, []))
 
-        Returns
-        -------
-        str
-            Canonical table name (dataset_title)
-            
-        Raises
-        ------
-        ValueError
-            If the identifier cannot be resolved to a table
-        """
-        if identifier in self._cache:
-            return identifier
+        if not matches and identifier_str in self._dataset_id_map:
+            record = self._dataset_id_map[identifier_str]
+            db_name = record.get("t2db_name")
+            if db_name:
+                matches = list(self._dataset_table_map.get(str(db_name), []))
 
-        if identifier in self._dataset_id_map:
-            return self._dataset_id_map[identifier]
+        if not matches and identifier_str in self._dataset_title_map:
+            record = self._dataset_title_map[identifier_str]
+            db_name = record.get("t2db_name")
+            if db_name:
+                matches = list(self._dataset_table_map.get(str(db_name), []))
 
-        available_titles = [name for name in self._resource_tables]
-        
-        error_msg = f"Table '{identifier}' not found.\n"
-        
-        if available_titles:
-            error_msg += "\nAvailable dataset titles:\n"
-            for title in available_titles[:5]:
-                dataset_id = self._dataset_title_map.get(title, "N/A")
-                error_msg += f"  - '{title}' (ID: {dataset_id})\n"
-            if len(available_titles) > 5:
-                error_msg += f"  ... and {len(available_titles) - 5} more\n"
-        
-        if "datasets" in self._cache:
-            error_msg += "\nOr use 'datasets' to view all datasets."
-        
-        raise ValueError(error_msg)
-    
-    # ----------------------------------------------------------------------
-    # API Helpers
-    # ----------------------------------------------------------------------
- 
+        if not matches:
+            prefix = f"{identifier_str}_"
+            matches = [
+                table_name
+                for table_name in self._resource_tables
+                if table_name.startswith(prefix)
+            ]
+
+        if len(matches) == 1:
+            return matches[0]
+
+        if len(matches) > 1:
+            raise ValueError(
+                f"Dataset '{identifier}' contains multiple cached tables: {matches}. "
+                "Specify the exact table name."
+            )
+
+        raise ValueError(
+            f"Table '{identifier}' not found. "
+            f"Available tables: {self._ordered_table_names()}"
+        )
+
+    # ------------------------------------------------------------------
+    # Table Helpers
+    # ------------------------------------------------------------------
     def _extract_tables(self, datasets):
         """
-        Split selected Oceans11 Tier 1 records into dataset rows and lookup maps.
-        Tier 2 tables are loaded separately from each selected row's t2db_path.
+        Normalize selected Tier-1 rows and construct dataset lookup maps.
 
-        Returns
-        -------
-        tuple
-            (dataset_rows, resource_map, id_map)
+        Tier-2 tables are loaded separately from each selected row's
+        ``t2db_path``.
         """
-
         dataset_rows = []
         resource_map = {}
         id_map = {}
 
-        for ds in datasets:
-            dataset_id = ds.get("osti_id") or ds.get("doi")
-            dataset_title = ds.get("title") or dataset_id
+        for dataset in datasets:
+            dataset_id = dataset.get("osti_id") or dataset.get("doi")
+            dataset_title = dataset.get("title") or dataset_id
 
             if dataset_id and dataset_title:
                 id_map[dataset_id] = dataset_title
 
-            # guaranteed fields to save
             row = {
-                "osti_id": ds.get("osti_id"),
-                "title": ds.get("title"),
-                "authors": ds.get("authors"),
-                "subjects": ds.get("subjects"),
-                "description": ds.get("description"),
-                "doi": ds.get("doi"),
-                "report_number": ds.get("report_number"),
-                "t2db_url": ds.get("t2db_url"),
-                "t2db_path": ds.get("t2db_path"),
+                "osti_id": dataset.get("osti_id"),
+                "title": dataset.get("title"),
+                "authors": dataset.get("authors"),
+                "subjects": dataset.get("subjects"),
+                "description": dataset.get("description"),
+                "doi": dataset.get("doi"),
+                "report_number": dataset.get("report_number"),
+                "t2db_url": dataset.get("t2db_url"),
+                "t2db_path": dataset.get("t2db_path"),
+                "t2db_name": dataset.get("t2db_name"),
             }
 
-            # Preserve any additional fields from the T1 DB without losing them
-            for key, value in ds.items():
+            for key, value in dataset.items():
                 if key not in row:
                     row[key] = value
 
             dataset_rows.append(row)
 
-            # Placeholder for Tier 2 tables; populated elsewhere
             if dataset_title:
                 resource_map.setdefault(dataset_title, [])
 
         return dataset_rows, resource_map, id_map
 
     def _rows_to_table(self, rows):
-        """
-        Convert list-of-dicts to column-oriented OrderedDict.
-
-        Parameters
-        ----------
-        `rows` : list of dict
-            Row data as list of dictionaries
-
-        Returns
-        -------
-        OrderedDict
-            Column-oriented table structure
-        """
-
+        """Convert list-of-dicts to a column-oriented OrderedDict."""
         if not rows:
             return OrderedDict()
 
-        cols = list(rows[0].keys())
-        table = OrderedDict({c: [] for c in cols})
+        # Preserve first-seen order while retaining keys introduced by later rows.
+        columns = list(rows[0].keys())
+        for row in rows[1:]:
+            for key in row.keys():
+                if key not in columns:
+                    columns.append(key)
 
-        for r in rows:
-            for c in cols:
-                table[c].append(r.get(c))
+        table = OrderedDict((column, []) for column in columns)
+        for row in rows:
+            for column in columns:
+                table[column].append(row.get(column))
 
         return table
 
-
-    # # ----------------------------------------------------------------------
-    # # Terminal Methods
-    # # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Terminal / Backend Interface
+    # ------------------------------------------------------------------
     def num_tables(self):
-        """
-        Prints the number of cached tables.
-        """
-        num = len(self._cache)
-        print(f"{num} tables loaded")
+        """Print the number of cached Oceans11 tables."""
+        table_count = len(self._cache)
+        if table_count != 1:
+            print(f"Database now has {table_count} tables")
+        else:
+            print(f"Database now has {table_count} table")
 
-    def get_table(self, table_name, dict_return=False):
-        """
-        Returns all data from a specified table.
-        
-        `table_name` : str
-            Dataset title or ID
-        `dict_return` : bool, default False
-            If True, returns OrderedDict. 
-            If False, returns DataFrame.
-        
-        **Return : OrderedDict or pandas.DataFrame**
-        """
+    def get_table(self, table_name="records", dict_return=False):
+        """Return all data from a cached Oceans11 table."""
+        if not self._loaded:
+            raise RuntimeError("No data loaded. Cannot retrieve an empty backend.")
 
         resolved_name = self._resolve_table_name(table_name)
-
-        if resolved_name not in self._cache:
+        table = self._cache.get(resolved_name)
+        if table is None:
             raise ValueError(f"Table '{table_name}' not found")
-
-        table = self._cache[resolved_name]
 
         if dict_return:
             return table
-
         return pd.DataFrame(table)
 
     def get_schema(self):
-        """
-        Return a lightweight schema description of cached tables from CKAN.
-
-        Return : str
-            Each table's structural schema is combined into one large string.
-        """
+        """Return a lightweight CREATE TABLE-style schema for cached tables."""
         schema_lines = []
-        for table_name, table in self._cache.items():
-            cols = []
-            for col_name, values in table.items():
-                dtype = "TEXT"
-                for v in values:
-                    if v is None:
-                        continue
 
-                    if isinstance(v, bool):
+        for table_name, table in self._cache.items():
+            columns = []
+            for column_name, values in table.items():
+                dtype = "TEXT"
+                for value in values:
+                    if value is None:
+                        continue
+                    if isinstance(value, bool):
                         dtype = "BOOLEAN"
-                    elif isinstance(v, int):
+                    elif isinstance(value, int):
                         dtype = "INTEGER"
-                    elif isinstance(v, float):
+                    elif isinstance(value, float):
                         dtype = "REAL"
+                    elif isinstance(value, (dict, list, tuple, set)):
+                        dtype = "OBJECT"
+                    else:
+                        dtype = "TEXT"
                     break
 
-                cols.append(f"    {col_name} {dtype}")
+                columns.append(f"    {column_name} {dtype}")
 
-            create_stmt = (
+            schema_lines.append(
                 f"CREATE TABLE {table_name} (\n"
-                + ",\n".join(cols)
+                + ",\n".join(columns)
                 + "\n);"
             )
-            schema_lines.append(create_stmt)
 
         return "\n\n".join(schema_lines)
 
-
     def get_table_names(self, query):
-        """
-        Extracts table/dataset names mentioned in a query string.
-        
-        `query` : str
-            Query string to parse
-        
-        Return : list
-            List of dataset names/IDs found in query
-        """
-        if not self._loaded:
-            return []
-        
-        pattern = r'\b[a-zA-Z_][a-zA-Z0-9_-]*\b'
-        words = re.findall(pattern, query)
-        
-        found_tables = []
-        for word in words:
-            if word in self._cache:
-                found_tables.append(word)
-            elif word in self._dataset_id_map:
-                found_tables.append(self._dataset_id_map[word])
-        
-        return list(set(found_tables))
+        """SQL table-name extraction is not supported for Oceans11."""
+        raise NotImplementedError(
+            "Oceans11 backend has not implemented get_table_names"
+        )
 
-
-    # ----------------------------------------------------------------------
-    # Query Interface (in-memory)
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Query Interface
+    # ------------------------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
-        Query all tables using a pandas query string.
+        Public query() is not supported for Oceans11 because it is non-SQL.
 
-        `query` : str
-            Pandas query string for filtering data
-        `dict_return` : bool, optional, default True
-            If True, returns dict format.
-            If False, returns pandas DataFrames.
-        
-        `**kwargs` : dict
-            Additional keyword arguments
-
-        Return : dict
-            Dictionary mapping table names to query results
+        The private Tier-1 catalog search remains SQL-backed internally, but
+        users should use find(), search(), find_relation(), or get_table().
         """
-        if not self._loaded:
-            raise RuntimeError("No data loaded. Cannot query empty backend.")
+        raise NotImplementedError(
+            "query() is not supported for Oceans11 backend - it is a non-SQL backend.\n\n"
+            "Use these methods instead:\n"
+            "  dsi.find(...)             # Search for values\n"
+            "  dsi.search(...)           # Search across backend data\n"
+            "  dsi.get_table(...)        # Retrieve a cached table\n"
+        )
 
-        table_name = kwargs.get("table_name")
-
-        if table_name:
-            resolved = self._resolve_table_name(table_name)
-
-            if resolved not in self._cache:
-                raise ValueError(f"Table '{table_name}' not found")
-
-            tables = {resolved: self._cache[resolved]}
-        else:
-            tables = self._cache
-
-        results = {}
-
-        for t_name, table in tables.items():
-            df = pd.DataFrame(table)
-
-            if df.empty:
-                continue
-
-            try:
-                result_df = df.query(query, engine="python")
-
-                if not result_df.empty:
-                    results[t_name] = (
-                        result_df.to_dict(orient="list")
-                        if dict_return else result_df
-                    )
-
-            except pd.errors.UndefinedVariableError:
-                continue
-
-            except Exception as e:
-                raise ValueError(f"Query error in {t_name}: {e}")
-
-        if not results:
-            raise ValueError(f"Query returned no results: '{query}'")
-
-        return results        
-
-        # if not self._loaded:
-        #     raise RuntimeError("Oceans11 backend is not loaded")
-
-        # import sqlite3
-
-        # conn = sqlite3.connect(":memory:")
-
-        # try:
-        #     # Load cached OrderedDict tables into temporary SQLite DB
-        #     for table_name, table in self._cache.items():
-
-        #         df = pd.DataFrame(table)
-
-        #         df.to_sql(
-        #             table_name,
-        #             conn,
-        #             if_exists="replace",
-        #             index=False,
-        #         )
-
-        #     result = pd.read_sql_query(query, conn)
-
-        # finally:
-        #     conn.close()
-
-        # if dict_return:
-        #     return result
-
-        # return result.to_dict(orient="records")
-
-
-    # ----------------------------------------------------------------------
-    # Artifact Processing (tiered table construction)
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Artifact Processing
+    # ------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Return selected Tier 1 Oceans11 records for export/process.
+        Return all cached Oceans11 data for export/process.
 
-        Tier 2 databases remain separate local files and are referenced
-        through the `t2db_path` column.
-
-        Return : OrderedDict
-            Exportable Tier 1 records table
+        Includes Tier-1 catalog tables and loaded Tier-2 tables.
         """
-
         if not self._loaded:
-            return {}
+            return OrderedDict()
 
-        # saving only the T1 table because it links to the T2 tables
-        return OrderedDict({
-            "records": self._cache["records"]
-        })
-    
-        # If you want to save out all the T1 and T2 tables
-        # return self._cache
+        return self._cache
 
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Find Methods
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     def find(self, query_object, **kwargs):
-        """
-        Searches for all instances of `query_object` across the table, column, and cell levels.
-
-        `query_object` : int, float, or str
-            The value to search for across all tables in the backend
-        
-        `**kwargs` : dict
-            Additional keyword arguments
-
-        Return : list of ValueObjects representing matches across:
-            - table names
-            - column names
-            - cell values
-
-        ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) Column name(s)
-            - row_num : (int or None) Row index
-            - value :   (any) Matched value or data
-            - type :    (str) {'table', 'column', 'cell'}
-        """
+        """Search for a value across table, column, and cell levels."""
         if not self._loaded:
             return []
 
         query_str = str(query_object).lower()
-
         return (
-            self.find_table(query_str) +
-            self.find_column(query_str) +
-            self.find_cell(query_object)
+            self.find_table(query_str)
+            + self.find_column(query_str)
+            + self.find_cell(query_object)
         )
-    
+
     def find_table(self, query_object, **kwargs):
-        """
-        Finds all tables whose names contain the given query_object. Search is case-insensitive.
-
-        `query_object` : str
-            The string to match against table names
-        `**kwargs` : dict
-            Additional keyword arguments
-
-        Return : list of ValueObject
-            One ValueObject per matching table
-
-        ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List of all columns in the table
-            - value :   (dict) Full table data (dict of columns)
-            - row_num : (None)
-            - type :    (str) 'table'
-        """
-
-        if not self._loaded:
+        """Find cached tables whose names contain ``query_object``."""
+        if not self._loaded or not isinstance(query_object, str):
             return []
 
-        results = []
+        matches = []
+        for table_name, table_data in self._cache.items():
+            if query_object.lower() in table_name.lower():
+                value = ValueObject()
+                value.t_name = table_name
+                value.c_name = list(table_data.keys())
+                value.value = table_data
+                value.type = "table"
+                matches.append(value)
 
-        query = str(query_object).lower()
-
-        for table_name in self._cache.keys():
-            if query in table_name.lower():
-                results.append(
-                    ValueObject(
-                        t_name=table_name,
-                        c_name=["table_name"],
-                        row_num=None,
-                        value=[table_name],
-                        type="table"
-                    )
-                )
-
-        return results
+        return matches
 
     def find_column(self, query_object, **kwargs):
-        """
-        Finds all columns whose names contain the given query_object. Search is case-insensitive.
-
-        `query_object` : str
-            The string to match against column names
-        `**kwargs` : dict
-            Additional keyword arguments
-
-        Return : list of ValueObject
-            One ValueObject per matching column
-
-        ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) List with the matched column name
-            - value :   (list) Full column data
-            - row_num : (None)
-            - type :    (str) 'column'
-        """
-
-        if not self._loaded:
+        """Find cached columns whose names contain ``query_object``."""
+        if not self._loaded or not isinstance(query_object, str):
             return []
 
-        results = []
+        matches = []
+        for table_name, table_data in self._cache.items():
+            for column_name, column_data in table_data.items():
+                if query_object.lower() in column_name.lower():
+                    value = ValueObject()
+                    value.t_name = table_name
+                    value.c_name = [column_name]
+                    value.value = column_data
+                    value.type = "column"
+                    matches.append(value)
 
-        query = str(query_object).lower()
-
-        for table_name, table in self._cache.items():
-
-            for col_name, values in table.items():
-
-                if query in col_name.lower():
-
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=[col_name],
-                            row_num=None,
-                            value=values,
-                            type='column'
-                        )
-                    )
-
-        return results
+        return matches
 
     def find_cell(self, query_object, row=False, **kwargs):
         """
-        Finds all cells that match the given query_object.
-        
-        Exact match for all data types, plus case-insensitive partial match for strings.
+        Find matching cells across all cached tables.
 
-        `query_object` : int, float, or str
-            The value to search for within table cells
-        
-        `row`: bool, optional, default=False
-            If True, certain fields in ValueObject will contain entire row's metadata/data
-            If False, certain fields in ValueObject will only contain the matching cell's metadata/data.
-        
-        `**kwargs` : dict
-            Additional keyword arguments
-
-        Return : list of ValueObject
-            One ValueObject per matching cell
-
-        ValueObject Structure:
-            - t_name :  (str) Table name
-            - c_name :  (list) All columns in table (row=True) or just matched column name (row=False)
-            - row_num : (int) Row index of the match
-            - value :   (any) full row of values (row=True) or just matched cell value (row=False)
-            - type :    (str) 'row' (row=True) or 'cell' (row=False)
+        When row=False, return one ValueObject per matching cell.
+        When row=True, return each matching row only once.
         """
-
         if not self._loaded:
             return []
 
-        results = []
+        matches = []
+        is_string_query = isinstance(query_object, str)
+        query_lower = query_object.lower() if is_string_query else None
 
-        query = str(query_object).lower()
-
-        for table_name, table in self._cache.items():
-
-            columns = list(table.keys())
-
-            if not columns:
+        for table_name, table_data in self._cache.items():
+            if not table_data:
                 continue
 
-            num_rows = len(table[columns[0]])
+            columns = list(table_data.keys())
+            rows = zip(*table_data.values())
 
-            for row_idx in range(num_rows):
+            for row_idx, row_data in enumerate(rows):
+                for column_idx, cell in enumerate(row_data):
+                    match = query_object == cell
 
-                row_values = []
-                matched_cols = []
+                    if (
+                        not match
+                        and is_string_query
+                        and isinstance(cell, str)
+                        and query_lower in cell.lower()
+                    ):
+                        match = True
+                    elif (
+                        not match
+                        and is_string_query
+                        and isinstance(cell, (dict, list, tuple))
+                        and query_lower in str(cell).lower()
+                    ):
+                        match = True
 
-                for col in columns:
+                    if not match:
+                        continue
 
-                    value = table[col][row_idx]
-                    row_values.append(value)
+                    value = ValueObject()
+                    value.t_name = table_name
+                    value.row_num = row_idx
 
-                    if value is not None and query in str(value).lower():
-                        matched_cols.append(col)
+                    if row:
+                        value.c_name = columns
+                        value.value = list(row_data)
+                        value.type = "row"
+                        matches.append(value)
 
-                if matched_cols:
+                        # search() wants matching ROWS, not one copy
+                        # of the row for every matching cell.
+                        break
 
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=matched_cols if not row else columns,
-                            row_num=row_idx + 1,
-                            value=row_values if row else [
-                                table[c][row_idx] for c in matched_cols
-                            ],
-                            type='row' if row else 'cell'
-                        )
-                    )
+                    value.c_name = [columns[column_idx]]
+                    value.value = cell
+                    value.type = "cell"
+                    matches.append(value)
 
-        return results
-
+        return matches
 
     def find_relation(self, column_name, relation, **kwargs):
         """
-        Finds all rows in the 'records' table that satisfy the relation on the given column.
+        Find rows in cached tables satisfying a relation.
 
-        `column_name` : str
-            The name of the column to apply the relation to.
-        
-        `relation` : str
-            The operator and value to apply to the column. Ex: >4, <4, =4, >=4, <=4, ==4, !=4
-
-        Return : list of ValueObjects
-            One ValueObject per matching row in that first table.
-
-        ValueObject Structure:
-            - t_name:   (str) table name
-            - c_name:   (list) list of all columns in the table
-            - value:    (list) full row of values
-            - row_num:  (int) row index of the match
-            - type:     (str) 'relation'
+        Searches every loaded table containing ``column_name``.
         """
-
         if not self._loaded:
-            return []
+            raise RuntimeError(
+                "find_relation() ERROR: Cannot search an empty backend."
+            )
 
-        ops = {
-            "=": operator.eq,
-            "==": operator.eq,
-            "!=": operator.ne,
-            ">": operator.gt,
-            "<": operator.lt,
-            ">=": operator.ge,
-            "<=": operator.le,
-        }
+        # Find every loaded table containing this column.
+        matching_tables = [
+            table_name
+            for table_name, table_data in self._cache.items()
+            if column_name in table_data
+        ]
 
+        if not matching_tables:
+            return (
+                f"'{column_name}' is not a column in this database. "
+                "Ensure the column is written first."
+            )
+
+        if len(matching_tables) > 1:
+            return [
+                f"SELECT * FROM {table_name} WHERE {column_name} {relation}"
+                for table_name in matching_tables
+            ]
+
+        relation_operator, value = self._parse_relation(relation)
+
+        matches = []
+
+        for table_name in matching_tables:
+            df = pd.DataFrame(self._cache[table_name])
+
+            filtered = self._apply_pandas_filter(
+                df,
+                column_name,
+                relation_operator,
+                value,
+            )
+
+            for idx, row_data in filtered.iterrows():
+                value_object = ValueObject()
+                value_object.t_name = table_name
+                value_object.c_name = list(df.columns)
+                value_object.row_num = int(idx) + 1
+                value_object.value = row_data.tolist()
+                value_object.type = "relation"
+                matches.append(value_object)
+
+        if not matches:
+            return (
+                f"Could not find any rows where "
+                f" {column_name} {relation}  in this database."
+            )
+
+        return matches 
+
+    def _apply_pandas_filter(self, df, column, relation_operator, value):
+        """Apply a parsed DSI relation to a DataFrame column."""
+        series = df[column]
+
+        if relation_operator == "contains":
+            mask = series.astype(str).str.contains(
+                str(value),
+                case=False,
+                na=False,
+            )
+            return df[mask]
+
+        if relation_operator == "range":
+            min_value, max_value = value
+            if (
+                isinstance(min_value, (int, float))
+                and not isinstance(min_value, bool)
+                and isinstance(max_value, (int, float))
+                and not isinstance(max_value, bool)
+            ):
+                numeric = pd.to_numeric(series, errors="coerce")
+                mask = numeric.between(min_value, max_value)
+            else:
+                text = series.astype("string")
+                mask = (
+                    (text >= str(min_value))
+                    & (text <= str(max_value))
+                )
+            return df[mask.fillna(False)]
+
+        if value is None:
+            if relation_operator == "==":
+                return df[series.isna()]
+            if relation_operator == "!=":
+                return df[series.notna()]
+
+        if isinstance(value, bool):
+            if relation_operator == "==":
+                return df[series == value]
+            if relation_operator == "!=":
+                return df[series != value]
+
+        if relation_operator in {"==", "!="}:
+            if pd.api.types.is_numeric_dtype(series):
+                compare_value = value
+                compare_series = series
+            else:
+                compare_value = str(value)
+                compare_series = series.astype("string")
+
+            if relation_operator == "==":
+                mask = compare_series == compare_value
+            else:
+                mask = compare_series != compare_value
+
+            return df[mask.fillna(False)]
+
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            compare_series = pd.to_numeric(series, errors="coerce")
+        else:
+            compare_series = series.astype("string")
+            value = str(value)
+
+        if relation_operator == ">":
+            mask = compare_series > value
+        elif relation_operator == "<":
+            mask = compare_series < value
+        elif relation_operator == ">=":
+            mask = compare_series >= value
+        elif relation_operator == "<=":
+            mask = compare_series <= value
+        else:
+            raise ValueError(
+                f"Unsupported relation operator: {relation_operator}"
+            )
+
+        return df[mask.fillna(False)]
+
+    def _parse_relation(self, relation):
+        """Parse a DSI relation into an operator and Python value."""
         relation = relation.strip()
 
-        matched_op = None
-        matched_value = None
+        if relation.startswith(">="):
+            return ">=", self._parse_value(relation[2:])
+        if relation.startswith("<="):
+            return "<=", self._parse_value(relation[2:])
+        if relation.startswith("=="):
+            return "==", self._parse_value(relation[2:])
+        if relation.startswith("!="):
+            return "!=", self._parse_value(relation[2:])
+        if relation.startswith("~~"):
+            return "contains", self._parse_value(relation[2:])
+        if relation.startswith(">"):
+            return ">", self._parse_value(relation[1:])
+        if relation.startswith("<"):
+            return "<", self._parse_value(relation[1:])
+        if relation.startswith("="):
+            return "==", self._parse_value(relation[1:])
+        if relation.startswith("~"):
+            return "contains", self._parse_value(relation[1:])
 
-        for op in sorted(ops.keys(), key=len, reverse=True):
-            if relation.startswith(op):
-                matched_op = op
-                matched_value = relation[len(op):].strip().strip("'\"")
-                break
+        if relation.startswith("(") and relation.endswith(")"):
+            values = relation[1:-1].split(",")
+            if len(values) == 2:
+                return (
+                    "range",
+                    (
+                        self._parse_value(values[0]),
+                        self._parse_value(values[1]),
+                    ),
+                )
 
-        if matched_op is None:
-            raise ValueError(f"Unsupported relation: {relation}")
+        raise ValueError(f"Unknown relation format: {relation}")
 
-        compare = ops[matched_op]
+    def _parse_value(self, value):
+        """Convert a relation value into an appropriate Python value."""
+        value = str(value).strip()
 
-        results = []
+        if (
+            (value.startswith("'") and value.endswith("'"))
+            or (value.startswith('"') and value.endswith('"'))
+        ):
+            value = value[1:-1]
 
-        for table_name, table in self._cache.items():
+        value = value.replace("''", "'")
 
-            if column_name not in table:
-                continue
+        if value.lower() == "true":
+            return True
+        if value.lower() == "false":
+            return False
+        if value.lower() in {"none", "null"}:
+            return None
 
-            columns = list(table.keys())
+        try:
+            if "." not in value:
+                return int(value)
+            return float(value)
+        except ValueError:
+            return value
 
-            num_rows = len(table[column_name])
-
-            for row_idx in range(num_rows):
-
-                value = table[column_name][row_idx]
-
-                try:
-                    lhs = float(value)
-                    rhs = float(matched_value)
-                except Exception:
-                    lhs = str(value)
-                    rhs = str(matched_value)
-
-                try:
-                    if compare(lhs, rhs):
-
-                        row_values = [
-                            table[c][row_idx]
-                            for c in columns
-                        ]
-
-                        results.append(
-                            ValueObject(
-                                t_name=table_name,
-                                c_name=columns,
-                                row_num=row_idx + 1,
-                                value=row_values,
-                                type='relation'
-                            )
-                        )
-
-                except Exception:
-                    continue
-
-        return results
-
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Utility / Display
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    def _ordered_table_names(self):
+        """Return cached tables in their load order."""
+        return list(self._cache.keys())
+
     def list(self, collection=False):
-        """
-        Lists tables or prints each table's dimensions.
+        """List loaded Oceans11 tables."""
 
-        `collection` : bool, default False
-            - If True, return list of table names.
-            - If False, print table names with dimensions.
+        if not self._loaded:
+            return [] if collection else None
 
-        Return : list or None
-            Table names if collection=True, otherwise None
-        """
+        table_names = list(self._cache.keys())
 
         if collection:
-            return list(self._cache.keys())
+            return table_names
 
-        for name, table in self._cache.items():
-            df = pd.DataFrame(table)
+        for table_name in table_names:
+            table = self._cache[table_name]
 
-            if name in self._resource_tables:
-                print(f"{name} [T2]: ({len(df)} rows, {len(df.columns)} cols)")
+            num_columns = len(table)
+
+            if table:
+                first_column = next(iter(table.values()))
+                num_rows = len(first_column)
             else:
-                print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
+                num_rows = 0
 
+            print(f"\nTable: {table_name}")
+            print(f"  - num of columns: {num_columns}")
+            print(f"  - num of rows: {num_rows}")
 
     def summary(self, table_name=None):
         """
-        Returns numerical metadata for tables. For resource tables, includes dataset_id information.
+        Return column-level summary metadata for cached Oceans11 tables.
 
-        `table_name` : str, optional
-            If provided, returns summary for a single table. Either dataset_title or dataset_id.
-            If None, returns summary for all tables in expected format.
-
-        Return : pandas.DataFrame or list
-            - If table_name is None: returns [table_names_list, df1, df2, ...]
-            - If table_name provided: returns single DataFrame
+        With no table name, returns
+        ``[table_name_list, table1_df, table2_df, ...]``.
         """
-
-        if not self._loaded:
-            return pd.DataFrame()
-
-        if table_name:
+        if table_name is not None:
             resolved_name = self._resolve_table_name(table_name)
-            table = self._cache.get(resolved_name)
+            if resolved_name not in self._cache:
+                raise ValueError(
+                    f"Table '{table_name}' not found. "
+                    f"Available tables: {list(self._cache.keys())}"
+                )
+            if not self._cache[resolved_name]:
+                raise ValueError(f"Table '{resolved_name}' is empty")
 
-            if not table:
-                raise ValueError(f"Table '{resolved_name}' is empty or not found")
-
-            df = pd.DataFrame(table)
-
-            summary_dict = {
-                "table_name": resolved_name,
-                "num_rows": len(df),
-                "num_columns": len(df.columns),
-                "columns": list(df.columns),
-            }
-
-            if resolved_name in self._resource_tables:
-                summary_dict["tier"] = "T2"
-            else:
-                summary_dict["tier"] = "T1"
-
-            return pd.DataFrame([summary_dict])
+            return self._summary_helper(resolved_name)
 
         table_names = []
         summary_dfs = []
 
-        for name, table in self._cache.items():
-            df = pd.DataFrame(table)
-
-            summary_dict = {
-                "table_name": name,
-                "num_rows": len(df),
-                "num_columns": len(df.columns),
-                "columns": list(df.columns),
-                "tier": "T2" if name in self._resource_tables else "T1",
-            }
-
+        for name in self._ordered_table_names():
+            table = self._cache[name]
+            if not table:
+                continue
             table_names.append(name)
-            summary_dfs.append(pd.DataFrame([summary_dict]))
+            summary_dfs.append(self._summary_helper(name))
 
         return [table_names] + summary_dfs
 
+    def _summary_helper(self, table_name):
+        """Generate OSTI-style column-level summary metadata."""
+        df = pd.DataFrame(self._cache[table_name]).infer_objects()
 
-    def display(self, table_name, num_rows=25, display_cols=None):
-        """
-        Displays rows from a specified Oceans11 table.
+        headers = [
+            "column",
+            "type",
+            "unique",
+            "min",
+            "max",
+            "avg",
+            "std_dev",
+        ]
 
-        Accepts either dataset_title or dataset_id for resource tables.
+        skip_min_max = {
+            "t2db_url",
+            "t2db_path",
+            "t2db_name",
+        }
 
-        `table_name` : str
-            Name or ID of the table to display
+        rows = []
+        for column in df.columns:
+            series = df[column]
+            non_null = series.dropna()
 
-        `num_rows` : int, default 25
-            Number of rows to display
+            if pd.api.types.is_bool_dtype(series):
+                column_type = "BOOLEAN"
+            elif pd.api.types.is_integer_dtype(series):
+                column_type = "INTEGER"
+            elif pd.api.types.is_float_dtype(series):
+                column_type = "REAL"
+            elif pd.api.types.is_datetime64_any_dtype(series):
+                column_type = "DATETIME"
+            elif non_null.empty or all(
+                isinstance(value, str) for value in non_null
+            ):
+                column_type = "TEXT"
+            else:
+                column_type = "OBJECT"
 
-        `display_cols` : list of str, optional
-            Subset of columns to display
+            has_complex_values = (
+                non_null.apply(
+                    lambda item: isinstance(item, (dict, list, tuple, set))
+                ).any()
+                if not non_null.empty
+                else False
+            )
 
-        Return : pandas.DataFrame
-            Displayed table data with long strings truncated
-        """
+            if has_complex_values:
+                unique_values = int(non_null.astype(str).nunique())
+            else:
+                unique_values = int(non_null.nunique())
 
+            min_value = None
+            max_value = None
+            average = None
+            std_dev = None
+
+            numeric_series = pd.to_numeric(
+                non_null,
+                errors="coerce",
+            ).dropna()
+
+            if not non_null.empty and len(numeric_series) == len(non_null):
+                min_value = numeric_series.min()
+                max_value = numeric_series.max()
+                average = numeric_series.mean()
+                std_dev = numeric_series.std()
+                if pd.isna(std_dev):
+                    std_dev = None
+            elif (
+                not non_null.empty
+                and not has_complex_values
+                and column.lower() not in skip_min_max
+                and non_null.astype(str).str.len().max() <= 80
+            ):
+                try:
+                    min_value = non_null.min()
+                    max_value = non_null.max()
+                except TypeError:
+                    pass
+
+            rows.append(
+                [
+                    column,
+                    column_type,
+                    unique_values,
+                    min_value,
+                    max_value,
+                    average,
+                    std_dev,
+                ]
+            )
+
+        return pd.DataFrame(rows, columns=headers, dtype=object)
+
+    def display(self, table_name="records", num_rows=25, display_cols=None):
+        """Return rows from a cached Oceans11 table as a DataFrame."""
         if not self._loaded:
             raise RuntimeError("No data loaded. Cannot display empty backend.")
 
         resolved_name = self._resolve_table_name(table_name)
-
         table = self._cache.get(resolved_name)
-
-        if not table:
-            raise ValueError(f"Table '{resolved_name}' is empty")
+        if table is None:
+            raise ValueError(f"Table '{table_name}' not found")
 
         df = pd.DataFrame(table)
+        if df.empty:
+            raise ValueError(f"The '{resolved_name}' table is empty")
 
         if display_cols:
-            missing_cols = set(display_cols) - set(df.columns)
-
-            if missing_cols:
+            missing_columns = set(display_cols) - set(df.columns)
+            if missing_columns:
                 raise ValueError(
-                    f"Columns not found in '{resolved_name}': {missing_cols}\n"
+                    f"Columns not found in '{resolved_name}': {missing_columns}\n"
                     f"Available columns: {list(df.columns)}"
                 )
-
             df = df[display_cols]
 
-        # Store original row count before limiting rows
         df.attrs["max_rows"] = len(df)
-
         if num_rows:
             df = df.head(num_rows)
 
-        # Truncate long strings for readable display
-        df = df.map(
-            lambda x:
-                (str(x)[:60] + "...")
-                if isinstance(x, str) and len(str(x)) > 60
-                else x
+        return df.map(
+            lambda value: (
+                str(value)[:60] + "..."
+                if isinstance(value, str) and len(value) > 60
+                else value
+            )
         )
 
-        return df
-
-
     def notebook(self, **kwargs):
-        """
-        **Notebook generation not supported for Oceans11 backend.**
-        """
+        """Notebook generation is not supported for Oceans11."""
+        pass
 
-
-    # # ----------------------------------------------------------------------
-    # # Lifecycle
-    # # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
     def close(self):
-        """
-        Close Oceans11 backend and clear loaded state.
-        """
-
+        """Close the backend and clear all cached state."""
         self._cache.clear()
+        self._tier1_tables.clear()
         self._resource_tables.clear()
         self._dataset_id_map.clear()
         self._dataset_title_map.clear()
+        self._dataset_table_map.clear()
 
         if hasattr(self, "_catalog_dsi"):
             try:
@@ -1246,13 +1334,9 @@ class Oceans11(Webserver):
         self.catalog_path = None
         self._loaded = False
 
-
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Abstract Methods
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
-        """
-        **Not supported - Oceans11 backend is read-only**
-        """
+        """Oceans11 is read-only."""
         raise NotImplementedError("Oceans11 backend is read-only")
-    
