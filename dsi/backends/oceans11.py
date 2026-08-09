@@ -66,7 +66,7 @@ class Oceans11(Webserver):
 
         self.workspace = kwargs.get(
             "workspace",
-            str(Path("./").expanduser()),
+            str(Path("./").expanduser()) #where the downloaded file will be saved
         )
 
         parsed = urlparse(base_url)
@@ -84,7 +84,7 @@ class Oceans11(Webserver):
         self._dataset_table_map = {}
 
         self._loaded = False
-        self.catalog_path = None
+        self.catalog_path = None # the local path for the T1 catalog. 
         self.params = params or {}
         self.validate_error_msg = None
 
@@ -93,21 +93,21 @@ class Oceans11(Webserver):
         if kwargs.get("only_validate", False):
             return
 
-        # Normal construction validates the live catalog by downloading it.
         # Validate connection FIRST before attempting to load data
         if not self.validate_connection():
             self._loaded = False
             raise ConnectionError(self.validate_error_msg or "Failed to connect to Oceans11 catalog")
 
+        # Initial data load (only if connection is valid and params provided)
         if self.params:
             try:
                 self._load_initial_data(self.params)
-                self._loaded = True
-            except Exception as exc:
+                self._loaded = True  # Data successfully loaded
+            except Exception as e:
                 self._loaded = False
-                raise RuntimeError(f"Failed to load initial data: {exc}") from exc
+                raise RuntimeError(f"Failed to load initial data: {e}") from e
         else:
-            self._loaded = True
+            self._loaded = True  # Backend ready, no initial data to load
 
     # ------------------------------------------------------------------
     # Connection Validation
