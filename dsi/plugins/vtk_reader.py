@@ -25,9 +25,10 @@ class VTK_Reader(FileReader):
             If multiple files are provided, all data must correspond to the same table.
         """
         try:
-            import vtk
+            from importlib import import_module
+            import_module("vtk")
         except ImportError:
-            raise RuntimeError("Must have vtk package installed to use the VTK reader.")
+            raise RuntimeError("Must have vtk package installed to use the VTK reader.") from None
 
         super().__init__(filenames, **kwargs)
         self.vtk_data = OrderedDict()
