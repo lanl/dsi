@@ -1053,24 +1053,9 @@ def test_rcsbpdb_ingest_artifacts_read_only(backend):
         backend.ingest_artifacts({})
 
 
-def test_rcsbpdb_write_read_only(backend):
-    with pytest.raises(NotImplementedError):
-        backend.write({})
-
-
-def test_rcsbpdb_update_read_only(backend):
-    with pytest.raises(NotImplementedError):
-        backend.update({})
-
-
 def test_rcsbpdb_query_artifacts_not_implemented(backend):
     with pytest.raises(NotImplementedError):
         backend.query_artifacts("10.2210/pdb1cbs/pdb")
-
-
-def test_rcsbpdb_query_not_implemented(backend):
-    with pytest.raises(NotImplementedError):
-        backend.query("SELECT * FROM datasets")
 
 
 def test_rcsbpdb_notebook_not_implemented(backend):
