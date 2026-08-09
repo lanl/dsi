@@ -75,11 +75,6 @@ class Oceans11(Webserver):
 
         self.base_url = base_url.rstrip("/")
 
-        # Backend discovery/configuration check.  This mirrors the behavior
-        # used by the other web backends and intentionally performs no I/O.
-        if kwargs.get("only_validate", False):
-            return
-
         # Tier 1 is stored as records. Tier 2 tables are loaded separately.
         self._cache = OrderedDict()
         self._tier1_tables = []
@@ -91,13 +86,18 @@ class Oceans11(Webserver):
         self._loaded = False
         self.catalog_path = None
         self.params = params or {}
+        self.validate_error_msg = None
+
+        # Backend discovery/configuration check.  This mirrors the behavior
+        # used by the other web backends and intentionally performs no I/O.
+        if kwargs.get("only_validate", False):
+            return
 
         # Normal construction validates the live catalog by downloading it.
-        try:
-            self.catalog_path = self.validate_connection()
-        except (ConnectionError, RuntimeError):
+        # Validate connection FIRST before attempting to load data
+        if not self.validate_connection():
             self._loaded = False
-            raise
+            raise ConnectionError(self.validate_error_msg or "Failed to connect to Oceans11 catalog")
 
         if self.params:
             try:
@@ -116,54 +116,52 @@ class Oceans11(Webserver):
         """
         Validate that the Oceans11 catalog is accessible and usable.
 
-        Normal use returns the downloaded local catalog path. If this method
-        is called explicitly with ``only_validate=True``, it returns a bool
-        and removes the temporary downloaded validation folder.
-        """
+        Tests the connection by calling DSI Federated's pull_data() to:
+            - Download the oceans11.db catalog from https://oceans11.lanl.gov/dataCatalog/
+            - Set `self.catalog_path` to the download location
+
+        If this method is called explicitly with ``only_validate=True``, it 
+        removes the temporary downloaded validation folder.
+        
+        Return : bool
+            True if connection is valid
+        """                
         try:
-            from contextlib import redirect_stdout
-            import os
-            import shutil
-
             from dsi.utils.federated.federate_datasets import pull_data
+            import os
+            from contextlib import redirect_stdout
 
-            with open(os.devnull, "w", encoding="utf-8") as fnull:
-                with redirect_stdout(fnull):
-                    info = pull_data(
-                        location_type="url",
-                        location=self.base_url,
-                        path=self.base_url,
-                        abs_path_workspace_folder=self.workspace,
-                        username="",
-                    )
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                info = pull_data(
+                    location_type="url",
+                    location=self.base_url,
+                    path=self.base_url,
+                    abs_path_workspace_folder=self.workspace,
+                    username="",
+                    download_limit=1024**5
+                )
 
             if info is None:
-                if kwargs.get("only_validate", False):
-                    return False
-                raise ConnectionError(
-                    f"Failed to download catalog from {self.base_url}"
-                )
+                self.validate_error_msg = f"Failed to download catalog from {self.base_url}"
+                return False
 
             local_path = info.get("local_path")
             if not local_path or not Path(local_path).is_file():
-                if kwargs.get("only_validate", False):
-                    return False
-                raise RuntimeError("Downloaded catalog file is invalid or missing")
-
-            if kwargs.get("only_validate", False):
-                folder_hash = info.get("folder_hash")
-                if folder_hash:
-                    shutil.rmtree(folder_hash, ignore_errors=True)
-                return True
-
-            return local_path
-
-        except Exception as exc:
-            if kwargs.get("only_validate", False):
+                self.validate_error_msg = "Downloaded catalog file is invalid or missing"
                 return False
-            raise ConnectionError(
-                f"Unable to access Oceans11 catalog: {exc}"
-            ) from exc
+
+            # skip data retrieval if only checking connection to oceans11
+            if kwargs.get("only_validate", False):
+                import shutil
+                shutil.rmtree(info["folder_hash"] + "/")
+
+            self.catalog_path = local_path
+            return True
+
+        except Exception as e:
+            self.validate_error_msg = f"Unable to access Oceans11 catalog: {e}"
+            return False
 
     # ------------------------------------------------------------------
     # Initial Data Load
@@ -469,6 +467,7 @@ class Oceans11(Webserver):
             path=full_url,
             abs_path_workspace_folder=self.workspace,
             username="",
+            download_limit=1024**5
         )
 
         if info is None or not info.get("local_path"):
