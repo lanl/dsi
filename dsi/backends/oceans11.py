@@ -38,12 +38,12 @@ class ValueObject:
     type : str
         {'table', 'column', 'cell'}
     """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
+    def __init__(self, t_name, c_name, row_num, value, type):
+        self.t_name = t_name # ""
+        self.c_name = c_name #[]
+        self.row_num = row_num # None
+        self.value = value # None
+        self.type = type # ""
 
 # ----------------------------------------------------------------------
 # Oceans11 Backend (Webserver - Read only)
@@ -99,10 +99,6 @@ class Oceans11(Webserver):
 
         self.base_url = base_url.rstrip("/")
 
-        # skip data retrieval if only checking connection to oceans11
-        if kwargs.get("only_validate", False):
-            return
-
         # Data storage (tiered structure)
         # Tier 1: datasets, Tier 2: per-dataset resource tables
         self._cache = OrderedDict()
@@ -113,13 +109,16 @@ class Oceans11(Webserver):
         self._loaded = False
         self.catalog_path = None # the local path for the T1 catalog. 
         self.params = params or {}
+        self.validate_error_msg = None
+
+        # skip data retrieval if only checking connection to oceans11
+        if kwargs.get("only_validate", False):
+            return
 
         # Validate connection FIRST before attempting to load data
-        try:
-            self.catalog_path = self.validate_connection()
-        except (ConnectionError, RuntimeError):
+        if not self.validate_connection():
             self._loaded = False
-            raise
+            raise ConnectionError(self.validate_error_msg or "Failed to connect to Oceans11 catalog")
 
         # Initial data load (only if connection is valid and params provided)
         if self.params:
@@ -163,31 +162,29 @@ class Oceans11(Webserver):
                     path=self.base_url,
                     abs_path_workspace_folder=self.workspace,
                     username="",
+                    download_limit=1024**5
                 )
 
             if info is None:
-                if kwargs.get("only_validate", False):
-                    return False
-                raise ConnectionError(f"Failed to download catalog from {self.base_url}")
+                self.validate_error_msg = f"Failed to download catalog from {self.base_url}"
+                return False
 
             local_path = info.get("local_path")
             if not local_path or not Path(local_path).is_file():
-                if kwargs.get("only_validate", False):
-                    return False
-                raise RuntimeError("Downloaded catalog file is invalid or missing")
+                self.validate_error_msg = "Downloaded catalog file is invalid or missing"
+                return False
 
             # skip data retrieval if only checking connection to oceans11
             if kwargs.get("only_validate", False):
                 import shutil
                 shutil.rmtree(info["folder_hash"] + "/")
-                return True
 
-            return local_path
+            self.catalog_path = local_path
+            return True
 
         except Exception as e:
-            if kwargs.get("only_validate", False):
-                return False
-            raise ConnectionError(f"Unable to access Oceans11 catalog: {e}") from e
+            self.validate_error_msg = f"Unable to access Oceans11 catalog: {e}"
+            return False
 
     # ---------------------------------------------------
     # Initial Data Load
@@ -402,7 +399,8 @@ class Oceans11(Webserver):
             location=full_url,
             path=full_url,
             abs_path_workspace_folder=self.workspace,
-            host_username=""
+            username="",
+            download_limit=1024**5
         )
 
         if info is None or not info.get("local_path"):
@@ -813,45 +811,13 @@ class Oceans11(Webserver):
         if not self._loaded:
             return []
 
-        results = []
+        query_str = str(query_object).lower()
 
-        for table_name, table in self._cache.items():
-
-            columns = list(table.keys())
-
-            if not columns:
-                continue
-
-            num_rows = len(table[columns[0]])
-
-            for row_idx in range(num_rows):
-
-                row_values = []
-
-                matched = False
-
-                for col in columns:
-
-                    value = table[col][row_idx]
-                    row_values.append(value)
-
-                    if query_object is None:
-                        continue
-
-                    if value is not None and str(query_object).lower() in str(value).lower():
-                        matched = True
-
-                if matched:
-                    results.append(
-                        ValueObject(
-                            t_name=table_name,
-                            c_name=columns,
-                            row_num=row_idx + 1,
-                            value=row_values,
-                        )
-                    )
-
-        return results
+        return (
+            self.find_table(query_str) +
+            self.find_column(query_str) +
+            self.find_cell(query_object)
+        )
     
     def find_table(self, query_object, **kwargs):
         """

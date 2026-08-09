@@ -1,4 +1,4 @@
-name: osti.py test
+name: oceans11.py test
 
 on:
   push:
@@ -28,9 +28,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install . -r requirements.extras.txt
 
-    - name: Test OSTI Backend
+    - name: Test OCEANS11 Backend
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_osti.py -v --tb=short -m "not integration"
+        pytest dsi/backends/tests/test_oceans11.py -v --tb=short -m "not integration"
       env:
         PYTHONUNBUFFERED: 1

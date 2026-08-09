@@ -1475,48 +1475,48 @@ class Terminal:
                 return False
         elif parent_name == "Webserver":
             if backend.__class__.__name__ == "NDP":
-                    # NDP is valid if data is loaded and connection works
-                    if not backend._loaded:
-                        return False
-                    
-                    try:
-                        backend.validate_connection()
-                        return True
-                    except (ConnectionError, RuntimeError) as e:
-                        if self.debug_level != 0:
-                            self.logger.warning(f"NDP backend connection validation failed: {e!s}")
-                        return False
-            if backend.__class__.__name__ == "OSTI":
-                    # OSTI is valid if data is loaded and connection works
-                    if not backend._loaded:
-                        return False
-                    
-                    try:
-                        backend.validate_connection()
-                        return True
-                    except (ConnectionError, RuntimeError) as e:
-                        if self.debug_level != 0:
-                            self.logger.warning(f"OSTI backend connection validation failed: {e!s}")
-                        return False 
-            if backend.__class__.__name__ == "RCSBPDB":
-                    # RCSBPDB is valid if data is loaded and RCSB connection works
-                    if not backend._loaded:
-                        return False
-
-                    if backend.validate_connection():
-                        return True
-                    else:
-                        if self.debug_level != 0:
-                            self.logger.warning("RCSBPDB backend connection failed.")
-                        return False
-            if backend.__class__.__name__ == "Oceans11":
+                # NDP is valid if data is loaded and connection works
                 if not backend._loaded:
                     return False
                 
-                return (
-                    backend.catalog_path is not None
-                    and os.path.isfile(backend.catalog_path)
-                )
+                if backend.validate_connection():
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("NDP backend connection failed")
+                    return False
+            if backend.__class__.__name__ == "OSTI":
+                # OSTI is valid if data is loaded and connection works
+                if not backend._loaded:
+                    return False
+                
+                if backend.validate_connection():
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("OSTI backend connection failed")
+                    return False
+            if backend.__class__.__name__ == "RCSBPDB":
+                # RCSBPDB is valid if data is loaded and RCSB connection works
+                if not backend._loaded:
+                    return False
+
+                if backend.validate_connection():
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("RCSBPDB backend connection failed.")
+            if backend.__class__.__name__ == "Oceans11":
+                # Oceans11 is valid if data is loaded and connection works
+                if not backend._loaded:
+                    return False
+                
+                if backend.validate_connection(only_validate=True) and backend.catalog_path is not None:
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("Oceans11 backend connection failed")
+                    return False
         return True
 
     # Internal function that returns if a user can create a file/db in a specified location
