@@ -10,6 +10,7 @@ Tier-1 search behavior is tested against the already-downloaded local catalog.
 
 from collections import OrderedDict
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -543,10 +544,8 @@ def test_oceans11_ingest_artifacts(backend):
 # 10) Utility Helpers
 # =============================================================================
 
-def test_oceans11_rows_to_table():
+def test_oceans11_rows_to_table(backend):
     """Test conversion from row dictionaries to column-oriented data."""
-    instance = Oceans11.__new__(Oceans11)
-
     rows = [
         {
             "id": 1,
@@ -559,7 +558,7 @@ def test_oceans11_rows_to_table():
         },
     ]
 
-    result = instance._rows_to_table(rows)
+    result = backend._rows_to_table(rows)
 
     assert isinstance(result, OrderedDict)
     assert result["id"] == [1, 2]
@@ -567,10 +566,8 @@ def test_oceans11_rows_to_table():
     assert result["extra"] == [None, "value"]
 
 
-def test_oceans11_deduplicate_records():
-    """Test Tier-1 record deduplication without network access."""
-    instance = Oceans11.__new__(Oceans11)
-
+def test_oceans11_deduplicate_records(backend):
+    """Test Tier-1 record deduplication."""
     records = [
         {
             "osti_id": "1",
@@ -586,29 +583,25 @@ def test_oceans11_deduplicate_records():
         },
     ]
 
-    result = instance._deduplicate_records(records)
+    result = backend._deduplicate_records(records)
 
     assert len(result) == 2
     assert result[0]["title"] == "one"
     assert result[1]["title"] == "two"
 
 
-def test_oceans11_escape_sql():
+def test_oceans11_escape_sql(backend):
     """Test SQL literal escaping."""
-    instance = Oceans11.__new__(Oceans11)
-
-    assert instance._escape_sql("O'Brien") == "O''Brien"
+    assert backend._escape_sql("O'Brien") == "O''Brien"
 
 
-def test_oceans11_parse_relation():
-    """Test relation parsing without network access."""
-    instance = Oceans11.__new__(Oceans11)
-
-    assert instance._parse_relation(">= 10") == (">=", 10)
-    assert instance._parse_relation("<= 20") == ("<=", 20)
-    assert instance._parse_relation("== 'heat'") == ("==", "heat")
-    assert instance._parse_relation("~~ heat") == ("contains", "heat")
-    assert instance._parse_relation("(1, 5)") == (
+def test_oceans11_parse_relation(backend):
+    """Test relation parsing."""
+    assert backend._parse_relation(">= 10") == (">=", 10)
+    assert backend._parse_relation("<= 20") == ("<=", 20)
+    assert backend._parse_relation("== 'heat'") == ("==", "heat")
+    assert backend._parse_relation("~~ heat") == ("contains", "heat")
+    assert backend._parse_relation("(1, 5)") == (
         "range",
         (1, 5),
     )
@@ -619,13 +612,13 @@ def test_oceans11_parse_relation():
 # =============================================================================
 
 def test_oceans11_close_without_network():
-    """
-    Test close using synthetic backend state.
-
-    The shared live backend remains open for the rest of the session, so
-    lifecycle cleanup is tested without creating another network connection.
-    """
-    instance = Oceans11.__new__(Oceans11)
+    """Test close on a normally initialized backend without network access."""
+    with patch.object(
+        Oceans11,
+        "validate_connection",
+        return_value="/tmp/fake-oceans11.db",
+    ):
+        instance = Oceans11()
 
     instance._cache = OrderedDict(
         {
