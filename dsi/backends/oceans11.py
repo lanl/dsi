@@ -1310,7 +1310,6 @@ class Oceans11(Webserver):
 
     def notebook(self, **kwargs):
         """Notebook generation is not supported for Oceans11."""
-        pass
 
     # ------------------------------------------------------------------
     # Lifecycle
