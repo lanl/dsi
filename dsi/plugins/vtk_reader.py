@@ -8,7 +8,7 @@ from typing import Any, Iterable
 try:
     import vtk
 except ImportError:
-    raise RuntimeError("Must have vtk package installed to use the VTK reader.")
+    vtk=None
 
 from dsi.plugins.file_reader import FileReader
 
@@ -24,6 +24,11 @@ class VTK_Reader(FileReader):
             Required. One or more VTK file paths to be loaded into DSI.
             If multiple files are provided, all data must correspond to the same table.
         """
+        try:
+            import vtk
+        except ImportError:
+            raise RuntimeError("Must have vtk package installed to use the VTK reader.")
+
         super().__init__(filenames, **kwargs)
         self.vtk_data = OrderedDict()
         if isinstance(filenames, str):
