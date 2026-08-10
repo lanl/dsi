@@ -188,10 +188,10 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int, ispace: str 
 
         # add_value_labels(ax, add_bars, add_values)
         # add_value_labels(ax, commit_bars, commit_values)
-        total_std = [
-            tool_data.at[dataset, "total_ms_std"] if dataset in tool_data.index else 0.0
-            for dataset in dataset_order
-        ]
+        # total_std = [
+        #     tool_data.at[dataset, "total_ms_std"] if dataset in tool_data.index else 0.0
+        #     for dataset in dataset_order
+        # ]
         # if ispace == "space":
         #     total_std = [
         #         tool_data.at[dataset, "space_gb_std"] if dataset in tool_data.index else 0.0

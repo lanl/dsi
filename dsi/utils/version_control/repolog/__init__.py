@@ -13,35 +13,20 @@ that is expected to live in a separate component built on top of
 Public entry point: `RepositoryLog`.
 """
 
-from .log_record import (
-    OperationType,
-    RecordKind,
-    LogRecord,
-)
-from .file_store import Location
-from .exceptions import (
-    RepoLogError,
-    ChainIntegrityError,
-    RecordNotFoundError,
-    InvalidCommitError,
-    CorruptFrameError,
-)
-from .repository_log import RepositoryLog, AppendResult, VerificationResult, RecoveryState
-
-__all__ = sorted([
+__all__ = [
+    "AppendResult",
+    "ChainIntegrityError",
+    "CorruptFrameError",
+    "InvalidCommitError",
+    "Location",
+    "LogRecord",
     "OperationType",
     "RecordKind",
-    "LogRecord",
-    "Location",
-    "RepoLogError",
-    "ChainIntegrityError",
     "RecordNotFoundError",
-    "InvalidCommitError",
-    "CorruptFrameError",
-    "RepositoryLog",
-    "AppendResult",
-    "VerificationResult",
     "RecoveryState",
-])
+    "RepoLogError",
+    "RepositoryLog",
+    "VerificationResult",
+]
 
 __version__ = "0.0.1"
