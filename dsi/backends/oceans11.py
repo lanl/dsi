@@ -761,9 +761,9 @@ class Oceans11(Webserver):
         return "\n\n".join(schema_lines)
 
 
-    # ----------------------------------------------------------------------
-    # Query Interface (in-memory)
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Query Interface
+    # ------------------------------------------------------------------
     def query_artifacts(self, query, dict_return=True, **kwargs):
         """
         Public query() is not supported for Oceans11 because it is non-SQL.
