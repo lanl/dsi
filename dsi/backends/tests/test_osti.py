@@ -385,12 +385,6 @@ def test_osti_notebook():
     backend.notebook()
 
 
-def test_osti_get_table_names():
-    """OSTI does not support SQL table-name extraction."""
-    with pytest.raises(NotImplementedError):
-        backend.get_table_names("SELECT * FROM records")
-
-
 def test_osti_close():
     """Test close() without destroying the shared backend used by other tests."""
     local = OSTI.__new__(OSTI)

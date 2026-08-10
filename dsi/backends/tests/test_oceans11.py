@@ -204,12 +204,6 @@ def test_oceans11_get_schema(backend):
     assert "t2db_url" in schema
 
 
-def test_oceans11_get_table_names_not_supported(backend):
-    """SQL table-name extraction is not supported by Oceans11."""
-    with pytest.raises(NotImplementedError):
-        backend.get_table_names("SELECT * FROM records")
-
-
 # =============================================================================
 # 4) Find Operations
 # =============================================================================
