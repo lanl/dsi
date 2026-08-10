@@ -20,10 +20,6 @@ class Filesystem(Backend, ABC):
         pass
 
     @abstractmethod
-    def notebook(self, **kwargs):
-        pass
-
-    @abstractmethod
     def process_artifacts(self, **kwargs):
         pass
 
