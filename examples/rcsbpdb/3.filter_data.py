@@ -72,7 +72,7 @@ def main():
         try:
             download_file(url, output_path)
             print(f"Downloaded: {output_path}")
-        except Exception as exc:
+        except requests.RequestException as exc:
             print(f"Failed to download {url}: {exc}")
 
     dsi.close()
