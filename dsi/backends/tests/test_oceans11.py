@@ -661,4 +661,8 @@ def test_oceans11_close_without_network():
 
 def test_oceans11_notebook(backend):
     """Test notebook is currently a no-op."""
-    assert backend.notebook() is None
+    try:
+        backend.notebook()
+        assert False
+    except NotImplementedError: # should throw error
+        assert True
