@@ -290,8 +290,9 @@ class Sqlite(Filesystem):
                     types.unit_keys.append(sql_key + col_type)
             
             self.ingest_table_helper(types, foreign_query)
-            
-            if not all(v == [] for v in tableData.values()): # if table is empty (empty list as value) skip insert
+
+            # skip insert if table is empty
+            if not all(v in ([], [""], [None]) for v in tableData.values()): 
                 col_names = ', '.join(types.properties.keys())
                 placeholders = ', '.join('?' * len(types.properties))
 
