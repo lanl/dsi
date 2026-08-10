@@ -16,7 +16,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 from .exceptions import CorruptFrameError, RecordNotFoundError
 from .frame_codec import decode_frame_backward, decode_frame_forward, encode_frame
@@ -39,7 +39,7 @@ class LogFileStore:
     repository's log, in order, forever.
     """
 
-    def __init__(self, log_file_path: Union[str, Path]):
+    def __init__(self, log_file_path: str | Path):
         self.log_file_path = Path(log_file_path)
         self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.log_file_path.exists():

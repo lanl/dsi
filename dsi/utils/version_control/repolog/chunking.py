@@ -1,7 +1,7 @@
 import hashlib
 import os
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 from .log_record import _utcnow
 from .content_chunking.npy_chunking import NPY_MAGIC, chunk_npy_file, NpyFormatError
 from .content_chunking.db_chunking import SQLITE_MAGIC, chunk_sqlite_file, SQLiteFormatError
@@ -259,7 +259,7 @@ def _find_fastcdc_cut(
 
 
 def chunk_file_fastcdc(
-    path: Union[str, os.PathLike[str]],
+    path: str | os.PathLike[str],
 ) -> list[dict[str, object]]:
     """
     Split a file into FastCDC chunks.

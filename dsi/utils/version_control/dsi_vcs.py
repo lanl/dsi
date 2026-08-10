@@ -5,19 +5,21 @@ Captures full Linux file metadata (stat, ACL, xattrs), MD5 hash,
 and stores versioned snapshots in SQLite.
 
 Usage:
-    python dsi_vcs.py init                 # init repo in current directory
-    python dsi_vcs.py add <path>...        # stage paths for the next commit
-    python dsi_vcs.py delete <path>...     # stage paths for deletion
-    python dsi_vcs.py remove <path>...     # unstage paths
-    python dsi_vcs.py commit [message]     # commit a new version
-    python dsi_vcs.py log                  # list versions
-    python dsi_vcs.py diff <v1> <v2>       # diff two versions
-    python dsi_vcs.py restore <version>    # restore a version
+    dsi-vcs init                 # init repo in current directory
+    dsi-vcs add <path>...        # stage paths for the next commit
+    dsi-vcs delete <path>...     # stage paths for deletion
+    dsi-vcs remove <path>...     # unstage paths
+    dsi-vcs commit [message]     # commit a new version
+    dsi-vcs log                  # list versions
+    dsi-vcs diff <v1> <v2>       # diff two versions
+    dsi-vcs restore <version>    # restore a version
+    dsi-vcs clone <path>         # clone a repository
+    dsi-vcs branch <branch name> # create a new branch
+    dsi-vcs list-branch          # list branches
+    dsi-vcs merge <branch name>  # merge a branch to current branch
 
 Requirements:
-    pip install pyxattr                # for extended attributes
-    sudo apt install acl               # for getfacl (ACL support)
-    rsync must be installed            # for snapshot copies
+    sudo apt install acl         # for getfacl (ACL support)
 """
 
 import os
@@ -159,7 +161,7 @@ def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root
 
 
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
-class Version():
+class Version:
 
     def __init__(self, folder: str):
         self.root_folder = os.path.abspath(folder)

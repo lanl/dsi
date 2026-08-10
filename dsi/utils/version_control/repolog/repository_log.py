@@ -4,7 +4,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Optional, Sequence, Union
+from typing import Iterable, Iterator, Optional, Sequence
 
 from .exceptions import ChainIntegrityError, InvalidCommitError
 from .file_store import Location, LogFileStore, TruncationReport
@@ -52,7 +52,7 @@ class RepositoryLog:
     flag on old records.
     """
 
-    def __init__(self, log_file_dir: Union[str, Path], repository_id: str):
+    def __init__(self, log_file_dir: str | Path, repository_id: str):
         self.log_file = os.path.join(log_file_dir, f"{repository_id}.log")
         self.latest_commit_location: Optional[Location] = None # this is stored in version sql table
         self.repository_id = repository_id

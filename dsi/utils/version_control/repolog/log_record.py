@@ -76,7 +76,7 @@ def ns_to_datetime_parts(timestamp_ns: int) -> dict:
             "nanosecond": int,
         }
     """
-    seconds, nanosecond = divmod(timestamp_ns, 1_000_000_000)
+    seconds, _nanosecond = divmod(timestamp_ns, 1_000_000_000)
 
     dt = datetime.fromtimestamp(seconds, tz=timezone.utc)
     return dt

@@ -2,7 +2,7 @@
 repolog
 =======
 
-A persistent, append-only, hash-linked repository log -- a blockchain-like
+A persistent, append-only, hash-linked repository log, a blockchain-like
 write-ahead log stored as a sequence of immutable, length-framed records
 in a single ever-growing file. This package implements the LOG ONLY
 (architecture sections 1-2, plus the log's share of sections 4 and 11).
