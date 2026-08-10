@@ -1592,16 +1592,8 @@ class NDP(Webserver):
     def notebook(self, **kwargs):
         """
         Notebook generation not supported for NDP backend.
-
-        Parameters
-        ----------
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        None
         """
+        raise NotImplementedError("Notebook generation not supported for NDP backend")
 
 
     # ----------------------------------------------------------------------

@@ -1370,6 +1370,7 @@ class OSTI(Webserver):
         """
         **Notebook generation not supported for OSTI backend.**
         """
+        raise NotImplementedError("Notebook generation not supported for OSTI backend")
 
 
     # ----------------------------------------------------------------------

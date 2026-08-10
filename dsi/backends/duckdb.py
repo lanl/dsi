@@ -509,7 +509,8 @@ class DuckDB(Filesystem):
 
 
     def notebook(self, interactive=False):
-        pass
+        """Notebook generation is not supported for DuckDB backend"""
+        raise NotImplementedError("Notebook generation not supported for DuckDB backend")
 
 
 

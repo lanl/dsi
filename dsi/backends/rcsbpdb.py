@@ -1227,17 +1227,13 @@ class RCSBPDB(Webserver):
         raise NotImplementedError("rcsbpdb backend is read-only.")
 
     def query_artifacts(self, query, **kwargs):
-        raise NotImplementedError(
-            "query() is not implemented for RCSBPDB because it is not a SQL backend."
-        )
+        raise NotImplementedError("query() is not implemented for RCSBPDB because it is not a SQL backend.")
 
     def notebook(self, **kwargs):
         """
         Notebook generation is not supported for the rcsbpdb backend.
         """
-        raise NotImplementedError(
-            "Notebook generation is not supported for the rcsbpdb backend."
-        )
+        raise NotImplementedError("Notebook generation is not supported for the rcsbpdb backend.")
 
     def process_artifacts(self, **kwargs):
         extracted = self._extract_tables(self.raw_results)

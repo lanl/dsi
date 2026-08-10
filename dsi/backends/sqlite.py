@@ -550,6 +550,7 @@ class Sqlite(Filesystem):
                        nbf.v4.new_code_cell(textwrap.dedent(code4))]
         
         fname = 'dsi_sqlite_backend_output.ipynb'
+        print("WARNING: notebook() will soon be deprecated. To retrieve database data in a dataframe, call dsi.get_table(tbl_name, True)")
         print('Writing Jupyter notebook...')
         with open(fname, 'w') as fh:
             nbf.write(nb, fh)
