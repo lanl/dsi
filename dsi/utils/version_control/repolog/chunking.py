@@ -3,7 +3,12 @@ import os
 from pathlib import Path
 from typing import Any, Optional, Union
 from .log_record import _utcnow
-from .npy_chunking import NPY_MAGIC, chunk_npy_file
+from .content_chunking.npy_chunking import NPY_MAGIC, chunk_npy_file, NpyFormatError
+from .content_chunking.db_chunking import SQLITE_MAGIC, chunk_sqlite_file, SQLiteFormatError
+from .content_chunking.csv_chunking import CSVFormatError, chunk_csv_file
+from .content_chunking.xlsx_chunking import XLSXFormatError, chunk_xlsx_file
+from .content_chunking.json_chunking import JSONFormatError, chunk_json_file
+from .content_chunking.xml_chunking import XMLFormatError, chunk_xml_file
 
 # -----------------------------
 # Rolling hash parameters
@@ -351,22 +356,51 @@ def _has_npy_magic(path: str | os.PathLike[str]) -> bool:
     except OSError:
         return False
 
+def is_sqlite_file(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read(16) == SQLITE_MAGIC
+    except OSError:
+        return False
 
 def chunk_file(path):
     path = Path(path)
+    f_suffix = path.suffix.lower()
 
-    if (
-        path.suffix.lower() == ".npy"
-        and _has_npy_magic(path)
-    ):
+    if (f_suffix == ".npy" and _has_npy_magic(path)):
         try:
-            return chunk_npy_file(
-                path,
-                target_chunk_size=8 * 1024 * 1024,
-            )
+            return chunk_npy_file(path)
         except NpyFormatError:
-            # Object arrays, malformed files, and unsupported variants
-            # use the general-purpose chunker.
+            pass
+
+    if (f_suffix in {".db", ".sqlite", ".sqlite3"} and is_sqlite_file(path)):
+        try:
+            return chunk_sqlite_file(path)
+        except SQLiteFormatError:
+            pass
+
+    if f_suffix == ".csv":
+        try:
+            return chunk_csv_file(path)
+        except CSVFormatError:
+            pass
+
+    if f_suffix == ".xlsx":
+        try:
+            return chunk_xlsx_file(path)
+        except XLSXFormatError:
+            pass
+
+    if f_suffix == ".json":
+        try:
+            return chunk_json_file(path)
+        except JSONFormatError:
+            pass
+
+    if f_suffix == ".xml":
+        try:
+            return chunk_xml_file(path)
+        except XMLFormatError:
             pass
 
     return chunk_file_fastcdc(path)

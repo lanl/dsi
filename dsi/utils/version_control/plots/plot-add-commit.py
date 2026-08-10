@@ -18,7 +18,7 @@ REQUIRED_COLUMNS = {
     "total_ms",
 }
 
-DATASETS = ["small", "medium", "large"]
+DATASETS = ["small", "medium", "large", "big"]
 TOOLS = ["rsnapshot", "gitlfs", "dsivcs"]
 PRETTY_TOOL_NAMES = ["rsnapshot", "Git LFS", "DSI VCS"]
 
@@ -119,7 +119,7 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int, ispace: str 
                     "commit_ms": [0.0] * len(dataset_order),
                     "total_ms": [0.0] * len(dataset_order),
                     "total_ms_std": [0.0] * len(dataset_order),
-                    "space_gb": [0.384800, 2.436905, 45.911644],
+                    "space_gb": [0.384800, 2.436905, 45.911644, 322],
                     "space_gb_std": [0.0] * len(dataset_order),
                 }
             ),
@@ -235,9 +235,9 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int, ispace: str 
               markerscale=2.0,
               frameon=True, 
               ncols=min(tool_count, 1), 
-              loc="upper left" if ispace != "space-percent-change" else "upper center")
+              loc="upper left" if ispace != "space-percent-change" else "upper right")
 
-    ymax = max(grouped["total_ms"].max(), 160)
+    ymax = max(grouped["total_ms"].max(), 512)
     if ispace == "space":
         ymax = max(grouped["space_gb"].max(), 64)
     elif ispace == "space-percent-change":
@@ -251,8 +251,8 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int, ispace: str 
         ax.set_yticks([0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 1, 2, 4, 8, 16, 32, 64])
         ax.set_yticklabels(["0", "0.02", "0.03", "0.05", "0.1", "0.2", "0.3", "0.5", "1", "2", "4", "8", "16", "32", "64"])
     else:
-        ax.set_yticks([1, 2, 4, 8, 16, 32, 64, 128, 160])
-        ax.set_yticklabels(["1", "2", "4", "8", "16", "32", "64", "128", "160"])
+        ax.set_yticks([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 1500])
+        ax.set_yticklabels(["1", "2", "4", "8", "16", "32", "64", "128", "256", "512", "1024", "1500"])
     ax.tick_params(axis="x", labelsize=14)
     ax.tick_params(axis="y", labelsize=14)
     # plt.tight_layout()
