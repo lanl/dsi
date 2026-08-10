@@ -68,6 +68,7 @@ class NDP(Webserver):
             Base CKAN URL. If None, a default CKAN endpoint is used.
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from CKAN.
+
             Supported keys:
                 - keywords : str - Full-text search
                 - creator : str - Creator name filter (from extras.creatorName)
@@ -1053,9 +1054,12 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Returns all cached tables in tiered format.
+        Returns all cached tables in tiered format. 
+        
+        Structure is:
 
-        Structure:
+        .. code-block:: text
+
             {
                 "datasets": <dataset table>,
                 "<dataset_name>": <resource table>,
