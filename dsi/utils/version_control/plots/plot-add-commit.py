@@ -192,11 +192,11 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int, ispace: str 
             tool_data.at[dataset, "total_ms_std"] if dataset in tool_data.index else 0.0
             for dataset in dataset_order
         ]
-        if ispace == "space":
-            total_std = [
-                tool_data.at[dataset, "space_gb_std"] if dataset in tool_data.index else 0.0
-                for dataset in dataset_order
-            ]
+        # if ispace == "space":
+        #     total_std = [
+        #         tool_data.at[dataset, "space_gb_std"] if dataset in tool_data.index else 0.0
+        #         for dataset in dataset_order
+        #     ]
         total_bars = ax.bar(
             positions,
             total_values,
@@ -242,7 +242,7 @@ def plot(summary: pd.DataFrame, output: Path, title: str, dpi: int, ispace: str 
         ymax = max(grouped["space_gb"].max(), 64)
     elif ispace == "space-percent-change":
         ymax = 20
-    ymin = 1 if ispace == "space-percent-change" else 1
+    ymin = 1
     ax.set_ylim(ymin, ymax)
     if ispace == "space":
         ax.set_yticks([0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64])

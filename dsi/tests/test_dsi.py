@@ -1810,7 +1810,7 @@ def test_versioning():
     dummy_file_path = os.path.join(wpath, "a_dummy_file")
     with open(dummy_file_path, 'w') as f:
         for _ in range(10):
-            f.write(str(random.randint(0, 100)) + '\n')
+            f.writelines(str(random.randint(0, 100)))
     test.version("add", os.path.join(wpath, "a_dummy_file"))
 
     dummy_file_path = os.path.join(wpath, "second_dummy_file")

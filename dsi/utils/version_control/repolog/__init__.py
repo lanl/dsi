@@ -28,7 +28,7 @@ from .exceptions import (
 )
 from .repository_log import RepositoryLog, AppendResult, VerificationResult, RecoveryState
 
-__all__ = [
+__all__ = sorted([
     "OperationType",
     "RecordKind",
     "LogRecord",
@@ -42,6 +42,6 @@ __all__ = [
     "AppendResult",
     "VerificationResult",
     "RecoveryState",
-]
+])
 
 __version__ = "0.0.1"

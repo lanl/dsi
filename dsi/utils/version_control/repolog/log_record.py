@@ -213,7 +213,7 @@ class LogRecord(BaseModel):
     model_config = {"use_enum_values": False}
 
     @model_validator(mode="after")
-    def _check_kind_specific_fields(self) -> "LogRecord":
+    def _check_kind_specific_fields(self) -> LogRecord:
         if self.kind == RecordKind.DATA:
             if not self.file_path or not self.file_path.strip():
                 raise ValueError("DATA records require a non-empty file_path")
