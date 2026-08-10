@@ -25,12 +25,10 @@ import sys
 import subprocess
 import json
 import datetime
-import hashlib
 import shutil
 import tempfile
 import pwd
 import grp
-from turtle import mode
 from typing import Optional
 
 from .vcs_db import DB_NAME, SNAPSHOTS_DIR, open_db
@@ -300,7 +298,6 @@ class Version():
 
     def cmd_remove(self, paths: list[str]):
         """Remove path(s) from the staging area without touching the actual files."""
-        root_folder = os.path.abspath(self.root_folder)
         db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
         if not os.path.isfile(db_path):
             sys.exit("No dsi-vcs repo found. Run 'init' first.")

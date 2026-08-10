@@ -1,11 +1,9 @@
-import os
 import sqlite3
 from pathlib import Path
 from shutil import which
 import pytest
 import stat
 
-from dsi.dsi import DSI
 from dsi.utils.version_control.dsi_vcs import Version
 from dsi.utils.version_control.vcs_db import DB_NAME, SNAPSHOTS_DIR
 

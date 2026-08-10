@@ -125,32 +125,42 @@ Example output:
 
 ```shell
 Diff f826177ae78f4e48a8c08054e2bb9a71 → latest  (./root_folder)  
-                                                  
-STATUS     PATH                                   
+                                                
+STATUS     PATH                                 
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                      
-MODIFIED   file_schema.json  [owner]              
-diff result: 2c2                                  
-<    "genesis_datacard": {                        
----                                               
->    2"genesis_datacard": {                       
-26c26                                             
-< }                                               
-\ No newline at end of file                       
----                                               
-> }                                               
-MODIFIED   schema2.json  [content, size]          
-                                                  
-Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged 
+MODIFIED   file_new  [owner]                    
+MODIFIED   file_schema.json  [owner]            
+diff result: 2c2                                
+<    "genesis_datacard": {                      
+---                                             
+>    2"genesis_datacard": {                     
+26c26                                           
+< }                                             
+\ No newline at end of file                     
+---                                             
+> }                                             
+MODIFIED   schema2.json  [content, size]        
+                                                
+Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged
 ```
 
 ### Restore a Version
 
 Restore the entire repository to a previous commit:
 
-```bash
+```Shell
 dsi-vcs restore <version>
 dsi-vcs restore abc123def456
+```
+
+
+
+### Clone a DSI-VCS Repository
+
+Clone a previously initialized DSI-VCS repostory to the current working directory:
+
+```Shell
+dsi-vcs clone pathe_to_repository
 ```
 
 ## Python API
@@ -368,6 +378,16 @@ dsi.version("merge", "feature-work")
 dsi.version("diff")
 ```
 
+---
+
+### `clone`
+
+Restores the repository to a previously committed version.
+
+```python
+obj.version("clone", "path_to_repository")
+```
+
 ## Database Schema
 
 ### `versions` Table
@@ -398,7 +418,7 @@ Stores the content-addressed tree node for each committed path, including the sy
 | Column              | Type       | Description                                        |
 | ------------------- | ---------- | -------------------------------------------------- |
 | id                  | INTEGER PK | Auto-increment                                     |
-| version_id          | INTEGER FK | References `versions(id)` ON DELETE CASCADE      |
+| version_id          | INTEGER FK | References`versions(id)` ON DELETE CASCADE       |
 | root_folder         | TEXT       | Partition key                                      |
 | relative_path       | TEXT       | Path relative to root                              |
 | file_type           | TEXT       | file/dir/symlink/etc                               |

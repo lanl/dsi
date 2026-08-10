@@ -1,19 +1,5 @@
-"""
-The persistent, append-only, hash-linked repository log (architecture
-sections 1-2, plus the log's own share of section 4's commit process
-and section 11's recovery model).
-
-This module does not implement chunk storage, version tables, version
-graphs, Merkle trees, or any SQL-based indexing. Those are separate
-components; the intended integration point for an external index is
-`RepositoryLog.iter_records()`, which sequentially yields every
-`(Location, LogRecord)` in the log so an index can be built or
-incrementally refreshed without this module knowing anything about SQL.
-"""
-
 from __future__ import annotations
 
-from logging import log
 import os
 import threading
 from dataclasses import dataclass
