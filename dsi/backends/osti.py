@@ -1160,8 +1160,7 @@ class OSTI(Webserver):
 
         `collection` : bool, optional, default=False
             - If True, returns the list of table names.
-            - If False (default), prints metadata of all tables:
-            table names and dimensions.
+            - If False (default), prints table names and dimensions for all tables.
         """
         if collection:
             return list(self._cache.keys())

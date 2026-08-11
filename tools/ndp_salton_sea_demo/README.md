@@ -1,6 +1,6 @@
 # NDP / DSI / Pelican Seismic Demo Notebook
 
-## Step 1 — Ensure you have a python environement and DSI installed
+## Step 1 — Ensure you have a python environment and DSI installed
 
 Using Python's built-in `venv` module:
 
