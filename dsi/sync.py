@@ -535,7 +535,7 @@ class Sync:
             signal.alarm(10)
 
             result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
-            if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
+            if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
             try:
