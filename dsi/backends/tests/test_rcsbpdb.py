@@ -15,7 +15,6 @@ import requests
 
 from dsi.backends.rcsbpdb import RCSBPDB, FileResource, RCSBPDBResolution
 
-
 TEST_DOIS = [
     "10.2210/pdb1cbs/pdb",
     "10.2210/pdb4hhb/pdb",
@@ -576,7 +575,7 @@ def test_rcsbpdb_errors_table_for_invalid_identifier(mocked_rcsb):
 # 7) Find Operations
 # =============================================================================
 
-def test_rcsbpdb_find_condition(mocked_rcsb):
+def test_rcsbpdb_find_searches_table_column_and_cell_values(mocked_rcsb):
     backend = RCSBPDB(
         identifiers=TEST_DOIS,
         auto_load=True,
@@ -584,32 +583,17 @@ def test_rcsbpdb_find_condition(mocked_rcsb):
         validate_resource_urls=False,
     )
 
-    matches = backend.find("dataset_id = 1CBS")
+    matches = backend.find("1CBS")
 
     assert isinstance(matches, list)
     assert len(matches) >= 1
-
-    dataset_matches = [
-        match for match in matches
-        if match.t_name == "datasets"
-    ]
-
-    assert len(dataset_matches) == 1
-    assert dataset_matches[0].type == "row"
-    assert dataset_matches[0].value["dataset_id"] == "1CBS"
-
-    resource_matches = [
-        match for match in matches
-        if match.t_name == "resources"
-    ]
-
-    assert len(resource_matches) >= 1
-    assert all(match.value["dataset_id"] == "1CBS" for match in resource_matches)
+    assert any(match.type == "cell" for match in matches)
+    assert any(match.t_name == "datasets" for match in matches)
 
     backend.close()
 
 
-def test_rcsbpdb_find_contains(mocked_rcsb):
+def test_rcsbpdb_find_missing_value_returns_empty_list(mocked_rcsb):
     backend = RCSBPDB(
         identifiers=TEST_DOIS,
         auto_load=True,
@@ -617,41 +601,7 @@ def test_rcsbpdb_find_contains(mocked_rcsb):
         validate_resource_urls=False,
     )
 
-    matches = backend.find("title ~ structure")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert all(match.t_name == "datasets" for match in matches)
-    assert any("STRUCTURE" in match.value["title"].upper() for match in matches)
-
-    backend.close()
-
-
-def test_rcsbpdb_find_numeric_condition(mocked_rcsb):
-    backend = RCSBPDB(
-        identifiers=TEST_DOIS,
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    matches = backend.find("resource_count > 0")
-
-    assert isinstance(matches, list)
-    assert len(matches) == 2
-
-    backend.close()
-
-
-def test_rcsbpdb_find_invalid_query_returns_empty_list(mocked_rcsb):
-    backend = RCSBPDB(
-        identifiers=TEST_DOIS,
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    matches = backend.find("hemoglobin")
+    matches = backend.find("definitely-not-present-value")
 
     assert isinstance(matches, list)
     assert matches == []
@@ -673,6 +623,11 @@ def test_rcsbpdb_find_table(mocked_rcsb):
     assert len(matches) >= 1
     assert any(match.t_name == "datasets" for match in matches)
 
+    dataset_match = next(match for match in matches if match.t_name == "datasets")
+    assert dataset_match.type == "table"
+    assert "dataset_id" in dataset_match.c_name
+    assert isinstance(dataset_match.value, OrderedDict)
+
     backend.close()
 
 
@@ -690,10 +645,15 @@ def test_rcsbpdb_find_column(mocked_rcsb):
     assert len(matches) >= 1
     assert any("title" in match.c_name for match in matches)
 
+    title_match = next(match for match in matches if "title" in match.c_name)
+    assert title_match.type == "column"
+    assert isinstance(title_match.value, list)
+    assert len(title_match.value) == 2
+
     backend.close()
 
 
-def test_rcsbpdb_find_cell_aliases_find(mocked_rcsb):
+def test_rcsbpdb_find_cell_matches_value(mocked_rcsb):
     backend = RCSBPDB(
         identifiers=TEST_DOIS,
         auto_load=True,
@@ -701,21 +661,21 @@ def test_rcsbpdb_find_cell_aliases_find(mocked_rcsb):
         validate_resource_urls=False,
     )
 
-    matches = backend.find_cell("dataset_id = 1CBS")
+    matches = backend.find_cell("1CBS")
 
     assert isinstance(matches, list)
     assert len(matches) >= 1
+    assert all(match.type == "cell" for match in matches)
 
     dataset_matches = [
         match for match in matches
         if match.t_name == "datasets"
     ]
 
-    assert len(dataset_matches) == 1
-    assert dataset_matches[0].value["dataset_id"] == "1CBS"
+    assert len(dataset_matches) >= 1
+    assert any("1CBS" in match.value for match in dataset_matches)
 
     backend.close()
-
 
 
 def test_rcsbpdb_find_relation_condition_string(mocked_rcsb):
@@ -737,7 +697,10 @@ def test_rcsbpdb_find_relation_condition_string(mocked_rcsb):
     ]
 
     assert len(dataset_matches) == 1
-    assert dataset_matches[0].value["dataset_id"] == "1CBS"
+    assert dataset_matches[0].type == "cell"
+
+    dataset_idx = dataset_matches[0].c_name.index("dataset_id")
+    assert dataset_matches[0].value[dataset_idx] == "1CBS"
 
     backend.close()
 
@@ -761,7 +724,49 @@ def test_rcsbpdb_find_relation_condition_split_args(mocked_rcsb):
     ]
 
     assert len(dataset_matches) == 1
-    assert dataset_matches[0].value["dataset_id"] == "1CBS"
+    assert dataset_matches[0].type == "cell"
+
+    dataset_idx = dataset_matches[0].c_name.index("dataset_id")
+    assert dataset_matches[0].value[dataset_idx] == "1CBS"
+
+    backend.close()
+
+
+def test_rcsbpdb_find_relation_contains(mocked_rcsb):
+    backend = RCSBPDB(
+        identifiers=TEST_DOIS,
+        auto_load=True,
+        validate_on_init=False,
+        validate_resource_urls=False,
+    )
+
+    matches = backend.find_relation("title", "~~ structure")
+
+    assert isinstance(matches, list)
+    assert len(matches) >= 1
+    assert all(match.t_name == "datasets" for match in matches)
+
+    assert any(
+        "STRUCTURE" in match.value[match.c_name.index("title")].upper()
+        for match in matches
+    )
+
+    backend.close()
+
+
+def test_rcsbpdb_find_relation_numeric_condition(mocked_rcsb):
+    backend = RCSBPDB(
+        identifiers=TEST_DOIS,
+        auto_load=True,
+        validate_on_init=False,
+        validate_resource_urls=False,
+    )
+
+    matches = backend.find_relation("resource_count", "> 0")
+
+    assert isinstance(matches, list)
+    assert len(matches) == 2
+    assert all(match.t_name == "datasets" for match in matches)
 
     backend.close()
 
@@ -982,15 +987,12 @@ def test_rcsbpdb_display_returns_none(mocked_rcsb):
     backend.close()
 
 
-def test_rcsbpdb_display_missing_table_returns_none(backend):
-    try:
+def test_rcsbpdb_display_missing_table_raises_value_error(backend):
+    with pytest.raises(ValueError):
         backend.display("missing_table")
-        assert False # should raise Error
-    except ValueError:
-        assert True # should be error
 
 
-def test_rcsbpdb_display_missing_column_returns_none(mocked_rcsb):
+def test_rcsbpdb_display_missing_column_raises_value_error(mocked_rcsb):
     backend = RCSBPDB(
         identifiers=["1CBS"],
         auto_load=True,
@@ -998,11 +1000,8 @@ def test_rcsbpdb_display_missing_column_returns_none(mocked_rcsb):
         validate_resource_urls=False,
     )
 
-    try:
+    with pytest.raises(ValueError):
         backend.display("datasets", display_cols=["missing_column"])
-        assert False # should raise Error
-    except ValueError:
-        assert True # should be error
 
     backend.close()
 

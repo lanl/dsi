@@ -65,11 +65,13 @@ params
 
 from __future__ import annotations
 
-import re
+import builtins
 import json
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Iterable, List, Optional
+import re
 from collections import OrderedDict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field
+from typing import Any, ClassVar
 
 import pandas as pd
 import requests
@@ -77,6 +79,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from dsi.backends.webserver import Webserver
+
 
 class ValueObject:
     """Container used by find/find_table/find_column/find_cell."""
@@ -88,7 +91,7 @@ class ValueObject:
         self.value = None
         self.type = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "t_name": self.t_name,
             "c_name": self.c_name,
@@ -102,14 +105,14 @@ class ValueObject:
 class FileResource:
     """Normalized downloadable file/resource representation."""
 
-    label: Optional[str]
+    label: str | None
     url: str
-    extension: Optional[str]
+    extension: str | None
     source: str
-    format_hint: Optional[str] = None
-    exists: Optional[bool] = None
-    status_code: Optional[int] = None
-    content_type: Optional[str] = None
+    format_hint: str | None = None
+    exists: bool | None = None
+    status_code: int | None = None
+    content_type: str | None = None
 
 
 @dataclass
@@ -119,18 +122,18 @@ class RCSBPDBResolution:
     original_identifier: str
     normalized_identifier: str
     repo: str
-    endpoint_used: Optional[str]
-    endpoint_variables: Dict[str, Any] = field(default_factory=dict)
+    endpoint_used: str | None
+    endpoint_variables: dict[str, Any] = field(default_factory=dict)
     status: str = "no_match"
-    title: Optional[str] = None
-    record_id: Optional[str] = None
-    doi: Optional[str] = None
-    metadata_url: Optional[str] = None
-    landing_page_url: Optional[str] = None
-    query_source: Optional[str] = None
-    files: List[FileResource] = field(default_factory=list)
-    raw_metadata: Dict[str, Any] = field(default_factory=dict)
-    notes: List[str] = field(default_factory=list)
+    title: str | None = None
+    record_id: str | None = None
+    doi: str | None = None
+    metadata_url: str | None = None
+    landing_page_url: str | None = None
+    query_source: str | None = None
+    files: list[FileResource] = field(default_factory=list)
+    raw_metadata: dict[str, Any] = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)
 
 
 class RCSBPDB(Webserver):
@@ -144,7 +147,7 @@ class RCSBPDB(Webserver):
     DATA_CORE_URL = "https://data.rcsb.org/rest/v1/core"
     SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 
-    ENDPOINTS = {
+    ENDPOINTS: ClassVar[dict[str, str]] = {
         "search": SEARCH_URL,
         "data_core": DATA_CORE_URL,
         "entry": f"{DATA_CORE_URL}/entry/{{pdb_id}}",
@@ -159,7 +162,7 @@ class RCSBPDB(Webserver):
     RCSBPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.IGNORECASE)
     PDB_ID_REGEX = re.compile(r"^[A-Za-z0-9]{4}$")
 
-    DATASET_SCHEMA = [
+    DATASET_SCHEMA: ClassVar[list[str]] = [
         "dataset_id",
         "doi",
         "title",
@@ -174,7 +177,7 @@ class RCSBPDB(Webserver):
         "notes",
     ]
 
-    RESOURCE_SCHEMA = [
+    RESOURCE_SCHEMA: ClassVar[list[str]] = [
         "resource_id",
         "dataset_id",
         "name",
@@ -185,7 +188,7 @@ class RCSBPDB(Webserver):
         "raw_metadata",
     ]
 
-    ERROR_SCHEMA = [
+    ERROR_SCHEMA: ClassVar[list[str]] = [
         "identifier",
         "normalized_identifier",
         "repo",
@@ -195,7 +198,7 @@ class RCSBPDB(Webserver):
         "notes",
     ]
 
-    SUPPORTED_PARAMS = {
+    SUPPORTED_PARAMS: ClassVar[set[str]] = {
         "keywords",
         "authors",
         "experimental_method",
@@ -215,9 +218,9 @@ class RCSBPDB(Webserver):
 
     def __init__(
         self,
-        url: Optional[str] = None,
-        identifiers: Optional[List[str]] = None,
-        params: Optional[Dict[str, Any]] = None,
+        url: str | None = None,
+        identifiers: builtins.list[str] | None = None,
+        params: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -242,21 +245,20 @@ class RCSBPDB(Webserver):
 
         self.session = self._create_session(retries=self.retries)
 
-        self.tables: Dict[str, List[Dict[str, Any]]] = {}
-        self.schemas: Dict[str, List[str]] = {
+        self.tables: dict[str, list[dict[str, Any]]] = {}
+        self.schemas: dict[str, list[str]] = {
             "datasets": self.DATASET_SCHEMA,
             "resources": self.RESOURCE_SCHEMA,
             "errors": self.ERROR_SCHEMA,
         }
 
-        self.raw_results: List[RCSBPDBResolution] = []
-        self.last_search_response: Optional[Dict[str, Any]] = None
+        self.raw_results: list[RCSBPDBResolution] = []
+        self.last_search_response: dict[str, Any] | None = None
         self._loaded = False
 
-        if self.validate_on_init:
-            if not self.validate_connection():
-                self._loaded = False
-                raise ConnectionError(self.validate_error_msg or "RCSBPDB connection validation failed.")
+        if self.validate_on_init and not self.validate_connection():
+            self._loaded = False
+            raise ConnectionError(self.validate_error_msg or "RCSBPDB connection validation failed.")
 
         if self.auto_load:
             try:
@@ -322,11 +324,11 @@ class RCSBPDB(Webserver):
             response.raise_for_status()
             return True
 
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             self.validate_error_msg = f"Unable to connect to RCSB Data API: {e}"
             return False
 
-    def _request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _request(self, endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Generic GET helper.
         """
@@ -343,7 +345,7 @@ class RCSBPDB(Webserver):
         except ValueError as exc:
             raise ValueError(f"RCSB response was not valid JSON: {endpoint}") from exc
 
-    def _post_json(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _post_json(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         """
         Generic POST helper.
         """
@@ -364,7 +366,7 @@ class RCSBPDB(Webserver):
     # Identifier helpers
     # ------------------------------------------------------------------
     @classmethod
-    def normalize_doi(cls, value: Any) -> Optional[str]:
+    def normalize_doi(cls, value: Any) -> str | None:
         if value is None:
             return None
 
@@ -379,7 +381,7 @@ class RCSBPDB(Webserver):
         return match.group(1).lower().rstrip(" .;,)") if match else None
 
     @classmethod
-    def normalize_pdb_id(cls, value: Any) -> Optional[str]:
+    def normalize_pdb_id(cls, value: Any) -> str | None:
         if value is None:
             return None
 
@@ -402,12 +404,12 @@ class RCSBPDB(Webserver):
         return "other"
 
     @classmethod
-    def extract_pdb_id_from_doi(cls, doi: str) -> Optional[str]:
+    def extract_pdb_id_from_doi(cls, doi: str) -> str | None:
         match = cls.RCSBPDB_DOI_REGEX.search(doi)
         return match.group(1).upper() if match else None
 
     @staticmethod
-    def get_file_ext(name_or_url: Optional[str]) -> Optional[str]:
+    def get_file_ext(name_or_url: str | None) -> str | None:
         if not isinstance(name_or_url, str) or "." not in name_or_url:
             return None
 
@@ -420,7 +422,7 @@ class RCSBPDB(Webserver):
         return parts[-1]
 
     @staticmethod
-    def classify_usability(exts: Iterable[Optional[str]]) -> str:
+    def classify_usability(exts: Iterable[str | None]) -> str:
         """
         Classify resource usability based on file extensions.
         """
@@ -444,7 +446,7 @@ class RCSBPDB(Webserver):
     # ------------------------------------------------------------------
     # Query-driven Search API support
     # ------------------------------------------------------------------
-    def _extract_identifiers_from_params(self, params: Dict[str, Any]) -> List[str]:
+    def _extract_identifiers_from_params(self, params: dict[str, Any]) -> builtins.list[str]:
         """
         Extract DOI/PDB identifiers from params and normalize aliases.
 
@@ -453,7 +455,7 @@ class RCSBPDB(Webserver):
         - pdb_id, pdbID, pdbId, PDB_ID, pdbid, PDBID
         - doi, DOI
         """
-        identifiers: List[str] = []
+        identifiers: list[str] = []
 
         for key in ("identifiers",):
             value = params.get(key)
@@ -481,7 +483,7 @@ class RCSBPDB(Webserver):
 
         return list(dict.fromkeys(identifiers))
     
-    def _load_from_params(self, params: Dict[str, Any]) -> None:
+    def _load_from_params(self, params: dict[str, Any]) -> None:
         self._validate_params(params)
 
         identifiers = self._extract_identifiers_from_params(params)
@@ -503,7 +505,7 @@ class RCSBPDB(Webserver):
         ]
         self.process_artifacts()
 
-    def _search_rcsb(self, params: Dict[str, Any]) -> List[str]:
+    def _search_rcsb(self, params: dict[str, Any]) -> builtins.list[str]:
         """
         Search RCSB and return PDB IDs.
         """
@@ -543,7 +545,7 @@ class RCSBPDB(Webserver):
 
         return list(dict.fromkeys(identifiers))
 
-    def _validate_params(self, params: Dict[str, Any]) -> None:
+    def _validate_params(self, params: dict[str, Any]) -> None:
         unsupported = set(params.keys()) - self.SUPPORTED_PARAMS
         if unsupported:
             raise ValueError(
@@ -551,8 +553,8 @@ class RCSBPDB(Webserver):
                 f"Supported params: {sorted(self.SUPPORTED_PARAMS)}"
             )
 
-    def _build_search_query(self, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        nodes: List[Dict[str, Any]] = []
+    def _build_search_query(self, params: dict[str, Any]) -> dict[str, Any] | None:
+        nodes: list[dict[str, Any]] = []
 
         keywords = params.get("keywords")
         if keywords:
@@ -610,7 +612,7 @@ class RCSBPDB(Webserver):
     def lookup_identifier(
         self,
         identifier: str,
-        query_source: Optional[str] = None,
+        query_source: str | None = None,
     ) -> RCSBPDBResolution:
         kind = self.classify_identifier(identifier)
 
@@ -668,7 +670,7 @@ class RCSBPDB(Webserver):
 
             return exists, status_code, content_type
 
-        except Exception:
+        except Exception: # noqa: BLE001
             return None, None, None
 
     def _make_resource(
@@ -679,7 +681,7 @@ class RCSBPDB(Webserver):
         extension: str,
         source: str,
         format_hint: str,
-    ) -> Optional[FileResource]:
+    ) -> FileResource | None:
         exists = None
         status_code = None
         content_type = None
@@ -701,7 +703,7 @@ class RCSBPDB(Webserver):
             content_type=content_type,
         )
 
-    def _build_file_resources(self, pdb_id: str, meta: Dict[str, Any]) -> List[FileResource]:
+    def _build_file_resources(self, pdb_id: str, meta: dict[str, Any]) -> builtins.list[FileResource]:
         pdb_id_upper = pdb_id.upper()
         pdb_id_lower = pdb_id.lower()
 
@@ -844,10 +846,10 @@ class RCSBPDB(Webserver):
 
     def lookup_rcsbpdb(
         self,
-        pdb_id: Optional[str],
+        pdb_id: str | None,
         original_identifier: str,
-        doi: Optional[str] = None,
-        query_source: Optional[str] = None,
+        doi: str | None = None,
+        query_source: str | None = None,
     ) -> RCSBPDBResolution:
         result = RCSBPDBResolution(
             original_identifier=original_identifier,
@@ -901,12 +903,12 @@ class RCSBPDB(Webserver):
 
         except requests.RequestException as exc:
             result.status = "request_failed"
-            result.notes.append(f"rcsbpdb request error: {str(exc)}")
+            result.notes.append(f"rcsbpdb request error: {exc!s}")
             return result
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             result.status = "parse_failed"
-            result.notes.append(f"rcsbpdb parsing error: {str(exc)}")
+            result.notes.append(f"rcsbpdb parsing error: {exc!s}")
             return result
 
     # ------------------------------------------------------------------
@@ -919,10 +921,10 @@ class RCSBPDB(Webserver):
         ]
         self.process_artifacts()
 
-    def _extract_tables(self, results: List[RCSBPDBResolution]) -> Dict[str, List[Dict[str, Any]]]:
-        datasets: List[Dict[str, Any]] = []
-        resources: List[Dict[str, Any]] = []
-        errors: List[Dict[str, Any]] = []
+    def _extract_tables(self, results: builtins.list[RCSBPDBResolution]) -> dict[str, builtins.list[dict[str, Any]]]:
+        datasets: list[dict[str, Any]] = []
+        resources: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
 
         for res in results:
             if res.status != "ok":
@@ -980,10 +982,10 @@ class RCSBPDB(Webserver):
             "errors": self._apply_schema(errors, self.ERROR_SCHEMA),
         }
 
-    def _apply_schema(self, rows: List[Dict[str, Any]], schema: List[str]) -> List[Dict[str, Any]]:
+    def _apply_schema(self, rows: builtins.list[dict[str, Any]], schema: builtins.list[str]) -> builtins.list[dict[str, Any]]:
         return [{column: row.get(column) for column in schema} for row in rows]
 
-    def _rows_to_table(self, rows: List[Dict[str, Any]], schema: List[str]):
+    def _rows_to_table(self, rows: builtins.list[dict[str, Any]], schema: builtins.list[str]):
         table = OrderedDict()
 
         for column in schema:
@@ -991,7 +993,7 @@ class RCSBPDB(Webserver):
 
         return table
 
-    def _resolve_table_name(self, table_name: Optional[str]) -> Optional[str]:
+    def _resolve_table_name(self, table_name: str | None) -> str | None:
         if table_name is None:
             return None
 
@@ -1016,7 +1018,7 @@ class RCSBPDB(Webserver):
             return str(value)
 
     @staticmethod
-    def _extract_experimental_method(raw_metadata: Dict[str, Any]) -> Optional[str]:
+    def _extract_experimental_method(raw_metadata: dict[str, Any]) -> str | None:
         methods = raw_metadata.get("experimental_methods", [])
         extracted = []
 
@@ -1027,17 +1029,17 @@ class RCSBPDB(Webserver):
         return " | ".join(extracted) if extracted else None
 
     @staticmethod
-    def _extract_release_date(raw_metadata: Dict[str, Any]) -> Optional[str]:
+    def _extract_release_date(raw_metadata: dict[str, Any]) -> str | None:
         accession_info = raw_metadata.get("rcsb_accession_info", {})
         return accession_info.get("initial_release_date") if isinstance(accession_info, dict) else None
 
     @staticmethod
-    def _extract_revision_date(raw_metadata: Dict[str, Any]) -> Optional[str]:
+    def _extract_revision_date(raw_metadata: dict[str, Any]) -> str | None:
         accession_info = raw_metadata.get("rcsb_accession_info", {})
         return accession_info.get("revision_date") if isinstance(accession_info, dict) else None
 
     @staticmethod
-    def _extract_doi(raw_metadata: Dict[str, Any]) -> Optional[str]:
+    def _extract_doi(raw_metadata: dict[str, Any]) -> str | None:
         full_metadata = raw_metadata.get("full_metadata", {})
 
         citation = full_metadata.get("rcsb_primary_citation", {})
@@ -1057,7 +1059,7 @@ class RCSBPDB(Webserver):
         return None
 
     @staticmethod
-    def _extract_description(raw_metadata: Dict[str, Any]) -> Optional[str]:
+    def _extract_description(raw_metadata: dict[str, Any]) -> str | None:
         full_metadata = raw_metadata.get("full_metadata", {})
 
         struct_keywords = full_metadata.get("struct_keywords", {})
@@ -1104,51 +1106,103 @@ class RCSBPDB(Webserver):
 
         return None
 
+    def _apply_pandas_filter(self, df, column, operator, value):
+        """Apply comparison filter using pandas."""
+        if operator == ">":
+            return df[df[column] > value]
+        if operator == "<":
+            return df[df[column] < value]
+        if operator == ">=":
+            return df[df[column] >= value]
+        if operator == "<=":
+            return df[df[column] <= value]
+        if operator == "==":
+            return df[df[column] == value]
+        if operator == "!=":
+            return df[df[column] != value]
+        if operator == "contains":
+            return df[
+                df[column].astype(str).str.contains(
+                    str(value),
+                    case=False,
+                    na=False,
+                )
+            ]
+        if operator == "range":
+            min_val, max_val = value
+            return df[(df[column] >= min_val) & (df[column] <= max_val)]
 
-    def _evaluate_find_condition(self, series, op: str, target_value: str):
-        if op in {"~", "~~"}:
-            return series.fillna("").astype(str).str.contains(
-                str(target_value),
-                case=False,
-                na=False,
-            )
+        return pd.DataFrame()
 
-        numeric_series = pd.to_numeric(series, errors="coerce")
-        numeric_target = pd.to_numeric(pd.Series([target_value]), errors="coerce").iloc[0]
 
-        use_numeric = pd.notna(numeric_target) and numeric_series.notna().any()
+    def _parse_relation(self, relation):
+        """
+        Parse relation string into operator and value.
 
-        if use_numeric and op in {">", "<", ">=", "<=", "=", "==", "!="}:
-            comparisons = {
-                ">": numeric_series > numeric_target,
-                "<": numeric_series < numeric_target,
-                ">=": numeric_series >= numeric_target,
-                "<=": numeric_series <= numeric_target,
-                "=": numeric_series == numeric_target,
-                "==": numeric_series == numeric_target,
-                "!=": numeric_series != numeric_target,
-            }
-            return comparisons[op].fillna(False)
+        Examples:
+        '> 5' -> ('>', 5)
+        '<= 10' -> ('<=', 10)
+        '== 3' -> ('==', 3)
+        "(2, 5)" -> ('range', (2, 5))
+        "~~ 'climate'" -> ('contains', 'climate')
+        """
+        relation = relation.strip()
 
-        string_series = series.fillna("").astype(str)
-        target = str(target_value)
+        if relation.startswith(">="):
+            return ">=", self._parse_value(relation[2:])
+        if relation.startswith("<="):
+            return "<=", self._parse_value(relation[2:])
+        if relation.startswith("=="):
+            return "==", self._parse_value(relation[2:])
+        if relation.startswith("!="):
+            return "!=", self._parse_value(relation[2:])
+        if relation.startswith("~~"):
+            return "contains", self._parse_value(relation[2:])
 
-        if op in {"=", "=="}:
-            return string_series.str.lower() == target.lower()
+        if relation.startswith(">"):
+            return ">", self._parse_value(relation[1:])
+        if relation.startswith("<"):
+            return "<", self._parse_value(relation[1:])
+        if relation.startswith("="):
+            return "==", self._parse_value(relation[1:])
+        if relation.startswith("~"):
+            return "contains", self._parse_value(relation[1:])
 
-        if op == "!=":
-            return string_series.str.lower() != target.lower()
+        if relation.startswith("(") and relation.endswith(")"):
+            parts = relation[1:-1].split(",")
+            if len(parts) == 2:
+                return "range", (
+                    self._parse_value(parts[0]),
+                    self._parse_value(parts[1]),
+                )
 
-        print(
-            f"find() operator '{op}' is not valid for non-numeric values "
-            f"in this query."
-        )
-        return pd.Series([False] * len(series), index=series.index)
+        raise ValueError(f"Unknown relation format: {relation}")
+
+
+    def _parse_value(self, value_str):
+        """Convert string to appropriate Python type."""
+        value_str = str(value_str).strip()
+
+        if (
+            value_str.startswith("'")
+            and value_str.endswith("'")
+        ) or (
+            value_str.startswith('"')
+            and value_str.endswith('"')
+        ):
+            value_str = value_str[1:-1]
+
+        try:
+            if "." not in value_str:
+                return int(value_str)
+            return float(value_str)
+        except ValueError:
+            return value_str
 
     def get_tables(self):
         return self.tables
 
-    def get_schema(self, table_name: Optional[str] = None):
+    def get_schema(self, table_name: str | None = None):
         if table_name is None:
             return self.schemas
         resolved = self._resolve_table_name(table_name)
@@ -1203,7 +1257,7 @@ class RCSBPDB(Webserver):
                     is_valid = 200 <= status_code < 400
                     response.close()
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 error = str(exc)
 
             results.append(
@@ -1249,249 +1303,219 @@ class RCSBPDB(Webserver):
         self._loaded = True
         return self.tables
 
-    def search(
-        self,
-        query_object,
-        table_name=None,
-        columns=None,
-        include_raw_metadata=False,
-        collection=False,
-        **kwargs,
-    ):
-        """
-        Search loaded table rows for a value.
-
-        search() is row-based. It scans the actual loaded table data and
-        returns rows where the search value appears in any searchable column.
-
-        This is different from find(), which is column-condition based.
-
-        Examples
-        --------
-        dsi.search("X-RAY")
-        dsi.search("4HHB")
-        dsi.search("pdf.gz")
-        dsi.search("hemoglobin", table_name="datasets")
-        """
-        search_value = str(query_object).strip()
-
-        if not search_value:
-            print("search() requires a non-empty search value.")
-            return []
-
-        if table_name is not None:
-            resolved_table = self._resolve_table_name(table_name)
-
-            if resolved_table not in self.tables:
-                print(
-                    f"search() could not find table '{table_name}'. "
-                    f"Available tables: {self.list(True)}"
-                )
-                return []
-
-            table_names = [resolved_table]
-        else:
-            table_names = self.list(True)
-
-        matches: List[ValueObject] = []
-
-        for current_table_name in table_names:
-            df = self.get_table(current_table_name)
-
-            if df.empty:
-                continue
-
-            if columns is not None:
-                search_columns = [col for col in columns if col in df.columns]
-            else:
-                search_columns = list(df.columns)
-
-            if not include_raw_metadata:
-                search_columns = [
-                    col
-                    for col in search_columns
-                    if col not in {"raw_metadata", "endpoint_variables"}
-                ]
-
-            if not search_columns:
-                continue
-
-            for row_num, row in df.iterrows():
-                row_values = row[search_columns]
-
-                found = row_values.astype(str).str.contains(
-                    search_value,
-                    case=False,
-                    na=False,
-                    regex=False,
-                ).any()
-
-                if not found:
-                    continue
-
-                display_row = row.drop(
-                    labels=[
-                        col
-                        for col in ["raw_metadata", "endpoint_variables"]
-                        if col in row.index
-                    ],
-                    errors="ignore",
-                )
-
-                vo = ValueObject()
-                vo.t_name = current_table_name
-                vo.c_name = list(display_row.index)
-                vo.row_num = row_num
-                vo.value = display_row.tolist()
-                vo.type = "row"
-                matches.append(vo)
-
-        if collection:
-            return matches
-
-        if not matches:
-            print(f"No matches found for search value: {search_value}")
-            return []
-
-        for match in matches:
-            print(f"\nTable: {match.t_name}")
-            print(f"- Columns: {match.c_name}")
-            print(f"- Row Number: {match.row_num}")
-            print(f"- Data: {match.value}")
-
-        return matches
-
     def find(self, query_object, **kwargs):
         """
-        Find rows across loaded tables using a simple column-level condition.
+        Searches for all instances of query_object across all loaded tables.
 
-        Supported examples:
-        - resource_count > 8
-        - experimental_method = SOLUTION NMR
-        - format = pdb.gz
-        - title ~ genomics
+        Searches at the table, column, and cell levels.
         """
-        query = str(query_object).strip()
+        query_str = str(query_object).lower()
 
-        if not query:
-            print("find() requires a non-empty query string.")
-            return []
-
-        parsed = self._parse_find_query(query)
-
-        if parsed is None:
-            print(
-                "find() could not parse the query. Use format: "
-                "'column operator value', for example 'resource_count > 8' "
-                "or 'format = pdb.gz'."
-            )
-            return []
-
-        column_name, op, target_value = parsed
-        matches: List[ValueObject] = []
-
-        for table_name in self.list(True):
-            df = self.get_table(table_name)
-
-            if df.empty or column_name not in df.columns:
-                continue
-
-            mask = self._evaluate_find_condition(df[column_name], op, target_value)
-
-            for row_num in df[mask].index:
-                vo = ValueObject()
-                vo.t_name = table_name
-                vo.c_name = list(df.columns)
-                row_dict = df.loc[row_num].to_dict()
-                row_dict.pop("raw_metadata", None)
-
-                vo.c_name = list(row_dict.keys())
-                vo.value = row_dict
-                vo.type = "row"
-                matches.append(vo)
-
-        if not matches:
-            print(f"No matches found for query: {query}")
-
-        return matches
+        return (
+            self.find_table(query_str)
+            + self.find_column(query_str)
+            + self.find_cell(query_object)
+        )
 
     def find_table(self, query_object, **kwargs):
-        needle = str(query_object).lower()
-        matches: List[ValueObject] = []
+        if not isinstance(query_object, str):
+            raise TypeError("find_table() ERROR: query_object must be a string")
 
-        for table_name in self.tables:
-            if needle in table_name.lower():
-                vo = ValueObject()
-                vo.t_name = table_name
-                vo.value = table_name
-                vo.type = "table"
-                matches.append(vo)
+        matches = []
+
+        for table_name, table_data in self.tables.items():
+            if query_object in table_name.lower():
+                val = ValueObject()
+                val.t_name = table_name
+                val.c_name = list(table_data.keys())
+                val.value = table_data
+                val.type = "table"
+
+                matches.append(val)
 
         return matches
 
     def find_column(self, query_object, **kwargs):
-        needle = str(query_object).lower()
-        matches: List[ValueObject] = []
+        if not isinstance(query_object, str):
+            raise TypeError("find_column() ERROR: query_object must be a string")
 
-        for table_name, columns in self.schemas.items():
-            for col_name in columns:
-                if needle in col_name.lower():
-                    vo = ValueObject()
-                    vo.t_name = table_name
-                    vo.c_name = [col_name]
-                    vo.value = col_name
-                    vo.type = "column"
-                    matches.append(vo)
+        matches = []
+
+        for table_name, table_data in self.tables.items():
+            for col_name, col_data in table_data.items():
+                if query_object in col_name.lower():
+                    val = ValueObject()
+                    val.t_name = table_name
+                    val.c_name = [col_name]
+                    val.value = col_data
+                    val.type = "column"
+
+                    matches.append(val)
 
         return matches
 
     def find_cell(self, query_object, **kwargs):
         """
-        Alias for find() to support DSI cell-style lookup calls.
+        Finds all cells that match the given query_object.
+
+        Matching behavior:
+        - Exact match for all data types
+        - Case-insensitive partial match for strings
+        - String representation match for complex objects
         """
-        return self.find(query_object, **kwargs)
+        matches = []
+
+        is_str_query = isinstance(query_object, str)
+        query_lower = query_object.lower() if is_str_query else None
+
+        for table_name, table_data in self.tables.items():
+            if not table_data:
+                continue
+
+            cols = list(table_data.keys())
+            df = pd.DataFrame(table_data)
+
+            for row_idx, row in df.iterrows():
+                for col in cols:
+                    cell = row[col]
+                    match = False
+
+                    if (
+                        (pd.isna(cell) and pd.isna(query_object))
+                        or query_object == cell
+                        or (
+                            is_str_query
+                            and isinstance(cell, str)
+                            and query_lower in cell.lower()
+                        )
+                    ):
+                        match = True
+
+                    elif is_str_query and isinstance(cell, (dict, list, tuple)):
+                        cell_str = str(cell).lower()
+                        if query_lower in cell_str:
+                            match = True
+
+                    if match:
+                        val = ValueObject()
+                        val.t_name = table_name
+                        val.c_name = cols
+                        val.row_num = row_idx
+                        val.value = row.tolist()
+                        val.type = "cell"
+
+                        matches.append(val)
+
+        return matches
 
     def find_relation(self, query, relation=None, **kwargs):
         """
-        Supports DSI find-style calls and RCSBPDB API-backed lookup/search.
+        Supports both NDP-style condition queries and RCSBPDB API-backed lookup/search.
 
-        DSI wrapper may call this as:
+        Examples:
             find_relation("resource_count", "> 8")
-
-        Direct backend use may call:
+            find_relation("dataset_id", "= 1CBS")
+            find_relation("title", "~~ structure")
             find_relation("resource_count > 8")
-            find_relation({"keywords": "genomics", "limit": 5})
             find_relation("1CBS")
+            find_relation("10.2210/pdb1cbs/pdb")
+            find_relation("hemoglobin", limit=2)
+            find_relation({"keywords": "hemoglobin", "limit": 2})
+            find_relation(["1CBS", "4HHB"])
         """
         if query is None:
             return self.tables
 
         try:
-            # DSI wrapper path: dsi.find("resource_count > 8")
-            # may arrive here as query="resource_count", relation="> 8"
+            # find_relation("dataset_id", "= 1CBS")
             if relation is not None:
-                condition = f"{query} {relation}".strip()
+                operator, value = self._parse_relation(relation)
+                matches = []
 
-                if self._parse_find_query(condition) is not None:
-                    return self.find(condition)
+                for table_name in self.list(collection=True):
+                    df = self.get_table(table_name, dict_return=False)
 
-                print(
-                    "find_relation() could not parse the condition. "
-                    "Use format like 'resource_count > 8' or 'format = pdb.gz'."
-                )
-                return []
+                    if df.empty or query not in df.columns:
+                        continue
 
-            # Direct condition string path
-            if isinstance(query, str) and self._parse_find_query(query) is not None:
-                return self.find(query)
+                    if operator in {">", "<", ">=", "<=", "range"}:
+                        df[query] = pd.to_numeric(df[query], errors="coerce")
+                        df = df.dropna(subset=[query])
 
-            # API-backed query path
+                    filtered = self._apply_pandas_filter(df, query, operator, value)
+
+                    for idx, row in filtered.iterrows():
+                        vo = ValueObject()
+                        vo.t_name = table_name
+                        vo.c_name = list(df.columns)
+                        vo.row_num = int(idx) + 1
+                        vo.value = row.tolist()
+                        vo.type = "cell"
+                        matches.append(vo)
+
+                return matches
+
+            # One-string condition:
+            # find_relation("dataset_id = 1CBS")
+            if isinstance(query, str):
+                parsed = self._parse_find_query(query)
+
+                if parsed is not None:
+                    column_name, op, target_value = parsed
+                    operator, value = self._parse_relation(f"{op} {target_value}")
+                    matches = []
+
+                    for table_name in self.list(collection=True):
+                        df = self.get_table(table_name, dict_return=False)
+
+                        if df.empty or column_name not in df.columns:
+                            continue
+
+                        if operator in {">", "<", ">=", "<=", "range"}:
+                            df[column_name] = pd.to_numeric(
+                                df[column_name],
+                                errors="coerce",
+                            )
+                            df = df.dropna(subset=[column_name])
+
+                        filtered = self._apply_pandas_filter(
+                            df,
+                            column_name,
+                            operator,
+                            value,
+                        )
+
+                        for idx, row in filtered.iterrows():
+                            vo = ValueObject()
+                            vo.t_name = table_name
+                            vo.c_name = list(df.columns)
+                            vo.row_num = int(idx) + 1
+                            vo.value = row.tolist()
+                            vo.type = "cell"
+                            matches.append(vo)
+
+                    return matches
+
+            # API-backed query path:
+            # find_relation({"keywords": "hemoglobin", "limit": 2})
             if isinstance(query, dict):
                 self.params = query
                 self._load_from_params(query)
                 self._loaded = True
                 return self.tables
 
+            # API-backed list path:
+            # find_relation(["1CBS", "4HHB"])
+            if isinstance(query, list):
+                self.identifiers = query
+                self._load_initial_data()
+                self._loaded = True
+                return self.tables
+
+            # API-backed string path:
+            # find_relation("1CBS")
+            # find_relation("10.2210/pdb1cbs/pdb")
+            # find_relation("hemoglobin", limit=2)
             if isinstance(query, str):
                 kind = self.classify_identifier(query)
 
@@ -1504,12 +1528,6 @@ class RCSBPDB(Webserver):
                     self.params = query_params
                     self._load_from_params(self.params)
 
-                self._loaded = True
-                return self.tables
-
-            if isinstance(query, list):
-                self.identifiers = query
-                self._load_initial_data()
                 self._loaded = True
                 return self.tables
 
