@@ -549,7 +549,7 @@ class Sync:
                 raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
 
             try:
-                base_cmd = conduit_cmd.extend(['cp','-r'])
+                base_cmd = [*conduit_cmd, 'cp','-r']
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + self.remote_location)
