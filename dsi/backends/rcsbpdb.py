@@ -324,7 +324,7 @@ class RCSBPDB(Webserver):
             response.raise_for_status()
             return True
 
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             self.validate_error_msg = f"Unable to connect to RCSB Data API: {e}"
             return False
 
@@ -670,7 +670,7 @@ class RCSBPDB(Webserver):
 
             return exists, status_code, content_type
 
-        except Exception:
+        except Exception: # noqa: BLE001
             return None, None, None
 
     def _make_resource(
@@ -906,7 +906,7 @@ class RCSBPDB(Webserver):
             result.notes.append(f"rcsbpdb request error: {exc!s}")
             return result
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             result.status = "parse_failed"
             result.notes.append(f"rcsbpdb parsing error: {exc!s}")
             return result
@@ -1257,7 +1257,7 @@ class RCSBPDB(Webserver):
                     is_valid = 200 <= status_code < 400
                     response.close()
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 error = str(exc)
 
             results.append(
