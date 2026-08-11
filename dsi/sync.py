@@ -306,18 +306,18 @@ class Sync:
 
         return metadata
 
-    def execute_cmd(self, cmd, cmd_name, timeout=None):
+    def execute_cmd(self, cmd, cmd_name, timer = False):
         """Internal helper for Sync to call executable actions"""
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='latin-1')
 
-        try:
-            stdout, stderr = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = process.communicate()
+        if timer:
+            start = time.time()
+            while process.poll() is None:
+                elapsed = int(time.time() - start)
+                print(f"\rRunning... {elapsed}s elapsed", end="", flush=True)
+                time.sleep(10)
 
-            raise RuntimeError(f"{cmd_name} timed out after {timeout} seconds.") from None
-
+        stdout, stderr = process.communicate()
         if process.returncode != 0:
             if "too many authentication failures" in str(stderr).lower():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
@@ -332,7 +332,7 @@ class Sync:
         """Change group permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
             cmd = ["chgrp", "-R", user_group, local_loc]
-            self.execute_cmd(cmd, "changing user group for data")
+            self.execute_cmd(cmd, "changing user group for data", True)
 
             cmd = ["chgrp", user_group, self.full_db_name]
             self.execute_cmd(cmd, "changing user group for database")
@@ -344,7 +344,7 @@ class Sync:
         """Change read permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
             cmd = ["chmod", "-R", "750", local_loc] # 770 to make read/write to all. 750 to make read to all
-            self.execute_cmd(cmd, "changing read permissions for data")
+            self.execute_cmd(cmd, "changing read permissions for data", True)
 
             cmd = ["chmod", "750", self.full_db_name]
             self.execute_cmd(cmd, "changing read permissions for database")
@@ -526,40 +526,27 @@ class Sync:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
 
-            try:
-                result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True, timeout=10)
-            except subprocess.TimeoutExpired:
-                raise RuntimeError("Conduit check timed out. Please try again.") from None
-            
+            result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
             if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
             try:
-                result = subprocess.run(["bash", "-lc", "type conduit"], capture_output=True, text=True, timeout=10)
+                result = subprocess.run(["bash", "-lc", "type conduit"], capture_output=True, text=True)
                 conduit_cmd = str(result.stdout).split()
                 for idx, s in enumerate(conduit_cmd):
                     if "/" in s:
                         conduit_cmd = conduit_cmd[idx:idx+3]
                         break
-            except subprocess.TimeoutExpired:
-                raise RuntimeError("Checking for Conduit timed out") from None
             except Exception as e:
-                raise ValueError("Conduit not available in this environment: " + str(e))
+                raise RuntimeError("Conduit not available in this environment: " + str(e)) from None
 
             if self.verbose:
                 print("Testing Conduit: conduit get")
             cmd = [*conduit_cmd, "get"]
             try:
-                stdout = self.execute_cmd(cmd, "Testing conduit get", timeout=10)
-            except RuntimeError as exc:
-                if "timed out" in str(exc):
-                    raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
-                raise
-
-            if "TRANSFER_ID" in stdout and self.verbose:
-                print(" Conduit is authenticated.")
-            elif "TRANSFER_ID" not in stdout:
-                raise RuntimeError("Conduit Error: " + str(stdout))
+                result = subprocess.run(cmd, timeout=10)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
 
             try:
                 base_cmd = conduit_cmd.extend(['cp','-r'])
