@@ -48,7 +48,7 @@ gh-pages: _build/html
 	git remote add origin https://github.com/lanl/dsi.git && \
 	git push -f origin gh-pages && \
 	rm -rf .git && \
-	rm -r images/cli_output.txt
+	rm images/cli_output.txt
 
 # # Push to external docs site
 # publish:

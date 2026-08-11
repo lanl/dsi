@@ -3,64 +3,63 @@ RCSBPDB Webserver Backend for DSI
 
 Read-only metadata-first backend that retrieves rcsb pdb metadata
 and exposes it as in-memory DSI tables.
-
-Access modes
-------------
-1. Identifier-driven mode
-   - DOI input, e.g. "10.2210/pdb1cbs/pdb"
-   - PDB ID input, e.g. "1CBS"
-
-2. Query-driven mode, closer to NDP
-   - params={"keywords": "hemoglobin", "limit": 5}
-   - find_relation({"keywords": "hemoglobin", "limit": 5})
-   - find_relation("hemoglobin")
-
-DOI behavior
-------------
-RCSB-style DOI input is supported through identifiers or params.
-Only DOIs of the form 10.2210/pdbXXXX/pdb are converted directly into PDB IDs.
-General publication DOI search is not currently supported.
-
-REST flow
----------
-RCSB Search API -> PDB IDs -> RCSB Data API -> normalized DSI tables
-
-Tables
-------
-- datasets
-- resources
-- errors
-
-Tier mapping
-------------
-self.tables["datasets"] = Tier 1 datasets
-self.tables["resources"] = Tier 2 normalized resources
-self.tables["errors"] = failed/skipped lookups
-
-Current scope
--------------
-- Metadata-first
-- Read-only
-- REST APIs only
-- Exposes mmCIF download URLs
-- Does not parse raw mmCIF content yet
-
-identifiers
-→ __init__()
-→ _load_initial_data()
-→ lookup_identifier()
-→ lookup_rcsbpdb()
-→ _request()
-→ GET https://data.rcsb.org/rest/v1/core/entry/{pdb_id}
-
-params
-→ __init__()
-→ _load_from_params()
-→ _search_rcsb()
-→ _build_search_query()
-→ _post_json()
-→ POST https://search.rcsb.org/rcsbsearch/v2/query
 """
+# Access modes
+# ------------
+# 1. Identifier-driven mode
+#    - DOI input, e.g. "10.2210/pdb1cbs/pdb"
+#    - PDB ID input, e.g. "1CBS"
+
+# 2. Query-driven mode, closer to NDP
+#    - params={"keywords": "hemoglobin", "limit": 5}
+#    - find_relation({"keywords": "hemoglobin", "limit": 5})
+#    - find_relation("hemoglobin")
+
+# DOI behavior
+# ------------
+# RCSB-style DOI input is supported through identifiers or params.
+# Only DOIs of the form 10.2210/pdbXXXX/pdb are converted directly into PDB IDs.
+# General publication DOI search is not currently supported.
+
+# REST flow
+# ---------
+# RCSB Search API -> PDB IDs -> RCSB Data API -> normalized DSI tables
+
+# Tables
+# ------
+# - datasets
+# - resources
+# - errors
+
+# Tier mapping
+# ------------
+# self.tables["datasets"] = Tier 1 datasets
+# self.tables["resources"] = Tier 2 normalized resources
+# self.tables["errors"] = failed/skipped lookups
+
+# Current scope
+# -------------
+# - Metadata-first
+# - Read-only
+# - REST APIs only
+# - Exposes mmCIF download URLs
+# - Does not parse raw mmCIF content yet
+
+# identifiers
+# → __init__()
+# → _load_initial_data()
+# → lookup_identifier()
+# → lookup_rcsbpdb()
+# → _request()
+# → GET https://data.rcsb.org/rest/v1/core/entry/{pdb_id}
+
+# params
+# → __init__()
+# → _load_from_params()
+# → _search_rcsb()
+# → _build_search_query()
+# → _post_json()
+# → POST https://search.rcsb.org/rcsbsearch/v2/query
 
 
 from __future__ import annotations
