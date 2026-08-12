@@ -3,6 +3,7 @@ from dsi.backends.ndp import NDP
 from dsi.backends.osti import OSTI
 from dsi.backends.rcsbpdb import RCSBPDB
 from dsi.backends.oceans11 import Oceans11
+from dsi.backends.zenodo import Zenodo
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -18,6 +19,8 @@ import inspect
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+from urllib3.exceptions import InsecureRequestWarning
+warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +48,12 @@ class DSI:
                 - If backend_name = "OSTI" → No filename input (read-only backend)
                 - If backend_name = "RCSBPDB" → No filename input (read-only backend)
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
+                - If backend_name = "Zenodo" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate.
 
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", or "RCSBPDB".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo" or "RCSBPDB".
 
             If using an external backend, provide the relative path to the Python module with the backend.
         """
@@ -123,7 +127,7 @@ class DSI:
             backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
             if backend_module is None:
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo")
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
@@ -132,7 +136,7 @@ class DSI:
             except AttributeError:
                 raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
             
-            # Handle in-memory backends (NDP, OSTI, Oceans11)
+            # Handle in-memory backends (NDP, OSTI, Oceans11, RCSBPDB, Zenodo)
             if self.read_only_flag:
                 self.database_name = None
 
@@ -164,8 +168,11 @@ class DSI:
                 elif backend_name.lower() == "rcsbpdb":
                     backend_name = "RCSBPDB"
                     query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "zenodo":
+                    backend_name = "Zenodo"
+                    query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB and Oceans11")
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo and Oceans11")
                 
                 try:
                     # Pass query params as 'params' argument
@@ -250,6 +257,9 @@ class DSI:
         n = Oceans11(only_validate=True)
         if n.validate_connection(only_validate=True):
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
+        n = Zenodo(only_validate=True)
+        if n.validate_connection():
+            print("Zenodo : Read-only metadata backend for discovering and querying public Zenodo records.")
         print()
 
 

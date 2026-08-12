@@ -2,13 +2,18 @@
 Example 5: Validate Zenodo file URLs and export tables to CSV.
 
 This example demonstrates:
+
 - loading Zenodo metadata
 - validating resource download URLs
 - exporting datasets/resources tables to CSV files
 
+This example may make extra HTTP HEAD/GET requests because validate_urls()
+checks each resource URL. The query limit is kept small for that reason.
+
 Output files:
-- examples/zenodo/zenodo_datasets_export.csv
-- examples/zenodo/zenodo_resources_export.csv
+
+- examples/backends/zenodo/zenodo_datasets_export.csv
+- examples/backends/zenodo/zenodo_resources_export.csv
 """
 
 import warnings
@@ -17,7 +22,6 @@ from pathlib import Path
 from urllib3.exceptions import InsecureRequestWarning
 
 from dsi.backends.zenodo import Zenodo
-
 
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
@@ -29,7 +33,9 @@ def section(title):
 
 
 def main():
-    output_dir = Path("examples/zenodo")
+    output_dir = Path("examples/backends/zenodo")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     datasets_out = output_dir / "zenodo_datasets_export.csv"
     resources_out = output_dir / "zenodo_resources_export.csv"
 
@@ -53,7 +59,20 @@ def main():
 
         section("Get updated resources table")
         resources = zenodo.get_table("resources")
-        print(resources[["resource_id", "name", "download_url", "url_valid"]].head())
+
+        if resources.empty:
+            print("No resources found.")
+        else:
+            print(
+                resources[
+                    [
+                        "resource_id",
+                        "name",
+                        "download_url",
+                        "url_valid",
+                    ]
+                ].head()
+            )
 
         section("Export datasets and resources")
         datasets = zenodo.get_table("datasets")

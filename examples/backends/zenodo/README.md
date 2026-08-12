@@ -18,7 +18,7 @@ Useful Zenodo resources:
 > **Note:** This backend is read-only. It retrieves and organizes public Zenodo metadata but does not create, update, delete, upload, or modify Zenodo records.
 
 <details>
-<summary><b>API Reference (for developers)</b></summary>
+<summary><b>API Reference</b></summary>
 
 The backend uses public Zenodo record endpoints:
 
@@ -39,9 +39,35 @@ The backend automatically builds request parameters from the user-provided `para
 
 ---
 
+## Current Integration Status
+
+The Zenodo backend currently works as a **direct backend**:
+
+```python
+from dsi.backends.zenodo import Zenodo
+```
+
+At this stage, Zenodo is **not yet exposed through the user-facing `DSI(backend_name="Zenodo")` wrapper** unless `dsi.py` and `core.py` are updated to include it.
+
+Use the direct backend examples in:
+
+```text
+examples/backends/zenodo/
+```
+
+Do not use:
+
+```python
+DSI(backend_name="Zenodo", ...)
+```
+
+until Zenodo is officially added to the supported DSI backend list.
+
+---
+
 ## Quick Start
 
-### Initialize the Backend Directly
+### Initialize the Backend
 
 ```python
 from dsi.backends.zenodo import Zenodo
@@ -52,41 +78,33 @@ zenodo = Zenodo(
 )
 ```
 
-### Initialize Through DSI
-
-```python
-from dsi.dsi import DSI
-
-dsi = DSI(
-    backend_name="Zenodo",
-    params={"keywords": "climate", "limit": 5},
-    verify_ssl=False
-)
-```
-
 ### List Available Tables
-
-```python
-dsi.list()
-```
-
-or with the backend directly:
 
 ```python
 zenodo.list()
 ```
 
-### Access a Table
+Example output:
 
-```python
-datasets_df = dsi.get_table("datasets", collection=True)
-resources_df = dsi.get_table("resources", collection=True)
-
-print(datasets_df)
-print(resources_df)
+```text
+datasets: (3 rows, 23 cols)
+resources: (22 rows, 14 cols)
 ```
 
-or with the backend directly:
+To return table names as a Python list:
+
+```python
+table_names = zenodo.list(collection=True)
+print(table_names)
+```
+
+Example output:
+
+```text
+['datasets', 'resources']
+```
+
+### Access Tables
 
 ```python
 datasets_df = zenodo.get_table("datasets")
@@ -99,13 +117,21 @@ print(resources_df)
 ### Close the Backend
 
 ```python
-dsi.close()
+zenodo.close()
 ```
 
-or:
+A context manager is also supported:
 
 ```python
-zenodo.close()
+from dsi.backends.zenodo import Zenodo
+
+with Zenodo(
+    params={"keywords": "climate", "limit": 5},
+    verify_ssl=False
+) as zenodo:
+    zenodo.list()
+    datasets = zenodo.get_table("datasets")
+    resources = zenodo.get_table("resources")
 ```
 
 ---
@@ -125,12 +151,12 @@ zenodo = Zenodo(
 )
 ```
 
-Equivalent DSI usage:
+Convenience constructor:
 
 ```python
-dsi = DSI(
-    backend_name="Zenodo",
-    params={"keywords": "climate", "limit": 10},
+zenodo = Zenodo(
+    keywords="climate",
+    limit=10,
     verify_ssl=False
 )
 ```
@@ -297,12 +323,12 @@ zenodo = Zenodo(
 
 ## Tables
 
-The backend returns two DSI tables:
+The backend returns exactly two DSI tables:
 
-1. **datasets** - Record-level Zenodo metadata, one row per Zenodo record.
-2. **resources** - File-level Zenodo metadata, one row per file attached to a Zenodo record.
+1. **`datasets`** - Record-level Zenodo metadata, one row per Zenodo record.
+2. **`resources`** - File-level Zenodo metadata, one row per file attached to a Zenodo record.
 
-The backend does not create an errors table.
+The backend does **not** create an errors table.
 
 ---
 
@@ -343,13 +369,6 @@ datasets_df = zenodo.get_table("datasets")
 print(datasets_df[["dataset_id", "doi", "title", "resource_count"]])
 ```
 
-With DSI:
-
-```python
-datasets_df = dsi.get_table("datasets", collection=True)
-print(datasets_df[["dataset_id", "doi", "title", "resource_count"]])
-```
-
 ---
 
 ## `resources` Table
@@ -379,13 +398,6 @@ Example:
 
 ```python
 resources_df = zenodo.get_table("resources")
-print(resources_df[["resource_id", "name", "format", "size", "download_url"]])
-```
-
-With DSI:
-
-```python
-resources_df = dsi.get_table("resources", collection=True)
 print(resources_df[["resource_id", "name", "format", "size", "download_url"]])
 ```
 
@@ -493,12 +505,12 @@ print(datasets_df[["title", "resource_count", "usability_label"]])
 
 ---
 
-## Common DSI Operations
+## Common Backend Operations
 
 ### List Tables
 
 ```python
-dsi.list()
+zenodo.list()
 ```
 
 Example output:
@@ -511,7 +523,7 @@ resources: (22 rows, 14 cols)
 ### Return Table Names
 
 ```python
-table_names = dsi.list(collection=True)
+table_names = zenodo.list(collection=True)
 print(table_names)
 ```
 
@@ -521,55 +533,82 @@ Example output:
 ['datasets', 'resources']
 ```
 
-### View Backend Summary
-
-```python
-dsi.summary()
-```
-
 ### Retrieve Tables
 
 ```python
-datasets_df = dsi.get_table("datasets", collection=True)
-resources_df = dsi.get_table("resources", collection=True)
+datasets_df = zenodo.get_table("datasets")
+resources_df = zenodo.get_table("resources")
+```
+
+### View Backend Summary
+
+```python
+summary = zenodo.summary()
+print(summary)
+```
+
+Single-table summary:
+
+```python
+summary = zenodo.summary("datasets")
+print(summary)
 ```
 
 ### Display Table Preview
 
 ```python
-dsi.display("datasets", num_rows=5)
-dsi.display("resources", num_rows=10)
+print(zenodo.display("datasets", num_rows=5))
+print(zenodo.display("resources", num_rows=10))
 ```
 
 Use `display_cols` to focus on specific columns:
 
 ```python
-dsi.display(
-    "datasets",
-    num_rows=5,
-    display_cols=["dataset_id", "doi", "title", "resource_count"]
+print(
+    zenodo.display(
+        "datasets",
+        num_rows=5,
+        display_cols=["dataset_id", "doi", "title", "resource_count"]
+    )
 )
 
-dsi.display(
-    "resources",
-    num_rows=10,
-    display_cols=["resource_id", "name", "format", "size", "download_url"]
+print(
+    zenodo.display(
+        "resources",
+        num_rows=10,
+        display_cols=["resource_id", "name", "format", "size", "download_url"]
+    )
 )
 ```
 
-### Search Loaded Metadata
+### Get Schema
 
 ```python
-dsi.search("Zenodo")
+schema = zenodo.get_schema()
+print(schema)
 ```
 
-`search()` searches across:
+Example output:
 
-- Table names
-- Column names
-- Cell values
+```text
+CREATE TABLE datasets (
+    dataset_id TEXT,
+    concept_record_id TEXT,
+    doi TEXT,
+    ...
+);
 
-### Filter Data Directly Through the Backend
+CREATE TABLE resources (
+    resource_id TEXT,
+    dataset_id TEXT,
+    source_repository TEXT,
+    ...
+);
+```
+
+---
+
+## Filtering Loaded Tables
 
 The Zenodo backend supports local pandas-style filtering through `query_artifacts()`.
 
@@ -588,26 +627,93 @@ resources_result = zenodo.query_artifacts(
     "size >= 0",
     dict_return=False
 )
+
+print(datasets_result)
+print(resources_result)
 ```
 
 > **Note:** `query_artifacts()` filters already-loaded DSI tables. It is not SQL.
 
-### Find Rows Directly Through the Backend
+---
+
+## Find Methods
+
+The Zenodo backend supports RCSBPDB-style find methods.
+
+### `find()`
+
+`find()` combines:
+
+- `find_table()`
+- `find_column()`
+- `find_cell()`
 
 ```python
-matches = zenodo.find_relation("resource_count", ">= '1'")
+matches = zenodo.find("doi")
+
+for match in matches:
+    print(match.to_dict())
+```
+
+### `find_table()`
+
+Search input across table names.
+
+```python
+matches = zenodo.find_table("data")
+
+for match in matches:
+    print(match.to_dict())
+```
+
+### `find_column()`
+
+Search input across column names.
+
+```python
+matches = zenodo.find_column("doi")
+
+for match in matches:
+    print(match.to_dict())
+```
+
+### `find_cell()`
+
+Search input across cell values and return matching rows as `ValueObject` instances.
+
+```python
+matches = zenodo.find_cell("Zenodo")
+
+for match in matches:
+    print(match.to_dict())
+```
+
+### `find_relation()`
+
+Filter rows using a column-level relation.
+
+Split-argument style:
+
+```python
+matches = zenodo.find_relation("resource_count", ">= 1")
+```
+
+One-string condition style:
+
+```python
+matches = zenodo.find_relation("resource_count >= 1")
 ```
 
 String contains search:
 
 ```python
-matches = zenodo.find_relation("title", "~ 'climate'")
+matches = zenodo.find_relation("title", "~ climate")
 ```
 
 Exact format search:
 
 ```python
-matches = zenodo.find_relation("format", "= 'csv'")
+matches = zenodo.find_relation("format", "= csv")
 ```
 
 Supported relation operators:
@@ -617,6 +723,42 @@ Supported relation operators:
 ```
 
 The `~` and `~~` operators perform case-insensitive substring matching.
+
+### API-Backed `find_relation()`
+
+Some `find_relation()` calls perform a new Zenodo API lookup/search and return `self.tables`.
+
+Record ID lookup:
+
+```python
+tables = zenodo.find_relation("record_id = 16537543")
+```
+
+Dataset ID lookup:
+
+```python
+tables = zenodo.find_relation("dataset_id = 16537543")
+```
+
+DOI lookup:
+
+```python
+tables = zenodo.find_relation("doi = 10.5281/zenodo.16537543")
+```
+
+Keyword search:
+
+```python
+tables = zenodo.find_relation("keywords ~ climate", limit=3)
+```
+
+Query string search:
+
+```python
+tables = zenodo.find_relation("q ~ battery", limit=3)
+```
+
+> **Note:** API-backed `find_relation()` calls reload the backend tables.
 
 ---
 
@@ -698,6 +840,8 @@ The `url_valid` column is:
 | `False` | URL did not respond successfully |
 | `None` | URL validation was not run or could not be determined |
 
+> **Note:** `validate_urls()` may make extra HTTP HEAD/GET requests because it checks each resource URL.
+
 ---
 
 ## Export Data
@@ -712,81 +856,48 @@ datasets_df.to_csv("zenodo_datasets.csv", index=False)
 resources_df.to_csv("zenodo_resources.csv", index=False)
 ```
 
-### Export Through DSI Writer
+### Export Example Output Paths
 
-```python
-dsi.write(
-    filename="zenodo_datasets.csv",
-    writer_name="Csv",
-    table_name="datasets"
-)
-```
+The export example writes files to:
 
-```python
-dsi.write(
-    filename="zenodo_resources.csv",
-    writer_name="Csv",
-    table_name="resources"
-)
-```
-
----
-
-## Process to Writable Backend
-
-Convert read-only Zenodo metadata to a local SQLite database.
-
-```python
-from dsi.dsi import DSI
-
-dsi = DSI(
-    backend_name="Zenodo",
-    params={"keywords": "climate", "limit": 10},
-    verify_ssl=False
-)
-
-dsi.process(
-    backend_name="Sqlite",
-    filename="zenodo_climate.db"
-)
-
-dsi.close()
-
-local_dsi = DSI(
-    backend_name="Sqlite",
-    filename="zenodo_climate.db"
-)
-
-datasets_df = local_dsi.get_table("datasets", collection=True)
-resources_df = local_dsi.get_table("resources", collection=True)
-
-print(f"Loaded {len(datasets_df)} datasets")
-print(f"Loaded {len(resources_df)} resources")
-
-local_dsi.close()
+```text
+examples/backends/zenodo/zenodo_datasets_export.csv
+examples/backends/zenodo/zenodo_resources_export.csv
 ```
 
 ---
 
 ## Example Scripts
 
-The following example scripts demonstrate common workflows with the Zenodo backend. All scripts are in `examples/zenodo/`.
+The following example scripts demonstrate common workflows with the Zenodo backend.
 
-### 1. `1_basic_keyword_search.py`
+All scripts are in:
+
+```text
+examples/backends/zenodo/
+```
+
+### 1. `1.load_basic.py`
 
 Initialize the Zenodo backend with a simple keyword search and inspect the returned tables.
 
 Demonstrates:
 
 - Basic search with `keywords`
-- `get_table_names()`
 - `list()`
+- `list(collection=True)`
 - `get_table("datasets")`
 - `get_table("resources")`
 
+Run:
+
+```bash
+PYTHONPATH=. python examples/backends/zenodo/1.load_basic.py
+```
+
 ---
 
-### 2. `2_record_and_doi_lookup.py`
+### 2. `2.lookup_record_doi.py`
 
 Load a specific Zenodo record using record ID and DOI.
 
@@ -794,17 +905,23 @@ Demonstrates:
 
 - `record_id` lookup
 - `doi` lookup
-- Confirming both lookup styles return the same record
 - Inspecting associated file resources
+
+Run:
+
+```bash
+PYTHONPATH=. python examples/backends/zenodo/2.lookup_record_and_doi.py
+```
 
 ---
 
-### 3. `3_tables_summary_schema.py`
+### 3. `3.tables_summary.py`
 
 Explore the DSI table structure returned by the backend.
 
 Demonstrates:
 
+- `list(collection=True)`
 - `list()`
 - `num_tables()`
 - `summary()`
@@ -812,9 +929,15 @@ Demonstrates:
 - `get_schema()`
 - Selecting specific display columns
 
+Run:
+
+```bash
+PYTHONPATH=. python examples/backends/zenodo/3.list_tables.py
+```
+
 ---
 
-### 4. `4_filter_and_find.py`
+### 4. `4.filter_find.py`
 
 Filter already-loaded Zenodo tables and search metadata.
 
@@ -825,17 +948,19 @@ Demonstrates:
 - `find_column()`
 - `find_cell()`
 - `find()`
-- `find_relation()`
+- `find_relation()` with split arguments
+- `find_relation()` with one-string conditions
+- API-backed `find_relation()` lookup/search
 
-Supported relation operators:
+Run:
 
-```text
-=, ==, !=, >, <, >=, <=, ~, ~~
+```bash
+PYTHONPATH=. python examples/backends/zenodo/4.filter_and_find.py
 ```
 
 ---
 
-### 5. `5_validate_urls_and_export.py`
+### 5. `5.validate_urls_export.py`
 
 Validate resource URLs and export metadata tables.
 
@@ -846,22 +971,24 @@ Demonstrates:
 - Exporting `datasets` to CSV
 - Exporting `resources` to CSV
 
+Run:
+
+```bash
+PYTHONPATH=. python examples/backends/zenodo/5.validate_urls_and_export.py
+```
+
 ---
 
-### 6. `6_dsi_wrapper_basic.py`
+## Run All Examples
 
-Use Zenodo through the user-facing `DSI` wrapper.
+From the repository root:
 
-Demonstrates:
-
-- `DSI(backend_name="Zenodo", ...)`
-- `list()`
-- `list(collection=True)`
-- `num_tables()`
-- `get_table()`
-- `display()`
-- `summary()`
-- `search()`
+```bash
+for f in examples/backends/zenodo/*.py; do
+    echo "Running $f"
+    PYTHONPATH=. python "$f"
+done
+```
 
 ---
 
@@ -881,6 +1008,9 @@ Demonstrates:
 - Invalid record ID format raises `ValueError`
 - Invalid DOI format raises `ValueError`
 - Valid but unmatched record IDs or DOIs return empty tables
+- `find_cell()` returns matching rows as `ValueObject` instances
+- API-backed `find_relation()` calls reload backend tables and return `self.tables`
+- `get_table_names()` is not used by the examples; use `list(collection=True)` instead
 
 ---
 
@@ -894,10 +1024,10 @@ Make sure `zenodo.py` is located here:
 dsi/backends/zenodo.py
 ```
 
-Run from the repository root:
+Run examples from the repository root:
 
 ```bash
-PYTHONPATH=. python examples/zenodo/1_basic_keyword_search.py
+PYTHONPATH=. python examples/backends/zenodo/1.load_basic.py
 ```
 
 or install the repository in editable mode:
@@ -905,6 +1035,36 @@ or install the repository in editable mode:
 ```bash
 pip install -e .
 ```
+
+### `DSI(backend_name="Zenodo")` Is Not Supported
+
+If you see:
+
+```text
+RuntimeError: Please check the 'backend_name' argument as it is not supported by DSI
+Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB
+```
+
+then Zenodo has not yet been added to the DSI wrapper backend list.
+
+Use the backend directly:
+
+```python
+from dsi.backends.zenodo import Zenodo
+
+zenodo = Zenodo(
+    params={"keywords": "climate", "limit": 3},
+    verify_ssl=False
+)
+```
+
+Do not use:
+
+```python
+DSI(backend_name="Zenodo", ...)
+```
+
+until `dsi.py` and `core.py` support Zenodo.
 
 ### SSL Certificate Errors
 
@@ -918,16 +1078,6 @@ For local testing only, use:
 
 ```python
 Zenodo(
-    params={"keywords": "climate", "limit": 3},
-    verify_ssl=False
-)
-```
-
-or:
-
-```python
-DSI(
-    backend_name="Zenodo",
     params={"keywords": "climate", "limit": 3},
     verify_ssl=False
 )
@@ -959,15 +1109,37 @@ Try:
 - Checking record ID spelling
 - Testing the query directly in the Zenodo search interface
 
-### `dsi.query()` Returns a Dict Error
+### `query_artifacts()` Returns No Results
 
-If your current `core.py` cannot be changed, avoid `dsi.query()` for the Zenodo backend and use direct backend filtering instead:
+If a local filter does not match any loaded rows, `query_artifacts()` may raise:
+
+```text
+ValueError: Query returned no results
+```
+
+Example:
 
 ```python
 zenodo.query_artifacts("resource_count >= 0", dict_return=False)
 ```
 
-The direct backend method returns a pandas DataFrame when one table matches.
+Make sure the column exists in one of the loaded tables and that the condition matches at least one row.
+
+### `find_relation()` Reloaded My Tables
+
+Some `find_relation()` calls are API-backed and intentionally reload the backend tables.
+
+These include:
+
+```python
+zenodo.find_relation("record_id = 16537543")
+zenodo.find_relation("dataset_id = 16537543")
+zenodo.find_relation("doi = 10.5281/zenodo.16537543")
+zenodo.find_relation("keywords ~ climate", limit=3)
+zenodo.find_relation("q ~ battery", limit=3)
+```
+
+Run API-backed `find_relation()` calls after local filtering examples if you do not want the loaded data to change before filtering.
 
 ---
 
@@ -978,8 +1150,9 @@ The direct backend method returns a pandas DataFrame when one table matches.
 - Use direct record ID or DOI lookup when you know the exact record
 - Use `display_cols` in `display()` to focus on useful columns
 - Use pandas DataFrame filtering after retrieval for complex local analysis
-- Use `process()` to cache read-only Zenodo metadata into a local database for repeated analysis
 - Avoid validating many resource URLs unless needed, because URL checks require extra network requests
+- Reuse a single backend instance for multiple local inspections instead of creating many new connections
+- Close backend instances when done
 
 ---
 

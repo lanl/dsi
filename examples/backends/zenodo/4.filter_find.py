@@ -4,12 +4,15 @@ Example 4: Local filtering and find methods.
 This example demonstrates local table filtering after Zenodo data is loaded.
 
 Covered methods:
+
 - query_artifacts() with pandas-style filters
 - find_table()
 - find_column()
-- find_cell()
+- find_cell(), which returns matching rows as ValueObjects
 - find()
-- find_relation()
+- find_relation() with split arguments
+- find_relation() with one-string conditions
+- find_relation() with API-backed lookup/search
 
 Note:
 query_artifacts() here is used directly on the Zenodo backend.
@@ -21,7 +24,6 @@ import warnings
 from urllib3.exceptions import InsecureRequestWarning
 
 from dsi.backends.zenodo import Zenodo
-
 
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
@@ -45,6 +47,12 @@ def show_value_objects(values, limit=5):
 
     if len(values) > limit:
         print(f"... showing {limit} of {len(values)} matches")
+
+
+def show_tables_result(tables):
+    print("Returned object type:", type(tables))
+    if isinstance(tables, dict):
+        print("Table names:", list(tables.keys()))
 
 
 def main():
@@ -82,23 +90,50 @@ def main():
         section("Find columns containing 'doi'")
         show_value_objects(zenodo.find_column("doi"))
 
-        section("Find cells containing 'Zenodo'")
+        section("Find rows with cells containing 'Zenodo'")
         show_value_objects(zenodo.find_cell("Zenodo"))
 
         section("Find all matches for 'doi'")
         show_value_objects(zenodo.find("doi"))
 
-        section("find_relation: datasets resource_count >= 0")
-        relation_matches = zenodo.find_relation("resource_count", ">= '0'")
+        section("find_relation split args: datasets resource_count >= 0")
+        relation_matches = zenodo.find_relation("resource_count", ">= 0")
         show_value_objects(relation_matches)
 
-        section("find_relation: resources size >= 0")
-        relation_matches = zenodo.find_relation("size", ">= '0'")
+        section("find_relation split args: resources size >= 0")
+        relation_matches = zenodo.find_relation("size", ">= 0")
         show_value_objects(relation_matches)
 
-        section("find_relation: title contains climate")
-        relation_matches = zenodo.find_relation("title", "~ 'climate'")
+        section("find_relation split args: title contains climate")
+        relation_matches = zenodo.find_relation("title", "~ climate")
         show_value_objects(relation_matches)
+
+        section("find_relation one-string: resource_count >= 0")
+        relation_matches = zenodo.find_relation("resource_count >= 0")
+        show_value_objects(relation_matches)
+
+        section("find_relation one-string: size >= 0")
+        relation_matches = zenodo.find_relation("size >= 0")
+        show_value_objects(relation_matches)
+
+        section("find_relation one-string: title contains climate")
+        relation_matches = zenodo.find_relation("title ~ climate")
+        show_value_objects(relation_matches)
+
+        section("API-backed find_relation: record_id lookup")
+        tables = zenodo.find_relation("record_id = 16537543")
+        show_tables_result(tables)
+        zenodo.list()
+
+        section("API-backed find_relation: DOI lookup")
+        tables = zenodo.find_relation("doi = 10.5281/zenodo.16537543")
+        show_tables_result(tables)
+        zenodo.list()
+
+        section("API-backed find_relation: keyword search")
+        tables = zenodo.find_relation("keywords ~ climate", limit=3)
+        show_tables_result(tables)
+        zenodo.list()
 
     finally:
         zenodo.close()

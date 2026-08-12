@@ -2,7 +2,8 @@
 Example 3: Explore Zenodo DSI tables, summaries, display, and schema.
 
 This example focuses on table inspection methods:
-- get_table_names()
+
+- list(collection=True)
 - list()
 - num_tables()
 - summary()
@@ -15,7 +16,6 @@ import warnings
 from urllib3.exceptions import InsecureRequestWarning
 
 from dsi.backends.zenodo import Zenodo
-
 
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
@@ -37,7 +37,7 @@ def main():
 
     try:
         section("Table names")
-        print(zenodo.get_table_names())
+        print(zenodo.list(collection=True))
 
         section("List tables")
         zenodo.list()

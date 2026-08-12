@@ -2,6 +2,7 @@
 Example 1: Basic Zenodo keyword search.
 
 This example shows the simplest Zenodo backend workflow:
+
 - create backend
 - search Zenodo using keywords
 - list available DSI tables
@@ -13,7 +14,6 @@ import warnings
 from urllib3.exceptions import InsecureRequestWarning
 
 from dsi.backends.zenodo import Zenodo
-
 
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
@@ -31,7 +31,7 @@ def main():
         print("\nZenodo backend loaded successfully.")
 
         print("\nTable names:")
-        print(zenodo.get_table_names())
+        print(zenodo.list(collection=True))
 
         print("\nTable list:")
         zenodo.list()

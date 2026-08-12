@@ -111,10 +111,6 @@ class Zenodo(Webserver):
 
     read_only = True
 
-    # This intentionally removes the method implementation while clearing
-    # the abstract method requirement if Webserver declares get_table_names().
-    get_table_names = None
-
     DEFAULT_URL = "https://zenodo.org"
 
     DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
@@ -211,6 +207,7 @@ class Zenodo(Webserver):
         self.token = kwargs.get("token", os.getenv("ZENODO_TOKEN"))
         self.validate_on_init = kwargs.get("validate_on_init", True)
         self.auto_load = kwargs.get("auto_load", True)
+        self.only_validate = kwargs.get("only_validate", False)
 
         self.headers = {
             "User-Agent": "dsi-zenodo-backend/1.0",
@@ -239,6 +236,10 @@ class Zenodo(Webserver):
         self.raw_records = []
 
         self._initialize_empty_tables()
+
+        if self.only_validate:
+            self._loaded = False
+            return
 
         if self.validate_on_init:
             self.validate_connection()

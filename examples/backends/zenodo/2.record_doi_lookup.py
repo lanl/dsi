@@ -2,6 +2,7 @@
 Example 2: Lookup Zenodo records by record ID and DOI.
 
 This example shows two precise lookup modes:
+
 - record_id lookup
 - DOI lookup
 
@@ -15,7 +16,6 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from dsi.backends.zenodo import Zenodo
 
-
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
 
@@ -25,7 +25,7 @@ def show_backend_result(title, backend):
     print("=" * 80)
 
     print("\nTable names:")
-    print(backend.get_table_names())
+    print(backend.list(collection=True))
 
     print("\nTables:")
     backend.list()
@@ -34,7 +34,16 @@ def show_backend_result(title, backend):
     resources = backend.get_table("resources")
 
     print("\nDatasets:")
-    print(datasets[["dataset_id", "doi", "title", "resource_count"]].head())
+    if datasets.empty:
+        print("No datasets found.")
+    else:
+        display_cols = [
+            "dataset_id",
+            "doi",
+            "title",
+            "resource_count",
+        ]
+        print(datasets[display_cols].head())
 
     print("\nResources:")
     if resources.empty:
@@ -53,21 +62,27 @@ def show_backend_result(title, backend):
 
 def main():
     record_backend = Zenodo(
-        params={"record_id": "16537543"},
-        verify_ssl=False,
-    )
-
-    doi_backend = Zenodo(
-        params={"doi": "10.5281/zenodo.16537543"},
+        params={
+            "record_id": "16537543",
+        },
         verify_ssl=False,
     )
 
     try:
         show_backend_result("Record ID lookup", record_backend)
-        show_backend_result("DOI lookup", doi_backend)
-
     finally:
         record_backend.close()
+
+    doi_backend = Zenodo(
+        params={
+            "doi": "10.5281/zenodo.16537543",
+        },
+        verify_ssl=False,
+    )
+
+    try:
+        show_backend_result("DOI lookup", doi_backend)
+    finally:
         doi_backend.close()
 
 
