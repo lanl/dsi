@@ -3,7 +3,6 @@ from dsi.backends.ndp import NDP
 from dsi.backends.osti import OSTI
 from dsi.backends.rcsbpdb import RCSBPDB
 from dsi.backends.oceans11 import Oceans11
-from dsi.backends.zenodo import Zenodo
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -46,12 +45,11 @@ class DSI:
                 - If backend_name = "OSTI" → No filename input (read-only backend)
                 - If backend_name = "RCSBPDB" → No filename input (read-only backend)
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
-                - If backend_name = "Zenodo" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate.
 
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo" or "RCSBPDB".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", or "RCSBPDB".
 
             If using an external backend, provide the relative path to the Python module with the backend.
         """
@@ -125,7 +123,7 @@ class DSI:
             backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
             if backend_module is None:
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB")
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
@@ -134,7 +132,7 @@ class DSI:
             except AttributeError:
                 raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
             
-            # Handle in-memory backends (NDP, OSTI, Oceans11, RCSBPDB, Zenodo)
+            # Handle in-memory backends (NDP, OSTI, Oceans11)
             if self.read_only_flag:
                 self.database_name = None
 
@@ -166,11 +164,8 @@ class DSI:
                 elif backend_name.lower() == "rcsbpdb":
                     backend_name = "RCSBPDB"
                     query_params = kwargs.pop("params", {})
-                elif backend_name.lower() == "zenodo":
-                    backend_name = "Zenodo"
-                    query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo and Oceans11")
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB and Oceans11")
                 
                 try:
                     # Pass query params as 'params' argument
@@ -193,7 +188,13 @@ class DSI:
                 if filename == ".temp_dsi.db" and os.path.exists(filename):
                     os.remove(filename)
 
-                if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                if filename != ".temp_dsi.db" and os.path.exists(filename):
+                    backend_type = self.t.identify_backend(filename)
+                    if backend_type is not None:
+                        backend_name = backend_type
+                    else:
+                        raise RuntimeError(f"Cannot initialize DSI with the file: {filename}. It is not a valid DSI backend.")
+                elif filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
                     file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
                     if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                         filename += ".db"
@@ -215,6 +216,8 @@ class DSI:
                     raise
         
         self.main_backend_obj = self.t.loaded_backends[0]
+        if backend_name.lower() == "duckdb":
+            backend_name = "DuckDB"
 
         if self.read_only_flag:
             msg = f"Created an instance of DSI with the {backend_name} read-only backend"
@@ -235,18 +238,15 @@ class DSI:
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         if importlib.util.find_spec("duckdb") is not None:
             print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
-        n = NDP()
+        n = NDP(only_validate=True)
         if n.validate_connection():
             print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
-        n = OSTI()
+        n = OSTI(only_validate=True)
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
-        n = RCSBPDB(auto_load=False)
+        n = RCSBPDB(only_validate=True)
         if n.validate_connection():
             print("RCSBPDB : Read-only metadata backend for discovering and querying RCSBPDB/RCSB structure metadata.")
-        n = Zenodo(params={}, auto_load=False)
-        if n.validate_connection():
-            print("Zenodo : Read-only data catalog backend for discovering and querying public Zenodo records.")
         n = Oceans11(only_validate=True)
         if n.validate_connection(only_validate=True):
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
@@ -319,6 +319,7 @@ class DSI:
         print("TOML                 : Loads data from standard TOML files that can have one or multiple tables per file")
         print("TOML1                : Loads data from TOML files of a certain structure")
         print("JSON                 : Loads single-table data from JSON files")
+        print("VTK                  : Loads metadata from VTK/VTI/VTM files")
         print("Ensemble             : Loads a CSV file where each row is a simulation run; creates a simulation table")
         print("Cloverleaf           : Loads data from a directory with subfolders for each simulation run's input and output data")
         print("Bueno                : Loads performance data from Bueno (github.com/lanl/bueno) (.data text file format)")
@@ -347,6 +348,7 @@ class DSI:
                 - "TOML"                 → .toml
                 - "TOML1"                → .toml
                 - "JSON"                 → .json
+                - "VTK"                  → .vtk or .vti or .vtm
                 - "Ensemble"             → .csv
                 - "Cloverleaf"           → /path/to/data/directory/
                 - "Bueno"                → .data
@@ -368,7 +370,7 @@ class DSI:
 
             Required when using the `Collection` reader to load an dictionary or pandas DataFrame representing only one table.
             
-            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
+            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, `VTK`, or `Ensemble` reader.
         """
         if self.read_only_flag:
             backend_name = self.main_backend_obj.__class__.__name__
@@ -467,6 +469,8 @@ class DSI:
                     self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "json":
                     self.t.load_module('plugin', 'JSON', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "vtk":
+                    self.t.load_module('plugin', 'VTK_Reader', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "cloverleaf":
                     self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
                 elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
@@ -578,7 +582,7 @@ class DSI:
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
             if update:
-                df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+                df.insert(0, "dsi_table_name", df.attrs["table_name"])
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df

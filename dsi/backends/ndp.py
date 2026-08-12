@@ -68,6 +68,7 @@ class NDP(Webserver):
             Base CKAN URL. If None, a default CKAN endpoint is used.
         `params` : dict, optional
             Dictionary of initial query parameters used to fetch data from CKAN.
+
             Supported keys:
                 - keywords : str - Full-text search
                 - creator : str - Creator name filter (from extras.creatorName)
@@ -105,6 +106,10 @@ class NDP(Webserver):
         if self.api_key:
             self.headers["Authorization"] = self.api_key
 
+        # skip data retrieval if only checking connection to oceans11
+        if kwargs.get("only_validate", False):
+            return
+
         # Data storage (tiered structure)
         # Tier 1: datasets, Tier 2: per-dataset resource tables
         self._cache = OrderedDict()
@@ -113,13 +118,12 @@ class NDP(Webserver):
 
         self._loaded = False
         self.params = params or {}
+        self.validate_error_msg = None
 
         # Validate connection before attempting to load data
-        try:
-            self.validate_connection()
-        except (ConnectionError, RuntimeError):
+        if not self.validate_connection():
             self._loaded = False
-            raise
+            raise ConnectionError(self.validate_error_msg or "Failed to connect to NDP")
 
         # Initial data load (only if connection is valid and params provided)
         if self.params:
@@ -143,18 +147,12 @@ class NDP(Webserver):
         This method tests the connection by making a simple API call to verify:
             - The URL is reachable
             - The CKAN API is responding
-        
-        Raises
-        ------
-        ConnectionError
-            If the URL cannot be reached
-        RuntimeError
-            If the CKAN API returns an error response
-        
+
         Returns
         -------
         bool
-            True if connection is valid
+            True if connection is valid.
+            False if connection is not valid.
         """
         try:
             test_url = f"{self.base_url}/api/3/action/status_show"
@@ -170,42 +168,33 @@ class NDP(Webserver):
             data = response.json()
             
             if not data.get("success"):
-                raise RuntimeError(
-                    f"CKAN API at {self.base_url} returned failure response"
-                )
+                self.validate_error_msg = f"CKAN API at {self.base_url} returned failure response"
+                return False
             
             return True
-        except: # noqa: E722
-            # Need to silent exit to continue external workflows
+
+        # Need to silent exit to continue external workflows
+        except requests.exceptions.Timeout:
+            self.validate_error_msg = f"Connection timeout: Cannot reach {self.base_url} within 10 seconds"
             return False
-        
-        # except requests.exceptions.Timeout:
-        #     raise ConnectionError(
-        #         f"Connection timeout: Unable to reach {self.base_url} within 10 seconds"
-        #     )
-        # except requests.exceptions.ConnectionError:
-        #     raise ConnectionError(
-        #         f"Connection failed: Unable to connect to {self.base_url}. "
-        #         "Check the URL and your network connection."
-        #     )
-        # except requests.exceptions.HTTPError as e:
-        #     if e.response.status_code == 404:
-        #         raise RuntimeError(
-        #             f"CKAN API not found at {self.base_url}. "
-        #             "Verify this is a valid CKAN endpoint."
-        #         )
-        #     else:
-        #         raise RuntimeError(
-        #             f"HTTP {e.response.status_code} Error: {str(e)}"
-        #         )
-        # except requests.exceptions.RequestException as e:
-        #     raise ConnectionError(
-        #         f"Failed to validate connection to {self.base_url}: {str(e)}"
-        #     )
-        # except ValueError as e:
-        #     raise RuntimeError(
-        #         f"Invalid JSON response from {self.base_url}: {str(e)}"
-        #     )
+        except requests.exceptions.ConnectionError:
+            self.validate_error_msg = f"Connection failed: Cannot connect to {self.base_url}. Check your network connection."
+            return False
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                self.validate_error_msg = f"CKAN API not found at {self.base_url}. Verify this is a valid CKAN endpoint."
+                return False
+            else:
+                self.validate_error_msg = f"HTTP {e.response.status_code} Error: {str(e)}"
+                return False
+        except requests.exceptions.RequestException as e:
+            self.validate_error_msg = f"Failed to validate connection to {self.base_url}: {str(e)}"
+            return False
+        except ValueError as e:
+            self.validate_error_msg = f"Invalid JSON response from {self.base_url}: {str(e)}"
+            return False
+        except Exception:
+            return False
 
 
     # ----------------------------------------------------------------------
@@ -839,61 +828,6 @@ class NDP(Webserver):
         return "\n".join(schema_lines)
 
 
-    def get_table_names(self, query):
-        """
-        Extracts table/dataset names mentioned in a query string.
-        
-        Parameters
-        ----------
-        `query` : str
-            Query string to parse
-        
-        Returns
-        -------
-        list
-            List of dataset names/IDs found in query
-        """
-        if not self._loaded:
-            return []
-        
-        import re
-        
-        pattern = r'\b[a-zA-Z_][a-zA-Z0-9_-]*\b'
-        words = re.findall(pattern, query)
-        
-        found_tables = []
-        for word in words:
-            if word in self._cache:
-                found_tables.append(word)
-            elif word in self._dataset_id_map:
-                found_tables.append(self._dataset_id_map[word])
-        
-        return list(set(found_tables))
-
-
-    def overwrite_table(self, table_name, collection):
-        """
-        Not supported - NDP backend is read-only.
-        
-        Parameters
-        ----------
-        `table_name` : str or list
-            Table name(s)
-        `collection` : DataFrame or list
-            Data
-        
-        Raises
-        ------
-        NotImplementedError
-            Always raised as NDP is read-only
-        """
-        raise NotImplementedError(
-            "NDP backend is read-only. Cannot overwrite tables. "
-            "To modify data, use artifact_handler('process') to load into "
-            "a writable backend (Sqlite/DuckDB), make changes, then query."
-        )
-
-
     # ----------------------------------------------------------------------
     # Query Interface (in-memory)
     # ----------------------------------------------------------------------
@@ -1053,9 +987,12 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     def process_artifacts(self):
         """
-        Returns all cached tables in tiered format.
+        Returns all cached tables in tiered format. 
+        
+        Structure is:
 
-        Structure:
+        .. code-block:: text
+
             {
                 "datasets": <dataset table>,
                 "<dataset_name>": <resource table>,
@@ -1655,16 +1592,8 @@ class NDP(Webserver):
     def notebook(self, **kwargs):
         """
         Notebook generation not supported for NDP backend.
-
-        Parameters
-        ----------
-        `**kwargs` : dict
-            Additional keyword arguments (unused)
-
-        Returns
-        -------
-        None
         """
+        raise NotImplementedError("Notebook generation not supported for NDP backend")
 
 
     # ----------------------------------------------------------------------

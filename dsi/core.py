@@ -27,15 +27,16 @@ class Terminal:
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11', 'rcsbpdb', 'zenodo']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11', 'rcsbpdb']
     PLUGIN_PREFIX = ['dsi.plugins']
-    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader']
+    PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader', 'vtk_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
-    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'Ensemble', 'Cloverleaf', 'Dictionary', 'Dataframe']
+    VALID_READERS = ['Bueno', 'Csv', 'YAML', 'YAML1', 'TOML', 'TOML1', 'Parquet', 'Schema', 'JSON', 'Ensemble', 
+                     'Cloverleaf', 'Dictionary', 'Dataframe', "VTK_Reader"]
     VALID_DATACARDS = ['DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11', 'RCSBPDB', 'Zenodo']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11', 'RCSBPDB']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
@@ -1152,36 +1153,7 @@ class Terminal:
             self.table_print_helper(headers, rows, max_rows, num_rows)
             print()
 
-    def get_table_names(self, query):
-        """
-        Extracts and returns all table names referenced in a given query.
 
-        `query` : str
-            A query string written in a database language (typically SQL).
-        """
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.error(f'Getting all table names from the query: {query}')
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error('Need to load a valid backend to be able to identify table names in a query for that backend')
-            raise NotImplementedError('Need to load a valid backend to be able to identify table names in a query for that backend')
-        backend = self.loaded_backends[0]
-        start = datetime.now(timezone.utc)
-
-        try:
-            output = backend.get_table_names(query)
-        except Exception as e:
-            if self.debug_level != 0:
-                self.logger.info(f"Error getting table names {e!s}")
-            raise
-        
-        end = datetime.now(timezone.utc)
-        if self.debug_level != 0:
-            self.logger.info(f"Runtime: {end-start}")
-
-        if output is not None and isinstance(output, list):
-            return output
 
     def get_current_abstraction(self, table_name = None):
         """
@@ -1475,61 +1447,48 @@ class Terminal:
                 return False
         elif parent_name == "Webserver":
             if backend.__class__.__name__ == "NDP":
-                    # NDP is valid if data is loaded and connection works
-                    if not backend._loaded:
-                        return False
-                    
-                    try:
-                        backend.validate_connection()
-                        return True
-                    except (ConnectionError, RuntimeError) as e:
-                        if self.debug_level != 0:
-                            self.logger.warning(f"NDP backend connection validation failed: {e!s}")
-                        return False
-            if backend.__class__.__name__ == "OSTI":
-                    # OSTI is valid if data is loaded and connection works
-                    if not backend._loaded:
-                        return False
-                    
-                    try:
-                        backend.validate_connection()
-                        return True
-                    except (ConnectionError, RuntimeError) as e:
-                        if self.debug_level != 0:
-                            self.logger.warning(f"OSTI backend connection validation failed: {e!s}")
-                        return False 
-            if backend.__class__.__name__ == "RCSBPDB":
-                    # RCSBPDB is valid if data is loaded and RCSB connection works
-                    if not backend._loaded:
-                        return False
-
-                    if backend.validate_connection():
-                        return True
-                    else:
-                        if self.debug_level != 0:
-                            self.logger.warning("RCSBPDB backend connection validation failed.")
-                        return False
-            if backend.__class__.__name__ == "Zenodo":
-                if not backend._loaded:
-                    return False
-
-                try:
-                    backend.validate_connection()
-                    return True
-                except Exception as e:
-                    if self.debug_level != 0:
-                        self.logger.warning(
-                            f"Zenodo backend connection validation failed: {e!s}"
-                        )
-                    return False
-            if backend.__class__.__name__ == "Oceans11":
+                # NDP is valid if data is loaded and connection works
                 if not backend._loaded:
                     return False
                 
-                return (
-                    backend.catalog_path is not None
-                    and os.path.isfile(backend.catalog_path)
-                )
+                if backend.validate_connection():
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("NDP backend connection failed")
+                    return False
+            if backend.__class__.__name__ == "OSTI":
+                # OSTI is valid if data is loaded and connection works
+                if not backend._loaded:
+                    return False
+                
+                if backend.validate_connection():
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("OSTI backend connection failed")
+                    return False
+            if backend.__class__.__name__ == "RCSBPDB":
+                # RCSBPDB is valid if data is loaded and RCSB connection works
+                if not backend._loaded:
+                    return False
+
+                if backend.validate_connection():
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("RCSBPDB backend connection failed.")
+            if backend.__class__.__name__ == "Oceans11":
+                # Oceans11 is valid if data is loaded and connection works
+                if not backend._loaded:
+                    return False
+                
+                if backend.validate_connection(only_validate=True) and backend.catalog_path is not None:
+                    return True
+                else:
+                    if self.debug_level != 0:
+                        self.logger.warning("Oceans11 backend connection failed")
+                    return False
         return True
 
     # Internal function that returns if a user can create a file/db in a specified location

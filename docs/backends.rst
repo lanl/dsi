@@ -80,3 +80,10 @@ OSTI (Read-only)
 .. automodule:: dsi.backends.osti
    :members: OSTI
    :special-members: __init__
+
+RCSBPDP (Read-only)
+-------------------
+
+.. automodule:: dsi.backends.rcsbpdb
+   :members: RCSBPDB
+   :special-members: __init__

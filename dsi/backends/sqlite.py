@@ -290,9 +290,9 @@ class Sqlite(Filesystem):
                     types.unit_keys.append(sql_key + col_type)
             
             self.ingest_table_helper(types, foreign_query)
-            
-            # TODO: move this check to schema reader by allowing users to just create table without data
-            if not all(v == [""] for v in tableData.values()): # if table is just one row of empty strings, don't insert
+
+            # skip insert if table is empty
+            if not all(v in ([], [""], [None]) for v in tableData.values()): 
                 col_names = ', '.join(types.properties.keys())
                 placeholders = ', '.join('?' * len(types.properties))
 
@@ -394,15 +394,19 @@ class Sqlite(Filesystem):
                 raise
         else:
             raise RuntimeError("Can only run SELECT, PRAGMA, UPDATE, or ALTER queries on the data")
-        
+
+        primary_table = self.get_sql_query_table_name(query)
+        if primary_table is None:
+            raise ValueError("Query must reference at least one table")
+
         if dict_return:
-            tables = self.get_table_names(query)
-            if len(tables) > 1:
-                raise RuntimeError("Can only return ordered dictionary if querying one table")
             return OrderedDict(data.to_dict(orient='list'))
         else:
+            data.attrs["table_name"] = primary_table
             return data
-        
+
+
+
     def get_table(self, table_name, dict_return = False):
         """
         Retrieves all data from a specified table without requiring knowledge of SQL.
@@ -421,10 +425,12 @@ class Sqlite(Filesystem):
             - If `dict_return` is True: returns an OrderedDict
         """
         return self.query_artifacts(query=f"SELECT * FROM {table_name}", dict_return=dict_return)
-    
-    def get_table_names(self, query):
+
+
+
+    def get_sql_query_table_name(self, query):
         """
-        Extracts all table names from a SQL query. Helper function for `query_artifacts()` that users do not need to call
+        Extracts all table names from a SQL query. Helper function for `query_artifacts()` that users should not call
 
         `query` : str
             A SQL query string, typically passed into `query_artifacts()`.
@@ -432,9 +438,19 @@ class Sqlite(Filesystem):
         Return: list of str
             List of table names referenced in the query.
         """
-        all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
-        tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
-        return tables
+        try:
+            from sqlglot import parse_one, exp
+            tree = parse_one(query, dialect="sqlite")
+            cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
+            query_tables = [table.name for table in tree.find_all(exp.Table) if table.name not in cte_names]
+
+        except ModuleNotFoundError:
+            all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
+            query_tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
+
+        return query_tables[0] if query_tables else None
+
+
 
     def get_schema(self):
         """
@@ -445,6 +461,7 @@ class Sqlite(Filesystem):
         """
         schema_stmts = self.query_artifacts(query="SELECT sql FROM sqlite_master where sql NOT NULL ORDER BY type, name")
         return schema_stmts["sql"].str.cat(sep="\n")
+
 
 
     def notebook(self, interactive=False):
@@ -533,6 +550,7 @@ class Sqlite(Filesystem):
                        nbf.v4.new_code_cell(textwrap.dedent(code4))]
         
         fname = 'dsi_sqlite_backend_output.ipynb'
+        print("WARNING: notebook() will soon be deprecated. To retrieve database data in a dataframe, call dsi.get_table(tbl_name, True)")
         print('Writing Jupyter notebook...')
         with open(fname, 'w') as fh:
             nbf.write(nb, fh)

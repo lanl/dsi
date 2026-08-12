@@ -144,8 +144,6 @@ class Gufi(Filesystem):
         pass
     def get_table(self):
         raise NotImplementedError("Cannot get table data with the GUFI backend")
-    def get_table_names(self):
-        raise NotImplementedError("Cannot get table names with the GUFI backend")
     def list(self):
         raise NotImplementedError("Cannot list tables with the GUFI backend")
     def notebook(self):
