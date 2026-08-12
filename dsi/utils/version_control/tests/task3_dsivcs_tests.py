@@ -20,7 +20,7 @@ import os
 import sqlite3
 import stat
 
-from task2_dsivcs_test import (
+from task2_dsivcs_tests import (
     DB_NAME,
     SNAPSHOTS_DIR,
     DsiTestEnvironment,

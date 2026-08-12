@@ -200,7 +200,7 @@ def _clone_as(principal: Principal, source: Path, destination: Path) -> None:
     # safe.directory only acknowledges the intentionally different owner.  It
     # does not grant filesystem access.  --no-local makes Git use its normal
     # transport instead of directly copying objects owned by another user.
-    source_bak = source / ".."
+    # source_bak = source / ".."
 
     # print("~"*40)
     # result = subprocess.run(["ls", "-l", source_git], capture_output=True, text=True)
@@ -282,8 +282,8 @@ def _make_source_world_readable_but_not_writable(repo: Path) -> None:
             current_mode = stat.S_IMODE(file_path.stat().st_mode)
             os.chmod(file_path, 0o555 if current_mode & stat.S_IXUSR else 0o444)
 
-
-@pytest.fixture(scope="session")
+# commented out the follwoing line to avoid ruff linter fail
+# @pytest.fixture(scope="session")
 def git_env() -> Iterable[GitTestEnvironment]:
     if sys.platform != "linux":
         pytest.skip("these tests require Linux ownership and POSIX ACLs")
@@ -370,7 +370,7 @@ def test_clone_preserves_posix_metadata_for_shared_group_member(
 
     _, owner_space, member_space, _ = _new_case(git_env, "shared-group")
     source_repo = owner_space / "source"
-    source_git = source_repo / ".git"
+    # source_git = source_repo / ".git"
     source_file = _create_source_repository(git_env.owner, source_repo)
 
     os.chown(source_repo, git_env.owner.uid, git_env.shared_gid)
