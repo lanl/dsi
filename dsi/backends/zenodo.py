@@ -111,6 +111,10 @@ class Zenodo(Webserver):
 
     read_only = True
 
+    # This intentionally removes the method implementation while clearing
+    # the abstract method requirement if Webserver declares get_table_names().
+    get_table_names = None
+
     DEFAULT_URL = "https://zenodo.org"
 
     DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
@@ -189,52 +193,6 @@ class Zenodo(Webserver):
     ) -> None:
         """
         Initialize Zenodo backend.
-
-        Parameters
-        ----------
-        url : str, optional
-            Base Zenodo URL. Default: https://zenodo.org
-
-        params : dict, optional
-            Zenodo search/lookup params.
-
-        keywords : str, optional
-            Convenience keyword search input.
-
-        record_id : str or list[str], optional
-            Convenience Zenodo record ID input.
-
-        doi : str or list[str], optional
-            Convenience DOI input.
-
-        limit : int, optional
-            Search result limit.
-
-        kwargs
-        ------
-        token : str, optional
-            Optional Zenodo token. Not required for public records.
-
-        verify_ssl / verify : bool
-            SSL verification flag. Default True.
-
-        timeout : int
-            Request timeout. Default 60.
-
-        retries : int
-            HTTP retry count. Default 3.
-
-        validate_resource_urls : bool
-            If True, HEAD/GET checks resource URLs.
-
-        use_truststore : bool
-            If True, use truststore adapter when available.
-
-        validate_on_init : bool
-            If True, validate Zenodo API connection on init. Default True.
-
-        auto_load : bool
-            If True, load data on init when params are provided. Default True.
         """
         base_url = url or self.DEFAULT_URL
 
@@ -265,6 +223,7 @@ class Zenodo(Webserver):
         self.session = self._create_session(self.retries)
 
         self._cache = OrderedDict()
+        self.tables = self._cache
         self._loaded = False
 
         self.params = self._build_params(
@@ -335,6 +294,7 @@ class Zenodo(Webserver):
         self._cache["resources"] = OrderedDict(
             {col: [] for col in self.RESOURCE_COLUMNS}
         )
+        self.tables = self._cache
 
     def _create_session(self, retries):
         session = requests.Session()
@@ -388,7 +348,7 @@ class Zenodo(Webserver):
         """
         raise NotImplementedError("Zenodo backend is read-only.")
 
-    def query_artifacts(self, query, dict_return=True, **kwargs):
+    def query_artifacts(self, query=None, dict_return=True, **kwargs):
         """
         Query Zenodo or filter already-loaded DSI tables.
 
@@ -446,18 +406,6 @@ class Zenodo(Webserver):
 
         return pd.DataFrame(table)
 
-    def get_table_names(self, query=None):
-        if not self._loaded:
-            return []
-
-        names = list(self._cache.keys())
-
-        if query is None:
-            return names
-
-        query_lower = str(query).lower()
-        return [name for name in names if query_lower in name.lower()]
-
     def notebook(self, **kwargs):
         """
         Notebook generation is not supported for the Zenodo backend.
@@ -505,118 +453,205 @@ class Zenodo(Webserver):
 
         return "\n\n".join(schema_lines)
 
-    def find(self, query_object, **kwargs):
-        query_str = str(query_object).lower()
+    # ------------------------------------------------------------------
+    # Find/search methods
+    # ------------------------------------------------------------------
 
+    def find(self, query_object, **kwargs):
+        """
+        Search table names, column names, and cell values.
+
+        Returns
+        -------
+        list[ValueObject]
+            Combined results from find_table(), find_column(), and find_cell().
+        """
         return (
-            self.find_table(query_str)
-            + self.find_column(query_str)
-            + self.find_cell(query_object)
+            self.find_table(query_object, **kwargs)
+            + self.find_column(query_object, **kwargs)
+            + self.find_cell(query_object, **kwargs)
         )
 
     def find_table(self, query_object, **kwargs):
-        if not isinstance(query_object, str):
+        """
+        Search input across table names.
+
+        Returns
+        -------
+        list[ValueObject]
+        """
+        if query_object is None:
             return []
 
+        query = str(query_object).lower()
         matches = []
 
         for table_name, table_data in self._cache.items():
-            if query_object.lower() in table_name.lower():
+            if query in table_name.lower():
                 val = ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
+                val.row_num = None
                 val.value = table_data
                 val.type = "table"
                 matches.append(val)
 
         return matches
 
-    def find_column(self, query_object, **kwargs):
-        if not isinstance(query_object, str):
+    def find_column(self, query_object, range=False, **kwargs):
+        """
+        Search input across column names.
+
+        Returns
+        -------
+        list[ValueObject]
+        """
+        if query_object is None:
             return []
 
+        query = str(query_object).lower()
         matches = []
 
         for table_name, table_data in self._cache.items():
             for col_name, col_data in table_data.items():
-                if query_object.lower() in col_name.lower():
+                if query in col_name.lower():
                     val = ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
+                    val.row_num = None
                     val.value = col_data
                     val.type = "column"
+
+                    if range:
+                        numeric_col = pd.to_numeric(
+                            pd.Series(col_data),
+                            errors="coerce",
+                        ).dropna()
+
+                        if not numeric_col.empty:
+                            val.value = {
+                                "min": numeric_col.min(),
+                                "max": numeric_col.max(),
+                            }
+
                     matches.append(val)
 
         return matches
 
-    def find_cell(self, query_object, **kwargs):
+    def find_cell(self, query_object, row=True, **kwargs):
+        """
+        Search input across cell values.
+
+        The returned ValueObjects represent full matching rows, not only the
+        matched cell. This matches the RCSBPDB-style DSI find behavior.
+        """
+        if query_object is None:
+            return []
+
         matches = []
+        seen_rows = set()
 
         is_str_query = isinstance(query_object, str)
         query_lower = query_object.lower() if is_str_query else None
 
         for table_name, table_data in self._cache.items():
-            if not table_data:
+            df = pd.DataFrame(table_data)
+
+            if df.empty:
                 continue
 
-            cols = list(table_data.keys())
-            rows = zip(*table_data.values())
+            for row_idx, row_data in df.iterrows():
+                row_matched = False
 
-            for row_idx, row in enumerate(rows):
-                for col_idx, cell in enumerate(row):
-                    match = False
-
+                for cell in row_data.tolist():
                     if query_object == cell:
-                        match = True
-                    elif (
-                        is_str_query
-                        and isinstance(cell, str)
-                        and query_lower in cell.lower()
-                    ):
-                        match = True
+                        row_matched = True
+                        break
 
-                    if match:
-                        val = ValueObject()
-                        val.t_name = table_name
-                        val.c_name = [cols[col_idx]]
-                        val.row_num = row_idx
-                        val.value = cell
-                        val.type = "cell"
-                        matches.append(val)
+                    if is_str_query and query_lower in str(cell).lower():
+                        row_matched = True
+                        break
+
+                if row_matched:
+                    key = (table_name, int(row_idx))
+                    if key in seen_rows:
+                        continue
+
+                    seen_rows.add(key)
+                    matches.append(
+                        self._row_to_value_object(
+                            table_name=table_name,
+                            row_num=int(row_idx),
+                            row=row_data.to_dict(),
+                            value_type="row",
+                        )
+                    )
 
         return matches
 
-    def find_relation(self, column_name, relation, **kwargs):
+    def find_relation(self, column_name, relation=None, **kwargs):
         """
-        Find rows across datasets/resources using a column-level relation.
+        Filter rows using a column-level relation.
 
-        DSI.find() routes through Terminal.find_relation(), which calls:
+        Supported call styles
+        ---------------------
+        1. Column + relation:
+            find_relation("resource_count", ">= '1'")
+            find_relation("format", "= 'csv'")
+            find_relation("title", "~ 'climate'")
 
-            backend.find_relation(column_name, relation)
+        2. One-string condition:
+            find_relation("resource_count >= 1")
+            find_relation("format = csv")
+            find_relation("title ~ climate")
 
-        Examples after DSI parsing:
-            column_name="resource_count", relation=">= '1'"
-            column_name="format", relation="= 'pdf'"
-            column_name="title", relation="~ 'climate'"
+        3. Zenodo API-backed lookup/search:
+            find_relation("record_id = 16537543")
+            find_relation("dataset_id = 16537543")
+            find_relation("doi = 10.5281/zenodo.16537543")
+            find_relation("keywords ~ climate")
+            find_relation("q ~ climate")
+
+        Returns
+        -------
+        list[ValueObject]
+            For local table filtering.
+
+        OrderedDict
+            For Zenodo API-backed lookup/search calls. The returned object is
+            self.tables after reloading datasets/resources from the API.
         """
-        if not self._loaded:
-            raise RuntimeError("No data loaded. Cannot find relation.")
+        if relation is None:
+            column_name, relation = self._parse_condition_string(column_name)
 
         if column_name is None or relation is None:
-            raise ValueError("find_relation requires column_name and relation.")
+            raise ValueError("find_relation requires a condition or column + relation.")
 
+        column_name = str(column_name).strip()
         relation = str(relation).strip()
-        parsed = self._parse_relation(relation)
 
+        parsed = self._parse_relation(relation)
         if parsed is None:
             raise ValueError(
                 "Could not parse relation. Expected examples: "
-                ">= '1', = 'pdf', ~ 'climate'."
+                ">= '1', = 'csv', ~ 'climate'."
             )
 
         op, target_value = parsed
+
+        api_result = self._maybe_api_backed_find_relation(
+            column_name=column_name,
+            op=op,
+            target_value=target_value,
+            **kwargs,
+        )
+        if api_result is not None:
+            return api_result
+
+        if not self._loaded:
+            raise RuntimeError("No data loaded. Cannot find relation.")
+
         matches = []
-        matching_tables = []
 
         for table_name, table in self._cache.items():
             df = pd.DataFrame(table)
@@ -624,25 +659,18 @@ class Zenodo(Webserver):
             if df.empty or column_name not in df.columns:
                 continue
 
-            matching_tables.append(table_name)
             mask = self._evaluate_relation(df[column_name], op, target_value)
 
             for row_num in df[mask].index:
                 row_dict = df.loc[row_num].to_dict()
-
-                val = ValueObject()
-                val.t_name = table_name
-                val.c_name = list(row_dict.keys())
-                val.row_num = row_num
-                val.value = row_dict
-                val.type = "row"
-                matches.append(val)
-
-        if len(matching_tables) > 1:
-            return [
-                f"{column_name} {relation} in {table_name}"
-                for table_name in matching_tables
-            ]
+                matches.append(
+                    self._row_to_value_object(
+                        table_name=table_name,
+                        row_num=int(row_num),
+                        row=row_dict,
+                        value_type="row",
+                    )
+                )
 
         return matches
 
@@ -684,12 +712,15 @@ class Zenodo(Webserver):
                 )
             df = df[display_cols]
 
-        df.attrs["max_rows"] = len(df)
+        max_rows = len(df)
 
         if num_rows:
             df = df.head(num_rows)
 
-        return df.map(lambda x: self._truncate_cell(x, max_chars=80))
+        df = self._map_dataframe(df, lambda x: self._truncate_cell(x, max_chars=80))
+        df.attrs["max_rows"] = max_rows
+
+        return df
 
     def summary(self, table_name=None, **kwargs):
         if not self._loaded:
@@ -738,6 +769,7 @@ class Zenodo(Webserver):
             self.session.close()
 
         self._cache = OrderedDict()
+        self.tables = self._cache
         self.raw_records = []
         self.last_search_response = None
         self.last_request_params = None
@@ -781,6 +813,7 @@ class Zenodo(Webserver):
             self.RESOURCE_COLUMNS,
         )
 
+        self.tables = self._cache
         self._loaded = True
 
     def _records_from_params(self, params):
@@ -1139,6 +1172,180 @@ class Zenodo(Webserver):
             return None, None, None
 
     # ------------------------------------------------------------------
+    # Find helper methods
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _row_to_value_object(table_name, row_num, row, value_type="row"):
+        val = ValueObject()
+        val.t_name = table_name
+        val.c_name = list(row.keys())
+        val.row_num = row_num
+        val.value = row
+        val.type = value_type
+        return val
+
+    def _maybe_api_backed_find_relation(
+        self,
+        column_name,
+        op,
+        target_value,
+        **kwargs,
+    ):
+        """
+        Convert specific find_relation inputs into Zenodo API lookups/searches.
+
+        API-backed calls reload self.tables and return self.tables.
+        """
+        column = str(column_name).strip().lower()
+        value = str(target_value).strip()
+        limit = kwargs.get("limit")
+
+        params = None
+
+        if op in {"=", "=="} and column in {
+            "record_id",
+            "recordid",
+            "dataset_id",
+            "id",
+        }:
+            normalized = self.normalize_record_id(value)
+            if not normalized:
+                raise ValueError(
+                    f"Invalid Zenodo record_id: {target_value}. "
+                    "Zenodo record IDs must be numeric."
+                )
+            params = {"record_id": normalized}
+
+        elif op in {"=", "=="} and column in {"doi", "concept_doi"}:
+            doi = self.normalize_doi(value)
+            if not doi:
+                raise ValueError(
+                    f"Invalid DOI: {target_value}. "
+                    "Expected a DOI such as '10.5281/zenodo.16537543'."
+                )
+            params = {"doi": doi}
+
+        elif op in {"~", "~~", "=", "=="} and column in {"keywords", "keyword"}:
+            params = {"keywords": value}
+
+        elif op in {"~", "~~", "=", "=="} and column == "q":
+            params = {"q": value}
+
+        elif op in {"~", "~~", "=", "=="} and column in {
+            "communities",
+            "resource_type",
+            "access_right",
+        }:
+            params = {column: value}
+
+        if params is None:
+            return None
+
+        if limit is not None:
+            params["limit"] = limit
+        elif "limit" in self.params:
+            params["limit"] = self.params["limit"]
+
+        self.params = params
+        self._load_initial_data(params)
+        return self.tables
+
+    @staticmethod
+    def _parse_condition_string(condition):
+        if condition is None:
+            raise ValueError("find_relation condition cannot be None.")
+
+        condition = str(condition).strip()
+
+        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
+
+        in_single = False
+        in_double = False
+
+        for idx, char in enumerate(condition):
+            if char == "'" and not in_double:
+                in_single = not in_single
+            elif char == '"' and not in_single:
+                in_double = not in_double
+
+            if in_single or in_double:
+                continue
+
+            for op in operators:
+                if condition.startswith(op, idx):
+                    column_name = condition[:idx].strip()
+                    value = condition[idx + len(op):].strip()
+
+                    if not column_name or not value:
+                        raise ValueError(
+                            "One-string find_relation input must include "
+                            "column, operator, and value."
+                        )
+
+                    return column_name, f"{op} {value}"
+
+        raise ValueError(
+            "Could not parse one-string find_relation condition. "
+            "Expected examples: 'resource_count >= 1', 'format = csv'."
+        )
+
+    @staticmethod
+    def _parse_relation(relation):
+        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
+
+        relation = str(relation).strip()
+
+        for op in operators:
+            if relation.startswith(op):
+                value = relation[len(op):].strip()
+                value = value.strip("'").strip('"')
+                return op, value
+
+        return None
+
+    @staticmethod
+    def _evaluate_relation(series, op, target_value):
+        if op in {"~", "~~"}:
+            return series.fillna("").astype(str).str.contains(
+                str(target_value),
+                case=False,
+                na=False,
+                regex=False,
+            )
+
+        numeric_series = pd.to_numeric(series, errors="coerce")
+        numeric_target = pd.to_numeric(
+            pd.Series([target_value]),
+            errors="coerce",
+        ).iloc[0]
+
+        use_numeric = pd.notna(numeric_target) and numeric_series.notna().any()
+
+        if use_numeric and op in {">", "<", ">=", "<=", "=", "==", "!="}:
+            comparisons = {
+                ">": numeric_series > numeric_target,
+                "<": numeric_series < numeric_target,
+                ">=": numeric_series >= numeric_target,
+                "<=": numeric_series <= numeric_target,
+                "=": numeric_series == numeric_target,
+                "==": numeric_series == numeric_target,
+                "!=": numeric_series != numeric_target,
+            }
+            return comparisons[op].fillna(False)
+
+        string_series = series.fillna("").astype(str)
+        target = str(target_value)
+
+        if op in {"=", "=="}:
+            return string_series.str.lower() == target.lower()
+
+        if op == "!=":
+            return string_series.str.lower() != target.lower()
+
+        return pd.Series([False] * len(series), index=series.index)
+
+    # ------------------------------------------------------------------
     # Normalization / utility helpers
     # ------------------------------------------------------------------
 
@@ -1216,59 +1423,11 @@ class Zenodo(Webserver):
             return str(value)
 
     @staticmethod
-    def _parse_relation(relation):
-        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
+    def _map_dataframe(df, func):
+        if hasattr(df, "map"):
+            return df.map(func)
 
-        relation = str(relation).strip()
-
-        for op in operators:
-            if relation.startswith(op):
-                value = relation[len(op):].strip()
-                value = value.strip("'").strip('"')
-                return op, value
-
-        return None
-
-    @staticmethod
-    def _evaluate_relation(series, op, target_value):
-        if op in {"~", "~~"}:
-            return series.fillna("").astype(str).str.contains(
-                str(target_value),
-                case=False,
-                na=False,
-                regex=False,
-            )
-
-        numeric_series = pd.to_numeric(series, errors="coerce")
-        numeric_target = pd.to_numeric(
-            pd.Series([target_value]),
-            errors="coerce",
-        ).iloc[0]
-
-        use_numeric = pd.notna(numeric_target) and numeric_series.notna().any()
-
-        if use_numeric and op in {">", "<", ">=", "<=", "=", "==", "!="}:
-            comparisons = {
-                ">": numeric_series > numeric_target,
-                "<": numeric_series < numeric_target,
-                ">=": numeric_series >= numeric_target,
-                "<=": numeric_series <= numeric_target,
-                "=": numeric_series == numeric_target,
-                "==": numeric_series == numeric_target,
-                "!=": numeric_series != numeric_target,
-            }
-            return comparisons[op].fillna(False)
-
-        string_series = series.fillna("").astype(str)
-        target = str(target_value)
-
-        if op in {"=", "=="}:
-            return string_series.str.lower() == target.lower()
-
-        if op == "!=":
-            return string_series.str.lower() != target.lower()
-
-        return pd.Series([False] * len(series), index=series.index)
+        return df.applymap(func)
 
     @staticmethod
     def classify_usability(exts):
