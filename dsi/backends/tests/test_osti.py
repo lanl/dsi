@@ -381,14 +381,12 @@ def test_osti_combined_filters():
 
 
 def test_osti_notebook():
-    """Test that notebook() doesn't raise errors."""
-    backend.notebook()
-
-
-def test_osti_get_table_names():
-    """OSTI does not support SQL table-name extraction."""
-    with pytest.raises(NotImplementedError):
-        backend.get_table_names("SELECT * FROM records")
+    """Test that notebook() throws NotImplementedError."""
+    try:
+        backend.notebook()
+        assert False
+    except NotImplementedError: # should throw error
+        assert True
 
 
 def test_osti_close():

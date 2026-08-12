@@ -517,8 +517,6 @@ class Sync:
             print(" DSI Rsync database movement complete.")
         
         elif tool.lower() == "conduit":
-            import signal
-
             # Test Kerberos
             if self.verbose:
                 print( "Testing: klist")
@@ -528,14 +526,8 @@ class Sync:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
 
-            # Test Conduit status
-            def alarm_handler(signum, frame):
-                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
-            signal.signal(signal.SIGALRM, alarm_handler)
-            signal.alarm(10)
-
             result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
-            if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
+            if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
             try:
@@ -546,23 +538,18 @@ class Sync:
                         conduit_cmd = conduit_cmd[idx:idx+3]
                         break
             except Exception as e:
-                raise ValueError("Conduit not available in this environment: " + str(e))
+                raise RuntimeError("Conduit not available in this environment: " + str(e)) from None
+
+            if self.verbose:
+                print("Testing Conduit: conduit get")
+            cmd = [*conduit_cmd, "get"]
+            try:
+                result = subprocess.run(cmd, timeout=10)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
 
             try:
-                if self.verbose:
-                    print("Testing Conduit: conduit get")
-                cmd = conduit_cmd.append("get")
-                stdout = self.execute_cmd(cmd, "Testing conduit get")
-
-                if "TRANSFER_ID" in stdout and self.verbose:
-                    print(" Conduit is authenticated.")
-                elif "TRANSFER_ID" not in stdout:
-                    raise RuntimeError("Conduit Error: " + str(stdout))
-            finally:
-                signal.alarm(0)
-
-            try:
-                base_cmd = conduit_cmd.extend(['cp','-r'])
+                base_cmd = [*conduit_cmd, 'cp','-r']
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + self.remote_location)

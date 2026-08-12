@@ -760,11 +760,6 @@ class Oceans11(Webserver):
 
         return "\n\n".join(schema_lines)
 
-    def get_table_names(self, query):
-        """SQL table-name extraction is not supported for Oceans11."""
-        raise NotImplementedError(
-            "Oceans11 backend has not implemented get_table_names"
-        )
 
     # ------------------------------------------------------------------
     # Query Interface
@@ -1310,6 +1305,7 @@ class Oceans11(Webserver):
 
     def notebook(self, **kwargs):
         """Notebook generation is not supported for Oceans11."""
+        raise NotImplementedError("Notebook generation not supported for Oceans11 backend")
 
     # ------------------------------------------------------------------
     # Lifecycle

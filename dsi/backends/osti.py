@@ -587,18 +587,6 @@ class OSTI(Webserver):
         return "\n\n".join(schema_lines)
 
 
-    def get_table_names(self, query):
-        """
-        Extracts table/dataset names mentioned in a query string.
-        
-        `query` : str
-            Query string to parse
-        
-        Return : list
-            List of dataset names/IDs found in query
-        """
-        raise NotImplementedError("OSTI backend has not implemented get_table_names")
-
     # ---------------------------------------------------
     # Query Interface (in-memory)
     # ---------------------------------------------------
@@ -1172,8 +1160,7 @@ class OSTI(Webserver):
 
         `collection` : bool, optional, default=False
             - If True, returns the list of table names.
-            - If False (default), prints metadata of all tables:
-            table names and dimensions.
+            - If False (default), prints table names and dimensions for all tables.
         """
         if collection:
             return list(self._cache.keys())
@@ -1382,6 +1369,7 @@ class OSTI(Webserver):
         """
         **Notebook generation not supported for OSTI backend.**
         """
+        raise NotImplementedError("Notebook generation not supported for OSTI backend")
 
 
     # ----------------------------------------------------------------------
