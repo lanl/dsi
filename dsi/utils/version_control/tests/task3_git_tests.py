@@ -29,7 +29,8 @@ from task2_git_tests import (
     _new_case,
     _run,
     _run_as,
-    git_env,
+    # commented out git_env to avoid linter fail
+    # git_env,
 )
 
 

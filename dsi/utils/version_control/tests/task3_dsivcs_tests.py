@@ -35,7 +35,8 @@ from task2_dsivcs_tests import (
     _run,
     _run_as,
     _version_count,
-    dsi_env,
+    # commented out git_env to avoid linter fail
+    # dsi_env,
 )
 
 
