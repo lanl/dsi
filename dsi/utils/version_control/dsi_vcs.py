@@ -5,21 +5,22 @@ Captures full Linux file metadata (stat, ACL, xattrs), MD5 hash,
 and stores versioned snapshots in SQLite.
 
 Usage:
-    dsi-vcs init                 # init repo in current directory
-    dsi-vcs add <path>...        # stage paths for the next commit
-    dsi-vcs delete <path>...     # stage paths for deletion
-    dsi-vcs remove <path>...     # unstage paths
-    dsi-vcs commit [message]     # commit a new version
-    dsi-vcs log                  # list versions
-    dsi-vcs diff <v1> <v2>       # diff two versions
-    dsi-vcs restore <version>    # restore a version
-    dsi-vcs clone <path>         # clone a repository
-    dsi-vcs branch <branch name> # create a new branch
-    dsi-vcs list-branch          # list branches
-    dsi-vcs merge <branch name>  # merge a branch to current branch
+    dsi-vcs init                          # init repo in current directory
+    dsi-vcs add <path>...                 # stage paths for the next commit
+    dsi-vcs delete <path>...              # stage paths for deletion
+    dsi-vcs remove <path>...              # unstage paths
+    dsi-vcs commit [message]              # commit a new version
+    dsi-vcs log                           # list versions
+    dsi-vcs diff <v1> <v2>                # diff two versions
+    dsi-vcs restore <version>             # restore a version
+    dsi-vcs mount <mountpoint> [version]  # mount a version read-only via FUSE
+    dsi-vcs clone <path>                  # clone a repository
+    dsi-vcs branch <branch name>          # create a new branch
+    dsi-vcs list-branch                   # list branches
+    dsi-vcs merge <branch name>           # merge a branch to current branch
 
 Requirements:
-    sudo apt install acl         # for getfacl (ACL support)
+    sudo apt install acl                  # for getfacl (ACL support)
 """
 
 import os
@@ -1026,6 +1027,51 @@ class Version:
             conn.commit()
         conn.close()
         print(f" Restored to {full_hash} in branch '{branch_name}'")
+
+    def cmd_mount(self, commit_hash: Optional[str], mountpoint: str):
+        """Mount a commit read-only via FUSE, serving reads straight from the
+        chunk store instead of materializing tracked files into the working tree."""
+        try:
+            from .repolog.fuse_mount import mount_commit
+        except ImportError:
+            sys.exit(
+                "Mounting requires the optional 'pyfuse3' and 'trio' packages "
+                "(and libfuse3 on the host) — see requirements.fuse.txt."
+            )
+
+        root_folder = os.path.abspath(self.root_folder)
+        conn = open_db(root_folder)
+
+        if commit_hash in (None, "latest"):
+            branch_name = self._get_latest_branch_name(conn)
+            resolved_hash = self._get_tracked_commit_of_branch(conn, branch_name) if branch_name else None
+            if not resolved_hash:
+                conn.close()
+                sys.exit("No commits yet — nothing to mount.")
+        else:
+            resolved_hash = commit_hash
+
+        row = conn.execute(
+            "SELECT id, commit_hash, committed_at FROM versions "
+            "WHERE root_folder = ? AND commit_hash LIKE ?",
+            (root_folder, resolved_hash + "%"),
+        ).fetchone()
+        if not row:
+            conn.close()
+            sys.exit(f"Commit '{commit_hash}' not found.")
+
+        if not os.path.isdir(mountpoint):
+            conn.close()
+            sys.exit(f"Mountpoint '{mountpoint}' does not exist or is not a directory.")
+
+        chunk_dir = os.path.join(root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR)
+        print(f"Mounting {row['commit_hash'][:12]} at {mountpoint} (read-only — Ctrl-C to unmount)")
+        try:
+            mount_commit(conn, root_folder, row["commit_hash"], row["id"], row["committed_at"],
+                         chunk_dir, mountpoint)
+        finally:
+            conn.close()
+        print("Unmounted.")
 
     def cmd_clone(self, source_repo_path: str, target_repo_path: str):
         """Clone a dsi-vcs repository from source to target."""
