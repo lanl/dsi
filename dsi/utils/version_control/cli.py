@@ -56,7 +56,11 @@ def main():
     p_clone.add_argument("dest_path", nargs="?", default=None)
 
     sub.add_parser("status", help="Show current branch, commit, and staged files")
-    
+
+    p_mount = sub.add_parser("mount", help="Mount a commit read-only via FUSE (no working tree creation)")
+    p_mount.add_argument("mountpoint")
+    p_mount.add_argument("commit", nargs="?", default=None)
+
     args = parser.parse_args(args=None if sys.argv[1:] else ["-h"])
 
     # parser.print_help()
@@ -102,6 +106,9 @@ def main():
     elif args.command == "status":
         vcs = Version(os.getcwd())
         vcs.cmd_status()
+    elif args.command == "mount":
+        vcs = Version(os.getcwd())
+        vcs.cmd_mount(args.commit, args.mountpoint)
 
 if __name__ == "__main__":
     # print("\n=== dsi-vcs: rsync-based file version control ===\n")

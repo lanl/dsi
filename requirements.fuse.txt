@@ -1,0 +1,9 @@
+# Optional: only required for `dsi-vcs mount` (read-only FUSE view of a
+# commit, backed directly by the chunk store — see
+# dsi/utils/version_control/repolog/fuse_mount.py).
+#
+# Also requires libfuse3 + fusermount3 on the host, e.g.:
+#   Gentoo:        emerge -av sys-fs/libfuse:3
+#   Debian/Ubuntu: apt install libfuse3-dev fuse3
+pyfuse3>=3.2.0
+trio>=0.22
