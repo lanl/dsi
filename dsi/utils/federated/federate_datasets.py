@@ -156,24 +156,18 @@ def get_file_size_and_download(hostname, username, password, remote_path, local_
 def get_file_size_and_download_with_progress(hostname: str, 
                                              username: str, 
                                              remote_path: str, 
-                                             local_folder: Optional[str] = None) -> Tuple[Optional[int], bool]:
-    """Get file size and download using SSH/SCP with progress display.
-    
-    Same as get_file_size_and_download but shows progress during download.
-    """
-    print(f"hostname: {hostname}, username: {username}, remote_path: {remote_path}")
+                                             local_folder: Optional[str] = None,
+                                             verbose: bool = False) -> Tuple[Optional[int], bool]:
+    """Get file size and download using SSH/SCP with progress display."""
     
     filename = os.path.basename(remote_path)
-    if local_folder is None:
-        local_folder = "."
+    local_folder = local_folder or "."
     local_path = os.path.join(local_folder, filename)
     os.makedirs(local_folder, exist_ok=True)
     
     try:
         # Get file size
-        print(f"Getting file size...")
         stat_command = f"stat -c %s {remote_path} 2>/dev/null || stat -f %z {remote_path}"
-        
         result = subprocess.run(
             ['ssh', f'{username}@{hostname}', stat_command],
             capture_output=True,
@@ -182,43 +176,40 @@ def get_file_size_and_download_with_progress(hostname: str,
         )
         
         if result.returncode != 0:
-            print(f"✗ Failed to get file size: {result.stderr.strip()}")
+            if verbose:
+                print(f"✗ Failed to get file size: {result.stderr.strip()}")
             return None, False
         
         file_size = int(result.stdout.strip())
-        print(f"File size: {file_size} bytes ({file_size / (1024*1024):.2f} MB)")
+        if verbose:
+            print(f"File size: {file_size / (1024*1024):.2f} MB")
         
-        # Download with progress (uses stderr for progress updates)
-        print(f"Downloading to {local_path}...")
-        
-        # Run SCP without capture_output to show progress in terminal
+        # Download with progress
         scp_result = subprocess.run(
-            ['scp', '-v', f'{username}@{hostname}:{remote_path}', local_path],
+            ['scp', f'{username}@{hostname}:{remote_path}', local_path],
             timeout=300
         )
         
         if scp_result.returncode != 0:
-            print(f"✗ Download failed")
             return file_size, False
         
-        # Verify
+        # Verify download
         if os.path.exists(local_path):
             downloaded_size = os.path.getsize(local_path)
-            if downloaded_size == file_size:
-                print(f"Success!!! Downloaded {downloaded_size} bytes")
-                return file_size, True
-            else:
-                print(f"⚠ Warning: Size mismatch. Expected {file_size}, got {downloaded_size}")
-                return file_size, False
-        else:
-            print(f"✗ File not found after download")
-            return file_size, False
+            success = downloaded_size == file_size
+            if verbose and success:
+                print(f"✓ Downloaded {downloaded_size / (1024*1024):.2f} MB")
+            return file_size, success
+        
+        return file_size, False
         
     except subprocess.TimeoutExpired:
-        print(f"✗ Operation timed out")
+        if verbose:
+            print(f"✗ Operation timed out")
         return None, False
     except Exception as e:
-        print(f"!!!! !!!! !!! Error: {e}")
+        if verbose:
+            print(f"✗ Error: {e}")
         return None, False
 
         
@@ -420,8 +411,20 @@ def pull_data(location_type: str,
     cleaned_location_type = location_type.strip().lower()
     filename = get_last_part(path)
 
+    if filename == "":
+        print(f"Could not get the filename from {path}")
+        return None
+    else:
+        print(f"Filename: {filename}")
+
     # Create folder for data
-    abs_path_workspace_folder = str(Path(abs_path_workspace_folder).resolve())
+    tmp_path = Path(abs_path_workspace_folder).resolve()
+    if not tmp_path:
+        print(f"{abs_path_workspace_folder} is invalid!!!")
+        return None
+
+    
+    abs_path_workspace_folder = str(tmp_path)
     if parent_hash:
         folder_hash, abs_path_db_folder = create_hashed_folder_from_path(parent_hash, abs_path_workspace_folder)
     else:
@@ -880,7 +883,7 @@ def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> lis
         print(f"Retreiving data for {endpoint_name} at {endpoint_db_path}")
     
         username = input("Username: ")
-        password = getpass.getpass("Password: ")  # Hidden input!
+        #password = getpass.getpass("Password: ")  # Hidden input!
     
         db_info = just_pull_data(location_type="hpc",
                       location=hpc_name,
@@ -916,7 +919,7 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
             print(f"Enter credentials for data at {row['location']} : {row['path']}")
             username = input("Username: ")
             password = getpass.getpass("Password: ")  # Hidden input!
-    
+
         db_info = pull_data(location_type=row['location_type'],
                   location=row['location'],
                   path=row['path'],
@@ -943,7 +946,8 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
 def get_remote_endpoints_ssh(hostname: str, 
                              username: str,
                             script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
-                            prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']) -> dict:
+                            prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'],
+                            verbose: bool = False) -> dict:
     """ Source bash script on remote server and retrieve environment variables matching specified prefixes.
     
     Args:
@@ -990,7 +994,6 @@ PYTHON_EOF
     print(f"Connecting to {hostname} as {username}...")
     
     try:
-        # Use system SSH with Kerberos authentication
         result = subprocess.run(
             ['ssh', f'{username}@{hostname}', command],
             capture_output=True,
@@ -998,47 +1001,39 @@ PYTHON_EOF
             timeout=30
         )
         
-        stdout_text = result.stdout.strip()
-        stderr_text = result.stderr.strip()
-        exit_code = result.returncode
-        
-        if exit_code != 0:
-            print(f"✗ Command failed with exit code {exit_code}")
-            if stderr_text:
-                print(f"Error: {stderr_text}")
+        if result.returncode != 0:
+            if verbose:
+                print(f"✗ Command failed: {result.stderr.strip()}")
             return {}
         
-        print(f"✓ Sourced {script_path} and reading endpoints...")
+        endpoints = json.loads(result.stdout.strip())
         
-        # Parse the JSON output
-        endpoints = json.loads(stdout_text)
-        
-        print(f"✓ Found {len(endpoints)} endpoints:")
-        for key, value in endpoints.items():
-            print(f"  {key} = {value}")
+        if verbose:
+            print(f"✓ Found {len(endpoints)} endpoints on {hostname}")
         
         return endpoints
         
     except subprocess.TimeoutExpired:
-        print(f"✗ Connection timed out after 30 seconds")
+        if verbose:
+            print(f"✗ Connection to {hostname} timed out")
         return {}
-    except json.JSONDecodeError as e:
-        print(f"✗ Failed to parse output: {e}")
-        print(f"Raw output: {stdout_text}")
-        if stderr_text:
-            print(f"Stderr: {stderr_text}")
+    except json.JSONDecodeError:
+        if verbose:
+            print(f"✗ Failed to parse endpoint data")
         return {}
     except FileNotFoundError:
-        print(f"✗ SSH command not found. Ensure SSH is installed.")
+        if verbose:
+            print(f"✗ SSH client not found")
         return {}
     except Exception as e:
-        print(f"!!!! !!!! !!! Error: {e}")
+        if verbose:
+            print(f"✗ Error: {e}")
         return {}
 
 
 
 
-def get_remote_endpoints(hostname: str, username: str, password: str, 
+def get_remote_endpoints_gui(hostname: str, username: str, password: str, 
                          script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
                          prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']) -> dict:
     """ Source bash script on remote server and retrieve environment variables matching specified prefixes.

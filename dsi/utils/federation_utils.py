@@ -132,16 +132,25 @@ def combine_csv(folder_path: str, output_csv: str) -> list:
 
 
 def get_last_part(s: str) -> str:
-    """Get the last part of a path or URL, which is often the filename. Works for both URLs and plain paths.
+    """Get the last part of a path or URL, which is often the filename.
     
     Arg:
         s (str): The input string, which can be a file path or a URL.
-
-    Returns:
-        str: The last part of the path or URL, typically the filename.
+    
+        Returns:
+            str: The last part of the path or URL, typically the filename.
     """
-    path = urlparse(s).path  # works for both URLs and plain paths
-    return PurePosixPath(path).name
+    try:
+        # Convert to string first (handles float, int, None, etc.)
+        s = str(s).strip()
+        
+        # Now parse it
+        path = urlparse(s).path
+        return PurePosixPath(path).name
+        
+    except Exception as e:
+        print(f"Cannot parse '{s}': {e}")
+        return ""
 
 
 

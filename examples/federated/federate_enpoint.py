@@ -1,4 +1,5 @@
 import getpass
+import sys
 from pathlib import Path
 
 from dsi.utils.federated.federate_datasets import (
@@ -20,15 +21,18 @@ prefixes=['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']
 
 endpoints_location = get_remote_endpoints_ssh(hpc_name, username, script_path, prefixes)
 
+if endpoints_location == {}:
+    print(f"No endpoints found at {script_path}!")
+    sys.exit(0)
 
 
 # Federate the data in specified folder
-rel_wrks_folder = input("Enter the name of the folder (on your computer) to federate to: ") #"test_federate_07"
+rel_wrks_folder = input("Enter the name of the folder (on your local computer) to federate to: ") #"test_federate_07"
 workspace_folder = str(Path(rel_wrks_folder).resolve())
 
 database_info = pull_data_endpoints(endpoints_location, hpc_name, workspace_folder)
 
-
+# /vast/home/pascalgrosset/dsi_sources_tests/load_dsi_endpoints.sh
 
 # In load_dsi_endpoints.sh
 # export DSI_ENDPOINT_CHICOMA_1="/users/pascalgrosset/dsi_test/dsi_hpc_sources.csv"
