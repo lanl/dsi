@@ -165,14 +165,15 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
 
 
 def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
-    for entry in os.listdir(root_folder):
-        if entry in {DB_NAME, SNAPSHOTS_DIR}:
-            continue
-        path = os.path.join(root_folder, entry)
-        if os.path.isdir(path) and not os.path.islink(path):
-            shutil.rmtree(path)
-        elif os.path.lexists(path):
-            os.unlink(path)
+    # TODO: implemente stash, then uncomment the follwoing.
+    # for entry in os.listdir(root_folder):
+    #     if entry in {DB_NAME, SNAPSHOTS_DIR}:
+    #         continue
+    #     path = os.path.join(root_folder, entry)
+    #     if os.path.isdir(path) and not os.path.islink(path):
+    #         shutil.rmtree(path)
+    #     elif os.path.lexists(path):
+    #         os.unlink(path)
 
     rebuild_tree_from_chunks(conn, commit_hash, chunk_root, root_folder)
 
