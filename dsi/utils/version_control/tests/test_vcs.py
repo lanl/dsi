@@ -6,6 +6,7 @@ import stat
 
 from dsi.utils.version_control.dsi_vcs import Version
 from dsi.utils.version_control.vcs_db import DB_NAME, SNAPSHOTS_DIR
+from dsi.utils.version_control.repolog.chunking import CHUNK_STORAGE_DIR
 
 def require_rsync():
     if which("rsync") is None:
@@ -20,7 +21,7 @@ def commits(repo_path):
     with connect_repo(repo_path) as conn:
         conn.row_factory = sqlite3.Row
         return conn.execute(
-            "SELECT id, commit_hash, snapshot_path FROM versions ORDER BY id"
+            "SELECT id, commit_hash FROM versions ORDER BY id"
             ).fetchall()
 
 def test_add(tmp_path):
@@ -38,20 +39,23 @@ def test_add(tmp_path):
 
     repo.cmd_add(["a.txt", "nested", "empty"])
     repo.cmd_commit("alpha")
+    alpha_hash = commits(tmp_path)[-1]["commit_hash"]
 
     (tmp_path / "c.txt").write_text("baz")
 
     repo.cmd_add(["c.txt"])
     repo.cmd_commit("beta")
+    beta_hash = commits(tmp_path)[-1]["commit_hash"]
 
-    alpha, beta = commits(tmp_path)
-    alpha_path = Path(alpha["snapshot_path"])
-    beta_path = Path(beta["snapshot_path"])
-    assert (alpha_path / "a.txt").read_text() == "foo"
-    assert (alpha_path / "nested" / "child" / "b.txt").read_text() == "bar"
-    assert (beta_path / "c.txt").read_text() == "baz"
-    assert (alpha_path / "empty").exists()
-    assert stat.S_IMODE((alpha_path / "empty").stat().st_mode) == 0o2775
+    repo.cmd_restore(alpha_hash)
+    assert (tmp_path / "a.txt").read_text() == "foo"
+    assert (tmp_path / "nested" / "child" / "b.txt").read_text() == "bar"
+    assert (tmp_path / "empty").exists()
+    assert stat.S_IMODE((tmp_path / "empty").stat().st_mode) == 0o2775
+    assert not (tmp_path / "c.txt").exists()
+
+    repo.cmd_restore(beta_hash)
+    assert (tmp_path / "c.txt").read_text() == "baz"
 
 
 def test_commit_only_includes_staged_files(tmp_path):
@@ -68,13 +72,13 @@ def test_commit_only_includes_staged_files(tmp_path):
     repo.cmd_add(["c.txt"])
     repo.cmd_commit("second")
 
-    latest_commit = commits(tmp_path)[-1]
-    snapshot_path = Path(latest_commit["snapshot_path"])
+    latest_hash = commits(tmp_path)[-1]["commit_hash"]
+    repo.cmd_restore(latest_hash)
 
-    assert (snapshot_path / "a.txt").read_text() == "first"
-    assert (snapshot_path / "b.txt").read_text() == "second"
-    assert (snapshot_path / "c.txt").read_text() == "third"
-    assert not (snapshot_path / "keep.txt").exists()
+    assert (tmp_path / "a.txt").read_text() == "first"
+    assert (tmp_path / "b.txt").read_text() == "second"
+    assert (tmp_path / "c.txt").read_text() == "third"
+    assert not (tmp_path / "keep.txt").exists()
 
 
 def test_commit_records_active_branch_name_in_branch_links(tmp_path):
@@ -113,12 +117,14 @@ def test_chunking_persists_chunks_to_disk(tmp_path):
 
     with connect_repo(tmp_path) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT chunk_hash, chunk_path FROM chunk_store").fetchall()
+        rows = conn.execute("SELECT chunk_hash FROM chunk_store").fetchall()
 
     assert rows
+    chunk_dir = tmp_path / SNAPSHOTS_DIR / CHUNK_STORAGE_DIR
     for row in rows:
-        assert Path(row["chunk_path"]).exists()
-        assert Path(row["chunk_path"]).stat().st_size > 0
+        chunk_path = chunk_dir / row["chunk_hash"]
+        assert chunk_path.exists()
+        assert chunk_path.stat().st_size > 0
 
 
 def test_switch_restores_branch_snapshot(tmp_path):

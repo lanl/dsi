@@ -72,6 +72,13 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         (commit_hash,),
     ).fetchall()
 
+    dir_rows = conn.execute(
+        "SELECT merkle_nodes.relative_path FROM merkle_nodes, versions "
+        "WHERE merkle_nodes.version_id = versions.id AND versions.commit_hash = ? "
+        "AND merkle_nodes.file_type = 'dir' AND merkle_nodes.relative_path <> '.'",
+        (commit_hash,),
+    ).fetchall()
+
     grouped: dict[str, list[tuple[str, int]]] = {}
     access_checked = dict[str, str]()
     for row in rows:
@@ -100,6 +107,16 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
         with open(target_path, "wb") as handle:
             handle.write(data)
+
+    '''
+    Always create directories: chunk_store only contains file content
+    so we would otherwise miss empty directories.
+    '''
+    for row in dir_rows:
+        rel_path = row["relative_path"]
+        os.makedirs(snapshot_target(target_tree, rel_path), exist_ok=True)
+        if rel_path not in access_checked:
+            access_checked[rel_path] = check_access_permission(conn, target_tree, commit_hash, rel_path, "read")
 
     # update acl text, owner, group, and permissions
     for rel_path in access_checked:
@@ -148,14 +165,14 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
 
 
 def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
-    # for entry in os.listdir(root_folder):
-    #     if entry in {DB_NAME, SNAPSHOTS_DIR}:
-    #         continue
-    #     path = os.path.join(root_folder, entry)
-    #     if os.path.isdir(path) and not os.path.islink(path):
-    #         shutil.rmtree(path)
-    #     elif os.path.lexists(path):
-    #         os.unlink(path)
+    for entry in os.listdir(root_folder):
+        if entry in {DB_NAME, SNAPSHOTS_DIR}:
+            continue
+        path = os.path.join(root_folder, entry)
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path)
+        elif os.path.lexists(path):
+            os.unlink(path)
 
     rebuild_tree_from_chunks(conn, commit_hash, chunk_root, root_folder)
 
@@ -386,17 +403,15 @@ class Version:
 
         commit_hash = row["commit_hash"]
         now = _utcnow()
-        latest_branch_name = self._get_latest_branch_name(conn)
-        if latest_branch_name != branch_name:
-            conn.execute(
-                "UPDATE branches SET is_latest=0 WHERE root_folder=? AND branch_name<>?",
-                (self.root_folder, latest_branch_name),
-            )
-            cur.execute(
-                "INSERT OR IGNORE INTO branches (root_folder, branch_name, head_commit_hash, tracked_commit_hash, is_latest, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (self.root_folder, branch_name, commit_hash, commit_hash, 1, now),
-            )
+        '''
+        Branch creation only creates (does not activate) the branch.
+        Use switch to move to a new branch.
+        '''
+        cur.execute(
+            "INSERT OR IGNORE INTO branches (root_folder, branch_name, head_commit_hash, tracked_commit_hash, is_latest, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (self.root_folder, branch_name, commit_hash, commit_hash, 0, now),
+        )
         conn.commit()
         conn.close()
         print(f"Created branch '{branch_name}' at {commit_hash[:12]}")
@@ -642,7 +657,7 @@ class Version:
         )
         conn.commit()
 
-        latest_commit_hash = self._get_latest_commit_of_branch(conn, branch_name)
+        latest_commit_hash = self._get_tracked_commit_of_branch(conn, branch_name)
         if not latest_commit_hash:
             conn.close()
             sys.exit(f"No commit found for branch '{branch_name}'.")
