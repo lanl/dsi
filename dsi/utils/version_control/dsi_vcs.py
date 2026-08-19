@@ -851,6 +851,43 @@ class Version:
             ).fetchone()
             return row["count"] if row else 0
 
+        def compare_lists(list_a, list_b):
+            equal = []
+            different = []
+            added_to_a = []
+            added_to_b = []
+            i = 0
+            j = 0
+
+            while i < len(list_a) and j < len(list_b):
+                if list_a[i] == list_b[j]:
+                    equal.append((i, j))
+                    i += 1
+                    j += 1
+                    continue
+                try:
+                    next_j = list_b.index(list_a[i], j + 1)
+                except ValueError:
+                    next_j = None
+                try:
+                    next_i = list_a.index(list_b[j], i + 1)
+                except ValueError:
+                    next_i = None
+
+                if next_j is not None and (next_i is None or next_j - j <= next_i - i):
+                    added_to_b.extend(range(j, next_j))
+                    j = next_j
+                elif next_i is not None:
+                    added_to_a.extend(range(i, next_i))
+                    i = next_i
+                else:
+                    different.append((i, j))
+                    i += 1
+                    j += 1
+            added_to_a.extend(range(i, len(list_a)))
+            added_to_b.extend(range(j, len(list_b)))
+            return equal, different, added_to_a, added_to_b
+
         def compare_file_contents(commit1, file_entry1, commit2, file_entry2):
             tmpdir = tempfile.mkdtemp()
             first_file = file_entry1["absolute_path"]
@@ -902,33 +939,37 @@ class Version:
             shutil.rmtree(tmpdir)
             if f1_hash == f2_hash:
                 return True
-            rows = conn.execute(
-                "SELECT "
-                "    COALESCE(a.chunk_index, b.chunk_index) AS chunk_index, "
-                "    a.chunk_hash AS old_hash, "
-                "    b.chunk_hash AS new_hash "
-                "FROM "
-                "    (SELECT chunk_index, chunk_hash FROM chunk_store "
-                "     WHERE commit_hash LIKE ? AND relative_file_path = ?) a "
-                "FULL OUTER JOIN "
-                "    (SELECT chunk_index, chunk_hash FROM chunk_store "
-                "     WHERE commit_hash LIKE ? AND relative_file_path = ?) b "
-                "    ON a.chunk_index = b.chunk_index "
-                "WHERE "
-                "    a.chunk_hash IS NOT b.chunk_hash OR "
-                "    (a.chunk_hash IS NULL AND b.chunk_hash IS NOT NULL) OR "
-                "    (a.chunk_hash IS NOT NULL AND b.chunk_hash IS NULL);",
-                (commit1 + "%", file_entry1["relative_path"], commit2 + "%", file_entry2["relative_path"])
+            old_rows = conn.execute(
+                "SELECT chunk_hash "
+                "FROM chunk_store "
+                "WHERE commit_hash LIKE ? AND relative_file_path = ? "
+                "ORDER BY chunk_index;",
+                (commit1 + "%", file_entry1["relative_path"])
             ).fetchall()
 
-            for row in rows:
-                first_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, row['old_hash'])
-                second_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, row['new_hash'])
+            new_rows = conn.execute(
+                "SELECT chunk_hash "
+                "FROM chunk_store "
+                "WHERE commit_hash LIKE ? AND relative_file_path = ? "
+                "ORDER BY chunk_index;",
+                (commit2 + "%", file_entry2["relative_path"])
+            ).fetchall()
+
+            list_old = [row[0] for row in old_rows]
+            list_new = [row[0] for row in new_rows]
+            equal, different, added_a, added_b = compare_lists(list_old, list_new)
+
+            # print(different, added_a, added_b)
+            for diff in different:
+                first_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, list_old[diff[0]])
+                second_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, list_new[diff[1]])
                 result = subprocess.run(['diff', first_file, second_file], capture_output=True, text=True)
                 print(f"diff result: {result.stdout.strip()}")
-            return len(rows) == 0
-
-
+            if len(added_a) > 0:
+                print(f"New content added in {commit1}")
+            if len(added_b) > 0:
+                print(f"New content added in {commit2}")
+            return (len(different) + len(added_a) + len(added_b)) == 0
 
         files1 = files2 = {}
         unchanged = 0
@@ -959,12 +1000,6 @@ class Version:
         print("─" * 70)
 
         for p in all_paths:
-            # if p in files1 and p not in files2:
-            #     print(f"{'DELETED':<10} {p:<40} in {c2}")
-            #     deleted += 1
-            # elif p in files2 and p not in files1:
-            #     print(f"{'ADDED':<10} {p:<40} in {c2}")
-            #     added += 1
             if p not in files1:
                 print(f"{'ADDED':<10} {p:<40} in {c2}")
                 added += 1
