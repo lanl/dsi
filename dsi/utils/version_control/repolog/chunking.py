@@ -1,5 +1,6 @@
 import hashlib
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 from .log_record import _utcnow
@@ -470,8 +471,22 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
             chunk_path = os.path.join(chunk_dir, chunk['sha256'])
             h.update(chunk['sha256'].encode('utf-8'))
             if not os.path.exists(chunk_path):
-                with open(chunk_path, "wb") as handle:
-                    handle.write(chunk['data'])
+                fd, temp_path = tempfile.mkstemp(
+                    dir=chunk_dir, prefix=f".{chunk['sha256']}.", suffix=".tmp"
+                )
+                try:
+                    os.chmod(temp_path, 0o600)
+                    with os.fdopen(fd, "wb") as handle:
+                        fd = None
+                        handle.write(chunk['data'])
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.replace(temp_path, chunk_path)
+                finally:
+                    if fd is not None:
+                        os.close(fd)
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
             conn.execute(
                 "INSERT INTO chunk_store "
                 "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) VALUES (?, ?, ?, ?, ?, ?)",
@@ -482,14 +497,20 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
         chunk_length[entry['relative_path']] = len(all_chunks)
     return file_hashes, chunk_hashes, chunk_length
 
-def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_hash: str, output_path: str) -> bool:
+def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_hash: str, file_hash: str, output_path: str) -> bool:
     chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
     rows = conn.execute(
         "SELECT chunk_hash, chunk_size FROM chunk_store WHERE relative_file_path = ? AND commit_hash LIKE ? ORDER BY chunk_index",
         (relative_path, commit_hash + "%")
     ).fetchall()
     chunk_hashes = [row['chunk_hash'] for row in rows]
-    # print(f"Rebuilding {relative_path} from chunks: {chunk_hashes} commit_hash={commit_hash}")
+
+    chunk_hash_digest = hashlib.sha256()
+    for chunk_hash in chunk_hashes:
+        chunk_hash_digest.update(chunk_hash.encode('utf-8'))
+    if chunk_hash_digest.hexdigest() != file_hash:
+        return False
+
     try:
         os.makedirs(os.path.dirname(os.path.join(output_path, relative_path)), exist_ok=True)
         with open(os.path.join(output_path, relative_path), "wb") as out_file:

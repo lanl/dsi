@@ -786,7 +786,7 @@ class Version:
 
         def get_merkle_nodes(version_id):
             rows = conn.execute(
-                "SELECT relative_path, file_type, node_hash, metadata_hash "
+                "SELECT relative_path, file_type, node_hash, metadata "
                 "FROM merkle_nodes WHERE version_id=?",
                 (version_id,),
             ).fetchall()
@@ -826,7 +826,7 @@ class Version:
                     return
 
                 if path != ".":
-                    if n1["file_type"] != n2["file_type"] or n1["metadata_hash"] != n2["metadata_hash"]:
+                    if n1["file_type"] != n2["file_type"] or n1["metadata"] != n2["metadata"]:
                         changed_paths.add(path)
                     elif n1["file_type"] != "dir":
                         changed_paths.add(path)
@@ -882,11 +882,11 @@ class Version:
                 f2_hash = rows['content_hash_sha256'] if rows else None
             compare_latest = False
             if commit2 == "latest" and \
-                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry1["relative_path"], commit1, tmpdir) is True:
+                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry1["relative_path"], commit1, f1_hash, tmpdir) is True:
                 first_file = os.path.join(tmpdir, file_entry1["relative_path"])
                 compare_latest = True
             if commit1 == "latest" and \
-                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry2["relative_path"], commit2, tmpdir) is True:
+                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry2["relative_path"], commit2, f2_hash, tmpdir) is True:
                 second_file = os.path.join(tmpdir, file_entry2["relative_path"])
                 compare_latest = True
             
