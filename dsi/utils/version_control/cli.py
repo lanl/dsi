@@ -41,6 +41,7 @@ def main():
 
     p_log = sub.add_parser("log", help="List all commits")
     p_log.add_argument("branch_name", nargs="?", default=None)
+    p_log.add_argument("v_limit", nargs="?", default=10, type=int)
 
     p_diff = sub.add_parser("diff", help="Diff two commits")
     p_diff.add_argument("c1", nargs="?", default=None)
@@ -51,6 +52,7 @@ def main():
 
     p_clone = sub.add_parser("clone", help="Clone a remote repo")
     p_clone.add_argument("repo_url")
+    p_clone.add_argument("dest_path", nargs="?", default=None)
     
     args = parser.parse_args(args=None if sys.argv[1:] else ["-h"])
 
@@ -87,13 +89,13 @@ def main():
         vcs.cmd_diff(args.c1, args.c2)
     elif args.command == "log":
         vcs = Version(os.getcwd())
-        vcs.cmd_log(args.branch_name)
+        vcs.cmd_log(args.branch_name, args.v_limit)
     elif args.command == "restore":
         vcs = Version(os.getcwd())
         vcs.cmd_restore(args.version)
     elif args.command == "clone":
         vcs = Version(os.getcwd())
-        vcs.cmd_clone(args.repo_url, os.getcwd())
+        vcs.cmd_clone(args.repo_url, args.dest_path)
 
 if __name__ == "__main__":
     # print("\n=== dsi-vcs: rsync-based file version control ===\n")

@@ -63,7 +63,7 @@ def copy_path_into_snapshot(root_folder: str, snapshot_path: str, abs_path: str)
 def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tree: str) -> None:
     if not commit_hash:
         os.makedirs(target_tree, exist_ok=True)
-        return
+        return False
 
     chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
     rows = conn.execute(
@@ -93,20 +93,26 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
             grouped.setdefault(row["relative_file_path"], []).append((row["chunk_hash"], row["chunk_index"]))
         
 
-    for rel_path, chunks in grouped.items():
-        data = bytearray()
-        for chunk_hash, _chunk_index in sorted(chunks, key=lambda item: item[1]):
-            chunk_path = os.path.join(chunk_dir, chunk_hash)
-            if not os.path.exists(chunk_path):
-                continue
-            with open(chunk_path, "rb") as handle:
-                data.extend(handle.read())
-        if not data:
-            continue
-        target_path = snapshot_target(target_tree, rel_path)
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, "wb") as handle:
-            handle.write(data)
+    try:
+        for rel_path, chunks in grouped.items():
+            data = bytearray()
+            for chunk_hash, _chunk_index in sorted(chunks, key=lambda item: item[1]):
+                chunk_path = os.path.join(chunk_dir, chunk_hash)
+                if not os.path.exists(chunk_path):
+                    print(f"---> Chunk not found for chunk hash: {chunk_path}")
+                    return False
+                with open(chunk_path, "rb") as handle:
+                    data.extend(handle.read())
+            if not data:
+                print(f"--> Corrupted chunk data")
+                return False
+            target_path = snapshot_target(target_tree, rel_path)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, "wb") as handle:
+                handle.write(data)
+    except Exception as e:
+        print(f"---> Error occurred which rebuilding chunks: {e}")
+        return False
 
     '''
     Always create directories: chunk_store only contains file content
@@ -161,7 +167,7 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
 
             if os.geteuid() == 0 or owner_name(os.getuid()) == metadata.get("owner_name"):
                 os.chmod(target_path, permissions_int)
-
+    return True
 
 
 def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
@@ -175,7 +181,7 @@ def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root
     #     elif os.path.lexists(path):
     #         os.unlink(path)
 
-    rebuild_tree_from_chunks(conn, commit_hash, chunk_root, root_folder)
+    return rebuild_tree_from_chunks(conn, commit_hash, chunk_root, root_folder)
 
 
 # ─────────────────────────── COMMANDS ────────────────────────────────────────
@@ -420,6 +426,7 @@ class Version:
 
     def cmd_merge(self, branch_name: str, target_commit: Optional[str] = None):
         """Merge the named branch into the current HEAD by recording a parent-child link."""
+        # TODO: implement three way merge.
         conn = open_db(self.root_folder)
         cur = conn.cursor()
 
@@ -488,7 +495,7 @@ class Version:
         for added_paths in staged_adds:
             entries_in_last_commit.add(os.path.relpath(added_paths, start=self.root_folder))
         for deleted_paths in staged_deletes:
-            entries_in_last_commit.remove(os.path.relpath(deleted_paths, start=self.root_folder))
+            entries_in_last_commit.discard(os.path.relpath(deleted_paths, start=self.root_folder))
 
         # ── Collect metadata for the complete committed tree ───────────────────
         entries = []
@@ -672,11 +679,14 @@ class Version:
             sys.exit(f"No commit found for branch '{branch_name}'.")
 
         print(f"Switching to branch '{branch_name}' at {version_row['commit_hash'][:12]}")
-        materialize_commit_to_worktree(conn, version_row["commit_hash"], os.path.join(self.root_folder, SNAPSHOTS_DIR), self.root_folder)
+        result = materialize_commit_to_worktree(conn, version_row["commit_hash"], os.path.join(self.root_folder, SNAPSHOTS_DIR), self.root_folder)
         conn.close()
-        print(f"Restored branch snapshot into {self.root_folder}")
+        if result is False:
+            print(f"Failed to switch branch: {branch_name}.")
+        else:
+            print(f"Restored branch snapshot into {self.root_folder}")
 
-    def cmd_log(self, branch_name: str = None):
+    def cmd_log(self, branch_name: str = None, v_limit: int = 10):
         root_folder = os.path.abspath(self.root_folder)
         conn = open_db(root_folder)
 
@@ -693,8 +703,8 @@ class Version:
         rows = conn.execute(
             "SELECT commit_hash, committed_at, owner_name, message, file_count, total_bytes "
             "FROM versions, branch_links ON versions.commit_hash = branch_links.child_commit_hash "
-            "WHERE branch_links.child_branch_name=? ORDER BY versions.committed_at DESC",
-            (branch_name,),
+            "WHERE branch_links.child_branch_name=? ORDER BY versions.committed_at DESC LIMIT ?",
+            (branch_name, v_limit,),
         ).fetchall()
 
         conn.close()
@@ -1044,8 +1054,12 @@ class Version:
 
         full_hash = row["commit_hash"]
         print(f"Restoring {commit_hash} from chunk store → {root_folder}")
-        materialize_commit_to_worktree(conn, full_hash, os.path.join(root_folder, SNAPSHOTS_DIR), root_folder)
+        result = materialize_commit_to_worktree(conn, full_hash, os.path.join(root_folder, SNAPSHOTS_DIR), root_folder)
 
+        if result is False:
+            conn.close()
+            sys.exit(f"Failed to restore version: {commit_hash}")
+        
         branch_name = "latest"
         row = conn.execute(
             "SELECT child_branch_name FROM branch_links "
@@ -1063,8 +1077,11 @@ class Version:
         conn.close()
         print(f" Restored to {full_hash} in branch '{branch_name}'")
 
-    def cmd_clone(self, source_repo_path: str, target_repo_path: str):
+    def cmd_clone(self, source_repo_path: str, target_repo_path: str = None):
         """Clone a dsi-vcs repository from source to target."""
+
+        if target_repo_path is None:
+            target_repo_path = os.getcwd()
         source_repo_path = os.path.abspath(source_repo_path)
         target_repo_path = os.path.abspath(target_repo_path)
 

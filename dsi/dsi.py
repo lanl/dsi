@@ -1327,18 +1327,17 @@ class DSI:
           -  delete: A required argument with the file(s) to delete from the staging area for the next commit, specified as a space-separated string or list of file paths.
           -  commit: An optional message describing the version being committed, specified as a string.
           -  branch: An optional argument to specify the name of the new branch, specified as a string.
-          -  merge: An optional argument to specify the branch to merge into the current branch, specified as a string.
+          -  merge: A required argument with the target branch name and an optional argument with the target commit hash, specified as two space separated strings.
           -  list-branch: No additional arguments are required for this command.
           -  switch: A required argument to specify the branch to switch to, specified as a string.
-          -  log: An optional argument to specify the number of recent versions to display, specified as an integer. If not provided, recent 5 versions are displayed.
+          -  log: Two optional arguments, one to specify the branch name and the other to indicate the number of recent versions to display. If no argument is provided, recent 10 versions are displayed for the latest branch.
           -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
           -  restore: A required argument to specify the version to restore, specified by its commit hash.
-          -  clone: A required argument to specify the path of the remote repository to clone.
+          -  clone: A required argument to specify the path of the remote repository to clone and an optional argument (default is current working directory) to specify the path where the repository will be cloned.
         """
         if command == "init":
             if args is None:
                 raise RuntimeError("version() ERROR: 'init' command requires a 'root_folder' argument specifying the name of the root folder for the versioning repository.")
-            
             self.vcs = Version(args)
         elif command == "add" and self.vcs is not None:
             if args is None:
@@ -1387,15 +1386,34 @@ class DSI:
                     raise RuntimeError("version() ERROR: 'diff' command requires zero, one, or two commit hashes as arguments.")
             self.vcs.cmd_diff(c1, c2)
         elif command == "log" and self.vcs is not None:
-            self.vcs.cmd_log(args)
-            print("---->", args)
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'log' command requires branch name and log history limit.")
+            self.vcs.cmd_log(c1, int(c2))
         elif command == "restore" and self.vcs is not None:
             if args is None:
                 raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
             self.vcs.cmd_restore(args)
         elif command == "clone" and self.vcs is not None:
-            if args is None:
-                raise RuntimeError("version() ERROR: 'clone' command requires a 'remote_path' argument specifying the path of the remote repository to clone.")
-            self.vcs.cmd_clone(args)
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'clone' command requires source path and destination path.")
+            else:
+                raise RuntimeError("version() ERROR: 'clone' command requires 'source_path' argument specifying the path of the remote repository to clone and 'destination_path' argument specifying the path where the repository will be cloned.")
+            self.vcs.cmd_clone(c1, c2)
         else:
             raise RuntimeError("version() ERROR: Invalid command or versioning repository not initialized. Please check the command and ensure 'init' has been called with a root folder argument.")
