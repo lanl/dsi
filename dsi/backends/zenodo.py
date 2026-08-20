@@ -198,11 +198,6 @@ class Zenodo(Webserver):
 
         self.base_url = base_url.rstrip("/")
         self.records_api = f"{self.base_url}/api/records"
-        self.validate_error_msg = None
-
-        # skip data retrieval if only checking connection to zenodo
-        if kwargs.get("only_validate", False):
-            return
 
         self.timeout = kwargs.get("timeout", 60)
         self.verify_ssl = kwargs.get("verify_ssl", kwargs.get("verify", True))
@@ -213,6 +208,7 @@ class Zenodo(Webserver):
         self.validate_error_msg = None
         self.validate_on_init = kwargs.get("validate_on_init", True)
         self.auto_load = kwargs.get("auto_load", True)
+        self.only_validate = kwargs.get("only_validate", False)
 
         self.headers = {
             "User-Agent": "dsi-zenodo-backend/1.0",
@@ -241,6 +237,10 @@ class Zenodo(Webserver):
         self.raw_records = []
 
         self._initialize_empty_tables()
+
+        if self.only_validate:
+            self._loaded = False
+            return
 
         if self.validate_on_init and not self.validate_connection():
             self._loaded = False

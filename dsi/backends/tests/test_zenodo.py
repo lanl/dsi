@@ -21,6 +21,10 @@ import requests
 from dsi.backends.zenodo import Zenodo
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore::urllib3.exceptions.InsecureRequestWarning"
+)
+
 TEST_RECORD_IDS = ["16537543", "16537544"]
 TEST_DOI = "10.5281/zenodo.16537543"
 
@@ -49,7 +53,10 @@ def sample_zenodo_record(
                 "checksum": f"md5:{record_id}csvchecksum",
                 "mimetype": "text/csv",
                 "links": {
-                    "self": f"https://zenodo.org/api/records/{record_id}/files/sample_{record_id}.csv/content"
+                    "self": (
+                        "https://zenodo.org/api/records/"
+                        f"{record_id}/files/sample_{record_id}.csv/content"
+                    )
                 },
             }
         )
@@ -62,7 +69,10 @@ def sample_zenodo_record(
                 "checksum": f"md5:{record_id}jsonchecksum",
                 "mimetype": "application/json",
                 "links": {
-                    "self": f"https://zenodo.org/api/records/{record_id}/files/metadata_{record_id}.json/content"
+                    "self": (
+                        "https://zenodo.org/api/records/"
+                        f"{record_id}/files/metadata_{record_id}.json/content"
+                    )
                 },
             }
         )
@@ -180,7 +190,7 @@ def mock_url_exists(self, url):
     return True, 200, "application/octet-stream"
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def mocked_zenodo():
     """Patch network helpers once so tests are deterministic and offline."""
     monkeypatch = pytest.MonkeyPatch()
@@ -192,9 +202,15 @@ def mocked_zenodo():
     monkeypatch.undo()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def loaded_backend(mocked_zenodo):
-    """Shared loaded backend for non-destructive tests."""
+    """
+    Shared loaded backend for non-destructive tests.
+
+    Do not call close() on this fixture from an individual test. Tests that
+    intentionally unload or invalidate backend state should use a dedicated
+    fixture instead.
+    """
     instance = Zenodo(
         params={
             "record_id": TEST_RECORD_IDS,
@@ -210,7 +226,7 @@ def loaded_backend(mocked_zenodo):
         instance.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def keyword_backend(mocked_zenodo):
     """Shared backend loaded through keyword search."""
     instance = Zenodo(
@@ -229,7 +245,7 @@ def keyword_backend(mocked_zenodo):
         instance.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def empty_result_backend(mocked_zenodo):
     """Shared backend for an empty search result."""
     instance = Zenodo(
@@ -248,7 +264,7 @@ def empty_result_backend(mocked_zenodo):
         instance.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def empty_backend(mocked_zenodo):
     """Shared backend with empty initialized tables for helper tests."""
     instance = Zenodo(
@@ -263,9 +279,29 @@ def empty_backend(mocked_zenodo):
         instance.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def mutable_backend(mocked_zenodo):
-    """Fresh backend for tests that intentionally mutate loaded state."""
+    """Shared backend for tests that do not need loaded table state."""
+    instance = Zenodo(
+        auto_load=False,
+        validate_on_init=False,
+        validate_resource_urls=False,
+    )
+
+    yield instance
+
+    if instance._loaded:
+        instance.close()
+
+
+@pytest.fixture(scope="module")
+def api_backend(mocked_zenodo):
+    """
+    Shared backend for API-backed find_relation tests.
+
+    These tests intentionally reload this backend with different parameters,
+    but do not close it or leave it invalidated.
+    """
     instance = Zenodo(
         auto_load=False,
         validate_on_init=False,
@@ -279,10 +315,17 @@ def mutable_backend(mocked_zenodo):
 
 
 @pytest.fixture
-def api_backend(mocked_zenodo):
-    """Fresh backend for API-backed find_relation tests that reload state."""
+def error_backend(mocked_zenodo):
+    """
+    Dedicated backend for tests that intentionally raise from methods.
+
+    This avoids invalidating shared fixtures such as loaded_backend.
+    """
     instance = Zenodo(
-        auto_load=False,
+        params={
+            "record_id": TEST_RECORD_IDS,
+        },
+        auto_load=True,
         validate_on_init=False,
         validate_resource_urls=False,
     )
@@ -365,6 +408,20 @@ def test_zenodo_initialization_no_auto_load(empty_backend):
 
     assert list(datasets.columns) == Zenodo.DATASET_COLUMNS
     assert list(resources.columns) == Zenodo.RESOURCE_COLUMNS
+
+
+def test_zenodo_only_validate_initializes_without_loading(mocked_zenodo):
+    backend = Zenodo(
+        only_validate=True,
+        validate_on_init=False,
+        validate_resource_urls=False,
+    )
+
+    assert backend._loaded is False
+    assert backend.list(collection=True) == ["datasets", "resources"]
+    assert backend.validate_error_msg is None
+
+    backend.close()
 
 
 def test_zenodo_initialization_with_record_ids(loaded_backend):
@@ -802,6 +859,8 @@ def test_zenodo_query_artifacts_dict_not_implemented(mutable_backend):
                 "record_id": "16537543",
             }
         )
+
+
 # =============================================================================
 # 8) Find Operations
 # =============================================================================
@@ -906,6 +965,7 @@ def test_zenodo_find_relation_condition_split_args_local(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "datasets" for match in matches)
+    assert all(match.type == "cell" for match in matches)
 
 
 def test_zenodo_find_relation_contains(loaded_backend):
@@ -930,6 +990,7 @@ def test_zenodo_find_relation_numeric_resource_size(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "resources" for match in matches)
+    assert all(match.type == "cell" for match in matches)
 
 
 def test_zenodo_find_relation_format_exact(loaded_backend):
@@ -1011,10 +1072,6 @@ def test_zenodo_find_relation_plain_string_searches_api(api_backend):
     assert any("Climate" in title for title in datasets["title"])
 
 
-def test_zenodo_find_relation_invalid_relation_raises(loaded_backend):
-    with pytest.raises(ValueError):
-        loaded_backend.find_relation("resource_count", "bad relation")
-
 def test_zenodo_find_relation_api_record_id_list(api_backend):
     tables = api_backend.find_relation(["16537543", "16537544"])
 
@@ -1025,6 +1082,12 @@ def test_zenodo_find_relation_api_record_id_list(api_backend):
     datasets = api_backend.get_table("datasets")
     assert len(datasets) == 2
     assert set(datasets["dataset_id"]) == {"16537543", "16537544"}
+
+
+def test_zenodo_find_relation_invalid_relation_raises(error_backend):
+    with pytest.raises(ValueError):
+        error_backend.find_relation("resource_count", "bad relation")
+
 
 # =============================================================================
 # 9) URL Validation
@@ -1053,11 +1116,15 @@ class FakeSession:
 
 
 def test_zenodo_url_exists(loaded_backend):
+    original_session = loaded_backend.session
     loaded_backend.session = FakeSession()
 
-    exists, status_code, content_type = loaded_backend._url_exists(
-        "https://zenodo.org/example-file.csv"
-    )
+    try:
+        exists, status_code, content_type = loaded_backend._url_exists(
+            "https://zenodo.org/example-file.csv"
+        )
+    finally:
+        loaded_backend.session = original_session
 
     assert exists is True
     assert status_code == 200
@@ -1065,9 +1132,13 @@ def test_zenodo_url_exists(loaded_backend):
 
 
 def test_zenodo_validate_urls(loaded_backend):
+    original_session = loaded_backend.session
     loaded_backend.session = FakeSession()
 
-    results = loaded_backend.validate_urls()
+    try:
+        results = loaded_backend.validate_urls()
+    finally:
+        loaded_backend.session = original_session
 
     assert isinstance(results, list)
     assert len(results) >= 1
