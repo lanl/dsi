@@ -198,6 +198,11 @@ class Zenodo(Webserver):
 
         self.base_url = base_url.rstrip("/")
         self.records_api = f"{self.base_url}/api/records"
+        self.validate_error_msg = None
+
+        # skip data retrieval if only checking connection to zenodo
+        if kwargs.get("only_validate", False):
+            return
 
         self.timeout = kwargs.get("timeout", 60)
         self.verify_ssl = kwargs.get("verify_ssl", kwargs.get("verify", True))
@@ -207,7 +212,6 @@ class Zenodo(Webserver):
         self.token = kwargs.get("token", os.getenv("ZENODO_TOKEN"))
         self.validate_on_init = kwargs.get("validate_on_init", True)
         self.auto_load = kwargs.get("auto_load", True)
-        self.only_validate = kwargs.get("only_validate", False)
 
         self.headers = {
             "User-Agent": "dsi-zenodo-backend/1.0",
@@ -237,12 +241,9 @@ class Zenodo(Webserver):
 
         self._initialize_empty_tables()
 
-        if self.only_validate:
+        if self.validate_on_init and not self.validate_connection():
             self._loaded = False
-            return
-
-        if self.validate_on_init:
-            self.validate_connection()
+            raise ConnectionError(self.validate_error_msg or "Validating Zenodo connection failed.")
 
         if self.params and self.auto_load:
             self._load_initial_data(self.params)
@@ -328,20 +329,31 @@ class Zenodo(Webserver):
     def validate_connection(self):
         """
         Validate that Zenodo Records API is reachable.
+
+        Return
+        ------
+        bool
+            True if connection is valid, False otherwise.
         """
-        response = self.session.get(
-            self.records_api,
-            params={"size": 1},
-            timeout=self.timeout,
-            verify=self.verify_ssl,
-        )
-        response.raise_for_status()
+        try:
+            response = self.session.get(
+                self.records_api,
+                params={"size": 1},
+                timeout=self.timeout,
+                verify=self.verify_ssl,
+            )
+            response.raise_for_status()
 
-        data = response.json()
-        if "hits" not in data:
-            raise RuntimeError("Zenodo Records API returned unexpected response.")
+            data = response.json()
+            if "hits" not in data:
+                self.validate_error_msg = "Zenodo Records API returned unexpected response."
+                return False
 
-        return True
+            return True
+
+        except Exception as e:
+            self.validate_error_msg = f"Unable to connect to Zenodo API: {e}"
+            return False
 
     def ingest_artifacts(self, artifacts, **kwargs) -> None:
         """

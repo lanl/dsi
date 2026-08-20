@@ -106,7 +106,7 @@ class NDP(Webserver):
         if self.api_key:
             self.headers["Authorization"] = self.api_key
 
-        # skip data retrieval if only checking connection to oceans11
+        # skip data retrieval if only checking connection to ndp
         if kwargs.get("only_validate", False):
             return
 

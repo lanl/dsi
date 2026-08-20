@@ -230,7 +230,7 @@ class RCSBPDB(Webserver):
         self.params = params or {}
         self.validate_error_msg = None
 
-        # skip data retrieval if only checking connection to oceans11
+        # skip data retrieval if only checking connection to rcsbpdb
         if kwargs.get("only_validate", False):
             return
 
@@ -257,7 +257,7 @@ class RCSBPDB(Webserver):
 
         if self.validate_on_init and not self.validate_connection():
             self._loaded = False
-            raise ConnectionError(self.validate_error_msg or "RCSBPDB connection validation failed.")
+            raise ConnectionError(self.validate_error_msg or "Validating RCSBPDB connection failed.")
 
         if self.auto_load:
             try:
