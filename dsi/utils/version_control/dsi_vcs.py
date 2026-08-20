@@ -972,7 +972,7 @@ class Version:
 
             list_old = [row[0] for row in old_rows]
             list_new = [row[0] for row in new_rows]
-            equal, different, added_a, added_b = compare_lists(list_old, list_new)
+            _, different, added_a, added_b = compare_lists(list_old, list_new)
 
             # print(different, added_a, added_b)
             for diff in different:

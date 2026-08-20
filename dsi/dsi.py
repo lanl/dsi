@@ -1396,7 +1396,7 @@ class DSI:
                     c1, c2 = arg_list
                 elif len(arg_list) > 2:
                     raise RuntimeError("version() ERROR: 'log' command requires branch name and log history limit.")
-            self.vcs.cmd_log(c1, int(c2))
+            self.vcs.cmd_log(c1, 10 if c2 is None else int(c2))
         elif command == "restore" and self.vcs is not None:
             if args is None:
                 raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
