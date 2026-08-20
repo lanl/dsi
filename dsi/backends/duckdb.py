@@ -407,7 +407,7 @@ class DuckDB(Filesystem):
         """
         data = None
         command = query.strip().split(None, 1)[0].lower()
-        if command in {"select", "pragma"}:
+        if command in {"select", "pragma", "with"}:
             try:
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
