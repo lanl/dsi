@@ -210,6 +210,7 @@ class Zenodo(Webserver):
         self.retries = kwargs.get("retries", 3)
         self.use_truststore = kwargs.get("use_truststore", False)
         self.token = kwargs.get("token", os.getenv("ZENODO_TOKEN"))
+        self.validate_error_msg = None
         self.validate_on_init = kwargs.get("validate_on_init", True)
         self.auto_load = kwargs.get("auto_load", True)
 
@@ -243,7 +244,9 @@ class Zenodo(Webserver):
 
         if self.validate_on_init and not self.validate_connection():
             self._loaded = False
-            raise ConnectionError(self.validate_error_msg or "Validating Zenodo connection failed.")
+            raise ConnectionError(
+                self.validate_error_msg or "Validating Zenodo connection failed."
+            )
 
         if self.params and self.auto_load:
             self._load_initial_data(self.params)
@@ -343,10 +346,12 @@ class Zenodo(Webserver):
                 verify=self.verify_ssl,
             )
             response.raise_for_status()
-
             data = response.json()
+
             if "hits" not in data:
-                self.validate_error_msg = "Zenodo Records API returned unexpected response."
+                self.validate_error_msg = (
+                    "Zenodo Records API returned unexpected response."
+                )
                 return False
 
             return True
@@ -361,49 +366,11 @@ class Zenodo(Webserver):
         """
         raise NotImplementedError("Zenodo backend is read-only.")
 
-    def query_artifacts(self, query=None, dict_return=True, **kwargs):
-        """
-        Query Zenodo or filter already-loaded DSI tables.
-
-        Behavior
-        --------
-        query is dict:
-            Re-query Zenodo API and rebuild datasets/resources.
-
-        query is str and looks like a filter:
-            Apply pandas query syntax to loaded tables.
-
-        query is str and does not look like a filter:
-            Treat it as a Zenodo keyword search.
-
-        query is None:
-            Return loaded tables.
-        """
-        if query is None:
-            return self._cache if dict_return else self.get_tables_as_dataframes()
-
-        if isinstance(query, dict):
-            self.params = query
-            self._load_initial_data(self.params)
-            return self._cache if dict_return else self.get_tables_as_dataframes()
-
-        if isinstance(query, str):
-            looks_like_filter = any(
-                op in query
-                for op in ["==", "!=", ">=", "<=", ">", "<", " in ", ".str"]
-            )
-
-            if looks_like_filter:
-                return self._query_loaded_tables(query, dict_return=dict_return)
-
-            query_params = {"keywords": query}
-            query_params.update(kwargs)
-            self.params = query_params
-            self._load_initial_data(self.params)
-            return self._cache if dict_return else self.get_tables_as_dataframes()
-
-        raise TypeError("query_artifacts expects None, str, or dict.")
-
+    def query_artifacts(self, query, **kwargs):
+        raise NotImplementedError(
+            "query() is not implemented for Zenodo because it is not a SQL backend."
+        )
+        
     def get_table(self, table_name, dict_return=False, **kwargs):
         if not self._loaded:
             raise RuntimeError("No data loaded.")
@@ -601,91 +568,210 @@ class Zenodo(Webserver):
                     )
 
         return matches
+    
+    def _parse_find_query(self, query):
+        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
 
-    def find_relation(self, column_name, relation=None, **kwargs):
-        """
-        Filter rows using a column-level relation.
+        for op in operators:
+            pattern = rf"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*{re.escape(op)}\s*(.+?)\s*$"
+            match = re.match(pattern, query)
 
-        Supported call styles
-        ---------------------
-        1. Column + relation:
-            find_relation("resource_count", ">= '1'")
-            find_relation("format", "= 'csv'")
-            find_relation("title", "~ 'climate'")
+            if match:
+                column_name = match.group(1)
+                value = match.group(2).strip().strip("'").strip('"')
+                return column_name, op, value
 
-        2. One-string condition:
-            find_relation("resource_count >= 1")
-            find_relation("format = csv")
-            find_relation("title ~ climate")
+        return None
 
-        3. Zenodo API-backed lookup/search:
-            find_relation("record_id = 16537543")
-            find_relation("dataset_id = 16537543")
-            find_relation("doi = 10.5281/zenodo.16537543")
-            find_relation("keywords ~ climate")
-            find_relation("q ~ climate")
 
-        Returns
-        -------
-        list[ValueObject]
-            For local table filtering.
+    def _apply_pandas_filter(self, df, column, operator, value):
+        """Apply comparison filter using pandas."""
+        if operator == ">":
+            return df[df[column] > value]
 
-        OrderedDict
-            For Zenodo API-backed lookup/search calls. The returned object is
-            self.tables after reloading datasets/resources from the API.
-        """
-        if relation is None:
-            column_name, relation = self._parse_condition_string(column_name)
+        if operator == "<":
+            return df[df[column] < value]
 
-        if column_name is None or relation is None:
-            raise ValueError("find_relation requires a condition or column + relation.")
+        if operator == ">=":
+            return df[df[column] >= value]
 
-        column_name = str(column_name).strip()
-        relation = str(relation).strip()
+        if operator == "<=":
+            return df[df[column] <= value]
 
-        parsed = self._parse_relation(relation)
-        if parsed is None:
-            raise ValueError(
-                "Could not parse relation. Expected examples: "
-                ">= '1', = 'csv', ~ 'climate'."
-            )
+        if operator == "==":
+            return df[df[column] == value]
 
-        op, target_value = parsed
+        if operator == "!=":
+            return df[df[column] != value]
 
-        api_result = self._maybe_api_backed_find_relation(
-            column_name=column_name,
-            op=op,
-            target_value=target_value,
-            **kwargs,
-        )
-        if api_result is not None:
-            return api_result
-
-        if not self._loaded:
-            raise RuntimeError("No data loaded. Cannot find relation.")
-
-        matches = []
-
-        for table_name, table in self._cache.items():
-            df = pd.DataFrame(table)
-
-            if df.empty or column_name not in df.columns:
-                continue
-
-            mask = self._evaluate_relation(df[column_name], op, target_value)
-
-            for row_num in df[mask].index:
-                row_dict = df.loc[row_num].to_dict()
-                matches.append(
-                    self._row_to_value_object(
-                        table_name=table_name,
-                        row_num=int(row_num),
-                        row=row_dict,
-                        value_type="row",
-                    )
+        if operator == "contains":
+            return df[
+                df[column].astype(str).str.contains(
+                    str(value),
+                    case=False,
+                    na=False,
                 )
+            ]
 
-        return matches
+        if operator == "range":
+            min_val, max_val = value
+            return df[(df[column] >= min_val) & (df[column] <= max_val)]
+
+        return pd.DataFrame()
+
+
+    def _parse_value(self, value_str):
+        """Convert string to appropriate Python type."""
+        value_str = str(value_str).strip()
+
+        if (
+            value_str.startswith("'")
+            and value_str.endswith("'")
+        ) or (
+            value_str.startswith('"')
+            and value_str.endswith('"')
+        ):
+            value_str = value_str[1:-1]
+
+        try:
+            if "." not in value_str:
+                return int(value_str)
+            return float(value_str)
+        except ValueError:
+            return value_str
+
+    def find_relation(self, query, relation=None, **kwargs):
+        """
+        Supports both condition queries and Zenodo API-backed lookup/search.
+
+        Examples:
+            find_relation("resource_count", ">= 1")
+            find_relation("dataset_id", "= 16537543")
+            find_relation("title", "~~ climate")
+            find_relation("resource_count >= 1")
+            find_relation("16537543")
+            find_relation("10.5281/zenodo.16537543")
+            find_relation("climate", limit=2)
+            find_relation({"keywords": "climate", "limit": 2})
+            find_relation(["16537543", "16537544"])
+        """
+        if query is None:
+            return self.tables
+
+        try:
+            # find_relation("dataset_id", "= 16537543")
+            if relation is not None:
+                operator, value = self._parse_relation(relation)
+                matches = []
+
+                for table_name in self.list(collection=True):
+                    df = self.get_table(table_name, dict_return=False)
+
+                    if df.empty or query not in df.columns:
+                        continue
+
+                    if operator in {">", "<", ">=", "<=", "range"}:
+                        df[query] = pd.to_numeric(df[query], errors="coerce")
+                        df = df.dropna(subset=[query])
+
+                    filtered = self._apply_pandas_filter(df, query, operator, value)
+
+                    for idx, row in filtered.iterrows():
+                        vo = ValueObject()
+                        vo.t_name = table_name
+                        vo.c_name = list(df.columns)
+                        vo.row_num = int(idx) + 1
+                        vo.value = row.tolist()
+                        vo.type = "cell"
+                        matches.append(vo)
+
+                return matches
+
+            # One-string condition:
+            # find_relation("resource_count >= 1")
+            if isinstance(query, str):
+                parsed = self._parse_find_query(query)
+
+                if parsed is not None:
+                    column_name, op, target_value = parsed
+                    operator, value = self._parse_relation(f"{op} {target_value}")
+                    matches = []
+
+                    for table_name in self.list(collection=True):
+                        df = self.get_table(table_name, dict_return=False)
+
+                        if df.empty or column_name not in df.columns:
+                            continue
+
+                        if operator in {">", "<", ">=", "<=", "range"}:
+                            df[column_name] = pd.to_numeric(
+                                df[column_name],
+                                errors="coerce",
+                            )
+                            df = df.dropna(subset=[column_name])
+
+                        filtered = self._apply_pandas_filter(
+                            df,
+                            column_name,
+                            operator,
+                            value,
+                        )
+
+                        for idx, row in filtered.iterrows():
+                            vo = ValueObject()
+                            vo.t_name = table_name
+                            vo.c_name = list(df.columns)
+                            vo.row_num = int(idx) + 1
+                            vo.value = row.tolist()
+                            vo.type = "cell"
+                            matches.append(vo)
+
+                    return matches
+
+            # API-backed query path:
+            # find_relation({"keywords": "climate", "limit": 2})
+            if isinstance(query, dict):
+                self.params = query
+                self._load_initial_data(query)
+                self._loaded = True
+                return self.tables
+
+            # API-backed list path:
+            # find_relation(["16537543", "16537544"])
+            if isinstance(query, list):
+                self.params = {"record_id": query}
+                self._load_initial_data(self.params)
+                self._loaded = True
+                return self.tables
+
+            # API-backed string path:
+            # find_relation("16537543")
+            # find_relation("10.5281/zenodo.16537543")
+            # find_relation("climate", limit=2)
+            if isinstance(query, str):
+                normalized_record_id = self.normalize_record_id(query)
+                normalized_doi = self.normalize_doi(query)
+
+                if normalized_record_id:
+                    self.params = {"record_id": normalized_record_id}
+                    self._load_initial_data(self.params)
+                elif normalized_doi:
+                    self.params = {"doi": normalized_doi}
+                    self._load_initial_data(self.params)
+                else:
+                    query_params = {"keywords": query}
+                    query_params.update(kwargs)
+                    self.params = query_params
+                    self._load_initial_data(self.params)
+
+                self._loaded = True
+                return self.tables
+
+        except Exception:
+            self._loaded = False
+            raise
+
+        raise TypeError("find_relation() expects None, str, list, or dict.")
 
     def list(self, collection=False, **kwargs):
         if collection:
@@ -1198,124 +1284,57 @@ class Zenodo(Webserver):
         val.type = value_type
         return val
 
-    def _maybe_api_backed_find_relation(
-        self,
-        column_name,
-        op,
-        target_value,
-        **kwargs,
-    ):
+    
+    def _parse_relation(self, relation):
         """
-        Convert specific find_relation inputs into Zenodo API lookups/searches.
+        Parse relation string into operator and value.
 
-        API-backed calls reload self.tables and return self.tables.
+        Examples:
+        '> 5' -> ('>', 5)
+        '<= 10' -> ('<=', 10)
+        '== 3' -> ('==', 3)
+        "(2, 5)" -> ('range', (2, 5))
+        "~~ 'climate'" -> ('contains', 'climate')
         """
-        column = str(column_name).strip().lower()
-        value = str(target_value).strip()
-        limit = kwargs.get("limit")
+        relation = relation.strip()
 
-        params = None
+        if relation.startswith(">="):
+            return ">=", self._parse_value(relation[2:])
 
-        if op in {"=", "=="} and column in {
-            "record_id",
-            "recordid",
-            "dataset_id",
-            "id",
-        }:
-            normalized = self.normalize_record_id(value)
-            if not normalized:
-                raise ValueError(
-                    f"Invalid Zenodo record_id: {target_value}. "
-                    "Zenodo record IDs must be numeric."
+        if relation.startswith("<="):
+            return "<=", self._parse_value(relation[2:])
+
+        if relation.startswith("=="):
+            return "==", self._parse_value(relation[2:])
+
+        if relation.startswith("!="):
+            return "!=", self._parse_value(relation[2:])
+
+        if relation.startswith("~~"):
+            return "contains", self._parse_value(relation[2:])
+
+        if relation.startswith(">"):
+            return ">", self._parse_value(relation[1:])
+
+        if relation.startswith("<"):
+            return "<", self._parse_value(relation[1:])
+
+        if relation.startswith("="):
+            return "==", self._parse_value(relation[1:])
+
+        if relation.startswith("~"):
+            return "contains", self._parse_value(relation[1:])
+
+        if relation.startswith("(") and relation.endswith(")"):
+            parts = relation[1:-1].split(",")
+
+            if len(parts) == 2:
+                return "range", (
+                    self._parse_value(parts[0]),
+                    self._parse_value(parts[1]),
                 )
-            params = {"record_id": normalized}
 
-        elif op in {"=", "=="} and column in {"doi", "concept_doi"}:
-            doi = self.normalize_doi(value)
-            if not doi:
-                raise ValueError(
-                    f"Invalid DOI: {target_value}. "
-                    "Expected a DOI such as '10.5281/zenodo.16537543'."
-                )
-            params = {"doi": doi}
-
-        elif op in {"~", "~~", "=", "=="} and column in {"keywords", "keyword"}:
-            params = {"keywords": value}
-
-        elif op in {"~", "~~", "=", "=="} and column == "q":
-            params = {"q": value}
-
-        elif op in {"~", "~~", "=", "=="} and column in {
-            "communities",
-            "resource_type",
-            "access_right",
-        }:
-            params = {column: value}
-
-        if params is None:
-            return None
-
-        if limit is not None:
-            params["limit"] = limit
-        elif "limit" in self.params:
-            params["limit"] = self.params["limit"]
-
-        self.params = params
-        self._load_initial_data(params)
-        return self.tables
-
-    @staticmethod
-    def _parse_condition_string(condition):
-        if condition is None:
-            raise ValueError("find_relation condition cannot be None.")
-
-        condition = str(condition).strip()
-
-        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
-
-        in_single = False
-        in_double = False
-
-        for idx, char in enumerate(condition):
-            if char == "'" and not in_double:
-                in_single = not in_single
-            elif char == '"' and not in_single:
-                in_double = not in_double
-
-            if in_single or in_double:
-                continue
-
-            for op in operators:
-                if condition.startswith(op, idx):
-                    column_name = condition[:idx].strip()
-                    value = condition[idx + len(op):].strip()
-
-                    if not column_name or not value:
-                        raise ValueError(
-                            "One-string find_relation input must include "
-                            "column, operator, and value."
-                        )
-
-                    return column_name, f"{op} {value}"
-
-        raise ValueError(
-            "Could not parse one-string find_relation condition. "
-            "Expected examples: 'resource_count >= 1', 'format = csv'."
-        )
-
-    @staticmethod
-    def _parse_relation(relation):
-        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
-
-        relation = str(relation).strip()
-
-        for op in operators:
-            if relation.startswith(op):
-                value = relation[len(op):].strip()
-                value = value.strip("'").strip('"')
-                return op, value
-
-        return None
+        raise ValueError(f"Unknown relation format: {relation}")
 
     @staticmethod
     def _evaluate_relation(series, op, target_value):
@@ -1558,78 +1577,67 @@ class Zenodo(Webserver):
             for table_name, table in self._cache.items()
         }
 
-    def _query_loaded_tables(self, query, dict_return=True):
-        if not self._loaded:
-            raise RuntimeError("No data loaded. Cannot query empty backend.")
 
-        results = {}
-
-        for table_name, table in self._cache.items():
-            df = pd.DataFrame(table)
-
-            if df.empty:
-                continue
-
-            try:
-                result_df = df.query(query, engine="python")
-
-                if not result_df.empty:
-                    results[table_name] = (
-                        result_df.to_dict(orient="list")
-                        if dict_return
-                        else result_df
-                    )
-            except pd.errors.UndefinedVariableError:
-                continue
-            except Exception as exc:
-                raise ValueError(f"Query error in {table_name}: {exc}") from exc
-
-        if not results:
-            raise ValueError(f"Query returned no results: '{query}'")
-
-        if not dict_return:
-            if len(results) == 1:
-                return next(iter(results.values()))
-
-            return results
-
-        return results
-
-    def validate_urls(self):
-        resources = self._cache.get("resources", {})
-        urls = resources.get("download_url", [])
-
+    def validate_urls(self, table_name="resources", url_column="download_url", **kwargs):
+        rows = self.get_table(table_name)
+        results = []
         valid_list = []
 
-        for url in urls:
-            if not url:
-                valid_list.append(False)
-                continue
+        for idx, row in rows.iterrows():
+            url = row.get(url_column)
+            is_valid = False
+            status_code = None
+            error = None
+            method_used = None
 
             try:
-                response = self.session.head(
-                    url,
-                    allow_redirects=True,
-                    timeout=self.timeout,
-                    verify=self.verify_ssl,
-                )
-
-                if response.status_code == 405:
-                    response = self.session.get(
+                if not isinstance(url, str) or not url.strip():
+                    error = "missing_url"
+                else:
+                    response = self.session.head(
                         url,
-                        stream=True,
+                        allow_redirects=True,
                         timeout=self.timeout,
                         verify=self.verify_ssl,
                     )
+                    status_code = response.status_code
+                    method_used = "HEAD"
 
-                valid_list.append(200 <= response.status_code < 400)
-                response.close()
+                    if not (200 <= status_code < 400):
+                        response = self.session.get(
+                            url,
+                            stream=True,
+                            allow_redirects=True,
+                            timeout=self.timeout,
+                            verify=self.verify_ssl,
+                        )
+                        status_code = response.status_code
+                        method_used = "GET_STREAM"
 
-            except Exception:
-                valid_list.append(False)
+                    is_valid = 200 <= status_code < 400
+                    response.close()
 
-        resources["url_valid"] = valid_list
-        return valid_list
+            except Exception as exc:
+                error = str(exc)
+
+            valid_list.append(is_valid)
+
+            results.append(
+                {
+                    "row_num": idx,
+                    "table_name": table_name,
+                    "url": url,
+                    "is_valid": is_valid,
+                    "status_code": status_code,
+                    "method_used": method_used,
+                    "error": error,
+                }
+            )
+
+        if table_name == "resources" and "url_valid" in self.tables.get("resources", {}):
+            self.tables["resources"]["url_valid"] = valid_list
+
+        return results
 
     def __enter__(self):
         return self

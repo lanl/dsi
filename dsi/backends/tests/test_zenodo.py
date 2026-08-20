@@ -785,80 +785,23 @@ def test_zenodo_search_by_exact_doi(empty_backend):
 # 7) Query Artifacts
 # =============================================================================
 
-def test_zenodo_query_artifacts_none_returns_cache(loaded_backend):
-    tables = loaded_backend.query_artifacts(None)
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-    assert "resources" in tables
+def test_zenodo_query_artifacts_not_implemented(loaded_backend):
+    with pytest.raises(NotImplementedError):
+        loaded_backend.query_artifacts("resource_count >= 1")
 
 
-def test_zenodo_query_artifacts_none_dataframe_return(loaded_backend):
-    tables = loaded_backend.query_artifacts(None, dict_return=False)
-
-    assert isinstance(tables, dict)
-    assert "datasets" in tables
-    assert "resources" in tables
-    assert isinstance(tables["datasets"], pd.DataFrame)
-    assert isinstance(tables["resources"], pd.DataFrame)
+def test_zenodo_query_artifacts_none_not_implemented(loaded_backend):
+    with pytest.raises(NotImplementedError):
+        loaded_backend.query_artifacts(None)
 
 
-def test_zenodo_query_artifacts_filter_dataset(loaded_backend):
-    results = loaded_backend.query_artifacts(
-        "resource_count >= 1",
-        dict_return=False,
-    )
-
-    assert isinstance(results, pd.DataFrame)
-    assert not results.empty
-    assert "resource_count" in results.columns
-
-
-def test_zenodo_query_artifacts_filter_resource(loaded_backend):
-    results = loaded_backend.query_artifacts(
-        "size >= 0",
-        dict_return=False,
-    )
-
-    assert isinstance(results, pd.DataFrame)
-    assert not results.empty
-    assert "size" in results.columns
-
-
-def test_zenodo_query_artifacts_dict_reload(mutable_backend):
-    tables = mutable_backend.query_artifacts(
-        {
-            "record_id": "16537543",
-        }
-    )
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = mutable_backend.get_table("datasets")
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "16537543"
-
-
-def test_zenodo_query_artifacts_keyword_reload(mutable_backend):
-    tables = mutable_backend.query_artifacts(
-        "battery",
-        limit=2,
-    )
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = mutable_backend.get_table("datasets")
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "16537544"
-
-
-def test_zenodo_query_artifacts_invalid_type_raises(loaded_backend):
-    with pytest.raises(TypeError):
-        loaded_backend.query_artifacts(12345)
-
-
+def test_zenodo_query_artifacts_dict_not_implemented(mutable_backend):
+    with pytest.raises(NotImplementedError):
+        mutable_backend.query_artifacts(
+            {
+                "record_id": "16537543",
+            }
+        )
 # =============================================================================
 # 8) Find Operations
 # =============================================================================
@@ -953,7 +896,8 @@ def test_zenodo_find_relation_condition_string_local(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "datasets" for match in matches)
-    assert all(match.type == "row" for match in matches)
+    assert all(match.type == "cell" for match in matches)
+    assert all(isinstance(match.value, list) for match in matches)
 
 
 def test_zenodo_find_relation_condition_split_args_local(loaded_backend):
@@ -970,9 +914,12 @@ def test_zenodo_find_relation_contains(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "datasets" for match in matches)
+    assert all(match.type == "cell" for match in matches)
+
+    title_index = Zenodo.DATASET_COLUMNS.index("title")
 
     assert any(
-        "CLIMATE" in match.value["title"].upper()
+        "CLIMATE" in str(match.value[title_index]).upper()
         for match in matches
     )
 
@@ -991,11 +938,15 @@ def test_zenodo_find_relation_format_exact(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "resources" for match in matches)
-    assert all(match.value["format"] == "csv" for match in matches)
+    assert all(match.type == "cell" for match in matches)
+
+    format_index = Zenodo.RESOURCE_COLUMNS.index("format")
+
+    assert all(match.value[format_index] == "csv" for match in matches)
 
 
 def test_zenodo_find_relation_api_record_id(api_backend):
-    tables = api_backend.find_relation("record_id = 16537543")
+    tables = api_backend.find_relation("16537543")
 
     assert isinstance(tables, OrderedDict)
     assert "datasets" in tables
@@ -1006,19 +957,8 @@ def test_zenodo_find_relation_api_record_id(api_backend):
     assert datasets.iloc[0]["dataset_id"] == "16537543"
 
 
-def test_zenodo_find_relation_api_dataset_id(api_backend):
-    tables = api_backend.find_relation("dataset_id = 16537543")
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = api_backend.get_table("datasets")
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "16537543"
-
-
 def test_zenodo_find_relation_api_doi(api_backend):
-    tables = api_backend.find_relation(f"doi = {TEST_DOI}")
+    tables = api_backend.find_relation(TEST_DOI)
 
     assert isinstance(tables, OrderedDict)
     assert "datasets" in tables
@@ -1029,7 +969,12 @@ def test_zenodo_find_relation_api_doi(api_backend):
 
 
 def test_zenodo_find_relation_api_keywords(api_backend):
-    tables = api_backend.find_relation("keywords ~~ climate", limit=2)
+    tables = api_backend.find_relation(
+        {
+            "keywords": "climate",
+            "limit": 2,
+        }
+    )
 
     assert isinstance(tables, OrderedDict)
     assert "datasets" in tables
@@ -1040,7 +985,12 @@ def test_zenodo_find_relation_api_keywords(api_backend):
 
 
 def test_zenodo_find_relation_api_q(api_backend):
-    tables = api_backend.find_relation("q ~~ battery", limit=2)
+    tables = api_backend.find_relation(
+        {
+            "q": "battery",
+            "limit": 2,
+        }
+    )
 
     assert isinstance(tables, OrderedDict)
     assert "datasets" in tables
@@ -1050,15 +1000,31 @@ def test_zenodo_find_relation_api_q(api_backend):
     assert datasets.iloc[0]["dataset_id"] == "16537544"
 
 
-def test_zenodo_find_relation_invalid_condition_raises(loaded_backend):
-    with pytest.raises(ValueError):
-        loaded_backend.find_relation("resource_count")
+def test_zenodo_find_relation_plain_string_searches_api(api_backend):
+    tables = api_backend.find_relation("climate", limit=2)
+
+    assert isinstance(tables, OrderedDict)
+    assert "datasets" in tables
+
+    datasets = api_backend.get_table("datasets")
+    assert len(datasets) >= 1
+    assert any("Climate" in title for title in datasets["title"])
 
 
 def test_zenodo_find_relation_invalid_relation_raises(loaded_backend):
     with pytest.raises(ValueError):
         loaded_backend.find_relation("resource_count", "bad relation")
 
+def test_zenodo_find_relation_api_record_id_list(api_backend):
+    tables = api_backend.find_relation(["16537543", "16537544"])
+
+    assert isinstance(tables, OrderedDict)
+    assert "datasets" in tables
+    assert "resources" in tables
+
+    datasets = api_backend.get_table("datasets")
+    assert len(datasets) == 2
+    assert set(datasets["dataset_id"]) == {"16537543", "16537544"}
 
 # =============================================================================
 # 9) URL Validation
@@ -1105,7 +1071,10 @@ def test_zenodo_validate_urls(loaded_backend):
 
     assert isinstance(results, list)
     assert len(results) >= 1
-    assert all(isinstance(value, bool) for value in results)
+    assert all(isinstance(value, dict) for value in results)
+    assert all("is_valid" in value for value in results)
+    assert all("status_code" in value for value in results)
+    assert all(value["is_valid"] is True for value in results)
 
     resources = loaded_backend.get_table("resources")
 

@@ -18,6 +18,7 @@ Useful Zenodo resources:
 > **Note:** This backend is read-only. It retrieves and organizes public Zenodo metadata but does not create, update, delete, upload, or modify Zenodo records.
 
 <details>
+
 <summary><b>API Reference</b></summary>
 
 The backend uses public Zenodo record endpoints:
@@ -71,7 +72,6 @@ until Zenodo is officially added to the supported DSI backend list.
 
 ```python
 from dsi.backends.zenodo import Zenodo
-
 zenodo = Zenodo(
     params={"keywords": "climate", "limit": 5},
     verify_ssl=False
@@ -109,7 +109,6 @@ Example output:
 ```python
 datasets_df = zenodo.get_table("datasets")
 resources_df = zenodo.get_table("resources")
-
 print(datasets_df)
 print(resources_df)
 ```
@@ -124,7 +123,6 @@ A context manager is also supported:
 
 ```python
 from dsi.backends.zenodo import Zenodo
-
 with Zenodo(
     params={"keywords": "climate", "limit": 5},
     verify_ssl=False
@@ -326,6 +324,7 @@ zenodo = Zenodo(
 The backend returns exactly two DSI tables:
 
 1. **`datasets`** - Record-level Zenodo metadata, one row per Zenodo record.
+
 2. **`resources`** - File-level Zenodo metadata, one row per file attached to a Zenodo record.
 
 The backend does **not** create an errors table.
@@ -427,7 +426,6 @@ Example:
 datasets
 --------
 16537543 | Example Zenodo Record
-
 resources
 ---------
 16537543:1 | file1.csv
@@ -467,7 +465,6 @@ Example:
 ```python
 datasets_df = zenodo.get_table("datasets")
 full_record_metadata = datasets_df.iloc[0]["raw_metadata"]
-
 resources_df = zenodo.get_table("resources")
 full_file_metadata = resources_df.iloc[0]["raw_metadata"]
 ```
@@ -571,7 +568,6 @@ print(
         display_cols=["dataset_id", "doi", "title", "resource_count"]
     )
 )
-
 print(
     zenodo.display(
         "resources",
@@ -597,7 +593,6 @@ CREATE TABLE datasets (
     doi TEXT,
     ...
 );
-
 CREATE TABLE resources (
     resource_id TEXT,
     dataset_id TEXT,
@@ -610,7 +605,9 @@ CREATE TABLE resources (
 
 ## Filtering Loaded Tables
 
-The Zenodo backend supports local pandas-style filtering through `query_artifacts()`.
+The Zenodo backend follows the RCSBPDB-style read-only Webserver backend pattern. It does not implement `query_artifacts()` for filtering because it is not a SQL backend.
+
+Use `find_relation()` for local filtering of already-loaded tables.
 
 ```python
 zenodo = Zenodo(
@@ -618,21 +615,17 @@ zenodo = Zenodo(
     verify_ssl=False
 )
 
-datasets_result = zenodo.query_artifacts(
-    "resource_count >= 0",
-    dict_return=False
-)
+dataset_matches = zenodo.find_relation("resource_count >= 0")
+resource_matches = zenodo.find_relation("size >= 0")
 
-resources_result = zenodo.query_artifacts(
-    "size >= 0",
-    dict_return=False
-)
+for match in dataset_matches:
+    print(match.to_dict())
 
-print(datasets_result)
-print(resources_result)
+for match in resource_matches:
+    print(match.to_dict())
 ```
 
-> **Note:** `query_artifacts()` filters already-loaded DSI tables. It is not SQL.
+> **Note:** `find_relation()` returns a list of `ValueObject` instances for local table filtering. `query_artifacts()` intentionally raises `NotImplementedError`.
 
 ---
 
@@ -650,7 +643,6 @@ The Zenodo backend supports RCSBPDB-style find methods.
 
 ```python
 matches = zenodo.find("doi")
-
 for match in matches:
     print(match.to_dict())
 ```
@@ -661,7 +653,6 @@ Search input across table names.
 
 ```python
 matches = zenodo.find_table("data")
-
 for match in matches:
     print(match.to_dict())
 ```
@@ -672,7 +663,6 @@ Search input across column names.
 
 ```python
 matches = zenodo.find_column("doi")
-
 for match in matches:
     print(match.to_dict())
 ```
@@ -683,7 +673,6 @@ Search input across cell values and return matching rows as `ValueObject` instan
 
 ```python
 matches = zenodo.find_cell("Zenodo")
-
 for match in matches:
     print(match.to_dict())
 ```
@@ -731,31 +720,31 @@ Some `find_relation()` calls perform a new Zenodo API lookup/search and return `
 Record ID lookup:
 
 ```python
-tables = zenodo.find_relation("record_id = 16537543")
-```
-
-Dataset ID lookup:
-
-```python
-tables = zenodo.find_relation("dataset_id = 16537543")
+tables = zenodo.find_relation("16537543")
 ```
 
 DOI lookup:
 
 ```python
-tables = zenodo.find_relation("doi = 10.5281/zenodo.16537543")
+tables = zenodo.find_relation("10.5281/zenodo.16537543")
 ```
 
 Keyword search:
 
 ```python
-tables = zenodo.find_relation("keywords ~ climate", limit=3)
+tables = zenodo.find_relation({"keywords": "climate", "limit": 3})
 ```
 
 Query string search:
 
 ```python
-tables = zenodo.find_relation("q ~ battery", limit=3)
+tables = zenodo.find_relation({"q": "battery", "limit": 3})
+```
+
+Multiple record IDs:
+
+```python
+tables = zenodo.find_relation(["16537543", "16537544"])
 ```
 
 > **Note:** API-backed `find_relation()` calls reload the backend tables.
@@ -770,7 +759,6 @@ Resource rows contain file-level metadata and download URLs. The backend does no
 
 ```python
 resources_df = zenodo.get_table("resources")
-
 for _, row in resources_df.iterrows():
     print(f"Name: {row['name']}")
     print(f"Format: {row['format']}")
@@ -783,11 +771,9 @@ for _, row in resources_df.iterrows():
 
 ```python
 resources_df = zenodo.get_table("resources")
-
 csv_resources = resources_df[
     resources_df["format"].fillna("").str.lower() == "csv"
 ]
-
 print(csv_resources[["name", "size", "download_url"]])
 ```
 
@@ -795,19 +781,14 @@ print(csv_resources[["name", "size", "download_url"]])
 
 ```python
 import requests
-
 resources_df = zenodo.get_table("resources")
-
 first_resource = resources_df.dropna(subset=["download_url"]).iloc[0]
 url = first_resource["download_url"]
 name = first_resource["name"] or "zenodo_resource"
-
 response = requests.get(url, timeout=60)
 response.raise_for_status()
-
 with open(name, "wb") as output_file:
     output_file.write(response.content)
-
 print(f"Downloaded: {name}")
 ```
 
@@ -824,10 +805,8 @@ zenodo = Zenodo(
     params={"keywords": "climate", "limit": 3},
     verify_ssl=False
 )
-
 valid_list = zenodo.validate_urls()
 print(valid_list)
-
 resources_df = zenodo.get_table("resources")
 print(resources_df[["name", "download_url", "url_valid"]])
 ```
@@ -851,7 +830,6 @@ The `url_valid` column is:
 ```python
 datasets_df = zenodo.get_table("datasets")
 resources_df = zenodo.get_table("resources")
-
 datasets_df.to_csv("zenodo_datasets.csv", index=False)
 resources_df.to_csv("zenodo_resources.csv", index=False)
 ```
@@ -943,7 +921,6 @@ Filter already-loaded Zenodo tables and search metadata.
 
 Demonstrates:
 
-- `query_artifacts()` with pandas-style conditions
 - `find_table()`
 - `find_column()`
 - `find_cell()`
@@ -995,6 +972,7 @@ done
 ## Notes
 
 - The backend is **read-only**
+- `query_artifacts()` is intentionally not implemented because Zenodo is not a SQL backend
 - The backend is **metadata-first**
 - The backend returns exactly two tables: `datasets` and `resources`
 - The backend does not create an errors table
@@ -1051,7 +1029,6 @@ Use the backend directly:
 
 ```python
 from dsi.backends.zenodo import Zenodo
-
 zenodo = Zenodo(
     params={"keywords": "climate", "limit": 3},
     verify_ssl=False
@@ -1109,21 +1086,22 @@ Try:
 - Checking record ID spelling
 - Testing the query directly in the Zenodo search interface
 
-### `query_artifacts()` Returns No Results
+### `query_artifacts()` Is Not Implemented
 
-If a local filter does not match any loaded rows, `query_artifacts()` may raise:
-
-```text
-ValueError: Query returned no results
-```
-
-Example:
+`query_artifacts()` intentionally raises `NotImplementedError` for Zenodo because Zenodo is a read-only Webserver backend, not a SQL backend.
 
 ```python
-zenodo.query_artifacts("resource_count >= 0", dict_return=False)
+try:
+    zenodo.query_artifacts("resource_count >= 0")
+except NotImplementedError as exc:
+    print(exc)
 ```
 
-Make sure the column exists in one of the loaded tables and that the condition matches at least one row.
+Use `find_relation()` for local filtering:
+
+```python
+matches = zenodo.find_relation("resource_count >= 0")
+```
 
 ### `find_relation()` Reloaded My Tables
 
@@ -1132,11 +1110,11 @@ Some `find_relation()` calls are API-backed and intentionally reload the backend
 These include:
 
 ```python
-zenodo.find_relation("record_id = 16537543")
-zenodo.find_relation("dataset_id = 16537543")
-zenodo.find_relation("doi = 10.5281/zenodo.16537543")
-zenodo.find_relation("keywords ~ climate", limit=3)
-zenodo.find_relation("q ~ battery", limit=3)
+zenodo.find_relation("16537543")
+zenodo.find_relation("10.5281/zenodo.16537543")
+zenodo.find_relation({"keywords": "climate", "limit": 3})
+zenodo.find_relation({"q": "battery", "limit": 3})
+zenodo.find_relation(["16537543", "16537544"])
 ```
 
 Run API-backed `find_relation()` calls after local filtering examples if you do not want the loaded data to change before filtering.
@@ -1160,21 +1138,16 @@ Run API-backed `find_relation()` calls after local filtering examples if you do 
 
 ```python
 from dsi.backends.zenodo import Zenodo
-
 zenodo = Zenodo(
     params={"keywords": "climate", "limit": 3},
     verify_ssl=False
 )
-
 try:
     zenodo.list()
-
     datasets = zenodo.get_table("datasets")
     resources = zenodo.get_table("resources")
-
     print(datasets[["dataset_id", "doi", "title", "resource_count"]])
     print(resources[["resource_id", "name", "format", "size", "download_url"]])
-
 finally:
     zenodo.close()
 ```
