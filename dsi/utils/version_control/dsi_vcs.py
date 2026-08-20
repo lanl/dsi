@@ -95,21 +95,16 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
 
     try:
         for rel_path, chunks in grouped.items():
-            data = bytearray()
-            for chunk_hash, _chunk_index in sorted(chunks, key=lambda item: item[1]):
-                chunk_path = os.path.join(chunk_dir, chunk_hash)
-                if not os.path.exists(chunk_path):
-                    print(f"---> Chunk not found for chunk hash: {chunk_path}")
-                    return False
-                with open(chunk_path, "rb") as handle:
-                    data.extend(handle.read())
-            if not data:
-                print(f"--> Corrupted chunk data")
-                return False
             target_path = snapshot_target(target_tree, rel_path)
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with open(target_path, "wb") as handle:
-                handle.write(data)
+                for chunk_hash, _chunk_index in sorted(chunks, key=lambda item: item[1]):
+                    chunk_path = os.path.join(chunk_dir, chunk_hash)
+                    if not os.path.exists(chunk_path):
+                        print(f"---> Chunk not found for chunk hash: {chunk_path}")
+                        return False
+                    with open(chunk_path, "rb") as chunk_handle:
+                        shutil.copyfileobj(chunk_handle, handle)
     except Exception as e:
         print(f"---> Error occurred which rebuilding chunks: {e}")
         return False
@@ -255,7 +250,7 @@ class Version:
 
         def stage_path(abs_path: str):
             nonlocal staged
-            rel_path = os.path.relpath(abs_path)
+            rel_path = os.path.relpath(abs_path, self.root_folder)
 
             if not os.path.lexists(abs_path):
                 print(f"  [skip] {abs_path}: path does not exist")
@@ -305,6 +300,11 @@ class Version:
 
         for raw in paths:
             rel_path = raw
+            abs_path = os.path.join(self.root_folder, rel_path)
+            if not os.path.lexists(abs_path):
+                print(f"  [skip] {abs_path}: path does not exist")
+                continue
+
             stage_entries.append(
                 {
                     "file_path": rel_path,
@@ -334,6 +334,11 @@ class Version:
 
         for raw in paths:
             rel_path = raw
+            abs_path = os.path.join(self.root_folder, rel_path)
+            if not os.path.lexists(abs_path):
+                print(f"  [skip] {abs_path}: path does not exist")
+                continue
+            
             stage_entries.append(
                 {
                     "file_path": rel_path,
