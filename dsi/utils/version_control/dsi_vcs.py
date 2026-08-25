@@ -184,6 +184,7 @@ class Version:
 
     def __init__(self, folder: str):
         self.root_folder = os.path.abspath(folder)
+        self.skip_names = {DB_NAME, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR}
         if not os.path.isdir(self.root_folder):
             sys.exit(f"Error: '{self.root_folder}' is not a directory.")
 
@@ -230,6 +231,16 @@ class Version:
         ):
             print(f"  {rel_path} [{action}]")
 
+    def _check_path_validity(self, abs_path: str):
+        rel_path = os.path.relpath(abs_path, self.root_folder)
+        if not os.path.lexists(abs_path):
+            print(f"  [skip] {abs_path}: path does not exist.")
+            return False
+        if os.path.commonpath([os.path.realpath(rel_path), self.root_folder]) != self.root_folder:
+            print(f"  [skip] {abs_path}: path is not under root folder.")
+            return False
+        return True
+
     def cmd_add(self, paths: list[str]):
         """
         Stage one or more files/directories for the next commit.
@@ -244,28 +255,23 @@ class Version:
             sys.exit("No dsi-vcs repo found. Run 'init' first.")
 
         staged = 0
-        skip_names = {DB_NAME, SNAPSHOTS_DIR}
         stage_entries = []
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         def stage_path(abs_path: str):
             nonlocal staged
             rel_path = os.path.relpath(abs_path, self.root_folder)
-
-            if not os.path.lexists(abs_path):
-                print(f"  [skip] {abs_path}: path does not exist")
-                return
-
-            stage_entries.append(
-                {
-                    "file_path": rel_path,
-                    "operation": OperationType.FILE_ADD,
-                    "chunk_hash": None,
-                    "chunk_ref": None,
-                    "extra_metadata": {"staging_action": "add"},
-                }
-            )
-            staged += 1
+            if(self._check_path_validity(abs_path)):    
+                stage_entries.append(
+                    {
+                        "file_path": rel_path,
+                        "operation": OperationType.FILE_ADD,
+                        "chunk_hash": None,
+                        "chunk_ref": None,
+                        "extra_metadata": {"staging_action": "add"},
+                    }
+                )
+                staged += 1
 
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
@@ -273,10 +279,9 @@ class Version:
             if os.path.isdir(abs_path):
                 # Expand directory recursively
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
-                    dirnames[:] = [d for d in dirnames if d not in skip_names]
-                    stage_path(dirpath)
+                    dirnames[:] = [d for d in dirnames if d not in self.skip_names]
                     for fname in filenames:
-                        if fname in skip_names:
+                        if fname in self.skip_names:
                             continue
                         stage_path(os.path.join(dirpath, fname))
             else:
@@ -298,23 +303,34 @@ class Version:
         stage_entries = []
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
-        for raw in paths:
-            rel_path = raw
-            abs_path = os.path.join(self.root_folder, rel_path)
-            if not os.path.lexists(abs_path):
-                print(f"  [skip] {abs_path}: path does not exist")
-                continue
+        def stage_path(abs_path: str):
+            nonlocal staged
+            rel_path = os.path.relpath(abs_path, self.root_folder)
+            if(self._check_path_validity(abs_path)):    
+                stage_entries.append(
+                    {
+                        "file_path": rel_path,
+                        "operation": OperationType.FILE_DELETE,
+                        "chunk_hash": None,
+                        "chunk_ref": None,
+                        "extra_metadata": {"staging_action": "delete"},
+                    }
+                )
+                staged += 1
 
-            stage_entries.append(
-                {
-                    "file_path": rel_path,
-                    "operation": OperationType.FILE_DELETE,
-                    "chunk_hash": None,
-                    "chunk_ref": None,
-                    "extra_metadata": {"staging_action": "delete"},
-                }
-            )
-            staged += 1
+        for raw in paths:
+            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
+
+            if os.path.isdir(abs_path):
+                # Expand directory recursively
+                for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
+                    dirnames[:] = [d for d in dirnames if d not in self.skip_names]
+                    for fname in filenames:
+                        if fname in self.skip_names:
+                            continue
+                        stage_path(os.path.join(dirpath, fname))
+            else:
+                stage_path(abs_path)
 
         if stage_entries:
             self.repo_log.append_many(stage_entries, transaction_id=txn_id)
@@ -332,23 +348,34 @@ class Version:
         stage_entries = []
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
+        def stage_path(abs_path: str):
+            nonlocal removed
+            rel_path = os.path.relpath(abs_path, self.root_folder)
+            if(self._check_path_validity(abs_path)):    
+                stage_entries.append(
+                    {
+                        "file_path": rel_path,
+                        "operation": OperationType.FILE_REMOVE,
+                        "chunk_hash": None,
+                        "chunk_ref": None,
+                        "extra_metadata": {"staging_action": "remove", "staging_op": "remove"},
+                    }
+                )
+                removed += 1
+
         for raw in paths:
-            rel_path = raw
-            abs_path = os.path.join(self.root_folder, rel_path)
-            if not os.path.lexists(abs_path):
-                print(f"  [skip] {abs_path}: path does not exist")
-                continue
-            
-            stage_entries.append(
-                {
-                    "file_path": rel_path,
-                    "operation": OperationType.FILE_REMOVE,
-                    "chunk_hash": None,
-                    "chunk_ref": None,
-                    "extra_metadata": {"staging_action": "remove", "staging_op": "remove"},
-                }
-            )
-            removed += 1
+            abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
+
+            if os.path.isdir(abs_path):
+                # Expand directory recursively
+                for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
+                    dirnames[:] = [d for d in dirnames if d not in self.skip_names]
+                    for fname in filenames:
+                        if fname in self.skip_names:
+                            continue
+                        stage_path(os.path.join(dirpath, fname))
+            else:
+                stage_path(abs_path)
 
         if stage_entries:
             self.repo_log.append_many(stage_entries, transaction_id=txn_id)

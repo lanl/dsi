@@ -147,7 +147,8 @@ def set_acl(path: str, acl_string: str) -> None:
         _set_acl_darwin(path, acl_string)
     elif sys.platform == "linux":
         _set_acl_linux(path, acl_string)
-    print(f"Unsupported platform for ACL write: {sys.platform}")
+    else:
+        print(f"Unsupported platform for ACL write: {sys.platform}")
 
 
 def _set_acl_darwin(path: str, acl_string: str) -> None:

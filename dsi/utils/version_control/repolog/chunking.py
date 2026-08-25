@@ -24,7 +24,7 @@ AVG_CHUNK = 8 * 1024 * 1024      # 8 MB
 MAX_CHUNK = 64 * 1024 * 1024     # 64 MB
 
 MASK = AVG_CHUNK - 1      # AVG_CHUNK must be power of 2
-CHUNK_STORAGE_DIR = ".dsi_vcs_chunks"
+CHUNK_STORAGE_DIR = "dsi_vcs_chunks"
 
 class RollingHash:
     def __init__(self, window_size):
