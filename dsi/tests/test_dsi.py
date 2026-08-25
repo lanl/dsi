@@ -1804,7 +1804,7 @@ def test_versioning():
     test = DSI()
     wpath = os.getcwd()
     test.version("init", wpath)
-    assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
+    assert os.path.exists(wpath + "/dsi_vcs/dsi_vcs.db")
 
     # Create a file with ten random integers
     dummy_file_path = os.path.join(wpath, "a_dummy_file")
