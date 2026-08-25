@@ -281,7 +281,7 @@ class Version:
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
                     for fname in filenames:
-                        if fname in self.skip_names:
+                        if fname in self.skip_names or dirpath == os.path.join(self.root_folder, SNAPSHOTS_DIR):
                             continue
                         stage_path(os.path.join(dirpath, fname))
             else:
@@ -326,7 +326,7 @@ class Version:
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
                     for fname in filenames:
-                        if fname in self.skip_names:
+                        if fname in self.skip_names or dirpath == os.path.join(self.root_folder, SNAPSHOTS_DIR):
                             continue
                         stage_path(os.path.join(dirpath, fname))
             else:
@@ -371,7 +371,7 @@ class Version:
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
                     for fname in filenames:
-                        if fname in self.skip_names:
+                        if fname in self.skip_names or dirpath == os.path.join(self.root_folder, SNAPSHOTS_DIR):
                             continue
                         stage_path(os.path.join(dirpath, fname))
             else:
