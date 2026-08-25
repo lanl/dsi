@@ -244,9 +244,7 @@ class Zenodo(Webserver):
 
         if self.validate_on_init and not self.validate_connection():
             self._loaded = False
-            raise ConnectionError(
-                self.validate_error_msg or "Validating Zenodo connection failed."
-            )
+            raise ConnectionError(self.validate_error_msg or "Validating Zenodo connection failed.")
 
         if self.params and self.auto_load:
             self._load_initial_data(self.params)
@@ -349,9 +347,7 @@ class Zenodo(Webserver):
             data = response.json()
 
             if "hits" not in data:
-                self.validate_error_msg = (
-                    "Zenodo Records API returned unexpected response."
-                )
+                self.validate_error_msg = "Zenodo Records API returned unexpected response."
                 return False
 
             return True
@@ -366,11 +362,11 @@ class Zenodo(Webserver):
         """
         raise NotImplementedError("Zenodo backend is read-only.")
 
+
     def query_artifacts(self, query, **kwargs):
-        raise NotImplementedError(
-            "query() is not implemented for Zenodo because it is not a SQL backend."
-        )
-        
+        raise NotImplementedError("query() is not implemented for Zenodo because it is not a SQL backend.")
+
+
     def get_table(self, table_name, dict_return=False, **kwargs):
         if not self._loaded:
             raise RuntimeError("No data loaded.")
@@ -386,19 +382,20 @@ class Zenodo(Webserver):
 
         return pd.DataFrame(table)
 
+
     def notebook(self, **kwargs):
         """
         Notebook generation is not supported for the Zenodo backend.
         """
-        raise NotImplementedError(
-            "Notebook generation is not supported for the Zenodo backend."
-        )
+        raise NotImplementedError("Notebook generation is not supported for the Zenodo backend.")
+
 
     def process_artifacts(self, **kwargs):
         if not self._loaded:
             return OrderedDict()
 
         return self._cache
+
 
     def get_schema(self):
         schema_lines = []
@@ -433,6 +430,7 @@ class Zenodo(Webserver):
 
         return "\n\n".join(schema_lines)
 
+
     # ------------------------------------------------------------------
     # Find/search methods
     # ------------------------------------------------------------------
@@ -451,6 +449,7 @@ class Zenodo(Webserver):
             + self.find_column(query_object, **kwargs)
             + self.find_cell(query_object, **kwargs)
         )
+
 
     def find_table(self, query_object, **kwargs):
         """
@@ -477,6 +476,7 @@ class Zenodo(Webserver):
                 matches.append(val)
 
         return matches
+
 
     def find_column(self, query_object, range=False, **kwargs):
         """
@@ -517,6 +517,7 @@ class Zenodo(Webserver):
                     matches.append(val)
 
         return matches
+
 
     def find_cell(self, query_object, row=True, **kwargs):
         """
@@ -568,7 +569,8 @@ class Zenodo(Webserver):
                     )
 
         return matches
-    
+
+
     def _parse_find_query(self, query):
         operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
 
@@ -639,6 +641,7 @@ class Zenodo(Webserver):
             return float(value_str)
         except ValueError:
             return value_str
+
 
     def find_relation(self, query, relation=None, **kwargs):
         """
@@ -773,6 +776,7 @@ class Zenodo(Webserver):
 
         raise TypeError("find_relation() expects None, str, list, or dict.")
 
+
     def list(self, collection=False, **kwargs):
         if collection:
             return list(self._cache.keys())
@@ -780,6 +784,7 @@ class Zenodo(Webserver):
         for name, table in self._cache.items():
             df = pd.DataFrame(table)
             print(f"{name}: ({len(df)} rows, {len(df.columns)} cols)")
+
 
     def num_tables(self):
         if not self._loaded:
@@ -789,6 +794,7 @@ class Zenodo(Webserver):
         table_count = len(self._cache)
         print(f"{table_count} tables loaded")
         return table_count
+
 
     def display(self, table_name, num_rows=25, display_cols=None, **kwargs):
         if not self._loaded:
@@ -820,6 +826,7 @@ class Zenodo(Webserver):
         df.attrs["max_rows"] = max_rows
 
         return df
+
 
     def summary(self, table_name=None, **kwargs):
         if not self._loaded:
@@ -863,6 +870,7 @@ class Zenodo(Webserver):
 
         return [table_names] + summary_dfs
 
+
     def close(self):
         if hasattr(self, "session"):
             self.session.close()
@@ -874,6 +882,7 @@ class Zenodo(Webserver):
         self.last_request_params = None
         self.params = {}
         self._loaded = False
+
 
     # ------------------------------------------------------------------
     # Zenodo request helpers
