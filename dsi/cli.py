@@ -576,7 +576,7 @@ class DSI_cli:
         os.makedirs(download_dir, exist_ok=True)
         
         try:
-            from dsi.utils.federated.federate_datasets import pull_data
+            from dsi.utils.federated.federate_datasets import accquire_data
             
             # Default download limit: 100 MB
             download_limit = 100 * 1024 * 1024
@@ -584,7 +584,7 @@ class DSI_cli:
             print(f"\nPulling data from {source_type}:{source}:{path}")
             print(f"Download directory: {download_dir}\n")
             print(source_type, source, path, download_dir, username, download_limit)
-            db_info = pull_data(
+            db_info = accquire_data(
                 location_type=source_type,
                 location=source,
                 path=path,

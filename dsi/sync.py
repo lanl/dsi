@@ -15,7 +15,7 @@ from collections import OrderedDict
 from urllib.parse import urlparse
 
 from dsi.core import Terminal
-from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
+from dsi.utils.federated.federate_datasets import federate_datasets, accquire_data
 
 class Sync():
     """
@@ -816,14 +816,14 @@ class Sync():
             parent_url = os.path.commonprefix(remote_files.tolist())
             for remote_url in remote_files:
                 # Downloading each file from fileystem
-                db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_url, 
+                db_info, username = accquire_data(db_data["location_type"], db_data["location"], remote_url, 
                                             workspace_folder, username, internal_use=True, parent_hash=parent_url)
                 new_folder = Path(db_info.pop("new_db_folder"))
                 if new_folder.is_dir() and not any(new_folder.iterdir()):
                     new_folder.rmdir()
         else:        
             # Currently pulling all referenced data -- eventually allow user to download certain data
-            db_info, username = pull_data(db_data["location_type"], db_data["location"], remote_loc, 
+            db_info, username = accquire_data(db_data["location_type"], db_data["location"], remote_loc, 
                                         workspace_folder, username, internal_use=True)
             new_folder = Path(db_info.pop("new_db_folder"))
             if new_folder.is_dir() and not any(new_folder.iterdir()):

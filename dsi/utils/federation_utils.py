@@ -5,12 +5,16 @@ import shutil
 import pandas as pd
 import shlex
 import subprocess
+import logging
 
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 from dsi.dsi import DSI
+
+
+logger = logging.getLogger(__name__)
 
 
 def parse_timestamp(ts: str) -> datetime:
@@ -222,10 +226,11 @@ def local_md5(local_path: str, timeout: int | None = None) -> str:
     return h.hexdigest()
 
 
-def should_download(remote:str, remote_path:str, stored_md5:str) -> bool:
+def should_download(local_path: str, remote:str, remote_path:str) -> bool:
     """Determines whether a remote file should be downloaded by comparing its MD5 checksum to a stored value.
     
     Args:
+        local_path (str): The path to the file on the local filesystem
         remote (str): The remote host, optionally with username (e.g. "user@host")
         remote_path (str): The path to the file on the remote host (e.g. "/data/file.bin")
         stored_md5 (str): The stored MD5 checksum to compare against.
@@ -233,6 +238,18 @@ def should_download(remote:str, remote_path:str, stored_md5:str) -> bool:
     Returns:
         bool: True if the file should be downloaded, False otherwise.
     """
+    try:
+        h = hashlib.md5()
+        
+        with open(local_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+
+        stored_md5 = h.hexdigest()
+    except Exception as e:
+        logger.debug(f'Error: {e}')
+        raise
+    
     try:
         if remote != "":
             returned_hash = remote_md5(remote, remote_path)
