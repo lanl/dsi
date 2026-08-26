@@ -11,4 +11,5 @@ xmltodict>=0.14.2
 ruamel.yaml>=0.18.0
 boto3>=1.42.91
 coolname>=4.2.0
-sqlglot>=30.0.0
+sqlglot>=30.0.0truststore>=0.9; python_version >= "3.10"
+truststore>=0.9; python_version >= "3.10"

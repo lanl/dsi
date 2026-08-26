@@ -4,6 +4,7 @@ from dsi.backends.osti import OSTI
 from dsi.backends.rcsbpdb import RCSBPDB
 from dsi.backends.oceans11 import Oceans11
 from dsi.backends.zenodo import Zenodo
+from dsi.backends.navdat import NAVDAT
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -49,11 +50,12 @@ class DSI:
                 - If backend_name = "RCSBPDB" → No filename input (read-only backend)
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
                 - If backend_name = "Zenodo" → No filename input (read-only backend)
+                - If backend_name = "NAVDAT" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate.
 
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo" or "RCSBPDB".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo", "RCSBPDB", or "NAVDAT".
 
             If using an external backend, provide the relative path to the Python module with the backend.
         """
@@ -127,7 +129,7 @@ class DSI:
             backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
             if backend_module is None:
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo, NAVDAT")
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
@@ -171,8 +173,11 @@ class DSI:
                 elif backend_name.lower() == "zenodo":
                     backend_name = "Zenodo"
                     query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "navdat":
+                    backend_name = "NAVDAT"
+                    query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo and Oceans11")
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo, Oceans11, and NAVDAT")
                 
                 try:
                     # Pass query params as 'params' argument
@@ -260,6 +265,9 @@ class DSI:
         n = Zenodo(only_validate=True)
         if n.validate_connection():
             print("Zenodo : Read-only metadata backend for discovering and querying public Zenodo records.")
+        n = NAVDAT(only_validate=True)
+        if n.validate_connection():
+            print("NAVDAT : Read-only metadata backend for discovering and querying NAVDAT/federated PetDB geochemistry data.")
         print()
 
 
