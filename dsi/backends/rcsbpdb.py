@@ -1081,13 +1081,19 @@ class RCSBPDB(Webserver):
     
     def get_table(self, table_name: str, dict_return=False):
         resolved = self._resolve_table_name(table_name)
+
+        if resolved not in self.schemas:
+            raise ValueError(
+                f"Table '{table_name}' not found. Available tables: {list(self.schemas.keys())}"
+            )
+
         table = self.tables.get(resolved, OrderedDict())
 
         if dict_return:
             return table
 
         if not table:
-            return pd.DataFrame(columns=self.get_schema(resolved))
+            return pd.DataFrame(columns=self.schemas.get(resolved, []))
 
         return pd.DataFrame(table)
 
@@ -1202,10 +1208,56 @@ class RCSBPDB(Webserver):
         return self.tables
 
     def get_schema(self, table_name: str | None = None):
-        if table_name is None:
-            return self.schemas
-        resolved = self._resolve_table_name(table_name)
-        return self.schemas.get(resolved, [])
+        """
+        Return SQL-style CREATE TABLE schema text.
+
+        Parameters
+        ----------
+        table_name : str or None
+            If provided, return schema text for one table.
+            If None, return schema text for all loaded/known tables.
+        """
+        table_names = [self._resolve_table_name(table_name)] if table_name else list(self.schemas.keys())
+        schema_lines = []
+
+        for name in table_names:
+            if name not in self.schemas:
+                raise ValueError(
+                    f"Table '{table_name}' not found. Available tables: {list(self.schemas.keys())}"
+                )
+
+            table = self.tables.get(name, OrderedDict())
+            cols = []
+
+            for col_name in self.schemas[name]:
+                dtype = "TEXT"
+
+                values = table.get(col_name, []) if isinstance(table, dict) else []
+
+                for value in values:
+                    if value is None:
+                        continue
+
+                    if isinstance(value, bool):
+                        dtype = "BOOLEAN"
+                    elif isinstance(value, int):
+                        dtype = "INTEGER"
+                    elif isinstance(value, float):
+                        dtype = "REAL"
+
+                    break
+
+                cols.append(f"    {col_name} {dtype}")
+
+            create_stmt = (
+                f"CREATE TABLE {name} (\n"
+                + ",\n".join(cols)
+                + "\n);"
+            )
+
+            schema_lines.append(create_stmt)
+
+        return "\n\n".join(schema_lines)
 
     def num_tables(self):
         table_count = len(self.tables)
@@ -1353,9 +1405,17 @@ class RCSBPDB(Webserver):
 
         return matches
 
-    def find_cell(self, query_object, **kwargs):
+    def find_cell(self, query_object, row=True, **kwargs):
         """
         Finds all cells that match the given query_object.
+
+        Parameters
+        ----------
+        query_object : Any
+            Value to search for.
+        row : bool, optional
+            If True, return full matching rows.
+            If False, return individual matching cells.
 
         Matching behavior:
         - Exact match for all data types
@@ -1363,6 +1423,7 @@ class RCSBPDB(Webserver):
         - String representation match for complex objects
         """
         matches = []
+        seen_rows = set()
 
         is_str_query = isinstance(query_object, str)
         query_lower = query_object.lower() if is_str_query else None
@@ -1374,9 +1435,14 @@ class RCSBPDB(Webserver):
             cols = list(table_data.keys())
             df = pd.DataFrame(table_data)
 
-            for row_idx, row in df.iterrows():
+            if df.empty:
+                continue
+
+            for row_idx, row_data in df.iterrows():
+                row_matched = False
+
                 for col in cols:
-                    cell = row[col]
+                    cell = row_data[col]
                     match = False
 
                     if (
@@ -1389,21 +1455,42 @@ class RCSBPDB(Webserver):
                         )
                     ):
                         match = True
-
                     elif is_str_query and isinstance(cell, (dict, list, tuple)):
                         cell_str = str(cell).lower()
+
                         if query_lower in cell_str:
                             match = True
 
-                    if match:
-                        val = ValueObject()
-                        val.t_name = table_name
-                        val.c_name = cols
-                        val.row_num = row_idx
-                        val.value = row.tolist()
-                        val.type = "cell"
+                    if not match:
+                        continue
 
-                        matches.append(val)
+                    if row:
+                        row_matched = True
+                        break
+
+                    val = ValueObject()
+                    val.t_name = table_name
+                    val.c_name = [col]
+                    val.row_num = int(row_idx)
+                    val.value = cell
+                    val.type = "cell"
+                    matches.append(val)
+
+                if row and row_matched:
+                    key = (table_name, int(row_idx))
+
+                    if key in seen_rows:
+                        continue
+
+                    seen_rows.add(key)
+
+                    val = ValueObject()
+                    val.t_name = table_name
+                    val.c_name = cols
+                    val.row_num = int(row_idx)
+                    val.value = row_data.to_dict()
+                    val.type = "row"
+                    matches.append(val)
 
         return matches
 
@@ -1549,25 +1636,19 @@ class RCSBPDB(Webserver):
             print(f"  - num of rows: {df.shape[0]}")
         print()
 
-    def display(self, table_name=None, num_rows=25, display_cols=None, **kwargs):
+    def display(self, table_name, num_rows=25, display_cols=None, **kwargs):
         """
-        Print data from a table.
+        Return a preview DataFrame from a table.
 
         Parameters
         ----------
         table_name : str
             Name of the table to display.
         num_rows : int, optional
-            Number of rows to print.
+            Number of rows to return.
         display_cols : list[str], optional
             Specific columns to display.
         """
-        if table_name is None:
-            raise ValueError(
-                "display() requires a table_name. "
-                f"Available tables: {self.list(True)}"
-            )
-
         resolved = self._resolve_table_name(table_name)
 
         if resolved not in self.schemas:
@@ -1592,7 +1673,10 @@ class RCSBPDB(Webserver):
 
             df = df[display_cols]
 
-        print(df.head(num_rows).to_string(index=False))
+        if num_rows:
+            df = df.head(num_rows)
+
+        return df
 
 
     def summary(self, table_name=None, *args, **kwargs):

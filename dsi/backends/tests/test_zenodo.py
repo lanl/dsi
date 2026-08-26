@@ -934,6 +934,23 @@ def test_zenodo_find_cell_matches_value(loaded_backend):
     assert len(dataset_matches) >= 1
     assert any(match.value["dataset_id"] == "16537543" for match in dataset_matches)
 
+def test_zenodo_find_cell_cell_type_support(loaded_backend):
+    matches = loaded_backend.find_cell("16537543", row=False)
+
+    assert isinstance(matches, list)
+    assert len(matches) >= 1
+    assert all(match.type == "cell" for match in matches)
+
+    dataset_matches = [
+        match for match in matches
+        if match.t_name == "datasets"
+    ]
+
+    assert len(dataset_matches) >= 1
+    assert any(
+        match.c_name == ["dataset_id"] and match.value == "16537543"
+        for match in dataset_matches
+    )
 
 def test_zenodo_find_cell_rows_are_unique(loaded_backend):
     matches = loaded_backend.find_cell("Zenodo")

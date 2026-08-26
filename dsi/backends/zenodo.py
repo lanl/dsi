@@ -523,8 +523,17 @@ class Zenodo(Webserver):
         """
         Search input across cell values.
 
-        The returned ValueObjects represent full matching rows, not only the
-        matched cell. This matches the RCSBPDB-style DSI find behavior.
+        Parameters
+        ----------
+        query_object : Any
+            Value to search for.
+        row : bool, optional
+            If True, return full matching rows.
+            If False, return individual matching cells.
+
+        Returns
+        -------
+        list[ValueObject]
         """
         if query_object is None:
             return []
@@ -541,24 +550,43 @@ class Zenodo(Webserver):
             if df.empty:
                 continue
 
+            cols = list(df.columns)
+
             for row_idx, row_data in df.iterrows():
                 row_matched = False
 
-                for cell in row_data.tolist():
+                for col in cols:
+                    cell = row_data[col]
+                    match = False
+
                     if query_object == cell:
+                        match = True
+                    elif is_str_query and query_lower in str(cell).lower():
+                        match = True
+
+                    if not match:
+                        continue
+
+                    if row:
                         row_matched = True
                         break
 
-                    if is_str_query and query_lower in str(cell).lower():
-                        row_matched = True
-                        break
+                    val = ValueObject()
+                    val.t_name = table_name
+                    val.c_name = [col]
+                    val.row_num = int(row_idx)
+                    val.value = cell
+                    val.type = "cell"
+                    matches.append(val)
 
-                if row_matched:
+                if row and row_matched:
                     key = (table_name, int(row_idx))
+
                     if key in seen_rows:
                         continue
 
                     seen_rows.add(key)
+
                     matches.append(
                         self._row_to_value_object(
                             table_name=table_name,
