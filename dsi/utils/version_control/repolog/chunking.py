@@ -475,7 +475,7 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
                     dir=chunk_dir, prefix=f".{chunk['sha256']}.", suffix=".tmp"
                 )
                 try:
-                    os.chmod(temp_path, 0o600)
+                    os.chmod(temp_path, 0o644)
                     with os.fdopen(fd, "wb") as handle:
                         fd = None
                         handle.write(chunk['data'])

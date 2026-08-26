@@ -53,6 +53,8 @@ def main():
     p_clone = sub.add_parser("clone", help="Clone a remote repo")
     p_clone.add_argument("repo_url")
     p_clone.add_argument("dest_path", nargs="?", default=None)
+
+    sub.add_parser("status", help="Show current branch, commit, and staged files")
     
     args = parser.parse_args(args=None if sys.argv[1:] else ["-h"])
 
@@ -96,6 +98,9 @@ def main():
     elif args.command == "clone":
         vcs = Version(os.getcwd())
         vcs.cmd_clone(args.repo_url, args.dest_path)
+    elif args.command == "status":
+        vcs = Version(os.getcwd())
+        vcs.cmd_status()
 
 if __name__ == "__main__":
     # print("\n=== dsi-vcs: rsync-based file version control ===\n")

@@ -1319,7 +1319,7 @@ class DSI:
           -  diff                            # diff between two versions. If no version is provided, diff the current version with the previous version
           -  restore                         # restore a version with commit hash
           -  clone                           # clone a remote versioning repository
-
+          -  status                          # Show current branch, commit, and staged files
         `args` : str        
           -  init: A required argument with the name of the root folder for the versioning repository.
           -  add: A required argument with the file(s) to add to the staging area for the next commit, specified as a space-separated string or list of file paths.
@@ -1334,6 +1334,7 @@ class DSI:
           -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
           -  restore: A required argument to specify the version to restore, specified by its commit hash.
           -  clone: A required argument to specify the path of the remote repository to clone and an optional argument (default is current working directory) to specify the path where the repository will be cloned.
+          -  list-branch: No additional arguments are required for this command.
         """
         if command == "init":
             if args is None:
@@ -1369,6 +1370,8 @@ class DSI:
             self.vcs.cmd_merge(branch_name, target_commit)
         elif command == "list-branch" and self.vcs is not None:
             self.vcs.cmd_list_branch()
+        elif command == "status" and self.vcs is not None:
+            self.vcs.cmd_status()
         elif command == "switch" and self.vcs is not None:
             if args is None:
                 raise RuntimeError("version() ERROR: 'switch' command requires a 'branch_name' argument.")

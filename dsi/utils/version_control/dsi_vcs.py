@@ -1169,3 +1169,14 @@ class Version:
         conn.close()
         self.cmd_restore(c_hash)
         print(f"Cloned repository from '{source_repo_path}' to '{target_repo_path}'")
+
+    def cmd_status(self):
+        """Show current branch name, commit hash, and staged paths."""
+        conn = open_db(self.root_folder)
+        c_branch = self._get_latest_branch_name(conn)
+        print("="*20)
+        print(f"Branch: {c_branch}")
+        latest_commit_hash = self._get_tracked_commit_of_branch(conn, c_branch)
+        print(f"Commit: {latest_commit_hash[:12]}")
+        print("="*20)
+        self._print_staged_paths()
