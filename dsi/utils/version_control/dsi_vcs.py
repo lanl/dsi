@@ -29,9 +29,15 @@ import json
 import datetime
 import shutil
 import tempfile
-import pwd
-import grp
 from typing import Optional
+
+if sys.platform == "win32":
+    import getpass
+    pwd = None
+    grp = None
+else:
+    import pwd
+    import grp
 
 from .vcs_db import DB_NAME, SNAPSHOTS_DIR, open_db
 from .vcs_metadata_helper import collect_metadata, owner_name, check_access_permission, set_acl
@@ -119,49 +125,50 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         if rel_path not in access_checked:
             access_checked[rel_path] = check_access_permission(conn, target_tree, commit_hash, rel_path, "read")
 
-    # update acl text, owner, group, and permissions
-    for rel_path in access_checked:
-        metadata = access_checked[rel_path]
-        if metadata is not None:
-            acl_text = metadata.get("acl_text")
-            permissions_int = int(metadata.get("permissions_int", 0))
-            target_path = snapshot_target(target_tree, rel_path)
-            if acl_text is not None and acl_text != "":
-                set_acl(target_path, acl_text)
+    if sys.platform != "win32":
+        # update acl text, owner, group, and permissions
+        for rel_path in access_checked:
+            metadata = access_checked[rel_path]
+            if metadata is not None:
+                acl_text = metadata.get("acl_text")
+                permissions_int = int(metadata.get("permissions_int", 0))
+                target_path = snapshot_target(target_tree, rel_path)
+                if acl_text is not None and acl_text != "":
+                    set_acl(target_path, acl_text)
 
-            owner = metadata.get("owner_name")
-            group = metadata.get("group_name")
-            if owner or group:
-                uid = os.getuid()
-                gid = os.getgid()
-                if owner:
-                    try:
-                        uid = pwd.getpwnam(owner).pw_uid
-                    except KeyError:
-                        uid = os.getuid()
-                if group:
-                    try:
-                        gid = grp.getgrnam(group).gr_gid
-                    except KeyError:
-                        gid = os.getgid()
-                # If not running as root, we cannot chown to arbitrary users/groups.
-                # Ensure we don't attempt to set owner/group to someone else when
-                # the process lacks privilege — fall back to current user/group.
-                if os.geteuid() != 0:
-                    # cannot set arbitrary owner/group as non-root; assign to current user/group
+                owner = metadata.get("owner_name")
+                group = metadata.get("group_name")
+                if owner or group:
                     uid = os.getuid()
                     gid = os.getgid()
-                try:
-                    os.chown(target_path, uid, gid)
-                except PermissionError:
-                    # as a last resort, try to ensure the file is owned by current user
+                    if owner:
+                        try:
+                            uid = pwd.getpwnam(owner).pw_uid
+                        except KeyError:
+                            uid = os.getuid()
+                    if group:
+                        try:
+                            gid = grp.getgrnam(group).gr_gid
+                        except KeyError:
+                            gid = os.getgid()
+                    # If not running as root, we cannot chown to arbitrary users/groups.
+                    # Ensure we don't attempt to set owner/group to someone else when
+                    # the process lacks privilege — fall back to current user/group.
+                    if os.geteuid() != 0:
+                        # cannot set arbitrary owner/group as non-root; assign to current user/group
+                        uid = os.getuid()
+                        gid = os.getgid()
                     try:
-                        os.chown(target_path, os.getuid(), os.getgid())
+                        os.chown(target_path, uid, gid)
                     except PermissionError:
-                        pass
+                        # as a last resort, try to ensure the file is owned by current user
+                        try:
+                            os.chown(target_path, os.getuid(), os.getgid())
+                        except PermissionError:
+                            pass
 
-            if os.geteuid() == 0 or owner_name(os.getuid()) == metadata.get("owner_name"):
-                os.chmod(target_path, permissions_int)
+                if os.geteuid() == 0 or owner_name(os.getuid()) == metadata.get("owner_name"):
+                    os.chmod(target_path, permissions_int)
     return True
 
 
@@ -520,7 +527,11 @@ class Version:
         parent_commit_hash = self._get_tracked_commit_of_branch(conn, current_branch_name)
 
         committed_at = _utcnow()
-        running_user = owner_name(os.getuid())
+        running_user = ""
+        if sys.platform == "win32":
+            running_user = getpass.getuser()
+        else:
+            running_user = owner_name(os.getuid())
         snapshots_root = os.path.join(self.root_folder, SNAPSHOTS_DIR)
         entries_in_last_commit = set(self._get_entries_in_commit(conn, parent_commit_hash) if parent_commit_hash else [])
 

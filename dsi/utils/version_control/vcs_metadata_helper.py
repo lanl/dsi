@@ -3,10 +3,16 @@ import stat
 import hashlib
 import json
 import subprocess
-import pwd
-import grp
 import sys
 from typing import Optional
+
+if sys.platform == "win32":
+    import getpass
+    pwd = None
+    grp = None
+else:
+    import pwd
+    import grp
 
 from .vcs_db import DB_NAME, SNAPSHOTS_DIR
 
@@ -49,6 +55,11 @@ def permission_str(mode: int) -> str:
 
 
 def owner_name(uid: int) -> str:
+    if sys.platform == "win32":
+        try:
+            return getpass.getuser()
+        except (KeyError, OSError):
+            return str(uid)
     try:
         return pwd.getpwuid(uid).pw_name
     except KeyError:
@@ -56,6 +67,9 @@ def owner_name(uid: int) -> str:
 
 
 def group_name(gid: int) -> str:
+    if sys.platform == "win32":
+        # Windows has no POSIX gid database; preserve the numeric value.
+        return str(gid)
     try:
         return grp.getgrgid(gid).gr_name
     except KeyError:
@@ -71,7 +85,7 @@ def get_acl(path: str) -> Optional[str]:
         return _get_acl_darwin(path)
     elif sys.platform == "linux":
         return _get_acl_linux(path)
-    print(f"Unsupported platform for ACL read: {sys.platform}")
+    # print(f"Unsupported platform for ACL read: {sys.platform}")
     return None
 
 
@@ -147,8 +161,8 @@ def set_acl(path: str, acl_string: str) -> None:
         _set_acl_darwin(path, acl_string)
     elif sys.platform == "linux":
         _set_acl_linux(path, acl_string)
-    else:
-        print(f"Unsupported platform for ACL write: {sys.platform}")
+    # else:
+    #     print(f"Unsupported platform for ACL write: {sys.platform}")
 
 
 def _set_acl_darwin(path: str, acl_string: str) -> None:
@@ -377,22 +391,26 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
     if access not in {"read", "write"}:
         raise ValueError("access must be 'read' or 'write'")
 
-    try:
-        current_user = pwd.getpwuid(os.geteuid())
-        username = current_user.pw_name
-    except KeyError:
-        return {}
-
-    current_groups = set()
-    try:
-        current_groups.add(grp.getgrgid(os.getegid()).gr_name)
-    except KeyError:
-        pass
-    for gid in os.getgroups():
+    if sys.platform == "win32":
+        username = getpass.getuser()
+        return metadata if username == owner_name else None
+    else:
         try:
-            current_groups.add(grp.getgrgid(gid).gr_name)
+            current_user = pwd.getpwuid(os.geteuid())
+            username = current_user.pw_name
+        except KeyError:
+            return {}
+
+        current_groups = set()
+        try:
+            current_groups.add(grp.getgrgid(os.getegid()).gr_name)
         except KeyError:
             pass
+        for gid in os.getgroups():
+            try:
+                current_groups.add(grp.getgrgid(gid).gr_name)
+            except KeyError:
+                pass
 
     # If acl_text is available, check it first for explicit allows for the
     # current user or any of the user's groups. On Darwin, acl_text is expected
