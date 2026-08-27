@@ -4,7 +4,7 @@ import os
 # ─────────────────────────── CONFIG ──────────────────────────────────────────
 
 DB_NAME = "dsi_vcs.db"           # SQLite DB stored inside the root folder
-SNAPSHOTS_DIR = "dsi_vcs"  # rsync snapshot copies live here
+SNAPSHOTS_DIR = "__dsi_vcs"  # rsync snapshot copies live here
 
 # ─────────────────────────── DATABASE ────────────────────────────────────────
 
