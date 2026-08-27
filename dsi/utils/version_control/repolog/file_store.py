@@ -5,9 +5,6 @@ A repository's entire log lives in one file, which grows without bound
 as records are appended. Each frame (see frame_codec.py) is addressable
 by its byte offset in that file -- a plain `int` -- which is exactly
 what an external SQL-based index is expected to store per log entry.
-
-This module only deals in raw bytes (frames); it knows nothing about
-`LogRecord` or hashing. That logic lives in `log.py`.
 """
 
 from __future__ import annotations

@@ -4,10 +4,11 @@ import sys
 import os
 
 from .dsi_vcs import Version
+from . import __version__
 
 def main():
     parser = argparse.ArgumentParser(
-        description="dsi-vcs — rsync-based file version control with full Linux metadata"
+        description=f"dsi-vcs (v{__version__}) — content defined version control with file metadata"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

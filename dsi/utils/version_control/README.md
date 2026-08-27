@@ -1,15 +1,15 @@
-# dsi-vcs: Content Version Control with Full Linux Metadata
+# dsi-vcs: Content Defined Version Control with File Metadata
 
 ## Overview
 
-**dsi-vcs** is a lightweight content (Large data file, code) version control system designed for capturing and preserving complete Linux file metadata. Unlike traditional VCS tools, dsi-vcs focuses on:
+**dsi-vcs** is a lightweight content (Large data file, code) version control system designed for capturing and preserving complete file metadata. **dsi-vcs** focuses on:
 
-- **Full metadata capture**: permissions, ownership, ACLs, extended attributes, and SELinux contexts
-- **Rolling hash chunking**: Uses a rolling hash for efficient file chunking and deduplication
-- **Merkle commit chain**: SHA-256 commit IDs with per-path Merkle nodes for pruning unchanged subtrees
-- **Branch support**: Multiple branches with parent-child commit relationships
-- **SQLite database**: structured metadata storage for querying and diffing
-- **Complete file history**: Chunk-based content addressing with full metadata tracking
+- **Full metadata capture**: permissions, ownership, ACLs, extended attributes, and SELinux contexts.
+- **Hash chunking**: Uses FastCDC hash for efficient file chunking and deduplication.
+- **Merkle commit chain**: SHA-256 commit IDs with per-path Merkle nodes for pruning unchanged subtrees.
+- **Branch support**: Multiple branches with parent-child commit relationships.
+- **SQLite database**: structured metadata storage for querying and diffing.
+- **Complete file history**: Chunk-based content addressing with full metadata tracking.
 
 ---
 
@@ -43,6 +43,24 @@ dsi-vcs delete ./old_data/
 ```bash
 dsi-vcs remove <path> [<path> ...]
 dsi-vcs remove file1.txt
+```
+
+**Show status (branch name, commit hash, and staged files):**
+
+```bash
+dsi-vcs status
+```
+
+Example output:
+
+```shell
+====================
+Branch: main
+Commit: b7ddca6d19d0
+====================
+Staged paths (2):
+  genesis_wildfire.ipynb [add]
+  utils.py [delete]
 ```
 
 ### Commit Changes
@@ -125,22 +143,22 @@ Example output:
 
 ```shell
 Diff f826177ae78f4e48a8c08054e2bb9a71 → latest  (./root_folder)  
-                                                
-STATUS     PATH                                 
+                                            
+STATUS     PATH                             
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                    
-MODIFIED   file_schema.json  [owner]            
-diff result: 2c2                                
-<    "genesis_datacard": {                      
----                                             
->    2"genesis_datacard": {                     
-26c26                                           
-< }                                             
-\ No newline at end of file                     
----                                             
-> }                                             
-MODIFIED   schema2.json  [content, size]        
-                                                
+MODIFIED   file_new  [owner]                
+MODIFIED   file_schema.json  [owner]        
+diff result: 2c2                            
+<    "genesis_datacard": {                  
+---                                         
+>    2"genesis_datacard": {                 
+26c26                                       
+< }                                         
+\ No newline at end of file                 
+---                                         
+> }                                         
+MODIFIED   schema2.json  [content, size]    
+                                            
 Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged
 ```
 
@@ -152,8 +170,6 @@ Restore the entire repository to a previous commit:
 dsi-vcs restore <version>
 dsi-vcs restore abc123def456
 ```
-
-
 
 ### Clone a DSI-VCS Repository
 
@@ -230,6 +246,16 @@ obj.version("delete", "file1.py file2.py")
 
 ---
 
+### `status`
+
+Show current branch name, commit hahs, and list of staged files.
+
+```python
+obj.version("status")
+```
+
+---
+
 ### `commit`
 
 Commits all staged changes as a new version snapshot.
@@ -303,7 +329,7 @@ obj.version("log")            # shows logs in descending date order
 obj.version("log", "feature") # shows logs from feature branch only
 ```
 
-**Args (optional):** Number of recent versions to display. Defaults to `5`.
+**Args (optional):** A traget branch name (Defaults is the latest branch) and the number of recent versions to display (Defaults is `10`).
 
 ---
 
@@ -423,7 +449,7 @@ Stores the content-addressed tree node for each committed path, including the sy
 | relative_path       | TEXT       | Path relative to root                              |
 | file_type           | TEXT       | file/dir/symlink/etc                               |
 | node_hash           | TEXT       | SHA-256 hash for this path node                    |
-| metadata_hash       | TEXT       | SHA-256 hash of stable metadata                    |
+| metadata            | TEXT       | file metadata in json                              |
 | content_hash_sha256 | TEXT       | SHA-256 file content hash (NULL for directories)   |
 | subtree_file_count  | INTEGER    | File count below this node                         |
 | subtree_total_bytes | INTEGER    | Total bytes below this node                        |

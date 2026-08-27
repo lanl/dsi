@@ -202,7 +202,7 @@ class Version:
             repository_id="repo-123",
         )
         print(f"Initialized dsi-vcs repository in: {self.root_folder}")
-        print(f"  Snapshots: {self.root_folder}/{SNAPSHOTS_DIR}/")
+        print(f"Versions are recorded in folder: {SNAPSHOTS_DIR}")
 
     def _load_pending_stage_entries(self) -> dict[str, tuple[object, str]]:
         pending: dict[str, tuple[object, str]] = {}
