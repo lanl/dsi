@@ -113,8 +113,8 @@ class Zenodo(Webserver):
 
     DEFAULT_URL = "https://zenodo.org"
 
-    DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)
-    ZENODO_DOI_REGEX = re.compile(r"^10\.5281/zenodo\.(\d+)$", re.I)
+    DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.IGNORECASE)
+    ZENODO_DOI_REGEX = re.compile(r"^10\.5281/zenodo\.(\d+)$", re.IGNORECASE)
     RECORD_ID_REGEX = re.compile(r"^\d+$")
 
     SUPPORTED_PARAMS = {
