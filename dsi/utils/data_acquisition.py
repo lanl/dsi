@@ -57,7 +57,7 @@ async def get_file_size_and_download(
         int: filesize in bytes, success boolean
 
     Raises:
-        asyncssh.PermissionDenied: If authentication fails
+        asyncssh.PermissionDenied: If authentication fails after password prompt
         asyncssh.Error: For other SSH-related errors
         Exception: For any other errors during download
     """
@@ -112,113 +112,37 @@ async def get_file_size_and_download(
                 return file_size
         
     except asyncssh.PermissionDenied as e:
-        print(f"Authentication failed: {e}")
-        raise
+        # If no password was provided and authentication failed, prompt for password
+        if not password:
+            print(f"Authentication failed: {e}")
+            print(f"Please enter password for {username}@{hostname}")
+            password = getpass.getpass("Password: ")
+            
+            # Retry with password
+            connect_options['password'] = password
+            try:
+                async with asyncssh.connect(**connect_options) as conn:
+                    async with conn.start_sftp_client() as sftp:
+                        file_stat = await sftp.stat(remote_path)
+                        file_size = file_stat.size
+                        print(f"File size: {file_size} bytes")
+                        print(f"Downloading to {local_path}...")
+                        await sftp.get(remote_path, local_path)
+                        print(f"Success!!!")
+                        return file_size
+            except asyncssh.PermissionDenied as e2:
+                print(f"Authentication failed again: {e2}")
+                raise
+        else:
+            # Password was provided but still failed
+            print(f"Authentication failed: {e}")
+            raise
     except asyncssh.Error as e:
         print(f"SSH Error: {e}")
         raise
     except Exception as e:
         print(f"Error: {e}")
         raise
-
-
-def gather_datasets(workspace_folder: str, config_data: dict, base_path: str) -> list[dict[str, str]]:
-    """Gather datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
-      It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
-      The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
-
-    Args:
-        workspace_folder (str): The local folder where the datasets will be stored.
-        config_data (dict): A dictionary containing configuration data, including repository paths and download limits.
-        base_path (str): The path used for resolving relative paths to the data.
-    Returns:
-        list[dict[str, str]]: A list of dictionaries of downloaded databases and associated metadata, or an empty list if no databases downloaded.
-    """
-
-    # Create the workspace folder if it doesn't exist
-    abs_path_workspace_folder = str(Path(workspace_folder).resolve()) 
-    create_directory(abs_path_workspace_folder)  
-    print(f"Databases will be synchronized to: {abs_path_workspace_folder}")
-
-
-    # Get the list of repos
-    db_catalogue_list = []
-
-    for repo in config_data.get("repo_paths", []):
-        if Path(repo).is_absolute():
-            repo_path = Path(repo)
-        else:
-            repo_path = Path(base_path) / repo
-
-        clean_repo_path = str(repo_path.resolve())
-
-        if clean_repo_path.endswith(".csv"):
-            try:
-                _temp_catalogues = csv_to_list_of_dicts(clean_repo_path)
-                db_catalogue_list.extend(_temp_catalogues)
-            except Exception as e:
-                print(f"Error reading local repository {clean_repo_path}: {e}")
-        else:
-            print(f"Unsupported repository type for {clean_repo_path}. Only CSV files are supported for local repositories. Skipping this repo.")
-
-    
-    # Remove duplicates while keeping the latest entry for each unique path
-        # TODO: Allow the user to choose which one to keep instead of just keeping the 
-        # latest one or specify a resolution mode in the yaml file or allow user to keep both and rename them or ...
-    cleaned_db_catalogue_list = deduplicate_keep_latest(db_catalogue_list)
-    print("Number of repos found: ", len(cleaned_db_catalogue_list))
-
-
-    # Create/open the list of hostnames and usernames
-    try:
-        with open(f"{abs_path_workspace_folder}/host_usernames.json", "r", encoding="utf-8") as f:
-            host_username = yaml.safe_load(f)
-    except Exception:
-        host_username = {}
-
-
-    # information about each database
-    database_info = []
-    federation_dbs = []
-
-    
-    # Gather the databases and create the index database
-    success_counter = 0
-    for db in cleaned_db_catalogue_list:
-
-        db_info, actual_username = accquire_data(
-            location_type=db['location_type'],
-            location=db['location'],
-            path=db['path'],
-            abs_path_workspace_folder=abs_path_workspace_folder,
-            username=(host_username or {}).get(db['location'], ""),
-            download_limit=config_data["download_limit"]
-        )
-
-        new_folder = Path(db_info.pop("new_db_folder"))
-        if new_folder.is_dir() and not any(new_folder.iterdir()):
-            new_folder.rmdir()
-
-        if db_info:
-            database_info.append(db_info)
-            combined = {k: db[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name", "folder_hash"]}
-            combined["workspace_folder"] = abs_path_workspace_folder
-            federation_dbs.append(combined)
-            if actual_username != "":
-                host_username[db['location']] = actual_username
-            success_counter += 1
-
-    # Save host_usernames to a file for future runs
-    with open(f"{abs_path_workspace_folder}/host_usernames.json", "w", encoding="utf-8") as f:
-            yaml.safe_dump(host_username, f)
-
-    # Save databases information to a JSON file
-    upsert_records(f"{abs_path_workspace_folder}/dsi_database_list.json", database_info, key="original_path")
-
-
-    print(f"\nFinished gathering databases. Successfully downloaded {success_counter} databases to {abs_path_workspace_folder}.")
-
-    return federation_dbs
 
 
 
@@ -244,15 +168,22 @@ def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> lis
         print(f"Retreiving data for {endpoint_name} at {endpoint_db_path}")
     
         username = input("Username: ")
-        #password = getpass.getpass("Password: ")  # Hidden input!
     
-        db_info = pull_data(location_type="hpc",
-                      remote_location=hpc_name,
-                      remote_path=endpoint_db_path,
-                      download_location=temp_db_storage,
-                      username=username)
-                      #password=password)
-        db_infos.append(db_info)
+        try:
+            db_info = pull_data(location_type="hpc",
+                          remote_location=hpc_name,
+                          remote_path=endpoint_db_path,
+                          download_location=temp_db_storage,
+                          username=username)
+            db_infos.append(db_info)
+        except asyncssh.PermissionDenied as e:
+            print(f"Authentication failed for {endpoint_name}: {e}")
+            print(f"   Skipping {endpoint_name} and continuing with remaining endpoints...\n")
+            continue
+        except Exception as e:
+            print(f"Error accessing {endpoint_name}: {e}")
+            print(f"   Skipping {endpoint_name} and continuing with remaining endpoints...\n")
+            continue
     return db_infos
 
 
@@ -278,21 +209,25 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
         if row['location_type'].strip().lower() == "hpc":
             print(f"\n{'='*60}")
             print(f"Enter credentials for data at {row['location']} : {row['path']}")
-            username = input("Username: ")
-            password = getpass.getpass("Password: ")  # Hidden input!
+            username = input("Enter username: ")
+            password = getpass.getpass("Enter password: ")  # Hidden input!
 
         try:
+            folder_hash = create_hashed_folder_from_path(row['path'], workspace_folder)[0]
+            print(f"folder_hash: {folder_hash}")
+            print(f"workspace_folder: {workspace_folder}")
+
             downloaded_file_path = pull_data(location_type=row['location_type'],
                       remote_location=row['location'],
                       remote_path=row['path'],
-                      download_location=workspace_folder,
+                      download_location=(workspace_folder + '/' + folder_hash),
                       username=username,
                       password=password)
             
             if downloaded_file_path:
                 # Extract folder and filename from the downloaded path
                 _local_folder, _local_filename = split_path(downloaded_file_path)
-                folder_hash = create_hashed_folder_from_path(row['path'], workspace_folder)[0]
+                
                 
                 db_info = {
                     "original_location_type": row['location_type'],
@@ -308,7 +243,7 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
                 federation_dbs.append(combined)
                 success_counter += 1
         except Exception as e:
-            print(f"⚠️  Warning: Skipping database at {row['location']}:{row['path']} due to error: {e}")
+            print(f"Warning: Skipping database at {row['location']}:{row['path']} due to error: {e}")
             print(f"   Continuing with remaining databases...\n")
             continue
 
@@ -322,9 +257,10 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
 
 def get_remote_endpoints_ssh(hostname: str, 
                              username: str,
-                            script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
-                            prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'],
-                            verbose: bool = False) -> dict:
+                             hpc_type: str = "hpc",
+                             script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
+                             prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'],
+                             verbose: bool = False) -> dict:
     """ Source bash script on remote server and retrieve environment variables matching specified prefixes.
     
     Args:
@@ -380,31 +316,31 @@ PYTHON_EOF
         
         if result.returncode != 0:
             if verbose:
-                print(f"✗ Command failed: {result.stderr.strip()}")
+                print(f"Command failed: {result.stderr.strip()}")
             return {}
         
         endpoints = json.loads(result.stdout.strip())
         
         if verbose:
-            print(f"✓ Found {len(endpoints)} endpoints on {hostname}")
+            print(f"Found {len(endpoints)} endpoints on {hostname}")
         
         return endpoints
         
     except subprocess.TimeoutExpired:
         if verbose:
-            print(f"✗ Connection to {hostname} timed out")
+            print(f"Connection to {hostname} timed out")
         return {}
     except json.JSONDecodeError:
         if verbose:
-            print(f"✗ Failed to parse endpoint data")
+            print(f"Failed to parse endpoint data")
         return {}
     except FileNotFoundError:
         if verbose:
-            print(f"✗ SSH client not found")
+            print(f"SSH client not found")
         return {}
     except Exception as e:
         if verbose:
-            print(f"✗ Error: {e}")
+            print(f"Error: {e}")
         return {}
 
 
@@ -430,11 +366,22 @@ def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folde
     create_directory(dir_name=temp_db_storage, delete_if_exists=True, verbose=True)
 
     # download them
-    pull_remote_db(hpc_name, endpoints_location, temp_db_storage)
+    db_infos = pull_remote_db(hpc_name, endpoints_location, temp_db_storage)
+    
+    # Check if any endpoints were successfully downloaded
+    if not db_infos:
+        print("\nWarning: No endpoint metadata files were successfully downloaded.")
+        print("   No databases will be federated.")
+        return [], 0
 
     # combine them to output_csv and the dictionary csv_data_sources
-    output_csv = "output_csv.csv"
-    csv_data_sources = combine_csv(temp_db_storage, output_csv)
+    output_csv = str(Path(temp_db_storage) / "output_csv.csv")
+    try:
+        csv_data_sources = combine_csv(temp_db_storage, output_csv)
+    except ValueError as e:
+        print(f"\nWarning: {e}")
+        print("   No databases will be federated.")
+        return [], 0
 
     # Pull the data from the CSV file, return a dictionary, and output the dictionaty to workspace_folder
     database_info = read_data_sources(csv_data_sources, workspace_folder)
@@ -703,11 +650,12 @@ def accquire_data(location_type: str,
     else:
         folder_hash, abs_path_db_folder = create_hashed_folder_from_path(remote_path, abs_path_workspace_folder)
 
+    print(f"folder_hash: {folder_hash}, abs_path_db_folder: {abs_path_db_folder}")
     try:
         downloaded_file_path = pull_data(location_type, 
                                         remote_location, 
                                         remote_path, 
-                                        abs_path_db_folder, 
+                                        folder_hash, 
                                         username,
                                         password,
                                         download_limit)

@@ -1,14 +1,32 @@
 import getpass
 import sys
+import logging
 from pathlib import Path
+from datetime import datetime
 
 from dsi.utils.data_acquisition import (
     get_remote_endpoints_ssh,
     pull_data_endpoints,
 )
 
+# Configure logging - only to file, not console
+log_filename = f"federate_endpoints_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_filename)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+logger.info(f"Starting federate_endpoints script. Logs will be saved to: {log_filename}")
+print(f"Logs are being saved to: {log_filename}")
+
+hpc_type = input("Enter the type of HPC (hpc, kerberos, ...): ")
 hpc_name = input("Enter the name of the HPC: ")
 username = input("Enter username: ")
+
 #password = getpass.getpass("Enter password: ")
 script_path = input("Enter script path: ")
 
@@ -19,19 +37,41 @@ script_path = input("Enter script path: ")
 # prefix of the endpoints; environment variables to search for
 prefixes=['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'] 
 
-endpoints_location = get_remote_endpoints_ssh(hpc_name, username, script_path, prefixes)
+endpoints_location = get_remote_endpoints_ssh(hostname=hpc_name, 
+                                              username=username, 
+                                              script_path=script_path, 
+                                              prefixes=prefixes,
+                                              verbose=True)
+logger.info(f"Retrieved endpoints: {endpoints_location}")
 
 if endpoints_location == {}:
+    logger.warning(f"No endpoints found at {script_path}!")
     print(f"No endpoints found at {script_path}!")
     sys.exit(0)
 else:
+    logger.info(f"Found {len(endpoints_location)} endpoint(s)")
     print(f"Endpoint locations: {endpoints_location}")
 
 # Federate the data in specified folder
 rel_wrks_folder = input("\nEnter the name of the folder (on your local computer) to federate to: ") #"test_federate_07"
 workspace_folder = str(Path(rel_wrks_folder).resolve())
+logger.info(f"Workspace folder: {workspace_folder}")
 
-database_info = pull_data_endpoints(endpoints_location, hpc_name, workspace_folder)
+
+database_info, success_count = pull_data_endpoints(endpoints_location, hpc_name, workspace_folder)
+logger.info(f"Completed pulling data. Success count: {success_count}")
+
+if success_count == 0:
+    logger.error("No databases were successfully federated")
+    print("\nNo databases were successfully federated.")
+    print("   Please check your credentials and network connection.")
+    print(f"\nCheck the log file for details: {log_filename}")
+    sys.exit(1)
+else:
+    logger.info(f"Successfully gathered {success_count} database(s)")
+    print(f"\nSuccessfully gathered {success_count} database(s) to {workspace_folder}")
+    print(f"   Database info: {database_info}")
+    print(f"\nComplete log saved to: {log_filename}")
 
 # /vast/home/pascalgrosset/dsi_sources_tests/load_dsi_endpoints.sh
 
