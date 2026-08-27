@@ -532,7 +532,7 @@ class Sync:
             def alarm_handler(signum, frame):
                 raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
             signal.signal(signal.SIGALRM, alarm_handler)
-            signal.alarm(10)
+            signal.alarm(15)
 
             result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
             if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
