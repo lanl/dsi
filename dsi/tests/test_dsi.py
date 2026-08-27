@@ -9,6 +9,8 @@ import hashlib
 import random
 import pytest
 
+from dsi.utils.version_control.vcs_db import SNAPSHOTS_DIR, DB_NAME
+
 pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
 def test_list_functions():
@@ -1804,7 +1806,7 @@ def test_versioning():
     test = DSI()
     wpath = os.getcwd()
     test.version("init", wpath)
-    assert os.path.exists(wpath + "/dsi_vcs/dsi_vcs.db")
+    assert os.path.exists(wpath + f"/{SNAPSHOTS_DIR}/{DB_NAME}")
 
     # Create a file with ten random integers
     dummy_file_path = os.path.join(wpath, "a_dummy_file")
