@@ -68,6 +68,10 @@ debug.log
 *.csv
 *.cdb
 .temp.*
+*.log
+__dsi_vcs/
+dsi_vcs_chunks/
+
 
 # Force coverage svg include
 !coverage.svg
