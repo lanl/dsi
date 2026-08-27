@@ -18,7 +18,6 @@ import inspect
 
 import warnings
 
-from dsi.utils.version_control.dsi_vcs import Version
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 logger = logging.getLogger(__name__)
@@ -1336,6 +1335,11 @@ class DSI:
           -  clone: A required argument to specify the path of the remote repository to clone and an optional argument (default is current working directory) to specify the path where the repository will be cloned.
           -  list-branch: No additional arguments are required for this command.
         """
+        try:
+            from dsi.utils.version_control.dsi_vcs import Version
+        except Exception:
+            raise RuntimeError("You are trying to use DSI Versioning. Please run requirements.extras.txt")
+            
         if command == "init":
             if args is None:
                 raise RuntimeError("version() ERROR: 'init' command requires a 'root_folder' argument specifying the name of the root folder for the versioning repository.")
