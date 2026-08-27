@@ -1,8 +1,5 @@
 import sys
-import uuid
 import yaml
-import paramiko
-import argparse
 import subprocess
 import os
 import json
@@ -17,74 +14,24 @@ from pathlib import Path
 from typing import Tuple, List, Dict, Any, Optional
 
 
-from dsi.utils.federation_utils import (
-    compute_md5, 
+from dsi.utils.acquisition.utils import (
     create_directory, 
     create_hashed_folder_from_path, 
     csv_to_list_of_dicts, 
     deduplicate_keep_latest, 
     get_last_part, 
-    human_readable_size, 
-    should_download, 
     upsert_records,
     combine_csv,
-    create_folder
+    split_path,
+    confirm_large_download_prompt
 )
 
-from dsi.utils.git_utils import download_github_file, get_github_remote_file_size
-from dsi.utils.rsync_utils import rsync_download_interactive, ssh_remote_size_bytes_interactive
-from dsi.utils.web_utils import download_web_file, get_url_file_size
-from dsi.utils.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3, get_s3_client
-from dsi.utils.hpc_kerberos import ssh_k_remote_size_bytes, scp_k_copy_from
-
+from dsi.utils.acquisition.git_utils import download_github_file, get_github_remote_file_size
+from dsi.utils.acquisition.web_utils import download_web_file, get_url_file_size
+from dsi.utils.acquisition.s3_utils import download_s3_file, get_s3_remote_file_size, resolve_s3_bucket_and_key, should_download_s3, get_s3_client
 
 logger = logging.getLogger(__name__)
 
-
-def confirm_large_download_prompt(filesize: int, download_limit: int) -> bool:
-    """Prompts the user to confirm the download of a file if its size exceeds a specified limit. The function displays the file size in a human-readable format and asks the user for confirmation before proceeding with the download.
-    
-    Args:        
-        filesize (int): The size of the file in bytes.
-        download_limit (int): The download limit in bytes. If the file size exceeds this limit, the user will be prompted for confirmation.
-
-    Returns:
-        bool: True if the user confirms the download, False otherwise.
-    """
-
-    if filesize <= download_limit:
-        return True
-
-    print(
-        f"File size {human_readable_size(filesize)} exceeds the "
-        f"download limit of {human_readable_size(download_limit)}."
-    )
-    choice = input(" -- Please confirm that you want to download this file (y/n): ").strip().lower()
-    return choice == "y"
-
-
-
-def make_db_info(location_type:str, path:str, folder_hash:str, local_path:str, db_name:str="") -> dict:
-    """Creates a dictionary containing information about a database, including its original location type, original path, local path, and name.
-    
-    Args:
-        location_type (str): The type of the original location (e.g., "github", "HPC", "URL", "local").
-        path (str): The original path to the database.
-        folder_hash (str): The unique hash identifier for the folder that stores this database.
-        local_path (str): The local path where the database is stored after downloading or copying.
-        db_name (str): The name of the database.
-
-    Returns:
-        dict: A dictionary containing the database information with keys "original_location_type", "original_path", "local_path", and "name".
-    
-    """
-    return {
-        "original_location_type": location_type,
-        "original_path": path,
-        "folder_hash": folder_hash,
-        "local_path": str(local_path),
-        "name": db_name,
-    }
 
 
 
@@ -134,7 +81,8 @@ async def get_file_size_and_download(
         'host': hostname,
         'username': username,
         'known_hosts': None,
-        'connect_timeout': 30
+        'connect_timeout': 30,
+        'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
     }
     
     # Add authentication method
@@ -174,17 +122,8 @@ async def get_file_size_and_download(
         raise
 
 
-
-
-
-
-  
-    
-
-
-
-def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) -> list[dict[str, str]]:
-    """Federates datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
+def gather_datasets(workspace_folder: str, config_data: dict, base_path: str) -> list[dict[str, str]]:
+    """Gather datasets from various sources (local, GitHub, HPC, URL) based on the provided configuration.
       It checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
       The function also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
 
@@ -253,8 +192,7 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
             path=db['path'],
             abs_path_workspace_folder=abs_path_workspace_folder,
             username=(host_username or {}).get(db['location'], ""),
-            download_limit=config_data["download_limit"],
-            internal_use=True
+            download_limit=config_data["download_limit"]
         )
 
         new_folder = Path(db_info.pop("new_db_folder"))
@@ -283,6 +221,11 @@ def federate_datasets(workspace_folder: str, config_data: dict, base_path: str) 
     return federation_dbs
 
 
+
+#
+# Endpoints
+#
+
 def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> list:
     """ Pull database files from remote HPC endpoints.
     
@@ -304,7 +247,7 @@ def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> lis
         #password = getpass.getpass("Password: ")  # Hidden input!
     
         db_info = pull_data(location_type="hpc",
-                      location=hpc_name,
+                      remote_location=hpc_name,
                       remote_path=endpoint_db_path,
                       download_location=temp_db_storage,
                       username=username)
@@ -338,25 +281,43 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
             username = input("Username: ")
             password = getpass.getpass("Password: ")  # Hidden input!
 
-        db_info = pull_data(location_type=row['location_type'],
-                  location=row['location'],
-                  path=row['path'],
-                  abs_path_workspace_folder=workspace_folder,
-                  username=username,
-                  password=password,
-                  internal_use=False)
-        
-        if db_info:
-            database_info.append(db_info)
-            combined = {k: row[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name", "folder_hash"]}
-            combined["workspace_folder"] = workspace_folder
-            federation_dbs.append(combined)
-            success_counter += 1
+        try:
+            downloaded_file_path = pull_data(location_type=row['location_type'],
+                      remote_location=row['location'],
+                      remote_path=row['path'],
+                      download_location=workspace_folder,
+                      username=username,
+                      password=password)
+            
+            if downloaded_file_path:
+                # Extract folder and filename from the downloaded path
+                _local_folder, _local_filename = split_path(downloaded_file_path)
+                folder_hash = create_hashed_folder_from_path(row['path'], workspace_folder)[0]
+                
+                db_info = {
+                    "original_location_type": row['location_type'],
+                    "original_path": row['path'],
+                    "folder_hash": folder_hash,
+                    "local_path": _local_folder,
+                    "name": _local_filename,
+                }
+                
+                database_info.append(db_info)
+                combined = {k: row[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name", "folder_hash"]}
+                combined["workspace_folder"] = workspace_folder
+                federation_dbs.append(combined)
+                success_counter += 1
+        except Exception as e:
+            print(f"⚠️  Warning: Skipping database at {row['location']}:{row['path']} due to error: {e}")
+            print(f"   Continuing with remaining databases...\n")
+            continue
 
     # Save databases information to a JSON file
     upsert_records(f"{workspace_folder}/dsi_database_list.json", database_info, key="original_path")
 
     return database_info, success_counter
+
+
 
 
 def get_remote_endpoints_ssh(hostname: str, 
@@ -466,7 +427,7 @@ def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folde
     
     # create a temporaty folder to store the csv files to be downloaded
     temp_db_storage = ".test_00"
-    create_folder(temp_db_storage, delete_if_exists=True)
+    create_directory(dir_name=temp_db_storage, delete_if_exists=True, verbose=True)
 
     # download them
     pull_remote_db(hpc_name, endpoints_location, temp_db_storage)
@@ -483,7 +444,9 @@ def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folde
 
 
 
-
+#
+# Get data
+#
 
 def pull_data(location_type: str, 
               remote_location: str, 
@@ -505,7 +468,7 @@ def pull_data(location_type: str,
         password (str): optional
         download_limit (int): The maximum size of a file that can be downloaded without confirmation, if 0 no limit
     Returns:
-        tuple[str,int]: filepath"""
+        str: filepath"""
 
     # Do some cleanup
     cleaned_location_type = location_type.strip().lower()
@@ -595,7 +558,7 @@ def pull_data(location_type: str,
         # Get file size and download in one connection (TOTP passwords can only be used once!)
         try:
             # Run the async function synchronously
-            filesize, success = asyncio.run(get_file_size_and_download(
+            filesize = asyncio.run(get_file_size_and_download(
                 hostname=remote_location,
                 username=username,
                 password=password,
@@ -603,7 +566,7 @@ def pull_data(location_type: str,
                 local_folder=download_location
             ))
             
-            if not success or filesize is None:
+            if filesize is None:
                 print(f" -- Could not access or download the file at {remote_location}:{remote_path}. Skipping this database.")
                 raise RuntimeError(f"Failed to download from {remote_location}:{remote_path}")
             
@@ -614,7 +577,7 @@ def pull_data(location_type: str,
                 print(f" -- Downloaded file is {filesize} bytes (above {download_limit} byte limit)")
                 print(" -- Note: File was already downloaded due to one-time password limitation")
             
-            return str(file_path), filesize
+            return str(file_path)
                 
         except KeyboardInterrupt:
             print(f" -- Interrupted while accessing {remote_location}:{remote_path}. Skipping this database.")
@@ -703,8 +666,7 @@ def pull_data(location_type: str,
         raise ValueError(f"Unsupported location type: {location_type}")
 
 
-
-def accquire_database(location_type: str, 
+def accquire_data(location_type: str, 
               remote_location: str, 
               remote_path: str, 
               abs_path_workspace_folder: str, 
@@ -712,7 +674,7 @@ def accquire_database(location_type: str,
               password: str,
               download_limit: int = 10485760,
               internal_use = False,
-              parent_hash: str = None) -> dict | tuple[dict | None, str]:
+              parent_hash: str = None) -> dict:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -725,10 +687,8 @@ def accquire_database(location_type: str,
         username (str): username for hpc systems
         pass
         download_limit (int): The maximum size of a file that can be downloaded without confirmation.
-        internal_use (bool): Determines if returned object is a dict or a tuple of (dict, username)
     Returns:
-        dict | tuple[dict, str]: A dict of data/db info or a tuple of (data/db information, username). Second case if internal_use = True
-    """
+        dict : a dictionary entry for the data"""
 
     # Create folder for data
     tmp_path = Path(abs_path_workspace_folder).resolve()
@@ -739,9 +699,9 @@ def accquire_database(location_type: str,
     
     abs_path_workspace_folder = str(tmp_path)
     if parent_hash:
-        _, abs_path_db_folder = create_hashed_folder_from_path(parent_hash, abs_path_workspace_folder)
+        folder_hash, abs_path_db_folder = create_hashed_folder_from_path(parent_hash, abs_path_workspace_folder)
     else:
-        _, abs_path_db_folder = create_hashed_folder_from_path(remote_path, abs_path_workspace_folder)
+        folder_hash, abs_path_db_folder = create_hashed_folder_from_path(remote_path, abs_path_workspace_folder)
 
     try:
         downloaded_file_path = pull_data(location_type, 
@@ -751,22 +711,19 @@ def accquire_database(location_type: str,
                                         username,
                                         password,
                                         download_limit)
-        db_info = make_db_info(location, path, folder_hash, file_path, filename)
-        db_info = make_db_info(location_type, remote_path, folder_hash, downloaded_file_path, filename)
-        return ({"new_db_folder": abs_path_db_folder}, "") if internal_use else downloaded_file_path
+
+        _local_folder, _local_filename = split_path(downloaded_file_path)
+        print(f"Successfully acquired the data at {remote_location}:{remote_path} to {_local_folder}") 
+        
+        return {
+                "original_location_type": location_type,
+                "original_path": remote_path,
+                "folder_hash": folder_hash,
+                "local_path": _local_folder,
+                "name": _local_filename,
+            }
+
     
     except Exception as e:
-        print(f"Could not get the file at {remote_location}:{remote_path}")
-        return ""
-
-
-
-# def make_db_info(location_type:str, path:str, folder_hash:str, local_path:str, db_name:str="") -> dict:
-#     """Creates a dictionary containing information about a database, including its original location type, original path, local path, and name.
-    
-#     Args:
-#         location_type (str): The type of the original location (e.g., "github", "HPC", "URL", "local").
-#         path (str): The original path to the database.
-#         folder_hash (str): The unique hash identifier for the folder that stores this database.
-#         local_path (str): The local path where the database is stored after downloading or copying.
-#         db_name (str): The name of the database.
+        print(f"Could not acquire data at {remote_location}:{remote_path}")
+        return None

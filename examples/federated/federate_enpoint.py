@@ -2,7 +2,7 @@ import getpass
 import sys
 from pathlib import Path
 
-from dsi.utils.federated.federate_datasets import (
+from dsi.utils.data_acquisition import (
     get_remote_endpoints_ssh,
     pull_data_endpoints,
 )
@@ -24,10 +24,11 @@ endpoints_location = get_remote_endpoints_ssh(hpc_name, username, script_path, p
 if endpoints_location == {}:
     print(f"No endpoints found at {script_path}!")
     sys.exit(0)
-
+else:
+    print(f"Endpoint locations: {endpoints_location}")
 
 # Federate the data in specified folder
-rel_wrks_folder = input("Enter the name of the folder (on your local computer) to federate to: ") #"test_federate_07"
+rel_wrks_folder = input("\nEnter the name of the folder (on your local computer) to federate to: ") #"test_federate_07"
 workspace_folder = str(Path(rel_wrks_folder).resolve())
 
 database_info = pull_data_endpoints(endpoints_location, hpc_name, workspace_folder)
