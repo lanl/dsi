@@ -5,11 +5,12 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+from dsi._version import __version__
 
 project = 'DSI'
-copyright = '2023, Triad National Security, LLC. All rights reserved.'
+copyright = '2025, Triad National Security, LLC. All rights reserved. LA-UR-25-29248'
 author = 'The DSI Project team'
-release = '0.0.0'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -22,9 +23,11 @@ autosectionlabel_prefix_document = True
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.rst']
 
+rst_prolog = f".. |version_num| replace:: {__version__}"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'sphinx_rtd_theme'
-# html_static_path = ['_static']
+html_static_path = ['_static']
+html_css_files = ['custom.css']

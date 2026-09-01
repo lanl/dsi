@@ -1,40 +1,76 @@
 import pandas as pd
-from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import pyarrow as pa
+from pyarrow import parquet as pq
+import re
 
 from dsi.plugins.metadata import StructuredMetadata
 
 class FileWriter(StructuredMetadata):
     """
-    FileWriter Plugins keep information about the file that
-    they are ingesting, namely absolute path and hash.
+    FileWriters keep information about the file that they are ingesting, namely absolute path and hash.
     """
     def __init__(self, filenames, **kwargs):
         super().__init__(**kwargs)
-        if type(filenames) == str:
+        if isinstance(filenames, str):
             self.filenames = [filenames]
-        elif type(filenames) == list:
+        elif isinstance(filenames, list):
             self.filenames = filenames
         else:
             raise TypeError
 
 class ER_Diagram(FileWriter):
+    """
+    DSI Writer that generates an ER Diagram from the current data in the DSI abstraction
+    """
+    def __init__(self, filename, target_table_prefix = None, max_cols = None, **kwargs):
+        """
+        Initializes the ER Diagram writer
 
-    def __init__(self, filename, target_table_prefix = None, **kwargs):
+        `filename` : str
+            File name for the generated ER diagram. Supported formats are .png, .pdf, .jpg, or .jpeg.
+
+        `target_table_prefix` : str, optional
+            If provided, filters the ER Diagram to only include tables whose names begin with this prefix.
+
+            - Ex: If prefix = "student", only "student__address", "student__math", "student__physics" tables are included
+
+        `max_cols` : int, optional, default None
+            If provided, limits the number of columns displayed for each table in the ER Diagram.
+            If relational data is included, this must be >= number of primary and foreign keys for a table.
+        """
         super().__init__(filename, **kwargs)
         self.output_filename = filename
         self.target_table_prefix = target_table_prefix
+        self.max_cols = max_cols
+
+    def graphviz_name(self, name) -> str:
+        """ Converts non-alphanumeric characters in a table/col name to underscores"""
+        return re.sub(r'[^a-zA-Z0-9_]', '_', name)
 
     def get_rows(self, collection) -> None:
+        """
+        Generates the ER Diagram from the given DSI data collection.
+
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        """
         file_type = ".png"
-        if self.output_filename[-4:] == ".png" or self.output_filename[-4:] == ".pdf" or self.output_filename[-4:] == ".jpg":
+        if len(self.output_filename) > 4 and self.output_filename[-4:] in [".png", ".pdf", ".jpg"]:
             file_type = self.output_filename[-4:]
             self.output_filename = self.output_filename[:-4]
-        elif self.output_filename[-5:] == ".jpeg":
+        elif len(self.output_filename) > 5 and self.output_filename[-5:] == ".jpeg":
             file_type = self.output_filename[-5:]
             self.output_filename = self.output_filename[:-5]
+        elif len(self.output_filename) > 4 and self.output_filename[-4:] == ".svg":
+            raise RuntimeError("ER Diagram writer cannot generate a .SVG file due to issue with graphviz")
 
         if self.target_table_prefix is not None and not any(self.target_table_prefix in element for element in collection.keys()):
-            raise ValueError("Your input for target_table_prefix does not exist in the database. Please enter a valid prefix for table names.")
+            raise ValueError(f"The target_table_prefix '{self.target_table_prefix}' does not exist. Please enter a valid prefix for table names.")
         
         manual_dot = False
         try: from graphviz import Digraph
@@ -68,16 +104,32 @@ class ER_Diagram(FileWriter):
                 html_table = f"{tableName} [label="
             html_table += f"<<TABLE CELLSPACING=\"0\"><TR><TD COLSPAN=\"{num_tbl_cols}\"><B>{tableName}</B></TD></TR>"
             
-            col_list = tableData.keys()
+            col_list = list(tableData.keys())
             if tableName == "dsi_units":
-                col_list = ["table_name", "column_and_unit"]
+                col_list = ["table_name", "column_name", "unit"]
+            if self.max_cols is not None:
+                if "dsi_relations" in collection.keys():
+                    fk_cols = [t[1] for t in collection["dsi_relations"]["foreign_key"] if t[0] == tableName]
+                    pk_cols = [t[1] for t in collection["dsi_relations"]["primary_key"] if t[0] == tableName]
+                    rel_cols = set(pk_cols + fk_cols)
+
+                    if rel_cols:
+                        if len(rel_cols) > self.max_cols:
+                            raise ValueError("max_cols input must be >= to the number of primary/foreign key columns.")
+                        other_cols = [col for col in col_list if col not in rel_cols]
+                        combined = list(rel_cols) + other_cols[:self.max_cols - len(rel_cols)]
+                        col_list = [k for k in col_list if k in combined]
+                col_list = col_list[:self.max_cols]
+                if len(tableData.keys()) > self.max_cols:
+                    col_list.append("...")
+
             curr_row = 0
             inner_brace = 0
             for col_name in col_list:
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 1
                     html_table += "<TR>"
-                html_table += f"<TD PORT=\"{col_name}\">{col_name}</TD>"
+                html_table += f"<TD PORT=\"{self.graphviz_name(col_name)}\">{col_name}</TD>"
                 curr_row += 1
                 if curr_row % num_tbl_cols == 0:
                     inner_brace = 0
@@ -90,16 +142,18 @@ class ER_Diagram(FileWriter):
             if manual_dot: dot_file.write(html_table+"]; ")
             else: dot.node(tableName, label = html_table)
 
-        for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
-            if self.target_table_prefix is not None and self.target_table_prefix not in f_table:
-                continue
-            if f_table != "NULL":
-                foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
-                fk_string = f"{f_table}:{f_col}"
-                pk_string = f"{collection['dsi_relations']['primary_key'][foreignIndex][0]}:{collection['dsi_relations']['primary_key'][foreignIndex][1]}"
-                
-                if manual_dot: dot_file.write(f"{fk_string} -> {pk_string}; ")
-                else: dot.edge(fk_string, pk_string)
+        if "dsi_relations" in collection.keys():
+            for f_table, f_col in collection["dsi_relations"]["foreign_key"]:
+                if self.target_table_prefix is not None and f_table is not None and self.target_table_prefix not in f_table:
+                    continue
+                if f_table is not None:
+                    foreignIndex = collection["dsi_relations"]["foreign_key"].index((f_table, f_col))
+                    fk_string = f"{f_table}:{self.graphviz_name(f_col)}"
+                    pk_tuple = collection['dsi_relations']['primary_key'][foreignIndex]
+                    pk_string = f"{pk_tuple[0]}:{self.graphviz_name(pk_tuple[1])}"
+                    
+                    if manual_dot: dot_file.write(f"{pk_string} -> {fk_string}; ")
+                    else: dot.edge(pk_string, fk_string)
 
         if manual_dot:
             dot_file.write("}")
@@ -107,82 +161,207 @@ class ER_Diagram(FileWriter):
             subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
             os.remove(self.output_filename + ".dot")
         else:
-            dot.render(self.output_filename, cleanup=True)
+            try:
+                dot.render(self.output_filename, cleanup=True)
+            except Exception:
+                raise EnvironmentError("Graphviz executable must be downloaded to global environment using sudo or homebrew.")
 
 class Csv_Writer(FileWriter):
     """
-    A Plugin to output queries as CSV data
+    DSI Writer to output queries as CSV data
     """
-    def __init__(self, table_name, filename, cols_to_export = None, **kwargs):
-        '''
-        `table_name`: name of table to be exported to a csv
-        `filename`: name of the output file where the table will be stored
-        '''
+    def __init__(self, table_name, filename, export_cols = None, **kwargs):
+        """
+        Initializes the CSV Writer with the specified inputs
+
+        `table_name` : str
+            Name of the table to export from DSI.
+
+        `filename` : str
+            Name of the CSV file to be generated.
+
+        `export_cols` : list of str, optional, default is None.
+            A list of column names to include in the exported CSV file.
+            
+            If None , all columns from the table will be included.
+
+            - Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to the CSV
+        """
         super().__init__(filename, **kwargs)
         self.csv_file_name = filename
         self.table_name = table_name
-        self.export_cols = cols_to_export
+        self.export_cols = export_cols
 
     def get_rows(self, collection) -> None:
+        """
+        Exports data from the given DSI data collection to a CSV file.
+
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        """
         if self.table_name not in collection.keys():
-            raise ValueError(f"{self.table_name} does not exist in this database")
+            raise KeyError(f"{self.table_name} does not exist in memory")
+        if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
+            raise ValueError(f"Input list of column names to plot for {self.table_name} is invalid")
         
         df = pd.DataFrame(collection[self.table_name])
         
         if self.export_cols is not None:
             try:
-                df = df.iloc[:, self.export_cols]
-            except:
-                try:
-                    df = df[self.export_cols]
-                except:
-                    raise ValueError(f"Could not export to csv as specified column input {self.export_cols} is incorrect")
+                df = df[self.export_cols]
+            except Exception:
+                raise ValueError(f"Could not export to CSV as the specified columns {self.export_cols} are incorrect")
         df.to_csv(self.csv_file_name, index=False)
 
 class Table_Plot(FileWriter):
-    '''
-    Plugin that plots all numeric column data for a specified table
-    '''
+    """
+    DSI Writer that plots all numeric column data for a specified table
+    """
     def __init__(self, table_name, filename, display_cols = None, **kwargs):
-        '''
-        `table_name`: name of table to be plotted
-        `filename`: name of output file that plot be stored in
-        '''
+        """
+        Initializes the Table Plot writer with specified inputs
+
+        `table_name` : str
+            Name of the table to plot
+
+        `filename` : str
+            Name of the output file where the generated plot will be saved.
+        
+        `display_cols`: list of str, optional, default is None.
+            A list of column names to include in the plot. All included columns must contain
+            numerical data. 
+            
+            If None (default), all numerical columns in the specified table will be plotted.
+        """
         super().__init__(filename, **kwargs)
         self.output_name = filename
         self.table_name = table_name
         self.display_cols = display_cols
 
     def get_rows(self, collection) -> None:
+        """
+        Generates a plot of a specified table from the given DSI data collection.
+
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        """
         if self.table_name not in collection.keys():
-            raise ValueError(f"{self.table_name} not in the dataset")
+            raise KeyError(f"{self.table_name} does not exist in memory")
+        if self.table_name in ["dsi_units", "dsi_relations", "sqlite_sequence"]:
+            raise RuntimeError("Cannot plot the units or relations table")
         if self.display_cols is not None and not set(self.display_cols).issubset(set(collection[self.table_name].keys())):
-            raise ValueError(f"Inputted list of columns to plot for {self.table_name} is incorrect")
+            raise ValueError(f"Input list of columns to plot for {self.table_name} is invalid")
         
         numeric_cols = []
+        not_plot_cols = []
+        run_table_timesteps = []
         col_len = None
         for colName, colData in collection[self.table_name].items():
-            if colName == "run_id" or (self.display_cols is not None and colName not in self.display_cols):
+            if self.display_cols is not None and colName not in self.display_cols:
                 continue
-            if col_len == None:
+            if colName == "run_id":
+                if len(colData) == len(set(colData)):
+                    run_dict = collection["runTable"]
+                    for id in colData:
+                        if id in run_dict['run_id']:
+                            id_index = run_dict['run_id'].index(id)
+                            run_table_timesteps.append(run_dict['run_timestamp'][id_index])
+                        else:
+                            run_table_timesteps = []
+                            continue
+                continue
+
+            if col_len is None:
                 col_len = len(colData)
-            if isinstance(colData[0], str) == False:
-                unit_tuple = "NULL"
-                if "dsi_units" in collection.keys() and self.table_name in collection["dsi_units"].keys() and colName in collection["dsi_units"][self.table_name].keys():
-                    unit_tuple = collection["dsi_units"][self.table_name][colName]
-                    # unit_tuple = next((unit for col, unit in collection["dsi_units"][self.table_name].items() if col == colName), "NULL")
-                if unit_tuple != "NULL":
-                    numeric_cols.append((colName + f" ({unit_tuple})", colData))
-                else:
-                    numeric_cols.append((colName, colData))
+            if not any(isinstance(item, str) for item in colData):
+                all_num_col = [0 if item is None else item for item in colData]
+                unit = ""
+                if "dsi_units" in collection.keys(): 
+                    if self.table_name in collection["dsi_units"].keys() and colName in collection["dsi_units"][self.table_name].keys():
+                        unit = collection["dsi_units"][self.table_name][colName]
+                        unit = f" ({unit})"
+                numeric_cols.append((colName + unit, all_num_col))
+            elif self.display_cols is not None and colName in self.display_cols:
+                not_plot_cols.append(colName)
 
-        sim_list = list(range(1, col_len + 1))
+        if len(run_table_timesteps) > 0:
+            sim_list = run_table_timesteps
+        else:
+            sim_list = list(range(1, col_len + 1))
 
+        plt.clf()
         for colName, colData in numeric_cols:
             plt.plot(sim_list, colData, label = colName)
         plt.xticks(sim_list)
-        plt.xlabel("Sim Number")
-        plt.ylabel("Values")
+        if len(run_table_timesteps) > 0:
+            plt.xlabel("Timestamp")
+        else:
+            plt.xlabel("Row Number")
+        plt.ylabel("Units")
         plt.title(f"{self.table_name} Values")
         plt.legend()
-        plt.savefig(f"{self.table_name} Values", bbox_inches='tight')
+        plt.savefig(self.output_name, bbox_inches='tight')
+        plt.close('all')
+
+        if len(not_plot_cols) > 1:
+            print(f"WARNING: Cannot plot {not_plot_cols} as they are non-numeric")
+        elif len(not_plot_cols) == 1:
+            print(f"WARNING: Cannot plot {not_plot_cols} as it is non-numeric")
+
+class Parquet_Writer(FileWriter):
+    """
+    DSI Writer to output certain data as a Parquet file
+    """
+    def __init__(self, table_name, filename, export_cols = None, **kwargs):
+        """
+        Initializes the Parquet Writer with the specified inputs
+
+        `table_name` : str
+            Name of the table to export from DSI.
+
+        `filename` : str
+            Name of the Parquet file to be generated.
+
+        `export_cols` : list of str, optional, default is None.
+            A list of column names to include in the exported Parquet file.
+            
+            If None , all columns from the table will be included.
+
+            - Ex: if a table has columns [a, b, c, d, e], and export_cols = [a, c, e], only those are writted to Parquet
+        """
+        super().__init__(filename, **kwargs)
+        file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+        if file_extension not in ["pq", "parquet"]:
+            filename = filename + ".pq"
+        self.parquet_file_name = filename
+        self.table_name = table_name
+        self.export_cols = export_cols
+
+    def get_rows(self, collection) -> None:
+        """
+        Exports data from the given DSI data collection to a Parquet file.
+
+        `collection` : OrderedDict
+            The internal DSI abstraction. This is a nested OrderedDict where:
+                - Top-level keys are table names.
+                - Each value is another OrderedDict representing the table's data (with column names as keys and lists of values).
+        """
+        if self.table_name not in collection.keys():
+            raise KeyError(f"{self.table_name} does not exist in memory")
+        if self.export_cols is not None and not set(self.export_cols).issubset(set(collection[self.table_name].keys())):
+            raise ValueError(f"Input list of column names to plot for {self.table_name} is invalid")
+
+        df = pd.DataFrame(collection[self.table_name])
+        
+        if self.export_cols is not None:
+            try:
+                df = df[self.export_cols]
+            except Exception:
+                raise ValueError(f"Could not export to Parquet as the specified column input {self.export_cols} is incorrect")
+
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, self.parquet_file_name, compression="snappy")

@@ -1,5 +1,5 @@
 # Project ignores
-#data/
+#test/
 *.db
 #*.csv
 
@@ -28,6 +28,7 @@ MANIFEST
 # Local environment
 pcenv/
 dsienv/
+dsidoc/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -56,24 +57,30 @@ cover/
 
 # Testing artifacts
 *query.csv
+*.png
 dsi_parquet_backend_output.ipynb
 *.ipynb_checkpoints
 parquet.data
+debug.log
 
 # Intermediate data types
 # Unless manually specified in a git add
 *.csv
 *.cdb
+.temp.*
 
 # Force coverage svg include
 !coverage.svg
 # Misc
 .vscode
+.venv
 docs/_build
 dsi.egg-info/
 *.egg-info/
 .DS_Store
+_tmp*
 dsi-envs/
 
 HACC/HACCHaloVis/envs/
-HACC/HACCHaloVis/data
+HACC/HACCHaloVis/data_tmp*
+dsi_data/

@@ -3,7 +3,6 @@ from dsi.backends.filesystem import Backend
 import os
 import sys
 import graphviz
-import sqlalchemy
 
 # This is a hacky way to import all modules in a given directory
 sys.path.insert(0, sys.argv[1])
@@ -11,9 +10,12 @@ modules = []
 for module in os.listdir(sys.argv[1]):
     if module[-3:] == ".py":
         modules.append(module[:-3])
-        __import__(module[:-3], locals(), globals())
+        try:
+            __import__(module[:-3], locals(), globals())
+        except Exception:
+            pass
 print("Imported the following modules to find class hierarchy:",
-      ", ".join(modules), "\n")
+      ", ".join(modules))
 
 
 class ClassTreeNode:
@@ -35,15 +37,17 @@ class ClassTreeNode:
         dot.node(root.clas.__name__)
 
         def process_children(r):
-            print(r.clas.__name__)
+            # print(r.clas.__name__)
             for ch in r.subclasses:
+                if ch.clas.__name__ == "HPSS":
+                    continue
                 dot.node(ch.clas.__name__)
                 dot.edge(r.clas.__name__, ch.clas.__name__)
                 process_children(ch)
 
         process_children(root)
-        print("Rendering the following dot source:")
-        print(dot.source)
+        # print("Rendering the following dot source:")
+        # print(dot.source)
         dot.render()
         print("done.")
 

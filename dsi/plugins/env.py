@@ -7,7 +7,7 @@ from json import dumps
 
 from dsi.plugins.metadata import StructuredMetadata
 from dsi.plugins.plugin_models import (
-    EnvironmentModel, GitInfoModel, HostnameModel, SystemKernelModel, create_dynamic_model
+    GitInfoModel, HostnameModel, SystemKernelModel
 )
 
 
@@ -100,16 +100,22 @@ class SystemKernel(Environment):
     Plugin for reading environment provenance data.
 
     An environment provenance plugin which does the following:
+
     1. System Kernel Version
+
     2. Kernel compile-time config
+
     3. Kernel boot config
+
     4. Kernel runtime config
+
     5. Kernel modules and module config
+    
     6. Container information, if containerized
     """
 
     def __init__(self) -> None:
-        """Initialize SystemKernel with inital provenance info."""
+        """Initialize SystemKernel with initial provenance info."""
         super().__init__()
         self.prov_info = self.get_prov_info()
         self.column_names = ["kernel_info"]

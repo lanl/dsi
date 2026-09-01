@@ -1,0 +1,1279 @@
+from dsi.core import Terminal #, Sync
+from dsi.backends.ndp import NDP
+from dsi.backends.osti import OSTI
+from dsi.backends.oceans11 import Oceans11
+from collections import OrderedDict
+import numpy as np
+import pandas as pd
+import os
+import logging
+import importlib.util
+from contextlib import redirect_stdout
+import io
+import math
+import ast
+from datetime import datetime
+import inspect
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+logger = logging.getLogger(__name__)
+
+class DSI():
+    '''
+    A user-facing interface for DSI's Core middleware.
+
+    The DSI Class abstracts Core.Terminal for managing metadata and Core.Sync for data management and movement.
+    '''
+
+    def __init__(self, filename = ".temp_dsi.db", backend_name = "Sqlite", **kwargs):
+        """
+        Initializes DSI by activating a backend for data operations; default is a Sqlite backend for temporary data analysis.
+        If users specify `filename`, data is saved to a permanent backend file.
+
+        `filename` : str, optional, default is ".temp_dsi.db"
+            If not specified, a temporary, hidden backend file is created for users to analyze their data.
+            If specified and backend file already exists, it is activated for a user to explore its data.
+            If specified and backend file does not exist, a file with this name is created.
+            
+            Accepted file extensions for DSI-compatible backends:
+                - If backend_name = "Sqlite" → .db, .sqlite, .sqlite3
+                - If backend_name = "DuckDB" → .duckdb, .db
+                - If backend_name = "NDP" → No filename input (read-only backend)
+                - If backend_name = "OSTI" → No filename input (read-only backend)
+                - If backend_name = "Oceans11" → No filename input (read-only backend)
+            
+        `backend_name` : str, optional, default is "Sqlite".
+            Name of the backend to activate. 
+            
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI" or "Oceans11".
+            
+            If using an external backend, provide the relative path to the Python module with the backend. 
+        """
+        self.t = Terminal(debug = 0, runTable=False)
+        self.t.user_wrapper = True
+        self.schema_read = False
+        self.schema_tables = set()
+        self.loaded_tables = set()
+
+        self.silence_messages = kwargs.pop('silence_messages', False)
+
+        if backend_name.endswith(".py"):
+            if not os.path.exists(backend_name):
+                raise RuntimeError("backend() ERROR: `backend_name` must be a valid filepath to the custom backend. Please check again.")
+            
+            self.database_name = filename if filename != ".temp_dsi.db" else None
+
+            parsed_data = None
+            try:
+                with open(backend_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=backend_name)
+            except Exception:
+                raise RuntimeError("backend() Error: Could not read the Python file with the external backend.")
+            
+            class_name = None
+            init_params = []
+            custom_read_only = None
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+
+                    functions = {}
+                    for item in node.body:
+                        if isinstance(item, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "read_only" for t in item.targets):
+                            value = ast.literal_eval(item.value)
+                            if not isinstance(value, bool):
+                                raise RuntimeError("backend() Error: `read_only` must be True or False.")
+                            custom_read_only = value                        
+                        elif isinstance(item, ast.FunctionDef):
+                            functions[item.name] = item.args
+
+                    if "__init__" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name is None:
+                raise RuntimeError("backend() Error: The external backend must be structured as a Class in the Python script.")
+            if custom_read_only is None:
+                raise RuntimeError("backend() Error: The external backend class must define `read_only` = True/False")
+            self.read_only_flag = custom_read_only
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = filename
+
+            try:
+                external_backend_name = class_name
+                self.t.add_external_python_module('backend', external_backend_name, backend_name)
+                self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
+            except Exception as e:
+                logger.error(f"backend ERROR: {e}", exc_info=True)
+                if e.args:
+                    e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+
+        else:
+            backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
+            if backend_module is None:
+                raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11")
+            
+            backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
+                                 if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
+            try:
+                self.read_only_flag = getattr(backend_class, "read_only")
+            except AttributeError:
+                raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
+            
+            # Handle in-memory backends (NDP, OSTI, Oceans11)
+            if self.read_only_flag:
+                self.database_name = None
+
+                if backend_name.lower() == "ndp":
+                    backend_name = "NDP"
+                    query_params = {}
+                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    
+                    for key in ndp_param_keys:
+                        if key in kwargs:
+                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                elif backend_name.lower() == "osti":
+                    backend_name = "OSTI"
+                    query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "oceans11":
+                    backend_name = "Oceans11"
+                    query_params = kwargs.pop("params", {})
+                else:
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, and Oceans11")
+                
+                try:
+                    # Pass query params as 'params' argument
+                    self.t.load_module('backend', backend_name, 'back-read', params=query_params, **kwargs)
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
+                    raise
+
+            # Handle file-based backends (Sqlite, DuckDB)
+            else:
+                if "/" in filename:
+                    create_bool = self.t.can_create_file_here(filename.rsplit("/", 1)[0])
+                else:
+                    create_bool = self.t.can_create_file_here()
+                if create_bool is False:
+                    raise RuntimeError("Cannot initialize DSI due to write permissions in this directory. Please try elsewhere.")
+
+                if filename == ".temp_dsi.db" and os.path.exists(filename):
+                    os.remove(filename)
+
+                if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                    file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                    if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
+                        filename += ".db"
+                elif filename != ".temp_dsi.db" and backend_name.lower() == "duckdb":
+                    file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
+                    if file_extension.lower() not in ["db", "duckdb"]:
+                        filename += ".db"
+                self.database_name = filename
+
+                try:
+                    if backend_name.lower() == 'sqlite':
+                        self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                    elif backend_name.lower() == 'duckdb':
+                        self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                except Exception as e:
+                    logger.error(f"backend ERROR: {e}", exc_info=True)
+                    if e.args:
+                        e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
+                    raise
+        
+        self.main_backend_obj = self.t.loaded_backends[0]
+
+        if self.read_only_flag:
+            msg = f"Created an instance of DSI with the {backend_name} read-only backend"            
+        elif filename != ".temp_dsi.db":
+            msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
+        else:
+            msg = "Created an instance of DSI"
+        
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+
+
+    def list_backends(self):
+        """
+        Prints a list of valid backends that can be used in the `backend_name` argument in `backend()`
+        """
+        print("\nValid Backends for `backend_name` in backend():\n" + "-" * 40)
+        print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
+        if importlib.util.find_spec("duckdb") is not None:
+            print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
+        n = NDP()
+        if n.validate_connection():
+            print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
+        n = OSTI()
+        if n.validate_connection():
+            print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
+        n = Oceans11(only_validate=True)
+        if n.validate_connection(only_validate=True):
+            print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
+        print()
+
+
+
+    def schema(self, filename = None):
+        """
+        Either loads a relational database schema into DSI with a specified `filename` OR returns this database's structural schema.
+
+        `filename` : str, optional
+            Path to a JSON file describing the relationships of the tables in a database.
+            The schema should follow the format described in :ref:`user_schema_example_label`
+        
+        `return` : If filename = None, returns the structural schema of this backend - table/col names and their units.
+        **If loading a relational schema, this function must be called before reading in any associated data files**
+        """
+        if filename:
+            if self.read_only_flag:
+                backend_name = self.main_backend_obj.__class__.__name__
+                raise RuntimeError(f"{backend_name} is a read-only backend. A relational schema cannot be added.")
+            
+            if not os.path.exists(filename):
+                raise RuntimeError("schema() ERROR: Input schema file must have a valid filepath. Please check again.")
+            if "dsi_relations" in self.t.active_metadata:
+                raise RuntimeError("schema() ERROR: There is already a complex schema in memory. First load all its associated files.")
+
+            self.t.load_module('plugin', 'Schema', 'reader', filename=filename)
+
+            pk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["primary_key"])
+            fk_tables = set(t[0] for t in self.t.active_metadata["dsi_relations"]["foreign_key"] if t[0] is not None)
+            all_schema_tables = pk_tables.union(fk_tables)
+            
+            has_data = self.t.valid_backend(self.main_backend_obj)
+            if has_data and all_schema_tables.issubset(set(self.list(True))):
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    if e.args:
+                        e.args = (f'schema() ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+                self.t.active_metadata = OrderedDict()
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
+            else:
+                self.schema_read = True
+                self.schema_tables = all_schema_tables
+
+            msg = f"Successfully loaded the schema file: {filename}"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+        else:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                return self.t.get_schema()
+
+
+
+    def list_readers(self):
+        """
+        Prints a list of valid readers that can be used in the `reader_name` argument in `read()`
+        """
+        print("\nValid Readers for `reader_name` in read():\n" + "-"*50)
+        print("Collection           : Loads data from a dictionary or pandas DataFrame. For multiple tables, each table must be a nested dictionary.")
+        print("CSV                  : Loads data from CSV files (one table per call)")
+        print("Parquet              : Loads data from Parquet - a columnar storage format for Apache Hadoop (one table per call)")
+        print("YAML                 : Loads data from standard YAML files that contain one table per file")
+        print("YAML1                : Loads data from YAML files of a certain structure")
+        print("TOML                 : Loads data from standard TOML files that can have one or multiple tables per file")
+        print("TOML1                : Loads data from TOML files of a certain structure")
+        print("JSON                 : Loads single-table data from JSON files")
+        print("Ensemble             : Loads a CSV file where each row is a simulation run; creates a simulation table")
+        print("Cloverleaf           : Loads data from a directory with subfolders for each simulation run's input and output data")
+        print("Bueno                : Loads performance data from Bueno (github.com/lanl/bueno) (.data text file format)")
+        print("DublinCoreDatacard   : Loads dataset metadata adhering to the Dublin Core format (XML)")
+        print("SchemaOrgDatacard    : Loads dataset metadata adhering to schema.org (JSON)")
+        print("GoogleDatacard       : Loads dataset metadata adhering to the Google Data Cards Playbook (YAML)")
+        print("GenesisDatacard      : Loads dataset metadata for Genesis data standard (Markdown with YAML frontmatter)")
+        print()
+
+
+
+    # in future release, make data_sources and reader_name mandatory again
+    def read(self, data_sources: str | list[str] | dict | pd.DataFrame | None = None, reader_name: str | None = None, table_name = None, **kwargs):
+        """
+        Loads data into DSI using the specified parameter `reader_name`
+
+        `data_sources` : str, list of str, or data object (dict or pandas DataFrame)
+            File path(s) to the data, or an in-memory data object.
+
+            The expected input type depends on the selected `reader_name` (if a DSI-supported Reader):
+                - "Collection"           → python dictionary, OrderedDict, or pandas DataFrame
+                - "CSV"                  → .csv
+                - "Parquet"              → .pq
+                - "YAML"                 → .yaml or .yml
+                - "YAML1"                → .yaml or .yml
+                - "TOML"                 → .toml
+                - "TOML1"                → .toml
+                - "JSON"                 → .json
+                - "Ensemble"             → .csv
+                - "Cloverleaf"           → /path/to/data/directory/
+                - "Bueno"                → .data
+                - "DublinCoreDatacard"   → .xml
+                - "SchemaOrgDatacard"    → .json
+                - "GoogleDatacard"       → .yaml or .yml
+                - "GenesisDatacard"      → .md
+
+        `reader_name` : str
+            Name of the DSI Reader to use for loading the data. 
+
+            If using a DSI-supported Reader, this should be one of the reader_names from `list_readers()`.
+
+            If using a custom Reader, provide the relative file path to the Python script with the Reader.  
+            For guidance on creating a DSI-compatible Reader, view :ref:`custom_reader`.
+
+        `table_name` : str, optional
+            Name to assign to the loaded table.
+
+            Required when using the `Collection` reader to load an dictionary or pandas DataFrame representing only one table.
+            
+            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
+        """
+        if self.read_only_flag:
+            backend_name = self.main_backend_obj.__class__.__name__
+            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be ingested.")
+
+        # only DSI-repo readers require data_sources input. Custom readers do not.
+        if isinstance(data_sources, str) and not os.path.exists(data_sources) and not reader_name.endswith(".py"):
+            raise RuntimeError("read() ERROR: The input file must be a valid filepath. Please check again.")
+        if isinstance(data_sources, list) and not all(os.path.exists(f) for f in data_sources) and not reader_name.endswith(".py"):
+            raise RuntimeError("read() ERROR: All input files must have a valid filepath. Please check again.")
+        
+        # Eventually when deprecating filename/filenames, dont allow them to be passed in as kwargs
+        # expected_data_arg = ["file", "folder", "path", "filename"]
+        # if any(any(p in key.lower() for p in expected_data_arg) for key in kwargs):
+        #     raise ValueError("read() ERROR: Use the 'data_sources' argument to pass in an input file/folder/URL/data object")
+        # if any("table" in key.lower() for key in kwargs):
+        #     raise ValueError("read() ERROR: Use the in-built 'table_name' argument to pass in an input table name")
+        
+        if "filenames" in kwargs and data_sources is None:
+            data_sources = kwargs["filenames"]
+            del kwargs["filenames"]
+        elif "filename" in kwargs and data_sources is None:
+            data_sources = kwargs["filename"]
+            del kwargs["filename"]
+        if ("filename" in kwargs or "filenames" in kwargs) and data_sources is not None:
+            raise RuntimeError("read() ERROR: ONLY use the 'data_sources' arg to pass in an input file. Cannot specify data_sources and extra filename")
+
+        if reader_name.endswith(".py"):
+            if not os.path.exists(reader_name):
+                raise RuntimeError("read() ERROR: `reader_name` must be a valid filepath to the custom Reader. Please check again.")
+
+            parsed_data = None
+            try:
+                with open(reader_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=reader_name)
+            except Exception:
+                raise RuntimeError("read() Error: Could not read the Python file with the custom Reader.")
+
+            class_name = None
+            init_params = []
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    if "__init__" in functions and "add_rows" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name is None:
+                raise RuntimeError("read() Error: The custom Reader must be structured as a Class in the Python script.")
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = data_sources
+                if "table" in param.lower():
+                    updated[param] = table_name
+            
+            try:
+                self.t.add_external_python_module('plugin', class_name, reader_name)
+                self.t.load_module('plugin', class_name, 'reader', **updated, **kwargs)
+            except Exception as e:
+                if e.args:
+                    e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+
+        else:
+            try:
+                if reader_name.lower() == "dublincoredatacard":
+                    self.t.load_module('plugin', 'DublinCoreDatacard', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "schemaorgdatacard":
+                    self.t.load_module('plugin', 'SchemaOrgDatacard', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "googledatacard":
+                    self.t.load_module('plugin', 'GoogleDatacard', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "genesisdatacard":
+                    self.t.load_module('plugin', 'GenesisDatacard', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "bueno":
+                    self.t.load_module('plugin', 'Bueno', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "csv":
+                    self.t.load_module('plugin', 'Csv', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "parquet":
+                    self.t.load_module('plugin', 'Parquet', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "yaml":
+                    self.t.load_module('plugin', 'YAML', 'reader', filenames=data_sources, table_name = table_name, **kwargs)
+                elif reader_name.lower() == "yaml1":
+                    self.t.load_module('plugin', 'YAML1', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "toml":
+                    self.t.load_module('plugin', 'TOML', 'reader', filenames=data_sources, table_name = table_name, **kwargs)
+                elif reader_name.lower() == "toml1":
+                    self.t.load_module('plugin', 'TOML1', 'reader', filenames=data_sources, **kwargs)
+                elif reader_name.lower() == "ensemble":
+                    self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "json":
+                    self.t.load_module('plugin', 'JSON', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "cloverleaf":
+                    self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
+                elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
+                    self.t.load_module('plugin', 'Dictionary', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                    if isinstance(data_sources, OrderedDict):
+                        data_sources = "the Ordered Dict"
+                    else:
+                        data_sources = "the dictionary"
+                elif reader_name.lower() == "collection" and isinstance(data_sources, pd.DataFrame):
+                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                    data_sources = "the pandas DataFrame"
+                else:
+                    raise RuntimeError("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n"
+                                       "                            View eligible readers in the output of `list_readers()`")
+            except Exception as e:
+                if e.args:
+                    e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+
+        table_keys = [k for k in self.t.new_tables if k not in ("dsi_relations", "dsi_units")]
+        if self.schema_read:
+            overlap_tables = self.schema_tables & set(self.t.active_metadata.keys())
+            if not overlap_tables: # at least one table from schema in the first read()
+                raise RuntimeError("read() ERROR: Users must load all associated data for a schema after loading a complex schema.")
+            self.loaded_tables.update(overlap_tables)
+
+            if self.loaded_tables == self.schema_tables:
+                try:
+                    self.t.artifact_handler(interaction_type='ingest')
+                except Exception as e:
+                    if e.args:
+                        e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
+                    raise
+                self.t.active_metadata = OrderedDict()
+                self.schema_read = False
+                self.schema_tables = set()
+                self.loaded_tables = set()
+        else:
+            try:
+                self.t.artifact_handler(interaction_type='ingest')
+            except Exception as e:
+                if e.args:
+                    e.args = (f'read() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+            self.t.active_metadata = OrderedDict()
+
+        msg = f"Loaded {data_sources} into the tables: {', '.join(table_keys)}"
+        if len(table_keys) == 1:
+            msg.replace("the tables:", "the table:")
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+
+
+    def query(self, statement, collection = False, update = False, **kwargs):
+        """
+        Executes a SQL query on the active backend.
+
+        `statement` : str
+            A SQL query to execute. Only `SELECT` and `PRAGMA` statements are allowed.
+
+        `collection` : bool, optional, default False.
+            If True, returns the result as a pandas DataFrame or python dictionary.
+            
+            If False (default), prints the result.
+
+        `update` : bool, optional, default False.
+            If True, includes a 'dsi_table_name' column required for ``dsi.update()``. 
+
+            If False (default), return object does not include this column.
+
+        `return`: If the `statement` is incorrectly formatted, then nothing is returned or printed
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot query() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
+        if self.read_only_flag and collection and update:
+            print("query() WARNING: The returned collection object will include an extra DSI metadata column")
+        
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                df = self.t.artifact_handler(interaction_type='query', query=statement, **kwargs)
+            output = f.getvalue()
+        except Exception as e:
+            new_args = (f"query() ERROR: {e}",) + e.args[1:]
+            raise type(e)(*new_args) from None
+
+        if df is None:
+            return
+        
+        if df.empty:
+            msg = output if output else "WARNING: input query returned no data. Please check again."
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            return df
+        if not collection:
+            print(f"Printing the result of the query: {statement}")
+            headers = df.columns.tolist()
+            rows = df.values.tolist()
+            clean_rows = [
+                [None if isinstance(x, float) and math.isnan(x) else x for x in row]
+                for row in rows
+            ]
+            self.t.table_print_helper(headers, clean_rows, len(clean_rows))
+            print()
+        else:
+            msg = f"Storing the result of the query: {statement} as a collection"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+            if update:
+                df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
+            return df
+
+
+
+    def get_table(self, table_name, collection = False, update = False):
+        """
+        Retrieves all data from a specified table without requiring knowledge of the active backend's query language.
+        
+        This method offers a simplified alternative to `query()` for retrieving a full table data without using SQL.
+
+        `table_name` : str
+            Name of the table from which all data will be retrieved.
+
+        `collection` : bool, optional, default False.
+            If True, returns the result as a pandas DataFrame.
+            
+            If False (default), prints the result.
+        
+        `update` : bool, optional, default False.
+            If True, includes a 'dsi_table_name' column required for ``dsi.update()``. 
+
+            If False (default), return object does not include this column.
+        
+        `return`: If `table_name` does not exist in the backend, then nothing is returned or printed
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
+        if self.read_only_flag and collection and update:
+            print("get_table() WARNING: The returned collection object will include an extra DSI metadata column")
+        
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                df = self.t.get_table(table_name)
+            output = f.getvalue()
+        except Exception as e:
+            if e.args:
+                e.args = (f'get_table() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        if df.empty:
+            logger.log(logging.INFO, output) if self.silence_messages else print(output.rstrip("\n"))
+            return df
+        if not collection:
+            print(f"Printing all data from the table: {table_name}")
+            headers = df.columns.tolist()
+            rows = df.values.tolist()
+            clean_rows = [
+                [None if isinstance(x, float) and math.isnan(x) else x for x in row]
+                for row in rows
+            ]
+            self.t.table_print_helper(headers, clean_rows, len(clean_rows))
+            print()
+        else:
+            msg = f"Storing all data for the table: {table_name} as a collection"
+            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            
+            if update:
+                df.insert(0, "dsi_table_name", table_name)
+
+                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
+            return df
+
+
+
+    def find(self, query, collection = False, update = False):
+        """
+        Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
+
+        `query` : str
+            A column-level condition that must be in the format of a [column name] [operator] [value]. 
+            The value can be a string or number. Valid operators as example queries:
+            
+            - age > 4 
+            - age < 4 
+            - age >= 4 
+            - age <= 4 
+            - age = 4 
+            - age == 4
+            - age ~ 4    --> column age contains the number 4
+            - age ~~ 4   --> column age contains the number 4
+            - age != 4 
+            - age (4, 8) --> all values in 'age' between 4 and 8 (inclusive)
+
+        `collection` : bool, optional, default False.
+            If True, returns a pandas DataFrame representing a subset of table rows that satisfy the `query`.
+            
+            If False (default), prints the result.
+
+        `update` : bool, optional, default False.
+            If True, includes 'dsi_table_name' and 'dsi_row_index' columns required for ``dsi.update()``.
+
+            If False (default), return object does not include these columns.
+
+        `return` : If there are no matches found, then nothing is returned or printed
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot find() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot find() on an empty backend. Please ensure there is data in it.")
+        if self.read_only_flag and collection and update:
+            print("find() WARNING: The returned collection object will include extra DSI metadata columns")
+        
+        query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
+        query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
+
+        if not isinstance(query, str):
+            raise RuntimeError("find() ERROR: Input must be a string.")
+        operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
+        if not any(op in query for op in operators):
+            raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
+        
+        msg = f"Finding all rows where '{query}' in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                find_data = self.t.find_relation(query)
+            output = f.getvalue()
+        except Exception as e:
+            if e.args:
+                e.args = (f'find() ERROR: {str(e.args[0]).replace("query_object", "query")}',) + e.args[1:]
+            raise 
+        
+        if output and "WARNING" in output:
+            warn_msg = output[output.find("WARNING"):]
+            if "artifact_handler" in warn_msg:
+                lines = warn_msg.splitlines()
+                start = lines[1].find('`')
+                between = lines[1][start + 1 : lines[1].find('`', start + 1)]
+                lines[1] = lines[1].replace(between, "dsi.query()")
+                lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
+                warn_msg = '\n'.join(lines)
+            elif "Could not find" in warn_msg:
+                ending_ind = warn_msg.find("in this database")
+                warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
+            print("\n"+warn_msg.replace("database", "backend"))
+            return
+
+        table_name = None
+        output_df = None
+        row_list = [f.row_num for f in find_data]
+        for val in find_data:
+            if table_name is None:
+                table_name = val.t_name
+                output_df = pd.DataFrame([val.value], columns=val.c_name)
+            else:
+                output_df.loc[len(output_df)] = val.value
+
+        if not collection:
+            print(f'\nTable: {table_name}')
+            self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
+            print()
+        else:
+            if update:
+                output_df.insert(0, "dsi_row_index", row_list)
+                output_df.insert(0, "dsi_table_name", table_name)
+                first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+                msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            return output_df
+
+
+
+    def search(self, query, collection = False):
+        """
+        Finds all rows across all tables in the active backend where `query` can be found.
+
+        `query` : int, float, or str
+            The value to search for in all rows across all tables.
+
+        `collection` : bool, optional, default False. 
+            If True, returns a list of pandas DataFrames representing a subset of tables where `query` is found.
+
+            If False (default), prints the matches to the console.
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot search() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot search() on an empty backend. Please ensure there is data in it.")
+        query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
+        query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
+
+        val = f"'{query}'" if isinstance(query, str) else query
+        msg = f"Searching for all instances of {val} in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                find_cell = self.t.find_cell(query, row=True)
+                find_table = self.t.find_table(query)
+                find_col = self.t.find_column(query)
+        except Exception as e:
+            if e.args:
+                e.args = (f'search() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+        
+        if find_cell is None and find_col is None and find_table is None:
+            print(f"WARNING: {val} was not found in this backend\n")
+            return
+        if not collection:
+            print()
+            for val in find_table or []:
+                print(f"Found Table: '{val.t_name}' in database\n")
+            for val in find_col or []:
+                print(f"Found Column '{val.c_name[0]}' in Table: '{val.t_name}' in database\n")
+            for val in find_cell or []:
+                print(f"Table: {val.t_name}")
+                print(f"  - Columns: {val.c_name}")
+                print(f"  - Row Number: {val.row_num}")
+                print(f"  - Data: {val.value}\n")
+        else:
+            # ADD CHECKER IF VALUE OBJECT IS A TABLE THEN JUST MAKE MINI DATAFRAME FOR TABLES AND SIMILARLY FOR COL MATCH
+            output_dict = {}
+            for val in find_table or []:
+                if 'table_match' not in output_dict:
+                    output_dict['table_match'] = pd.DataFrame(columns=['table_name'])
+                output_dict['table_match'].loc[len(output_dict['table_match'])] = val.t_name
+            for val in find_col or []:
+                if 'col_match' not in output_dict:
+                    output_dict['col_match'] = pd.DataFrame(columns=['table_name', 'column_name'])
+                output_dict['col_match'].loc[len(output_dict['col_match'])] = [val.t_name, val.c_name[0]]
+            for val in find_cell or []:
+                if val.t_name not in output_dict:
+                    output_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
+                else:
+                    output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
+            
+            return list(output_dict.values())
+
+
+
+    def update(self, collection, backup = False):
+        """
+        Updates data in one or more tables in the active backend using the provided input. 
+        Intended to be used after modifying the output of `find()`, `search()`, `query()`, or `get_table()`
+
+        `collection` : pandas.DataFrame
+            The data used to update a table. 
+            DataFrame must include unchanged **`dsi_`** columns from `find()`, `search()`, `query()` or `get_table()` to successfully update.
+
+            - If a `query()` DataFrame is the input, the corresponding table in the backend will be completely overwritten.
+
+        `backup` : bool, optional, default False. 
+            If True, creates a backup file for the DSI backend before updating its data.
+
+            If False (default), only updates the data.
+
+        - NOTE: Columns from the original table cannot be deleted during update. Only row edits or column additions are allowed.
+        - NOTE: If update() affects a user-defined primary key column, row order may change upon reinsertion.
+        """
+        if self.read_only_flag:
+            backend_name = self.main_backend_obj.__class__.__name__
+            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
+        
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot update() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot update() an empty backend. Please ensure there is data in it.")
+        msg = "Updating the active backend with the input collection of data"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+        if not isinstance(collection, pd.DataFrame):
+            raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
+        elif 'dsi_table_name' not in collection.columns:
+            raise RuntimeError("update() ERROR: The 'dsi_table_name' column was not found. Ensure you set 'update'=True in the function that returned this collection")
+        elif 'dsi_table_name' in collection.columns:
+            if len(collection) == 0:
+                raise RuntimeError("update() ERROR: Cannot overwrite a table without any data.")
+            t_col = collection['dsi_table_name']
+            if not t_col.map(lambda x: isinstance(x, str)).all():
+                raise RuntimeError("update() ERROR: The 'dsi_table_name' column must be all strings. Extra rows must be empty.")
+            if t_col.replace('', pd.NA).dropna().nunique() > 1:
+                raise RuntimeError("update() ERROR: 'dsi_table_name' column must contain unchanged table name. Extra rows must be empty strings.")
+        
+        table_name = collection['dsi_table_name'].iloc[0]
+        actual_df = None
+        if table_name.lower() in self.t.dsi_tables:
+            raise RuntimeError(f"update() ERROR: '{table_name}' is a DSI-read-only table. Cannot update it.")
+        if 'dsi_row_index' in collection.columns:
+            table_df = collection.copy()
+
+            if any(not (isinstance(row_ind, int) or row_ind == '') for row_ind in table_df['dsi_row_index']):
+                raise RuntimeError("update() ERROR: 'dsi_row_index' column must be unchanged row indexes. Extra rows must be empty strings.")
+            match = table_df['dsi_row_index'].apply(lambda x: isinstance(x, int)) & (table_df['dsi_table_name'] != table_name)
+            empty_match = (table_df['dsi_row_index'] == '') & (table_df['dsi_table_name'] != '')
+            if match.any() or empty_match.any():
+                raise RuntimeError(f"update() ERROR: Rows in 'dsi_table_name' and 'dsi_row_index' must be '{table_name}' and row index or both be empty.")
+            numeric_rows = [int(val) for val in table_df['dsi_row_index'] if val != '']
+            if numeric_rows != sorted(numeric_rows) or len(numeric_rows) != len(set(numeric_rows)):
+                raise RuntimeError("update() ERROR: 'dsi_row_index' must be unchanged and in increasing order.")
+
+            row_num_list = numeric_rows
+            table_df = table_df.drop(columns='dsi_table_name')
+            table_df = table_df.drop(columns='dsi_row_index')
+
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                actual_df = self.t.get_table(table_name)
+            if actual_df.empty: # dont update if this table doesn't exist
+                print(f"WARNING: Cannot update the table '{table_name}' as it does not exist in the active backend.\n")
+                return
+            
+            if len(row_num_list) > len(actual_df) or any(ind > len(actual_df) for ind in row_num_list):
+                raise RuntimeError("update() ERROR: 'dsi_row_index' was modified. When adding new rows, values for 'dsi_row_index' must be empty.")
+            
+            # currently prevents users from dropping columns from the original table
+            if not set(actual_df.columns).issubset(set(table_df.columns)):
+                raise RuntimeError(f"update() ERROR: {table_name}'s edited data must contain all columns from the original table")
+            new_cols = list(set(table_df.columns) - set(actual_df.columns))
+            if new_cols:
+                for col in new_cols:
+                    actual_df[col] = None
+                actual_df = actual_df[table_df.columns]
+            
+            for col in actual_df.columns:
+                common_dtype = np.result_type(actual_df[col].to_numpy().dtype, table_df[col].to_numpy().dtype)
+                actual_df[col] = actual_df[col].astype(common_dtype)
+                table_df[col] = table_df[col].astype(common_dtype)
+            
+            id_list = [x - 1 for x in row_num_list] # IF ROW NUMBERS ARE 1-INDEXED NOT 0-INDEXED
+            table_df_max_len = table_df.iloc[:len(id_list)]
+            actual_df.loc[id_list] = table_df_max_len.values
+            if len(table_df) > len(id_list):
+                extra_rows = table_df.iloc[len(id_list):]
+                actual_df = pd.concat([actual_df, extra_rows], ignore_index=True)
+        else:
+            collection = collection.drop(columns='dsi_table_name')
+            actual_df = collection.copy()
+        
+        try:
+            if backup:
+                extension = self.database_name.rfind('.')
+                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                backup_file = self.database_name[:extension] + f".backup_{timestamp}" + self.database_name[extension:]
+                msg = f"Created backup '{backup_file}' before updating the data."
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            self.t.overwrite_table(table_name, actual_df, backup)
+        except Exception as e:
+            if e.args:
+                e.args = (f'update() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+
+
+    def process(self, backend_name, filename, **kwargs):
+        """
+        Process converts the current backend into another format: Sqlite or DuckDB for now
+
+        DSI instance will now use that new backend as the base for all functions. 
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot process() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot process() data from an empty backend. Please ensure there is data in it.")
+        
+        try:
+            self.t.artifact_handler(interaction_type='process')
+        except Exception as e:
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        old_backend_data = self.t.active_metadata
+
+        self.u = Terminal()
+        self.u.user_wrapper = True
+        self.u.active_metadata = old_backend_data
+
+        correct_backend = True
+        try:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                if backend_name.lower() == 'sqlite':
+                    self.u.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                    backend_name = 'Sqlite'
+                elif backend_name.lower() == 'duckdb':
+                    self.u.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
+                    backend_name = 'DuckDB'
+                else:
+                    correct_backend = False
+        except Exception as e:
+            logger.error(f"process() ERROR: {e}", exc_info=True)
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        if not correct_backend:
+            raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
+                            "Eligible backend_names are: Sqlite, DuckDB")
+        
+        try:
+            self.u.artifact_handler(interaction_type='ingest')
+        except Exception as e:
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+        
+        try:
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.u.close()
+                self.t.unload_module('backend',backend_name,'back-write')
+                self.t.load_module('backend',backend_name,'back-write', filename=filename)
+        except Exception as e: # there really shouldn't be an error here
+            logger.error(f"process() ERROR: {e}", exc_info=True)
+            if e.args:
+                e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+
+
+    def list_writers(self):
+        """
+        Prints a list of valid writers that can be used in the `writer_name` argument in `write()`
+        """
+        print("\nValid Writers for `writer_name` in write():", self.t.VALID_WRITERS, "\n")
+        print("ER_Diagram  : Creates a visual ER diagram image based on all tables in DSI.")
+        print("Table_Plot  : Generates a plot of numerical data from a specified table.")
+        print("Csv         : Exports the data of a specified table to a CSV file.")
+        print("Parquet     : Exports the data of a specified table to a Parquet file.")
+        print()
+
+
+
+    def write(self, filename, writer_name, table_name = None, **kwargs):
+        """
+        Exports data from the active backend using the specified `writer_name`.
+
+        `filename` : str
+            Name of the output file to write.
+
+            Expected file extensions based on `writer_name` (if a DSI-supported Writer):
+                - "ER_Diagram"   → .png, .pdf, .jpg, .jpeg
+                - "Table_Plot"   → .png, .jpg, .jpeg
+                - "Csv"          → .csv
+                - "Parquet"      → .pq
+
+        `writer_name` : str        
+            Name of the DSI Writer to export data. 
+            
+            If using a DSI-supported Writer, this should be one of the writer_names from `list_writers()`.
+
+            If using a custom Writer, provide the relative file path to the Python script with the Writer.  
+            For guidance on creating a DSI-compatible Writer, view :ref:`custom_writer`.
+
+        `table_name`: str, optional
+            Required when using "Table_Plot", "Csv" or "Parquet" to specify which table to export.
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot write() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot write() data from an empty backend. Please ensure there is data in it.")
+
+        collection = None
+        if "collection" in kwargs:
+            collection = kwargs["collection"]
+            if table_name is None:
+                table_name = "object_writer"
+            if isinstance(collection, dict):
+                if all(isinstance(val, list) for val in collection.values()):
+                    self.t.active_metadata = OrderedDict([(table_name, collection)])
+                elif not any(isinstance(val, dict) for val in collection.values()): # single dict with one value per key (no nested dicts)
+                    temp_dict = OrderedDict()
+                    for k, v in collection.items():
+                        temp_dict[k] = [v]
+                    self.t.active_metadata = OrderedDict([(table_name, temp_dict)])
+                else:
+                    raise ValueError("write() ERROR: 'collection' cannot have nested dictionaries as values.")
+            elif isinstance(collection, pd.DataFrame):
+                try:
+                    ordered_df = OrderedDict((col, collection[col].tolist()) for col in collection.columns)
+                    self.t.active_metadata = OrderedDict([(table_name, ordered_df)])
+                except Exception:
+                    raise ValueError("write() ERROR: Could not open the 'collections' DataFrame.")
+            else:
+                raise ValueError("write() ERROR: Input 'collection' arg has to be a dictionary or pandas DataFrame")
+
+        else:
+            try:        
+                self.t.artifact_handler(interaction_type='process')
+            except Exception as e:
+                if e.args:
+                    e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+
+        if writer_name.endswith(".py"):
+            if not os.path.exists(writer_name):
+                raise RuntimeError("write() ERROR: `writer_name` must be a valid filepath to the custom Writer. Please check again.")
+
+            import ast
+            parsed_data = None
+            try:
+                with open(writer_name, "r", encoding="utf-8") as external_reader:
+                    parsed_data = ast.parse(external_reader.read(), filename=writer_name)
+            except Exception:
+                raise RuntimeError("write() Error: Could not read the Python file with the custom Writer.")
+
+            class_name = None
+            init_params = []
+            for node in parsed_data.body:
+                if isinstance(node, ast.ClassDef):
+                    class_name = node.name
+                    functions = {item.name: item.args for item in node.body if isinstance(item, ast.FunctionDef)}
+
+                    if "__init__" in functions and "get_rows" in functions:
+                        arg_names = [a.arg for a in functions["__init__"].args]
+                        if arg_names and arg_names[0] == "self":
+                            arg_names = arg_names[1:]
+
+                        init_params = arg_names + [a.arg for a in functions["__init__"].kwonlyargs]
+
+            if class_name is None:
+                raise RuntimeError("write() Error: The custom Writer must be structured as a Class in the Python script.")
+            
+            updated = {}
+            for param in init_params:
+                if any(f in param.lower() for f in ["file", "folder", "path", "filename"]):
+                    updated[param] = filename
+                if "table" in param.lower():
+                    updated[param] = table_name
+            
+            try:
+                self.t.add_external_python_module('plugin', class_name, writer_name)
+                self.t.load_module('plugin', class_name, 'writer', **updated, **kwargs)
+            except Exception as e:
+                if e.args:
+                    e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+        else:
+            try:
+                if writer_name.lower() in ["er_diagram", "er diagram"]:
+                    self.t.load_module('plugin', 'ER_Diagram', 'writer', filename=filename, **kwargs)
+                elif writer_name.lower() in ["table_plot", "table plot"]:
+                    self.t.load_module('plugin', 'Table_Plot', 'writer', filename=filename, table_name = table_name, **kwargs)
+                elif writer_name.lower() in ["csv", "csv writer", "csv_writer"]:
+                    self.t.load_module('plugin', 'Csv_Writer', 'writer', filename=filename, table_name = table_name, **kwargs)
+                elif writer_name.lower() in ["parquet", "parquet writer", "parquet_writer"]:
+                    self.t.load_module('plugin', 'Parquet_Writer', 'writer', filename=filename, table_name = table_name, **kwargs)
+                else:
+                    raise RuntimeError("Please check your spelling of the 'writer_name' argument as it does not exist in DSI\n"
+                                       "                             View eligible readers in the output of `list_writers()`")
+            except Exception as e:
+                if e.args:
+                    e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
+                raise
+        
+        try:
+            self.t.transload()
+        except Exception as e:
+            if e.args:
+                e.args = (f'write() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        self.t.active_metadata = OrderedDict()
+        msg = f"Successfully wrote to the output file {filename}"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+
+
+
+    def list(self, collection: bool = False) -> list | None:
+        """
+        Gets the names and dimensions (rows x columns) of all tables in the active backend.
+
+        Arguments:
+            collection (bool): If True, returns a Python list of all the table names else if False (default), prints each table's name and dimensions to the console.
+
+        Returns:
+            list | None : list of table names if collection is True, else None. If there are no tables in the backend, then nothing is returned or printed.
+
+        Raises:
+            ValueError: If backend is empty or invalid.
+            RuntimeError: If called before schema data is loaded or if listing fails.
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot call list() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot list() tables of an empty backend. Please ensure there is data in it.")
+
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                table_list = self.t.list(collection)
+            output = f.getvalue()
+        except Exception as e:
+            if e.args:
+                e.args = (f'list() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        
+        if collection:
+            return table_list
+        else:
+            print(output)
+            return None
+
+
+
+    def summary(self, table_name = None, collection = False):
+        """
+        Prints numerical metadata and (optionally) sample data from tables in the active backend.
+
+        `table_name` : str, optional
+            If specified, only the numerical metadata for that table will be printed.
+            
+            If None (default), metadata for all available tables is printed.
+        
+        `collection` : bool, optional, default False. 
+            If True, and table_name specified, returns a Pandas DataFrame of the summary of that table.
+
+            If True, and table_name not specified, returns a list of Pandas DataFrames of the summary of all tables.
+            
+            If False (default), prints each table's name and numerical metadata to the console.
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot call summary() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot call summary() on an empty backend. Please ensure there is data in it.")
+        
+        output = None
+        try:
+            f = io.StringIO()
+            with redirect_stdout(f):
+                summary_df = self.t.summary(table_name, collection)
+            output = f.getvalue()
+        except Exception as e:
+            if e.args:
+                e.args = (f'summary() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+        if collection:
+            return summary_df
+        else:
+            print(output)
+
+
+
+    def num_tables(self):
+        """
+        Prints the number of tables in the active backend.
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
+        try:
+            self.t.num_tables()
+        except Exception as e:
+            if e.args:
+                e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+
+
+    def display(self, table_name, num_rows = 25, display_cols = None):
+        """
+        Prints data from a specified table in the active backend.
+        
+        `table_name` : str
+            Name of the table to display.
+         
+        `num_rows` : int, optional, default=25
+            Maximum number of rows to print. If the table contains fewer rows, only those are shown.
+
+        `display_cols` : list of str, optional
+            List of specific column names to display from the table. 
+
+            If None (default), all columns are displayed.
+        """
+        if self.schema_read:
+            raise RuntimeError("ERROR: Cannot display() until all associated data is loaded after a complex schema")
+        if not self.t.valid_backend(self.main_backend_obj):
+            raise RuntimeError("ERROR: Cannot call display() data from an empty backend. Please ensure there is data in it.")
+        if isinstance(num_rows, list):
+            display_cols = num_rows
+            num_rows = 25
+        try:
+            self.t.display(table_name, num_rows, display_cols)
+        except Exception as e:
+            if e.args:
+                e.args = (f'display() ERROR: {str(e.args[0])}',) + e.args[1:]
+            raise
+
+
+
+    def close(self):
+        """
+        Closes the connection to the active backend and clears all loaded DSI modules.
+        """
+        fnull = open(os.devnull, 'w')
+        with redirect_stdout(fnull):
+            self.t.close()
+        
+        if not self.silence_messages:
+            print("Closing this instance of DSI()")
+
+
+
+    #help, edge-finding (find this/that)
+    def get(self, dbname=None):
+        #if not dbname:
+        #    s = Sync(dbname)
+        #else:
+        #    s = Sync("workspace.db")
+        pass
+
+
+
+    def move(self, filepath):
+        pass
+
+
+
+    def fetch(self, fname):
+        pass

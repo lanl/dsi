@@ -1,0 +1,20 @@
+{
+    "simulation": {
+       "primary_key": "sim_id"
+    }, 
+    "input": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    }, 
+    "output": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    },
+    "viz_files": {
+       "foreign_key": {
+             "sim_id": ["simulation", "sim_id"]
+       }
+    }
+}

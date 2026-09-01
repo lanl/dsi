@@ -1,0 +1,183 @@
+my_user@local-machine examples % dsi
+    _____           ___                          
+   /  /  \         /  /\         ___     
+  /  / /\ \       /  / /_       /  /\    
+ /  / /  \ \     /  / / /\     /  / /    
+/__/ / \__\ |   /  / / /  \   /__/  \    
+\  \ \ /  / /  /__/ / / /\ \  \__\/\ \__ 
+ \  \ \  / /   \  \ \/ / / /     \  \ \/\
+  \  \ \/ /     \  \  / / /       \__\  /
+   \  \  /       \__\/ / /        /__/ / 
+    \__\/          /__/ /         \__\/  
+                   \__\/                   v1.2.2
+
+Created a temporary Sqlite DSI backend
+
+Enter "help" for usage hints.
+dsi> help
+
+display <table_name> [-n num_rows] [-e filename] Displays a table's data. Optionally limit 
+                                                  displayed rows and export to CSV/Parquet
+
+draw [-f filename]                               Draws an ER diagram of all tables in the 
+                                                  current DSI database
+
+exit                                             Exits the DSI Command Line Interface (CLI)
+federate <config file> [-w workspace_folder]     Collects databases from sources in a YAML
+                                                  file, or source in a CSV file, saving it to 
+                                                  an optional workspace folder.
+
+find <condition>                                 Finds all rows of a table that match a 
+                                                  column-level condition.
+
+get_data <database_name> [-w workspace_folder]   Collects referenced data in a DSI database,
+                                                  saving it to an optional workspace folder
+
+help                                             Shows this help message. For help with a
+                                                  command, enter <command name> -h
+
+list                                             Lists all tables in the current DSI database
+plot_table <table_name> [-f filename]            Plots numerical data from a table to an 
+                                                  optional file name argument
+
+query <SQL_query> [-n num_rows] [-e filename]    Executes a SQL query (in quotes). Optionally 
+                                                  limit printed rows or export to CSV/Parquet
+
+read <data_source> [-t table_name]               Reads a file or URL into the DSI database. 
+                                                  Optionally set table name.
+search <value>                                   Searches for a string or number across DSI.
+summary [-t table_name]                          Summary of the database or a specific table.
+viewers                                          Prints the available viewers for the user.
+view <available viewer>                          Creates an instance of the DSI viewer in 
+                                                  another application.
+
+write <filename>                                 Writes data in DSI database to a permanent 
+                                                  location.
+
+ls                                               Lists all files in the current or specified 
+                                                  directory.
+
+cd <path>                                        Changes the working directory within the CLI 
+                                                  environment.
+
+dsi> read wildfire/wildfire_google.yml -t google_data
+Loaded wildfire/wildfire_google.yml into the table google_data
+Database now has 1 table
+
+dsi> read test/example.toml
+Loaded test/example.toml into the table nodes
+Database now has 2 tables
+
+dsi> read test/results.toml
+Loaded test/results.toml into the table people
+Database now has 3 tables
+
+dsi> read test/yosemite5.csv
+Loaded test/yosemite5.csv into the table yosemite5
+Database now has 4 tables
+
+dsi> list
+
+Table: google_data
+  - num of columns: 36
+  - num of rows: 1
+
+Table: nodes
+  - num of columns: 2
+  - num of rows: 2
+
+Table: people
+  - num of columns: 6
+  - num of rows: 1
+
+Table: yosemite5
+  - num of columns: 9
+  - num of rows: 4
+
+dsi> query "SELECT * FROM nodes" -e nodes.csv
+Printing the result from input SQL query: SELECT * FROM nodes
+
+name  | resources_gpu
+---------------------
+node1 | 4            
+node2 | 2            
+
+Exported the query result to nodes.csv
+
+dsi> display people -e people_output.csv
+
+Table: people
+
+avg_height_units | avg_height_value | median_speed_units | median_speed_value | std_gravity_units | std_gravity_value
+---------------------------------------------------------------------------------------------------------------------
+m                | 5.5              | s                  | 6.95               | m/s/s             | 9.83             
+
+Exported people to people_output.csv
+
+dsi> draw -f dsi_er_diagram.png
+Saved an ER Diagram at dsi_er_diagram.png
+
+dsi> plot_table people -f people_plot.png
+Saved a plot of the people table in people_plot.png
+
+dsi> summary -t google_data
+
+Table: google_data
+
+column                                | type    | unique | min  | max  | avg  | std_dev
+---------------------------------------------------------------------------------------
+summary_dataset_name                  | VARCHAR | 1      | None | None | None | None   
+summary_summary                       | VARCHAR | 1      | None | None | None | None   
+summary_dataset_link                  | VARCHAR | 1      | None | None | None | None   
+summary_documentation_link            | VARCHAR | 1      | None | None | None | None   
+authorship_datacard_author1           | VARCHAR | 1      | None | None | None | None   
+authorship_datacard_author2           | VARCHAR | 1      | None | None | None | None   
+authorship_datacard_author3           | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_organization    | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_POC             | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_POC_affiliation | VARCHAR | 1      | None | None | None | None   
+authorship_publishing_POC_contact     | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owner1             | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owner2             | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owner3             | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owners_affiliation | VARCHAR | 1      | None | None | None | None   
+authorship_dataset_owners_contact     | VARCHAR | 1      | None | None | None | None   
+authorship_funding_institution        | VARCHAR | 1      | None | None | None | None   
+authorship_funding_summary            | VARCHAR | 1      | None | None | None | None   
+overview_data_subjects                | VARCHAR | 1      | None | None | None | None   
+overview_data_sensitivity             | VARCHAR | 1      | None | None | None | None   
+overview_version                      | FLOAT   | 1      | 1.0  | 1.0  | 1.0  | 0      
+overview_maintenance_status           | VARCHAR | 1      | None | None | None | None   
+overview_last_updated                 | VARCHAR | 1      | None | None | None | None   
+overview_release_date                 | VARCHAR | 1      | None | None | None | None   
+overview_motivation                   | VARCHAR | 1      | None | None | None | None   
+overview_dataset_uses                 | VARCHAR | 1      | None | None | None | None   
+overview_citation_guidelines          | VARCHAR | 1      | None | None | None | None   
+overview_citation_bibtex              | VARCHAR | 1      | None | None | None | None   
+provenance_collection_methods_used    | VARCHAR | 1      | None | None | None | None   
+provenance_source                     | VARCHAR | 1      | None | None | None | None   
+provenance_platform                   | VARCHAR | 1      | None | None | None | None   
+provenance_dates_of_collection        | VARCHAR | 1      | None | None | None | None   
+provenance_type_of_data               | VARCHAR | 1      | None | None | None | None   
+provenance_data_selection             | VARCHAR | 1      | None | None | None | None   
+provenance_data_inclusion             | VARCHAR | 1      | None | None | None | None   
+provenance_data_exclusion             | VARCHAR | 1      | None | None | None | None   
+
+dsi> viewers
+Available viewers are: dashboard, ml
+
+dsi> view ml
+
+View the ML emulator at http://localhost:8501
+
+To exit, press [Ctrl + C] here
+^C
+ Closing ML Emulator.
+
+dsi> write dsi_output.db
+Successfully wrote all data to dsi_output.db
+
+dsi> exit
+
+Exiting...
+my_user@local-machine examples %

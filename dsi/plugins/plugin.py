@@ -14,11 +14,6 @@ class Plugin(metaclass=ABCMeta):
         Read a Plugin file. Return a Plugin object.
         """
 
-    @property
-    @abstractmethod
-    def git_commit_sha(self):
-        pass
-
     @abstractmethod
     def add_to_output(self, path):
         """Initialize Plugin setup.

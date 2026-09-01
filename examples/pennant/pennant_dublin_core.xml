@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:xsi="http://w3.org"
+  xsi:schemaLocation="http://purl.org/dc/elements/1.1/ https://dublincore.org">
+
+  <dc:title>PENNANT</dc:title>
+  <dc:creator>Charles R. Ferenbaugh</dc:creator>
+  <dc:subject>key1</dc:subject>
+  <dc:description>PENNANT is an unstructured mesh physics mini-app designed for advanced architecture research. It contains mesh data structures and a few physics algorithms adapted from the LANL rad-hydro code FLAG, and gives a sample of the typical memory access patterns of FLAG.</dc:description>
+  <dc:publisher>Los Alamos National Laboratory (LANL)</dc:publisher>
+  <dc:contributor>Triad National Security, LLC</dc:contributor>
+  <dc:date>2012-03</dc:date>
+  <dc:type>Dataset</dc:type>
+  <dc:format>OUT file</dc:format>
+  <dc:identifier>LA-CC-12-021</dc:identifier>
+  <dc:identifier>Version 0.9</dc:identifier>
+  <dc:source>FLAG rad-hydro code (LANL)</dc:source>
+  <dc:language>en</dc:language>
+  <dc:relation>U.S. Government contract 89233218CNA000001</dc:relation>
+  <dc:coverage>10 files, 8.85 KB total dataset size</dc:coverage>
+  <dc:rights>Copyright (c) 2012, Triad National Security, LLC. All rights reserved. This software was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security Administration.</dc:rights>
+
+</metadata>

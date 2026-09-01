@@ -8,21 +8,24 @@ The Data Science Infrastructure Project (DSI)
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    introduction
    installation
-   contributing_readers
-   plugins
-   backends
-   core
-   contributing_readers
-   tiers
+   python_api
+   cli
+   federation
    examples
+   contributors
 
-Indices and tables
-==================
+Indices
+=======
 
 * :ref:`genindex`
 * :ref:`modindex`
-* :ref:`search`
+
+Contact Us
+==========
+
+For general inquiries or help, reach us at dsi-help (at) lanl.gov
+
+Bugs/Feature Requests: `DSI GitHub Requests <https://github.com/lanl/dsi/issues>`_

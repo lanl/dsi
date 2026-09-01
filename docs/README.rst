@@ -14,6 +14,7 @@ How to build documentation
    pip install sphinx sphinx_rtd_theme pytest-cov coverage-badge gitpython .
    pip install pyarrow nbconvert pydantic pandas pydot .
    pip install graphviz .
+   pip install codespell
 
 Note that if graphviz does not install, you may need to install via homebrew or manually build.
 
@@ -31,17 +32,17 @@ Note that if graphviz does not install, you may need to install via homebrew or 
 
 to build the documents.  When complete, push the changes to the repo.
 
-5. Then trigger the changes to the gh-pages via:
+5. Then trigger the changes to the gh-pages which updates the official documentation on Github:
 
 .. code-block:: unixconfig
 
    make gh-pages
 
-6. And update the official documentation on Github (this may take a few minutes to propogate):
+.. 6. And update the official documentation on Github (this may take a few minutes to propagate):
 
-.. code-block:: unixconfig
+.. .. code-block:: unixconfig
 
-   make publish
+..    make publish
 
 .. _label_virtual:
 
@@ -64,4 +65,4 @@ We suggest creating a python environment:
    source mydsi/bin/activate
 
 4. Proceed with the pip installation in the `How to build documentation`_ section.
-5. When you've completed work, deativate the environment with ``deactivate`` .
+5. When you've completed work, deactivate the environment with ``deactivate`` .

@@ -4,19 +4,17 @@ import inspect
 
 class StructuredMetadata(Plugin):
     """ plugin superclass that provides handy methods for structured data """
-    git_commit_sha: str = '5d79e08d4a6c1570ceb47cdd61d2259505c05de9'
 
     def __init__(self, **kwargs):
         """
-        Initializes a StructuredDataPlugin with an output collector
-        and an initially unset column count.
+        Initializes StructuredMetadata class with an output collector (Ordered Dictionary)
         """
         self.output_collector = OrderedDict()
         self.table_cnt = None # schema not set until pack_header
         self.validation_model = None  # optional pydantic Model
         # Check for strict_mode option
         if 'strict_mode' in kwargs:
-            if type(kwargs['strict_mode']) == bool:
+            if isinstance(kwargs['strict_mode'], bool):
                 self.strict_mode = kwargs['strict_mode']
             else:
                 print('strict_mode must be bool type.')
@@ -28,12 +26,21 @@ class StructuredMetadata(Plugin):
 
     def set_schema(self, table_data: list, validation_model=None) -> None:
         """
-        Initializes columns in the output_collector and table_cnt.
-        Useful in a plugin's pack_header method.
+        **Old function to be deprecated soon. Do not use.**
 
-        `table_data`: 
-            - for ingested data with multiple tables, table_data is list of tuples where each tuple is structured as (table name, column name list)
-            - for data without multiple tables, table_data is just a list of column names
+        Initializes column structure in the output_collector and table_cnt.
+
+        This method is typically used within a plugin `pack_header()` method to define
+        the expected schema before rows are added.
+
+        `table_data` : list
+            Defines the table structure to be used.
+
+            - For multple-table data:
+                A list of tuples, each structured as (table_name, list_of_column_names)
+
+            - For single-table data:
+                A simple list of column names.
         """
         # Strict mode | SMLock | relation
         # --------------------------------
@@ -64,6 +71,20 @@ class StructuredMetadata(Plugin):
             self.strict_mode_lock = True
 
     def set_schema_2(self, collection, validation_model=None) -> None:
+        """
+        **Use this if data in a Reader's ``add_rows()`` is structured as an OrderedDict()**
+
+        Faster update of the DSI abstraction when input data is structured as an OrderedDict.
+
+        This method is optimized for plugins where `add_rows()` passes data as an OrderedDict, and avoids
+        the incremental row ingest via `set_schema()` and ``add_to_output()``.
+
+        `collection` : OrderedDict
+            The plugin's data structure (with data) passed from a plugin.
+
+            - If collection only contains one table, the data will be wrapped in another OrderedDict,
+              where the plugin's class name is the table name key.
+        """
         # Finds file_reader class that called set_schema and assigns that as table_name for this data
         if not isinstance(collection[next(iter(collection))], OrderedDict):
             caller_frame = inspect.stack()[1]
@@ -76,13 +97,22 @@ class StructuredMetadata(Plugin):
 
     def add_to_output(self, row: list, tableName = None) -> None:
         """
-        Adds a row of data to the output_collector and guarantees good structure.
-        Useful in a plugin's add_rows method.
-        """
-        #POTENTIALLY REFACTOR AND AVOID FOR LOOP OF INGESTING DATA ROW BY ROW - MAYBE INGEST WHOLE DATA
+        **Old function to be deprecated soon. Do not use.**
+
+        Adds a row of data to the output_collector with enforced structure.
         
+        This method is typically used within a plugin's `add_rows()` method to incrementally
+        build table output in a consistent format.
+
+        `row` : list
+            A single row of data to be added. Must match the expected structure for the target table.
+
+        `tableName` : str, optional
+            Name of the table to which the row should be added. 
+            If None, the function identifies which plugin called it and assigns tableName for that data
+        """        
         # Finds file_reader class that called add_to_output and assigns that as table_name for this data
-        if tableName == None:
+        if tableName is None:
             caller_frame = inspect.stack()[1]
             tableName = caller_frame.frame.f_locals.get('self', None).__class__.__name__
 
@@ -102,5 +132,9 @@ class StructuredMetadata(Plugin):
                 self.output_collector[tableName][key] = row_elem
 
     def schema_is_set(self) -> bool:
-        """ Helper method to see if the schema has been set """
+        """
+        **Old function to be deprecated soon. Do not use.**
+
+        Helper method to see if the schema has been set 
+        """
         return self.table_cnt is not None

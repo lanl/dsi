@@ -1,0 +1,59 @@
+summary:
+  dataset_name: Vorticity-Driven Lateral Spread Ensemble Data Set
+  summary: This ensemble data set presents the study of wildfires, and more specifically, the phenomena known as vorticity-driven lateral spread (VLS) [1], in wildfires of mountain and canyon topographies.
+  dataset_link: ''
+  documentation_link: LA-UR-21-30892
+
+authorship:
+  datacard_author1: Divya Banesh, contributor
+  datacard_author2: Rodman Ray Linn, contributor
+  datacard_author3: John M Patchett, contributor
+  publishing_organization: IEEE Vis
+  publishing_POC: ""
+  publishing_POC_affiliation: IEEE Vis, 2022-10-23 (Oklahoma City, Oklahoma, United States)
+  publishing_POC_contact: ""
+  dataset_owner1: Divya Banesh
+  dataset_owner2: Rodman Ray Linn
+  dataset_owner3: John M Patchett
+  dataset_owners_affiliation: Los Alamos National Laboratory
+  dataset_owners_contact: dbanesh@lanl.gov
+  funding_institution: Los Alamos National Laboratory
+  funding_summary: Los Alamos National Laboratory, an affirmative action/equal opportunity employer, is operated by Triad National Security, LLC for the National Nuclear Security Administration of U.S. Department of Energy under contract 89233218CNA000001. By approving this article, the publisher recognizes that the U.S. Government retains nonexclusive, royalty-free license to publish or reproduce the published form of this contribution, or to allow others to do so, for U.S. Government purposes. Los Alamos National Laboratory requests that the publisher identify this article as work performed under the auspices of the U.S. Department of Energy. Los Alamos National Laboratory strongly supports academic freedom and a researcher's right to publish; as an institution, however, the Laboratory does not endorse the viewpoint of a publication or guarantee its technical correctness.
+
+overview:
+  data_subjects: Wildfire simulation data
+  data_sensitivity: External - Open Access
+  version: 1.0
+  maintenance_status: Not maintained
+  last_updated: 10/2021
+  release_date: 02/2023
+  motivation: Research
+  dataset_uses: Safe for research use
+  citation_guidelines: Copyright (c) 2021, Triad National Security, LLC. All rights reserved.
+  citation_bibtex: ''
+
+provenance:
+  collection_methods_used: artificially generated
+  source: Describe here. Include links where available.
+  platform: ""
+  dates_of_collection: 2021-2022
+  type_of_data: image
+  data_selection: ""
+  data_inclusion: ""
+  data_exclusion: ""
+
+# # it is optional to include this table - meant for AI/ML data
+# sampling_methods:
+#   sampling_method_used: cluster / haphazard / multi_stage / random / retrospective / stratified / systematic / weighted / unknown / unsampled / other
+#   sampling_criteria1: summarize method here. include links where applicable.
+#   sampling_criteria2: summarize method here. include links where applicable.
+#   sampling_criteria3: summarize method here. include links where applicable.
+
+# # it is optional to include this table - meant for AI/ML data
+# known_applications_and_benchmarks:
+#   ml_applications: ''
+#   ml_model_name: ''
+#   evaluation_accuracy: 123 (params)
+#   evaluation_precision: 123 (params)
+#   evaluation_recall: 123 (params)
+#   evaluation_performance_metric: 123 (params)
