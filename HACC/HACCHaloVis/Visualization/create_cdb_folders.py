@@ -1,14 +1,14 @@
 import os
 import time
 import sys
-sys.path.append('/Users/mhan/Desktop/HACCHaloVis/DBGenerator/')  
-sys.path.append('/Users/mhan/Desktop/HACCHaloVis/utils/')    
+sys.path.append('../DBGenerator/')  
+sys.path.append('../utils/')    
 from database import Database
 from helpers import *
 
 
 if __name__ == "__main__":
-    designCDB_path = "/Users/mhan/Desktop/Projects/3A_Paraview.cdb" ## path to save cinema database 
+    designCDB_path = "./256_3A_Paraview.cdb" ## path to save cinema database 
     ## angles for camera views 
     aPhi = 60
     aTheta = 45
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     
     ## Before creating cinema database find what attributes will be inserted into data.csv in cdb 
     ## load meta database 
-    database = Database("./databases/halo_galaxy_5.db")
+    database = Database("../DBGenerator/metadata.db")
     ## create the cdb for all runs 
     sql = "SELECT * from runs"
     runs = database.queryTable(sql)
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     designCDB.initialize()
     
     for r, run_item in enumerate(runs):
-        runID = run_item['runID']
+        runID = run_item['runID'] + 1
         # FSN = run_item['FSN']
         # VEL = run_item['VEL']
         # TEXP = run_item['TEXP']

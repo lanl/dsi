@@ -1,8 +1,8 @@
 from dsi.core import Terminal
 
 
-term = Terminal(debug_flag=0, backup_db_flag = False, run_table_flag=False)
-# term = Terminal()
+term = Terminal(debug=0, backup_db = False, runTable=False)
+#term = Terminal()
 
 # Second input is name of plugin class in the other file
 # Third input is name of the python file where the Reader/Writer is written
@@ -15,8 +15,8 @@ term.load_module('plugin', 'HACC', 'reader', filename = "./hacc.json", hacc_suit
 # /lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/128MPC_RUNS_FLAMINGO_DESIGN_3A/
 # "/lus/eagle/projects/CosDiscover/nfrontiere/SCIDAC_RUNS/256MPC_RUNS_HACC_2PARAM"
 print("load module Done!")
-term.load_module('backend','Sqlite','back-write', filename="hacc.db")
-term.artifact_handler(interaction_type='put')
+term.load_module('backend','Sqlite','back-write', filename="hacc_128_3a.db")
+term.artifact_handler(interaction_type='ingest')
 # print(term.get_current_abstraction())
 
 ## Query Test 
@@ -24,7 +24,7 @@ term.artifact_handler(interaction_type='put')
 table_name = 'hacc__halos'
 query_text = "SELECT * FROM hacc__halos WHERE halo_rank > 0 and run_id = 0"
 
-query_data = term.artifact_handler(interaction_type='get', query = query_text, dict_return = True)
+query_data = term.artifact_handler(interaction_type='query', query = query_text, dict_return = True)
 term.update_abstraction(table_name, query_data)
 
 #export to csv

@@ -3,7 +3,7 @@ import time
 from collections import OrderedDict
 from dsi.plugins.file_reader import FileReader
 import sys 
-sys.path.append("/home/mhan/genericio/legacy_python/")
+sys.path.append("/lus/eagle/projects/CosDiscover/ssakin/remote_gio_explorer-master/genericio/legacy_python/")
 import numpy as np 
 import genericio as gio
 from pandas import DataFrame

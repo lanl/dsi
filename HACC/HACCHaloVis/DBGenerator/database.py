@@ -33,7 +33,7 @@ class Database:
             - foreign_keys: create foreign keys refer to keys in other tables. 
             
     """   
-    def createTableDefault(self, table_name:str, table_headers:list[str], header_types:list[str], primary_keys:list[str], foreign_keys:= []):
+    def createTableDefault(self, table_name:str, table_headers:list[str], header_types:list[str], primary_keys:list[str], foreign_keys=[]):
         conn = sqlite3.connect(self.filename)
         cursor = conn.cursor()
         # Check if the table exists

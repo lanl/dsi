@@ -14,7 +14,7 @@ import math
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
-database = Database("../databases/halo_galaxy_largest5_allTS.db")
+database = Database("../DBGenerator/metadata.db")
 
 def process_task(task):
     runID = task['runID']
@@ -30,16 +30,14 @@ def process_task(task):
     ## find the full res path from files table 
     sqlText = f"SELECT bighaloparticles_path, galaxyproperties_path, galaxyparticles_path FROM files WHERE runID = {runID} AND ts = {ts};"
     answers = database.queryTable(sqlText)
-    temp = {k: answers[0][k] for k in answers[0].keys()}
-    bighaloparticles_path = temp['bighaloparticles_path']
-    galaxyproperties_path = temp['galaxyproperties_path']
-    galaxyparticles_path = temp['galaxyparticles_path']
-    
+    bighaloparticles_path = answers[0]['bighaloparticles_path']
+    galaxyproperties_path = answers[0]['galaxyproperties_path']
+    galaxyparticles_path = answers[0]['galaxyparticles_path']
+
     ## find the run folder name 
-    sqlText = f"SELECT PATH FROM runs WHERE runID = {runID};"
+    sqlText = f"SELECT PATH FROM runs WHERE runID = {runID-1};"
     answers = database.queryTable(sqlText)
-    temp = {k: answers[0][k] for k in answers[0].keys()}
-    path = temp['PATH']
+    path = answers[0]['PATH']
     basename = os.path.basename(os.path.normpath(path))
     bighaloparticles_path = os.path.join(path, bighaloparticles_path)
     galaxyproperties_path = os.path.join(path, galaxyproperties_path)
@@ -47,7 +45,7 @@ def process_task(task):
     
     ## extract bighalo particles 
     vars = ['x', 'y', 'z', 'phi', 'fof_halo_tag', 'vx', 'vy', 'vz']
-    output_path = os.path.join("/lus/eagle/projects/CosDiscover/mengjiao/halo_galaxy_particles_run_6267/", basename, str(ts))
+    output_path = os.path.join("./vtk_outputs/", basename, str(ts))
     create_directory(output_path)
     output_halo_filename = os.path.join(output_path, "halo_" + str(halo_rank))
     [x, y, z, attributes] = extractFromBighaloparticlesByRegion(bighaloparticles_path, halo_center_x, halo_center_y, halo_center_z, halo_radius, vars)
@@ -77,16 +75,16 @@ if rank == 0:
     print("num tasks", n_tasks) 
     sys.stdout.flush()
     
-    
-    # Distribute tasks using round-robin
-    task_chunks = {i: [] for i in range(1, size)}  # Create empty lists for workers
-    for i, task in enumerate(tasks):
-        worker_rank = (i % (size - 1)) + 1  # Assign tasks round-robin to workers
-        task_chunks[worker_rank].append(task)
-    # Send tasks to each worker
-    for worker_rank in range(1, size):
-        comm.send(task_chunks[worker_rank], dest=worker_rank, tag=0)
-        # print(f"Rank 0 sent {len(task_chunks[worker_rank])} tasks to rank {worker_rank}.")        
+    if size > 1:
+        # Distribute tasks using round-robin
+        task_chunks = {i: [] for i in range(1, size)}  # Create empty lists for workers
+        for i, task in enumerate(tasks):
+            worker_rank = (i % (size - 1)) + 1  # Assign tasks round-robin to workers
+            task_chunks[worker_rank].append(task)
+        # Send tasks to each worker
+        for worker_rank in range(1, size):
+            comm.send(task_chunks[worker_rank], dest=worker_rank, tag=0)
+            # print(f"Rank 0 sent {len(task_chunks[worker_rank])} tasks to rank {worker_rank}.")        
     
     '''
     chunks = []

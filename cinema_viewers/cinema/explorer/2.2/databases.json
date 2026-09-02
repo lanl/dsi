@@ -6,6 +6,11 @@
 		"query": ["SELECT * FROM cdb"]
 	},
 	{
+		"name" : "Cosmology",
+		"directory" : "data/cosmodata.cdb",
+		"query": ["SELECT * FROM cdb"]
+	},
+	{
 		"name": "2PARAM_Step_624_Halo_5",
 		"directory" : "data/2PARAM_Step_624_Halo_5.cdb",
 		"init_data_filter": {

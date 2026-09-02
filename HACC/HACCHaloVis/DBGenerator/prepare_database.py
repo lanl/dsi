@@ -4,7 +4,7 @@ import time
 import sys 
 sys.path.append("../utils")
 import argparse
-from helpers import get_time_steps
+from helpers import match_time_steps
 from database import Database
 from readHalos import readHalos
 
@@ -12,7 +12,7 @@ from readHalos import readHalos
 def main(suite_paths, database_save_path, n_halos = 5, n_ts = 113, n_runs = 1):
     ## find time steps available for haloproperties and full resolution data
     ## in the simulations, haloproperties are saved more frequently than full resolution data  
-    [haloproperties_ts, full_res_ts] = get_time_steps(os.path.join(suite_paths[0], 'VKIN_10000_EPS_2.440'))
+    [haloproperties_ts, full_res_ts] = match_time_steps(os.path.join(suite_paths[0], 'VKIN_10000_EPS_2.440'))
     haloproperties_ts = haloproperties_ts[0:n_ts]
     
     # create a database object
@@ -55,10 +55,14 @@ def main(suite_paths, database_save_path, n_halos = 5, n_ts = 113, n_runs = 1):
     for suite_path in suite_paths:
         ## find all ensembles folder 
         current_filenames = [os.path.join(suite_path, f) for f in os.listdir(suite_path) if f.startswith('VKIN')]
-        filenames.append(current_filenames)
+        filenames.extend(current_filenames)
 
     ## only select n_runs ensembles 
     filenames = filenames[0:n_runs]
+
+    print("="*10)
+    print(filenames)
+    print("="*10)
     for f, filename in enumerate(filenames):
         print("filename", filename)
         basename = os.path.basename(os.path.normpath(filename))
