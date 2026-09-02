@@ -17,7 +17,7 @@ import sqlite3
 import time 
 import sys 
 # sys.path.append('/Users/mhan/Desktop/HACCHaloVis/DBGenerator/')  
-sys.path.append('/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/utils')
+sys.path.append('../../utils')
 from helpers import *
 # from database import Database 
 from cdb import *
@@ -33,20 +33,20 @@ aTheta = 45
 [phi, theta] = get_angles(aPhi, aTheta)
 
 # path to save the cinema database 
-output_path = "/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/outputs/test.cdb" 
+output_path = "./test_cosmo.cdb" 
 ## create a cinema database 
 create_directory(output_path)
 designCDB = cdb(output_path)
 designCDB.initialize()
 
 # path to halos and galaxies data 
-halo_galaxy_particles_path = "/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/data/test"
+halo_galaxy_particles_path = "../../DataExtraction/vtk_outputs"
 # find all run folders [e.g. VKIN_a_EPS_b]
-runs = [f for f in os.listdir(halo_galaxy_particles_path) if f.startswith('FSN')]
+runs = [f for f in os.listdir(halo_galaxy_particles_path) if f.startswith('VKIN')]
 
 # Load the metadata database to retrieve halo properties 
 # database = Database("/home/mhan/projects/hacc_halo_vis/databases/halo_galaxy_5.db")
-database_path = "/Users/mhan/Desktop/dsi/HACC/HACCHaloVis/data/hacc.db"
+database_path = "../../DBGenerator/metadata.db"
 conn = sqlite3.connect(database_path) 
 conn.row_factory = sqlite3.Row
 
@@ -58,8 +58,8 @@ for r, run in enumerate(runs):
     print(run)
     run_path = os.path.join(halo_galaxy_particles_path, run)
     # find simulation parameter for current run 
-    FSN = run.split("_")[1]
-    VEL = run.split("_")[3]
+    VKIN = run.split("_")[1]
+    EPS = run.split("_")[3]
     ## create cdb folder to runs
     runCDB_path = os.path.join(output_path, run + ".cdb")
     check = create_directory(runCDB_path)
@@ -69,14 +69,14 @@ for r, run in enumerate(runs):
     else:
         runCDB.read_data_from_file()
     ## read rows from metadata database for current run 
-    sqlText = f"SELECT * FROM hacc__runs WHERE FSN={FSN} and VEL = {VEL}"
+    sqlText = f"SELECT * FROM runs WHERE VKIN={VKIN} and EPS = {EPS}"
     # print(FSN, VEL)
     # current_run = database.query(sqlText)
     cursor = conn.cursor()
     cursor.execute(sqlText)
     current_run = cursor.fetchall()
     ## find run_id, then use run_id to find halos in hacc__halos table 
-    runID = current_run[0]['run_id']
+    runID = current_run[0]['runID'] + 1
     print("runId", runID)
     for t, ts in enumerate(timesteps):
         ## current time step path 
@@ -97,7 +97,7 @@ for r, run in enumerate(runs):
             halo_path = os.path.join(ts_path, halo_file)
             galaxy_path = os.path.join(ts_path, "galaxy_" + str(rank) + ".vtu")
             # find halo center
-            sqlText = f"SELECT * FROM hacc__halos WHERE run_id = {runID} AND ts = 624 AND halo_rank = {rank}"
+            sqlText = f"SELECT * FROM halos WHERE runID = {runID} AND ts = {ts} AND halo_rank = {rank}"
             # halo_info = database.query(sqlText)
             cursor = conn.cursor()
             cursor.execute(sqlText)
@@ -331,11 +331,13 @@ for r, run in enumerate(runs):
                     camera.Elevation(aTheta * a)  
                     Render()
                     # save screenshot
-                    image_name = "phi_" + str(angle_phi) + '_theta_' + str(angle_theta) + '.png'
-                    SaveScreenshot(os.path.join(output_path, run + '.cdb', 'ts_624.cdb', 'halo_' + str(rank) + '.cdb', image_name), renderView1, ImageResolution=[width, height])
+                    cur_output_path = os.path.join(output_path, run + '.cdb', 'ts_' + str(ts) + '.cdb', 'halo_' + str(rank) + '.cdb')
+                    image_name_base = "phi_" + str(angle_phi) + '_theta_' + str(angle_theta) + '.png'
+                    image_name = os.path.join(cur_output_path, image_name_base)
+                    SaveScreenshot(image_name, renderView1, ImageResolution=[width, height])
                     ## write cinema database entry
                     haloCDB.add_entry({'phi': str(angle_phi), 'theta': str(angle_theta), 'FILE': image_name}) 
-                    image_name = "halo_" + str(rank) + ".cdb/" + image_name
+                    image_name = "halo_" + str(rank) + ".cdb/" + image_name_base
                     tsCDB.add_entry({"halo_rank": rank, "halo_tag": halo_tag, "halo_count": halo_count, 'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
                     image_name = "ts_" + str(ts) + ".cdb/" + image_name
                     runCDB.add_entry({"ts": str(ts), "halo_rank": rank, "halo_tag": halo_tag, "halo_count": halo_count,  "halo_center_x": halo_center_x, "halo_center_y": halo_center_y, "halo_center_z": halo_center_z, 'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
@@ -343,7 +345,7 @@ for r, run in enumerate(runs):
                     # designCDB.add_entry({"runID": str(runID), "FSN": FSN, "VEL": VEL, "TEXP": TEXP, "BETA": BETA, "SEED": SEED, \
                     #                         "ts": str(ts), "halo_rank": halo_rank, "halo_tag": halo_tag, "halo_count": halo_count, \
                     #                         'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
-                    designCDB.add_entry({"runID": str(runID), "FSN": FSN, "VEL": VEL, \
+                    designCDB.add_entry({"runID": str(runID), "VKIN": VKIN, "EPS": EPS, \
                                             "ts": str(ts), "halo_rank": rank, "halo_tag": halo_tag, "halo_count": halo_count, \
                                                 "halo_center_x": halo_center_x, "halo_center_y": halo_center_y, "halo_center_z": halo_center_z, \
                                             'phi': str(angle_phi), "theta": str(angle_theta), "FILE": image_name})
