@@ -257,9 +257,18 @@ def test_rcsbpdb_classify_usability():
 def test_rcsbpdb_initialization_no_auto_load(empty_backend):
     assert empty_backend._loaded is True
     assert empty_backend.list(True) == []
-    assert empty_backend.get_schema("datasets") == RCSBPDB.DATASET_SCHEMA
-    assert empty_backend.get_schema("resources") == RCSBPDB.RESOURCE_SCHEMA
-    assert empty_backend.get_schema("errors") == RCSBPDB.ERROR_SCHEMA
+
+    datasets_schema = empty_backend.get_schema("datasets")
+    resources_schema = empty_backend.get_schema("resources")
+    errors_schema = empty_backend.get_schema("errors")
+
+    assert isinstance(datasets_schema, str)
+    assert isinstance(resources_schema, str)
+    assert isinstance(errors_schema, str)
+
+    assert "CREATE TABLE datasets" in datasets_schema
+    assert "CREATE TABLE resources" in resources_schema
+    assert "CREATE TABLE errors" in errors_schema
 
 
 def test_rcsbpdb_initialization_with_identifiers(loaded_backend):
@@ -406,10 +415,26 @@ def test_rcsbpdb_get_schema(empty_backend):
     resource_schema = empty_backend.get_schema("resource")
     error_schema = empty_backend.get_schema("error")
 
-    assert isinstance(full_schema, dict)
-    assert dataset_schema == RCSBPDB.DATASET_SCHEMA
-    assert resource_schema == RCSBPDB.RESOURCE_SCHEMA
-    assert error_schema == RCSBPDB.ERROR_SCHEMA
+    assert isinstance(full_schema, str)
+    assert isinstance(dataset_schema, str)
+    assert isinstance(resource_schema, str)
+    assert isinstance(error_schema, str)
+
+    assert "CREATE TABLE datasets" in full_schema
+    assert "CREATE TABLE resources" in full_schema
+    assert "CREATE TABLE errors" in full_schema
+
+    assert "CREATE TABLE datasets" in dataset_schema
+    assert "dataset_id" in dataset_schema
+    assert "doi" in dataset_schema
+
+    assert "CREATE TABLE resources" in resource_schema
+    assert "resource_id" in resource_schema
+    assert "download_url" in resource_schema
+
+    assert "CREATE TABLE errors" in error_schema
+    assert "identifier" in error_schema
+    assert "status" in error_schema
 
 
 def test_rcsbpdb_table_name_resolution(empty_backend):
@@ -582,7 +607,7 @@ def test_rcsbpdb_find_searches_table_column_and_cell_values(loaded_backend):
 
     assert isinstance(matches, list)
     assert len(matches) >= 1
-    assert any(match.type == "cell" for match in matches)
+    assert any(match.type == "row" for match in matches)
     assert any(match.t_name == "datasets" for match in matches)
 
 
@@ -624,6 +649,24 @@ def test_rcsbpdb_find_cell_matches_value(loaded_backend):
 
     assert isinstance(matches, list)
     assert len(matches) >= 1
+    assert all(match.type == "row" for match in matches)
+
+    dataset_matches = [
+        match for match in matches
+        if match.t_name == "datasets"
+    ]
+
+    assert len(dataset_matches) >= 1
+    assert any(
+        match.value["dataset_id"] == "1CBS"
+        for match in dataset_matches
+    )
+
+def test_rcsbpdb_find_cell_cell_type_support(loaded_backend):
+    matches = loaded_backend.find_cell("1CBS", row=False)
+
+    assert isinstance(matches, list)
+    assert len(matches) >= 1
     assert all(match.type == "cell" for match in matches)
 
     dataset_matches = [
@@ -632,8 +675,10 @@ def test_rcsbpdb_find_cell_matches_value(loaded_backend):
     ]
 
     assert len(dataset_matches) >= 1
-    assert any("1CBS" in match.value for match in dataset_matches)
-
+    assert any(
+        match.c_name == ["dataset_id"] and match.value == "1CBS"
+        for match in dataset_matches
+    )
 
 def test_rcsbpdb_find_relation_condition_string(loaded_backend):
     matches = loaded_backend.find_relation("dataset_id = 1CBS")
@@ -842,11 +887,25 @@ def test_rcsbpdb_summary_single_table(loaded_backend):
     assert "dataset_id" in set(summary["column"])
 
 
-def test_rcsbpdb_display_returns_none(loaded_backend):
+def test_rcsbpdb_display_returns_dataframe(loaded_backend):
     result = loaded_backend.display("datasets", num_rows=1)
 
-    assert result is None
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 1
 
+def test_rcsbpdb_display_cols(loaded_backend):
+    result = loaded_backend.display(
+        "datasets",
+        num_rows=2,
+        display_cols=["dataset_id", "title"],
+    )
+
+    assert isinstance(result, pd.DataFrame)
+    assert list(result.columns) == ["dataset_id", "title"]
+
+def test_rcsbpdb_display_requires_table_name(loaded_backend):
+    with pytest.raises(TypeError):
+        loaded_backend.display()
 
 def test_rcsbpdb_display_missing_table_raises_value_error(empty_backend):
     with pytest.raises(ValueError):
