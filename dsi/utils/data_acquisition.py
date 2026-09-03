@@ -166,10 +166,10 @@ def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> lis
         endpoint_name = key
         endpoint_db_path = value
         print(f"Retreiving data for {endpoint_name} at {endpoint_db_path}")
-    
-        username = input("Username: ")
-    
+
         try:
+            username = input("Username: ")
+    
             db_info = pull_data(location_type="hpc",
                           remote_location=hpc_name,
                           remote_path=endpoint_db_path,
@@ -209,8 +209,12 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
         if row['location_type'].strip().lower() == "hpc":
             print(f"\n{'='*60}")
             print(f"Enter credentials for data at {row['location']} : {row['path']}")
-            username = input("Enter username: ")
-            password = getpass.getpass("Enter password: ")  # Hidden input!
+            try:
+                username = input("Enter username: ")
+                password = getpass.getpass("Enter password: ")  # Hidden input!
+            except:
+                print("... skipping and continue to the next ...")
+                continue
 
         try:
             folder_hash = create_hashed_folder_from_path(row['path'], workspace_folder)[0]
@@ -303,8 +307,9 @@ endpoints = {{
 print(json.dumps(endpoints))
 PYTHON_EOF
 """
-    
-    print(f"Connecting to {hostname} as {username}...")
+
+    print(f"\nGetting remote endpoints")
+    print(f"Connecting to {hostname} as {username} ...")
     
     try:
         result = subprocess.run(
@@ -366,6 +371,7 @@ def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folde
     create_directory(dir_name=temp_db_storage, delete_if_exists=True, verbose=True)
 
     # download them
+    print("\n\nPull Remote DBs ... ")
     db_infos = pull_remote_db(hpc_name, endpoints_location, temp_db_storage)
     
     # Check if any endpoints were successfully downloaded
@@ -384,6 +390,7 @@ def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folde
         return [], 0
 
     # Pull the data from the CSV file, return a dictionary, and output the dictionaty to workspace_folder
+    print("\n\nRead Data from endpoints ... ")
     database_info = read_data_sources(csv_data_sources, workspace_folder)
 
     return database_info
@@ -401,7 +408,7 @@ def pull_data(location_type: str,
               download_location: str, 
               username: str,
               password: str = "",
-              download_limit: int = 0) -> str:
+              download_limit: int = 10485760) -> str:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.

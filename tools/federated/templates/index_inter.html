@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSI Data Federation Tool - Interactive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            margin-left: 10px;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .endpoints-list {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .endpoint-item {
+            background: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+
+        .endpoint-item strong {
+            color: #667eea;
+        }
+
+        .cluster-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+        }
+
+        .cluster-section.failed {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .cluster-header {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #28a745;
+        }
+
+        .cluster-section.failed .cluster-header {
+            color: #dc3545;
+        }
+
+        .cluster-stats {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .stat-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .discovery-run {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+
+        .run-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .remove-endpoint-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .remove-endpoint-btn:hover {
+            background: #c82333;
+        }
+
+        .endpoint-group {
+            margin-left: 15px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1em;
+            color: #666;
+            transition: color 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            margin-bottom: -2px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .credential-section {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .credential-group {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+
+        .credential-header {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .db-list {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 3px;
+            font-size: 0.9em;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .db-item {
+            padding: 5px;
+            margin: 3px 0;
+            background: white;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        .log-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 DSI Data Federation Tool</h1>
+            <p>Interactive credential collection - No terminal interaction needed!</p>
+        </div>
+
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('discover')">1. Discover Endpoints</button>
+                <button class="tab" onclick="switchTab('federate')">2. Federate Data</button>
+                <button class="tab" onclick="switchTab('logs')">3. View Logs</button>
+            </div>
+
+            <!-- Discover Endpoints Tab -->
+            <div id="discover-tab" class="tab-content active">
+                <h2>Step 1: Discover Endpoints</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    💡 <strong>Tip:</strong> Run discovery multiple times with different settings. Each run adds more endpoints to your collection.
+                </p>
+
+                <!-- Accumulated Endpoints Display -->
+                <div id="accumulated-endpoints" class="hidden">
+                    <div class="card" style="background: #f8f9fa; padding: 20px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">📦 Accumulated Endpoints (<span id="endpoint-count">0</span>)</h3>
+                            <button type="button" class="btn btn-secondary" onclick="clearAllEndpoints()" style="padding: 8px 15px; font-size: 0.9em;">
+                                🗑️ Clear All
+                            </button>
+                        </div>
+                        <div id="accumulated-list"></div>
+                    </div>
+                </div>
+
+                <form id="discover-form">
+                    <div class="form-group">
+                        <label for="hpc-type">HPC Type:</label>
+                        <select id="hpc-type" required>
+                            <option value="hpc">HPC</option>
+                            <option value="kerberos">Kerberos</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hpc-names">HPC Hostnames (one per line):</label>
+                        <textarea id="hpc-names" rows="2" placeholder="cluster1.lanl.gov" required></textarea>
+                        <small>Enter one or more HPC hostnames, one per line. You can run this multiple times for different clusters with different settings.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" placeholder="Your username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" placeholder="Your password">
+                        <small>Leave blank to use Kerberos/SSH keys. Password will be used for all SSH connections in this session.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="script-path">Script Path:</label>
+                        <input type="text" id="script-path" placeholder="/path/to/load_dsi_endpoints.sh" required>
+                        <small>Path to the script that sets endpoint environment variables</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="prefixes">Endpoint Prefixes:</label>
+                        <input type="text" id="prefixes" value="DSI_ENDPOINT_,DIANA_ENDPOINT_">
+                        <small>Comma-separated list of environment variable prefixes to search for</small>
+                    </div>
+
+                    <button type="submit" class="btn" id="discover-btn">
+                        🔍 Discover & Add to Collection
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                        🔄 Reset Form
+                    </button>
+                </form>
+
+                <div id="discover-spinner" class="spinner hidden"></div>
+                <div id="discover-result"></div>
+            </div>
+
+            <!-- Federate Data Tab -->
+            <div id="federate-tab" class="tab-content">
+                <h2>Step 2: Federate Data</h2>
+
+                <div id="federate-notice" class="alert alert-info">
+                    Please discover endpoints first before federating data.
+                </div>
+
+                <!-- Phase 1: Show endpoints and workspace input -->
+                <div id="federate-phase1" class="hidden">
+                    <div id="endpoints-display" class="endpoints-list"></div>
+
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="workspace-folder">Local Workspace Folder:</label>
+                        <input type="text" id="workspace-folder" placeholder="e.g., ./federated_data" required>
+                        <small>Path to the local folder where data will be federated</small>
+                    </div>
+
+                    <button class="btn" id="analyze-btn" onclick="analyzeEndpoints()">
+                        📊 Analyze Databases
+                    </button>
+                </div>
+
+                <!-- Phase 2: Show credential collection form -->
+                <div id="federate-phase2" class="hidden">
+                    <div class="alert alert-success">
+                        <strong>✓ Analysis Complete!</strong> <span id="analysis-summary"></span>
+                    </div>
+
+                    <div id="credential-form-container"></div>
+
+                    <button class="btn btn-success" id="federate-btn" onclick="executeFederation()">
+                        📥 Start Federation
+                    </button>
+                    <button class="btn btn-secondary" onclick="backToPhase1()">
+                        ← Back
+                    </button>
+                </div>
+
+                <div id="federate-spinner" class="spinner hidden"></div>
+                <div id="federate-result"></div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-content">
+                <h2>View Logs</h2>
+
+                <div class="form-group">
+                    <label for="log-select">Select Log Session:</label>
+                    <select id="log-select">
+                        <option value="">-- Select a log file --</option>
+                    </select>
+                    <button class="btn" onclick="loadLogs()">🔄 Refresh Log List</button>
+                </div>
+
+                <div id="log-content" class="hidden">
+                    <h3>Log Content:</h3>
+                    <div id="log-viewer" class="log-viewer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let discoveredEndpoints = {};
+        let discoveryHistory = [];
+        let analysisResult = null;
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+
+            if (tabName === 'logs') {
+                loadLogs();
+            }
+        }
+
+        // Discover endpoints form
+        document.getElementById('discover-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const button = document.getElementById('discover-btn');
+            const spinner = document.getElementById('discover-spinner');
+            const result = document.getElementById('discover-result');
+
+            button.disabled = true;
+            spinner.classList.remove('hidden');
+            result.innerHTML = '';
+
+            const prefixesStr = document.getElementById('prefixes').value;
+            const prefixes = prefixesStr.split(',').map(p => p.trim()).filter(p => p);
+
+            const hpcNamesStr = document.getElementById('hpc-names').value;
+            const hpcNames = hpcNamesStr.split('\n').map(h => h.trim()).filter(h => h);
+
+            if (hpcNames.length === 0) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Please enter at least one HPC hostname</div>';
+                button.disabled = false;
+                spinner.classList.add('hidden');
+                return;
+            }
+
+            const formData = {
+                hpc_type: document.getElementById('hpc-type').value,
+                hpc_names: hpcNames,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value || null,
+                script_path: document.getElementById('script-path').value,
+                prefixes: prefixes
+            };
+
+            try {
+                const response = await fetch('/api/discover-endpoints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (!currentSessionId) {
+                        currentSessionId = data.session_id;
+                    }
+
+                    Object.assign(discoveredEndpoints, data.endpoints);
+                    discoveryHistory.push({
+                        timestamp: new Date().toISOString(),
+                        clusters: hpcNames,
+                        endpoints: data.endpoints,
+                        cluster_results: data.cluster_results
+                    });
+
+                    updateAccumulatedEndpoints();
+
+                    let summaryHTML = `
+                        <div class="alert alert-success">
+                            <strong>✓ Success!</strong> Found ${Object.keys(data.endpoints).length} endpoint(s) from ${data.successful_clusters} cluster(s)
+                        </div>
+                        <div class="summary-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">${data.total_clusters}</div>
+                                <div class="stat-label">Total Clusters</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${data.successful_clusters}</div>
+                                <div class="stat-label">Successful</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${Object.keys(data.endpoints).length}</div>
+                                <div class="stat-label">Total Endpoints</div>
+                            </div>
+                        </div>
+                    `;
+
+                    summaryHTML += '<div class="endpoints-list">';
+                    for (const [clusterName, clusterData] of Object.entries(data.cluster_results)) {
+                        const clusterClass = clusterData.success ? 'cluster-section' : 'cluster-section failed';
+                        summaryHTML += `<div class="${clusterClass}">`;
+                        summaryHTML += `<div class="cluster-header">🖥️ ${clusterName}</div>`;
+
+                        if (clusterData.success) {
+                            summaryHTML += `<div class="cluster-stats">Found ${clusterData.count} endpoint(s)</div>`;
+                            for (const [key, value] of Object.entries(clusterData.endpoints)) {
+                                summaryHTML += `<div class="endpoint-item"><strong>${key}:</strong> ${value}</div>`;
+                            }
+                        } else {
+                            summaryHTML += `<div class="cluster-stats">❌ ${clusterData.message}</div>`;
+                        }
+                        summaryHTML += '</div>';
+                    }
+                    summaryHTML += '</div>';
+
+                    result.innerHTML = '<div class="alert alert-success"><strong>✓ Added!</strong> Successfully added ' +
+                        Object.keys(data.endpoints).length + ' endpoint(s) from this discovery run.</div>' + summaryHTML;
+
+                    if (Object.keys(discoveredEndpoints).length > 0) {
+                        document.getElementById('federate-notice').classList.add('hidden');
+                        document.getElementById('federate-phase1').classList.remove('hidden');
+                        updateFederateDisplay();
+                    }
+
+                    document.getElementById('accumulated-endpoints').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    let errorHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + data.message + '</div>';
+                    if (data.cluster_results) {
+                        errorHTML += '<div class="endpoints-list">';
+                        for (const [clusterName, clusterData] of Object.entries(data.cluster_results)) {
+                            if (!clusterData.success) {
+                                errorHTML += `<div class="cluster-section failed">
+                                    <div class="cluster-header">🖥️ ${clusterName}</div>
+                                    <div class="cluster-stats">❌ ${clusterData.message}</div>
+                                </div>`;
+                            }
+                        }
+                        errorHTML += '</div>';
+                    }
+                    result.innerHTML = errorHTML;
+                }
+            } catch (error) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + error.message + '</div>';
+            } finally {
+                button.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        });
+
+        function updateAccumulatedEndpoints() {
+            const container = document.getElementById('accumulated-endpoints');
+            const list = document.getElementById('accumulated-list');
+            const count = document.getElementById('endpoint-count');
+
+            if (Object.keys(discoveredEndpoints).length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            count.textContent = Object.keys(discoveredEndpoints).length;
+
+            const byCluster = {};
+            for (const [endpointName, endpointPath] of Object.entries(discoveredEndpoints)) {
+                const clusterName = endpointName.includes('::') ? endpointName.split('::')[0] : 'unknown';
+                if (!byCluster[clusterName]) byCluster[clusterName] = [];
+                byCluster[clusterName].push([endpointName, endpointPath]);
+            }
+
+            let html = '';
+            for (const [cluster, endpoints] of Object.entries(byCluster)) {
+                html += `<div class="discovery-run">
+                    <div class="run-header">
+                        <span>🖥️ ${cluster} (${endpoints.length} endpoint(s))</span>
+                        <button type="button" class="remove-endpoint-btn" onclick="removeCluster('${cluster}')">Remove All</button>
+                    </div>
+                    <div class="endpoint-group">`;
+
+                for (const [name, path] of endpoints) {
+                    const displayName = name.includes('::') ? name.split('::')[1] : name;
+                    html += `<div class="endpoint-item" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div><strong>${displayName}:</strong> ${path}</div>
+                        <button type="button" class="remove-endpoint-btn" onclick="removeEndpoint('${name}')">Remove</button>
+                    </div>`;
+                }
+
+                html += '</div></div>';
+            }
+
+            list.innerHTML = html;
+        }
+
+        function updateFederateDisplay() {
+            const byCluster = {};
+            for (const [endpointName, endpointPath] of Object.entries(discoveredEndpoints)) {
+                const clusterName = endpointName.includes('::') ? endpointName.split('::')[0] : 'unknown';
+                if (!byCluster[clusterName]) byCluster[clusterName] = [];
+                byCluster[clusterName].push([endpointName, endpointPath]);
+            }
+
+            let federateHTML = `<h3>Ready to Federate (<span style="color: #667eea;">${Object.keys(discoveredEndpoints).length}</span> endpoint(s)):</h3>
+                <div class="endpoints-list">`;
+
+            for (const [cluster, endpoints] of Object.entries(byCluster)) {
+                federateHTML += `<div class="cluster-section">
+                    <div class="cluster-header">🖥️ ${cluster} (${endpoints.length} endpoint(s))</div>`;
+                for (const [name, path] of endpoints) {
+                    const displayName = name.includes('::') ? name.split('::')[1] : name;
+                    federateHTML += `<div class="endpoint-item"><strong>${displayName}:</strong> ${path}</div>`;
+                }
+                federateHTML += '</div>';
+            }
+
+            federateHTML += '</div>';
+            document.getElementById('endpoints-display').innerHTML = federateHTML;
+        }
+
+        // Phase 1: Analyze endpoints
+        async function analyzeEndpoints() {
+            const workspace = document.getElementById('workspace-folder').value;
+            if (!workspace) {
+                alert('Please enter a workspace folder');
+                return;
+            }
+
+            const button = document.getElementById('analyze-btn');
+            const spinner = document.getElementById('federate-spinner');
+            const result = document.getElementById('federate-result');
+
+            button.disabled = true;
+            spinner.classList.remove('hidden');
+            result.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/analyze-endpoints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        endpoints_location: discoveredEndpoints
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    analysisResult = data;
+                    showCredentialForm(data);
+                } else {
+                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + data.message + '</div>';
+                }
+            } catch (error) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + error.message + '</div>';
+            } finally {
+                button.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // Show credential collection form
+        function showCredentialForm(data) {
+            const summary = document.getElementById('analysis-summary');
+            summary.textContent = `Found ${data.totals.total} database(s): ${data.totals.hpc} HPC, ${data.totals.url} URL, ${data.totals.s3} S3`;
+
+            const container = document.getElementById('credential-form-container');
+            let html = '';
+
+            if (data.totals.hpc > 0) {
+                html += '<h3>HPC Credentials Required</h3>';
+                html += '<p style="color: #666; margin-bottom: 15px;">Provide credentials for each HPC location below:</p>';
+                html += '<div class="credential-section">';
+
+                for (const [cluster, clusterData] of Object.entries(data.databases_by_cluster)) {
+                    for (const [location, databases] of Object.entries(clusterData.hpc_by_location)) {
+                        html += `<div class="credential-group">
+                            <div class="credential-header">🖥️ ${location} (${databases.length} database(s))</div>
+                            <div class="form-group">
+                                <label for="username-${location}">Username:</label>
+                                <input type="text" id="username-${location}" placeholder="Username for ${location}">
+                            </div>
+                            <div class="form-group">
+                                <label for="password-${location}">Password:</label>
+                                <input type="password" id="password-${location}" placeholder="Password for ${location}">
+                                <small>Leave blank to use Kerberos authentication</small>
+                            </div>
+                            <details>
+                                <summary style="cursor: pointer; color: #667eea;">Show ${databases.length} database(s)</summary>
+                                <div class="db-list">`;
+
+                        for (const db of databases.slice(0, 10)) {
+                            html += `<div class="db-item">${db.path}</div>`;
+                        }
+                        if (databases.length > 10) {
+                            html += `<div class="db-item">... and ${databases.length - 10} more</div>`;
+                        }
+
+                        html += `</div></details></div>`;
+                    }
+                }
+
+                html += '</div>';
+            }
+
+            if (data.totals.url > 0) {
+                html += `<div class="alert alert-info" style="margin-top: 20px;">
+                    <strong>ℹ️ Note:</strong> ${data.totals.url} URL database(s) will be downloaded without credentials.
+                </div>`;
+            }
+
+            if (data.totals.s3 > 0) {
+                html += `<div class="alert alert-warning" style="margin-top: 20px;">
+                    <strong>⚠️ Note:</strong> ${data.totals.s3} S3 database(s) require AWS credentials configured in your environment.
+                </div>`;
+            }
+
+            container.innerHTML = html;
+
+            // Switch to phase 2
+            document.getElementById('federate-phase1').classList.add('hidden');
+            document.getElementById('federate-phase2').classList.remove('hidden');
+        }
+
+        // Phase 2: Execute federation
+        async function executeFederation() {
+            const button = document.getElementById('federate-btn');
+            const spinner = document.getElementById('federate-spinner');
+            const result = document.getElementById('federate-result');
+
+            button.disabled = true;
+            spinner.classList.remove('hidden');
+            result.innerHTML = '';
+
+            // Collect credentials
+            const credentials = {};
+            if (analysisResult) {
+                for (const [cluster, clusterData] of Object.entries(analysisResult.databases_by_cluster)) {
+                    for (const location of Object.keys(clusterData.hpc_by_location)) {
+                        const username = document.getElementById(`username-${location}`)?.value || '';
+                        const password = document.getElementById(`password-${location}`)?.value || '';
+                        if (username || password) {
+                            credentials[location] = { username, password };
+                        }
+                    }
+                }
+            }
+
+            try {
+                const response = await fetch('/api/federate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        endpoints_location: discoveredEndpoints,
+                        workspace_folder: document.getElementById('workspace-folder').value,
+                        credentials: credentials
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const dbsByCluster = {};
+                    data.database_info.forEach(db => {
+                        const cluster = db.source_cluster || 'unknown';
+                        if (!dbsByCluster[cluster]) dbsByCluster[cluster] = [];
+                        dbsByCluster[cluster].push(db);
+                    });
+
+                    let successHTML = `<div class="alert alert-success">
+                        <strong>✓ Success!</strong> Successfully federated ${data.success_count} database(s) from ${data.clusters_processed} cluster(s)
+                    </div>
+                    <div class="summary-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">${data.clusters_processed}</div>
+                            <div class="stat-label">Clusters Processed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${data.success_count}</div>
+                            <div class="stat-label">Databases Federated</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;"><strong>Workspace:</strong> ${data.workspace_folder}</div>`;
+
+                    successHTML += '<div class="endpoints-list" style="margin-top: 15px;">';
+                    for (const [cluster, dbs] of Object.entries(dbsByCluster)) {
+                        successHTML += `<div class="cluster-section">
+                            <div class="cluster-header">🖥️ ${cluster} (${dbs.length} database(s))</div>`;
+                        dbs.forEach(db => {
+                            successHTML += `<div class="endpoint-item">
+                                <strong>${db.name}</strong><br>
+                                <small>Original: ${db.original_path}</small><br>
+                                <small>Local: ${db.local_path}</small>
+                            </div>`;
+                        });
+                        successHTML += '</div>';
+                    }
+                    successHTML += '</div>';
+
+                    result.innerHTML = successHTML;
+                } else {
+                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + data.message + '</div>';
+                }
+            } catch (error) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + error.message + '</div>';
+            } finally {
+                button.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function backToPhase1() {
+            document.getElementById('federate-phase1').classList.remove('hidden');
+            document.getElementById('federate-phase2').classList.add('hidden');
+            document.getElementById('federate-result').innerHTML = '';
+        }
+
+        function removeEndpoint(endpointName) {
+            if (confirm(`Remove endpoint: ${endpointName}?`)) {
+                delete discoveredEndpoints[endpointName];
+                updateAccumulatedEndpoints();
+                updateFederateDisplay();
+
+                if (Object.keys(discoveredEndpoints).length === 0) {
+                    document.getElementById('federate-notice').classList.remove('hidden');
+                    document.getElementById('federate-phase1').classList.add('hidden');
+                }
+            }
+        }
+
+        function removeCluster(clusterName) {
+            if (confirm(`Remove all endpoints from ${clusterName}?`)) {
+                const toRemove = Object.keys(discoveredEndpoints).filter(name =>
+                    name.startsWith(clusterName + '::') || (clusterName === 'unknown' && !name.includes('::'))
+                );
+                toRemove.forEach(name => delete discoveredEndpoints[name]);
+                updateAccumulatedEndpoints();
+                updateFederateDisplay();
+
+                if (Object.keys(discoveredEndpoints).length === 0) {
+                    document.getElementById('federate-notice').classList.remove('hidden');
+                    document.getElementById('federate-phase1').classList.add('hidden');
+                }
+            }
+        }
+
+        function clearAllEndpoints() {
+            if (confirm('Remove all accumulated endpoints?')) {
+                discoveredEndpoints = {};
+                discoveryHistory = [];
+                updateAccumulatedEndpoints();
+                document.getElementById('federate-notice').classList.remove('hidden');
+                document.getElementById('federate-phase1').classList.add('hidden');
+                document.getElementById('discover-result').innerHTML = '';
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('discover-form').reset();
+            document.getElementById('hpc-names').value = '';
+            document.getElementById('discover-result').innerHTML = '';
+        }
+
+        // Log viewer
+        async function loadLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+
+                if (data.success) {
+                    const select = document.getElementById('log-select');
+                    select.innerHTML = '<option value="">-- Select a log file --</option>';
+
+                    data.logs.forEach(log => {
+                        const option = document.createElement('option');
+                        option.value = log.session_id;
+                        option.textContent = `${log.session_id} (${(log.size / 1024).toFixed(2)} KB)`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        document.getElementById('log-select').addEventListener('change', async (e) => {
+            const sessionId = e.target.value;
+
+            if (!sessionId) {
+                document.getElementById('log-content').classList.add('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/logs/${sessionId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('log-content').classList.remove('hidden');
+                    document.getElementById('log-viewer').textContent = data.content;
+                }
+            } catch (error) {
+                console.error('Error loading log content:', error);
+            }
+        });
+
+        loadLogs();
+    </script>
+</body>
+</html>

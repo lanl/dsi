@@ -72,7 +72,7 @@ for url in urls:
 
     before = set(glob.glob(os.path.join(files, "*")))
 
-    pull_data(
+    accquire_data(
         location_type="url",
         location=url_parent,
         path=url,

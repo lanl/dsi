@@ -22,12 +22,12 @@ from dsi.dsi import DSI
 logger = logging.getLogger(__name__)
 
 
-def confirm_large_download_prompt(filesize: int, download_limit: int) -> bool:
+def confirm_large_download_prompt(filesize: int, download_limit: int = 10485760) -> bool:
     """Prompts the user to confirm the download of a file if its size exceeds a specified limit. The function displays the file size in a human-readable format and asks the user for confirmation before proceeding with the download.
     
     Args:        
         filesize (int): The size of the file in bytes.
-        download_limit (int): The download limit in bytes. If the file size exceeds this limit, the user will be prompted for confirmation.
+        download_limit (int): The download limit in bytes. If the file size exceeds this limit (default is 10MB), the user will be prompted for confirmation.
 
     Returns:
         bool: True if the user confirms the download, False otherwise.
@@ -36,12 +36,16 @@ def confirm_large_download_prompt(filesize: int, download_limit: int) -> bool:
     if filesize <= download_limit:
         return True
 
-    print(
-        f"File size {human_readable_size(filesize)} exceeds the "
-        f"download limit of {human_readable_size(download_limit)}."
-    )
-    choice = input(" -- Please confirm that you want to download this file (y/n): ").strip().lower()
-    return choice == "y"
+    try:
+        print(
+            f"File size {human_readable_size(filesize)} exceeds the "
+            f"download limit of {human_readable_size(download_limit)}."
+        )
+        choice = input(" -- Please confirm that you want to download this file (y/n): ").strip().lower()
+        return choice == "y"
+    except Exception:
+        return False
+        
 
 
 def is_valid_sqlite_with_data(path: str) -> tuple[bool, str]:

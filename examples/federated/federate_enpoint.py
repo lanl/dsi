@@ -45,11 +45,9 @@ endpoints_location = get_remote_endpoints_ssh(hostname=hpc_name,
 logger.info(f"Retrieved endpoints: {endpoints_location}")
 
 if endpoints_location == {}:
-    logger.warning(f"No endpoints found at {script_path}!")
     print(f"No endpoints found at {script_path}!")
     sys.exit(0)
 else:
-    logger.info(f"Found {len(endpoints_location)} endpoint(s)")
     print(f"Endpoint locations: {endpoints_location}")
 
 # Federate the data in specified folder
@@ -62,13 +60,11 @@ database_info, success_count = pull_data_endpoints(endpoints_location, hpc_name,
 logger.info(f"Completed pulling data. Success count: {success_count}")
 
 if success_count == 0:
-    logger.error("No databases were successfully federated")
     print("\nNo databases were successfully federated.")
     print("   Please check your credentials and network connection.")
     print(f"\nCheck the log file for details: {log_filename}")
     sys.exit(1)
 else:
-    logger.info(f"Successfully gathered {success_count} database(s)")
     print(f"\nSuccessfully gathered {success_count} database(s) to {workspace_folder}")
     print(f"   Database info: {database_info}")
     print(f"\nComplete log saved to: {log_filename}")
@@ -89,3 +85,6 @@ else:
 # location_type,location,path,type,submitter_name,submitter_email,timestamp
 # url,url,https://www.timestored.com/data/sample/sakila.db,data,unknown,unknown,2026-3-10--16:38:00
 # url,url,https://oceans11.lanl.gov/dataCatalog/oceans11.db,data,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:30:00
+
+# /users/pascalgrosset/dsi_test/load_dsi_endpoints.sh
+# /vast/home/pascalgrosset/dsi_sources_tests/load_dsi_endpoints.sh
