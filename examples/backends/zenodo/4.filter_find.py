@@ -5,18 +5,16 @@ This example demonstrates local table filtering after Zenodo data is loaded.
 
 Covered methods:
 
-- query_artifacts() with pandas-style filters
 - find_table()
 - find_column()
 - find_cell(), which returns matching rows as ValueObjects
 - find()
-- find_relation() with split arguments
+- find_relation() with split arguments with pandas-style filters
 - find_relation() with one-string conditions
 - find_relation() with API-backed lookup/search
 
 Note:
-query_artifacts() here is used directly on the Zenodo backend.
-It does not use DSI.query().
+query_artifacts() is not implemented on the Zenodo backend.
 """
 
 import warnings
@@ -67,22 +65,6 @@ def main():
     try:
         section("Loaded tables")
         zenodo.list()
-
-        section("Filter datasets where resource_count >= 0")
-        dataset_filter = zenodo.query_artifacts(
-            "resource_count >= 0",
-            dict_return=False,
-        )
-        print(dataset_filter.head())
-        print("shape:", dataset_filter.shape)
-
-        section("Filter resources where size >= 0")
-        resource_filter = zenodo.query_artifacts(
-            "size >= 0",
-            dict_return=False,
-        )
-        print(resource_filter.head())
-        print("shape:", resource_filter.shape)
 
         section("Find table containing 'data'")
         show_value_objects(zenodo.find_table("data"))
