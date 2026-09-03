@@ -6,7 +6,10 @@ import textwrap
 from pandas import DataFrame
 from collections import OrderedDict
 import hashlib
+import random
 import pytest
+
+from dsi.utils.version_control.vcs_db import SNAPSHOTS_DIR, DB_NAME
 
 pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
@@ -1798,6 +1801,39 @@ def test_fail_overwrite_schema_duckdb_backend():
     except Exception as e:
         expected = "schema() ERROR: A complex schema with a circular dependency cannot be ingested into a DuckDB backend."
         assert str(e) == expected
+
+def test_versioning():
+    test = DSI()
+    wpath = os.getcwd()
+    test.version("init", wpath)
+    assert os.path.exists(wpath + f"/{SNAPSHOTS_DIR}/{DB_NAME}")
+
+    # Create a file with ten random integers
+    dummy_file_path = os.path.join(wpath, "a_dummy_file")
+    with open(dummy_file_path, 'w') as f:
+        for _ in range(10):
+            f.writelines(str(random.randint(0, 100)))
+    test.version("add", os.path.join(wpath, "a_dummy_file"))
+
+    dummy_file_path = os.path.join(wpath, "second_dummy_file")
+    with open(dummy_file_path, 'w') as f:
+        for _ in range(10):
+            f.write(str(random.randint(0, 100)) + '\n')
+    test.version("add", os.path.join(wpath, "second_dummy_file"))
+
+    dummy_file_path = os.path.join(wpath, "third_dummy_file")
+    with open(dummy_file_path, 'w') as f:
+        for _ in range(10):
+            f.write(str(random.randint(0, 100)) + '\n')
+    test.version("add", os.path.join(wpath, "third_dummy_file"))
+
+    test.version("remove", os.path.join(wpath, "second_dummy_file"))
+    test.version("delete", os.path.join(wpath, "third_dummy_file"))
+
+    test.version("commit", "Tester Commits")
+    test.version("log")
+    test.version("diff")
+    assert True
         
 # =============================================================================
 # NDP BACKEND TESTS
@@ -2040,3 +2076,26 @@ def test_ndp_num_datasets(ndp_dsi_basic):
     """Get num datasets using overloaded num_tables() on NDP backend"""
     num_datasets = ndp_dsi_basic.num_tables(table_name="datasets")
     assert num_datasets > 0
+
+
+# def test_versioning():
+#     test = DSI()
+#     # test.version("init", os.getcwd())
+#     # wpath = "/Users/ssakin/Public/versioning-test/clover-demo"
+#     wpath = os.getcwd()
+#     test.version("init", wpath)
+#     assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
+
+#     test.version("add", os.path.join(wpath, "a_dummy_file"))
+#     print(">Single file added.")
+#     test.version("add", os.path.join(wpath, "schema.json") + " " + os.path.join(wpath, "schema2.json"))
+#     print(">Multi file added.")
+#     print(">Versioning initialized.")
+
+#     test.version("remove", os.path.join(wpath, "schema2.json"))
+#     print(">Single file removed.")
+
+#     test.version("commit", "Tester Commits")
+#     test.version("log")
+#     test.version("diff", "77345f1115d94c69a1255b9fb0524378 4af9e3d4dc854d699b96b5a84f913ac0")
+#     assert True

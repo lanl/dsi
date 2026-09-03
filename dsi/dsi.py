@@ -18,6 +18,8 @@ from datetime import datetime
 import inspect
 
 import warnings
+
+from dsi.utils.version_control.dsi_vcs import Version
 warnings.filterwarnings("ignore", category=FutureWarning)
 from urllib3.exceptions import InsecureRequestWarning
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
@@ -232,7 +234,7 @@ class DSI:
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
             msg = "Created an instance of DSI"
-        
+        self.vcs = None
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
 
@@ -1321,3 +1323,122 @@ class DSI:
 
     def fetch(self, fname):
         pass
+    def version(self, command: str, args: str = None):
+        """
+        Internal DSI Versioning.
+
+        `command` : str
+          -  init                            # initialize a versioning repository in a root folder
+          -  add                             # add file(s) to the staging area for the next commit
+          -  remove                          # remove file(s) from the staging area without touching the actual files
+          -  delete                          # delete file(s) from the staging area for the next commit
+          -  commit                          # commit a new version with the staged file(s) and an optional message describing the version
+          -  branch                          # create a new branch with an optional starting point (commit hash)
+          -  merge                           # merge a branch into the current branch with an optional target commit hash
+          -  list-branch                     # list all branches in the versioning repository
+          -  switch                          # switch to a different branch in the versioning repository
+          -  log                             # list versions
+          -  diff                            # diff between two versions. If no version is provided, diff the current version with the previous version
+          -  restore                         # restore a version with commit hash
+          -  clone                           # clone a remote versioning repository
+          -  status                          # Show current branch, commit, and staged files
+        `args` : str        
+          -  init: A required argument with the name of the root folder for the versioning repository.
+          -  add: A required argument with the file(s) to add to the staging area for the next commit, specified as a space-separated string or list of file paths.
+          -  remove: A required argument with the file(s) to remove from the staging area without touching the actual files, specified as a space-separated string or list of file paths.
+          -  delete: A required argument with the file(s) to delete from the staging area for the next commit, specified as a space-separated string or list of file paths.
+          -  commit: An optional message describing the version being committed, specified as a string.
+          -  branch: An optional argument to specify the name of the new branch, specified as a string.
+          -  merge: A required argument with the target branch name and an optional argument with the target commit hash, specified as two space separated strings.
+          -  list-branch: No additional arguments are required for this command.
+          -  switch: A required argument to specify the branch to switch to, specified as a string.
+          -  log: Two optional arguments, one to specify the branch name and the other to indicate the number of recent versions to display. If no argument is provided, recent 10 versions are displayed for the latest branch.
+          -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
+          -  restore: A required argument to specify the version to restore, specified by its commit hash.
+          -  clone: A required argument to specify the path of the remote repository to clone and an optional argument (default is current working directory) to specify the path where the repository will be cloned.
+          -  list-branch: No additional arguments are required for this command.
+        """
+        if command == "init":
+            if args is None:
+                raise RuntimeError("version() ERROR: 'init' command requires a 'root_folder' argument specifying the name of the root folder for the versioning repository.")
+            self.vcs = Version(args)
+        elif command == "add" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'add' command requires a 'files' argument specifying the file(s) to add to the staging area for the next commit.")
+            self.vcs.cmd_add(args.split())
+        elif command == "remove" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'remove' command requires a 'files' argument specifying the file(s) to remove from the staging area for the next commit.")
+            self.vcs.cmd_remove(args.split())
+        elif command == "delete" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'delete' command requires a 'files' argument specifying the file(s) to delete from the repository.")
+            self.vcs.cmd_delete(args.split())
+        elif command == "commit" and self.vcs is not None:
+            self.vcs.cmd_commit(args)
+        elif command == "branch" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'branch' command requires a 'branch_name' argument.")
+            arg_list = args.split(maxsplit=1)
+            branch_name = arg_list[0]
+            start_point = arg_list[1] if len(arg_list) > 1 else None
+            self.vcs.cmd_branch(branch_name, start_point)
+        elif command == "merge" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'merge' command requires a 'branch_name' argument.")
+            arg_list = args.split(maxsplit=1)
+            branch_name = arg_list[0]
+            target_commit = arg_list[1] if len(arg_list) > 1 else None
+            self.vcs.cmd_merge(branch_name, target_commit)
+        elif command == "list-branch" and self.vcs is not None:
+            self.vcs.cmd_list_branch()
+        elif command == "status" and self.vcs is not None:
+            self.vcs.cmd_status()
+        elif command == "switch" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'switch' command requires a 'branch_name' argument.")
+            self.vcs.cmd_switch(args)
+        elif command == "diff" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'diff' command requires zero, one, or two commit hashes as arguments.")
+            self.vcs.cmd_diff(c1, c2)
+        elif command == "log" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'log' command requires branch name and log history limit.")
+            self.vcs.cmd_log(c1, 10 if c2 is None else int(c2))
+        elif command == "restore" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
+            self.vcs.cmd_restore(args)
+        elif command == "clone" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'clone' command requires source path and destination path.")
+            else:
+                raise RuntimeError("version() ERROR: 'clone' command requires 'source_path' argument specifying the path of the remote repository to clone and 'destination_path' argument specifying the path where the repository will be cloned.")
+            self.vcs.cmd_clone(c1, c2)
+        else:
+            raise RuntimeError("version() ERROR: Invalid command or versioning repository not initialized. Please check the command and ensure 'init' has been called with a root folder argument.")
