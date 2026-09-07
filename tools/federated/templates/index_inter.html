@@ -350,6 +350,34 @@
             font-size: 0.85em;
         }
 
+        .database-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .database-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 12px;
+            transition: all 0.2s;
+        }
+
+        .database-item:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .database-item input[type="radio"]:checked + div {
+            color: #667eea;
+        }
+
+        .database-item:has(input[type="radio"]:checked) {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
         .log-viewer {
             background: #1e1e1e;
             color: #d4d4d4;
@@ -362,6 +390,45 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section-header {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+            margin: 0 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-content {
+            background: white;
+            border-radius: 5px;
+            padding: 15px;
+        }
+
+        .status-section {
+            background: #f1f3f5;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            border-left: 4px solid #868e96;
+        }
+
+        .status-header {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #495057;
+            margin: 0 0 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -373,9 +440,10 @@
 
         <div class="card">
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('discover')">1. Discover Endpoints</button>
-                <button class="tab" onclick="switchTab('federate')">2. Federate Data</button>
-                <button class="tab" onclick="switchTab('logs')">3. View Logs</button>
+                <button class="tab active" onclick="switchTab('discover', event)">1. Discover Endpoints</button>
+                <button class="tab" onclick="switchTab('pull', event)">2. Pull Data Sources</button>
+                <button class="tab" onclick="switchTab('read', event)">3. Pull Remote Databases</button>
+                <button class="tab" onclick="switchTab('logs', event)">4. View Logs</button>
             </div>
 
             <!-- Discover Endpoints Tab -->
@@ -385,44 +453,75 @@
                     💡 <strong>Tip:</strong> Run discovery multiple times with different settings. Each run adds more endpoints to your collection.
                 </p>
 
-                <!-- Accumulated Endpoints Display -->
-                <div id="accumulated-endpoints" class="hidden">
-                    <div class="card" style="background: #f8f9fa; padding: 20px; margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3 style="margin: 0;">📦 Accumulated Endpoints (<span id="endpoint-count">0</span>)</h3>
-                            <button type="button" class="btn btn-secondary" onclick="clearAllEndpoints()" style="padding: 8px 15px; font-size: 0.9em;">
-                                🗑️ Clear All
-                            </button>
-                        </div>
+                <!-- Endpoints Section -->
+                <div class="section hidden" id="accumulated-endpoints">
+                    <div class="section-header">
+                        📦 Endpoints (<span id="endpoint-count">0</span>)
+                        <div style="flex: 1;"></div>
+                        <button type="button" class="btn btn-secondary" onclick="clearAllEndpoints()" style="padding: 6px 12px; font-size: 0.85em;">
+                            🗑️ Clear All
+                        </button>
+                    </div>
+                    <div class="section-content">
                         <div id="accumulated-list"></div>
                     </div>
                 </div>
 
-                <form id="discover-form">
+                <!-- Source Section -->
+                <div class="section">
+                    <div class="section-header">🔍 Source</div>
+                    <div class="section-content">
+                        <form id="discover-form">
                     <div class="form-group">
                         <label for="hpc-type">HPC Type:</label>
-                        <select id="hpc-type" required>
-                            <option value="hpc">HPC</option>
-                            <option value="kerberos">Kerberos</option>
-                            <option value="other">Other</option>
+                        <select id="hpc-type" required onchange="toggleJumpHostFields()">
+                            <option value="hpc">HPC (Direct SSH)</option>
+                            <option value="kerberos">Kerberos (via Jump Host)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="hpc-names">HPC Hostnames (one per line):</label>
-                        <textarea id="hpc-names" rows="2" placeholder="cluster1.lanl.gov" required></textarea>
-                        <small>Enter one or more HPC hostnames, one per line. You can run this multiple times for different clusters with different settings.</small>
+                        <label for="hpc-name">HPC Hostname:</label>
+                        <input type="text" id="hpc-name" placeholder="cluster1.lanl.gov" required>
+                        <small>Final destination hostname</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="username">Username:</label>
-                        <input type="text" id="username" placeholder="Your username" required>
+                        <label for="username">Username (on HPC):</label>
+                        <input type="text" id="username" placeholder="Your username on HPC" required>
+                        <small>Username for the final HPC destination</small>
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password:</label>
                         <input type="password" id="password" placeholder="Your password">
-                        <small>Leave blank to use Kerberos/SSH keys. Password will be used for all SSH connections in this session.</small>
+                        <small>Leave blank to use SSH keys. For Kerberos, this field is not used (reticket handles authentication).</small>
+                    </div>
+
+                    <!-- Jump Host Fields (for Kerberos) -->
+                    <div id="jump-host-fields" style="display: none; border: 2px solid #667eea; border-radius: 5px; padding: 15px; margin: 15px 0; background: #f0f2ff;">
+                        <h4 style="margin-top: 0; color: #667eea;">🔐 Jump Host Configuration</h4>
+                        <p style="color: #666; font-size: 0.9em; margin: 5px 0 15px 0;">
+                            Pattern: SSH to jump host → Run <code>reticket</code> → SSH to HPC with Kerberos
+                        </p>
+
+                        <div class="form-group">
+                            <label for="jump-host">Jump Host Hostname:</label>
+                            <input type="text" id="jump-host" placeholder="jump.lanl.gov">
+                            <small>The intermediate server to connect through</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="jump-username">Jump Host Username:</label>
+                            <input type="text" id="jump-username" placeholder="Your username on jump host">
+                            <small>Your username to log into the jump host</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="jump-password">Jump Host Password:</label>
+                            <input type="password" id="jump-password" placeholder="Jump host password">
+                            <small>Password for jump host SSH (or leave blank for SSH keys)</small>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -437,59 +536,134 @@
                         <small>Comma-separated list of environment variable prefixes to search for</small>
                     </div>
 
-                    <button type="submit" class="btn" id="discover-btn">
-                        🔍 Discover & Add to Collection
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="clearForm()">
-                        🔄 Reset Form
-                    </button>
-                </form>
+                            <button type="submit" class="btn" id="discover-btn">
+                                🔍 Discover & Add to Collection
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                                🔄 Reset Form
+                            </button>
+                        </form>
+                    </div>
+                </div>
 
-                <div id="discover-spinner" class="spinner hidden"></div>
-                <div id="discover-result"></div>
+                <!-- Status Section -->
+                <div class="status-section">
+                    <div class="status-header">📊 Status</div>
+                    <div id="discover-spinner" class="spinner hidden"></div>
+                    <div id="discover-result"></div>
+                </div>
             </div>
 
-            <!-- Federate Data Tab -->
-            <div id="federate-tab" class="tab-content">
-                <h2>Step 2: Federate Data</h2>
+            <!-- Pull Data Sources Tab (pull_remote_db) -->
+            <div id="pull-tab" class="tab-content">
+                <h2>Step 2: Pull Data Sources (pull_remote_db)</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Download CSV endpoint files from remote servers to discover available data sources.
+                </p>
 
-                <div id="federate-notice" class="alert alert-info">
-                    Please discover endpoints first before federating data.
+                <div id="pull-notice" class="alert alert-info">
+                    Please discover endpoints first (Step 1) before pulling data sources.
                 </div>
 
-                <!-- Phase 1: Show endpoints and workspace input -->
-                <div id="federate-phase1" class="hidden">
-                    <div id="endpoints-display" class="endpoints-list"></div>
-
-                    <div class="form-group" style="margin-top: 20px;">
-                        <label for="workspace-folder">Local Workspace Folder:</label>
-                        <input type="text" id="workspace-folder" placeholder="e.g., ./federated_data" required>
-                        <small>Path to the local folder where data will be federated</small>
+                <div id="pull-form-container" class="hidden">
+                    <!-- Endpoints Section -->
+                    <div class="section">
+                        <div class="section-header">📡 Endpoints</div>
+                        <div class="section-content">
+                            <p style="color: #666; margin-bottom: 10px;">Select one endpoint to analyze:</p>
+                            <div id="endpoints-display" class="endpoints-list"></div>
+                        </div>
                     </div>
 
-                    <button class="btn" id="analyze-btn" onclick="analyzeEndpoints()">
-                        📊 Analyze Databases
-                    </button>
-                </div>
-
-                <!-- Phase 2: Show credential collection form -->
-                <div id="federate-phase2" class="hidden">
-                    <div class="alert alert-success">
-                        <strong>✓ Analysis Complete!</strong> <span id="analysis-summary"></span>
+                    <!-- Credentials Section -->
+                    <div class="section">
+                        <div class="section-header">🔐 Credentials</div>
+                        <div class="section-content">
+                            <p style="color: #666; margin-bottom: 10px;">Enter credentials for the selected endpoint:</p>
+                            <div id="endpoint-credentials-form"></div>
+                            <button class="btn" id="pull-btn" onclick="pullDatabases()" style="margin-top: 15px;">
+                                📥 Pull Data Sources (Download CSV)
+                            </button>
+                        </div>
                     </div>
 
-                    <div id="credential-form-container"></div>
+                    <!-- Data Sources Section -->
+                    <div class="section" id="data-sources-section" style="display: none;">
+                        <div class="section-header">📂 Data Sources</div>
+                        <div class="section-content" id="data-sources-display"></div>
+                    </div>
+                </div>
 
-                    <button class="btn btn-success" id="federate-btn" onclick="executeFederation()">
-                        📥 Start Federation
+                <!-- Status Section -->
+                <div class="status-section">
+                    <div class="status-header">📊 Status</div>
+                    <div id="pull-spinner" class="spinner hidden"></div>
+                    <div id="pull-result"></div>
+                </div>
+            </div>
+
+            <!-- Pull Remote Databases Tab (read_data_sources) -->
+            <div id="read-tab" class="tab-content">
+                <h2>Step 3: Pull Remote Databases (read_data_sources)</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Select and download individual database files from the discovered data sources.
+                </p>
+
+                <div id="read-notice" class="alert alert-info">
+                    Please pull data sources first (Step 2).
+                </div>
+
+                <div id="read-form-container" class="hidden">
+                    <div class="alert alert-success" style="margin-bottom: 20px;">
+                        <strong>✓ Data Sources Analyzed!</strong> <span id="analysis-summary"></span>
+                    </div>
+
+                    <!-- Workspace Configuration -->
+                    <div class="section">
+                        <div class="section-header">📁 Workspace</div>
+                        <div class="section-content">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="workspace-folder">Local Workspace Folder:</label>
+                                <input type="text" id="workspace-folder" placeholder="e.g., ./federated_data" required>
+                                <small>Path to the local folder where databases will be downloaded</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Database Selection -->
+                    <div class="section">
+                        <div class="section-header">🗄️ Select Database</div>
+                        <div class="section-content">
+                            <div id="read-database-list" style="max-height: 400px; overflow-y: auto;">
+                                <!-- Database list will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Credentials -->
+                    <div class="section">
+                        <div class="section-header">🔐 Credentials</div>
+                        <div class="section-content">
+                            <div id="read-credentials-container">
+                                <!-- Credentials form will appear here when database is selected -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success" id="read-btn" onclick="executeFederation()">
+                        📥 Download Selected Database
                     </button>
-                    <button class="btn btn-secondary" onclick="backToPhase1()">
-                        ← Back
+                    <button class="btn btn-secondary" onclick="backToPull()">
+                        ← Back to Pull Data Sources
                     </button>
                 </div>
 
-                <div id="federate-spinner" class="spinner hidden"></div>
-                <div id="federate-result"></div>
+                <!-- Status Section -->
+                <div class="status-section">
+                    <div class="status-header">📊 Status</div>
+                    <div id="read-spinner" class="spinner hidden"></div>
+                    <div id="read-result"></div>
+                </div>
             </div>
 
             <!-- Logs Tab -->
@@ -517,18 +691,40 @@
         let discoveredEndpoints = {};
         let discoveryHistory = [];
         let analysisResult = null;
+        let accumulatedPullResults = []; // Track all pulled databases
+        let downloadedDatabases = []; // Track all downloaded databases
 
         // Tab switching
-        function switchTab(tabName) {
+        function switchTab(tabName, event) {
+            // Remove active class from all tabs
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            event.target.classList.add('active');
 
+            // Add active class to clicked tab (if event exists)
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Find the tab by name and activate it
+                const tabs = document.querySelectorAll('.tab');
+                tabs.forEach(tab => {
+                    if (tab.textContent.includes(tabName === 'discover' ? '1. Discover' :
+                                                  tabName === 'pull' ? '2. Pull' :
+                                                  tabName === 'read' ? '3. Read' : '4. View')) {
+                        tab.classList.add('active');
+                    }
+                });
+            }
+
+            // Switch tab content
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
             });
-            document.getElementById(`${tabName}-tab`).classList.add('active');
+
+            const tabContent = document.getElementById(`${tabName}-tab`);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
 
             if (tabName === 'logs') {
                 loadLogs();
@@ -550,24 +746,40 @@
             const prefixesStr = document.getElementById('prefixes').value;
             const prefixes = prefixesStr.split(',').map(p => p.trim()).filter(p => p);
 
-            const hpcNamesStr = document.getElementById('hpc-names').value;
-            const hpcNames = hpcNamesStr.split('\n').map(h => h.trim()).filter(h => h);
+            const hpcName = document.getElementById('hpc-name').value.trim();
 
-            if (hpcNames.length === 0) {
-                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Please enter at least one HPC hostname</div>';
+            if (!hpcName) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Please enter an HPC hostname</div>';
                 button.disabled = false;
                 spinner.classList.add('hidden');
                 return;
             }
 
+            const hpcNames = [hpcName];
+
+            const hpcType = document.getElementById('hpc-type').value;
             const formData = {
-                hpc_type: document.getElementById('hpc-type').value,
+                hpc_type: hpcType,
                 hpc_names: hpcNames,
                 username: document.getElementById('username').value,
                 password: document.getElementById('password').value || null,
                 script_path: document.getElementById('script-path').value,
                 prefixes: prefixes
             };
+
+            // Add jump host data for Kerberos
+            if (hpcType === 'kerberos') {
+                formData.jump_host = document.getElementById('jump-host').value.trim();
+                formData.jump_username = document.getElementById('jump-username').value.trim();
+                formData.jump_password = document.getElementById('jump-password').value || null;
+
+                if (!formData.jump_host || !formData.jump_username) {
+                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Jump host and username required for Kerberos</div>';
+                    button.disabled = false;
+                    spinner.classList.add('hidden');
+                    return;
+                }
+            }
 
             try {
                 const response = await fetch('/api/discover-endpoints', {
@@ -579,9 +791,15 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    if (!currentSessionId) {
-                        currentSessionId = data.session_id;
-                    }
+                    // Always use the latest session ID to get the most recent jump host mappings
+                    currentSessionId = data.session_id;
+
+                    // Store jump host mapping and credentials for Step 2
+                    window.discoveryResults = {
+                        jump_host_map: data.jump_host_map || {},
+                        jump_host: data.jump_host || '',
+                        jump_username: data.jump_username || ''
+                    };
 
                     Object.assign(discoveredEndpoints, data.endpoints);
                     discoveryHistory.push({
@@ -635,9 +853,11 @@
                         Object.keys(data.endpoints).length + ' endpoint(s) from this discovery run.</div>' + summaryHTML;
 
                     if (Object.keys(discoveredEndpoints).length > 0) {
-                        document.getElementById('federate-notice').classList.add('hidden');
-                        document.getElementById('federate-phase1').classList.remove('hidden');
-                        updateFederateDisplay();
+                        const pullNotice = document.getElementById('pull-notice');
+                        const pullForm = document.getElementById('pull-form-container');
+                        if (pullNotice) pullNotice.classList.add('hidden');
+                        if (pullForm) pullForm.classList.remove('hidden');
+                        updatePullDisplay();
                     }
 
                     document.getElementById('accumulated-endpoints').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -669,6 +889,11 @@
             const container = document.getElementById('accumulated-endpoints');
             const list = document.getElementById('accumulated-list');
             const count = document.getElementById('endpoint-count');
+
+            if (!container || !list || !count) {
+                console.error('Accumulated endpoints elements not found');
+                return;
+            }
 
             if (Object.keys(discoveredEndpoints).length === 0) {
                 container.classList.add('hidden');
@@ -708,7 +933,13 @@
             list.innerHTML = html;
         }
 
-        function updateFederateDisplay() {
+        function updatePullDisplay() {
+            const endpointsDisplay = document.getElementById('endpoints-display');
+            if (!endpointsDisplay) {
+                console.error('endpoints-display not found');
+                return;
+            }
+
             const byCluster = {};
             for (const [endpointName, endpointPath] of Object.entries(discoveredEndpoints)) {
                 const clusterName = endpointName.includes('::') ? endpointName.split('::')[0] : 'unknown';
@@ -716,207 +947,1011 @@
                 byCluster[clusterName].push([endpointName, endpointPath]);
             }
 
-            let federateHTML = `<h3>Ready to Federate (<span style="color: #667eea;">${Object.keys(discoveredEndpoints).length}</span> endpoint(s)):</h3>
+            let displayHTML = `
+                <h3>Select One Endpoint to Pull (<span style="color: #667eea;">${Object.keys(discoveredEndpoints).length}</span> available):</h3>
+                <p style="color: #666; margin-bottom: 15px;">
+                    Select one endpoint to download. Credentials will appear below.
+                </p>
                 <div class="endpoints-list">`;
 
             for (const [cluster, endpoints] of Object.entries(byCluster)) {
-                federateHTML += `<div class="cluster-section">
-                    <div class="cluster-header">🖥️ ${cluster} (${endpoints.length} endpoint(s))</div>`;
+                displayHTML += `<div class="cluster-section">
+                    <div class="cluster-header">
+                        🖥️ ${cluster} (${endpoints.length} endpoint(s))
+                    </div>`;
+
                 for (const [name, path] of endpoints) {
                     const displayName = name.includes('::') ? name.split('::')[1] : name;
-                    federateHTML += `<div class="endpoint-item"><strong>${displayName}:</strong> ${path}</div>`;
+                    const inputId = name.replace(/[^a-zA-Z0-9]/g, '_');
+
+                    displayHTML += `
+                        <div class="endpoint-item" style="display: flex; align-items: center; gap: 10px;">
+                            <input type="radio" name="endpoint-selection" id="select-${inputId}" value="${name}"
+                                   onchange="updateEndpointCredentials()"
+                                   style="width: auto; cursor: pointer;">
+                            <label for="select-${inputId}" style="flex: 1; cursor: pointer; margin: 0;">
+                                <strong>${displayName}:</strong> ${path}
+                            </label>
+                        </div>`;
                 }
-                federateHTML += '</div>';
+                displayHTML += '</div>';
             }
 
-            federateHTML += '</div>';
-            document.getElementById('endpoints-display').innerHTML = federateHTML;
+            displayHTML += '</div>';
+            endpointsDisplay.innerHTML = displayHTML;
+
+            // Initially show no credentials (nothing selected)
+            updateEndpointCredentials();
         }
 
-        // Phase 1: Analyze endpoints
-        async function analyzeEndpoints() {
+        function updateEndpointCredentials() {
+            const container = document.getElementById('endpoint-credentials-form');
+            if (!container) {
+                console.error('endpoint-credentials-form container not found');
+                return;
+            }
+
+            // Get selected endpoint (radio button - only one)
+            const selectedRadio = document.querySelector('input[name="endpoint-selection"]:checked');
+
+            if (!selectedRadio) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>ℹ️ No endpoint selected</strong><br>
+                        Please select one endpoint above to enter credentials.
+                    </div>`;
+                return;
+            }
+
+            const endpointName = selectedRadio.value;
+            const displayName = endpointName.includes('::') ? endpointName.split('::')[1] : endpointName;
+            const path = discoveredEndpoints[endpointName];
+            const clusterName = endpointName.includes('::') ? endpointName.split('::')[0] : 'unknown';
+            const inputId = endpointName.replace(/[^a-zA-Z0-9]/g, '_');
+
+            // Debug logging
+            console.log('Step 2 - Endpoint selected:', endpointName);
+            console.log('Step 2 - Cluster name:', clusterName);
+            console.log('Step 2 - window.discoveryResults:', window.discoveryResults);
+            console.log('Step 2 - jump_host_map:', window.discoveryResults?.jump_host_map);
+
+            // Check if this endpoint was discovered via jump host
+            const needsJumpHost = window.discoveryResults &&
+                                 window.discoveryResults.jump_host_map &&
+                                 window.discoveryResults.jump_host_map[clusterName];
+
+            console.log('Step 2 - needsJumpHost:', needsJumpHost);
+
+            let html = `
+                <div class="alert alert-success">
+                    <strong>✓ 1 endpoint selected</strong><br>
+                    Enter credentials below for the selected endpoint.
+                </div>`;
+
+            // Jump host credentials if needed
+            if (needsJumpHost) {
+                html += `
+                <div class="cluster-section" style="margin-bottom: 20px; background: #fff8e1; border-left-color: #ff9800;">
+                    <h4 style="color: #ff9800; margin-bottom: 10px;">🔐 Jump Host Required</h4>
+                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
+                        This endpoint requires jump host access (Kerberos tickets expire).
+                    </p>
+                    <div class="credential-group">
+                        <div class="form-group">
+                            <label for="jump-host-step2">Jump Host:</label>
+                            <input type="text" id="jump-host-step2" placeholder="e.g., ro-rfe.lanl.gov"
+                                   value="${window.discoveryResults.jump_host || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="jump-username-step2">Jump Host Username:</label>
+                            <input type="text" id="jump-username-step2" placeholder="Your username on jump host"
+                                   value="${window.discoveryResults.jump_username || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="jump-password-step2">Jump Host Password:</label>
+                            <input type="password" id="jump-password-step2" placeholder="Jump host password">
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            html += `
+                <div class="cluster-section" style="margin-bottom: 20px;">
+                    <h4 style="color: #28a745; margin-bottom: 15px;">🖥️ ${clusterName}</h4>
+                    <div class="credential-group">
+                        <div class="credential-header">${displayName}</div>
+                        <small style="color: #666;">${path}</small>
+                        <div class="form-group">
+                            <label for="username-${inputId}">Username:</label>
+                            <input type="text" id="username-${inputId}" placeholder="Username for ${clusterName}">
+                        </div>
+                        <div class="form-group">
+                            <label for="password-${inputId}">Password:</label>
+                            <input type="password" id="password-${inputId}" placeholder="Password for ${clusterName}">
+                            <small>Leave blank to use SSH keys</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // Step 2: Pull Databases
+        async function pullDatabases() {
+            const button = document.getElementById('pull-btn');
+            const spinner = document.getElementById('pull-spinner');
+            const result = document.getElementById('pull-result');
+
+            // Get selected endpoint (radio button - only one)
+            const selectedRadio = document.querySelector('input[name="endpoint-selection"]:checked');
+
+            if (!selectedRadio) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Please select one endpoint</div>';
+                return;
+            }
+
+            const endpointName = selectedRadio.value;
+            const endpointPath = discoveredEndpoints[endpointName];
+            const inputId = endpointName.replace(/[^a-zA-Z0-9]/g, '_');
+
+            const username = document.getElementById(`username-${inputId}`)?.value || '';
+            const password = document.getElementById(`password-${inputId}`)?.value || '';
+
+            if (!username) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Please provide username for the selected endpoint</div>';
+                return;
+            }
+
+            // Only the selected endpoint
+            const selectedEndpoints = {
+                [endpointName]: endpointPath
+            };
+
+            const endpointCredentials = {
+                [endpointName]: { username, password }
+            };
+
+            // Check if jump host credentials are needed
+            const clusterName = endpointName.includes('::') ? endpointName.split('::')[0] : 'unknown';
+            const needsJumpHost = window.discoveryResults &&
+                                 window.discoveryResults.jump_host_map &&
+                                 window.discoveryResults.jump_host_map[clusterName];
+
+            let jumpHostCreds = null;
+            if (needsJumpHost) {
+                const jumpHost = document.getElementById('jump-host-step2')?.value || '';
+                const jumpUsername = document.getElementById('jump-username-step2')?.value || '';
+                const jumpPassword = document.getElementById('jump-password-step2')?.value || '';
+
+                if (!jumpHost || !jumpUsername || !jumpPassword) {
+                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> Please provide jump host credentials</div>';
+                    return;
+                }
+
+                jumpHostCreds = { jumpHost, jumpUsername, jumpPassword };
+            }
+
+            button.disabled = true;
+            spinner.classList.remove('hidden');
+            result.innerHTML = '';
+
+            try {
+                const requestBody = {
+                    session_id: currentSessionId,
+                    endpoints_location: selectedEndpoints,
+                    endpoint_credentials: endpointCredentials
+                };
+
+                // Add jump host credentials if needed
+                if (jumpHostCreds) {
+                    requestBody.jump_host = jumpHostCreds.jumpHost;
+                    requestBody.jump_username = jumpHostCreds.jumpUsername;
+                    requestBody.jump_password = jumpHostCreds.jumpPassword;
+                }
+
+                // Send the complete jump host mapping from frontend
+                // (merges mappings from all discovery sessions)
+                if (window.discoveryResults && window.discoveryResults.jump_host_map) {
+                    requestBody.jump_host_required_map = window.discoveryResults.jump_host_map;
+                }
+
+                const response = await fetch('/api/analyze-endpoints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store/update jump host mapping for Step 3
+                    // IMPORTANT: Merge instead of replace to preserve mappings from previous endpoints
+                    if (!window.discoveryResults) {
+                        window.discoveryResults = { jump_host_map: {} };
+                    }
+                    if (!window.discoveryResults.jump_host_map) {
+                        window.discoveryResults.jump_host_map = {};
+                    }
+
+                    // Merge new jump host mappings with existing ones
+                    if (data.jump_host_map) {
+                        Object.assign(window.discoveryResults.jump_host_map, data.jump_host_map);
+                    }
+
+                    // Update jump host credentials if provided
+                    if (data.jump_host) {
+                        window.discoveryResults.jump_host = data.jump_host;
+                    }
+                    if (data.jump_username) {
+                        window.discoveryResults.jump_username = data.jump_username;
+                    }
+
+                    // Add to accumulated results
+                    accumulatedPullResults.push({
+                        timestamp: new Date().toLocaleTimeString(),
+                        endpoint: endpointName,
+                        data: data
+                    });
+
+                    // Merge all accumulated results into a single analysisResult
+                    analysisResult = mergeAccumulatedPullResults();
+
+                    console.log('Merged analysis result:', analysisResult);
+
+                    // Build detailed result display with accumulated data
+                    let resultHTML = `<div class="alert alert-success">
+                        <strong>✓ Success!</strong> Found ${data.totals.total} database(s) from CSV files.
+                    </div>`;
+
+                    // Show accumulated results
+                    resultHTML += buildAccumulatedPullDisplay();
+
+                    resultHTML += `<div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
+                        <strong>➡️ Next Step:</strong> Go to <strong>"3. Read Remote Databases"</strong> tab and enter credentials to download these databases.
+                    </div>`;
+
+                    result.innerHTML = resultHTML;
+
+                    // Show Data Sources section in Step 2
+                    const dataSourcesSection = document.getElementById('data-sources-section');
+                    const dataSourcesDisplay = document.getElementById('data-sources-display');
+                    if (dataSourcesSection && dataSourcesDisplay) {
+                        dataSourcesSection.style.display = 'block';
+                        dataSourcesDisplay.innerHTML = buildAccumulatedPullDisplay();
+                    }
+
+                    // Enable Step 3
+                    const readNotice = document.getElementById('read-notice');
+                    const readForm = document.getElementById('read-form-container');
+                    if (readNotice) readNotice.classList.add('hidden');
+                    if (readForm) readForm.classList.remove('hidden');
+                    showCredentialForm(analysisResult);
+                } else {
+                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + data.message + '</div>';
+                }
+            } catch (error) {
+                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + error.message + '</div>';
+            } finally {
+                button.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // Merge all accumulated pull results into a single structure
+        function mergeAccumulatedPullResults() {
+            if (accumulatedPullResults.length === 0) return null;
+
+            const merged = {
+                databases_by_cluster: {},
+                totals: { hpc: 0, url: 0, s3: 0, total: 0 }
+            };
+
+            // Merge all pull results
+            for (const pullResult of accumulatedPullResults) {
+                const data = pullResult.data;
+
+                if (!data.databases_by_cluster) continue;
+
+                for (const [clusterName, clusterData] of Object.entries(data.databases_by_cluster)) {
+                    if (!merged.databases_by_cluster[clusterName]) {
+                        merged.databases_by_cluster[clusterName] = {
+                            hpc_by_location: {},
+                            url_databases: [],
+                            s3_databases: [],
+                            total_hpc: 0,
+                            total_url: 0,
+                            total_s3: 0
+                        };
+                    }
+
+                    const mergedCluster = merged.databases_by_cluster[clusterName];
+
+                    // Merge HPC databases
+                    if (clusterData.hpc_by_location) {
+                        for (const [location, dbs] of Object.entries(clusterData.hpc_by_location)) {
+                            if (!mergedCluster.hpc_by_location[location]) {
+                                mergedCluster.hpc_by_location[location] = [];
+                            }
+                            mergedCluster.hpc_by_location[location].push(...dbs);
+                        }
+                    }
+
+                    // Merge URL databases
+                    if (clusterData.url_databases) {
+                        mergedCluster.url_databases.push(...clusterData.url_databases);
+                    }
+
+                    // Merge S3 databases
+                    if (clusterData.s3_databases) {
+                        mergedCluster.s3_databases.push(...clusterData.s3_databases);
+                    }
+
+                    // Update cluster totals
+                    mergedCluster.total_hpc = Object.values(mergedCluster.hpc_by_location).flat().length;
+                    mergedCluster.total_url = mergedCluster.url_databases.length;
+                    mergedCluster.total_s3 = mergedCluster.s3_databases.length;
+                }
+            }
+
+            // Calculate global totals
+            for (const clusterData of Object.values(merged.databases_by_cluster)) {
+                merged.totals.hpc += clusterData.total_hpc;
+                merged.totals.url += clusterData.total_url;
+                merged.totals.s3 += clusterData.total_s3;
+            }
+            merged.totals.total = merged.totals.hpc + merged.totals.url + merged.totals.s3;
+
+            return merged;
+        }
+
+        // Build accumulated pull results display
+        function buildAccumulatedPullDisplay() {
+            let html = `<div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                <h4 style="margin-top: 0;">📊 Accumulated Database Analysis (${accumulatedPullResults.length} pull(s))</h4>`;
+
+            // Aggregate all data
+            let totalHPC = 0, totalURL = 0, totalS3 = 0;
+            let allClusters = {};
+
+            for (const pullResult of accumulatedPullResults) {
+                const data = pullResult.data;
+                totalHPC += data.totals.hpc;
+                totalURL += data.totals.url;
+                totalS3 += data.totals.s3;
+
+                // Merge cluster data
+                if (data.databases_by_cluster) {
+                    for (const [clusterName, clusterData] of Object.entries(data.databases_by_cluster)) {
+                        if (!allClusters[clusterName]) {
+                            allClusters[clusterName] = {
+                                hpc_by_location: {},
+                                url_databases: [],
+                                s3_databases: []
+                            };
+                        }
+
+                        // Merge HPC locations
+                        if (clusterData.hpc_by_location) {
+                            for (const [location, dbs] of Object.entries(clusterData.hpc_by_location)) {
+                                if (!allClusters[clusterName].hpc_by_location[location]) {
+                                    allClusters[clusterName].hpc_by_location[location] = [];
+                                }
+                                allClusters[clusterName].hpc_by_location[location].push(...dbs);
+                            }
+                        }
+
+                        // Merge URL/S3
+                        if (clusterData.url_databases) {
+                            allClusters[clusterName].url_databases.push(...clusterData.url_databases);
+                        }
+                        if (clusterData.s3_databases) {
+                            allClusters[clusterName].s3_databases.push(...clusterData.s3_databases);
+                        }
+                    }
+                }
+            }
+
+            // Show totals
+            html += `<div style="margin: 10px 0;">
+                <strong>Total Summary:</strong>
+                <ul style="margin: 5px 0;">
+                    <li>🖥️ HPC Databases: ${totalHPC}</li>
+                    <li>🌐 URL Databases: ${totalURL}</li>
+                    <li>☁️ S3 Databases: ${totalS3}</li>
+                </ul>
+            </div>`;
+
+            // Show details by cluster
+            for (const [clusterName, clusterData] of Object.entries(allClusters)) {
+                html += `<div style="margin: 15px 0; padding: 10px; background: white; border-left: 3px solid #4CAF50;">
+                    <strong>Cluster: ${clusterName}</strong>`;
+
+                // HPC locations with database details
+                if (clusterData.hpc_by_location && Object.keys(clusterData.hpc_by_location).length > 0) {
+                    html += `<div style="margin: 10px 0;"><strong>HPC Locations:</strong></div>`;
+                    for (const [location, dbs] of Object.entries(clusterData.hpc_by_location)) {
+                        const locationId = location.replace(/[^a-zA-Z0-9]/g, '_');
+                        const showCount = 2;
+                        const hasMore = dbs.length > showCount;
+
+                        html += `<div style="margin: 10px 0 10px 20px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                            <strong>${location}</strong> (${dbs.length} database(s))
+                            <ul style="margin: 5px 0; font-family: monospace; font-size: 0.9em;">`;
+
+                        // Show first 2 databases
+                        for (let i = 0; i < Math.min(showCount, dbs.length); i++) {
+                            const db = dbs[i];
+                            html += `<li style="margin: 3px 0; word-break: break-all;">
+                                <span style="color: #2196F3;">${db.location}</span>:<span style="color: #4CAF50;">${db.path}</span>
+                                ${db.type ? `<span style="color: #999; font-size: 0.85em;"> (${db.type})</span>` : ''}
+                            </li>`;
+                        }
+
+                        // Show "and X more..." if there are more
+                        if (hasMore) {
+                            html += `<li style="margin: 3px 0;">
+                                <a href="#" onclick="toggleDatabaseList('${locationId}'); return false;"
+                                   style="color: #1976D2; text-decoration: none;">
+                                   ▸ Show ${dbs.length - showCount} more...
+                                </a>
+                                <div id="db-list-${locationId}" style="display: none; margin-top: 5px;">`;
+
+                            // Hidden databases
+                            for (let i = showCount; i < dbs.length; i++) {
+                                const db = dbs[i];
+                                html += `<div style="margin: 3px 0; word-break: break-all;">
+                                    <span style="color: #2196F3;">${db.location}</span>:<span style="color: #4CAF50;">${db.path}</span>
+                                    ${db.type ? `<span style="color: #999; font-size: 0.85em;"> (${db.type})</span>` : ''}
+                                </div>`;
+                            }
+
+                            html += `</div></li>`;
+                        }
+
+                        html += `</ul></div>`;
+                    }
+                }
+
+                // URL databases with paths
+                if (clusterData.url_databases && clusterData.url_databases.length > 0) {
+                    const showCount = 2;
+                    const hasMore = clusterData.url_databases.length > showCount;
+                    const urlId = `${clusterName}_url`.replace(/[^a-zA-Z0-9]/g, '_');
+
+                    html += `<div style="margin: 10px 0 10px 20px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                        <strong>URL Databases</strong> (${clusterData.url_databases.length})
+                        <ul style="margin: 5px 0; font-family: monospace; font-size: 0.9em;">`;
+
+                    for (let i = 0; i < Math.min(showCount, clusterData.url_databases.length); i++) {
+                        const db = clusterData.url_databases[i];
+                        html += `<li style="margin: 3px 0; word-break: break-all;">
+                            <span style="color: #2196F3;">${db.location}</span>:<span style="color: #4CAF50;">${db.path}</span>
+                        </li>`;
+                    }
+
+                    if (hasMore) {
+                        html += `<li style="margin: 3px 0;">
+                            <a href="#" onclick="toggleDatabaseList('${urlId}'); return false;"
+                               style="color: #1976D2; text-decoration: none;">
+                               ▸ Show ${clusterData.url_databases.length - showCount} more...
+                            </a>
+                            <div id="db-list-${urlId}" style="display: none; margin-top: 5px;">`;
+
+                        for (let i = showCount; i < clusterData.url_databases.length; i++) {
+                            const db = clusterData.url_databases[i];
+                            html += `<div style="margin: 3px 0; word-break: break-all;">
+                                <span style="color: #2196F3;">${db.location}</span>:<span style="color: #4CAF50;">${db.path}</span>
+                            </div>`;
+                        }
+
+                        html += `</div></li>`;
+                    }
+
+                    html += `</ul></div>`;
+                }
+
+                // S3 databases with paths
+                if (clusterData.s3_databases && clusterData.s3_databases.length > 0) {
+                    const showCount = 2;
+                    const hasMore = clusterData.s3_databases.length > showCount;
+                    const s3Id = `${clusterName}_s3`.replace(/[^a-zA-Z0-9]/g, '_');
+
+                    html += `<div style="margin: 10px 0 10px 20px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                        <strong>S3 Databases</strong> (${clusterData.s3_databases.length})
+                        <ul style="margin: 5px 0; font-family: monospace; font-size: 0.9em;">`;
+
+                    for (let i = 0; i < Math.min(showCount, clusterData.s3_databases.length); i++) {
+                        const db = clusterData.s3_databases[i];
+                        html += `<li style="margin: 3px 0; word-break: break-all;">
+                            <span style="color: #2196F3;">${db.location}</span>:<span style="color: #4CAF50;">${db.path}</span>
+                        </li>`;
+                    }
+
+                    if (hasMore) {
+                        html += `<li style="margin: 3px 0;">
+                            <a href="#" onclick="toggleDatabaseList('${s3Id}'); return false;"
+                               style="color: #1976D2; text-decoration: none;">
+                               ▸ Show ${clusterData.s3_databases.length - showCount} more...
+                            </a>
+                            <div id="db-list-${s3Id}" style="display: none; margin-top: 5px;">`;
+
+                        for (let i = showCount; i < clusterData.s3_databases.length; i++) {
+                            const db = clusterData.s3_databases[i];
+                            html += `<div style="margin: 3px 0; word-break: break-all;">
+                                <span style="color: #2196F3;">${db.location}</span>:<span style="color: #4CAF50;">${db.path}</span>
+                            </div>`;
+                        }
+
+                        html += `</div></li>`;
+                    }
+
+                    html += `</ul></div>`;
+                }
+
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        // Toggle database list expansion
+        function toggleDatabaseList(id) {
+            const element = document.getElementById(`db-list-${id}`);
+            if (element) {
+                const isHidden = element.style.display === 'none';
+                element.style.display = isHidden ? 'block' : 'none';
+
+                // Update link text
+                const link = element.parentElement.querySelector('a');
+                if (link) {
+                    const text = link.textContent;
+                    if (isHidden) {
+                        link.textContent = text.replace('▸ Show', '▾ Hide');
+                    } else {
+                        link.textContent = text.replace('▾ Hide', '▸ Show');
+                    }
+                }
+            }
+        }
+
+        // Show credential collection form - now with database selection
+        function showCredentialForm(data) {
+            const summary = document.getElementById('analysis-summary');
+            summary.textContent = `Found ${data.totals.total} database(s): ${data.totals.hpc} HPC, ${data.totals.url} URL, ${data.totals.s3} S3`;
+
+            updateReadDatabaseDisplay();
+        }
+
+        // Update Step 3 display with database list
+        function updateReadDatabaseDisplay() {
+            if (!analysisResult) {
+                console.error('No analysisResult available');
+                return;
+            }
+
+            console.log('Analysis result:', analysisResult);
+
+            const container = document.getElementById('read-database-list');
+            const credentialsContainer = document.getElementById('read-credentials-container');
+
+            if (!container || !credentialsContainer) {
+                console.error('Containers not found');
+                return;
+            }
+
+            let html = '<h3>Select Database to Download</h3>';
+            html += '<p style="color: #666; margin-bottom: 15px;">Choose one database at a time:</p>';
+
+            // Show downloaded databases if any
+            if (downloadedDatabases.length > 0) {
+                html += '<div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #4CAF50;">';
+                html += `<h4 style="margin: 0 0 10px 0; color: #2e7d32;">✓ Downloaded Databases (${downloadedDatabases.length})</h4>`;
+                for (const db of downloadedDatabases) {
+                    html += `<div style="background: white; padding: 10px; margin: 5px 0; border-radius: 3px;">
+                        <div style="font-weight: 600;">${db.name}</div>
+                        <div style="font-family: monospace; font-size: 0.85em; color: #666; margin: 3px 0;">
+                            ${db.original_location}:${db.original_path}
+                        </div>
+                        <div style="font-size: 0.8em; color: #999;">
+                            Local: ${db.local_path}/${db.name}
+                        </div>
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            html += '<div class="database-selection">';
+
+            // Build flat list of all databases
+            let dbIndex = 0;
+            console.log('Building database list from:', analysisResult.databases_by_cluster);
+
+            for (const [cluster, clusterData] of Object.entries(analysisResult.databases_by_cluster)) {
+                console.log(`Processing cluster: ${cluster}`, clusterData);
+                // HPC databases
+                if (clusterData.hpc_by_location) {
+                    for (const [location, databases] of Object.entries(clusterData.hpc_by_location)) {
+                        for (const db of databases) {
+                            const dbId = `db_${dbIndex}`;
+                            html += `<div class="database-item">
+                                <label style="display: flex; align-items: start; cursor: pointer;">
+                                    <input type="radio" name="database-selection" value="${dbIndex}"
+                                           data-location="${location}"
+                                           data-path="${db.path}"
+                                           data-type="${db.location_type}"
+                                           data-cluster="${cluster}"
+                                           onchange="updateReadCredentials()"
+                                           style="margin-top: 3px;">
+                                    <div style="margin-left: 10px; flex: 1;">
+                                        <div style="font-weight: 500;">
+                                            🖥️ ${db.type || 'database'}
+                                        </div>
+                                        <div style="font-family: monospace; font-size: 0.9em; color: #2196F3; margin: 3px 0;">
+                                            ${location}
+                                        </div>
+                                        <div style="font-family: monospace; font-size: 0.9em; color: #4CAF50; word-break: break-all;">
+                                            ${db.path}
+                                        </div>
+                                        <div style="font-size: 0.85em; color: #999; margin-top: 3px;">
+                                            Cluster: ${cluster} | Submitter: ${db.submitter_name || 'unknown'}
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>`;
+                            dbIndex++;
+                        }
+                    }
+                }
+
+                // URL databases (no credentials needed)
+                if (clusterData.url_databases && clusterData.url_databases.length > 0) {
+                    for (const db of clusterData.url_databases) {
+                        const dbId = `db_${dbIndex}`;
+                        html += `<div class="database-item">
+                            <label style="display: flex; align-items: start; cursor: pointer;">
+                                <input type="radio" name="database-selection" value="${dbIndex}"
+                                       data-location="${db.location}"
+                                       data-path="${db.path}"
+                                       data-type="url"
+                                       data-cluster="${cluster}"
+                                       onchange="updateReadCredentials()"
+                                       style="margin-top: 3px;">
+                                <div style="margin-left: 10px; flex: 1;">
+                                    <div style="font-weight: 500;">
+                                        🌐 URL database (no credentials needed)
+                                    </div>
+                                    <div style="font-family: monospace; font-size: 0.9em; color: #2196F3; margin: 3px 0;">
+                                        ${db.location}
+                                    </div>
+                                    <div style="font-family: monospace; font-size: 0.9em; color: #4CAF50; word-break: break-all;">
+                                        ${db.path}
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #999; margin-top: 3px;">
+                                        Cluster: ${cluster}
+                                    </div>
+                                </div>
+                            </label>
+                        </div>`;
+                        dbIndex++;
+                    }
+                }
+
+                // S3 databases (env credentials)
+                if (clusterData.s3_databases && clusterData.s3_databases.length > 0) {
+                    for (const db of clusterData.s3_databases) {
+                        const dbId = `db_${dbIndex}`;
+                        html += `<div class="database-item">
+                            <label style="display: flex; align-items: start; cursor: pointer;">
+                                <input type="radio" name="database-selection" value="${dbIndex}"
+                                       data-location="${db.location}"
+                                       data-path="${db.path}"
+                                       data-type="s3"
+                                       data-cluster="${cluster}"
+                                       onchange="updateReadCredentials()"
+                                       style="margin-top: 3px;">
+                                <div style="margin-left: 10px; flex: 1;">
+                                    <div style="font-weight: 500;">
+                                        ☁️ S3 database (uses AWS env credentials)
+                                    </div>
+                                    <div style="font-family: monospace; font-size: 0.9em; color: #2196F3; margin: 3px 0;">
+                                        ${db.location}
+                                    </div>
+                                    <div style="font-family: monospace; font-size: 0.9em; color: #4CAF50; word-break: break-all;">
+                                        ${db.path}
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #999; margin-top: 3px;">
+                                        Cluster: ${cluster}
+                                    </div>
+                                </div>
+                            </label>
+                        </div>`;
+                        dbIndex++;
+                    }
+                }
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+
+            // Show placeholder for credentials
+            credentialsContainer.innerHTML = `<div class="alert alert-info">
+                <strong>ℹ️ Select a database above</strong> to enter credentials
+            </div>`;
+        }
+
+        // Update credentials form based on selected database
+        function updateReadCredentials() {
+            const selected = document.querySelector('input[name="database-selection"]:checked');
+            const credentialsContainer = document.getElementById('read-credentials-container');
+
+            if (!credentialsContainer) return;
+
+            if (!selected) {
+                credentialsContainer.innerHTML = `<div class="alert alert-info">
+                    <strong>ℹ️ Select a database above</strong> to enter credentials
+                </div>`;
+                return;
+            }
+
+            const location = selected.dataset.location;
+            const path = selected.dataset.path;
+            const type = selected.dataset.type;
+            const cluster = selected.dataset.cluster;
+
+            let html = '';
+
+            if (type === 'hpc') {
+                // Check if this location needs jump host
+                const needsJumpHost = window.discoveryResults &&
+                                     window.discoveryResults.jump_host_map &&
+                                     window.discoveryResults.jump_host_map[location];
+
+                html = `<div class="credential-group">
+                    <h4 style="margin-top: 0;">🔐 Enter Credentials</h4>
+                    <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 15px;">
+                        <div style="font-size: 0.9em; color: #666;">Selected database:</div>
+                        <div style="font-family: monospace; font-size: 0.9em; color: #2196F3;">
+                            ${location}:${path}
+                        </div>
+                    </div>`;
+
+                // Jump host credentials if needed
+                if (needsJumpHost) {
+                    html += `
+                    <div style="background: #fff8e1; padding: 15px; border-left: 4px solid #ff9800; margin-bottom: 15px; border-radius: 4px;">
+                        <h4 style="color: #ff9800; margin: 0 0 10px 0;">🔐 Jump Host Required</h4>
+                        <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
+                            This database location requires jump host access (Kerberos tickets expire).
+                        </p>
+                        <div class="form-group">
+                            <label for="read-jump-host">Jump Host:</label>
+                            <input type="text" id="read-jump-host" placeholder="e.g., ro-rfe.lanl.gov"
+                                   value="${window.discoveryResults.jump_host || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="read-jump-username">Jump Host Username:</label>
+                            <input type="text" id="read-jump-username" placeholder="Your username on jump host"
+                                   value="${window.discoveryResults.jump_username || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="read-jump-password">Jump Host Password:</label>
+                            <input type="password" id="read-jump-password" placeholder="Jump host password">
+                        </div>
+                    </div>`;
+                }
+
+                html += `
+                    <div class="form-group">
+                        <label for="read-username">Username for ${location}:</label>
+                        <input type="text" id="read-username" placeholder="Username">
+                    </div>
+                    <div class="form-group">
+                        <label for="read-password">Password:</label>
+                        <input type="password" id="read-password" placeholder="Password">
+                        <small>Leave blank to use SSH keys / Kerberos</small>
+                    </div>
+                </div>`;
+            } else if (type === 'url') {
+                html = `<div class="alert alert-success">
+                    <strong>✓ No credentials needed</strong> for URL databases
+                    <div style="margin-top: 10px; font-family: monospace; font-size: 0.9em;">
+                        ${location}:${path}
+                    </div>
+                </div>`;
+            } else if (type === 's3') {
+                html = `<div class="alert alert-warning">
+                    <strong>⚠️ S3 Credentials</strong>
+                    <p>This database uses AWS credentials from your environment (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)</p>
+                    <div style="margin-top: 10px; font-family: monospace; font-size: 0.9em;">
+                        ${location}:${path}
+                    </div>
+                </div>`;
+            }
+
+            credentialsContainer.innerHTML = html;
+        }
+
+        // Step 3: Read Data Sources - Download single selected database
+        async function executeFederation() {
             const workspace = document.getElementById('workspace-folder').value;
             if (!workspace) {
                 alert('Please enter a workspace folder');
                 return;
             }
 
-            const button = document.getElementById('analyze-btn');
-            const spinner = document.getElementById('federate-spinner');
-            const result = document.getElementById('federate-result');
+            // Get selected database
+            const selected = document.querySelector('input[name="database-selection"]:checked');
+            if (!selected) {
+                alert('Please select a database to download');
+                return;
+            }
+
+            const location = selected.dataset.location;
+            const path = selected.dataset.path;
+            const type = selected.dataset.type;
+            const cluster = selected.dataset.cluster;
+
+            // Get credentials if HPC database
+            let username = '';
+            let password = '';
+            if (type === 'hpc') {
+                username = document.getElementById('read-username')?.value || '';
+                password = document.getElementById('read-password')?.value || '';
+
+                if (!username) {
+                    alert('Please enter a username for this HPC database');
+                    return;
+                }
+            }
+
+            // Check if jump host credentials are needed
+            const needsJumpHost = window.discoveryResults &&
+                                 window.discoveryResults.jump_host_map &&
+                                 window.discoveryResults.jump_host_map[location];
+
+            let jumpHostCreds = null;
+            if (needsJumpHost) {
+                const jumpHost = document.getElementById('read-jump-host')?.value || '';
+                const jumpUsername = document.getElementById('read-jump-username')?.value || '';
+                const jumpPassword = document.getElementById('read-jump-password')?.value || '';
+
+                if (!jumpHost || !jumpUsername || !jumpPassword) {
+                    alert('Please provide jump host credentials');
+                    return;
+                }
+
+                jumpHostCreds = { jumpHost, jumpUsername, jumpPassword };
+            }
+
+            const button = document.getElementById('read-btn');
+            const spinner = document.getElementById('read-spinner');
+            const result = document.getElementById('read-result');
 
             button.disabled = true;
             spinner.classList.remove('hidden');
             result.innerHTML = '';
 
-            try {
-                const response = await fetch('/api/analyze-endpoints', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: currentSessionId,
-                        endpoints_location: discoveredEndpoints
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    analysisResult = data;
-                    showCredentialForm(data);
-                } else {
-                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + data.message + '</div>';
-                }
-            } catch (error) {
-                result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + error.message + '</div>';
-            } finally {
-                button.disabled = false;
-                spinner.classList.add('hidden');
-            }
-        }
-
-        // Show credential collection form
-        function showCredentialForm(data) {
-            const summary = document.getElementById('analysis-summary');
-            summary.textContent = `Found ${data.totals.total} database(s): ${data.totals.hpc} HPC, ${data.totals.url} URL, ${data.totals.s3} S3`;
-
-            const container = document.getElementById('credential-form-container');
-            let html = '';
-
-            if (data.totals.hpc > 0) {
-                html += '<h3>HPC Credentials Required</h3>';
-                html += '<p style="color: #666; margin-bottom: 15px;">Provide credentials for each HPC location below:</p>';
-                html += '<div class="credential-section">';
-
-                for (const [cluster, clusterData] of Object.entries(data.databases_by_cluster)) {
-                    for (const [location, databases] of Object.entries(clusterData.hpc_by_location)) {
-                        html += `<div class="credential-group">
-                            <div class="credential-header">🖥️ ${location} (${databases.length} database(s))</div>
-                            <div class="form-group">
-                                <label for="username-${location}">Username:</label>
-                                <input type="text" id="username-${location}" placeholder="Username for ${location}">
-                            </div>
-                            <div class="form-group">
-                                <label for="password-${location}">Password:</label>
-                                <input type="password" id="password-${location}" placeholder="Password for ${location}">
-                                <small>Leave blank to use Kerberos authentication</small>
-                            </div>
-                            <details>
-                                <summary style="cursor: pointer; color: #667eea;">Show ${databases.length} database(s)</summary>
-                                <div class="db-list">`;
-
-                        for (const db of databases.slice(0, 10)) {
-                            html += `<div class="db-item">${db.path}</div>`;
-                        }
-                        if (databases.length > 10) {
-                            html += `<div class="db-item">... and ${databases.length - 10} more</div>`;
-                        }
-
-                        html += `</div></details></div>`;
-                    }
-                }
-
-                html += '</div>';
-            }
-
-            if (data.totals.url > 0) {
-                html += `<div class="alert alert-info" style="margin-top: 20px;">
-                    <strong>ℹ️ Note:</strong> ${data.totals.url} URL database(s) will be downloaded without credentials.
-                </div>`;
-            }
-
-            if (data.totals.s3 > 0) {
-                html += `<div class="alert alert-warning" style="margin-top: 20px;">
-                    <strong>⚠️ Note:</strong> ${data.totals.s3} S3 database(s) require AWS credentials configured in your environment.
-                </div>`;
-            }
-
-            container.innerHTML = html;
-
-            // Switch to phase 2
-            document.getElementById('federate-phase1').classList.add('hidden');
-            document.getElementById('federate-phase2').classList.remove('hidden');
-        }
-
-        // Phase 2: Execute federation
-        async function executeFederation() {
-            const button = document.getElementById('federate-btn');
-            const spinner = document.getElementById('federate-spinner');
-            const result = document.getElementById('federate-result');
-
-            button.disabled = true;
-            spinner.classList.remove('hidden');
-            result.innerHTML = '';
-
-            // Collect credentials
+            // Build credentials object for this single database
             const credentials = {};
-            if (analysisResult) {
-                for (const [cluster, clusterData] of Object.entries(analysisResult.databases_by_cluster)) {
-                    for (const location of Object.keys(clusterData.hpc_by_location)) {
-                        const username = document.getElementById(`username-${location}`)?.value || '';
-                        const password = document.getElementById(`password-${location}`)?.value || '';
-                        if (username || password) {
-                            credentials[location] = { username, password };
-                        }
-                    }
-                }
+            if (type === 'hpc') {
+                credentials[location] = { username, password };
             }
 
             try {
+                const requestBody = {
+                    session_id: currentSessionId,
+                    workspace_folder: workspace,
+                    credentials: credentials,
+                    selected_database: {
+                        location: location,
+                        path: path,
+                        type: type,
+                        cluster: cluster
+                    }
+                };
+
+                // Add jump host credentials if needed
+                if (jumpHostCreds) {
+                    requestBody.jump_host = jumpHostCreds.jumpHost;
+                    requestBody.jump_username = jumpHostCreds.jumpUsername;
+                    requestBody.jump_password = jumpHostCreds.jumpPassword;
+                }
+
                 const response = await fetch('/api/federate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: currentSessionId,
-                        endpoints_location: discoveredEndpoints,
-                        workspace_folder: document.getElementById('workspace-folder').value,
-                        credentials: credentials
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    const dbsByCluster = {};
-                    data.database_info.forEach(db => {
-                        const cluster = db.source_cluster || 'unknown';
-                        if (!dbsByCluster[cluster]) dbsByCluster[cluster] = [];
-                        dbsByCluster[cluster].push(db);
-                    });
+                    // Single database downloaded
+                    const db = data.database_info[0];
+
+                    // Add to downloaded list
+                    downloadedDatabases.push(db);
 
                     let successHTML = `<div class="alert alert-success">
-                        <strong>✓ Success!</strong> Successfully federated ${data.success_count} database(s) from ${data.clusters_processed} cluster(s)
+                        <strong>✓ Success!</strong> Downloaded database successfully (${downloadedDatabases.length} total)
                     </div>
-                    <div class="summary-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">${data.clusters_processed}</div>
-                            <div class="stat-label">Clusters Processed</div>
+                    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #4CAF50;">
+                        <div style="font-weight: 600; margin-bottom: 10px;">📦 ${db.name}</div>
+                        <div style="font-family: monospace; font-size: 0.9em; margin: 5px 0;">
+                            <strong>Original:</strong><br>
+                            <span style="color: #2196F3;">${db.original_location}</span>:<span style="color: #4CAF50;">${db.original_path}</span>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value">${data.success_count}</div>
-                            <div class="stat-label">Databases Federated</div>
+                        <div style="font-family: monospace; font-size: 0.9em; margin: 5px 0;">
+                            <strong>Local Path:</strong><br>
+                            <span style="color: #666;">${db.local_path}/${db.name}</span>
+                        </div>
+                        <div style="font-size: 0.85em; color: #999; margin-top: 10px;">
+                            Cluster: ${db.source_cluster} | Type: ${db.original_location_type}
                         </div>
                     </div>
-                    <div style="margin-top: 10px;"><strong>Workspace:</strong> ${data.workspace_folder}</div>`;
+                    <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
+                        <strong>➡️ Next:</strong> Select another database above to download more, or check <strong>"4. View Logs"</strong> for details.
+                    </div>`;
 
-                    successHTML += '<div class="endpoints-list" style="margin-top: 15px;">';
-                    for (const [cluster, dbs] of Object.entries(dbsByCluster)) {
-                        successHTML += `<div class="cluster-section">
-                            <div class="cluster-header">🖥️ ${cluster} (${dbs.length} database(s))</div>`;
-                        dbs.forEach(db => {
-                            successHTML += `<div class="endpoint-item">
-                                <strong>${db.name}</strong><br>
-                                <small>Original: ${db.original_path}</small><br>
-                                <small>Local: ${db.local_path}</small>
-                            </div>`;
-                        });
-                        successHTML += '</div>';
+                    // Mark downloaded database as completed (visually) and refresh display
+                    const downloadedRadio = document.querySelector(`input[name="database-selection"][data-location="${db.original_location}"][data-path="${db.original_path}"]`);
+                    if (downloadedRadio) {
+                        const dbItem = downloadedRadio.closest('.database-item');
+                        if (dbItem) {
+                            dbItem.style.background = '#e8f5e9';
+                            dbItem.style.borderColor = '#4CAF50';
+                            const label = dbItem.querySelector('label > div');
+                            if (label) {
+                                const badge = document.createElement('span');
+                                badge.style.cssText = 'background: #4CAF50; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-left: 10px;';
+                                badge.textContent = '✓ Downloaded';
+                                label.firstElementChild.appendChild(badge);
+                            }
+                        }
+                        // Uncheck the radio button
+                        downloadedRadio.checked = false;
                     }
-                    successHTML += '</div>';
+
+                    // Refresh the display to show updated downloaded list
+                    updateReadDatabaseDisplay();
+
+                    // Clear credentials form
+                    const credentialsContainer = document.getElementById('read-credentials-container');
+                    if (credentialsContainer) {
+                        credentialsContainer.innerHTML = `<div class="alert alert-info">
+                            <strong>ℹ️ Select another database above</strong> to continue downloading
+                        </div>`;
+                    }
 
                     result.innerHTML = successHTML;
                 } else {
-                    result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + data.message + '</div>';
+                    let errorHTML = `<div class="alert alert-error">
+                        <strong>✗ Error:</strong> ${data.message}
+                    </div>`;
+
+                    // Show details if available
+                    if (data.details) {
+                        errorHTML += `<details style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 3px;">
+                            <summary style="cursor: pointer; font-weight: 600;">Show Error Details</summary>
+                            <pre style="margin: 10px 0; font-size: 0.85em; white-space: pre-wrap; word-wrap: break-word;">${data.details}</pre>
+                        </details>`;
+                    }
+
+                    // Show suggestion for common errors
+                    if (data.message.includes('Permission denied')) {
+                        errorHTML += `<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 3px; border-left: 4px solid #ffc107;">
+                            <strong>💡 Suggestion:</strong> Check that:
+                            <ul style="margin: 5px 0 0 20px;">
+                                <li>Username is correct</li>
+                                <li>Password is correct (or SSH keys are set up)</li>
+                                <li>You have permission to access this file on the remote server</li>
+                            </ul>
+                        </div>`;
+                    }
+
+                    result.innerHTML = errorHTML;
                 }
             } catch (error) {
                 result.innerHTML = '<div class="alert alert-error"><strong>✗ Error:</strong> ' + error.message + '</div>';
@@ -926,21 +1961,22 @@
             }
         }
 
-        function backToPhase1() {
-            document.getElementById('federate-phase1').classList.remove('hidden');
-            document.getElementById('federate-phase2').classList.add('hidden');
-            document.getElementById('federate-result').innerHTML = '';
+        function backToPull() {
+            // Switch back to Pull Database tab (no event)
+            switchTab('pull', null);
         }
 
         function removeEndpoint(endpointName) {
             if (confirm(`Remove endpoint: ${endpointName}?`)) {
                 delete discoveredEndpoints[endpointName];
                 updateAccumulatedEndpoints();
-                updateFederateDisplay();
+                updatePullDisplay();
 
                 if (Object.keys(discoveredEndpoints).length === 0) {
-                    document.getElementById('federate-notice').classList.remove('hidden');
-                    document.getElementById('federate-phase1').classList.add('hidden');
+                    const pullNotice = document.getElementById('pull-notice');
+                    const pullForm = document.getElementById('pull-form-container');
+                    if (pullNotice) pullNotice.classList.remove('hidden');
+                    if (pullForm) pullForm.classList.add('hidden');
                 }
             }
         }
@@ -952,30 +1988,64 @@
                 );
                 toRemove.forEach(name => delete discoveredEndpoints[name]);
                 updateAccumulatedEndpoints();
-                updateFederateDisplay();
+                updatePullDisplay();
 
                 if (Object.keys(discoveredEndpoints).length === 0) {
-                    document.getElementById('federate-notice').classList.remove('hidden');
-                    document.getElementById('federate-phase1').classList.add('hidden');
+                    const pullNotice = document.getElementById('pull-notice');
+                    const pullForm = document.getElementById('pull-form-container');
+                    if (pullNotice) pullNotice.classList.remove('hidden');
+                    if (pullForm) pullForm.classList.add('hidden');
                 }
             }
         }
 
         function clearAllEndpoints() {
-            if (confirm('Remove all accumulated endpoints?')) {
+            if (confirm('Remove all accumulated endpoints, pull results, and downloaded databases?')) {
                 discoveredEndpoints = {};
                 discoveryHistory = [];
+                accumulatedPullResults = [];
+                downloadedDatabases = [];
+                analysisResult = null;
                 updateAccumulatedEndpoints();
-                document.getElementById('federate-notice').classList.remove('hidden');
-                document.getElementById('federate-phase1').classList.add('hidden');
-                document.getElementById('discover-result').innerHTML = '';
+
+                // Clear Step 2 and 3
+                const pullNotice = document.getElementById('pull-notice');
+                const pullForm = document.getElementById('pull-form-container');
+                const pullResult = document.getElementById('pull-result');
+                if (pullNotice) pullNotice.classList.remove('hidden');
+                if (pullForm) pullForm.classList.add('hidden');
+                if (pullResult) pullResult.innerHTML = '';
+
+                const readNotice = document.getElementById('read-notice');
+                const readForm = document.getElementById('read-form-container');
+                const readResult = document.getElementById('read-result');
+                if (readNotice) readNotice.classList.remove('hidden');
+                if (readForm) readForm.classList.add('hidden');
+                if (readResult) readResult.innerHTML = '';
+
+                const discoverResult = document.getElementById('discover-result');
+                if (discoverResult) discoverResult.innerHTML = '';
+            }
+        }
+
+        function toggleJumpHostFields() {
+            const hpcType = document.getElementById('hpc-type').value;
+            const jumpFields = document.getElementById('jump-host-fields');
+
+            if (jumpFields) {
+                if (hpcType === 'kerberos') {
+                    jumpFields.style.display = 'block';
+                } else {
+                    jumpFields.style.display = 'none';
+                }
             }
         }
 
         function clearForm() {
             document.getElementById('discover-form').reset();
-            document.getElementById('hpc-names').value = '';
+            document.getElementById('hpc-name').value = '';
             document.getElementById('discover-result').innerHTML = '';
+            toggleJumpHostFields();
         }
 
         // Log viewer
@@ -1013,8 +2083,10 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    document.getElementById('log-content').classList.remove('hidden');
-                    document.getElementById('log-viewer').textContent = data.content;
+                    const logContent = document.getElementById('log-content');
+                    const logViewer = document.getElementById('log-viewer');
+                    if (logContent) logContent.classList.remove('hidden');
+                    if (logViewer) logViewer.textContent = data.content;
                 }
             } catch (error) {
                 console.error('Error loading log content:', error);
