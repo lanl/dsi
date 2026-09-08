@@ -36,15 +36,21 @@ logger = logging.getLogger(__name__)
 
 
 async def get_file_size_and_download(
-    hostname, 
-    username, 
+    hostname,
+    username,
     password=None,
     private_key_path=None,
     remote_path=None,
-    local_folder=None
+    local_folder=None,
+    jump_host=None,
+    jump_username=None,
+    jump_password=None,
+    jump_host_required=False
 ):
     """Get file size and download using a single SSH connection.
-    
+
+    Now supports jump host for Kerberos authentication.
+
     Args:
         hostname: SSH server hostname
         username: SSH username
@@ -52,7 +58,11 @@ async def get_file_size_and_download(
         private_key_path: Path to private key file (optional, for key auth)
         remote_path: Path to file on remote server
         local_folder: Folder to save to (default: current directory)
-    
+        jump_host: Jump host hostname (optional, for Kerberos)
+        jump_username: Username on jump host (optional)
+        jump_password: Password for jump host (optional)
+        jump_host_required: Whether jump host is required for this hostname
+
     Returns:
         int: filesize in bytes, success boolean
 
@@ -62,54 +72,84 @@ async def get_file_size_and_download(
         Exception: For any other errors during download
     """
     print(f"hostname {hostname}, username: {username}, len(password): {len(password) if password else 0}, remote_path: {remote_path}")
-    
+
     # Get the filename from remote path
     filename = os.path.basename(remote_path)
-    
+
     # Set default folder to current directory
     if local_folder is None:
         local_folder = "."
-    
+
     # Create the full local path
     local_path = os.path.join(local_folder, filename)
-    
+
     # Create folder if it doesn't exist
     os.makedirs(local_folder, exist_ok=True)
-    
-    # Prepare connection options
-    connect_options = {
-        'host': hostname,
-        'username': username,
-        'known_hosts': None,
-        'connect_timeout': 30,
-        'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
-    }
-    
-    # Add authentication method
-    if password:
-        connect_options['password'] = password
-    elif private_key_path:
-        connect_options['client_keys'] = [private_key_path]
-    # If neither is provided, it will try SSH agent or default keys
-    
+
     try:
-        # Single async connection for both operations
-        async with asyncssh.connect(**connect_options) as conn:
-            
-            # Open SFTP session
-            async with conn.start_sftp_client() as sftp:
-                
+        # Check if jump host is required
+        use_jump_host = jump_host_required and jump_host
+
+        if use_jump_host:
+            # Use jump host connection from federated module
+            from dsi.utils.federated import download_database_file_async
+
+            print(f"Using jump host {jump_host} to download from {hostname}")
+            result = await download_database_file_async(
+                hostname=hostname,
+                remote_path=remote_path,
+                local_folder=local_folder,
+                username=username,
+                password=password,
+                jump_host=jump_host,
+                jump_username=jump_username,
+                jump_password=jump_password,
+                jump_host_required=True,
+                logger=logging.getLogger(__name__)
+            )
+
+            if result:
                 # Get file size
-                file_stat = await sftp.stat(remote_path)
-                file_size = file_stat.size
+                file_size = os.path.getsize(result)
                 print(f"File size: {file_size} bytes")
-                
-                # Download the file using the same connection
-                print(f"Downloading to {local_path}...")
-                await sftp.get(remote_path, local_path)
-                print(f"Success!!!")
-                
                 return file_size
+            else:
+                raise Exception(f"Failed to download via jump host")
+        else:
+            # Direct connection (original behavior)
+            # Prepare connection options
+            connect_options = {
+                'host': hostname,
+                'username': username,
+                'known_hosts': None,
+                'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
+            }
+
+            # Add authentication method
+            if password:
+                connect_options['password'] = password
+            elif private_key_path:
+                connect_options['client_keys'] = [private_key_path]
+            # If neither is provided, it will try SSH agent or default keys
+
+            # Single async connection for both operations
+            async with asyncssh.connect(**connect_options) as conn:
+
+                # Open SFTP session
+                async with conn.start_sftp_client() as sftp:
+
+                    # Get file size
+                    file_stat = await sftp.stat(remote_path)
+                    file_size = file_stat.size
+                    print(f"File size: {file_size} bytes")
+
+                    # Download the file using the same connection
+                    print(f"Downloading to {local_path}...")
+                    await sftp.get(remote_path, local_path)
+                    print(f"Success!!!")
+
+                    return file_size
         
     except asyncssh.PermissionDenied as e:
         # If no password was provided and authentication failed, prompt for password
@@ -259,90 +299,106 @@ def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[
 
 
 
-def get_remote_endpoints_ssh(hostname: str, 
+def get_remote_endpoints_ssh(hostname: str,
                              username: str,
                              hpc_type: str = "hpc",
+                             password: str = None,
                              script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
                              prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'],
+                             jump_host: str = None,
+                             jump_username: str = None,
+                             jump_password: str = None,
                              verbose: bool = False) -> dict:
     """ Source bash script on remote server and retrieve environment variables matching specified prefixes.
-    
+
+    Now supports jump host and password authentication via the federated discovery module.
+
     Args:
         hostname: Remote server hostname or IP address.
-        username: SSH username for authentication.
+        username: SSH username for authentication on target HPC.
+        hpc_type: Type of HPC authentication ('hpc', 'kerberos'). Default: 'hpc'
+        password: Password for direct SSH authentication (optional).
         script_path: Path to bash script on remote server that sets endpoint variables.
                     Default: '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
         prefixes: List of environment variable prefixes to match (e.g., 'DSI_ENDPOINT_').
                  Default: ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']
-    
+        jump_host: Jump host hostname for Kerberos authentication (optional).
+        jump_username: Username on jump host (optional).
+        jump_password: Password for jump host (optional).
+        verbose: Print detailed progress information. Default: False
+
     Returns:
         dict: Dictionary mapping endpoint variable names to their values.
               Returns empty dict if connection fails or no endpoints found.
-    
+
+    Examples:
+        # Direct SSH with Kerberos (old behavior - still works)
+        endpoints = get_remote_endpoints_ssh(
+            hostname='darwin-fe.lanl.gov',
+            username='pascalgrosset',
+            script_path='/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
+        )
+
+        # Direct SSH with password
+        endpoints = get_remote_endpoints_ssh(
+            hostname='darwin-fe.lanl.gov',
+            username='pascalgrosset',
+            password='mypassword',
+            script_path='/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
+        )
+
+        # Via jump host with Kerberos (NEW!)
+        endpoints = get_remote_endpoints_ssh(
+            hostname='tuolumne.llnl.gov',
+            username='grosset2',
+            hpc_type='kerberos',
+            script_path='/g/g92/grosset2/dsi_test/load_dsi_endpoints.sh',
+            jump_host='ro-rfe.lanl.gov',
+            jump_username='pascalgrosset',
+            jump_password='jumphost_password'
+        )
+
     Note:
-        Uses system SSH with Kerberos authentication. Ensure you have a valid Kerberos ticket
-        (run 'klist' to check, 'reticket' to obtain).
+        This function now uses dsi.utils.federated.discover_endpoints_async internally,
+        which provides enhanced authentication options including jump host support.
     """
-    # Convert prefixes list to a format safe for bash
-    prefixes_str = ','.join(f'"{p}"' for p in prefixes)
-    
-    # Use heredoc to avoid quote escaping issues
-    command = f"""
-source {script_path} && python3 << 'PYTHON_EOF'
-import os
-import json
+    from dsi.utils.federated import discover_endpoints_async
 
-# The prefixes we're looking for
-prefixes = [{prefixes_str}]
-prefix_tuple = tuple(prefixes)
-
-# Get matching environment variables
-endpoints = {{
-    key: value 
-    for key, value in os.environ.items() 
-    if key.startswith(prefix_tuple)
-}}
-
-# Output as JSON so we can parse it easily
-print(json.dumps(endpoints))
-PYTHON_EOF
-"""
+    # Setup simple logger if verbose
+    logger = None
+    if verbose:
+        logger = logging.getLogger(__name__)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
 
     print(f"\nGetting remote endpoints")
     print(f"Connecting to {hostname} as {username} ...")
-    
+    if jump_host:
+        print(f"  via jump host: {jump_host}")
+
     try:
-        result = subprocess.run(
-            ['ssh', f'{username}@{hostname}', command],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        
-        if result.returncode != 0:
-            if verbose:
-                print(f"Command failed: {result.stderr.strip()}")
-            return {}
-        
-        endpoints = json.loads(result.stdout.strip())
-        
+        # Call the new federated discovery function
+        endpoints = asyncio.run(discover_endpoints_async(
+            hostname=hostname,
+            username=username,
+            script_path=script_path,
+            prefixes=prefixes,
+            password=password,
+            hpc_type=hpc_type,
+            jump_host=jump_host,
+            jump_username=jump_username,
+            jump_password=jump_password,
+            logger=logger
+        ))
+
         if verbose:
             print(f"Found {len(endpoints)} endpoints on {hostname}")
-        
+
         return endpoints
-        
-    except subprocess.TimeoutExpired:
-        if verbose:
-            print(f"Connection to {hostname} timed out")
-        return {}
-    except json.JSONDecodeError:
-        if verbose:
-            print(f"Failed to parse endpoint data")
-        return {}
-    except FileNotFoundError:
-        if verbose:
-            print(f"SSH client not found")
-        return {}
+
     except Exception as e:
         if verbose:
             print(f"Error: {e}")
@@ -402,16 +458,22 @@ def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folde
 # Get data
 #
 
-def pull_data(location_type: str, 
-              remote_location: str, 
-              remote_path: str, 
-              download_location: str, 
+def pull_data(location_type: str,
+              remote_location: str,
+              remote_path: str,
+              download_location: str,
               username: str,
               password: str = "",
-              download_limit: int = 10485760) -> str:
-    """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
-    The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
+              download_limit: int = 10485760,
+              jump_host: str = None,
+              jump_username: str = None,
+              jump_password: str = None,
+              jump_host_required: bool = False) -> str:
+    """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local").
+    The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
+
+    Now supports jump host authentication for HPC systems requiring Kerberos via jump host.
 
     Args:
         location_type (str): The type of the original location (e.g., "github", "HPC", "HPC-kerberos", "URL", "local").
@@ -421,6 +483,10 @@ def pull_data(location_type: str,
         username (str): username for hpc systems
         password (str): optional
         download_limit (int): The maximum size of a file that can be downloaded without confirmation, if 0 no limit
+        jump_host (str): Jump host hostname for Kerberos authentication (optional)
+        jump_username (str): Username on jump host (optional)
+        jump_password (str): Password for jump host (optional)
+        jump_host_required (bool): Whether jump host is required for this remote_location
     Returns:
         str: filepath"""
 
@@ -517,7 +583,11 @@ def pull_data(location_type: str,
                 username=username,
                 password=password,
                 remote_path=remote_path,
-                local_folder=download_location
+                local_folder=download_location,
+                jump_host=jump_host,
+                jump_username=jump_username,
+                jump_password=jump_password,
+                jump_host_required=jump_host_required
             ))
             
             if filesize is None:

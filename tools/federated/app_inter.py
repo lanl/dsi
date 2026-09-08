@@ -30,6 +30,13 @@ from dsi.utils.acquisition.utils import (
     upsert_records,
 )
 
+# Import federated utilities (core reusable functions)
+from dsi.utils.federated import (
+    discover_endpoints_async,
+    download_csv_files_async,
+    download_database_file_async,
+)
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
 
@@ -118,107 +125,19 @@ def discover_endpoints():
             try:
                 logger.info(f"Discovering endpoints from {hpc_name}")
 
-                # Use asyncssh for discovery
-                async def discover_with_asyncssh():
-                    # Build command to run on remote server
-                    prefixes_str = ','.join(f'"{p}"' for p in prefixes)
-                    remote_cmd = f"""
-source {script_path} && python3 << 'PYTHON_EOF'
-import os
-import json
-prefixes = [{prefixes_str}]
-prefix_tuple = tuple(prefixes)
-endpoints = {{k: v for k, v in os.environ.items() if k.startswith(prefix_tuple)}}
-print(json.dumps(endpoints))
-PYTHON_EOF
-"""
-
-                    try:
-                        if hpc_type == 'kerberos' and jump_host:
-                            # Connect via jump host with Kerberos pattern:
-                            # 1. SSH to jump host with username/password
-                            # 2. Run reticket on jump host
-                            # 3. SSH from jump host to HPC using Kerberos
-                            logger.info(f"Connecting via jump host {jump_host}")
-
-                            # Connect to jump host first
-                            jump_options = {
-                                'host': jump_host,
-                                'username': jump_username,
-                                'known_hosts': None,
-                                'connect_timeout': 30,
-                            }
-                            if jump_password:
-                                jump_options['password'] = jump_password
-
-                            async with asyncssh.connect(**jump_options) as jump_conn:
-                                # Run reticket on jump host to get Kerberos tickets
-                                logger.info(f"Running reticket on jump host")
-                                reticket_cmd = "reticket"
-                                reticket_result = await jump_conn.run(reticket_cmd, check=False)
-                                logger.info(f"reticket output: {reticket_result.stdout}")
-
-                                if reticket_result.stderr:
-                                    logger.info(f"reticket stderr: {reticket_result.stderr}")
-
-                                if reticket_result.exit_status != 0:
-                                    logger.warning(f"reticket failed with exit code: {reticket_result.exit_status}")
-
-                                # Check Kerberos tickets
-                                logger.info(f"Checking Kerberos tickets with klist")
-                                klist_result = await jump_conn.run("klist", check=False)
-                                logger.info(f"klist output: {klist_result.stdout}")
-
-                                # Try to connect to final HPC from jump host using Kerberos
-                                logger.info(f"Connecting to {hpc_name} from jump host as {username}")
-
-                                # Method 1: Try using connect_ssh with GSSAPI
-                                try:
-                                    logger.info(f"Method 1: Using connect_ssh with gss_auth=True")
-                                    async with jump_conn.connect_ssh(
-                                        hpc_name,
-                                        username=username,
-                                        known_hosts=None,
-                                        gss_auth=True,  # Use Kerberos/GSSAPI
-                                        gss_delegate_creds=True  # Forward Kerberos credentials
-                                    ) as final_conn:
-                                        result = await final_conn.run(remote_cmd, check=True)
-                                        logger.info("Method 1 succeeded!")
-                                        return json.loads(result.stdout.strip())
-                                except Exception as e:
-                                    logger.warning(f"Method 1 failed: {str(e)}")
-
-                                    # Method 2: Run SSH command directly on jump host (mirrors manual workflow)
-                                    # This is what works manually: ssh grosset2@tuolumne.llnl.gov 'command'
-                                    logger.info(f"Method 2: Running SSH command directly on jump host")
-                                    try:
-                                        ssh_cmd = f"ssh -o StrictHostKeyChecking=no {username}@{hpc_name} '{remote_cmd}'"
-                                        logger.info(f"Running: ssh -o StrictHostKeyChecking=no {username}@{hpc_name} '<python command>'")
-                                        result = await jump_conn.run(ssh_cmd, check=True)
-                                        logger.info("Method 2 succeeded!")
-                                        return json.loads(result.stdout.strip())
-                                    except Exception as e2:
-                                        logger.error(f"Method 2 also failed: {str(e2)}")
-                                        raise Exception(f"Both connection methods failed. Method 1: {e}, Method 2: {e2}")
-                        else:
-                            # Direct SSH connection
-                            connect_options = {
-                                'host': hpc_name,
-                                'username': username,
-                                'known_hosts': None,
-                                'connect_timeout': 30,
-                            }
-                            if password:
-                                connect_options['password'] = password
-
-                            async with asyncssh.connect(**connect_options) as conn:
-                                result = await conn.run(remote_cmd, check=True)
-                                return json.loads(result.stdout.strip())
-                    except Exception as e:
-                        logger.error(f"SSH error: {str(e)}")
-                        return {}
-
-                endpoints_location = asyncio.run(discover_with_asyncssh())
+                # Use core discover_endpoints_async function
+                endpoints_location = asyncio.run(discover_endpoints_async(
+                    hostname=hpc_name,
+                    username=username,
+                    script_path=script_path,
+                    prefixes=prefixes,
+                    password=password,
+                    hpc_type=hpc_type,
+                    jump_host=jump_host,
+                    jump_username=jump_username,
+                    jump_password=jump_password,
+                    logger=logger
+                ))
 
                 if endpoints_location:
                     # Mark this hostname as requiring jump host if we used one
@@ -287,304 +206,65 @@ PYTHON_EOF
         }), 500
 
 
-async def download_csv_files_asyncssh(hostname, csv_paths, temp_folder, username, password, logger, session_creds=None):
-    """
-    Download CSV files from remote HPC using asyncssh
-    Returns list of local file paths
-    Supports jump host if session_creds contains jump host info
-    """
-    downloaded_files = []
-
-    try:
-        # Check if we need to use jump host for THIS specific hostname
-        jump_host_required_map = session_creds.get('jump_host_required', {}) if session_creds else {}
-
-        # Debug logging
-        logger.info(f"Download check for hostname: {hostname}")
-        logger.info(f"Jump host required map: {jump_host_required_map}")
-        logger.info(f"Jump host available: {session_creds.get('jump_host') if session_creds else None}")
-
-        use_jump_host = (session_creds and
-                        session_creds.get('jump_host') and
-                        jump_host_required_map.get(hostname, False))
-
-        if use_jump_host:
-            logger.info(f"✓ Hostname {hostname} requires jump host (marked during discovery)")
-            jump_host = session_creds['jump_host']
-            jump_username = session_creds['jump_username']
-            jump_password = session_creds.get('jump_password')
-
-            logger.info(f"Using jump host {jump_host} to reach {hostname}")
-
-            # Connect to jump host
-            jump_options = {
-                'host': jump_host,
-                'username': jump_username,
-                'known_hosts': None,
-                'connect_timeout': 30,
-            }
-            if jump_password:
-                jump_options['password'] = jump_password
-
-            async with asyncssh.connect(**jump_options) as jump_conn:
-                # Run reticket on jump host to get Kerberos tickets
-                logger.info(f"Running reticket on jump host")
-                reticket_cmd = "reticket"
-                reticket_result = await jump_conn.run(reticket_cmd, check=False)
-                logger.info(f"reticket output: {reticket_result.stdout}")
-
-                if reticket_result.stderr:
-                    logger.info(f"reticket stderr: {reticket_result.stderr}")
-
-                if reticket_result.exit_status != 0:
-                    logger.warning(f"reticket failed with exit code: {reticket_result.exit_status}")
-
-                # Check Kerberos tickets
-                logger.info(f"Checking Kerberos tickets with klist")
-                klist_result = await jump_conn.run("klist", check=False)
-                logger.info(f"klist output: {klist_result.stdout}")
-
-                # Connect to final host from jump host using Kerberos
-                logger.info(f"Connecting to {hostname} from jump host as {username}")
-
-                # Method 1: Try using connect_ssh with GSSAPI
-                download_success = False
-                try:
-                    logger.info(f"Method 1: Using connect_ssh with gss_auth=True")
-                    async with jump_conn.connect_ssh(
-                        hostname,
-                        username=username,
-                        known_hosts=None,
-                        gss_auth=True,
-                        gss_delegate_creds=True  # Forward Kerberos credentials
-                    ) as conn:
-                        async with conn.start_sftp_client() as sftp:
-                            for csv_name, csv_path in csv_paths.items():
-                                try:
-                                    local_filename = f"{hostname}_{csv_name}.csv"
-                                    local_path = Path(temp_folder) / local_filename
-                                    logger.info(f"Downloading {hostname}:{csv_path}")
-                                    await sftp.get(csv_path, str(local_path))
-
-                                    if local_path.exists():
-                                        downloaded_files.append(str(local_path))
-                                        logger.info(f"Successfully downloaded {local_filename}")
-                                    else:
-                                        logger.error(f"File not found after download: {local_filename}")
-                                except Exception as e:
-                                    logger.error(f"Error downloading {csv_path}: {str(e)}")
-                                    continue
-                    download_success = True
-                    logger.info("Method 1 succeeded!")
-                except Exception as e:
-                    logger.warning(f"Method 1 failed: {str(e)}")
-
-                    # Method 2: Use SCP command on jump host (mirrors manual workflow)
-                    logger.info(f"Method 2: Using SCP command directly on jump host")
-                    try:
-                        for csv_name, csv_path in csv_paths.items():
-                            try:
-                                local_filename = f"{hostname}_{csv_name}.csv"
-                                local_path = Path(temp_folder) / local_filename
-
-                                # Create a temp file on jump host, then download it
-                                jump_temp_file = f"/tmp/{local_filename}"
-                                scp_cmd = f"scp -o StrictHostKeyChecking=no {username}@{hostname}:{csv_path} {jump_temp_file}"
-                                logger.info(f"Running: scp {username}@{hostname}:{csv_path} {jump_temp_file}")
-
-                                result = await jump_conn.run(scp_cmd, check=True)
-                                logger.info(f"SCP completed, downloading from jump host")
-
-                                # Download from jump host to local
-                                async with jump_conn.start_sftp_client() as sftp:
-                                    await sftp.get(jump_temp_file, str(local_path))
-
-                                # Clean up temp file on jump host
-                                await jump_conn.run(f"rm {jump_temp_file}", check=False)
-
-                                if local_path.exists():
-                                    downloaded_files.append(str(local_path))
-                                    logger.info(f"Successfully downloaded {local_filename}")
-                                else:
-                                    logger.error(f"File not found after download: {local_filename}")
-                            except Exception as e2:
-                                logger.error(f"Error downloading {csv_path} with SCP: {str(e2)}")
-                                continue
-                        download_success = True
-                        logger.info("Method 2 succeeded!")
-                    except Exception as e3:
-                        logger.error(f"Method 2 also failed: {str(e3)}")
-                        raise Exception(f"Both download methods failed. Method 1: {e}, Method 2: {e3}")
-        else:
-            # Direct connection
-            connect_options = {
-                'host': hostname,
-                'username': username,
-                'known_hosts': None,
-                'connect_timeout': 30,
-            }
-            if password:
-                connect_options['password'] = password
-
-            async with asyncssh.connect(**connect_options) as conn:
-                async with conn.start_sftp_client() as sftp:
-                    for csv_name, csv_path in csv_paths.items():
-                        try:
-                            local_filename = f"{hostname}_{csv_name}.csv"
-                            local_path = Path(temp_folder) / local_filename
-
-                            logger.info(f"Downloading {hostname}:{csv_path}")
-
-                            # Download file via SFTP
-                            await sftp.get(csv_path, str(local_path))
-
-                            if local_path.exists():
-                                downloaded_files.append(str(local_path))
-                                logger.info(f"Successfully downloaded {local_filename}")
-                            else:
-                                logger.error(f"File not found after download: {local_filename}")
-
-                        except Exception as e:
-                            logger.error(f"Error downloading {csv_path}: {str(e)}")
-                            continue
-
-    except asyncssh.Error as e:
-        logger.error(f"SSH connection error to {hostname}: {str(e)}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-
-    return downloaded_files
-
-
 def download_csv_files_ssh(hostname, csv_paths, temp_folder, username, password, logger, session_creds=None):
     """
-    Synchronous wrapper for download_csv_files_asyncssh
+    Wrapper around core download_csv_files_async function.
+    Extracts jump host info from session_creds and calls the core function.
     """
-    return asyncio.run(download_csv_files_asyncssh(hostname, csv_paths, temp_folder, username, password, logger, session_creds))
+    # Extract jump host info from session credentials
+    jump_host_required_map = session_creds.get('jump_host_required', {}) if session_creds else {}
+    jump_host_required = jump_host_required_map.get(hostname, False)
 
+    jump_host = session_creds.get('jump_host') if session_creds else None
+    jump_username = session_creds.get('jump_username') if session_creds else None
+    jump_password = session_creds.get('jump_password') if session_creds else None
 
-async def download_database_file_asyncssh(hostname, remote_path, local_folder, username, password, logger, session_creds=None):
-    """
-    Download a database file from remote HPC using asyncssh with jump host support
-    Similar to DSI's get_file_size_and_download but with jump host capability
+    # Debug logging
+    logger.info(f"Download check for hostname: {hostname}")
+    logger.info(f"Jump host required map: {jump_host_required_map}")
+    logger.info(f"Jump host available: {jump_host}")
 
-    Returns: local file path if successful, None otherwise
-    """
-    filename = os.path.basename(remote_path)
-    local_path = Path(local_folder) / filename
-
-    try:
-        # Check if this hostname needs jump host
-        jump_host_required_map = session_creds.get('jump_host_required', {}) if session_creds else {}
-        use_jump_host = (session_creds and
-                        session_creds.get('jump_host') and
-                        jump_host_required_map.get(hostname, False))
-
-        if use_jump_host:
-            jump_host = session_creds['jump_host']
-            jump_username = session_creds['jump_username']
-            jump_password = session_creds.get('jump_password')
-
-            logger.info(f"Using jump host {jump_host} to download from {hostname}")
-
-            # Connect to jump host
-            jump_options = {
-                'host': jump_host,
-                'username': jump_username,
-                'known_hosts': None,
-                'connect_timeout': 30,
-            }
-            if jump_password:
-                jump_options['password'] = jump_password
-
-            async with asyncssh.connect(**jump_options) as jump_conn:
-                # Run reticket
-                logger.info(f"Running reticket on jump host")
-                await jump_conn.run("reticket", check=False)
-
-                # Method 1: Try with asyncssh's connect_ssh
-                try:
-                    logger.info(f"Method 1: Direct SFTP via jump host")
-                    async with jump_conn.connect_ssh(
-                        hostname,
-                        username=username,
-                        known_hosts=None,
-                        gss_auth=True,
-                        gss_delegate_creds=True
-                    ) as conn:
-                        async with conn.start_sftp_client() as sftp:
-                            logger.info(f"Downloading {hostname}:{remote_path} to {local_path}")
-                            await sftp.get(remote_path, str(local_path))
-
-                            if local_path.exists():
-                                logger.info(f"Successfully downloaded {filename}")
-                                return str(local_path)
-                            else:
-                                logger.error(f"File not found after download: {filename}")
-                                return None
-                except Exception as e:
-                    logger.warning(f"Method 1 failed: {str(e)}")
-
-                    # Method 2: Use SCP command on jump host
-                    logger.info(f"Method 2: SCP via jump host")
-                    try:
-                        jump_temp_file = f"/tmp/{filename}"
-                        scp_cmd = f"scp -o StrictHostKeyChecking=no {username}@{hostname}:{remote_path} {jump_temp_file}"
-                        logger.info(f"Running SCP on jump host")
-
-                        result = await jump_conn.run(scp_cmd, check=True)
-                        logger.info(f"SCP completed, downloading from jump host")
-
-                        # Download from jump host to local
-                        async with jump_conn.start_sftp_client() as sftp:
-                            await sftp.get(jump_temp_file, str(local_path))
-
-                        # Clean up temp file on jump host
-                        await jump_conn.run(f"rm {jump_temp_file}", check=False)
-
-                        if local_path.exists():
-                            logger.info(f"Successfully downloaded {filename}")
-                            return str(local_path)
-                        else:
-                            logger.error(f"File not found after download: {filename}")
-                            return None
-                    except Exception as e2:
-                        logger.error(f"Method 2 also failed: {str(e2)}")
-                        return None
-        else:
-            # Direct SSH connection (no jump host)
-            logger.info(f"Direct SSH to {hostname}")
-            connect_options = {
-                'host': hostname,
-                'username': username,
-                'known_hosts': None,
-                'connect_timeout': 30,
-            }
-            if password:
-                connect_options['password'] = password
-
-            async with asyncssh.connect(**connect_options) as conn:
-                async with conn.start_sftp_client() as sftp:
-                    logger.info(f"Downloading {hostname}:{remote_path} to {local_path}")
-                    await sftp.get(remote_path, str(local_path))
-
-                    if local_path.exists():
-                        logger.info(f"Successfully downloaded {filename}")
-                        return str(local_path)
-                    else:
-                        logger.error(f"File not found after download: {filename}")
-                        return None
-
-    except Exception as e:
-        logger.error(f"Error downloading {remote_path}: {str(e)}")
-        return None
+    # Call the core download function
+    return asyncio.run(download_csv_files_async(
+        hostname=hostname,
+        csv_paths=csv_paths,
+        temp_folder=temp_folder,
+        username=username,
+        password=password,
+        jump_host=jump_host,
+        jump_username=jump_username,
+        jump_password=jump_password,
+        jump_host_required=jump_host_required,
+        logger=logger
+    ))
 
 
 def download_database_file_ssh(hostname, remote_path, local_folder, username, password, logger, session_creds=None):
     """
-    Synchronous wrapper for download_database_file_asyncssh
+    Wrapper around core download_database_file_async function.
+    Extracts jump host info from session_creds and calls the core function.
     """
-    return asyncio.run(download_database_file_asyncssh(hostname, remote_path, local_folder, username, password, logger, session_creds))
+    # Extract jump host info from session credentials
+    jump_host_required_map = session_creds.get('jump_host_required', {}) if session_creds else {}
+    jump_host_required = jump_host_required_map.get(hostname, False)
+
+    jump_host = session_creds.get('jump_host') if session_creds else None
+    jump_username = session_creds.get('jump_username') if session_creds else None
+    jump_password = session_creds.get('jump_password') if session_creds else None
+
+    # Call the core download function
+    return asyncio.run(download_database_file_async(
+        hostname=hostname,
+        remote_path=remote_path,
+        local_folder=local_folder,
+        username=username,
+        password=password,
+        jump_host=jump_host,
+        jump_username=jump_username,
+        jump_password=jump_password,
+        jump_host_required=jump_host_required,
+        logger=logger
+    ))
 
 
 @app.route('/api/analyze-endpoints', methods=['POST'])
@@ -687,9 +367,38 @@ def analyze_endpoints():
                         else:
                             logger.info(f"Direct SSH to {cluster_name} (no jump host needed)")
 
-                        files = download_csv_files_ssh(cluster_name, single_ep, temp_db_storage,
-                                                       username, password, logger, session_data)
-                        downloaded_files.extend(files)
+                        # Use pull_data() for each CSV file (unified with CLI path!)
+                        jump_required = session_data.get('jump_host_required', {}).get(cluster_name, False)
+
+                        for endpoint_name, csv_path in single_ep.items():
+                            logger.info(f"Downloading CSV: {endpoint_name} from {csv_path}")
+                            try:
+                                downloaded_file = pull_data(
+                                    location_type='hpc',
+                                    remote_location=cluster_name,
+                                    remote_path=csv_path,
+                                    download_location=temp_db_storage,
+                                    username=username,
+                                    password=password,
+                                    jump_host=session_data.get('jump_host'),
+                                    jump_username=session_data.get('jump_username'),
+                                    jump_password=session_data.get('jump_password'),
+                                    jump_host_required=jump_required
+                                )
+
+                                if downloaded_file:
+                                    # Rename to match expected format: hostname_endpointname.csv
+                                    folder, filename = split_path(downloaded_file)
+                                    new_filename = f"{cluster_name}_{endpoint_name}.csv"
+                                    new_path = str(Path(folder) / new_filename)
+
+                                    import shutil
+                                    shutil.move(downloaded_file, new_path)
+                                    downloaded_files.append(new_path)
+                                    logger.info(f"✓ Downloaded and renamed to: {new_filename}")
+                            except Exception as e:
+                                logger.error(f"Failed to download {endpoint_name}: {e}")
+                                continue
 
                     if not downloaded_files:
                         logger.warning(f"No CSV files downloaded from {cluster_name}")
@@ -878,29 +587,21 @@ def federate_data():
                 logger.info(f"Downloading {location}:{path}")
                 print(f"\nDownloading from {location}: {path}")
 
-                # Check if this location needs jump host
-                if location_type == 'hpc' and jump_required:
-                    # Use our custom download function with jump host support
-                    logger.info(f"Using custom download function with jump host support")
-                    downloaded_file_path = download_database_file_ssh(
-                        hostname=location,
-                        remote_path=path,
-                        local_folder=(workspace_path + '/' + folder_hash),
-                        username=username,
-                        password=password,
-                        logger=logger,
-                        session_creds=session_data
-                    )
-                else:
-                    # Use standard DSI pull_data function
-                    downloaded_file_path = pull_data(
-                        location_type=location_type,
-                        remote_location=location,
-                        remote_path=path,
-                        download_location=(workspace_path + '/' + folder_hash),
-                        username=username,
-                        password=password
-                    )
+                # Use enhanced DSI pull_data function (now supports jump host!)
+                logger.info(f"Using DSI pull_data() with jump_host_required={jump_required}")
+
+                downloaded_file_path = pull_data(
+                    location_type=location_type,
+                    remote_location=location,
+                    remote_path=path,
+                    download_location=(workspace_path + '/' + folder_hash),
+                    username=username,
+                    password=password,
+                    jump_host=session_data.get('jump_host'),
+                    jump_username=session_data.get('jump_username'),
+                    jump_password=session_data.get('jump_password'),
+                    jump_host_required=jump_required
+                )
 
                 if downloaded_file_path:
                     _local_folder, _local_filename = split_path(downloaded_file_path)
