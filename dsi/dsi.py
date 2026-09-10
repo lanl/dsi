@@ -462,15 +462,18 @@ class DSI:
                     self.t.load_module('plugin', 'JSON', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "cloverleaf":
                     self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
-                elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
-                    self.t.load_module('plugin', 'Dictionary', 'reader', collection=data_sources, table_name=table_name, **kwargs)
-                    if isinstance(data_sources, OrderedDict):
-                        data_sources = "the Ordered Dict"
+                elif reader_name.lower() == "collection":
+                    if isinstance(data_sources, dict):
+                        self.t.load_module('plugin', 'Dictionary', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                        if isinstance(data_sources, OrderedDict):
+                            data_sources = "the Ordered Dict"
+                        else:
+                            data_sources = "the dictionary"
+                    elif isinstance(data_sources, pd.DataFrame):
+                        self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                        data_sources = "the pandas DataFrame"
                     else:
-                        data_sources = "the dictionary"
-                elif reader_name.lower() == "collection" and isinstance(data_sources, pd.DataFrame):
-                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
-                    data_sources = "the pandas DataFrame"
+                        raise TypeError("Input object for the 'Collection' reader must be a dictionary or pandas DataFrame")
                 else:
                     raise RuntimeError("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n"
                                        "                            View eligible readers in the output of `list_readers()`")
