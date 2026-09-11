@@ -117,10 +117,10 @@ class Sync:
                         return
                     
                     # update remote file paths to use new remote location
-                    filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
+                    filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, self.remote_location, regex=False)
                     
                     # update remote location in federated table
-                    fed_table.at[fed_table.index[0], "remote_location"] = os.path.join(remote_loc, self.project_name) + os.sep
+                    fed_table.at[fed_table.index[0], "remote_location"] = self.remote_location
 
                     self.t.dsi_tables.remove("filesystem")
                     self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
