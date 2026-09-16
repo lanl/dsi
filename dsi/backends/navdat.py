@@ -1,97 +1,8 @@
-"""
-NAVDAT Webserver Backend for DSI
+"""NAVDAT webserver backend for DSI.
 
-Read-only backend that queries the live EarthChem PetDB v4 API and exposes
-results as in-memory DSI tables: samples and citations.
-
-NOTE ON SCOPE: navdat.org itself has been static since 2014 and has no API.
-NAVDAT's data is now federated into PetDB 2.0 / EarthChem Synthesis and
-served through the PetDB v4 API, so this backend queries that API rather
-than navdat.org directly.
-
-SUPERSEDED ENDPOINT: an earlier draft of this backend targeted
-`http://portal.earthchem.org/restsearchservice` (the legacy EarthChem Portal
-REST Search Service), based on archived documentation. Live verification
-(2026-08-24) confirmed that service now 404s - it appears to have been
-decommissioned as part of the PetDB 2.0 migration (the original PetDB Search
-was announced deprecated as of Dec 31, 2025). The confirmed, live replacement
-is documented below.
-
-CONFIRMED WORKING END-TO-END (2026-08-24, live calls + a real NAVDAT() load):
-    - Base URL: https://api.earthchem.org
-    - Response envelope: {"status": "success", "data": ...}
-    - GET /v4/metrics -> connection check (used by validate_connection)
-    - GET /v4/locations/samples?size=N -> populates the `samples` table.
-      Confirmed shape: {"status","count","totalCount","data": [grouped
-      clusters with nested "samples" list]}, flattened here into one row
-      per individual sample.
-    - GET /v4/citations?authors=<name> -> populates the `citations` table.
-      Confirmed shape: {"status","afterKey","data": [flat citation/dataset
-      records with nested citationAuthors/methods/citationIdentifiers]},
-      flattened here into joined-string columns.
-    - `sampleNames=basalt` returning 0 rows (vs. 149778 unfiltered) confirms
-      /v4/locations/samples DOES apply at least that filter param.
-    - `authors=Walker` confirmed to filter BOTH endpoints: totalCount for
-      /v4/locations/samples drops from 149778 (unfiltered) to 1558 with
-      authors=Walker applied, and /v4/citations?authors=Walker returned
-      only Walker-authored records. So `authors` (and plausibly the other
-      citation-style search props by the same mechanism) filters samples
-      too, not just citations.
-
-STILL UNVERIFIED / OPEN ITEMS (do not assume answered):
-    - Whether the REST of SEARCH_PROP_KEYS beyond `sampleNames`/`authors`
-      (citationTitles, journals, publicationYears, laboratories,
-      dataSources, expeditions, analysisTypes, geoFeatures, taxons,
-      variables, boundingBox, polygons, precision) actually filter
-      `/v4/locations/samples`, following the same pattern `authors` did.
-    - Pagination beyond one page for both endpoints (see PENDING notes in
-      _fetch_samples / _fetch_citations).
-    - Whether/how `samples` and `citations` link to each other (no shared
-      key found in either confirmed shape so far).
-    - `taxons=<group>::[<value>]`-style advanced filter syntax for
-      rock-type-style filtering (e.g. does `taxons=igneous::[basalt]` work
-      the way the docs' `analysisTypes`/`geoFeatures` examples imply).
-
-ENVIRONMENT NOTE - corporate TLS-inspecting proxies (e.g. Zscaler): if
-`validate_connection()` fails with a generic connection error but the same
-URL works fine in `curl` or a browser, check for a masked SSLError first -
-`requests` uses its own bundled CA store (via `certifi`) rather than the
-OS/browser trust store, so it won't automatically trust a corporate proxy's
-intercepting root CA even when curl does.
-
-TIMELINE OF THIS DIAGNOSIS (2026-08-24) - kept deliberately, because the
-"confirmed" fix changed three times as more evidence came in, which is
-itself a useful example of provisional debugging - each step looked settled
-until a cleaner test disproved it:
-    1. First hypothesis: point `requests` at `/etc/ssl/cert.pem` via
-       `REQUESTS_CA_BUNDLE`/`SSL_CERT_FILE` (the file curl's own `-v`
-       output listed as its CAfile). Appeared to work, but was only ever
-       tested alongside `verify_ssl=False` in the same call - unisolated.
-    2. In a fresh shell, the connection failed again, and `grep -i zscaler
-       /etc/ssl/cert.pem` found nothing - that file never had the needed
-       cert. curl citing a CAfile in `-v` does not guarantee Python's
-       separate trust mechanism draws on the same material.
-    3. Installed `truststore` and confirmed it worked live, standalone.
-    4. Wired it via `conftest.py` into the real test suite - but the `cp`
-       command that was supposed to place it silently failed (wrong path),
-       so the real pytest run went ahead with truststore NOT injected, and
-       passed anyway (17/17) after just `unset`-ting the two env vars.
-       This looked like proof the env-var override alone was the whole
-       bug, with truststore incidental.
-    5. DEFINITIVE TEST: removed conftest.py (with truststore injection)
-       from the test directory -> full suite failed again. Restored it,
-       nothing else changed -> full suite passed. This is a clean,
-       isolated A/B test (one variable changed, both directions checked)
-       and settles it: `truststore.inject_into_ssl()` IS genuinely
-       required in this environment. Step 4's apparent "unset alone is
-       enough" result was itself a false read, likely from an even earlier,
-       stale truststore injection still active in that shell's Python
-       process from a prior `python3 -c` call in the same session.
-
-CONFIRMED FIX: `truststore.inject_into_ssl()` (Python 3.10+), applied once
-per process before any `requests` calls are made. Passing `verify_ssl=False`
-remains available as a last-resort local-debugging escape hatch, but should
-not be used as a default or committed into CI.
+The backend queries the EarthChem PetDB v4 API and exposes sample and
+citation metadata as in-memory DSI tables. NAVDAT data is served through
+PetDB because navdat.org does not provide an API.
 """
 
 from collections import OrderedDict
@@ -104,26 +15,8 @@ import requests
 from dsi.backends.webserver import Webserver
 
 
-# ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
 class ValueObject:
-    """
-    Container for search results returned by find* methods
-
-    Attributes
-    ----------
-    t_name : str
-        Table name
-    c_name : list
-        Column name(s)
-    row_num : int or None
-        Row index (if applicable)
-    value : any
-        Matched value
-    type : str
-        {'table', 'column', 'cell'}
-    """
+    """Container for results returned by the find methods."""
     def __init__(self):
         self.t_name = ""
         self.c_name = []
@@ -132,75 +25,28 @@ class ValueObject:
         self.type = ""
 
 
-# ----------------------------------------------------------------------
-# NAVDAT Backend (Webserver - Read only)
-# ----------------------------------------------------------------------
 class NAVDAT(Webserver):
-    """
-    PetDB v4 API-based web backend for querying NAVDAT and federated
-    geochemistry metadata in-memory.
+    """Read-only PetDB v4 backend for NAVDAT geochemistry metadata.
 
-    Two tables are populated:
-        - samples   : one row per sample, flattened from the grouped/nested
-                      response of GET /v4/locations/samples
-        - citations : one row per citation/dataset record, flattened from
-                      GET /v4/citations
-
-    NOTE: samples and citations are NOT currently linked to each other in
-    this backend (no shared key was found in either confirmed response
-    shape). Endpoints exist for that linkage (`/v4/citations/:id/samples`)
-    but haven't been wired in yet - see build log for status.
+    The ``samples`` table contains one row per sample. The ``citations``
+    table contains one row per citation or dataset record.
     """
     read_only = True
 
-    # ----------------------------------------------------------------------
-    # Initialization
-    # ----------------------------------------------------------------------
     def __init__(self, url=None, params=None, **kwargs):
-        """
-        Initialize backend and optionally load data from the live PetDB v4 API.
+        """Initialize the backend and optionally load PetDB data.
 
         Parameters
         ----------
         `url` : str, optional
-            Base API URL. If None, the confirmed-live default is used
-            (https://api.earthchem.org).
+            Base API URL. Defaults to ``https://api.earthchem.org``.
         `params` : dict or list of dict, optional
-            Dictionary (or list of dicts, for multiple queries) of search
-            props, passed through as GET query parameters to both
+            Search properties passed as GET query parameters to both
             `/v4/locations/samples` and `/v4/citations`.
-
-            Confirmed-relevant keys (from live testing, 2026-08-24):
-                - sampleNames : str - Literal sample name (exact-ish match;
-                  NOT a rock-type keyword - `sampleNames=basalt` returns 0
-                  rows in testing, since sample names look like
-                  "(2.151) 12.40-12.85", not rock types)
-                - authors : str - Author name. CONFIRMED to filter both
-                  `/v4/locations/samples` (totalCount 149778 -> 1558 with
-                  authors=Walker) and `/v4/citations`.
-                - citationTitles, journals, publicationYears, laboratories,
-                  dataSources, expeditions : str - documented citation-level
-                  search props, unverified live but same query mechanism as
-                  `authors`
-                - analysisTypes, geoFeatures, taxons, variables : str -
-                  documented advanced filters using a `group::[value]` syntax
-                  per docs, e.g. `taxons=igneous::[basalt]` - UNVERIFIED, a
-                  good next thing to test live for rock-type filtering
-                - boundingBox, polygons, precision : str - documented
-                  location filters - UNVERIFIED live
-                - size : int - page size for `/v4/locations/samples`
-                  (confirmed working, e.g. `size=3`); NOTE pagination beyond
-                  one page is NOT yet implemented - see `_fetch_samples`
         `**kwargs` : dict
             Additional keyword arguments:
-                - verify_ssl : bool, optional (default True)
-                    Only set False for local debugging behind a corporate
-                    TLS-inspecting proxy - see the ENVIRONMENT NOTE at the
-                    top of this module for the proper fix
-                    (REQUESTS_CA_BUNDLE) instead of disabling verification.
-                - fetch_citations : bool, optional (default True)
-                    If True, also populates the `citations` table via
-                    GET /v4/citations.
+                - verify_ssl: enable TLS certificate verification.
+                - fetch_citations: populate the ``citations`` table.
         """
 
         DEFAULT_URL = "https://api.earthchem.org"
@@ -216,7 +62,7 @@ class NAVDAT(Webserver):
 
         self.base_url = base_url.rstrip("/")
 
-        # skip data retrieval if only checking connection
+        # Skip data retrieval when only validating the endpoint.
         if kwargs.get("only_validate", False):
             return
 
@@ -240,19 +86,8 @@ class NAVDAT(Webserver):
         else:
             self._loaded = True
 
-    # ----------------------------------------------------------------------
-    # Connection Validation
-    # ----------------------------------------------------------------------
     def validate_connection(self):
-        """
-        Validates that the PetDB v4 API is accessible and functional, using
-        the confirmed-live GET /v4/metrics endpoint.
-
-        Returns
-        -------
-        bool
-            True if connection is valid, False otherwise.
-        """
+        """Return whether the PetDB v4 metrics endpoint is available."""
         try:
             response = requests.get(
                 f"{self.base_url}/v4/metrics",
@@ -283,18 +118,8 @@ class NAVDAT(Webserver):
         except Exception:
             return False
 
-    # ----------------------------------------------------------------------
-    # Initial Data Load
-    # ----------------------------------------------------------------------
     def _load_initial_data(self, params):
-        """
-        Loads data from the PetDB v4 API based on search props. Supports a
-        single query (dict) or multiple queries (list of dicts), combined
-        and deduplicated into unified tables.
-
-        Tier 1: samples table, from GET /v4/locations/samples
-        Tier 2: citations table, from GET /v4/citations
-        """
+        """Load and deduplicate sample and citation data for one or more queries."""
         if isinstance(params, dict):
             query_list = [params]
         elif isinstance(params, list) and all(isinstance(p, dict) for p in params):
@@ -319,10 +144,7 @@ class NAVDAT(Webserver):
 
         self._loaded = True
 
-    # Search props confirmed or documented as query-string passthrough for
-    # both /v4/locations/samples and /v4/citations. `authors` and
-    # `sampleNames` are live-confirmed; the rest are carried over from the
-    # documented "Search Props" table and passed through as-is, unverified.
+    # Query parameters supported by the PetDB search endpoints.
     SEARCH_PROP_KEYS = [
         "sampleNames", "authors", "citationTitles", "journals",
         "publicationYears", "laboratories", "dataSources", "expeditions",
@@ -331,34 +153,11 @@ class NAVDAT(Webserver):
     ]
 
     def _build_search_props(self, query_params):
-        """
-        Extracts the subset of a user-facing query dict that maps to
-        documented PetDB v4 search props, passed through unmodified as GET
-        query parameters.
-        """
+        """Return supported PetDB search properties from a query."""
         return {k: query_params[k] for k in self.SEARCH_PROP_KEYS if k in query_params}
 
     def _fetch_samples(self, query_params):
-        """
-        Fetches and flattens sample rows from GET /v4/locations/samples.
-
-        The endpoint returns clustered groups (one row per unique root
-        location), each with a nested `samples` list. This flattens that
-        into one row per individual sample, carrying the group-level
-        location fields onto each sample row.
-
-        PENDING: pagination beyond one page. The endpoint accepts `size`
-        (confirmed working) but no confirmed offset/page parameter has been
-        tested yet - only a single page (default or user-specified `size`)
-        is fetched. `count`/`totalCount` in the response tell you how many
-        rows exist in total; if `size` doesn't cover them, this needs a
-        follow-up live test to find the pagination parameter (candidates
-        to try: `from`, `page`, `offset`) before it can page reliably.
-
-        Returns
-        -------
-        list of dict
-        """
+        """Fetch sample groups and flatten them into individual sample rows."""
         rest_params = self._build_search_props(query_params)
         if "size" in query_params:
             rest_params["size"] = query_params["size"]
@@ -411,24 +210,7 @@ class NAVDAT(Webserver):
         return rows
 
     def _fetch_citations(self, query_params):
-        """
-        Fetches and flattens citation/dataset rows from GET /v4/citations.
-
-        Nested arrays (`citationAuthors`, `methods`, `citationIdentifiers`)
-        are flattened into comma-joined string columns, matching the
-        convention used elsewhere in this backend (see NDP's dataset
-        tags/groups handling for precedent).
-
-        PENDING: pagination. The response includes an `afterKey` cursor
-        object (composite citation/dataset/analysisType key), which strongly
-        suggests cursor-based pagination - but passing `afterKey` back as a
-        parameter on the next call is inferred from its name and shape, not
-        confirmed live. Only a single page is fetched for now.
-
-        Returns
-        -------
-        list of dict
-        """
+        """Fetch citation records and flatten nested values into strings."""
         rest_params = self._build_search_props(query_params)
 
         try:
