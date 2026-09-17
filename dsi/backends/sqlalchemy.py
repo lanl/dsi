@@ -41,9 +41,6 @@ class SqlAlchemy(Filesystem):
     def get_table(self, table_name, **kwargs):
         pass
 
-    def get_table_names(self, query):
-        pass
-
     def notebook(self, **kwargs):
         pass
 

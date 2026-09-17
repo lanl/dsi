@@ -9,7 +9,7 @@ my_user@local-machine examples % dsi
   \  \ \/ /     \  \  / / /       \__\  /
    \  \  /       \__\/ / /        /__/ / 
     \__\/          /__/ /         \__\/  
-                   \__\/                   v1.2.2
+                   \__\/                   v{{VERSION}}
 
 Created a temporary Sqlite DSI backend
 

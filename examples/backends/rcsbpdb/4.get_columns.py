@@ -48,7 +48,7 @@ def main():
     dsi.find("doi = 10.2210/pdb4hhb/pdb")
 
     print("\nSearch loaded row data:")
-    dsi.search("X-RAY")
+    dsi.find("experimental_method ~~ X-RAY")
 
     print("\nDisplay selected dataset columns:")
     dsi.display("datasets", display_cols=["title", "description"])

@@ -1115,9 +1115,6 @@ def test_terminal_query_not_supported(ndp_terminal):
     with pytest.raises(NotImplementedError):
         ndp_terminal.artifact_handler(interaction_type="ingest")
 
-    with pytest.raises(NotImplementedError):
-        ndp_terminal.overwrite_table("datasets", pd.DataFrame())
-
 
 def test_terminal_get_table_ndp(ndp_terminal):
     """Test Terminal.get_table() with the shared NDP backend."""

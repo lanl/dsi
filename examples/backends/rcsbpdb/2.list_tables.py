@@ -1,5 +1,7 @@
 import pandas as pd
+
 from dsi.dsi import DSI
+
 
 def main():
     dsi = DSI(
