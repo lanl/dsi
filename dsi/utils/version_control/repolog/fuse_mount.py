@@ -13,8 +13,10 @@ other dsi-vcs command), and libfuse3 + fusermount3 on the host.
 
 import bisect
 import errno
+import grp
 import json
 import os
+import pwd
 import stat
 from typing import Optional
 
@@ -27,6 +29,8 @@ class _Node:
         "relative_path",
         "file_type",
         "mode",
+        "uid",
+        "gid",
         "size",
         "children",
         "chunk_offsets",
@@ -37,6 +41,8 @@ class _Node:
         self.relative_path = relative_path
         self.file_type = file_type
         self.mode = 0o600
+        self.uid = os.getuid()
+        self.gid = os.getgid()
         self.size = 0
         self.children: list[str] = []
         self.chunk_offsets: list[int] = []
@@ -59,6 +65,30 @@ class CommitMount(pyfuse3.Operations):
         self._load_tree(conn, commit_hash, version_id)
 
     # Tree construction (once, at mount time)
+    @staticmethod
+    def _resolve_uid(owner: Optional[str]) -> int:
+        if not owner:
+            return os.getuid()
+        try:
+            return pwd.getpwnam(owner).pw_uid
+        except KeyError:
+            try:
+                return int(owner)
+            except ValueError:
+                return os.getuid()
+
+    @staticmethod
+    def _resolve_gid(group: Optional[str]) -> int:
+        if not group:
+            return os.getgid()
+        try:
+            return grp.getgrnam(group).gr_gid
+        except KeyError:
+            try:
+                return int(group)
+            except ValueError:
+                return os.getgid()
+
     def _load_tree(self, conn, commit_hash: str, version_id: int) -> None:
         root = _Node(".", "dir")
         root.mode = 0o755
@@ -76,6 +106,8 @@ class CommitMount(pyfuse3.Operations):
             metadata = json.loads(row["metadata"]) if row["metadata"] else {}
             default_mode = 0o700 if row["file_type"] == "dir" else 0o600
             node.mode = int(metadata.get("permissions_int") or default_mode) & 0o7777
+            node.uid = self._resolve_uid(metadata.get("owner_name"))
+            node.gid = self._resolve_gid(metadata.get("group_name"))
             node.size = row["subtree_total_bytes"] or 0
             self._nodes[rel_path] = node
 
@@ -135,8 +167,8 @@ class CommitMount(pyfuse3.Operations):
         is_dir = node.file_type == "dir"
         entry.st_mode = (stat.S_IFDIR | node.mode) if is_dir else (stat.S_IFREG | node.mode)
         entry.st_nlink = 2 if is_dir else 1
-        entry.st_uid = os.getuid()
-        entry.st_gid = os.getgid()
+        entry.st_uid = node.uid
+        entry.st_gid = node.gid
         entry.st_size = node.size
         entry.st_atime_ns = self._committed_at_ns
         entry.st_mtime_ns = self._committed_at_ns
@@ -224,8 +256,7 @@ def mount_commit(conn, root_folder: str, commit_hash: str, version_id: int,
 
     ops = CommitMount(conn, root_folder, commit_hash, version_id, committed_at_ns, chunk_dir)
 
-    fuse_options = set(pyfuse3.default_options)
-    fuse_options.add("ro")
+    fuse_options = _mount_options()
     pyfuse3.init(ops, mountpoint, fuse_options)
     try:
         trio.run(pyfuse3.main)
@@ -233,3 +264,10 @@ def mount_commit(conn, root_folder: str, commit_hash: str, version_id: int,
         pass
     finally:
         pyfuse3.close()
+
+
+def _mount_options() -> set[str]:
+    fuse_options = set(pyfuse3.default_options)
+    fuse_options.add("ro")
+    fuse_options.add("default_permissions")
+    return fuse_options

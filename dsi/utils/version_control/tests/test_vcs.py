@@ -159,6 +159,28 @@ def test_switch_restores_branch_snapshot(tmp_path):
     assert not (tmp_path / "new.txt").exists()
 
 
+def test_mount_attrs_preserve_committed_permissions():
+    pytest.importorskip("pyfuse3")
+
+    from dsi.utils.version_control.repolog.fuse_mount import CommitMount, _Node, _mount_options
+
+    ops = CommitMount.__new__(CommitMount)
+    ops._committed_at_ns = 123456789
+
+    node = _Node("group-data.txt", "file")
+    node.mode = 0o2640
+    node.uid = os.getuid() + 1000
+    node.gid = os.getgid() + 1000
+    node.size = 42
+
+    attrs = CommitMount._attrs(ops, 99, node)
+
+    assert stat.S_IMODE(attrs.st_mode) == 0o2640
+    assert attrs.st_uid == node.uid
+    assert attrs.st_gid == node.gid
+    assert "default_permissions" in _mount_options()
+
+
 def test_mount_serves_chunked_content_read_only(tmp_path):
     require_rsync()
     require_fuse()
