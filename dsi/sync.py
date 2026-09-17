@@ -544,7 +544,7 @@ class Sync:
                 print("Testing Conduit: conduit get")
             cmd = [*conduit_cmd, "get"]
             try:
-                result = subprocess.run(cmd, timeout=10)
+                result = subprocess.run(cmd, timeout=15)
             except subprocess.TimeoutExpired:
                 raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
 
