@@ -671,6 +671,506 @@ def federate_data():
         }), 500
 
 
+@app.route('/api/explore-databases', methods=['POST'])
+def explore_databases():
+    """
+    List all databases in a workspace folder by reading the dsi_database_list.json file
+    """
+    try:
+        data = request.json
+        workspace_folder = data.get('workspace_folder')
+
+        if not workspace_folder:
+            return jsonify({
+                'success': False,
+                'message': 'Workspace folder path required'
+            }), 400
+
+        workspace_path = Path(workspace_folder).resolve()
+        db_list_file = workspace_path / 'dsi_database_list.json'
+
+        if not db_list_file.exists():
+            return jsonify({
+                'success': False,
+                'message': f'No database list found at {db_list_file}',
+                'databases': []
+            })
+
+        # Read the database list
+        with open(db_list_file, 'r') as f:
+            databases = json.load(f)
+
+        return jsonify({
+            'success': True,
+            'databases': databases,
+            'workspace': str(workspace_path),
+            'count': len(databases)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}',
+            'databases': []
+        }), 500
+
+
+@app.route('/api/database-info', methods=['POST'])
+def get_database_info():
+    """
+    Get detailed information about a database file (size, tables, row counts) using DSI interface
+    """
+    try:
+        from dsi.backends.sqlite import Sqlite
+
+        data = request.json
+        database_path = data.get('database_path')
+
+        if not database_path:
+            return jsonify({
+                'success': False,
+                'message': 'Database path required'
+            }), 400
+
+        db_path = Path(database_path)
+
+        if not db_path.exists():
+            return jsonify({
+                'success': False,
+                'message': f'Database file not found: {database_path}'
+            }), 404
+
+        # Get file size
+        file_size = db_path.stat().st_size
+
+        result = {
+            'success': True,
+            'file_size': file_size,
+            'tables': []
+        }
+
+        # Try to get table information using DSI interface
+        try:
+            # Open database in read-only mode using DSI
+            dsi_db = Sqlite(f'file:{db_path}?mode=ro', uri=True)
+
+            # Get all table names using DSI's query_artifacts
+            tables_df = dsi_db.query_artifacts(
+                "SELECT name FROM sqlite_master WHERE type='table';",
+                isVerbose=False
+            )
+
+            if tables_df is not None and not tables_df.empty:
+                for table_name in tables_df['name']:
+                    try:
+                        # Get row count for each table using DSI
+                        count_query = f"SELECT COUNT(*) as count FROM `{table_name}`;"
+                        count_df = dsi_db.query_artifacts(count_query, isVerbose=False)
+
+                        if count_df is not None and not count_df.empty:
+                            row_count = int(count_df['count'].iloc[0])
+                            result['tables'].append({
+                                'name': table_name,
+                                'row_count': row_count
+                            })
+                        else:
+                            result['tables'].append({
+                                'name': table_name,
+                                'row_count': 0
+                            })
+                    except Exception as e:
+                        result['tables'].append({
+                            'name': table_name,
+                            'error': str(e)
+                        })
+
+            # Close DSI connection
+            dsi_db.con.close()
+
+        except Exception as e:
+            result['error'] = f'Could not read database structure: {str(e)}'
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+
+@app.route('/api/execute-dsi-query', methods=['POST'])
+def execute_dsi_query():
+    """
+    Execute a DSI query using one of the four methods: query(), get_table(), find(), search()
+    """
+    try:
+        import time
+        from dsi.dsi import DSI
+
+        data = request.json
+        databases = data.get('databases', [])
+        method = data.get('method', 'query')
+        query_param = data.get('query_param', '').strip()
+
+        if not query_param:
+            return jsonify({
+                'success': False,
+                'message': 'Query parameter is required'
+            }), 400
+
+        if not databases:
+            return jsonify({
+                'success': False,
+                'message': 'At least one database must be selected'
+            }), 400
+
+        # Validate method
+        valid_methods = ['query', 'get_table', 'find', 'search']
+        if method not in valid_methods:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid method. Must be one of: {", ".join(valid_methods)}'
+            }), 400
+
+        # For query method, validate it's SELECT or PRAGMA only
+        if method == 'query':
+            query_upper = query_param.upper().strip()
+            command = query_upper.split()[0] if query_upper else ''
+            if command not in ['SELECT', 'PRAGMA']:
+                return jsonify({
+                    'success': False,
+                    'message': f'Only SELECT and PRAGMA queries are allowed. Attempted command: {command}'
+                }), 400
+
+        results = []
+
+        for db in databases:
+            db_result = {
+                'database_name': db.get('name'),
+                'database_path': f"{db.get('local_path')}/{db.get('name')}",
+                'success': False
+            }
+
+            db_path = Path(db.get('local_path')) / db.get('name')
+
+            if not db_path.exists():
+                db_result['error'] = f'Database file not found: {db_path}'
+                results.append(db_result)
+                continue
+
+            try:
+                start_time = time.time()
+
+                # Initialize DSI with this database (read-only mode)
+                dsi_instance = DSI(
+                    filename=str(db_path),
+                    backend_name='Sqlite',
+                    silence_messages=True
+                )
+
+                # Execute the appropriate DSI method
+                result_df = None
+
+                if method == 'query':
+                    # Execute SQL query
+                    result_df = dsi_instance.query(query_param, collection=True)
+
+                elif method == 'get_table':
+                    # Get entire table
+                    result_df = dsi_instance.get_table(query_param, collection=True)
+
+                elif method == 'find':
+                    # Find rows matching condition
+                    result_df = dsi_instance.find(query_param, collection=True)
+
+                elif method == 'search':
+                    # Search across all tables
+                    # search() returns a list of DataFrames
+                    search_results = dsi_instance.search(query_param, collection=True)
+
+                    if search_results:
+                        # Combine all search results into one DataFrame
+                        import pandas as pd
+                        result_df = pd.concat(search_results, ignore_index=True)
+                    else:
+                        result_df = None
+
+                execution_time = round(time.time() - start_time, 3)
+
+                # Close DSI instance
+                dsi_instance.close()
+
+                if result_df is not None and not result_df.empty:
+                    # Limit to 1000 rows for safety
+                    if len(result_df) > 1000:
+                        result_df = result_df.head(1000)
+
+                    # Convert DataFrame to list of lists for JSON serialization
+                    rows = result_df.values.tolist()
+                    columns = result_df.columns.tolist()
+
+                    db_result['success'] = True
+                    db_result['rows'] = rows
+                    db_result['columns'] = columns
+                    db_result['row_count'] = len(rows)
+                    db_result['execution_time'] = execution_time
+                else:
+                    # Empty result
+                    db_result['success'] = True
+                    db_result['rows'] = []
+                    db_result['columns'] = []
+                    db_result['row_count'] = 0
+                    db_result['execution_time'] = execution_time
+
+            except Exception as e:
+                db_result['error'] = f'Error: {str(e)}'
+
+            results.append(db_result)
+
+        return jsonify({
+            'success': True,
+            'results': results,
+            'method': method,
+            'query_param': query_param
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+
+@app.route('/api/execute-query', methods=['POST'])
+def execute_query():
+    """
+    Execute a SQL query against one or more databases using DSI interface
+    """
+    try:
+        import time
+        from dsi.backends.sqlite import Sqlite
+
+        data = request.json
+        databases = data.get('databases', [])
+        query = data.get('query', '').strip()
+
+        if not query:
+            return jsonify({
+                'success': False,
+                'message': 'Query is required'
+            }), 400
+
+        if not databases:
+            return jsonify({
+                'success': False,
+                'message': 'At least one database must be selected'
+            }), 400
+
+        # Security check - only allow SELECT and PRAGMA queries
+        query_upper = query.upper().strip()
+        command = query_upper.split()[0] if query_upper else ''
+
+        if command not in ['SELECT', 'PRAGMA']:
+            return jsonify({
+                'success': False,
+                'message': f'Only SELECT and PRAGMA queries are allowed through the web interface. Attempted command: {command}'
+            }), 400
+
+        results = []
+
+        for db in databases:
+            db_result = {
+                'database_name': db.get('name'),
+                'database_path': f"{db.get('local_path')}/{db.get('name')}",
+                'success': False
+            }
+
+            db_path = Path(db.get('local_path')) / db.get('name')
+
+            if not db_path.exists():
+                db_result['error'] = f'Database file not found: {db_path}'
+                results.append(db_result)
+                continue
+
+            try:
+                start_time = time.time()
+
+                # Use DSI Sqlite interface with read-only connection
+                # Pass uri=True to allow read-only mode via file: URI scheme
+                dsi_db = Sqlite(f'file:{db_path}?mode=ro', uri=True)
+
+                # Execute query using DSI's query_artifacts method
+                # Returns a pandas DataFrame
+                result_df = dsi_db.query_artifacts(query, isVerbose=False)
+
+                execution_time = round(time.time() - start_time, 3)
+
+                if result_df is not None and not result_df.empty:
+                    # Limit to 1000 rows for safety
+                    if len(result_df) > 1000:
+                        result_df = result_df.head(1000)
+
+                    # Convert DataFrame to list of lists for JSON serialization
+                    rows = result_df.values.tolist()
+                    columns = result_df.columns.tolist()
+
+                    db_result['success'] = True
+                    db_result['rows'] = rows
+                    db_result['columns'] = columns
+                    db_result['row_count'] = len(rows)
+                    db_result['execution_time'] = execution_time
+                else:
+                    # Empty result
+                    db_result['success'] = True
+                    db_result['rows'] = []
+                    db_result['columns'] = []
+                    db_result['row_count'] = 0
+                    db_result['execution_time'] = execution_time
+
+                # Close DSI connection
+                dsi_db.con.close()
+
+            except Exception as e:
+                db_result['error'] = f'Error: {str(e)}'
+
+            results.append(db_result)
+
+        return jsonify({
+            'success': True,
+            'results': results,
+            'query': query
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+
+@app.route('/api/database-summary', methods=['POST'])
+def get_database_summary():
+    """
+    Get summary information and table list for selected databases using DSI
+    """
+    try:
+        import time
+        from dsi.dsi import DSI
+
+        data = request.json
+        databases = data.get('databases', [])
+
+        if not databases:
+            return jsonify({
+                'success': False,
+                'message': 'At least one database must be selected'
+            }), 400
+
+        summaries = []
+
+        for db in databases:
+            summary_result = {
+                'database_name': db.get('name'),
+                'database_path': f"{db.get('local_path')}/{db.get('name')}",
+                'success': False
+            }
+
+            db_path = Path(db.get('local_path')) / db.get('name')
+
+            if not db_path.exists():
+                summary_result['error'] = f'Database file not found: {db_path}'
+                summaries.append(summary_result)
+                continue
+
+            try:
+                # Initialize DSI with this database
+                dsi_instance = DSI(
+                    filename=str(db_path),
+                    backend_name='Sqlite',
+                    silence_messages=True
+                )
+
+                # Get table list
+                table_names = dsi_instance.list(collection=True)
+
+                if not table_names:
+                    summary_result['success'] = True
+                    summary_result['tables'] = []
+                    summary_result['total_rows'] = 0
+                    dsi_instance.close()
+                    summaries.append(summary_result)
+                    continue
+
+                # Get detailed info for each table
+                tables_info = []
+                total_rows = 0
+
+                for table_name in table_names:
+                    try:
+                        # Get table data to count rows and columns
+                        table_df = dsi_instance.get_table(table_name, collection=True)
+
+                        if table_df is not None and not table_df.empty:
+                            row_count = len(table_df)
+                            columns = []
+
+                            # Get column names and types
+                            for col_name in table_df.columns:
+                                col_type = str(table_df[col_name].dtype)
+                                columns.append({
+                                    'name': col_name,
+                                    'type': col_type
+                                })
+
+                            tables_info.append({
+                                'name': table_name,
+                                'row_count': row_count,
+                                'columns': columns
+                            })
+
+                            total_rows += row_count
+                        else:
+                            # Empty table
+                            tables_info.append({
+                                'name': table_name,
+                                'row_count': 0,
+                                'columns': []
+                            })
+
+                    except Exception as table_error:
+                        # If we can't read the table, still include it with error
+                        tables_info.append({
+                            'name': table_name,
+                            'row_count': None,
+                            'columns': [],
+                            'error': str(table_error)
+                        })
+
+                summary_result['success'] = True
+                summary_result['tables'] = tables_info
+                summary_result['total_rows'] = total_rows
+
+                # Close DSI instance
+                dsi_instance.close()
+
+            except Exception as e:
+                summary_result['error'] = f'Error: {str(e)}'
+
+            summaries.append(summary_result)
+
+        return jsonify({
+            'success': True,
+            'summaries': summaries
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+
 @app.route('/api/logs/<session_id>')
 def get_log(session_id):
     """

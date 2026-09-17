@@ -429,6 +429,217 @@
             color: #495057;
             margin: 0 0 10px 0;
         }
+
+        .database-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .database-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .database-card.selected {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .db-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .db-card-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .db-card-type {
+            background: #667eea;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+        }
+
+        .db-card-info {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #666;
+            margin: 5px 0;
+            word-break: break-all;
+        }
+
+        .db-card-path {
+            color: #2196F3;
+        }
+
+        .db-card-local {
+            color: #4CAF50;
+        }
+
+        .db-detail-row {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 10px 0;
+        }
+
+        .db-detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .db-detail-label {
+            font-weight: 600;
+            color: #667eea;
+            width: 180px;
+            flex-shrink: 0;
+        }
+
+        .db-detail-value {
+            color: #333;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .table-info {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .table-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 3px solid #667eea;
+        }
+
+        .query-results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            background: white;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .query-results-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #5568d3;
+        }
+
+        .query-results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e0e0e0;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .query-results-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .query-results-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .db-checkbox {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: white;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .db-checkbox:hover {
+            background: #f0f2ff;
+        }
+
+        .db-checkbox input[type="checkbox"] {
+            margin-right: 10px;
+            cursor: pointer;
+            width: auto;
+        }
+
+        .db-checkbox label {
+            cursor: pointer;
+            margin: 0;
+            flex: 1;
+        }
+
+        .query-result-db {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .query-result-db-header {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .query-error {
+            background: #fff5f5;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .query-error-header {
+            font-weight: 600;
+            color: #dc3545;
+            margin-bottom: 5px;
+        }
+
+        .result-stats {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+            padding: 5px 0;
+        }
+
+        .query-method-btn {
+            opacity: 0.6;
+            transition: all 0.2s;
+        }
+
+        .query-method-btn.active {
+            opacity: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .query-method-btn:hover {
+            opacity: 1;
+        }
+
+        .query-method-input {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -443,7 +654,8 @@
                 <button class="tab active" onclick="switchTab('discover', event)">1. Discover Endpoints</button>
                 <button class="tab" onclick="switchTab('pull', event)">2. Pull Data Sources</button>
                 <button class="tab" onclick="switchTab('read', event)">3. Pull Remote Databases</button>
-                <button class="tab" onclick="switchTab('logs', event)">4. View Logs</button>
+                <button class="tab" onclick="switchTab('explore', event)">4. Explore Databases</button>
+                <button class="tab" onclick="switchTab('logs', event)">5. View Logs</button>
             </div>
 
             <!-- Discover Endpoints Tab -->
@@ -666,9 +878,208 @@
                 </div>
             </div>
 
+            <!-- Explore Databases Tab -->
+            <div id="explore-tab" class="tab-content">
+                <h2>Step 4: Explore Databases</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Browse and explore downloaded databases from your workspace folder.
+                </p>
+
+                <div class="section">
+                    <div class="section-header">📁 Workspace</div>
+                    <div class="section-content">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="explore-workspace">Workspace Folder Path:</label>
+                            <input type="text" id="explore-workspace" placeholder="e.g., ./federated_data">
+                            <small>Enter the workspace folder path where databases were downloaded</small>
+                        </div>
+                        <button class="btn" onclick="loadDatabaseList()" style="margin-top: 15px;">
+                            📂 Load Databases
+                        </button>
+                    </div>
+                </div>
+
+                <div id="explore-notice" class="alert alert-info hidden">
+                    No databases found. Download databases in Step 3 first.
+                </div>
+
+                <div id="explore-results" class="hidden">
+                    <!-- Database list section -->
+                    <div class="section">
+                        <div class="section-header">
+                            🗄️ Downloaded Databases (<span id="db-count">0</span>)
+                            <div style="flex: 1;"></div>
+                            <button class="btn btn-secondary" onclick="toggleQueryInterface()" style="padding: 6px 12px; font-size: 0.85em;">
+                                🔍 Query Databases
+                            </button>
+                        </div>
+                        <div class="section-content">
+                            <div id="database-list-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Query Interface section -->
+                    <div class="section" id="query-interface-section" style="display: none;">
+                        <div class="section-header">
+                            🔍 Query Interface
+                            <div style="flex: 1;"></div>
+                            <button class="btn btn-secondary" onclick="toggleQueryInterface()" style="padding: 6px 12px; font-size: 0.85em;">
+                                ✕ Close Query
+                            </button>
+                        </div>
+                        <div class="section-content">
+                            <!-- Database Selection -->
+                            <div style="margin-bottom: 20px;">
+                                <h4 style="margin-bottom: 10px;">Select Databases to Query:</h4>
+                                <div id="query-database-selector" style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                                    <!-- Checkboxes will be populated here -->
+                                </div>
+                                <div style="margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
+                                    <button class="btn btn-secondary" onclick="selectAllDatabases(true)" style="padding: 6px 12px; font-size: 0.85em;">
+                                        ✓ Select All
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="selectAllDatabases(false)" style="padding: 6px 12px; font-size: 0.85em;">
+                                        ✕ Clear All
+                                    </button>
+                                    <button class="btn" onclick="getDatabaseSummary()" style="padding: 6px 12px; font-size: 0.85em; background: #28a745; color: white;">
+                                        📊 Get Summary & Tables
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Query Method Selection -->
+                            <div style="margin-bottom: 20px;">
+                                <h4 style="margin-bottom: 10px;">Query Method:</h4>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button onclick="setQueryMethod('query')" id="method-query" class="btn btn-secondary query-method-btn active" style="padding: 8px 16px; font-size: 0.9em;">
+                                        📝 SQL Query
+                                    </button>
+                                    <button onclick="setQueryMethod('get_table')" id="method-get_table" class="btn btn-secondary query-method-btn" style="padding: 8px 16px; font-size: 0.9em;">
+                                        📋 Get Table
+                                    </button>
+                                    <button onclick="setQueryMethod('find')" id="method-find" class="btn btn-secondary query-method-btn" style="padding: 8px 16px; font-size: 0.9em;">
+                                        🔍 Find (Condition)
+                                    </button>
+                                    <button onclick="setQueryMethod('search')" id="method-search" class="btn btn-secondary query-method-btn" style="padding: 8px 16px; font-size: 0.9em;">
+                                        🔎 Search (Value)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Query Input Section -->
+                            <div id="query-input-section">
+                                <!-- SQL Query Method -->
+                                <div id="input-query" class="query-method-input">
+                                    <h4 style="margin-bottom: 10px;">SQL Query:</h4>
+                                    <textarea id="query-input" style="width: 100%; min-height: 150px; font-family: 'Courier New', monospace; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 0.9em;" placeholder="SELECT * FROM table_name LIMIT 10;"></textarea>
+                                    <div style="margin-top: 10px;">
+                                        <small style="color: #666;">Quick templates:</small>
+                                        <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
+                                            <button onclick="setQueryTemplate('SELECT * FROM sqlite_master WHERE type=\\'table\\';')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                List Tables
+                                            </button>
+                                            <button onclick="setQueryTemplate('SELECT name FROM sqlite_master WHERE type=\\'table\\';')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Table Names
+                                            </button>
+                                            <button onclick="setQueryTemplate('SELECT * FROM [TABLE_NAME] LIMIT 10;')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Preview Table
+                                            </button>
+                                            <button onclick="setQueryTemplate('SELECT COUNT(*) as count FROM [TABLE_NAME];')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Count Rows
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Get Table Method -->
+                                <div id="input-get_table" class="query-method-input" style="display: none;">
+                                    <h4 style="margin-bottom: 10px;">Get Full Table:</h4>
+                                    <p style="color: #666; margin-bottom: 10px; font-size: 0.9em;">
+                                        Retrieve all data from a specific table without writing SQL.
+                                    </p>
+                                    <input type="text" id="get-table-name" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 0.9em; font-family: 'Courier New', monospace;" placeholder="table_name">
+                                    <small style="display: block; margin-top: 5px; color: #666;">Enter the table name to retrieve all its data</small>
+                                </div>
+
+                                <!-- Find Method -->
+                                <div id="input-find" class="query-method-input" style="display: none;">
+                                    <h4 style="margin-bottom: 10px;">Find Rows by Condition:</h4>
+                                    <p style="color: #666; margin-bottom: 10px; font-size: 0.9em;">
+                                        Find rows where a column-level condition is satisfied. Format: <code>column operator value</code>
+                                    </p>
+                                    <input type="text" id="find-condition" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 0.9em; font-family: 'Courier New', monospace;" placeholder="age > 25">
+                                    <div style="margin-top: 10px;">
+                                        <small style="color: #666;">Valid operators:</small>
+                                        <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
+                                            <button onclick="setFindTemplate('column > value')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Greater Than (>)
+                                            </button>
+                                            <button onclick="setFindTemplate('column < value')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Less Than (<)
+                                            </button>
+                                            <button onclick="setFindTemplate('column = value')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Equal (=)
+                                            </button>
+                                            <button onclick="setFindTemplate('column != value')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Not Equal (!=)
+                                            </button>
+                                            <button onclick="setFindTemplate('column ~ value')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Contains (~)
+                                            </button>
+                                            <button onclick="setFindTemplate('column (min, max)')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8em;">
+                                                Range (min, max)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Search Method -->
+                                <div id="input-search" class="query-method-input" style="display: none;">
+                                    <h4 style="margin-bottom: 10px;">Search Across All Tables:</h4>
+                                    <p style="color: #666; margin-bottom: 10px; font-size: 0.9em;">
+                                        Search for a value across all tables and columns in the database.
+                                    </p>
+                                    <input type="text" id="search-value" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 0.9em; font-family: 'Courier New', monospace;" placeholder="search_value">
+                                    <small style="display: block; margin-top: 5px; color: #666;">Enter a value to search for (string, number, etc.)</small>
+                                </div>
+
+                                <!-- Execute Button -->
+                                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                                    <button class="btn btn-success" onclick="executeDSIQuery()">
+                                        ▶️ Execute
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="clearQueryResults()">
+                                        🗑️ Clear Results
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Query Results -->
+                            <div id="query-results-container" style="display: none;">
+                                <h4 style="margin-bottom: 10px;">Query Results:</h4>
+                                <div id="query-results-content"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Database details section -->
+                    <div class="section" id="database-details-section" style="display: none;">
+                        <div class="section-header">📊 Database Details</div>
+                        <div class="section-content" id="database-details-content"></div>
+                    </div>
+                </div>
+
+                <!-- Status Section -->
+                <div class="status-section">
+                    <div class="status-header">📊 Status</div>
+                    <div id="explore-spinner" class="spinner hidden"></div>
+                    <div id="explore-result"></div>
+                </div>
+            </div>
+
             <!-- Logs Tab -->
             <div id="logs-tab" class="tab-content">
-                <h2>View Logs</h2>
+                <h2>Step 5: View Logs</h2>
 
                 <div class="form-group">
                     <label for="log-select">Select Log Session:</label>
@@ -710,7 +1121,8 @@
                 tabs.forEach(tab => {
                     if (tab.textContent.includes(tabName === 'discover' ? '1. Discover' :
                                                   tabName === 'pull' ? '2. Pull' :
-                                                  tabName === 'read' ? '3. Read' : '4. View')) {
+                                                  tabName === 'read' ? '3. Pull Remote' :
+                                                  tabName === 'explore' ? '4. Explore' : '5. View')) {
                         tab.classList.add('active');
                     }
                 });
@@ -1892,7 +2304,7 @@
                         </div>
                     </div>
                     <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
-                        <strong>➡️ Next:</strong> Select another database above to download more, or check <strong>"4. View Logs"</strong> for details.
+                        <strong>➡️ Next:</strong> Select another database above to download more, check <strong>"4. Explore Databases"</strong> to browse downloaded databases, or view <strong>"5. View Logs"</strong> for details.
                     </div>`;
 
                     // Mark downloaded database as completed (visually) and refresh display
@@ -2046,6 +2458,723 @@
             document.getElementById('hpc-name').value = '';
             document.getElementById('discover-result').innerHTML = '';
             toggleJumpHostFields();
+        }
+
+        // Explore Databases functionality
+        let loadedDatabases = [];
+        let selectedDatabaseIndex = null;
+
+        async function loadDatabaseList() {
+            const workspace = document.getElementById('explore-workspace').value;
+            if (!workspace) {
+                alert('Please enter a workspace folder path');
+                return;
+            }
+
+            const spinner = document.getElementById('explore-spinner');
+            const result = document.getElementById('explore-result');
+            const notice = document.getElementById('explore-notice');
+            const results = document.getElementById('explore-results');
+
+            spinner.classList.remove('hidden');
+            result.innerHTML = '';
+            notice.classList.add('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/explore-databases', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspace_folder: workspace })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.databases && data.databases.length > 0) {
+                    loadedDatabases = data.databases;
+                    displayDatabaseList(data.databases);
+                    results.classList.remove('hidden');
+                    result.innerHTML = `<div class="alert alert-success">
+                        <strong>✓ Success!</strong> Found ${data.databases.length} database(s) in workspace.
+                    </div>`;
+                } else {
+                    notice.classList.remove('hidden');
+                    result.innerHTML = `<div class="alert alert-warning">
+                        <strong>⚠ No databases found</strong> in workspace: ${workspace}
+                    </div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="alert alert-error">
+                    <strong>✗ Error:</strong> ${error.message}
+                </div>`;
+            } finally {
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function displayDatabaseList(databases) {
+            const container = document.getElementById('database-list-container');
+            const countSpan = document.getElementById('db-count');
+
+            countSpan.textContent = databases.length;
+
+            let html = '';
+            databases.forEach((db, index) => {
+                html += `
+                <div class="database-card" onclick="selectDatabase(${index})">
+                    <div class="db-card-header">
+                        <div class="db-card-title">📦 ${db.name}</div>
+                        <div class="db-card-type">${db.original_location_type || 'database'}</div>
+                    </div>
+                    <div class="db-card-info">
+                        <strong>Original:</strong> <span class="db-card-path">${db.original_location}:${db.original_path}</span>
+                    </div>
+                    <div class="db-card-info">
+                        <strong>Local:</strong> <span class="db-card-local">${db.local_path}/${db.name}</span>
+                    </div>
+                    <div class="db-card-info" style="font-size: 0.85em; color: #999; margin-top: 5px;">
+                        Cluster: ${db.source_cluster || 'unknown'} | Hash: ${db.folder_hash || 'N/A'}
+                    </div>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function selectDatabase(index) {
+            selectedDatabaseIndex = index;
+            const db = loadedDatabases[index];
+
+            // Update card selection state
+            document.querySelectorAll('.database-card').forEach((card, i) => {
+                if (i === index) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+
+            // Show database details
+            displayDatabaseDetails(db);
+        }
+
+        async function displayDatabaseDetails(db) {
+            const detailsSection = document.getElementById('database-details-section');
+            const detailsContent = document.getElementById('database-details-content');
+
+            detailsSection.style.display = 'block';
+
+            let html = `
+            <div class="db-detail-row">
+                <div class="db-detail-label">Database Name:</div>
+                <div class="db-detail-value">${db.name}</div>
+            </div>
+            <div class="db-detail-row">
+                <div class="db-detail-label">Type:</div>
+                <div class="db-detail-value">${db.original_location_type || 'unknown'}</div>
+            </div>
+            <div class="db-detail-row">
+                <div class="db-detail-label">Source Cluster:</div>
+                <div class="db-detail-value">${db.source_cluster || 'unknown'}</div>
+            </div>
+            <div class="db-detail-row">
+                <div class="db-detail-label">Original Location:</div>
+                <div class="db-detail-value">${db.original_location}</div>
+            </div>
+            <div class="db-detail-row">
+                <div class="db-detail-label">Original Path:</div>
+                <div class="db-detail-value">${db.original_path}</div>
+            </div>
+            <div class="db-detail-row">
+                <div class="db-detail-label">Local Path:</div>
+                <div class="db-detail-value">${db.local_path}/${db.name}</div>
+            </div>
+            <div class="db-detail-row">
+                <div class="db-detail-label">Folder Hash:</div>
+                <div class="db-detail-value">${db.folder_hash || 'N/A'}</div>
+            </div>`;
+
+            // Try to get database metadata (tables, size, etc.)
+            try {
+                const response = await fetch('/api/database-info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        database_path: `${db.local_path}/${db.name}`
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    html += `
+                    <div class="db-detail-row">
+                        <div class="db-detail-label">File Size:</div>
+                        <div class="db-detail-value">${formatBytes(data.file_size)}</div>
+                    </div>`;
+
+                    if (data.tables && data.tables.length > 0) {
+                        html += `
+                        <div class="db-detail-row" style="flex-direction: column;">
+                            <div class="db-detail-label" style="margin-bottom: 10px;">Tables (${data.tables.length}):</div>
+                            <div class="table-info">`;
+
+                        data.tables.forEach(table => {
+                            html += `
+                            <div class="table-item">
+                                <strong>${table.name}</strong>
+                                ${table.row_count !== undefined ? ` - ${table.row_count} rows` : ''}
+                            </div>`;
+                        });
+
+                        html += `</div></div>`;
+                    }
+
+                    if (data.error) {
+                        html += `
+                        <div class="db-detail-row">
+                            <div class="db-detail-label">Note:</div>
+                            <div class="db-detail-value" style="color: #ff9800;">${data.error}</div>
+                        </div>`;
+                    }
+                }
+            } catch (error) {
+                html += `
+                <div class="db-detail-row">
+                    <div class="db-detail-label">Metadata:</div>
+                    <div class="db-detail-value" style="color: #999;">Unable to load database metadata</div>
+                </div>`;
+            }
+
+            detailsContent.innerHTML = html;
+
+            // Scroll to details
+            detailsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Query Interface Functions
+        function toggleQueryInterface() {
+            const querySection = document.getElementById('query-interface-section');
+            const detailsSection = document.getElementById('database-details-section');
+
+            if (querySection.style.display === 'none') {
+                // Show query interface
+                querySection.style.display = 'block';
+                detailsSection.style.display = 'none';
+                populateDatabaseSelector();
+                querySection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                // Hide query interface
+                querySection.style.display = 'none';
+            }
+        }
+
+        function populateDatabaseSelector() {
+            const container = document.getElementById('query-database-selector');
+
+            if (!loadedDatabases || loadedDatabases.length === 0) {
+                container.innerHTML = '<p style="color: #999; padding: 10px;">No databases available</p>';
+                return;
+            }
+
+            let html = '';
+            loadedDatabases.forEach((db, index) => {
+                html += `
+                <div class="db-checkbox">
+                    <input type="checkbox" id="db-check-${index}" value="${index}">
+                    <label for="db-check-${index}">
+                        <strong>${db.name}</strong>
+                        <small style="display: block; color: #666; font-size: 0.85em;">
+                            ${db.original_location} | ${db.source_cluster || 'unknown'}
+                        </small>
+                    </label>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function selectAllDatabases(select) {
+            const checkboxes = document.querySelectorAll('#query-database-selector input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = select);
+        }
+
+        function setQueryTemplate(query) {
+            document.getElementById('query-input').value = query;
+        }
+
+        function setFindTemplate(template) {
+            document.getElementById('find-condition').value = template;
+        }
+
+        // Query Method Selection
+        let currentQueryMethod = 'query';
+
+        function setQueryMethod(method) {
+            currentQueryMethod = method;
+
+            // Update button states
+            document.querySelectorAll('.query-method-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`method-${method}`).classList.add('active');
+
+            // Show/hide input sections
+            document.querySelectorAll('.query-method-input').forEach(input => {
+                input.style.display = 'none';
+            });
+            document.getElementById(`input-${method}`).style.display = 'block';
+        }
+
+        async function executeDSIQuery() {
+            // Get query parameters based on method
+            let queryParam = '';
+            let methodName = currentQueryMethod;
+
+            switch(currentQueryMethod) {
+                case 'query':
+                    queryParam = document.getElementById('query-input').value.trim();
+                    if (!queryParam) {
+                        alert('Please enter a SQL query');
+                        return;
+                    }
+                    break;
+                case 'get_table':
+                    queryParam = document.getElementById('get-table-name').value.trim();
+                    if (!queryParam) {
+                        alert('Please enter a table name');
+                        return;
+                    }
+                    break;
+                case 'find':
+                    queryParam = document.getElementById('find-condition').value.trim();
+                    if (!queryParam) {
+                        alert('Please enter a condition (e.g., age > 25)');
+                        return;
+                    }
+                    break;
+                case 'search':
+                    queryParam = document.getElementById('search-value').value.trim();
+                    if (!queryParam) {
+                        alert('Please enter a value to search for');
+                        return;
+                    }
+                    break;
+            }
+
+            // Get selected databases
+            const checkboxes = document.querySelectorAll('#query-database-selector input[type="checkbox"]:checked');
+
+            if (checkboxes.length === 0) {
+                alert('Please select at least one database');
+                return;
+            }
+
+            const selectedDbs = Array.from(checkboxes).map(cb => {
+                const index = parseInt(cb.value);
+                return loadedDatabases[index];
+            });
+
+            const resultsContainer = document.getElementById('query-results-container');
+            const resultsContent = document.getElementById('query-results-content');
+
+            resultsContainer.style.display = 'block';
+            resultsContent.innerHTML = '<div class="spinner"></div><p style="text-align: center; color: #666;">Executing ' + methodName + '...</p>';
+
+            try {
+                const response = await fetch('/api/execute-dsi-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        databases: selectedDbs,
+                        method: methodName,
+                        query_param: queryParam
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayDSIQueryResults(data.results, methodName, queryParam);
+                } else {
+                    resultsContent.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>✗ Error:</strong> ${data.message}
+                    </div>`;
+                }
+            } catch (error) {
+                resultsContent.innerHTML = `
+                <div class="alert alert-error">
+                    <strong>✗ Error:</strong> ${error.message}
+                </div>`;
+            }
+        }
+
+        function displayDSIQueryResults(results, method, queryParam) {
+            const resultsContent = document.getElementById('query-results-content');
+
+            let html = '';
+            let totalRows = 0;
+            let successCount = 0;
+            let errorCount = 0;
+
+            // Method name display
+            const methodDisplay = {
+                'query': 'SQL Query',
+                'get_table': 'Get Table',
+                'find': 'Find',
+                'search': 'Search'
+            };
+
+            results.forEach(result => {
+                if (result.success) {
+                    successCount++;
+                    const rowCount = result.rows.length;
+                    totalRows += rowCount;
+
+                    html += `
+                    <div class="query-result-db">
+                        <div class="query-result-db-header">
+                            📦 ${result.database_name}
+                        </div>
+                        <div class="result-stats">
+                            Database: <code>${result.database_path}</code><br>
+                            Method: <strong>${methodDisplay[method]}</strong> |
+                            Rows returned: <strong>${rowCount}</strong> |
+                            Execution time: <strong>${result.execution_time}s</strong>
+                        </div>`;
+
+                    if (rowCount > 0) {
+                        // Build table
+                        html += '<div style="overflow-x: auto; margin-top: 10px;">';
+                        html += '<table class="query-results-table">';
+
+                        // Header
+                        html += '<thead><tr>';
+                        result.columns.forEach(col => {
+                            html += `<th>${col}</th>`;
+                        });
+                        html += '</tr></thead>';
+
+                        // Rows
+                        html += '<tbody>';
+                        result.rows.forEach(row => {
+                            html += '<tr>';
+                            row.forEach(cell => {
+                                const cellValue = cell === null ? '<em style="color: #999;">NULL</em>' : String(cell);
+                                html += `<td>${cellValue}</td>`;
+                            });
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+
+                        // Show limit warning if many rows
+                        if (rowCount >= 1000) {
+                            html += '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; font-size: 0.9em;">';
+                            html += '⚠️ Results limited to 1000 rows. Use LIMIT clause for better performance.';
+                            html += '</div>';
+                        }
+                    } else {
+                        html += '<div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; color: #666;">';
+                        html += 'No rows returned';
+                        html += '</div>';
+                    }
+
+                    html += '</div>';
+                } else {
+                    errorCount++;
+                    html += `
+                    <div class="query-error">
+                        <div class="query-error-header">
+                            ✗ ${result.database_name}
+                        </div>
+                        <div style="font-family: monospace; font-size: 0.9em; margin-top: 5px;">
+                            ${result.error}
+                        </div>
+                    </div>`;
+                }
+            });
+
+            // Add summary at the top
+            let summaryHtml = `
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <strong>Query Summary:</strong><br>
+                <div style="margin-top: 5px;">
+                    <strong>Method:</strong> ${methodDisplay[method]}<br>
+                    ✓ Success: ${successCount} database(s) |
+                    ✗ Errors: ${errorCount} database(s) |
+                    📊 Total rows: ${totalRows}
+                </div>
+                <details style="margin-top: 10px;">
+                    <summary style="cursor: pointer; color: #667eea; font-weight: 600;">View ${methodDisplay[method]} Input</summary>
+                    <pre style="background: white; padding: 10px; border-radius: 4px; margin-top: 5px; overflow-x: auto; font-size: 0.85em;">${queryParam}</pre>
+                </details>
+            </div>`;
+
+            resultsContent.innerHTML = summaryHtml + html;
+
+            // Scroll to results
+            document.getElementById('query-results-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function displayQueryResults(results, query) {
+            const resultsContent = document.getElementById('query-results-content');
+
+            let html = '';
+            let totalRows = 0;
+            let successCount = 0;
+            let errorCount = 0;
+
+            results.forEach(result => {
+                if (result.success) {
+                    successCount++;
+                    const rowCount = result.rows.length;
+                    totalRows += rowCount;
+
+                    html += `
+                    <div class="query-result-db">
+                        <div class="query-result-db-header">
+                            📦 ${result.database_name}
+                        </div>
+                        <div class="result-stats">
+                            Database: <code>${result.database_path}</code><br>
+                            Rows returned: <strong>${rowCount}</strong> |
+                            Execution time: <strong>${result.execution_time}s</strong>
+                        </div>`;
+
+                    if (rowCount > 0) {
+                        // Build table
+                        html += '<div style="overflow-x: auto; margin-top: 10px;">';
+                        html += '<table class="query-results-table">';
+
+                        // Header
+                        html += '<thead><tr>';
+                        result.columns.forEach(col => {
+                            html += `<th>${col}</th>`;
+                        });
+                        html += '</tr></thead>';
+
+                        // Rows
+                        html += '<tbody>';
+                        result.rows.forEach(row => {
+                            html += '<tr>';
+                            row.forEach(cell => {
+                                const cellValue = cell === null ? '<em style="color: #999;">NULL</em>' : String(cell);
+                                html += `<td>${cellValue}</td>`;
+                            });
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+
+                        // Show limit warning if many rows
+                        if (rowCount >= 1000) {
+                            html += '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; font-size: 0.9em;">';
+                            html += '⚠️ Results limited to 1000 rows. Use LIMIT clause for better performance.';
+                            html += '</div>';
+                        }
+                    } else {
+                        html += '<div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; color: #666;">';
+                        html += 'No rows returned';
+                        html += '</div>';
+                    }
+
+                    html += '</div>';
+                } else {
+                    errorCount++;
+                    html += `
+                    <div class="query-error">
+                        <div class="query-error-header">
+                            ✗ ${result.database_name}
+                        </div>
+                        <div style="font-family: monospace; font-size: 0.9em; margin-top: 5px;">
+                            ${result.error}
+                        </div>
+                    </div>`;
+                }
+            });
+
+            // Add summary at the top
+            let summaryHtml = `
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <strong>Query Summary:</strong><br>
+                <div style="margin-top: 5px;">
+                    ✓ Success: ${successCount} database(s) |
+                    ✗ Errors: ${errorCount} database(s) |
+                    📊 Total rows: ${totalRows}
+                </div>
+                <details style="margin-top: 10px;">
+                    <summary style="cursor: pointer; color: #667eea; font-weight: 600;">View Query</summary>
+                    <pre style="background: white; padding: 10px; border-radius: 4px; margin-top: 5px; overflow-x: auto; font-size: 0.85em;">${query}</pre>
+                </details>
+            </div>`;
+
+            resultsContent.innerHTML = summaryHtml + html;
+
+            // Scroll to results
+            document.getElementById('query-results-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function clearQueryResults() {
+            const resultsContainer = document.getElementById('query-results-container');
+            const resultsContent = document.getElementById('query-results-content');
+            resultsContainer.style.display = 'none';
+            resultsContent.innerHTML = '';
+        }
+
+        // Get Database Summary and Tables
+        async function getDatabaseSummary() {
+            // Get selected databases
+            const checkboxes = document.querySelectorAll('#query-database-selector input[type="checkbox"]:checked');
+
+            if (checkboxes.length === 0) {
+                alert('Please select at least one database');
+                return;
+            }
+
+            const selectedDbs = Array.from(checkboxes).map(cb => {
+                const index = parseInt(cb.value);
+                return loadedDatabases[index];
+            });
+
+            const resultsContainer = document.getElementById('query-results-container');
+            const resultsContent = document.getElementById('query-results-content');
+
+            resultsContainer.style.display = 'block';
+            resultsContent.innerHTML = '<div class="spinner"></div><p style="text-align: center; color: #666;">Loading database summaries...</p>';
+
+            try {
+                const response = await fetch('/api/database-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        databases: selectedDbs
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayDatabaseSummaries(data.summaries);
+                } else {
+                    resultsContent.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>✗ Error:</strong> ${data.message}
+                    </div>`;
+                }
+            } catch (error) {
+                resultsContent.innerHTML = `
+                <div class="alert alert-error">
+                    <strong>✗ Error:</strong> ${error.message}
+                </div>`;
+            }
+        }
+
+        function displayDatabaseSummaries(summaries) {
+            const resultsContent = document.getElementById('query-results-content');
+
+            let html = '';
+            let successCount = 0;
+            let errorCount = 0;
+            let totalTables = 0;
+
+            summaries.forEach(summary => {
+                if (summary.success) {
+                    successCount++;
+                    totalTables += summary.tables.length;
+
+                    html += `
+                    <div class="query-result-db">
+                        <div class="query-result-db-header">
+                            📦 ${summary.database_name}
+                        </div>
+                        <div class="result-stats">
+                            Database: <code>${summary.database_path}</code><br>
+                            Tables: <strong>${summary.tables.length}</strong> |
+                            Total Rows: <strong>${summary.total_rows}</strong>
+                        </div>`;
+
+                    if (summary.tables.length > 0) {
+                        html += '<div style="margin-top: 15px;">';
+                        html += '<h4 style="margin-bottom: 10px; color: #667eea;">📋 Tables:</h4>';
+                        html += '<table class="query-results-table">';
+                        html += '<thead><tr><th>Table Name</th><th>Row Count</th><th>Columns</th></tr></thead>';
+                        html += '<tbody>';
+
+                        summary.tables.forEach(table => {
+                            const columnCount = table.columns ? table.columns.length : 0;
+                            html += `<tr>
+                                <td style="font-weight: 600;">${table.name}</td>
+                                <td>${table.row_count !== undefined ? table.row_count.toLocaleString() : 'N/A'}</td>
+                                <td>${columnCount}</td>
+                            </tr>`;
+                        });
+
+                        html += '</tbody></table>';
+
+                        // Show columns for first table as example
+                        if (summary.tables[0] && summary.tables[0].columns) {
+                            html += '<details style="margin-top: 10px;">';
+                            html += '<summary style="cursor: pointer; color: #667eea; font-weight: 600;">📊 Show column details for first table</summary>';
+                            html += '<div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px;">';
+                            html += `<strong>Table: ${summary.tables[0].name}</strong><br>`;
+                            html += '<div style="margin-top: 5px; font-family: monospace; font-size: 0.9em;">';
+                            summary.tables[0].columns.forEach(col => {
+                                html += `<div style="padding: 3px 0;">• ${col.name} <span style="color: #999;">(${col.type})</span></div>`;
+                            });
+                            html += '</div></div></details>';
+                        }
+
+                        html += '</div>';
+                    } else {
+                        html += '<div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; color: #666;">';
+                        html += 'No tables found in database';
+                        html += '</div>';
+                    }
+
+                    html += '</div>';
+                } else {
+                    errorCount++;
+                    html += `
+                    <div class="query-error">
+                        <div class="query-error-header">
+                            ✗ ${summary.database_name}
+                        </div>
+                        <div style="font-family: monospace; font-size: 0.9em; margin-top: 5px;">
+                            ${summary.error}
+                        </div>
+                    </div>`;
+                }
+            });
+
+            // Add summary at the top
+            let summaryHtml = `
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #4CAF50;">
+                <strong>📊 Database Summary</strong><br>
+                <div style="margin-top: 5px;">
+                    ✓ Success: ${successCount} database(s) |
+                    ✗ Errors: ${errorCount} database(s) |
+                    📋 Total Tables: ${totalTables}
+                </div>
+                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                    <strong>Quick Actions:</strong><br>
+                    • Click on a table name to use in queries<br>
+                    • Use column names for Find conditions<br>
+                    • Row counts help estimate query times
+                </div>
+            </div>`;
+
+            resultsContent.innerHTML = summaryHtml + html;
+
+            // Scroll to results
+            document.getElementById('query-results-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         // Log viewer
