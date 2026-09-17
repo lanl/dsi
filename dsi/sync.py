@@ -7,7 +7,6 @@ import yaml
 import time
 import itertools
 import shutil
-import signal
 import pandas as pd
 from pathlib import Path
 from typing import Iterator
@@ -526,12 +525,6 @@ class Sync:
             if "No credentials" in stdout:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
-
-            # Test Conduit status
-            def alarm_handler(signum, frame):
-                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
-            signal.signal(signal.SIGALRM, alarm_handler)
-            signal.alarm(15)
 
             result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
             if "conduit/conduit-x86_64" not in str(result.stderr):
