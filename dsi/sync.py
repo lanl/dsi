@@ -7,7 +7,6 @@ import yaml
 import time
 import itertools
 import shutil
-import signal
 import pandas as pd
 from pathlib import Path
 from typing import Iterator
@@ -527,12 +526,6 @@ class Sync:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
 
-            # Test Conduit status
-            def alarm_handler(signum, frame):
-                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
-            signal.signal(signal.SIGALRM, alarm_handler)
-            signal.alarm(15)
-
             result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
             if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
@@ -551,7 +544,7 @@ class Sync:
                 print("Testing Conduit: conduit get")
             cmd = [*conduit_cmd, "get"]
             try:
-                result = subprocess.run(cmd, timeout=10)
+                result = subprocess.run(cmd, timeout=15)
             except subprocess.TimeoutExpired:
                 raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
 
