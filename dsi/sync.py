@@ -7,6 +7,7 @@ import yaml
 import time
 import itertools
 import shutil
+import signal
 import pandas as pd
 from pathlib import Path
 from typing import Iterator
