@@ -1076,7 +1076,18 @@ class Denodo(Webserver):
                 )
             df = df[display_cols]
 
-        return df.head(num_rows) if num_rows else df
+        # core.py reads attrs["max_rows"] to print "showing N of <total>",
+        # so it must be the row count BEFORE truncation (ndp.py precedent).
+        # Set it AFTER head(): older pandas does not carry attrs through a slice.
+        total_rows = len(df)
+
+        if num_rows:
+            df = df.head(num_rows)
+
+        df.attrs["max_rows"] = total_rows
+        return df
+
+
 
 
 
