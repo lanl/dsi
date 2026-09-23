@@ -95,6 +95,7 @@ def discover_endpoints():
         jump_host = data.get('jump_host')
         jump_username = data.get('jump_username')
         jump_password = data.get('jump_password')
+        reticket_cmd = data.get('reticket_cmd') or 'reticket'
 
         # Store credentials for this session
         session_credentials[session_id] = {
@@ -104,6 +105,7 @@ def discover_endpoints():
             'jump_host': jump_host,
             'jump_username': jump_username,
             'jump_password': jump_password,
+            'reticket_cmd': reticket_cmd,
             'jump_host_required': {}  # Maps hostname -> True if jump host needed
         }
 
@@ -136,6 +138,7 @@ def discover_endpoints():
                     jump_host=jump_host,
                     jump_username=jump_username,
                     jump_password=jump_password,
+                    reticket_cmd=reticket_cmd,
                     logger=logger
                 ))
 
@@ -193,7 +196,8 @@ def discover_endpoints():
             'log_file': str(log_file),
             'jump_host_map': session_credentials[session_id].get('jump_host_required', {}),
             'jump_host': jump_host,
-            'jump_username': jump_username
+            'jump_username': jump_username,
+            'reticket_cmd': reticket_cmd
         })
 
     except Exception as e:
@@ -218,6 +222,7 @@ def download_csv_files_ssh(hostname, csv_paths, temp_folder, username, password,
     jump_host = session_creds.get('jump_host') if session_creds else None
     jump_username = session_creds.get('jump_username') if session_creds else None
     jump_password = session_creds.get('jump_password') if session_creds else None
+    reticket_cmd = session_creds.get('reticket_cmd', 'reticket') if session_creds else 'reticket'
 
     # Debug logging
     logger.info(f"Download check for hostname: {hostname}")
@@ -235,6 +240,7 @@ def download_csv_files_ssh(hostname, csv_paths, temp_folder, username, password,
         jump_username=jump_username,
         jump_password=jump_password,
         jump_host_required=jump_host_required,
+        reticket_cmd=reticket_cmd,
         logger=logger
     ))
 
@@ -251,6 +257,7 @@ def download_database_file_ssh(hostname, remote_path, local_folder, username, pa
     jump_host = session_creds.get('jump_host') if session_creds else None
     jump_username = session_creds.get('jump_username') if session_creds else None
     jump_password = session_creds.get('jump_password') if session_creds else None
+    reticket_cmd = session_creds.get('reticket_cmd', 'reticket') if session_creds else 'reticket'
 
     # Call the core download function
     return asyncio.run(download_database_file_async(
@@ -263,6 +270,7 @@ def download_database_file_ssh(hostname, remote_path, local_folder, username, pa
         jump_username=jump_username,
         jump_password=jump_password,
         jump_host_required=jump_host_required,
+        reticket_cmd=reticket_cmd,
         logger=logger
     ))
 
@@ -284,6 +292,7 @@ def analyze_endpoints():
         jump_host = data.get('jump_host')
         jump_username = data.get('jump_username')
         jump_password = data.get('jump_password')
+        reticket_cmd = data.get('reticket_cmd')
 
         # Get jump host mapping from frontend (merged from all discovery sessions)
         jump_host_required_map = data.get('jump_host_required_map', {})
@@ -360,6 +369,12 @@ def analyze_endpoints():
                             session_credentials[session_id] = session_data  # Save back
                             logger.info(f"Updated session with fresh jump host credentials")
 
+                        # Update session with reticket_cmd if provided, otherwise fall back
+                        # to whatever was stored during discovery, defaulting to "reticket"
+                        if reticket_cmd:
+                            session_data['reticket_cmd'] = reticket_cmd
+                        reticket_cmd_for_call = session_data.get('reticket_cmd', 'reticket')
+
                         # Log jump host status for this cluster
                         jump_required = session_data.get('jump_host_required', {}).get(cluster_name, False)
                         if jump_required:
@@ -383,7 +398,8 @@ def analyze_endpoints():
                                     jump_host=session_data.get('jump_host'),
                                     jump_username=session_data.get('jump_username'),
                                     jump_password=session_data.get('jump_password'),
-                                    jump_host_required=jump_required
+                                    jump_host_required=jump_required,
+                                    reticket_cmd=reticket_cmd_for_call
                                 )
 
                                 if downloaded_file:
@@ -495,7 +511,8 @@ def analyze_endpoints():
                 'log_file': str(log_file),
                 'jump_host_map': session_credentials.get(session_id, {}).get('jump_host_required', {}),
                 'jump_host': session_credentials.get(session_id, {}).get('jump_host', ''),
-                'jump_username': session_credentials.get(session_id, {}).get('jump_username', '')
+                'jump_username': session_credentials.get(session_id, {}).get('jump_username', ''),
+                'reticket_cmd': session_credentials.get(session_id, {}).get('reticket_cmd', 'reticket')
             })
 
         finally:
@@ -532,6 +549,7 @@ def federate_data():
         jump_host = data.get('jump_host')
         jump_username = data.get('jump_username')
         jump_password = data.get('jump_password')
+        reticket_cmd = data.get('reticket_cmd')
 
         # New: Accept single database specification
         selected_database = data.get('selected_database')  # {location, path, type, cluster}
@@ -547,6 +565,12 @@ def federate_data():
             session_data['jump_username'] = jump_username
             session_data['jump_password'] = jump_password
             logger.info(f"Updated session with fresh jump host credentials for Step 3")
+
+        # Update session with reticket_cmd if provided, otherwise fall back
+        # to whatever was stored earlier, defaulting to "reticket"
+        if reticket_cmd:
+            session_data['reticket_cmd'] = reticket_cmd
+        reticket_cmd_for_call = session_data.get('reticket_cmd', 'reticket')
 
         # Resolve workspace folder path
         workspace_path = str(Path(workspace_folder).resolve())
@@ -600,7 +624,8 @@ def federate_data():
                     jump_host=session_data.get('jump_host'),
                     jump_username=session_data.get('jump_username'),
                     jump_password=session_data.get('jump_password'),
-                    jump_host_required=jump_required
+                    jump_host_required=jump_required,
+                    reticket_cmd=reticket_cmd_for_call
                 )
 
                 if downloaded_file_path:
@@ -1223,6 +1248,21 @@ def list_logs():
             'success': False,
             'message': str(e)
         }), 500
+
+
+@app.route('/api/help')
+def get_help():
+    """
+    Render help.md to HTML so the UI's Help tab can load it without a rebuild.
+    """
+    try:
+        import markdown
+        help_path = Path(__file__).parent / 'help.md'
+        md_text = help_path.read_text()
+        html = markdown.markdown(md_text, extensions=['fenced_code', 'tables'])
+        return jsonify({'success': True, 'html': html})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 if __name__ == '__main__':
