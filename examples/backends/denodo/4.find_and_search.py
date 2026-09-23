@@ -18,8 +18,12 @@ def main():
     print("\nViews whose name contains 'area':")
     dsi.find("name ~~ 'area'")
 
-    print("\nViews in one database (as a DataFrame):")
-    rows = dsi.find("database_name == 'dataportal'", collection=True)
+    # Take a database name from the result rather than hard-coding one, so the
+    # example works against any Data Catalog.
+    first_database = dsi.get_table("denodo_search_results", collection=True)["database_name"][0]
+
+    print(f"\nViews in the database '{first_database}' (as a DataFrame):")
+    rows = dsi.find(f"database_name == '{first_database}'", collection=True)
     print(f"{len(rows)} rows")
 
     print("\nFree-text search for 'waste' anywhere in the table:")
