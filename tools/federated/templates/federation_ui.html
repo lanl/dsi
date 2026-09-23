@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSI Data Federation Tool</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        background: #eef0f4;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    /* ---------- Top bar ---------- */
+    .topbar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 5;
+    }
+
+    .topbar h1 { font-size: 1.3em; font-weight: 600; }
+    .topbar .subtitle { opacity: 0.85; font-size: 0.85em; }
+    .topbar .spacer { flex: 1; }
+    .topbar .session-pill {
+        background: rgba(255,255,255,0.18);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8em;
+    }
+
+    /* ---------- Layout ---------- */
+    .layout {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+    }
+
+    .sidebar {
+        flex-shrink: 0;
+        overflow-y: auto;
+        background: white;
+    }
+
+    .sidebar-left {
+        width: 320px;
+        border-right: 1px solid #dcdfe4;
+        padding: 16px;
+    }
+
+    .sidebar-right {
+        width: 340px;
+        border-left: 1px solid #dcdfe4;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sidebar-right-top {
+        flex: 1 1 55%;
+        overflow-y: auto;
+        padding: 16px;
+        border-bottom: 1px solid #dcdfe4;
+        min-height: 0;
+    }
+
+    .sidebar-right-bottom {
+        flex: 1 1 45%;
+        overflow-y: auto;
+        padding: 12px 16px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .main-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        min-width: 0;
+    }
+
+    /* ---------- Sidebar sections ---------- */
+    .side-section {
+        margin-bottom: 18px;
+    }
+
+    .side-section-title {
+        font-size: 0.75em;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #8a8f98;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .side-card {
+        background: #f8f9fb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+    }
+
+    .side-card.destination-locked {
+        background: #f0f2ff;
+        border-color: #c7cdfa;
+    }
+
+    .destination-summary {
+        font-size: 0.85em;
+    }
+
+    .destination-summary .dest-host {
+        font-weight: 700;
+        color: #4b3fa8;
+        font-size: 1.05em;
+        word-break: break-all;
+    }
+
+    .destination-summary .dest-meta {
+        color: #666;
+        margin-top: 4px;
+    }
+
+    .link-btn {
+        background: none;
+        border: none;
+        color: #667eea;
+        font-size: 0.8em;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+    }
+
+    .link-btn:hover { color: #4b3fa8; }
+
+    /* ---------- Form elements ---------- */
+    .form-group { margin-bottom: 12px; }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.82em;
+        font-weight: 600;
+        color: #444;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1.5px solid #dcdfe4;
+        border-radius: 5px;
+        font-size: 0.9em;
+        transition: border-color 0.2s;
+        background: white;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .form-group small {
+        display: block;
+        margin-top: 3px;
+        color: #888;
+        font-size: 0.78em;
+    }
+
+    .btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 9px 16px;
+        border-radius: 6px;
+        font-size: 0.88em;
+        cursor: pointer;
+        font-weight: 600;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(102,126,234,0.35); }
+    .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-block { width: 100%; }
+    .btn-sm { padding: 5px 10px; font-size: 0.78em; }
+    .btn-secondary { background: #6c757d; }
+    .btn-success { background: #28a745; }
+    .btn-outline {
+        background: white;
+        color: #667eea;
+        border: 1.5px solid #667eea;
+    }
+    .btn-outline:hover { background: #f0f2ff; box-shadow: none; transform: none; }
+
+    /* ---------- Endpoint / database list items in sidebar ---------- */
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85em;
+        border: 1px solid transparent;
+        margin-bottom: 4px;
+        transition: background 0.15s;
+    }
+
+    .nav-item:hover { background: #f0f2ff; }
+
+    .nav-item.active {
+        background: #eef0ff;
+        border-color: #c7cdfa;
+        font-weight: 600;
+        color: #4b3fa8;
+    }
+
+    .nav-item .nav-item-icon { flex-shrink: 0; }
+    .nav-item .nav-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nav-item .nav-item-badge {
+        font-size: 0.72em;
+        background: #4CAF50;
+        color: white;
+        border-radius: 10px;
+        padding: 1px 7px;
+        flex-shrink: 0;
+    }
+
+    .empty-hint {
+        color: #999;
+        font-size: 0.82em;
+        padding: 8px 2px;
+        line-height: 1.4;
+    }
+
+    /* ---------- Alerts ---------- */
+    .alert {
+        padding: 12px 14px;
+        border-radius: 6px;
+        margin-bottom: 14px;
+        font-size: 0.9em;
+    }
+    .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+
+    .hidden { display: none !important; }
+
+    .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        animation: spin 1s linear infinite;
+        margin: 14px auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ---------- Main content tabs ---------- */
+    .main-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 18px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .main-tab {
+        background: none;
+        border: none;
+        padding: 10px 18px;
+        font-size: 0.92em;
+        font-weight: 600;
+        color: #888;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition: color 0.15s, border-color 0.15s;
+    }
+
+    .main-tab:hover { color: #4b3fa8; }
+
+    .main-tab.active {
+        color: #4b3fa8;
+        border-bottom-color: #667eea;
+    }
+
+    /* ---------- Main content cards ---------- */
+    .welcome-card {
+        max-width: 640px;
+        margin: 40px auto;
+        text-align: center;
+        color: #666;
+    }
+    .welcome-card h2 { color: #444; margin-bottom: 10px; }
+    .welcome-card .steps { text-align: left; margin-top: 24px; background: white; border-radius: 8px; padding: 20px; border: 1px solid #e5e7eb; }
+    .welcome-card .steps li { margin-bottom: 8px; }
+
+    /* ---------- Help tab (rendered markdown) ---------- */
+    .help-content {
+        max-width: 760px;
+        margin: 10px auto 40px;
+        text-align: left;
+        color: #333;
+        line-height: 1.6;
+    }
+    .help-content h1, .help-content h2, .help-content h3, .help-content h4 {
+        color: #333;
+        margin-top: 32px;
+        margin-bottom: 12px;
+        line-height: 1.3;
+    }
+    .help-content h1:first-child, .help-content h2:first-child, .help-content h3:first-child {
+        margin-top: 0;
+    }
+    .help-content h1 { font-size: 1.6em; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+    .help-content h2 { font-size: 1.3em; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+    .help-content h3 { font-size: 1.1em; color: #4b3fa8; }
+    .help-content p { margin: 12px 0; }
+    .help-content ul, .help-content ol { margin: 12px 0; padding-left: 28px; }
+    .help-content li { margin-bottom: 8px; }
+    .help-content li > ul, .help-content li > ol { margin: 8px 0; }
+    .help-content code {
+        background: #f0f2ff;
+        color: #4b3fa8;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+    .help-content pre {
+        background: #2d2d3a;
+        color: #f4f4f6;
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 16px 0;
+    }
+    .help-content pre code { background: none; color: inherit; padding: 0; }
+    .help-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 16px 0;
+    }
+    .help-content th, .help-content td {
+        border: 1px solid #e5e7eb;
+        padding: 8px 12px;
+        text-align: left;
+    }
+    .help-content th { background: #f7f7fb; }
+    .help-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+    .help-content blockquote {
+        border-left: 3px solid #667eea;
+        margin: 16px 0;
+        padding: 4px 16px;
+        color: #555;
+        background: #f7f7fb;
+    }
+
+    .content-card {
+        background: white;
+        border-radius: 10px;
+        padding: 24px;
+        margin-bottom: 20px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .content-card h2 {
+        color: #444;
+        font-size: 1.3em;
+        margin-bottom: 4px;
+    }
+    .content-card .content-card-sub { color: #888; font-size: 0.88em; margin-bottom: 18px; }
+
+    .cluster-section {
+        margin-bottom: 15px;
+        padding: 14px;
+        background: #f8f9fb;
+        border-radius: 6px;
+        border-left: 4px solid #28a745;
+    }
+    .cluster-section.failed { border-left-color: #dc3545; background: #fff5f5; }
+    .cluster-header { font-weight: 600; margin-bottom: 8px; color: #28a745; }
+    .cluster-section.failed .cluster-header { color: #dc3545; }
+
+    .db-result-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .db-result-item .db-info { flex: 1; min-width: 0; }
+    .db-result-item .db-loc { font-family: monospace; font-size: 0.88em; color: #2196F3; word-break: break-all; }
+    .db-result-item .db-path { font-family: monospace; font-size: 0.88em; color: #4CAF50; word-break: break-all; }
+    .db-result-item .db-meta { font-size: 0.78em; color: #999; margin-top: 3px; }
+    .db-result-item.downloaded { background: #e8f5e9; border-color: #b7dfb9; }
+
+    .inline-cred-box {
+        margin-top: 10px;
+        padding: 12px;
+        background: #fff8e1;
+        border-left: 4px solid #ff9800;
+        border-radius: 6px;
+    }
+    .inline-cred-box.hpc { background: #f0f2ff; border-left-color: #667eea; }
+
+    .database-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .database-card:hover { border-color: #667eea; box-shadow: 0 2px 8px rgba(102,126,234,0.15); }
+    .database-card.selected { border-color: #667eea; background: #f0f2ff; }
+    .db-card-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px; }
+    .db-card-title { font-weight: 600; font-size: 1.05em; }
+    .db-card-type { background: #667eea; color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.75em; }
+    .db-card-info { font-family: monospace; font-size: 0.85em; color: #666; margin: 4px 0; word-break: break-all; }
+
+    .db-detail-row { display: flex; border-bottom: 1px solid #eee; padding: 8px 0; font-size: 0.88em; }
+    .db-detail-row:last-child { border-bottom: none; }
+    .db-detail-label { font-weight: 600; color: #667eea; width: 130px; flex-shrink: 0; }
+    .db-detail-value { color: #333; font-family: monospace; word-break: break-all; }
+
+    .table-item {
+        background: #f8f9fb;
+        padding: 8px 10px;
+        margin: 4px 0;
+        border-radius: 4px;
+        border-left: 3px solid #667eea;
+        font-size: 0.88em;
+    }
+
+    .db-checkbox {
+        display: flex;
+        align-items: center;
+        padding: 7px 8px;
+        background: white;
+        margin: 4px 0;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid #eee;
+    }
+    .db-checkbox:hover { background: #f0f2ff; }
+    .db-checkbox input { margin-right: 8px; width: auto; }
+    .db-checkbox label { cursor: pointer; margin: 0; flex: 1; font-size: 0.88em; }
+
+    .query-method-btn { opacity: 0.6; transition: all 0.2s; }
+    .query-method-btn.active { opacity: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .query-method-btn:hover { opacity: 1; }
+    .query-method-input { margin-bottom: 16px; }
+
+    .query-results-table { width: 100%; border-collapse: collapse; margin: 10px 0; background: white; font-size: 0.85em; }
+    .query-results-table th { background: #667eea; color: white; padding: 8px 10px; text-align: left; }
+    .query-results-table td { padding: 7px 10px; border-bottom: 1px solid #eee; font-family: monospace; }
+    .query-results-table tr:hover { background: #f8f9fb; }
+
+    .query-result-db { background: #f8f9fb; border-left: 4px solid #667eea; padding: 12px; margin: 12px 0; border-radius: 6px; }
+    .query-result-db-header { font-weight: 600; color: #667eea; margin-bottom: 6px; }
+    .query-error { background: #fff5f5; border-left: 4px solid #dc3545; padding: 12px; margin: 12px 0; border-radius: 6px; }
+    .query-error-header { font-weight: 600; color: #dc3545; margin-bottom: 4px; }
+    .result-stats { font-size: 0.8em; color: #666; margin-top: 4px; }
+
+    /* ---------- Activity log (right-bottom) ---------- */
+    .log-title {
+        font-size: 0.75em;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #9aa0a8;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .log-title .link-btn { color: #8fb8ff; }
+
+    .log-feed {
+        flex: 1;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 0.78em;
+        line-height: 1.5;
+    }
+
+    .log-line { margin-bottom: 3px; word-break: break-word; }
+    .log-line .log-time { color: #6a9955; }
+    .log-line.log-success .log-msg { color: #6bcB77; }
+    .log-line.log-error .log-msg { color: #f28b82; }
+    .log-line.log-info .log-msg { color: #d4d4d4; }
+
+    .session-log-panel {
+        border-bottom: 1px solid #333;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+    }
+    .session-log-panel select {
+        width: 100%;
+        margin-bottom: 6px;
+        background: #2a2a2a;
+        color: #d4d4d4;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 4px;
+        font-size: 0.8em;
+    }
+    .session-log-content {
+        max-height: 140px;
+        overflow-y: auto;
+        background: #111;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 0.75em;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    /* ---------- Right sidebar "top" details ---------- */
+    .detail-placeholder { color: #999; font-size: 0.85em; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="app">
+
+    <div class="topbar">
+        <h1>🌐 DSI Data Federation</h1>
+        <span class="subtitle">Sidebar Interface</span>
+        <div class="spacer"></div>
+        <span class="session-pill" id="session-pill">No active session</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- ============ LEFT SIDEBAR ============ -->
+        <div class="sidebar sidebar-left">
+
+            <!-- Step 1: Workspace (must be set first) -->
+            <div class="side-section">
+                <div class="side-section-title">① Workspace</div>
+                <div id="workspace-form-card" class="side-card">
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <input type="text" id="workspace-folder" placeholder="./federated_data">
+                        <small>Downloads land here. Also used to browse previously downloaded databases.</small>
+                    </div>
+                    <button class="btn btn-block" onclick="setWorkspace()">
+                        ✓ Set Workspace
+                    </button>
+                    <div id="workspace-result"></div>
+                </div>
+
+                <div id="workspace-summary-card" class="side-card destination-locked hidden">
+                    <div class="destination-summary">
+                        <div class="dest-host" id="workspace-path-label"></div>
+                    </div>
+                    <div style="margin-top:8px; display:flex; gap:10px;">
+                        <button class="link-btn" onclick="refreshDownloadedDatabases()">🔄 Refresh databases</button>
+                        <button class="link-btn" onclick="changeWorkspace()">↺ Change workspace</button>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+
+            <!-- Step 2: Fetch Endpoint -->
+            <div class="side-section">
+                <div class="side-section-title">② Fetch Endpoint</div>
+                <div id="destination-nav-card">
+                    <div class="nav-item" id="federate-nav-item" onclick="showFederateForm()">
+                        <span class="nav-item-icon">🌐</span>
+                        <span class="nav-item-label">Fetch endpoints from a destination...</span>
+                    </div>
+                </div>
+
+                <div id="destination-summary-card" class="side-card destination-locked hidden">
+                    <div class="destination-summary">
+                        <div class="dest-host" id="dest-host-label"></div>
+                        <div class="dest-meta" id="dest-meta-label"></div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <button class="link-btn" onclick="changeDestination()">↺ Change destination / reload</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Endpoints list -->
+            <div class="side-section">
+                <div class="side-section-title">③ Endpoints <span id="endpoint-count-badge"></span></div>
+                <div id="endpoints-nav">
+                    <div class="empty-hint">Load endpoints from a destination above to see them here.</div>
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+
+            <!-- Downloaded databases -->
+            <div class="side-section">
+                <div class="side-section-title">🗄️ Databases <span id="database-count-badge"></span></div>
+                <div id="databases-nav">
+                    <div class="empty-hint">Databases you download (or that already exist in the workspace) will appear here.</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ============ MAIN CONTENT ============ -->
+        <div class="main-content" id="main-content">
+            <div class="main-tabs">
+                <button class="main-tab active" id="tab-work" onclick="showMainTab('work')">Federation</button>
+                <button class="main-tab" id="tab-help" onclick="showMainTab('help')">Help</button>
+            </div>
+
+            <div id="tabpanel-work">
+                <div class="content-card hidden" id="view-federate">
+                    <h2>🌐 Fetch Endpoint</h2>
+                    <div class="content-card-sub">Choose the HPC destination to discover endpoints on.</div>
+
+                    <div class="form-group">
+                        <label for="hpc-type">HPC Type</label>
+                        <select id="hpc-type" onchange="toggleJumpHostFields()">
+                            <option value="hpc">HPC (Direct SSH)</option>
+                            <option value="kerberos">Kerberos (via Jump Host)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="hpc-name">HPC Hostname</label>
+                        <input type="text" id="hpc-name" placeholder="cluster1.lanl.gov">
+                    </div>
+                    <div class="form-group">
+                        <label for="username">Username (on HPC)</label>
+                        <input type="text" id="username" placeholder="Your username">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Leave blank for SSH keys">
+                    </div>
+
+                    <div id="jump-host-fields" class="hidden">
+                        <div class="form-group">
+                            <label for="jump-host">Jump Host</label>
+                            <input type="text" id="jump-host" placeholder="jump.lanl.gov">
+                        </div>
+                        <div class="form-group">
+                            <label for="jump-username">Jump Host Username</label>
+                            <input type="text" id="jump-username" placeholder="Username on jump host">
+                        </div>
+                        <div class="form-group">
+                            <label for="jump-password">Jump Host Password</label>
+                            <input type="password" id="jump-password" placeholder="Jump host password">
+                        </div>
+                        <div class="form-group">
+                            <label for="reticket-cmd">Kerberos Init Command</label>
+                            <input type="text" id="reticket-cmd" value="reticket" placeholder="reticket">
+                            <small>Command run on the jump host to (re)initialize Kerberos tickets, e.g. "reticket" or "kinit".</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="script-path">Endpoint Script Path</label>
+                        <input type="text" id="script-path" placeholder="/path/to/load_dsi_endpoints.sh">
+                    </div>
+                    <div class="form-group">
+                        <label for="prefixes">Endpoint Prefixes</label>
+                        <input type="text" id="prefixes" value="DSI_ENDPOINT_,DIANA_ENDPOINT_">
+                    </div>
+
+                    <button class="btn" id="load-endpoints-btn" onclick="loadEndpoints()">
+                        🔍 Load Endpoints
+                    </button>
+                    <div id="destination-spinner" class="spinner hidden"></div>
+                    <div id="destination-result"></div>
+                </div>
+
+                <div class="welcome-card" id="view-welcome">
+                    <h2>Nothing selected yet</h2>
+                    <p>Click "Fetch endpoints from a destination..." in the left sidebar to get started, or see the <button class="link-btn" onclick="showMainTab('help')" style="font-size:1em;">Help</button> tab for a walkthrough.</p>
+                </div>
+
+                <div id="view-endpoint" class="hidden"></div>
+                <div id="view-database" class="hidden"></div>
+            </div>
+
+            <div id="tabpanel-help" class="hidden">
+                <div class="help-content" id="help-content">Loading help...</div>
+            </div>
+        </div>
+
+        <!-- ============ RIGHT SIDEBAR ============ -->
+        <div class="sidebar sidebar-right">
+            <div class="sidebar-right-top" id="details-panel">
+                <div class="side-section-title">📋 Details</div>
+                <div class="detail-placeholder" id="details-content">
+                    Select an endpoint or database to see details here.
+                </div>
+            </div>
+            <div class="sidebar-right-bottom">
+                <div class="session-log-panel">
+                    <div class="log-title">
+                        Session Log Files
+                        <button class="link-btn" onclick="loadSessionLogList()">🔄 refresh</button>
+                    </div>
+                    <select id="log-select">
+                        <option value="">-- Select a log file --</option>
+                    </select>
+                    <div id="session-log-content" class="session-log-content hidden"></div>
+                </div>
+                <div class="log-title">Activity</div>
+                <div class="log-feed" id="activity-feed"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // Global state
+    // ============================================================
+    let currentSessionId = null;
+    let workspaceFolder = null;      // must be set before fetching endpoints
+    let destination = null;          // { hpcName, hpcType, jumpHostMap, jumpHost, jumpUsername }
+    let discoveredEndpoints = {};    // name ("hpc::endpoint") -> path, for the active destination only
+    let pulledByEndpoint = {};       // endpointName -> analyze-endpoints result (databases_by_cluster/totals)
+    let activeEndpoint = null;       // currently selected endpoint name
+    let downloadedDatabases = [];    // list of database info objects (workspace-scoped)
+    let activeDatabaseIndex = null;  // index into downloadedDatabases currently shown in main view
+    let currentQueryMethod = 'query';
+
+    // ============================================================
+    // Activity log (right sidebar, bottom)
+    // ============================================================
+    function logActivity(message, level = 'info') {
+        const feed = document.getElementById('activity-feed');
+        const time = new Date().toLocaleTimeString();
+        const line = document.createElement('div');
+        line.className = `log-line log-${level}`;
+        line.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-msg">${message}</span>`;
+        feed.appendChild(line);
+        feed.scrollTop = feed.scrollHeight;
+    }
+
+    async function loadSessionLogList() {
+        try {
+            const response = await fetch('/api/logs');
+            const data = await response.json();
+            if (data.success) {
+                const select = document.getElementById('log-select');
+                select.innerHTML = '<option value="">-- Select a log file --</option>';
+                data.logs.forEach(log => {
+                    const option = document.createElement('option');
+                    option.value = log.session_id;
+                    option.textContent = `${log.session_id} (${(log.size / 1024).toFixed(1)} KB)`;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            logActivity(`Failed to load log list: ${error.message}`, 'error');
+        }
+    }
+
+    document.getElementById('log-select').addEventListener('change', async (e) => {
+        const sessionId = e.target.value;
+        const contentBox = document.getElementById('session-log-content');
+        if (!sessionId) {
+            contentBox.classList.add('hidden');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/logs/${sessionId}`);
+            const data = await response.json();
+            if (data.success) {
+                contentBox.classList.remove('hidden');
+                contentBox.textContent = data.content;
+                contentBox.scrollTop = contentBox.scrollHeight;
+            }
+        } catch (error) {
+            logActivity(`Failed to load log content: ${error.message}`, 'error');
+        }
+    });
+
+    // ============================================================
+    // Details panel (right sidebar, top)
+    // ============================================================
+    function setDetails(html) {
+        document.getElementById('details-content').innerHTML = html;
+    }
+
+    function detailRow(label, value) {
+        return `<div class="db-detail-row">
+            <div class="db-detail-label">${label}:</div>
+            <div class="db-detail-value">${value}</div>
+        </div>`;
+    }
+
+    // ============================================================
+    // Main view switching
+    // ============================================================
+    function showMainView(viewName) {
+        showMainTab('work');
+        document.getElementById('view-welcome').classList.add('hidden');
+        document.getElementById('view-federate').classList.add('hidden');
+        document.getElementById('view-endpoint').classList.add('hidden');
+        document.getElementById('view-database').classList.add('hidden');
+        document.getElementById(`view-${viewName}`).classList.remove('hidden');
+    }
+
+    function showMainTab(tabName) {
+        document.getElementById('tab-work').classList.toggle('active', tabName === 'work');
+        document.getElementById('tab-help').classList.toggle('active', tabName === 'help');
+        document.getElementById('tabpanel-work').classList.toggle('hidden', tabName !== 'work');
+        document.getElementById('tabpanel-help').classList.toggle('hidden', tabName !== 'help');
+        if (tabName === 'help') {
+            loadHelpContent();
+        }
+    }
+
+    let helpLoaded = false;
+    async function loadHelpContent() {
+        if (helpLoaded) return;
+        const container = document.getElementById('help-content');
+        try {
+            const response = await fetch('/api/help');
+            const data = await response.json();
+            if (data.success) {
+                container.innerHTML = data.html;
+                helpLoaded = true;
+            } else {
+                container.innerHTML = `<div class="alert alert-error">Failed to load help: ${data.message}</div>`;
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="alert alert-error">Failed to load help: ${error.message}</div>`;
+        }
+    }
+
+    // ============================================================
+    // Step 1: Workspace (must be set before anything else)
+    // ============================================================
+    function setWorkspace() {
+        const folder = document.getElementById('workspace-folder').value.trim();
+        const result = document.getElementById('workspace-result');
+        if (!folder) {
+            result.innerHTML = '<div class="alert alert-error">Please enter a workspace folder path.</div>';
+            return;
+        }
+        workspaceFolder = folder;
+        result.innerHTML = '';
+        lockWorkspaceForm(folder);
+        logActivity(`Workspace set to <strong>${folder}</strong>`, 'success');
+        refreshDownloadedDatabases();
+    }
+
+    function lockWorkspaceForm(folder) {
+        document.getElementById('workspace-form-card').classList.add('hidden');
+        const summaryCard = document.getElementById('workspace-summary-card');
+        summaryCard.classList.remove('hidden');
+        document.getElementById('workspace-path-label').textContent = `📁 ${folder}`;
+    }
+
+    function changeWorkspace() {
+        document.getElementById('workspace-form-card').classList.remove('hidden');
+        document.getElementById('workspace-summary-card').classList.add('hidden');
+        document.getElementById('workspace-result').innerHTML = '';
+    }
+
+    // ============================================================
+    // Step 2: Fetch Endpoint / Load Endpoints
+    // ============================================================
+    function showFederateForm() {
+        if (!workspaceFolder) {
+            logActivity('Set a workspace folder first before fetching endpoints.', 'error');
+            alert('Please set a workspace folder first (left sidebar, step ①).');
+            return;
+        }
+        showMainView('federate');
+    }
+
+    function toggleJumpHostFields() {
+        const hpcType = document.getElementById('hpc-type').value;
+        document.getElementById('jump-host-fields').classList.toggle('hidden', hpcType !== 'kerberos');
+    }
+
+    async function loadEndpoints() {
+        const button = document.getElementById('load-endpoints-btn');
+        const spinner = document.getElementById('destination-spinner');
+        const result = document.getElementById('destination-result');
+
+        const hpcName = document.getElementById('hpc-name').value.trim();
+        const scriptPath = document.getElementById('script-path').value.trim();
+        const hpcType = document.getElementById('hpc-type').value;
+
+        if (!hpcName || !scriptPath) {
+            result.innerHTML = '<div class="alert alert-error">Hostname and script path are required.</div>';
+            return;
+        }
+
+        const prefixesStr = document.getElementById('prefixes').value;
+        const prefixes = prefixesStr.split(',').map(p => p.trim()).filter(p => p);
+
+        const formData = {
+            hpc_type: hpcType,
+            hpc_names: [hpcName],
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value || null,
+            script_path: scriptPath,
+            prefixes: prefixes
+        };
+
+        if (hpcType === 'kerberos') {
+            formData.jump_host = document.getElementById('jump-host').value.trim();
+            formData.jump_username = document.getElementById('jump-username').value.trim();
+            formData.jump_password = document.getElementById('jump-password').value || null;
+            formData.reticket_cmd = document.getElementById('reticket-cmd').value.trim() || 'reticket';
+
+            if (!formData.jump_host || !formData.jump_username) {
+                result.innerHTML = '<div class="alert alert-error">Jump host and username required for Kerberos.</div>';
+                return;
+            }
+        }
+
+        button.disabled = true;
+        spinner.classList.remove('hidden');
+        result.innerHTML = '';
+
+        try {
+            const response = await fetch('/api/discover-endpoints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                currentSessionId = data.session_id;
+                document.getElementById('session-pill').textContent = `Session: ${currentSessionId}`;
+
+                destination = {
+                    hpcName: hpcName,
+                    hpcType: hpcType,
+                    jumpHostMap: data.jump_host_map || {},
+                    jumpHost: data.jump_host || '',
+                    jumpUsername: data.jump_username || '',
+                    reticketCmd: data.reticket_cmd || 'reticket'
+                };
+
+                discoveredEndpoints = Object.assign({}, discoveredEndpoints, data.endpoints);
+
+                result.innerHTML = `<div class="alert alert-success">Found ${Object.keys(data.endpoints).length} endpoint(s).</div>`;
+                logActivity(`Loaded ${Object.keys(data.endpoints).length} endpoint(s) from <strong>${hpcName}</strong>`, 'success');
+
+                lockDestinationForm(hpcName, hpcType);
+                renderEndpointsNav();
+            } else {
+                result.innerHTml = '';
+                result.innerHTML = `<div class="alert alert-error">${data.message}</div>`;
+                logActivity(`Failed to load endpoints from ${hpcName}: ${data.message}`, 'error');
+            }
+        } catch (error) {
+            result.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            logActivity(`Error loading endpoints: ${error.message}`, 'error');
+        } finally {
+            button.disabled = false;
+            spinner.classList.add('hidden');
+        }
+    }
+
+    function lockDestinationForm(hpcName, hpcType) {
+        document.getElementById('destination-nav-card').classList.add('hidden');
+        const summaryCard = document.getElementById('destination-summary-card');
+        summaryCard.classList.remove('hidden');
+        document.getElementById('dest-host-label').textContent = `🖥️ ${hpcName}`;
+        document.getElementById('dest-meta-label').textContent =
+            hpcType === 'kerberos' ? 'Kerberos (via jump host)' : 'Direct SSH';
+    }
+
+    function changeDestination() {
+        document.getElementById('destination-nav-card').classList.remove('hidden');
+        document.getElementById('destination-summary-card').classList.add('hidden');
+        document.getElementById('destination-result').innerHTML = '';
+        showFederateForm();
+    }
+
+    // ============================================================
+    // Step 2: Endpoints list + credentials + pull (analyze-endpoints)
+    // ============================================================
+    function renderEndpointsNav() {
+        const nav = document.getElementById('endpoints-nav');
+        const badge = document.getElementById('endpoint-count-badge');
+        const names = Object.keys(discoveredEndpoints);
+
+        badge.textContent = names.length ? `(${names.length})` : '';
+
+        if (names.length === 0) {
+            nav.innerHTML = '<div class="empty-hint">Load endpoints from a destination above to see them here.</div>';
+            return;
+        }
+
+        let html = '';
+        for (const name of names) {
+            const displayName = name.includes('::') ? name.split('::')[1] : name;
+            const isActive = name === activeEndpoint;
+            const isPulled = !!pulledByEndpoint[name];
+            html += `<div class="nav-item ${isActive ? 'active' : ''}" onclick="selectEndpoint('${name.replace(/'/g, "\\'")}')">
+                <span class="nav-item-icon">📡</span>
+                <span class="nav-item-label">${displayName}</span>
+                ${isPulled ? '<span class="nav-item-badge">pulled</span>' : ''}
+            </div>`;
+        }
+        nav.innerHTML = html;
+    }
+
+    function selectEndpoint(name) {
+        activeEndpoint = name;
+        renderEndpointsNav();
+        renderEndpointView();
+    }
+
+    function renderEndpointView() {
+        if (!activeEndpoint) return;
+        showMainView('endpoint');
+
+        const path = discoveredEndpoints[activeEndpoint];
+        const clusterName = activeEndpoint.includes('::') ? activeEndpoint.split('::')[0] : 'unknown';
+        const displayName = activeEndpoint.includes('::') ? activeEndpoint.split('::')[1] : activeEndpoint;
+        const needsJumpHost = destination && destination.jumpHostMap && destination.jumpHostMap[clusterName];
+        const pulled = pulledByEndpoint[activeEndpoint];
+
+        setDetails(`
+            <div class="db-detail-row"><div class="db-detail-label">Endpoint:</div><div class="db-detail-value">${displayName}</div></div>
+            <div class="db-detail-row"><div class="db-detail-label">Cluster:</div><div class="db-detail-value">${clusterName}</div></div>
+            <div class="db-detail-row"><div class="db-detail-label">Path:</div><div class="db-detail-value">${path}</div></div>
+            <div class="db-detail-row"><div class="db-detail-label">Jump host:</div><div class="db-detail-value">${needsJumpHost ? 'Required' : 'Not required'}</div></div>
+            ${pulled ? `<div class="db-detail-row"><div class="db-detail-label">Databases found:</div><div class="db-detail-value">${pulled.totals.total}</div></div>` : ''}
+        `);
+
+        let html = `<div class="content-card">
+            <h2>📡 ${displayName}</h2>
+            <div class="content-card-sub">${clusterName} &middot; ${path}</div>`;
+
+        if (!pulled) {
+            html += renderPullCredentialsForm(clusterName, needsJumpHost);
+        } else {
+            html += `<div class="alert alert-success">✓ Pulled ${pulled.totals.total} database(s) from this endpoint.</div>`;
+            html += `<button class="btn btn-outline btn-sm" onclick="resetPull()">↺ Re-pull with different credentials</button>`;
+        }
+        html += `<div id="pull-spinner-endpoint" class="spinner hidden"></div><div id="pull-result-endpoint"></div></div>`;
+
+        if (pulled) {
+            html += renderDataSourcesCard(pulled, clusterName);
+        }
+
+        document.getElementById('view-endpoint').innerHTML = html;
+    }
+
+    function renderPullCredentialsForm(clusterName, needsJumpHost) {
+        let html = '<div class="side-card" style="margin-top: 10px;">';
+        html += '<h4 style="margin-bottom:10px;">🔐 Credentials to pull data sources</h4>';
+
+        if (needsJumpHost) {
+            html += `<div class="inline-cred-box">
+                <strong>Jump Host Required</strong>
+                <div class="form-group" style="margin-top:8px;">
+                    <label for="jump-host-pull">Jump Host</label>
+                    <input type="text" id="jump-host-pull" value="${destination.jumpHost || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="jump-username-pull">Jump Host Username</label>
+                    <input type="text" id="jump-username-pull" value="${destination.jumpUsername || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="jump-password-pull">Jump Host Password</label>
+                    <input type="password" id="jump-password-pull">
+                </div>
+                <div class="form-group">
+                    <label for="reticket-cmd-pull">Kerberos Init Command</label>
+                    <input type="text" id="reticket-cmd-pull" value="${destination.reticketCmd || 'reticket'}">
+                </div>
+            </div>`;
+        }
+
+        html += `
+            <div class="form-group">
+                <label for="pull-username">Username for ${clusterName}</label>
+                <input type="text" id="pull-username">
+            </div>
+            <div class="form-group">
+                <label for="pull-password">Password</label>
+                <input type="password" id="pull-password">
+                <small>Leave blank to use SSH keys</small>
+            </div>
+            <button class="btn" onclick="pullEndpoint()">📥 Pull Data Sources</button>
+        </div>`;
+        return html;
+    }
+
+    function resetPull() {
+        delete pulledByEndpoint[activeEndpoint];
+        renderEndpointsNav();
+        renderEndpointView();
+    }
+
+    async function pullEndpoint() {
+        const spinner = document.getElementById('pull-spinner-endpoint');
+        const result = document.getElementById('pull-result-endpoint');
+
+        const username = document.getElementById('pull-username')?.value || '';
+        const password = document.getElementById('pull-password')?.value || '';
+
+        if (!username) {
+            result.innerHTML = '<div class="alert alert-error">Username is required.</div>';
+            return;
+        }
+
+        const clusterName = activeEndpoint.includes('::') ? activeEndpoint.split('::')[0] : 'unknown';
+        const needsJumpHost = destination && destination.jumpHostMap && destination.jumpHostMap[clusterName];
+
+        const requestBody = {
+            session_id: currentSessionId,
+            endpoints_location: { [activeEndpoint]: discoveredEndpoints[activeEndpoint] },
+            endpoint_credentials: { [activeEndpoint]: { username, password } },
+            jump_host_required_map: destination ? destination.jumpHostMap : {}
+        };
+
+        if (needsJumpHost) {
+            const jumpHost = document.getElementById('jump-host-pull')?.value || '';
+            const jumpUsername = document.getElementById('jump-username-pull')?.value || '';
+            const jumpPassword = document.getElementById('jump-password-pull')?.value || '';
+            const reticketCmd = document.getElementById('reticket-cmd-pull')?.value.trim() || 'reticket';
+            if (!jumpHost || !jumpUsername || !jumpPassword) {
+                result.innerHTML = '<div class="alert alert-error">Jump host credentials are required.</div>';
+                return;
+            }
+            requestBody.jump_host = jumpHost;
+            requestBody.jump_username = jumpUsername;
+            requestBody.jump_password = jumpPassword;
+            requestBody.reticket_cmd = reticketCmd;
+        }
+
+        spinner.classList.remove('hidden');
+        result.innerHTML = '';
+
+        try {
+            const response = await fetch('/api/analyze-endpoints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                pulledByEndpoint[activeEndpoint] = data;
+                if (data.jump_host) {
+                    destination.jumpHost = data.jump_host;
+                    destination.jumpUsername = data.jump_username;
+                }
+                if (data.reticket_cmd) {
+                    destination.reticketCmd = data.reticket_cmd;
+                }
+                if (data.jump_host_map) {
+                    destination.jumpHostMap = Object.assign({}, destination.jumpHostMap, data.jump_host_map);
+                }
+                logActivity(`Pulled ${data.totals.total} database(s) from <strong>${activeEndpoint}</strong>`, 'success');
+                renderEndpointsNav();
+                renderEndpointView();
+            } else {
+                result.innerHTML = `<div class="alert alert-error">${data.message}</div>`;
+                logActivity(`Pull failed for ${activeEndpoint}: ${data.message}`, 'error');
+            }
+        } catch (error) {
+            result.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            logActivity(`Pull error: ${error.message}`, 'error');
+        } finally {
+            spinner.classList.add('hidden');
+        }
+    }
+
+    // ============================================================
+    // Step 3: choose a database from the pulled data sources & download
+    // ============================================================
+    function renderDataSourcesCard(pulled, clusterName) {
+        let html = `<div class="content-card">
+            <h2>🗄️ Choose a database to download</h2>
+            <div class="content-card-sub">From ${clusterName} &middot; workspace: <code>${workspaceFolder}</code></div>`;
+
+        let index = 0;
+        for (const [cluster, clusterData] of Object.entries(pulled.databases_by_cluster)) {
+            if (clusterData.hpc_by_location) {
+                for (const [location, dbs] of Object.entries(clusterData.hpc_by_location)) {
+                    for (const db of dbs) {
+                        html += renderDbResultItem(index++, cluster, location, db.path, 'hpc', db);
+                    }
+                }
+            }
+            if (clusterData.url_databases) {
+                for (const db of clusterData.url_databases) {
+                    html += renderDbResultItem(index++, cluster, db.location, db.path, 'url', db);
+                }
+            }
+            if (clusterData.s3_databases) {
+                for (const db of clusterData.s3_databases) {
+                    html += renderDbResultItem(index++, cluster, db.location, db.path, 's3', db);
+                }
+            }
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    function renderDbResultItem(index, cluster, location, path, type, db) {
+        const typeIcon = { hpc: '🖥️', url: '🌐', s3: '☁️' }[type];
+        return `<div class="db-result-item" id="db-item-${index}">
+            <div class="db-info">
+                <div>${typeIcon} <span class="db-loc">${location}</span>:<span class="db-path">${path}</span></div>
+                <div class="db-meta">Cluster: ${cluster} | Type: ${type} | Submitter: ${db.submitter_name || 'unknown'}</div>
+                <div id="db-item-cred-${index}"></div>
+            </div>
+            <div style="flex-shrink:0;">
+                <button class="btn btn-sm" onclick="startDownload(${index}, '${cluster}', '${location.replace(/'/g, "\\'")}', '${path.replace(/'/g, "\\'")}', '${type}')">
+                    ⬇️ Download
+                </button>
+            </div>
+        </div>`;
+    }
+
+    function startDownload(index, cluster, location, path, type) {
+        const box = document.getElementById(`db-item-cred-${index}`);
+        const needsJumpHost = destination && destination.jumpHostMap && destination.jumpHostMap[location];
+
+        if (type !== 'hpc') {
+            box.innerHTML = `<div style="margin-top:8px;">
+                <button class="btn btn-success btn-sm" onclick="confirmDownload(${index}, '${cluster}', '${location.replace(/'/g, "\\'")}', '${path.replace(/'/g, "\\'")}', '${type}')">
+                    ✓ Confirm download (no credentials needed)
+                </button>
+            </div>`;
+            return;
+        }
+
+        let html = `<div class="inline-cred-box hpc">`;
+        if (needsJumpHost) {
+            html += `
+                <div class="form-group">
+                    <label>Jump Host</label>
+                    <input type="text" id="dl-jump-host-${index}" value="${destination.jumpHost || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Jump Host Username</label>
+                    <input type="text" id="dl-jump-username-${index}" value="${destination.jumpUsername || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Jump Host Password</label>
+                    <input type="password" id="dl-jump-password-${index}">
+                </div>
+                <div class="form-group">
+                    <label>Kerberos Init Command</label>
+                    <input type="text" id="dl-reticket-cmd-${index}" value="${destination.reticketCmd || 'reticket'}">
+                </div>`;
+        }
+        html += `
+            <div class="form-group">
+                <label>Username for ${location}</label>
+                <input type="text" id="dl-username-${index}">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="dl-password-${index}">
+            </div>
+            <button class="btn btn-success btn-sm" onclick="confirmDownload(${index}, '${cluster}', '${location.replace(/'/g, "\\'")}', '${path.replace(/'/g, "\\'")}', '${type}')">
+                ✓ Confirm download
+            </button>
+        </div>`;
+        box.innerHTML = html;
+    }
+
+    async function confirmDownload(index, cluster, location, path, type) {
+        const workspace = workspaceFolder;
+        if (!workspace) {
+            alert('Please set a workspace folder in the left sidebar.');
+            return;
+        }
+
+        let username = '', password = '';
+        if (type === 'hpc') {
+            username = document.getElementById(`dl-username-${index}`)?.value || '';
+            password = document.getElementById(`dl-password-${index}`)?.value || '';
+            if (!username) {
+                alert('Username is required for HPC databases.');
+                return;
+            }
+        }
+
+        const needsJumpHost = destination && destination.jumpHostMap && destination.jumpHostMap[location];
+        let jumpHost = '', jumpUsername = '', jumpPassword = '', reticketCmd = '';
+        if (needsJumpHost) {
+            jumpHost = document.getElementById(`dl-jump-host-${index}`)?.value || '';
+            jumpUsername = document.getElementById(`dl-jump-username-${index}`)?.value || '';
+            jumpPassword = document.getElementById(`dl-jump-password-${index}`)?.value || '';
+            reticketCmd = document.getElementById(`dl-reticket-cmd-${index}`)?.value.trim() || 'reticket';
+            if (!jumpHost || !jumpUsername || !jumpPassword) {
+                alert('Jump host credentials are required.');
+                return;
+            }
+        }
+
+        const credentials = {};
+        if (type === 'hpc') credentials[location] = { username, password };
+
+        const requestBody = {
+            session_id: currentSessionId,
+            workspace_folder: workspace,
+            credentials: credentials,
+            selected_database: { location, path, type, cluster }
+        };
+        if (needsJumpHost) {
+            requestBody.jump_host = jumpHost;
+            requestBody.jump_username = jumpUsername;
+            requestBody.jump_password = jumpPassword;
+            requestBody.reticket_cmd = reticketCmd;
+        }
+
+        const item = document.getElementById(`db-item-${index}`);
+        item.style.opacity = '0.6';
+
+        try {
+            const response = await fetch('/api/federate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                const db = data.database_info[0];
+                downloadedDatabases.push(db);
+                item.classList.add('downloaded');
+                item.style.opacity = '1';
+                document.getElementById(`db-item-cred-${index}`).innerHTML =
+                    '<div class="alert alert-success" style="margin:8px 0 0 0;">✓ Downloaded</div>';
+                logActivity(`Downloaded <strong>${db.name}</strong> to workspace`, 'success');
+                renderDatabasesNav();
+            } else {
+                item.style.opacity = '1';
+                document.getElementById(`db-item-cred-${index}`).innerHTML =
+                    `<div class="alert alert-error" style="margin:8px 0 0 0;">✗ ${data.message}</div>`;
+                logActivity(`Download failed for ${location}:${path} - ${data.message}`, 'error');
+            }
+        } catch (error) {
+            item.style.opacity = '1';
+            logActivity(`Download error: ${error.message}`, 'error');
+        }
+    }
+
+    // ============================================================
+    // Downloaded databases (left sidebar) + database view
+    // ============================================================
+    async function refreshDownloadedDatabases() {
+        const workspace = workspaceFolder;
+        if (!workspace) {
+            alert('Please set a workspace folder first (left sidebar, step ①).');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/explore-databases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workspace_folder: workspace })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                downloadedDatabases = data.databases || [];
+                logActivity(`Loaded ${downloadedDatabases.length} database(s) from workspace`, 'success');
+            } else {
+                downloadedDatabases = [];
+                logActivity(`No databases found in workspace: ${data.message || ''}`, 'info');
+            }
+            renderDatabasesNav();
+        } catch (error) {
+            logActivity(`Failed to load workspace databases: ${error.message}`, 'error');
+        }
+    }
+
+    function renderDatabasesNav() {
+        const nav = document.getElementById('databases-nav');
+        const badge = document.getElementById('database-count-badge');
+        badge.textContent = downloadedDatabases.length ? `(${downloadedDatabases.length})` : '';
+
+        if (downloadedDatabases.length === 0) {
+            nav.innerHTML = '<div class="empty-hint">Databases you download (or that already exist in the workspace) will appear here.</div>';
+            return;
+        }
+
+        let html = '';
+        downloadedDatabases.forEach((db, index) => {
+            const isActive = index === activeDatabaseIndex;
+            html += `<div class="nav-item ${isActive ? 'active' : ''}" onclick="selectDatabase(${index})">
+                <span class="nav-item-icon">🗄️</span>
+                <span class="nav-item-label">${db.name}</span>
+            </div>`;
+        });
+        nav.innerHTML = html;
+    }
+
+    function selectDatabase(index) {
+        activeDatabaseIndex = index;
+        renderDatabasesNav();
+        renderDatabaseView();
+    }
+
+    async function renderDatabaseView() {
+        const db = downloadedDatabases[activeDatabaseIndex];
+        showMainView('database');
+
+        setDetails('<div class="spinner"></div>');
+
+        let html = `<div class="content-card">
+            <h2>🗄️ ${db.name}</h2>
+            <div class="content-card-sub">${db.original_location || ''}:${db.original_path || ''}</div>
+            <div class="db-detail-row"><div class="db-detail-label">Local path:</div><div class="db-detail-value">${db.local_path}/${db.name}</div></div>
+            <div class="db-detail-row"><div class="db-detail-label">Source cluster:</div><div class="db-detail-value">${db.source_cluster || 'unknown'}</div></div>
+        </div>`;
+
+        html += buildQueryInterfaceHtml();
+        document.getElementById('view-database').innerHTML = html;
+
+        setQueryMethod('query');
+        populateDatabaseSelector();
+        // Auto-check the active database
+        const cb = document.getElementById(`db-check-${activeDatabaseIndex}`);
+        if (cb) cb.checked = true;
+
+        loadDatabaseDetailsIntoSidebar(db);
+    }
+
+    async function loadDatabaseDetailsIntoSidebar(db) {
+        try {
+            const response = await fetch('/api/database-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ database_path: `${db.local_path}/${db.name}` })
+            });
+            const data = await response.json();
+
+            let html = detailRow('Name', db.name) + detailRow('Cluster', db.source_cluster || 'unknown');
+            if (data.success) {
+                html += detailRow('File size', formatBytes(data.file_size));
+                if (data.tables && data.tables.length > 0) {
+                    html += `<div style="margin-top:10px; font-weight:600; color:#667eea;">Tables (${data.tables.length})</div>`;
+                    data.tables.forEach(table => {
+                        html += `<div class="table-item"><strong>${table.name}</strong>${table.row_count !== undefined ? ` - ${table.row_count} rows` : ''}</div>`;
+                    });
+                }
+                if (data.error) {
+                    html += `<div style="margin-top:8px; color:#ff9800; font-size:0.85em;">${data.error}</div>`;
+                }
+            }
+            setDetails(html);
+        } catch (error) {
+            setDetails(`<div class="alert alert-error">Failed to load database details: ${error.message}</div>`);
+        }
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // ============================================================
+    // Query interface (ported from index_inter.html, scoped to main-content)
+    // ============================================================
+    function buildQueryInterfaceHtml() {
+        return `
+        <div class="content-card">
+            <h2>🔍 Query Databases</h2>
+            <div class="content-card-sub">Select one or more downloaded databases and run a query.</div>
+
+            <div style="margin-bottom: 18px;">
+                <h4 style="margin-bottom: 8px;">Databases to query:</h4>
+                <div id="query-database-selector" style="max-height: 160px; overflow-y: auto; background: #f8f9fb; padding: 8px; border-radius: 6px;"></div>
+                <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary btn-sm" onclick="selectAllDatabases(true)">✓ Select All</button>
+                    <button class="btn btn-secondary btn-sm" onclick="selectAllDatabases(false)">✕ Clear All</button>
+                    <button class="btn btn-success btn-sm" onclick="getDatabaseSummary()">📊 Get Summary & Tables</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 18px;">
+                <h4 style="margin-bottom: 8px;">Query Method:</h4>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button onclick="setQueryMethod('query')" id="method-query" class="btn btn-secondary btn-sm query-method-btn active">📝 SQL Query</button>
+                    <button onclick="setQueryMethod('get_table')" id="method-get_table" class="btn btn-secondary btn-sm query-method-btn">📋 Get Table</button>
+                    <button onclick="setQueryMethod('find')" id="method-find" class="btn btn-secondary btn-sm query-method-btn">🔍 Find</button>
+                    <button onclick="setQueryMethod('search')" id="method-search" class="btn btn-secondary btn-sm query-method-btn">🔎 Search</button>
+                </div>
+            </div>
+
+            <div id="query-input-section">
+                <div id="input-query" class="query-method-input">
+                    <textarea id="query-input" style="width:100%; min-height:120px; font-family:'Courier New',monospace; padding:10px; border:1.5px solid #dcdfe4; border-radius:6px; font-size:0.88em;" placeholder="SELECT * FROM table_name LIMIT 10;"></textarea>
+                    <div style="margin-top: 8px; display:flex; gap:5px; flex-wrap: wrap;">
+                        <button onclick="setQueryTemplate('SELECT name FROM sqlite_master WHERE type=\\'table\\';')" class="btn btn-secondary btn-sm">Table Names</button>
+                        <button onclick="setQueryTemplate('SELECT * FROM [TABLE_NAME] LIMIT 10;')" class="btn btn-secondary btn-sm">Preview Table</button>
+                        <button onclick="setQueryTemplate('SELECT COUNT(*) as count FROM [TABLE_NAME];')" class="btn btn-secondary btn-sm">Count Rows</button>
+                    </div>
+                </div>
+                <div id="input-get_table" class="query-method-input hidden">
+                    <input type="text" id="get-table-name" placeholder="table_name">
+                </div>
+                <div id="input-find" class="query-method-input hidden">
+                    <input type="text" id="find-condition" placeholder="age > 25">
+                    <div style="margin-top: 8px; display:flex; gap:5px; flex-wrap: wrap;">
+                        <button onclick="setFindTemplate('column > value')" class="btn btn-secondary btn-sm">&gt;</button>
+                        <button onclick="setFindTemplate('column < value')" class="btn btn-secondary btn-sm">&lt;</button>
+                        <button onclick="setFindTemplate('column = value')" class="btn btn-secondary btn-sm">=</button>
+                        <button onclick="setFindTemplate('column ~ value')" class="btn btn-secondary btn-sm">~ contains</button>
+                    </div>
+                </div>
+                <div id="input-search" class="query-method-input hidden">
+                    <input type="text" id="search-value" placeholder="search_value">
+                </div>
+
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <button class="btn btn-success" onclick="executeDSIQuery()">▶️ Execute</button>
+                    <button class="btn btn-secondary" onclick="clearQueryResults()">🗑️ Clear Results</button>
+                </div>
+            </div>
+
+            <div id="query-results-container" class="hidden" style="margin-top: 18px;">
+                <h4 style="margin-bottom: 8px;">Results:</h4>
+                <div id="query-results-content"></div>
+            </div>
+        </div>`;
+    }
+
+    function populateDatabaseSelector() {
+        const container = document.getElementById('query-database-selector');
+        if (!downloadedDatabases || downloadedDatabases.length === 0) {
+            container.innerHTML = '<p style="color:#999; padding:8px;">No databases available</p>';
+            return;
+        }
+        let html = '';
+        downloadedDatabases.forEach((db, index) => {
+            html += `<div class="db-checkbox">
+                <input type="checkbox" id="db-check-${index}" value="${index}">
+                <label for="db-check-${index}"><strong>${db.name}</strong>
+                    <small style="display:block; color:#666;">${db.original_location || ''} | ${db.source_cluster || 'unknown'}</small>
+                </label>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function selectAllDatabases(select) {
+        document.querySelectorAll('#query-database-selector input[type="checkbox"]').forEach(cb => cb.checked = select);
+    }
+
+    function setQueryTemplate(query) { document.getElementById('query-input').value = query; }
+    function setFindTemplate(template) { document.getElementById('find-condition').value = template; }
+
+    function setQueryMethod(method) {
+        currentQueryMethod = method;
+        document.querySelectorAll('.query-method-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`method-${method}`).classList.add('active');
+        document.querySelectorAll('.query-method-input').forEach(input => input.classList.add('hidden'));
+        document.getElementById(`input-${method}`).classList.remove('hidden');
+    }
+
+    async function executeDSIQuery() {
+        let queryParam = '';
+        switch (currentQueryMethod) {
+            case 'query':
+                queryParam = document.getElementById('query-input').value.trim();
+                if (!queryParam) { alert('Please enter a SQL query'); return; }
+                break;
+            case 'get_table':
+                queryParam = document.getElementById('get-table-name').value.trim();
+                if (!queryParam) { alert('Please enter a table name'); return; }
+                break;
+            case 'find':
+                queryParam = document.getElementById('find-condition').value.trim();
+                if (!queryParam) { alert('Please enter a condition'); return; }
+                break;
+            case 'search':
+                queryParam = document.getElementById('search-value').value.trim();
+                if (!queryParam) { alert('Please enter a value to search for'); return; }
+                break;
+        }
+
+        const checkboxes = document.querySelectorAll('#query-database-selector input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) { alert('Please select at least one database'); return; }
+        const selectedDbs = Array.from(checkboxes).map(cb => downloadedDatabases[parseInt(cb.value)]);
+
+        const resultsContainer = document.getElementById('query-results-container');
+        const resultsContent = document.getElementById('query-results-content');
+        resultsContainer.classList.remove('hidden');
+        resultsContent.innerHTML = '<div class="spinner"></div>';
+
+        try {
+            const response = await fetch('/api/execute-dsi-query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ databases: selectedDbs, method: currentQueryMethod, query_param: queryParam })
+            });
+            const data = await response.json();
+            if (data.success) {
+                displayDSIQueryResults(data.results, currentQueryMethod);
+                logActivity(`Ran ${currentQueryMethod} query across ${selectedDbs.length} database(s)`, 'success');
+            } else {
+                resultsContent.innerHTML = `<div class="alert alert-error">${data.message}</div>`;
+                logActivity(`Query failed: ${data.message}`, 'error');
+            }
+        } catch (error) {
+            resultsContent.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            logActivity(`Query error: ${error.message}`, 'error');
+        }
+    }
+
+    function displayDSIQueryResults(results, method) {
+        const resultsContent = document.getElementById('query-results-content');
+        const methodDisplay = { query: 'SQL Query', get_table: 'Get Table', find: 'Find', search: 'Search' };
+        let html = '';
+        let totalRows = 0, successCount = 0, errorCount = 0;
+
+        results.forEach(result => {
+            if (result.success) {
+                successCount++;
+                const rowCount = result.rows.length;
+                totalRows += rowCount;
+                html += `<div class="query-result-db">
+                    <div class="query-result-db-header">📦 ${result.database_name}</div>
+                    <div class="result-stats">Method: ${methodDisplay[method]} | Rows: ${rowCount} | Time: ${result.execution_time}s</div>`;
+
+                if (rowCount > 0) {
+                    html += '<div style="overflow-x:auto; margin-top:8px;"><table class="query-results-table"><thead><tr>';
+                    result.columns.forEach(col => html += `<th>${col}</th>`);
+                    html += '</tr></thead><tbody>';
+                    result.rows.forEach(row => {
+                        html += '<tr>';
+                        row.forEach(cell => {
+                            const cellValue = cell === null ? '<em style="color:#999;">NULL</em>' : String(cell);
+                            html += `<td>${cellValue}</td>`;
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                } else {
+                    html += '<div style="margin-top:8px; color:#666;">No rows returned</div>';
+                }
+                html += '</div>';
+            } else {
+                errorCount++;
+                html += `<div class="query-error">
+                    <div class="query-error-header">✗ ${result.database_name}</div>
+                    <div style="font-family:monospace; font-size:0.85em;">${result.error}</div>
+                </div>`;
+            }
+        });
+
+        const summaryHtml = `<div style="background:#e3f2fd; padding:12px; border-radius:6px; margin-bottom:12px; font-size:0.88em;">
+            ✓ Success: ${successCount} | ✗ Errors: ${errorCount} | 📊 Total rows: ${totalRows}
+        </div>`;
+
+        resultsContent.innerHTML = summaryHtml + html;
+    }
+
+    function clearQueryResults() {
+        document.getElementById('query-results-container').classList.add('hidden');
+        document.getElementById('query-results-content').innerHTML = '';
+    }
+
+    async function getDatabaseSummary() {
+        const checkboxes = document.querySelectorAll('#query-database-selector input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) { alert('Please select at least one database'); return; }
+        const selectedDbs = Array.from(checkboxes).map(cb => downloadedDatabases[parseInt(cb.value)]);
+
+        const resultsContainer = document.getElementById('query-results-container');
+        const resultsContent = document.getElementById('query-results-content');
+        resultsContainer.classList.remove('hidden');
+        resultsContent.innerHTML = '<div class="spinner"></div>';
+
+        try {
+            const response = await fetch('/api/database-summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ databases: selectedDbs })
+            });
+            const data = await response.json();
+            if (data.success) {
+                displayDatabaseSummaries(data.summaries);
+            } else {
+                resultsContent.innerHTML = `<div class="alert alert-error">${data.message}</div>`;
+            }
+        } catch (error) {
+            resultsContent.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+        }
+    }
+
+    function displayDatabaseSummaries(summaries) {
+        const resultsContent = document.getElementById('query-results-content');
+        let html = '';
+        let successCount = 0, errorCount = 0, totalTables = 0;
+
+        summaries.forEach(summary => {
+            if (summary.success) {
+                successCount++;
+                totalTables += summary.tables.length;
+                html += `<div class="query-result-db">
+                    <div class="query-result-db-header">📦 ${summary.database_name}</div>
+                    <div class="result-stats">Tables: ${summary.tables.length} | Total rows: ${summary.total_rows}</div>`;
+
+                if (summary.tables.length > 0) {
+                    html += '<table class="query-results-table" style="margin-top:8px;"><thead><tr><th>Table</th><th>Rows</th><th>Columns</th></tr></thead><tbody>';
+                    summary.tables.forEach(table => {
+                        const columnCount = table.columns ? table.columns.length : 0;
+                        html += `<tr><td>${table.name}</td><td>${table.row_count !== undefined ? table.row_count.toLocaleString() : 'N/A'}</td><td>${columnCount}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                }
+                html += '</div>';
+            } else {
+                errorCount++;
+                html += `<div class="query-error">
+                    <div class="query-error-header">✗ ${summary.database_name}</div>
+                    <div style="font-size:0.85em;">${summary.error}</div>
+                </div>`;
+            }
+        });
+
+        const summaryHtml = `<div style="background:#e8f5e9; padding:12px; border-radius:6px; margin-bottom:12px; font-size:0.88em;">
+            ✓ Success: ${successCount} | ✗ Errors: ${errorCount} | 📋 Total tables: ${totalTables}
+        </div>`;
+        resultsContent.innerHTML = summaryHtml + html;
+    }
+
+    // ============================================================
+    // Init
+    // ============================================================
+    loadSessionLogList();
+    logActivity('Ready. Choose a destination to federate to.', 'info');
+</script>
+</body>
+</html>

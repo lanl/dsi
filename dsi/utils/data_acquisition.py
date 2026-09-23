@@ -45,7 +45,8 @@ async def get_file_size_and_download(
     jump_host=None,
     jump_username=None,
     jump_password=None,
-    jump_host_required=False
+    jump_host_required=False,
+    reticket_cmd="reticket"
 ):
     """Get file size and download using a single SSH connection.
 
@@ -62,6 +63,7 @@ async def get_file_size_and_download(
         jump_username: Username on jump host (optional)
         jump_password: Password for jump host (optional)
         jump_host_required: Whether jump host is required for this hostname
+        reticket_cmd: Kerberos ticket-init command to run on the jump host (default: "reticket")
 
     Returns:
         int: filesize in bytes, success boolean
@@ -105,6 +107,7 @@ async def get_file_size_and_download(
                 jump_username=jump_username,
                 jump_password=jump_password,
                 jump_host_required=True,
+                reticket_cmd=reticket_cmd,
                 logger=logging.getLogger(__name__)
             )
 
@@ -308,6 +311,7 @@ def get_remote_endpoints_ssh(hostname: str,
                              jump_host: str = None,
                              jump_username: str = None,
                              jump_password: str = None,
+                             reticket_cmd: str = "reticket",
                              verbose: bool = False) -> dict:
     """ Source bash script on remote server and retrieve environment variables matching specified prefixes.
 
@@ -325,6 +329,7 @@ def get_remote_endpoints_ssh(hostname: str,
         jump_host: Jump host hostname for Kerberos authentication (optional).
         jump_username: Username on jump host (optional).
         jump_password: Password for jump host (optional).
+        reticket_cmd: Kerberos ticket-init command to run on the jump host (default: "reticket").
         verbose: Print detailed progress information. Default: False
 
     Returns:
@@ -391,6 +396,7 @@ def get_remote_endpoints_ssh(hostname: str,
             jump_host=jump_host,
             jump_username=jump_username,
             jump_password=jump_password,
+            reticket_cmd=reticket_cmd,
             logger=logger
         ))
 
@@ -468,7 +474,8 @@ def pull_data(location_type: str,
               jump_host: str = None,
               jump_username: str = None,
               jump_password: str = None,
-              jump_host_required: bool = False) -> str:
+              jump_host_required: bool = False,
+              reticket_cmd: str = "reticket") -> str:
     """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local").
     The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly.
     It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
@@ -487,6 +494,7 @@ def pull_data(location_type: str,
         jump_username (str): Username on jump host (optional)
         jump_password (str): Password for jump host (optional)
         jump_host_required (bool): Whether jump host is required for this remote_location
+        reticket_cmd (str): Kerberos ticket-init command to run on the jump host (default: "reticket")
     Returns:
         str: filepath"""
 
@@ -587,7 +595,8 @@ def pull_data(location_type: str,
                 jump_host=jump_host,
                 jump_username=jump_username,
                 jump_password=jump_password,
-                jump_host_required=jump_host_required
+                jump_host_required=jump_host_required,
+                reticket_cmd=reticket_cmd
             ))
             
             if filesize is None:
