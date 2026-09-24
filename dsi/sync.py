@@ -15,7 +15,15 @@ from collections import OrderedDict
 from urllib.parse import urlparse
 
 from dsi.core import Terminal
-from dsi.utils.federated.federate_datasets import federate_datasets, accquire_data
+from dsi.utils.data_acquisition import pull_data
+from dsi.utils.acquisition.utils import (
+    create_directory,
+    csv_to_list_of_dicts,
+    deduplicate_keep_latest,
+    create_hashed_folder_from_path,
+    split_path,
+    upsert_records,
+)
 
 class Sync():
     """
@@ -697,6 +705,94 @@ class Sync():
             print(f"Runtime: {time.perf_counter() - start:.2f} seconds")
 
 
+    def _federate_datasets(self, workspace_folder: str, config_data: dict, base_path: str) -> list:
+        '''
+        Downloads datasets (local, GitHub, HPC, URL) referenced by CSV catalogues listed in config_data['repo_paths'].
+        Mirrors the download design used in tools/federated/federation_ui.py.
+        '''
+        abs_path_workspace_folder = str(Path(workspace_folder).resolve())
+        create_directory(dir_name=abs_path_workspace_folder, verbose=True)
+        print(f"Databases will be synchronized to: {abs_path_workspace_folder}")
+
+        # Gather and combine all CSV catalogues
+        db_catalogue_list = []
+        for repo in config_data.get("repo_paths", []):
+            repo_path = Path(repo) if Path(repo).is_absolute() else Path(base_path) / repo
+            clean_repo_path = str(repo_path.resolve())
+
+            if clean_repo_path.endswith(".csv"):
+                try:
+                    db_catalogue_list.extend(csv_to_list_of_dicts(clean_repo_path))
+                except Exception as e:
+                    print(f"Error reading local repository {clean_repo_path}: {e}")
+            else:
+                print(f"Unsupported repository type for {clean_repo_path}. Only CSV files are supported for local repositories. Skipping this repo.")
+
+        cleaned_db_catalogue_list = deduplicate_keep_latest(db_catalogue_list)
+        print("Number of repos found: ", len(cleaned_db_catalogue_list))
+
+        # Load cached hostname -> username mapping
+        host_usernames_path = f"{abs_path_workspace_folder}/host_usernames.json"
+        try:
+            with open(host_usernames_path, "r", encoding="utf-8") as f:
+                host_username = yaml.safe_load(f) or {}
+        except Exception:
+            host_username = {}
+
+        database_info = []
+        success_counter = 0
+        for db in cleaned_db_catalogue_list:
+            location_type = db['location_type'].strip().lower()
+            location = db['location']
+            remote_path = db['path']
+
+            username = host_username.get(location, "")
+            if location_type == "hpc" and username == "":
+                try:
+                    username = input(f" -- Enter the username for {location}: ")
+                except KeyboardInterrupt:
+                    print(f"\n -- Interrupted while entering username for {location}. Skipping this database.")
+                    continue
+                host_username[location] = username
+
+            folder_hash, db_download_folder = create_hashed_folder_from_path(remote_path, abs_path_workspace_folder)
+
+            try:
+                downloaded_file_path = pull_data(
+                    location_type=location_type,
+                    remote_location=location,
+                    remote_path=remote_path,
+                    download_location=db_download_folder,
+                    username=username,
+                    download_limit=config_data.get("download_limit", 10485760),
+                )
+            except Exception as e:
+                print(f"Warning: Skipping database at {location}:{remote_path} due to error: {e}")
+                continue
+
+            if downloaded_file_path:
+                _local_folder, _local_filename = split_path(downloaded_file_path)
+                database_info.append({
+                    "location_type": location_type,
+                    "location": location,
+                    "path": remote_path,
+                    "name": _local_filename,
+                    "workspace_folder": abs_path_workspace_folder,
+                    "folder_hash": folder_hash,
+                    "local_path": _local_folder,
+                    "submitter_name": db.get("submitter_name", ""),
+                })
+                success_counter += 1
+
+        with open(host_usernames_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(host_username, f)
+
+        upsert_records(f"{abs_path_workspace_folder}/dsi_database_list.json", database_info, key="path")
+
+        print(f"\nFinished gathering databases. Successfully downloaded {success_counter} databases to {abs_path_workspace_folder}.")
+        return database_info
+
+
     def get(self, config_file: str, workspace_folder: str):
         '''
         Helper function that searches remote location-based input config file, and retrieves metadata that contains DSI databases
@@ -730,7 +826,7 @@ class Sync():
             _workspace_folder = config_data.get("workspace_folder", "")
             workspace_folder = _workspace_folder or f"_dsi_datasets_folder_{uuid.uuid4().hex[:8]}"
 
-        downloaded_dbs = federate_datasets(workspace_folder, config_data, base_path)
+        downloaded_dbs = self._federate_datasets(workspace_folder, config_data, base_path)
 
         if downloaded_dbs:
             df = pd.DataFrame(downloaded_dbs)
@@ -813,19 +909,26 @@ class Sync():
 
         if is_url(remote_loc):
             remote_files = t2.get_table("filesystem")["file_remote"]
-            parent_url = os.path.commonprefix(remote_files.tolist())
             for remote_url in remote_files:
                 # Downloading each file from fileystem
-                db_info, username = accquire_data(db_data["location_type"], db_data["location"], remote_url, 
-                                            workspace_folder, username, internal_use=True, parent_hash=parent_url)
-                new_folder = Path(db_info.pop("new_db_folder"))
+                _, download_folder = create_hashed_folder_from_path(remote_url, workspace_folder)
+                try:
+                    pull_data(db_data["location_type"], db_data["location"], remote_url,
+                                download_folder, username)
+                except Exception as e:
+                    print(f"Warning: Skipping data at {db_data['location']}:{remote_url} due to error: {e}")
+                new_folder = Path(download_folder)
                 if new_folder.is_dir() and not any(new_folder.iterdir()):
                     new_folder.rmdir()
-        else:        
+        else:
             # Currently pulling all referenced data -- eventually allow user to download certain data
-            db_info, username = accquire_data(db_data["location_type"], db_data["location"], remote_loc, 
-                                        workspace_folder, username, internal_use=True)
-            new_folder = Path(db_info.pop("new_db_folder"))
+            _, download_folder = create_hashed_folder_from_path(remote_loc, workspace_folder)
+            try:
+                pull_data(db_data["location_type"], db_data["location"], remote_loc,
+                            download_folder, username)
+            except Exception as e:
+                print(f"Warning: Skipping data at {db_data['location']}:{remote_loc} due to error: {e}")
+            new_folder = Path(download_folder)
             if new_folder.is_dir() and not any(new_folder.iterdir()):
                 new_folder.rmdir()
 

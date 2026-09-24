@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import logging
 import yaml
 import hashlib
 from coolname import generate_slug
@@ -11,7 +12,10 @@ from pathlib import Path
 
 from dsi.dsi import DSI
 from dsi.sync import Sync
-from dsi.utils.dsi_utils import detect_valid_db_with_data
+from dsi.utils.utils import detect_valid_db_with_data
+
+logger = logging.getLogger(__name__)
+
 
 class DSIFederated:
     """A class for federated querying of DSI databases. It loads metadata about the databases and 
@@ -53,8 +57,8 @@ class DSIFederated:
         for d_id, dsi_db_info in enumerate(dsi_databases_list):
             db_info = {}
 
-            db_path = Path(dsi_db_info['local_path'])
-            database_type, valid_db = detect_valid_db_with_data(db_path)
+            db_path = Path(dsi_db_info['local_path']) / dsi_db_info['name']
+            database_type, valid_db, _ = detect_valid_db_with_data(db_path)
 
             if valid_db:
                 _temp = DSI(str(db_path), backend_name=database_type, silence_messages="True")
@@ -69,6 +73,7 @@ class DSIFederated:
                 db_info['original_path'] = dsi_db_info['original_path']
                 db_info['name'] = dsi_db_info['name']
                 db_info['path'] = str(db_path)
+                db_info['database_type'] = database_type
                 
                 _tbls = _temp.list(True)
                 db_info['num_tables'] = len(_tbls)
@@ -246,7 +251,7 @@ class DSIFederated:
         
         for db_info in found_dbs:
             print(f"\nDatabase: {db_info['name']} at path {db_info['path']}:")
-            _temp = DSI(db_info['path'], silence_messages="True")
+            _temp = DSI(db_info['path'], backend_name=db_info['database_type'], silence_messages="True")
 
             if table == "":
                 result = _temp.summary(collection=True)
@@ -291,7 +296,7 @@ class DSIFederated:
     
         res = []
         for db_info in found_dbs:
-            _temp = DSI(db_info['path'], silence_messages="True")
+            _temp = DSI(db_info['path'], backend_name=db_info['database_type'], silence_messages="True")
             result = _temp.query(query, collection=True)
             res.append(result)
             _temp.close()
@@ -324,7 +329,7 @@ class DSIFederated:
         # Use DSI to run the query on the specified database and table
         res = []
         for db_info in found_dbs:
-            _temp = DSI(db_info['path'], silence_messages="True")
+            _temp = DSI(db_info['path'], backend_name=db_info['database_type'], silence_messages="True")
             result = _temp.search(query, collection=True)
             res.append(result)
             _temp.close()
@@ -360,7 +365,7 @@ class DSIFederated:
         # Use DSI to run the find operation on the specified database and table
         res = []
         for db_info in found_dbs:
-            _temp = DSI(db_info['path'], silence_messages="True")
+            _temp = DSI(db_info['path'], backend_name=db_info['database_type'], silence_messages="True")
             result = _temp.find(query, collection=True)
             res.append(result)
             _temp.close()
@@ -412,24 +417,26 @@ class DSIFederated:
             "path": matches_src.iloc[0]["path"],
             "name": matches_src.iloc[0]["name"],
             "table": matches_src.iloc[0]["table"],
+            "database_type": matches_src.iloc[0]["database_type"],
         }
 
         dst_data = {
             "path": matches_dst.iloc[0]["path"],
             "name": matches_dst.iloc[0]["name"],
             "table": matches_dst.iloc[0]["table"],
+            "database_type": matches_dst.iloc[0]["database_type"],
         }
 
         print(f"source path: {src_data['path']}, table: {src_data['table']}")
         print(f"destination path: {dst_data['path']}, table: {dst_data['table']}")
 
-        _temp_src = DSI(src_data["path"], silence_messages=True)
+        _temp_src = DSI(src_data["path"], backend_name=src_data["database_type"], silence_messages=True)
         try:
             tbl_src = _temp_src.get_table(src_data["table"], collection=True)
         finally:
             _temp_src.close()
 
-        _temp_dst = DSI(dst_data["path"], silence_messages=True)
+        _temp_dst = DSI(dst_data["path"], backend_name=dst_data["database_type"], silence_messages=True)
         try:
             tbl_dst = _temp_dst.get_table(dst_data["table"], collection=True)
         finally:
@@ -477,7 +484,7 @@ class DSIFederated:
         df_to_update = df_out.copy()
         df_to_update.insert(0, "dsi_table_name", dst_data["table"])
 
-        _temp_dst = DSI(dst_data["path"], silence_messages=True)
+        _temp_dst = DSI(dst_data["path"], backend_name=dst_data["database_type"], silence_messages=True)
         try:
             _temp_dst.update(df_to_update)
         finally:
@@ -532,11 +539,13 @@ class DSIFederated:
             "path": matches_src.iloc[0]["path"],
             "name": matches_src.iloc[0]["name"],
             "table": matches_src.iloc[0]["table"],
+            "database_type": matches_src.iloc[0]["database_type"],
         }
 
         dst_data = {
             "path": matches_dst.iloc[0]["path"],
             "name": matches_dst.iloc[0]["name"],
+            "database_type": matches_dst.iloc[0]["database_type"],
         }
 
         # Check whether destination table already exists
@@ -552,7 +561,7 @@ class DSIFederated:
             )
 
         # Read source table
-        _temp_src = DSI(src_data["path"], silence_messages=True)
+        _temp_src = DSI(src_data["path"], backend_name=src_data["database_type"], silence_messages=True)
         try:
             tbl_src = _temp_src.get_table(src_data["table"], collection=True)
         finally:
@@ -564,7 +573,7 @@ class DSIFederated:
             )
 
         # Write into destination database
-        _temp_dst = DSI(dst_data["path"], silence_messages=True)
+        _temp_dst = DSI(dst_data["path"], backend_name=dst_data["database_type"], silence_messages=True)
         try:
             if existing_dst.empty:
                 # New table: use read(..., "Collection")

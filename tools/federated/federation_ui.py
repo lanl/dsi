@@ -19,6 +19,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from dsi.utils.data_acquisition import (
     pull_data,
+    discover_endpoints_async,
+    download_csv_files_async,
+    download_database_file_async,
 )
 from dsi.utils.acquisition.utils import (
     create_directory,
@@ -27,13 +30,7 @@ from dsi.utils.acquisition.utils import (
     split_path,
     upsert_records,
 )
-
-# Import federated utilities (core reusable functions)
-from dsi.utils.federated import (
-    discover_endpoints_async,
-    download_csv_files_async,
-    download_database_file_async,
-)
+from dsi.utils.utils import detect_valid_db_with_data
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
@@ -743,7 +740,7 @@ def get_database_info():
     Get detailed information about a database file (size, tables, row counts) using DSI interface
     """
     try:
-        from dsi.backends.sqlite import Sqlite
+        from dsi.dsi import DSI
 
         data = request.json
         database_path = data.get('database_path')
@@ -773,41 +770,29 @@ def get_database_info():
 
         # Try to get table information using DSI interface
         try:
+            database_type, valid_db, message = detect_valid_db_with_data(db_path)
+            if not valid_db:
+                raise RuntimeError(message)
+
             # Open database in read-only mode using DSI
-            dsi_db = Sqlite(f'file:{db_path}?mode=ro', uri=True)
+            dsi_instance = DSI(str(db_path), backend_name=database_type, silence_messages=True)
 
-            # Get all table names using DSI's query_artifacts
-            tables_df = dsi_db.query_artifacts(
-                "SELECT name FROM sqlite_master WHERE type='table';",
-                isVerbose=False
-            )
+            table_names = dsi_instance.list(collection=True)
+            for table_name in table_names:
+                try:
+                    table_df = dsi_instance.get_table(table_name, collection=True)
+                    row_count = len(table_df) if table_df is not None else 0
+                    result['tables'].append({
+                        'name': table_name,
+                        'row_count': row_count
+                    })
+                except Exception as e:
+                    result['tables'].append({
+                        'name': table_name,
+                        'error': str(e)
+                    })
 
-            if tables_df is not None and not tables_df.empty:
-                for table_name in tables_df['name']:
-                    try:
-                        # Get row count for each table using DSI
-                        count_query = f"SELECT COUNT(*) as count FROM `{table_name}`;"
-                        count_df = dsi_db.query_artifacts(count_query, isVerbose=False)
-
-                        if count_df is not None and not count_df.empty:
-                            row_count = int(count_df['count'].iloc[0])
-                            result['tables'].append({
-                                'name': table_name,
-                                'row_count': row_count
-                            })
-                        else:
-                            result['tables'].append({
-                                'name': table_name,
-                                'row_count': 0
-                            })
-                    except Exception as e:
-                        result['tables'].append({
-                            'name': table_name,
-                            'error': str(e)
-                        })
-
-            # Close DSI connection
-            dsi_db.con.close()
+            dsi_instance.close()
 
         except Exception as e:
             result['error'] = f'Could not read database structure: {str(e)}'
@@ -884,10 +869,14 @@ def execute_dsi_query():
             try:
                 start_time = time.time()
 
+                database_type, valid_db, message = detect_valid_db_with_data(db_path)
+                if not valid_db:
+                    raise RuntimeError(message)
+
                 # Initialize DSI with this database (read-only mode)
                 dsi_instance = DSI(
                     filename=str(db_path),
-                    backend_name='Sqlite',
+                    backend_name=database_type,
                     silence_messages=True
                 )
 
@@ -971,7 +960,7 @@ def execute_query():
     """
     try:
         import time
-        from dsi.backends.sqlite import Sqlite
+        from dsi.dsi import DSI
 
         data = request.json
         databases = data.get('databases', [])
@@ -1018,13 +1007,19 @@ def execute_query():
             try:
                 start_time = time.time()
 
-                # Use DSI Sqlite interface with read-only connection
-                # Pass uri=True to allow read-only mode via file: URI scheme
-                dsi_db = Sqlite(f'file:{db_path}?mode=ro', uri=True)
+                database_type, valid_db, message = detect_valid_db_with_data(db_path)
+                if not valid_db:
+                    raise RuntimeError(message)
 
-                # Execute query using DSI's query_artifacts method
-                # Returns a pandas DataFrame
-                result_df = dsi_db.query_artifacts(query, isVerbose=False)
+                # Initialize DSI with this database (read-only mode)
+                dsi_instance = DSI(
+                    filename=str(db_path),
+                    backend_name=database_type,
+                    silence_messages=True
+                )
+
+                # Execute query using DSI's query method
+                result_df = dsi_instance.query(query, collection=True)
 
                 execution_time = round(time.time() - start_time, 3)
 
@@ -1051,7 +1046,7 @@ def execute_query():
                     db_result['execution_time'] = execution_time
 
                 # Close DSI connection
-                dsi_db.con.close()
+                dsi_instance.close()
 
             except Exception as e:
                 db_result['error'] = f'Error: {str(e)}'
@@ -1106,10 +1101,14 @@ def get_database_summary():
                 continue
 
             try:
+                database_type, valid_db, message = detect_valid_db_with_data(db_path)
+                if not valid_db:
+                    raise RuntimeError(message)
+
                 # Initialize DSI with this database
                 dsi_instance = DSI(
                     filename=str(db_path),
-                    backend_name='Sqlite',
+                    backend_name=database_type,
                     silence_messages=True
                 )
 

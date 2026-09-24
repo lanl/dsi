@@ -1,51 +1,19 @@
 # Federation for DSI
 
-The allows users to pull database from many different locations and provide a centralized view of the databases. To run, from the DSI folder
+Need to update!
 
-To run:
+To pull data, use tools/federated/fedetation_ui.py. Launch as follows:
+
 ```bash
-python dsi/tools/federated/federate_datasets.py examples/federated/input.yaml
+python tools/federated/federation_ui.py
+Starting DSI Data Federation UI (Sidebar Version)
+Access the application at: http://localhost:5002
+Logs will be saved to: /Users/pascalgrosset/projects/dsi/tools/federated/logs
+ * Serving Flask app 'federation_ui'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5002
+ * Running on http://100.64.0.1:5002
+Press CTRL+C to quit
 ```
-where input.yaml is a config file
-
-
-## Config file
-input.yaml is the config file that contains the paths from which data can be pulled:
-```yaml
-repo_paths: 
-    - "~/remote_sources.csv"
-    - "local_dsi_sources.csv"
-workspace_folder: "dsi_databases_01"
-download_limit: 10485760 # 10 MB
-```
- - repo_paths: points to CSV files where the user can specify DSI repos. The paths should be relative to the config file or absolute paths
- - workspace_folder: is where the remote federated datasets will be stored, those local to your computer will not be moved
- - download_limit: after this file limit, the user will be asked to confirm
-
-
-## Data Sources
-
- An example of database sources is as follows:
-```csv
-location_type,location,path,type,submitter_name,submitter_email,timsestamp
-local,local,tools/federated/database/ocean_11_datasets.db,data,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:40:00s
-local,local,/home/pascalgrosset/data/artimis/fracture/3d/aleks/fracture_aleks.sqlite,data,pascal grosset,pascalgrosset@lanl.gov,2026-2-10--16:40:00s
-HPC,ch-fe.lanl.gov,/lustre/scratch5/pascalgrosset/test_db/nif.db,data,pascal grosset,pascalgrosset@lanl.gov,2026-3-10--16:38:00
-url,url,https://www.timestored.com/data/sample/sakila.db,data,unknown,unknown,2026-3-10--16:38:00
-```
-
-**Note:** only location_type, location, and path are required
-
-- location_type: the currently supported location_type are:
-  - local: refers to your local computer
-  - HPC: refers to a supercomupter
-  - url: a file on the web
-  - github: a file on a github repo
-
-- location: on HPC systems, indicates the name of the cluster the data is on. For the others, it is the same as location_type
-- path: the path of the dataset
-
-
-## Other Notes:
-- local repos will not be downloaded, there will just be a reference to them
-- a file called dsi_database_list.json will be created that will show all the paths of the files downloaded.

@@ -8,21 +8,13 @@ import shutil
 import logging
 import asyncio
 import asyncssh
+from contextlib import asynccontextmanager
 
 import pandas as pd
 from pathlib import Path
-from typing import Tuple, List, Dict, Any, Optional
-
 
 from dsi.utils.acquisition.utils import (
-    create_directory, 
-    create_hashed_folder_from_path, 
-    csv_to_list_of_dicts, 
-    deduplicate_keep_latest, 
-    get_last_part, 
-    upsert_records,
-    combine_csv,
-    split_path,
+    get_last_part,
     confirm_large_download_prompt
 )
 
@@ -93,9 +85,6 @@ async def get_file_size_and_download(
         use_jump_host = jump_host_required and jump_host
 
         if use_jump_host:
-            # Use jump host connection from federated module
-            from dsi.utils.federated import download_database_file_async
-
             print(f"Using jump host {jump_host} to download from {hostname}")
             result = await download_database_file_async(
                 hostname=hostname,
@@ -120,21 +109,8 @@ async def get_file_size_and_download(
                 raise Exception(f"Failed to download via jump host")
         else:
             # Direct connection (original behavior)
-            # Prepare connection options
-            connect_options = {
-                'host': hostname,
-                'username': username,
-                'known_hosts': None,
-                'connect_timeout': 30,
-                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
-            }
-
-            # Add authentication method
-            if password:
-                connect_options['password'] = password
-            elif private_key_path:
-                connect_options['client_keys'] = [private_key_path]
-            # If neither is provided, it will try SSH agent or default keys
+            # If neither password nor private_key_path is provided, it will try SSH agent or default keys
+            connect_options = _ssh_connect_options(hostname, username, password, private_key_path)
 
             # Single async connection for both operations
             async with asyncssh.connect(**connect_options) as conn:
@@ -188,276 +164,424 @@ async def get_file_size_and_download(
         raise
 
 
-
 #
-# Endpoints
+# Endpoint discovery and download with jump host and Kerberos support
 #
 
-def pull_remote_db(hpc_name: str, remote_dsi: dict, temp_db_storage: str) -> list:
-    """ Pull database files from remote HPC endpoints.
-    
-    Args:
-        hpc_name: Name of the HPC system to connect to.
-        remote_dsi: Dictionary mapping endpoint names to their database paths.
-        temp_db_storage: Local path where downloaded databases will be stored.
-    
-    Returns:
-        list: Database information objects for each successfully pulled endpoint. """
-    
-    db_infos = []
-    for key, value in remote_dsi.items():
-        endpoint_name = key
-        endpoint_db_path = value
-        print(f"Retreiving data for {endpoint_name} at {endpoint_db_path}")
-
-        try:
-            username = input("Username: ")
-    
-            db_info = pull_data(location_type="hpc",
-                          remote_location=hpc_name,
-                          remote_path=endpoint_db_path,
-                          download_location=temp_db_storage,
-                          username=username)
-            db_infos.append(db_info)
-        except asyncssh.PermissionDenied as e:
-            print(f"Authentication failed for {endpoint_name}: {e}")
-            print(f"   Skipping {endpoint_name} and continuing with remaining endpoints...\n")
-            continue
-        except Exception as e:
-            print(f"Error accessing {endpoint_name}: {e}")
-            print(f"   Skipping {endpoint_name} and continuing with remaining endpoints...\n")
-            continue
-    return db_infos
+def _ssh_connect_options(hostname: str, username: str, password: str = None, private_key_path: str = None) -> dict:
+    options = {
+        'host': hostname,
+        'username': username,
+        'known_hosts': None,
+        'connect_timeout': 30,
+        'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
+    }
+    if password:
+        options['password'] = password
+    elif private_key_path:
+        options['client_keys'] = [private_key_path]
+    return options
 
 
-def read_data_sources(csv_data: list, workspace_folder: str) -> Tuple[List[Dict[str, Any]], int]:
-    """ Read and pull data sources from CSV records, prompting for credentials when needed.
-    
-    Args:
-        csv_data: List of dictionaries containing source information with keys:
-                 'location_type', 'location', 'path', 'submitter_name'.
-        workspace_folder: Path to workspace folder for storing pulled data and metadata.
-    
-    Returns:
-        tuple: (database_info, success_counter) where:
-            - database_info: List of database information dictionaries for successfully pulled sources.
-            - success_counter: Number of successfully pulled data sources. """
-    
-    database_info = []
-    federation_dbs = []
-    success_counter = 0
-    for row in csv_data:
-        username = ""
-        password = ""
-        if row['location_type'].strip().lower() == "hpc":
-            print(f"\n{'='*60}")
-            print(f"Enter credentials for data at {row['location']} : {row['path']}")
-            try:
-                username = input("Enter username: ")
-                password = getpass.getpass("Enter password: ")  # Hidden input!
-            except:
-                print("... skipping and continue to the next ...")
-                continue
-
-        try:
-            folder_hash = create_hashed_folder_from_path(row['path'], workspace_folder)[0]
-            print(f"folder_hash: {folder_hash}")
-            print(f"workspace_folder: {workspace_folder}")
-
-            downloaded_file_path = pull_data(location_type=row['location_type'],
-                      remote_location=row['location'],
-                      remote_path=row['path'],
-                      download_location=(workspace_folder + '/' + folder_hash),
-                      username=username,
-                      password=password)
-            
-            if downloaded_file_path:
-                # Extract folder and filename from the downloaded path
-                _local_folder, _local_filename = split_path(downloaded_file_path)
-                
-                
-                db_info = {
-                    "original_location_type": row['location_type'],
-                    "original_path": row['path'],
-                    "folder_hash": folder_hash,
-                    "local_path": _local_folder,
-                    "name": _local_filename,
-                }
-                
-                database_info.append(db_info)
-                combined = {k: row[k] for k in ["location_type", "location", "submitter_name"]} | {k: db_info[k] for k in ["local_path", "name", "folder_hash"]}
-                combined["workspace_folder"] = workspace_folder
-                federation_dbs.append(combined)
-                success_counter += 1
-        except Exception as e:
-            print(f"Warning: Skipping database at {row['location']}:{row['path']} due to error: {e}")
-            print(f"   Continuing with remaining databases...\n")
-            continue
-
-    # Save databases information to a JSON file
-    upsert_records(f"{workspace_folder}/dsi_database_list.json", database_info, key="original_path")
-
-    return database_info, success_counter
-
-
-
-
-def get_remote_endpoints_ssh(hostname: str,
-                             username: str,
-                             hpc_type: str = "hpc",
-                             password: str = None,
-                             script_path: str = '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh',
-                             prefixes: List[str] = ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'],
-                             jump_host: str = None,
-                             jump_username: str = None,
-                             jump_password: str = None,
-                             reticket_cmd: str = "reticket",
-                             verbose: bool = False) -> dict:
-    """ Source bash script on remote server and retrieve environment variables matching specified prefixes.
-
-    Now supports jump host and password authentication via the federated discovery module.
-
-    Args:
-        hostname: Remote server hostname or IP address.
-        username: SSH username for authentication on target HPC.
-        hpc_type: Type of HPC authentication ('hpc', 'kerberos'). Default: 'hpc'
-        password: Password for direct SSH authentication (optional).
-        script_path: Path to bash script on remote server that sets endpoint variables.
-                    Default: '/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
-        prefixes: List of environment variable prefixes to match (e.g., 'DSI_ENDPOINT_').
-                 Default: ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']
-        jump_host: Jump host hostname for Kerberos authentication (optional).
-        jump_username: Username on jump host (optional).
-        jump_password: Password for jump host (optional).
-        reticket_cmd: Kerberos ticket-init command to run on the jump host (default: "reticket").
-        verbose: Print detailed progress information. Default: False
-
-    Returns:
-        dict: Dictionary mapping endpoint variable names to their values.
-              Returns empty dict if connection fails or no endpoints found.
-
-    Examples:
-        # Direct SSH with Kerberos (old behavior - still works)
-        endpoints = get_remote_endpoints_ssh(
-            hostname='darwin-fe.lanl.gov',
-            username='pascalgrosset',
-            script_path='/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
-        )
-
-        # Direct SSH with password
-        endpoints = get_remote_endpoints_ssh(
-            hostname='darwin-fe.lanl.gov',
-            username='pascalgrosset',
-            password='mypassword',
-            script_path='/users/pascalgrosset/dsi_test/load_dsi_endpoints.sh'
-        )
-
-        # Via jump host with Kerberos (NEW!)
-        endpoints = get_remote_endpoints_ssh(
-            hostname='tuolumne.llnl.gov',
-            username='grosset2',
-            hpc_type='kerberos',
-            script_path='/g/g92/grosset2/dsi_test/load_dsi_endpoints.sh',
-            jump_host='ro-rfe.lanl.gov',
-            jump_username='pascalgrosset',
-            jump_password='jumphost_password'
-        )
-
-    Note:
-        This function now uses dsi.utils.federated.discover_endpoints_async internally,
-        which provides enhanced authentication options including jump host support.
+@asynccontextmanager
+async def _connect_via_jump_host(
+    jump_host: str,
+    jump_username: str,
+    jump_password: str,
+    reticket_cmd: str,
+    logger: logging.Logger
+):
     """
-    from dsi.utils.federated import discover_endpoints_async
+    Connect to a jump host and run the Kerberos ticket-init command,
+    yielding the live jump host connection.
+    """
+    jump_options = _ssh_connect_options(jump_host, jump_username, jump_password)
 
-    # Setup simple logger if verbose
-    logger = None
-    if verbose:
+    async with asyncssh.connect(**jump_options) as jump_conn:
+        logger.info(f"Running '{reticket_cmd}' on jump host")
+        reticket_result = await jump_conn.run(reticket_cmd, check=False)
+        logger.info(f"{reticket_cmd} output: {reticket_result.stdout}")
+
+        if reticket_result.stderr:
+            logger.info(f"{reticket_cmd} stderr: {reticket_result.stderr}")
+
+        if reticket_result.exit_status != 0:
+            logger.warning(f"{reticket_cmd} failed with exit code: {reticket_result.exit_status}")
+
+        logger.info(f"Checking Kerberos tickets with klist")
+        klist_result = await jump_conn.run("klist", check=False)
+        logger.info(f"klist output: {klist_result.stdout}")
+
+        yield jump_conn
+
+
+@asynccontextmanager
+async def _connect_to_hpc_via_jump_host(
+    jump_conn,
+    hostname: str,
+    username: str,
+    logger: logging.Logger
+):
+    """
+    From an existing jump host connection, open a GSSAPI/Kerberos connection
+    to the final HPC target and yield it (Method 1 of the jump-host pattern).
+    """
+    logger.info(f"Method 1: Using connect_ssh with gss_auth=True")
+    async with jump_conn.connect_ssh(
+        hostname,
+        username=username,
+        known_hosts=None,
+        gss_auth=True,  # Use Kerberos/GSSAPI
+        gss_delegate_creds=True  # Forward Kerberos credentials
+    ) as conn:
+        yield conn
+    logger.info("Method 1 succeeded!")
+
+
+async def discover_endpoints_async(
+    hostname: str,
+    username: str,
+    script_path: str,
+    prefixes: list,
+    password: str = None,
+    hpc_type: str = 'standard',
+    jump_host: str = None,
+    jump_username: str = None,
+    jump_password: str = None,
+    reticket_cmd: str = "reticket",
+    logger: logging.Logger = None
+) -> dict:
+    """
+    Discover DSI endpoints from a remote HPC system.
+
+    Supports:
+    - Direct SSH connection
+    - Jump host with Kerberos authentication
+
+    Args:
+        hostname: Target HPC hostname
+        username: Username on target HPC
+        script_path: Path to load_dsi_endpoints.sh script
+        prefixes: List of endpoint prefixes (e.g., ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_'])
+        password: Password for direct SSH (optional)
+        hpc_type: 'standard' or 'kerberos'
+        jump_host: Jump host hostname (for Kerberos)
+        jump_username: Username on jump host
+        jump_password: Password for jump host
+        reticket_cmd: Kerberos ticket-init command to run on the jump host (default: "reticket")
+        logger: Logger instance
+
+    Returns:
+        dict: Discovered endpoints {endpoint_name: endpoint_path}
+    """
+    if logger is None:
         logger = logging.getLogger(__name__)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-            logger.addHandler(handler)
-            logger.setLevel(logging.INFO)
 
-    print(f"\nGetting remote endpoints")
-    print(f"Connecting to {hostname} as {username} ...")
-    if jump_host:
-        print(f"  via jump host: {jump_host}")
+    # Build command to run on remote server
+    prefixes_str = ','.join(f'"{p}"' for p in prefixes)
+    remote_cmd = f"""
+source {script_path} && python3 << 'PYTHON_EOF'
+import os
+import json
+prefixes = [{prefixes_str}]
+prefix_tuple = tuple(prefixes)
+endpoints = {{k: v for k, v in os.environ.items() if k.startswith(prefix_tuple)}}
+print(json.dumps(endpoints))
+PYTHON_EOF
+"""
 
     try:
-        # Call the new federated discovery function
-        endpoints = asyncio.run(discover_endpoints_async(
-            hostname=hostname,
-            username=username,
-            script_path=script_path,
-            prefixes=prefixes,
-            password=password,
-            hpc_type=hpc_type,
-            jump_host=jump_host,
-            jump_username=jump_username,
-            jump_password=jump_password,
-            reticket_cmd=reticket_cmd,
-            logger=logger
-        ))
+        if hpc_type == 'kerberos' and jump_host:
+            # Connect via jump host with Kerberos pattern:
+            # 1. SSH to jump host with username/password
+            # 2. Run reticket on jump host
+            # 3. SSH from jump host to HPC using Kerberos
+            logger.info(f"Connecting via jump host {jump_host}")
 
-        if verbose:
-            print(f"Found {len(endpoints)} endpoints on {hostname}")
+            async with _connect_via_jump_host(jump_host, jump_username, jump_password, reticket_cmd, logger) as jump_conn:
+                logger.info(f"Connecting to {hostname} from jump host as {username}")
 
-        return endpoints
+                # Method 1: Try using connect_ssh with GSSAPI
+                try:
+                    async with _connect_to_hpc_via_jump_host(jump_conn, hostname, username, logger) as final_conn:
+                        result = await final_conn.run(remote_cmd, check=True)
+                        return json.loads(result.stdout.strip())
+                except Exception as e:
+                    logger.warning(f"Method 1 failed: {str(e)}")
 
+                    # Method 2: Run SSH command directly on jump host (mirrors manual workflow)
+                    # This is what works manually: ssh grosset2@tuolumne.llnl.gov 'command'
+                    logger.info(f"Method 2: Running SSH command directly on jump host")
+                    try:
+                        ssh_cmd = f"ssh -o StrictHostKeyChecking=no {username}@{hostname} '{remote_cmd}'"
+                        logger.info(f"Running: ssh -o StrictHostKeyChecking=no {username}@{hostname} '<python command>'")
+                        result = await jump_conn.run(ssh_cmd, check=True)
+                        logger.info("Method 2 succeeded!")
+                        return json.loads(result.stdout.strip())
+                    except Exception as e2:
+                        logger.error(f"Method 2 also failed: {str(e2)}")
+                        raise Exception(f"Both connection methods failed. Method 1: {e}, Method 2: {e2}")
+        else:
+            # Direct SSH connection
+            async with asyncssh.connect(**_ssh_connect_options(hostname, username, password)) as conn:
+                result = await conn.run(remote_cmd, check=True)
+                return json.loads(result.stdout.strip())
     except Exception as e:
-        if verbose:
-            print(f"Error: {e}")
+        logger.error(f"SSH error: {str(e)}")
         return {}
 
 
-def pull_data_endpoints(endpoints_location: dict, hpc_name: str, workspace_folder: str) -> Tuple[List[Dict[str, Any]], int]:
-    """ Pull data from multiple remote endpoints by downloading metadata CSVs and fetching the actual data.
-    
+async def download_csv_files_async(
+    hostname: str,
+    csv_paths: dict,
+    temp_folder: str,
+    username: str,
+    password: str = None,
+    jump_host: str = None,
+    jump_username: str = None,
+    jump_password: str = None,
+    jump_host_required: bool = False,
+    reticket_cmd: str = "reticket",
+    logger: logging.Logger = None
+) -> list:
+    """
+    Download CSV files from remote HPC using asyncssh.
+
+    Supports:
+    - Direct SSH connection
+    - Jump host with Kerberos authentication
+
     Args:
-        endpoints_location: Dictionary mapping endpoint names to their remote CSV paths.
-        hpc_name: Name of the HPC system to connect to.
-        workspace_folder: Path to workspace folder for storing pulled data and metadata.
-    
+        hostname: Target HPC hostname
+        csv_paths: Dict of {endpoint_name: csv_file_path}
+        temp_folder: Local folder to save files
+        username: Username on target HPC
+        password: Password for direct SSH (optional)
+        jump_host: Jump host hostname (optional)
+        jump_username: Username on jump host (optional)
+        jump_password: Password for jump host (optional)
+        jump_host_required: Whether jump host is required for this hostname
+        reticket_cmd: Kerberos ticket-init command to run on the jump host (default: "reticket")
+        logger: Logger instance
+
     Returns:
-        tuple: (database_info, success_counter) from read_data_sources containing:
-            - database_info: List of database information dictionaries.
-            - success_counter: Number of successfully pulled data sources.
-    
-    Note:
-        Creates temporary folder '.test_00' for intermediate CSV files and
-        generates 'output_csv.csv' with combined metadata. """
-    
-    # create a temporaty folder to store the csv files to be downloaded
-    temp_db_storage = ".test_00"
-    create_directory(dir_name=temp_db_storage, delete_if_exists=True, verbose=True)
+        list: Local file paths of downloaded files
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
 
-    # download them
-    print("\n\nPull Remote DBs ... ")
-    db_infos = pull_remote_db(hpc_name, endpoints_location, temp_db_storage)
-    
-    # Check if any endpoints were successfully downloaded
-    if not db_infos:
-        print("\nWarning: No endpoint metadata files were successfully downloaded.")
-        print("   No databases will be federated.")
-        return [], 0
+    downloaded_files = []
 
-    # combine them to output_csv and the dictionary csv_data_sources
-    output_csv = str(Path(temp_db_storage) / "output_csv.csv")
     try:
-        csv_data_sources = combine_csv(temp_db_storage, output_csv)
-    except ValueError as e:
-        print(f"\nWarning: {e}")
-        print("   No databases will be federated.")
-        return [], 0
+        use_jump_host = jump_host_required and jump_host
 
-    # Pull the data from the CSV file, return a dictionary, and output the dictionaty to workspace_folder
-    print("\n\nRead Data from endpoints ... ")
-    database_info = read_data_sources(csv_data_sources, workspace_folder)
+        if use_jump_host:
+            logger.info(f"✓ Hostname {hostname} requires jump host (using {jump_host})")
 
-    return database_info
+            async with _connect_via_jump_host(jump_host, jump_username, jump_password, reticket_cmd, logger) as jump_conn:
+                logger.info(f"Connecting to {hostname} from jump host as {username}")
+
+                # Method 1: Try using connect_ssh with GSSAPI
+                try:
+                    async with _connect_to_hpc_via_jump_host(jump_conn, hostname, username, logger) as conn:
+                        async with conn.start_sftp_client() as sftp:
+                            for csv_name, csv_path in csv_paths.items():
+                                try:
+                                    local_filename = f"{hostname}_{csv_name}.csv"
+                                    local_path = Path(temp_folder) / local_filename
+                                    logger.info(f"Downloading {hostname}:{csv_path}")
+                                    await sftp.get(csv_path, str(local_path))
+
+                                    if local_path.exists():
+                                        downloaded_files.append(str(local_path))
+                                        logger.info(f"Successfully downloaded {local_filename}")
+                                    else:
+                                        logger.error(f"File not found after download: {local_filename}")
+                                except Exception as e:
+                                    logger.error(f"Error downloading {csv_path}: {str(e)}")
+                                    continue
+                except Exception as e:
+                    logger.warning(f"Method 1 failed: {str(e)}")
+
+                    # Method 2: Use SCP command on jump host (mirrors manual workflow)
+                    logger.info(f"Method 2: Using SCP command directly on jump host")
+                    try:
+                        for csv_name, csv_path in csv_paths.items():
+                            try:
+                                local_filename = f"{hostname}_{csv_name}.csv"
+                                local_path = Path(temp_folder) / local_filename
+
+                                # Create a temp file on jump host, then download it
+                                jump_temp_file = f"/tmp/{local_filename}"
+                                scp_cmd = f"scp -o StrictHostKeyChecking=no {username}@{hostname}:{csv_path} {jump_temp_file}"
+                                logger.info(f"Running: scp {username}@{hostname}:{csv_path} {jump_temp_file}")
+
+                                result = await jump_conn.run(scp_cmd, check=True)
+                                logger.info(f"SCP completed, downloading from jump host")
+
+                                # Download from jump host to local
+                                async with jump_conn.start_sftp_client() as sftp:
+                                    await sftp.get(jump_temp_file, str(local_path))
+
+                                # Clean up temp file on jump host
+                                await jump_conn.run(f"rm {jump_temp_file}", check=False)
+
+                                if local_path.exists():
+                                    downloaded_files.append(str(local_path))
+                                    logger.info(f"Successfully downloaded {local_filename}")
+                                else:
+                                    logger.error(f"File not found after download: {local_filename}")
+                            except Exception as e2:
+                                logger.error(f"Error downloading {csv_path} with SCP: {str(e2)}")
+                                continue
+                        logger.info("Method 2 succeeded!")
+                    except Exception as e3:
+                        logger.error(f"Method 2 also failed: {str(e3)}")
+                        raise Exception(f"Both download methods failed. Method 1: {e}, Method 2: {e3}")
+        else:
+            # Direct connection (no jump host)
+            logger.info(f"Direct SSH to {hostname}")
+            async with asyncssh.connect(**_ssh_connect_options(hostname, username, password)) as conn:
+                async with conn.start_sftp_client() as sftp:
+                    for csv_name, csv_path in csv_paths.items():
+                        try:
+                            local_filename = f"{hostname}_{csv_name}.csv"
+                            local_path = Path(temp_folder) / local_filename
+
+                            logger.info(f"Downloading {hostname}:{csv_path}")
+
+                            # Download file via SFTP
+                            await sftp.get(csv_path, str(local_path))
+
+                            if local_path.exists():
+                                downloaded_files.append(str(local_path))
+                                logger.info(f"Successfully downloaded {local_filename}")
+                            else:
+                                logger.error(f"File not found after download: {local_filename}")
+
+                        except Exception as e:
+                            logger.error(f"Error downloading {csv_path}: {str(e)}")
+                            continue
+
+    except asyncssh.Error as e:
+        logger.error(f"SSH connection error to {hostname}: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+
+    return downloaded_files
 
 
+async def download_database_file_async(
+    hostname: str,
+    remote_path: str,
+    local_folder: str,
+    username: str,
+    password: str = None,
+    jump_host: str = None,
+    jump_username: str = None,
+    jump_password: str = None,
+    jump_host_required: bool = False,
+    reticket_cmd: str = "reticket",
+    logger: logging.Logger = None
+) -> str:
+    """
+    Download a database file from remote HPC using asyncssh.
+
+    Similar to DSI's get_file_size_and_download but with jump host capability.
+
+    Supports:
+    - Direct SSH connection
+    - Jump host with Kerberos authentication
+
+    Args:
+        hostname: Target HPC hostname
+        remote_path: Path to file on remote system
+        local_folder: Local folder to save file
+        username: Username on target HPC
+        password: Password for direct SSH (optional)
+        jump_host: Jump host hostname (optional)
+        jump_username: Username on jump host (optional)
+        jump_password: Password for jump host (optional)
+        jump_host_required: Whether jump host is required for this hostname
+        reticket_cmd: Kerberos ticket-init command to run on the jump host (default: "reticket")
+        logger: Logger instance
+
+    Returns:
+        str: Local file path if successful, None otherwise
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    filename = os.path.basename(remote_path)
+    local_path = Path(local_folder) / filename
+
+    try:
+        use_jump_host = jump_host_required and jump_host
+
+        if use_jump_host:
+            logger.info(f"Using jump host {jump_host} to download from {hostname}")
+
+            async with _connect_via_jump_host(jump_host, jump_username, jump_password, reticket_cmd, logger) as jump_conn:
+                # Method 1: Try with asyncssh's connect_ssh
+                try:
+                    async with _connect_to_hpc_via_jump_host(jump_conn, hostname, username, logger) as conn:
+                        async with conn.start_sftp_client() as sftp:
+                            logger.info(f"Downloading {hostname}:{remote_path} to {local_path}")
+                            await sftp.get(remote_path, str(local_path))
+
+                            if local_path.exists():
+                                logger.info(f"Successfully downloaded {filename}")
+                                return str(local_path)
+                            else:
+                                logger.error(f"File not found after download: {filename}")
+                                return None
+                except Exception as e:
+                    logger.warning(f"Method 1 failed: {str(e)}")
+
+                    # Method 2: Use SCP command on jump host
+                    logger.info(f"Method 2: SCP via jump host")
+                    try:
+                        jump_temp_file = f"/tmp/{filename}"
+                        scp_cmd = f"scp -o StrictHostKeyChecking=no {username}@{hostname}:{remote_path} {jump_temp_file}"
+                        logger.info(f"Running SCP on jump host")
+
+                        result = await jump_conn.run(scp_cmd, check=True)
+                        logger.info(f"SCP completed, downloading from jump host")
+
+                        # Download from jump host to local
+                        async with jump_conn.start_sftp_client() as sftp:
+                            await sftp.get(jump_temp_file, str(local_path))
+
+                        # Clean up temp file on jump host
+                        await jump_conn.run(f"rm {jump_temp_file}", check=False)
+
+                        if local_path.exists():
+                            logger.info(f"Successfully downloaded {filename}")
+                            return str(local_path)
+                        else:
+                            logger.error(f"File not found after download: {filename}")
+                            return None
+                    except Exception as e2:
+                        logger.error(f"Method 2 also failed: {str(e2)}")
+                        return None
+        else:
+            # Direct SSH connection (no jump host)
+            logger.info(f"Direct SSH to {hostname}")
+            async with asyncssh.connect(**_ssh_connect_options(hostname, username, password)) as conn:
+                async with conn.start_sftp_client() as sftp:
+                    logger.info(f"Downloading {hostname}:{remote_path} to {local_path}")
+                    await sftp.get(remote_path, str(local_path))
+
+                    if local_path.exists():
+                        logger.info(f"Successfully downloaded {filename}")
+                        return str(local_path)
+                    else:
+                        logger.error(f"File not found after download: {filename}")
+                        return None
+
+    except Exception as e:
+        logger.error(f"Error downloading {remote_path}: {str(e)}")
+        return None
 
 
 #
@@ -697,67 +821,3 @@ def pull_data(location_type: str,
     else:
         print(f"Location type {location_type} for database {remote_path} is unsupported. Skipping.")
         raise ValueError(f"Unsupported location type: {location_type}")
-
-
-def accquire_data(location_type: str, 
-              remote_location: str, 
-              remote_path: str, 
-              abs_path_workspace_folder: str, 
-              username: str,
-              password: str,
-              download_limit: int = 10485760,
-              internal_use = False,
-              parent_hash: str = None) -> dict:
-    """Pulls data from a specified location based on the location type (e.g., "github", "HPC", "HPC-Kerberos", "URL", "local"). 
-    The function checks for existing files, compares them with remote versions using MD5 checksums, and downloads or skips files accordingly. 
-    It also handles user interactions for confirming downloads of large files and manages host usernames for HPC access.
-
-    Args:
-        location_type (str): The type of the original location (e.g., "github", "HPC", "HPC-kerberos", "URL", "local").
-        location (str): The location of the database (e.g., hostname for HPC, URL for web).
-        path (str): The path to the data or database at the original location.
-        abs_path_workspace_folder (str): The absolute path to the workspace folder where the data or database will be stored.
-        username (str): username for hpc systems
-        pass
-        download_limit (int): The maximum size of a file that can be downloaded without confirmation.
-    Returns:
-        dict : a dictionary entry for the data"""
-
-    # Create folder for data
-    tmp_path = Path(abs_path_workspace_folder).resolve()
-    if not tmp_path:
-        print(f"{abs_path_workspace_folder} is invalid!!!")
-        return None
-
-    
-    abs_path_workspace_folder = str(tmp_path)
-    if parent_hash:
-        folder_hash, abs_path_db_folder = create_hashed_folder_from_path(parent_hash, abs_path_workspace_folder)
-    else:
-        folder_hash, abs_path_db_folder = create_hashed_folder_from_path(remote_path, abs_path_workspace_folder)
-
-    print(f"folder_hash: {folder_hash}, abs_path_db_folder: {abs_path_db_folder}")
-    try:
-        downloaded_file_path = pull_data(location_type, 
-                                        remote_location, 
-                                        remote_path, 
-                                        folder_hash, 
-                                        username,
-                                        password,
-                                        download_limit)
-
-        _local_folder, _local_filename = split_path(downloaded_file_path)
-        print(f"Successfully acquired the data at {remote_location}:{remote_path} to {_local_folder}") 
-        
-        return {
-                "original_location_type": location_type,
-                "original_path": remote_path,
-                "folder_hash": folder_hash,
-                "local_path": _local_folder,
-                "name": _local_filename,
-            }
-
-    
-    except Exception as e:
-        print(f"Could not acquire data at {remote_location}:{remote_path}")
-        return None

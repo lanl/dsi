@@ -534,79 +534,6 @@ class DSI_cli:
         print()
 
 
-    def pull_data_parser(self):
-        parser = argparse.ArgumentParser(prog='pull_data')
-        parser.add_argument('source_type', help='Type of location data is stored in: GitHub, HPC, HPC-Kerberos, URL, S3, local')
-        parser.add_argument('source', help='user@hostname for HPC/HPC-Kerberos, bucket for S3, or descriptive name for others')
-        parser.add_argument('path', help='Absolute path or URL to data')
-        return parser
-
-
-    def pull_data(self, args):
-        """
-        Pull data using the pull_data function.
-        
-        Usage:
-        pull_data source_type source path
-        
-        source_type: github, HPC, URL, S3, or local
-        source: hostname for HPC, bucket for S3, or descriptive name for others
-        path: path to the file
-        """
-        source_type = args.source_type
-        source = args.source
-        path = args.path
-        username = ""
-        download_dir = os.getcwd()
-        
-        # Validate location_type
-        valid_types = ["github", "hpc", "hpc-kerberos", "url", "s3", "local"]
-        if source_type.lower() not in valid_types:
-            print(f"pull_data ERROR: location_type must be one of {', '.join(valid_types)}")
-            return
-        
-        # validate source is correct for HPC
-        if source_type.lower() == "hpc":
-            if "@" not in source:
-                print("pull_data ERROR: source must be 'user@hostname' to access the HPC")
-                return
-            username, source = source.split("@")
-        
-        # Create download directory if it doesn't exist
-        os.makedirs(download_dir, exist_ok=True)
-        
-        try:
-            from dsi.utils.federated.federate_datasets import accquire_data
-            
-            # Default download limit: 100 MB
-            download_limit = 100 * 1024 * 1024
-            
-            print(f"\nPulling data from {source_type}:{source}:{path}")
-            print(f"Download directory: {download_dir}\n")
-            print(source_type, source, path, download_dir, username, download_limit)
-            db_info = accquire_data(
-                location_type=source_type,
-                location=source,
-                path=path,
-                abs_path_workspace_folder=download_dir,
-                username=username,
-                download_limit=download_limit
-            )
-            
-            if db_info:
-                print(f"\nSuccessfully downloaded to: {db_info['local_path']}")
-            else:
-                print("\nFile was not downloaded (may already exist or was skipped)")
-        
-        except ImportError as e:
-            print(f"pull_data ERROR: Could not import pull_data function: {e}")
-            return
-        except Exception as e:
-            print(f"pull_data ERROR: {e}")
-            return
-        print()
-
-
     def get_query_parser(self):
         parser = argparse.ArgumentParser(prog='query')
         parser.add_argument('sql_query', help='SQL query (in quotes) to execute')
@@ -991,7 +918,6 @@ COMMANDS = {
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
-    'pull_data' : (cli.pull_data_parser, cli.pull_data), # to delete
     'query' : (cli.get_query_parser, cli.query),
     'read' : (cli.get_read_parser, cli.read),
     'search' : (None, cli.search),
