@@ -74,6 +74,7 @@ PYTHON_EOF
                 'username': jump_username,
                 'known_hosts': None,
                 'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
             }
             if jump_password:
                 jump_options['password'] = jump_password
@@ -133,6 +134,7 @@ PYTHON_EOF
                 'username': username,
                 'known_hosts': None,
                 'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
             }
             if password:
                 connect_options['password'] = password

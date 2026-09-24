@@ -62,6 +62,7 @@ async def download_csv_files_async(
                 'username': jump_username,
                 'known_hosts': None,
                 'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
             }
             if jump_password:
                 jump_options['password'] = jump_password
@@ -162,6 +163,7 @@ async def download_csv_files_async(
                 'username': username,
                 'known_hosts': None,
                 'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
             }
             if password:
                 connect_options['password'] = password
@@ -252,6 +254,7 @@ async def download_database_file_async(
                 'username': jump_username,
                 'known_hosts': None,
                 'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
             }
             if jump_password:
                 jump_options['password'] = jump_password
@@ -318,6 +321,7 @@ async def download_database_file_async(
                 'username': username,
                 'known_hosts': None,
                 'connect_timeout': 30,
+                'pkcs11_provider': None  # Disable PKCS#11 to avoid "PKCS#11 support not available" error
             }
             if password:
                 connect_options['password'] = password
