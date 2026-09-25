@@ -13,6 +13,7 @@ from typing import Iterator
 from contextlib import redirect_stdout
 from collections import OrderedDict
 from urllib.parse import urlparse
+import posixpath
 
 from dsi.core import Terminal
 from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
@@ -109,7 +110,7 @@ class Sync:
                 fed_table = self.t.get_table("federated")
                 fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
                 if fed_local == local_loc:
-                    self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
+                    self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
                     self.local_location = local_loc
                     if fed_remote == remote_loc:
                         if self.verbose:
@@ -147,8 +148,8 @@ class Sync:
             print("Crawled "+str(file_len)+" files.")
         
         file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
-        
-        self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
+
+        self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
@@ -183,9 +184,9 @@ class Sync:
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
-                rfilepath = os.path.join(remote_loc, self.project_name, rel_file)
+                rfilepath = posixpath.join(remote_loc, self.project_name, rel_file)
             else:
-                rfilepath = os.path.join(remote_loc, self.project_name, parent_rel_file)
+                rfilepath = posixpath.join(remote_loc, self.project_name, parent_rel_file)
             st_dict['file_origin'].append(rel_file)
             st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
