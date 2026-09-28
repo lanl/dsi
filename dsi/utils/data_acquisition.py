@@ -183,6 +183,16 @@ def _ssh_connect_options(hostname: str, username: str, password: str = None, pri
     return options
 
 
+def _log_process_error(logger: logging.Logger, e: Exception, label: str) -> None:
+    """If e is an asyncssh ProcessError, log the remote command's stdout/stderr (only
+    available on the process object, not in str(e)) so failures inside the remote
+    script/command are diagnosable instead of just showing an exit status."""
+    if isinstance(e, asyncssh.process.ProcessError):
+        logger.debug(f"{label} remote exit status: {e.exit_status}")
+        logger.debug(f"{label} remote stdout: {e.stdout!r}")
+        logger.debug(f"{label} remote stderr: {e.stderr!r}")
+
+
 def _redact_connect_options(options: dict) -> dict:
     """Copy of connect options with secrets redacted, safe to write to the debug log."""
     redacted = dict(options)
@@ -328,6 +338,7 @@ PYTHON_EOF
                 except Exception as e:
                     logger.warning(f"Method 1 failed: {str(e)}")
                     logger.debug("Method 1 failure details", exc_info=True)
+                    _log_process_error(logger, e, "Method 1")
 
                     # Method 2: Run SSH command directly on jump host (mirrors manual workflow)
                     # This is what works manually: ssh grosset2@tuolumne.llnl.gov 'command'
@@ -344,6 +355,7 @@ PYTHON_EOF
                     except Exception as e2:
                         logger.error(f"Method 2 also failed: {str(e2)}")
                         logger.debug("Method 2 failure details", exc_info=True)
+                        _log_process_error(logger, e2, "Method 2")
                         raise Exception(f"Both connection methods failed. Method 1: {e}, Method 2: {e2}")
         else:
             # Direct SSH connection
@@ -358,6 +370,7 @@ PYTHON_EOF
     except Exception as e:
         logger.error(f"SSH error: {str(e)}")
         logger.debug(f"SSH error details for {hostname}", exc_info=True)
+        _log_process_error(logger, e, "Direct SSH discovery command")
         return {}
 
 
@@ -470,6 +483,7 @@ async def download_csv_files_async(
                             except Exception as e2:
                                 logger.error(f"Error downloading {csv_path} with SCP: {str(e2)}")
                                 logger.debug(f"SCP failure details for {csv_path}", exc_info=True)
+                                _log_process_error(logger, e2, f"SCP for {csv_path}")
                                 continue
                         logger.info("Method 2 succeeded!")
                     except Exception as e3:
@@ -614,6 +628,7 @@ async def download_database_file_async(
                     except Exception as e2:
                         logger.error(f"Method 2 also failed: {str(e2)}")
                         logger.debug("Method 2 failure details", exc_info=True)
+                        _log_process_error(logger, e2, "Method 2 SCP")
                         return None
         else:
             # Direct SSH connection (no jump host)
