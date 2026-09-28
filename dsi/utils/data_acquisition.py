@@ -302,10 +302,15 @@ async def discover_endpoints_async(
     if logger is None:
         logger = logging.getLogger(__name__)
 
-    # Build command to run on remote server
+    # Build the script to run on the remote server. This is fed to the remote
+    # process over stdin (see below) rather than passed as the SSH command string,
+    # so it is always parsed by bash regardless of the remote user's login shell
+    # (tcsh/csh users would otherwise hit "export: Command not found" and mangled
+    # heredoc parsing, since csh doesn't understand `export` or bash-style `<<`).
     prefixes_str = ','.join(f'"{p}"' for p in prefixes)
-    remote_cmd = f"""
-source {script_path} && python3 << 'PYTHON_EOF'
+    remote_script = f"""
+source {script_path}
+python3 << 'PYTHON_EOF'
 import os
 import json
 prefixes = [{prefixes_str}]
@@ -314,8 +319,12 @@ endpoints = {{k: v for k, v in os.environ.items() if k.startswith(prefix_tuple)}
 print(json.dumps(endpoints))
 PYTHON_EOF
 """
+    # The remote-side command is just "bash -s": this is plain enough to be valid
+    # under any login shell (bash, tcsh, csh, zsh), and it's bash itself that then
+    # reads remote_script from stdin, so export/heredoc syntax is always understood.
+    bash_cmd = "bash -s"
 
-    logger.debug(f"Remote discovery command:\n{remote_cmd}")
+    logger.debug(f"Remote discovery script (sent via stdin to '{bash_cmd}'):\n{remote_script}")
 
     try:
         if hpc_type == 'kerberos' and jump_host:
@@ -331,7 +340,7 @@ PYTHON_EOF
                 # Method 1: Try using connect_ssh with GSSAPI
                 try:
                     async with _connect_to_hpc_via_jump_host(jump_conn, hostname, username, logger) as final_conn:
-                        result = await final_conn.run(remote_cmd, check=True)
+                        result = await final_conn.run(bash_cmd, input=remote_script, check=True)
                         logger.debug(f"Method 1 stdout: {result.stdout!r}")
                         logger.debug(f"Method 1 stderr: {result.stderr!r}")
                         return json.loads(result.stdout.strip())
@@ -342,12 +351,15 @@ PYTHON_EOF
 
                     # Method 2: Run SSH command directly on jump host (mirrors manual workflow)
                     # This is what works manually: ssh grosset2@tuolumne.llnl.gov 'command'
+                    # The script is streamed over stdin (forwarded through both SSH hops)
+                    # rather than embedded in the command string, avoiding shell-quoting
+                    # issues across two shell layers.
                     logger.info(f"Method 2: Running SSH command directly on jump host")
                     try:
-                        ssh_cmd = f"ssh -o StrictHostKeyChecking=no {username}@{hostname} '{remote_cmd}'"
-                        logger.info(f"Running: ssh -o StrictHostKeyChecking=no {username}@{hostname} '<python command>'")
+                        ssh_cmd = f"ssh -o StrictHostKeyChecking=no {username}@{hostname} {bash_cmd}"
+                        logger.info(f"Running: ssh -o StrictHostKeyChecking=no {username}@{hostname} {bash_cmd}")
                         logger.debug(f"Full Method 2 command: {ssh_cmd}")
-                        result = await jump_conn.run(ssh_cmd, check=True)
+                        result = await jump_conn.run(ssh_cmd, input=remote_script, check=True)
                         logger.debug(f"Method 2 stdout: {result.stdout!r}")
                         logger.debug(f"Method 2 stderr: {result.stderr!r}")
                         logger.info("Method 2 succeeded!")
@@ -363,7 +375,7 @@ PYTHON_EOF
             logger.debug(f"Direct SSH connect options: {_redact_connect_options(connect_options)}")
             async with asyncssh.connect(**connect_options) as conn:
                 logger.debug(f"Connected to {hostname}, running discovery command")
-                result = await conn.run(remote_cmd, check=True)
+                result = await conn.run(bash_cmd, input=remote_script, check=True)
                 logger.debug(f"Discovery stdout: {result.stdout!r}")
                 logger.debug(f"Discovery stderr: {result.stderr!r}")
                 return json.loads(result.stdout.strip())
