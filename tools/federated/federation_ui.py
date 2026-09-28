@@ -110,8 +110,11 @@ def discover_endpoints():
         logger.info(f"Prefixes: {prefixes}")
         logger.info(f"Using password auth: {bool(password)}")
         logger.info(f"HPC Type: {hpc_type}")
+        logger.debug(f"Username: {username}")
+        logger.debug(f"Request payload keys: {list(data.keys())}")
         if hpc_type == 'kerberos':
             logger.info(f"Jump host: {jump_host}, Jump username: {jump_username}")
+            logger.debug(f"Reticket command: {reticket_cmd}")
 
         # Aggregate endpoints from all clusters
         all_endpoints = {}
@@ -121,6 +124,7 @@ def discover_endpoints():
         for hpc_name in hpc_names:
             try:
                 logger.info(f"Discovering endpoints from {hpc_name}")
+                start_time = datetime.now()
 
                 # Use core discover_endpoints_async function
                 endpoints_location = asyncio.run(discover_endpoints_async(
@@ -136,6 +140,9 @@ def discover_endpoints():
                     reticket_cmd=reticket_cmd,
                     logger=logger
                 ))
+
+                elapsed = (datetime.now() - start_time).total_seconds()
+                logger.debug(f"discover_endpoints_async for {hpc_name} took {elapsed:.2f}s, returned: {endpoints_location}")
 
                 if endpoints_location:
                     # Mark this hostname as requiring jump host if we used one
@@ -164,6 +171,7 @@ def discover_endpoints():
 
             except Exception as e:
                 logger.error(f"Error discovering endpoints from {hpc_name}: {str(e)}", exc_info=True)
+                logger.debug(f"Exception type for {hpc_name}: {type(e).__name__}")
                 cluster_results[hpc_name] = {
                     'success': False,
                     'message': str(e)
@@ -171,6 +179,7 @@ def discover_endpoints():
                 failed_clusters.append(hpc_name)
 
         logger.info(f"Total endpoints discovered: {len(all_endpoints)}")
+        logger.debug(f"Cluster results: {cluster_results}")
 
         if not all_endpoints:
             return jsonify({

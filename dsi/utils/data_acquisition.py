@@ -183,6 +183,16 @@ def _ssh_connect_options(hostname: str, username: str, password: str = None, pri
     return options
 
 
+def _redact_connect_options(options: dict) -> dict:
+    """Copy of connect options with secrets redacted, safe to write to the debug log."""
+    redacted = dict(options)
+    if redacted.get('password'):
+        redacted['password'] = '***REDACTED***'
+    if redacted.get('client_keys'):
+        redacted['client_keys'] = [f'<key: {k}>' for k in redacted['client_keys']]
+    return redacted
+
+
 @asynccontextmanager
 async def _connect_via_jump_host(
     jump_host: str,
@@ -196,8 +206,10 @@ async def _connect_via_jump_host(
     yielding the live jump host connection.
     """
     jump_options = _ssh_connect_options(jump_host, jump_username, jump_password)
+    logger.debug(f"Jump host connect options: {_redact_connect_options(jump_options)}")
 
     async with asyncssh.connect(**jump_options) as jump_conn:
+        logger.debug(f"Connected to jump host {jump_host} as {jump_username}")
         logger.info(f"Running '{reticket_cmd}' on jump host")
         reticket_result = await jump_conn.run(reticket_cmd, check=False)
         logger.info(f"{reticket_cmd} output: {reticket_result.stdout}")
@@ -205,12 +217,14 @@ async def _connect_via_jump_host(
         if reticket_result.stderr:
             logger.info(f"{reticket_cmd} stderr: {reticket_result.stderr}")
 
+        logger.debug(f"{reticket_cmd} exit status: {reticket_result.exit_status}")
         if reticket_result.exit_status != 0:
             logger.warning(f"{reticket_cmd} failed with exit code: {reticket_result.exit_status}")
 
         logger.info(f"Checking Kerberos tickets with klist")
         klist_result = await jump_conn.run("klist", check=False)
         logger.info(f"klist output: {klist_result.stdout}")
+        logger.debug(f"klist exit status: {klist_result.exit_status}, stderr: {klist_result.stderr}")
 
         yield jump_conn
 
@@ -227,6 +241,7 @@ async def _connect_to_hpc_via_jump_host(
     to the final HPC target and yield it (Method 1 of the jump-host pattern).
     """
     logger.info(f"Method 1: Using connect_ssh with gss_auth=True")
+    logger.debug(f"connect_ssh target={hostname}, username={username}, gss_auth=True, gss_delegate_creds=True")
     async with jump_conn.connect_ssh(
         hostname,
         username=username,
@@ -290,6 +305,8 @@ print(json.dumps(endpoints))
 PYTHON_EOF
 """
 
+    logger.debug(f"Remote discovery command:\n{remote_cmd}")
+
     try:
         if hpc_type == 'kerberos' and jump_host:
             # Connect via jump host with Kerberos pattern:
@@ -305,9 +322,12 @@ PYTHON_EOF
                 try:
                     async with _connect_to_hpc_via_jump_host(jump_conn, hostname, username, logger) as final_conn:
                         result = await final_conn.run(remote_cmd, check=True)
+                        logger.debug(f"Method 1 stdout: {result.stdout!r}")
+                        logger.debug(f"Method 1 stderr: {result.stderr!r}")
                         return json.loads(result.stdout.strip())
                 except Exception as e:
                     logger.warning(f"Method 1 failed: {str(e)}")
+                    logger.debug("Method 1 failure details", exc_info=True)
 
                     # Method 2: Run SSH command directly on jump host (mirrors manual workflow)
                     # This is what works manually: ssh grosset2@tuolumne.llnl.gov 'command'
@@ -315,19 +335,29 @@ PYTHON_EOF
                     try:
                         ssh_cmd = f"ssh -o StrictHostKeyChecking=no {username}@{hostname} '{remote_cmd}'"
                         logger.info(f"Running: ssh -o StrictHostKeyChecking=no {username}@{hostname} '<python command>'")
+                        logger.debug(f"Full Method 2 command: {ssh_cmd}")
                         result = await jump_conn.run(ssh_cmd, check=True)
+                        logger.debug(f"Method 2 stdout: {result.stdout!r}")
+                        logger.debug(f"Method 2 stderr: {result.stderr!r}")
                         logger.info("Method 2 succeeded!")
                         return json.loads(result.stdout.strip())
                     except Exception as e2:
                         logger.error(f"Method 2 also failed: {str(e2)}")
+                        logger.debug("Method 2 failure details", exc_info=True)
                         raise Exception(f"Both connection methods failed. Method 1: {e}, Method 2: {e2}")
         else:
             # Direct SSH connection
-            async with asyncssh.connect(**_ssh_connect_options(hostname, username, password)) as conn:
+            connect_options = _ssh_connect_options(hostname, username, password)
+            logger.debug(f"Direct SSH connect options: {_redact_connect_options(connect_options)}")
+            async with asyncssh.connect(**connect_options) as conn:
+                logger.debug(f"Connected to {hostname}, running discovery command")
                 result = await conn.run(remote_cmd, check=True)
+                logger.debug(f"Discovery stdout: {result.stdout!r}")
+                logger.debug(f"Discovery stderr: {result.stderr!r}")
                 return json.loads(result.stdout.strip())
     except Exception as e:
         logger.error(f"SSH error: {str(e)}")
+        logger.debug(f"SSH error details for {hostname}", exc_info=True)
         return {}
 
 
@@ -377,6 +407,7 @@ async def download_csv_files_async(
 
         if use_jump_host:
             logger.info(f"✓ Hostname {hostname} requires jump host (using {jump_host})")
+            logger.debug(f"CSV paths to download: {csv_paths}")
 
             async with _connect_via_jump_host(jump_host, jump_username, jump_password, reticket_cmd, logger) as jump_conn:
                 logger.info(f"Connecting to {hostname} from jump host as {username}")
@@ -395,13 +426,16 @@ async def download_csv_files_async(
                                     if local_path.exists():
                                         downloaded_files.append(str(local_path))
                                         logger.info(f"Successfully downloaded {local_filename}")
+                                        logger.debug(f"Local file size: {local_path.stat().st_size} bytes")
                                     else:
                                         logger.error(f"File not found after download: {local_filename}")
                                 except Exception as e:
                                     logger.error(f"Error downloading {csv_path}: {str(e)}")
+                                    logger.debug(f"Download failure details for {csv_path}", exc_info=True)
                                     continue
                 except Exception as e:
                     logger.warning(f"Method 1 failed: {str(e)}")
+                    logger.debug("Method 1 failure details", exc_info=True)
 
                     # Method 2: Use SCP command on jump host (mirrors manual workflow)
                     logger.info(f"Method 2: Using SCP command directly on jump host")
@@ -418,6 +452,7 @@ async def download_csv_files_async(
 
                                 result = await jump_conn.run(scp_cmd, check=True)
                                 logger.info(f"SCP completed, downloading from jump host")
+                                logger.debug(f"SCP exit status: {result.exit_status}, stdout: {result.stdout!r}, stderr: {result.stderr!r}")
 
                                 # Download from jump host to local
                                 async with jump_conn.start_sftp_client() as sftp:
@@ -429,10 +464,12 @@ async def download_csv_files_async(
                                 if local_path.exists():
                                     downloaded_files.append(str(local_path))
                                     logger.info(f"Successfully downloaded {local_filename}")
+                                    logger.debug(f"Local file size: {local_path.stat().st_size} bytes")
                                 else:
                                     logger.error(f"File not found after download: {local_filename}")
                             except Exception as e2:
                                 logger.error(f"Error downloading {csv_path} with SCP: {str(e2)}")
+                                logger.debug(f"SCP failure details for {csv_path}", exc_info=True)
                                 continue
                         logger.info("Method 2 succeeded!")
                     except Exception as e3:
@@ -441,7 +478,10 @@ async def download_csv_files_async(
         else:
             # Direct connection (no jump host)
             logger.info(f"Direct SSH to {hostname}")
-            async with asyncssh.connect(**_ssh_connect_options(hostname, username, password)) as conn:
+            connect_options = _ssh_connect_options(hostname, username, password)
+            logger.debug(f"Direct SSH connect options: {_redact_connect_options(connect_options)}")
+            logger.debug(f"CSV paths to download: {csv_paths}")
+            async with asyncssh.connect(**connect_options) as conn:
                 async with conn.start_sftp_client() as sftp:
                     for csv_name, csv_path in csv_paths.items():
                         try:
@@ -456,18 +496,23 @@ async def download_csv_files_async(
                             if local_path.exists():
                                 downloaded_files.append(str(local_path))
                                 logger.info(f"Successfully downloaded {local_filename}")
+                                logger.debug(f"Local file size: {local_path.stat().st_size} bytes")
                             else:
                                 logger.error(f"File not found after download: {local_filename}")
 
                         except Exception as e:
                             logger.error(f"Error downloading {csv_path}: {str(e)}")
+                            logger.debug(f"Download failure details for {csv_path}", exc_info=True)
                             continue
 
     except asyncssh.Error as e:
         logger.error(f"SSH connection error to {hostname}: {str(e)}")
+        logger.debug(f"SSH connection error details for {hostname}", exc_info=True)
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
+        logger.debug("Unexpected error details", exc_info=True)
 
+    logger.debug(f"Total files downloaded from {hostname}: {len(downloaded_files)} -> {downloaded_files}")
     return downloaded_files
 
 
@@ -531,12 +576,14 @@ async def download_database_file_async(
 
                             if local_path.exists():
                                 logger.info(f"Successfully downloaded {filename}")
+                                logger.debug(f"Local file size: {local_path.stat().st_size} bytes")
                                 return str(local_path)
                             else:
                                 logger.error(f"File not found after download: {filename}")
                                 return None
                 except Exception as e:
                     logger.warning(f"Method 1 failed: {str(e)}")
+                    logger.debug("Method 1 failure details", exc_info=True)
 
                     # Method 2: Use SCP command on jump host
                     logger.info(f"Method 2: SCP via jump host")
@@ -544,9 +591,11 @@ async def download_database_file_async(
                         jump_temp_file = f"/tmp/{filename}"
                         scp_cmd = f"scp -o StrictHostKeyChecking=no {username}@{hostname}:{remote_path} {jump_temp_file}"
                         logger.info(f"Running SCP on jump host")
+                        logger.debug(f"Full SCP command: {scp_cmd}")
 
                         result = await jump_conn.run(scp_cmd, check=True)
                         logger.info(f"SCP completed, downloading from jump host")
+                        logger.debug(f"SCP exit status: {result.exit_status}, stdout: {result.stdout!r}, stderr: {result.stderr!r}")
 
                         # Download from jump host to local
                         async with jump_conn.start_sftp_client() as sftp:
@@ -557,23 +606,28 @@ async def download_database_file_async(
 
                         if local_path.exists():
                             logger.info(f"Successfully downloaded {filename}")
+                            logger.debug(f"Local file size: {local_path.stat().st_size} bytes")
                             return str(local_path)
                         else:
                             logger.error(f"File not found after download: {filename}")
                             return None
                     except Exception as e2:
                         logger.error(f"Method 2 also failed: {str(e2)}")
+                        logger.debug("Method 2 failure details", exc_info=True)
                         return None
         else:
             # Direct SSH connection (no jump host)
             logger.info(f"Direct SSH to {hostname}")
-            async with asyncssh.connect(**_ssh_connect_options(hostname, username, password)) as conn:
+            connect_options = _ssh_connect_options(hostname, username, password)
+            logger.debug(f"Direct SSH connect options: {_redact_connect_options(connect_options)}")
+            async with asyncssh.connect(**connect_options) as conn:
                 async with conn.start_sftp_client() as sftp:
                     logger.info(f"Downloading {hostname}:{remote_path} to {local_path}")
                     await sftp.get(remote_path, str(local_path))
 
                     if local_path.exists():
                         logger.info(f"Successfully downloaded {filename}")
+                        logger.debug(f"Local file size: {local_path.stat().st_size} bytes")
                         return str(local_path)
                     else:
                         logger.error(f"File not found after download: {filename}")
@@ -581,6 +635,7 @@ async def download_database_file_async(
 
     except Exception as e:
         logger.error(f"Error downloading {remote_path}: {str(e)}")
+        logger.debug(f"Download failure details for {hostname}:{remote_path}", exc_info=True)
         return None
 
 
