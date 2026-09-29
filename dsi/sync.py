@@ -149,6 +149,8 @@ class Sync:
             print("Crawled "+str(file_len)+" files.")
         
         file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
+        file_list = [files.replace("\\", "/") for files in file_list] # Normalize the directories
+
 
         self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
         self.local_location = local_loc
@@ -180,8 +182,8 @@ class Sync:
 
         for file in file_list:
             parent_rel_file = Path(file).relative_to(Path(local_loc).parent)
-            rel_file = os.path.relpath(file,local_loc).replace("\\", "/")
-            filepath = os.path.join(local_loc, rel_file).replace("\\", "/")
+            rel_file = os.path.relpath(file,local_loc)
+            filepath = os.path.join(local_loc, rel_file)
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
@@ -201,7 +203,7 @@ class Sync:
             st_dict['uid'].append(st.st_uid)
             st_dict['gid'].append(st.st_gid)
             st_dict['uuid'].append(self.gen_uuid(st))
-            st_dict['file_remote'].append(rfilepath)
+            st_dict['file_remote'].append(rfilepath.replace("\\", "/"))
             st_list.append(st)
             if self.verbose:
                 progress = int(len(st_list) / file_len * 100)
