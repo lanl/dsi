@@ -179,8 +179,8 @@ class Sync:
 
         for file in file_list:
             parent_rel_file = Path(file).relative_to(Path(local_loc).parent)
-            rel_file = os.path.relpath(file,local_loc) #rel path
-            filepath = os.path.join(local_loc, rel_file)
+            rel_file = os.path.relpath(file,local_loc).replace("\\", "/")
+            filepath = os.path.join(local_loc, rel_file).replace("\\", "/")
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
