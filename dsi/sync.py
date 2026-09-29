@@ -26,7 +26,7 @@ class Sync:
     sync (local filesystem with remote) exist.
     """
     def __init__(self, project_name, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
-        self.project_name = project_name
+        self.project_name = project_name.replace("\\", "/")
         self.verbose = isVerbose
         self.no_parent = no_parent
         self.skip_index = skip_index
