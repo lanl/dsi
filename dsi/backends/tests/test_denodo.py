@@ -22,6 +22,16 @@ import pytest
 
 from dsi.backends.denodo import Denodo
 
+from dsi.backends.denodo import (
+    Denodo,
+    canonical_property_name,
+    extract_urls,
+    normalize_description,
+    normalize_property_value,
+    null_if_empty,
+)
+
+
 # Captured before any patching, so a test can restore the real behaviour
 REAL_VALIDATE = Denodo.validate_connection
 
@@ -60,20 +70,52 @@ FAKE_CATALOG = [GOLDEN_HIT] + [
     for i in range(1, 250)
 ]
 
+# Databases as the API returns them: one plain description, one null,
+# one whitespace-only -- the last two must both normalize to None.
+FAKE_DATABASES = [
+    {"databaseId": 10, "serverId": 1, "databaseName": "db_a",
+     "description": "first database", "descriptionType": None},
+    {"databaseId": 5, "serverId": 1, "databaseName": "db_b",
+     "description": None, "descriptionType": None},
+    {"databaseId": 16, "serverId": 1, "databaseName": "db_empty",
+     "description": "   ", "descriptionType": None},
+]
+
+# db_a: 7 live + 1 deleted.  db_b: 2.  db_empty: none at all.
+FAKE_VIEWS = (
+    [{"name": f"v{i}", "db": "db_a", "deleted": False} for i in range(7)]
+    + [{"name": f"w{i}", "db": "db_b", "deleted": False} for i in range(2)]
+    + [{"name": "gone", "db": "db_a", "deleted": True}]
+)
+
+
 # Every request a test causes is recorded here
 REQUESTS = []
 
 
 def mock_request(self, endpoint, params=None, method="GET", json_body=None):
-    """Serve one page from FAKE_CATALOG and record the call."""
-    # dict(json_body): the backend reuses one body dict and mutates "offset",
+    """Serve a canned response per endpoint and record the call."""
+    # dict(...): the backend reuses one body dict and mutates "offset",
     # so storing a reference would make every recorded call look identical.
-    REQUESTS.append({"method": method, "endpoint": endpoint, "body": dict(json_body)})
+    REQUESTS.append({
+        "method": method,
+        "endpoint": endpoint,
+        "body": dict(json_body) if json_body else None,
+        "params": dict(params) if params else None,
+    })
+
+    if endpoint == "database-management/user/databases":
+        return [dict(db) for db in FAKE_DATABASES]
+
+    if endpoint == "views":
+        return [dict(v) for v in FAKE_VIEWS]
+
     offset, limit = json_body["offset"], json_body["limit"]
     return {
         "elementsCount": len(FAKE_CATALOG),
         "elements": FAKE_CATALOG[offset:offset + limit],
     }
+
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -143,7 +185,7 @@ def test_flatten_hit_empty_lists_become_none():
 
 def test_initialization(backend):
     assert backend._loaded is True
-    assert list(backend.schemas) == ["denodo_search_results"]
+    assert list(backend.schemas) == ["denodo_search_results", "denodo_databases"]
     assert "denodo_search_results" in backend._cache
 
 
@@ -257,8 +299,8 @@ def test_empty_result_still_has_every_column():
 
 
 def test_list_and_num_tables(backend):
-    assert backend.list(collection=True) == ["denodo_search_results"]
-    assert backend.num_tables() == 1
+    assert backend.list(collection=True) == ["denodo_search_results", "denodo_databases"]
+    assert backend.num_tables() == 2
 
 
 def test_get_schema(backend):
@@ -278,7 +320,7 @@ def test_summary_is_one_row_per_column(backend):
     assert len(summary) == len(Denodo.SEARCH_SCHEMA)
 
     all_tables = backend.summary()
-    assert all_tables[0] == ["denodo_search_results"]
+    assert all_tables[0] == ["denodo_search_results", "denodo_databases"]
 
 
 def test_display_sets_max_rows(backend):
@@ -383,6 +425,135 @@ def test_probe_without_configuration(monkeypatch):
     assert probe.base_url is None
     assert probe.validate_connection() is False
 
+
+# =============================================================================
+# 6) Normalization (contract section 3)
+# =============================================================================
+
+@pytest.mark.parametrize(("raw", "property_type", "expected"), [
+    ("user&#64;example.org", "RICH_TEXT", "user@example.org"),
+    ('<p><strong> <a href="https://example.org/x">Baker, Alex</a></strong></p>',
+     "RICH_TEXT", "Baker, Alex"),
+    ("Infrequently / Ad hoc basis", "ENUMERATION", "Infrequently / Ad hoc basis"),
+    ("WASTE_READ", "RICH_TEXT", "WASTE_READ"),
+])
+def test_normalize_property_value(raw, property_type, expected):
+    """The four cases the data contract requires (section 3.2)."""
+    assert normalize_property_value(raw, property_type) == expected
+
+
+def test_unescaping_happens_after_stripping():
+    """Unescaping first would build a tag that stripping then deletes."""
+    assert normalize_property_value("a &lt;b&gt; c", "RICH_TEXT") == "a <b> c"
+
+
+def test_tags_are_stripped_only_for_rich_text():
+    assert normalize_property_value("<b>x</b>", "RICH_TEXT") == "x"
+    assert normalize_property_value("<b>x</b>", "LONG_TEXT") == "<b>x</b>"
+
+
+def test_normalize_property_value_handles_empty_and_none():
+    assert normalize_property_value(None, "RICH_TEXT") is None
+    assert normalize_property_value("   ", "RICH_TEXT") is None
+
+
+def test_extract_urls_reads_hrefs_before_stripping():
+    raw = '<a href="https://example.org/a">a</a> and <a href=\'https://example.org/b\'>b</a>'
+    assert extract_urls(raw) == ["https://example.org/a", "https://example.org/b"]
+    assert extract_urls(None) == []
+    assert extract_urls("no links here") == []
+
+
+@pytest.mark.parametrize(("value", "expected"), [
+    ("", None), ("   ", None), ("NOLINK", None), ("ok", "ok"), (None, None),
+])
+def test_null_policy(value, expected):
+    assert null_if_empty(value) == expected
+
+
+def test_canonical_property_name_keeps_trailing_punctuation():
+    assert canonical_property_name("Details", "Business Unit:") == "Details/Business Unit:"
+
+
+def test_normalize_description_splits_text_and_url():
+    text, url = normalize_description(
+        '<p>Reference table. <a href="https://example.org/doc">docs</a></p>'
+    )
+    assert text == "Reference table. docs"
+    assert url == "https://example.org/doc"
+
+    assert normalize_description(None) == (None, None)
+    assert normalize_description("Plain text") == ("Plain text", None)
+
+
+# =============================================================================
+# 7) The databases table
+# =============================================================================
+def test_databases_table_is_registered_and_empty_by_default():
+    """Registering a schema is enough: the table exists before any fetch."""
+    backend = make_backend(keywords="test")
+    table = backend.get_table("denodo_databases")
+    assert list(table.columns) == Denodo.DATABASES_SCHEMA
+    assert table.shape == (0, len(Denodo.DATABASES_SCHEMA))
+    backend.close()
+
+
+def test_databases_table_has_one_row_per_database():
+    backend = make_backend(databases=[])
+    table = backend.get_table("denodo_databases")
+    assert table["db_name"].tolist() == ["db_a", "db_b", "db_empty"]
+    assert table["database_id"].tolist() == [10, 5, 16]
+    assert table["server_id"].tolist() == [1, 1, 1]
+    backend.close()
+
+
+def test_missing_description_is_none_however_it_is_spelled():
+    """None and a whitespace-only string are both 'no description'."""
+    backend = make_backend(databases=[])
+    assert backend.get_table("denodo_databases")["description"].tolist() == [
+        "first database", None, None,
+    ]
+    backend.close()
+
+
+def test_view_count_counts_live_views_only():
+    """A deleted view is not counted; a database with no views scores 0."""
+    backend = make_backend(databases=[])
+    assert backend.get_table("denodo_databases")["view_count"].tolist() == [7, 2, 0]
+    backend.close()
+
+
+def test_databases_can_be_restricted_to_a_subset():
+    backend = make_backend(databases=["db_b"])
+    table = backend.get_table("denodo_databases")
+    assert table["db_name"].tolist() == ["db_b"]
+    assert table["view_count"].tolist() == [2]
+    backend.close()
+
+
+
+def test_unknown_database_is_rejected_before_any_fetch():
+    """An unknown name must not reach the API, which answers 500, not 404."""
+    with pytest.raises(RuntimeError) as err:
+        make_backend(databases=["db_a", "nope"])
+    assert "nope" in str(err.value)
+
+
+def test_provenance_columns_are_filled():
+    backend = make_backend(databases=[])
+    table = backend.get_table("denodo_databases")
+    assert all(value == "example.org" for value in table["source_env"])
+    assert len(set(table["fetched_at"])) == 1      # one timestamp per fetch
+    assert all(t and t.endswith("+00:00") for t in table["fetched_at"])
+    backend.close()
+
+
+def test_the_databases_path_makes_exactly_two_calls():
+    """One call for the databases, one for the counts -- no per-view fetches."""
+    make_backend(databases=[])
+    assert [r["endpoint"] for r in REQUESTS] == [
+        "database-management/user/databases", "views",
+    ]
 
 
 
