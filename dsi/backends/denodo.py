@@ -14,7 +14,8 @@ import logging       # for normalization, because the contract requires URLs it 
 import re            # for normalization, for the tag and href patterns
 from pathlib import Path
 
-from collections import OrderedDict
+from collections import OrderedDict, Counter
+from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs, urlencode
 from typing import ClassVar  
 
@@ -353,6 +354,19 @@ class Denodo(Webserver):
         "ranking",
     ]
 
+    # One row per database, from GET database-management/user/databases.
+    # Column order here = column order in the DSI table.
+    DATABASES_SCHEMA: ClassVar[list[str]] = [
+        "db_name",
+        "description",
+        "database_id",    # Denodo's own databaseId -- source-assigned and
+                          # non-contiguous, not a row number
+        "server_id",      # a field of the response body, not just the request
+        "view_count",     # counted from the views endpoint, not from this one
+        "fetched_at",     # provenance
+        "source_env",     # provenance
+    ]
+
     SUPPORTED_PARAMS: ClassVar[set[str]] = {
         "keywords",      # text to search ("" = whole catalog)
         "search_in",     # name | description | properties | column_names | column_descriptions
@@ -362,6 +376,8 @@ class Denodo(Webserver):
         "limit",         # max rows (default: every hit)
         "database",      # existing path: all views of one database
         "view",          # existing path: one view (needs 'database')
+
+        "databases",     # list of database names; [] = every visible database                 # This is for database table
     }
 
     # Friendly param values -> Denodo API enums (confirmed via Swagger + probes)
@@ -479,6 +495,17 @@ class Denodo(Webserver):
         self.server_id = kwargs.get("server_id", 1)
         self.verify_ssl = kwargs.get("verify_ssl", True)
 
+        # Provenance (Principle #6). Same precedence as every other setting:
+        # explicit argument > environment variable > config file. The host
+        # actually talked to is the last resort, so the column is never null
+        # and nothing site-specific enters this file.
+        self.source_env = (                             # This is for database table
+            kwargs.get("source_env")
+            or _setting("source_env", env_var="DENODO_SOURCE_ENV")
+            or urlparse(self.base_url).netloc
+        )
+
+
         self.headers = {}
         if self.token:
             self.headers["Authorization"] = f"Bearer {self.token}"
@@ -488,6 +515,7 @@ class Denodo(Webserver):
         # as their schemas are defined.
         self.schemas = {
             "denodo_search_results": self.SEARCH_SCHEMA,
+            "denodo_databases": self.DATABASES_SCHEMA,
         }
 
         # Table data: table name -> column-oriented OrderedDict.
@@ -658,6 +686,9 @@ class Denodo(Webserver):
         # Collect results from all queries
         all_views = []     # view/database paths -> full view-details dicts
         search_rows = []   # search path -> flat rows from the POST response only
+        database_rows = []  # databases path -> one row per database
+
+
 
         for query_params in query_list:
             # Check if this is a direct view lookup
@@ -679,6 +710,12 @@ class Denodo(Webserver):
                         query_params["database"], query_params.get("limit", 100)
                     )
                 )
+            elif "databases" in query_params:
+                # Layer 1: one row per database. Independent of the
+                # view-details path, so it needs no view fetches.
+                database_rows.extend(
+                    self._build_database_rows(query_params["databases"])
+                )
             else:
                 # Search: POST /search/metadata only, no view-details calls
                 search_rows.extend(self._run_single_query(query_params))
@@ -694,6 +731,11 @@ class Denodo(Webserver):
             self._cache["denodo_search_results"] = self._rows_to_table(
                 unique_rows, self.SEARCH_SCHEMA
             )
+        if database_rows:
+            self._cache["denodo_databases"] = self._rows_to_table(
+                database_rows, self.DATABASES_SCHEMA
+            )
+
 
         # The four contract tables come only from the view/database paths.
         # Skipped until _extract_tables and their schemas exist (Phase 2).
@@ -806,6 +848,118 @@ class Denodo(Webserver):
                 views.append(view)
 
         return views
+
+
+    def _get_databases(self):                                                # For Database table
+        """
+        List every database the caller can see, with its description.
+
+        One call returns names and descriptions together. The older
+        route -- one browse/databases lookup per name -- returns the
+        same values one at a time.
+
+        Returns
+        -------
+        list of dict
+            {databaseId, serverId, databaseName, description, descriptionType}
+        """
+        result = self._request(
+            "database-management/user/databases",
+            params={"serverId": self.server_id},
+        )
+
+        if isinstance(result, list):
+            return result
+        return result.get("databases", result.get("elements", []))
+
+
+    def _get_view_counts(self):                                         # For Database table
+        """
+        Count views per database from a single call to the list endpoint.
+
+        The list endpoint ignores its databaseName parameter and always
+        returns the whole catalog, so one call is the cheapest and the
+        most reliable way to count. The per-database route does filter
+        correctly, but its response carries no total, so counting
+        through it costs one request per page per database.
+
+        Returns
+        -------
+        collections.Counter
+            {db_name: view_count}. A database with no views is absent
+            from the Counter and reads back as 0.
+        """
+        result = self._request("views", params={"serverId": self.server_id})
+
+        if isinstance(result, list):
+            all_views = result
+        else:
+            all_views = result.get("views", result.get("elements", []))
+
+        # "db" is the list endpoint's spelling; view-details calls the
+        # same concept "databaseName".
+        return Counter(v.get("db") for v in all_views if not v.get("deleted"))
+
+
+    def _build_database_rows(self, names=None):                     # For Database table
+        """
+        Build the rows of denodo_databases.
+
+        Parameters
+        ----------
+        names : list of str, optional
+            Restrict the table to these databases. None or an empty
+            list means every database the caller can see.
+
+        Returns
+        -------
+        list of dict
+            One dict per database, keyed by DATABASES_SCHEMA columns.
+
+        Raises
+        ------
+        ValueError
+            If a requested name is not one of the caller's databases.
+            An unknown name must never reach the per-database views
+            route: that route answers 500 with an internal query
+            fragment rather than a clean 404.
+        """
+        databases = self._get_databases()
+        available = {db.get("databaseName") for db in databases}
+
+        if names:
+            unknown = sorted(set(names) - available)
+            if unknown:
+                raise ValueError(
+                    f"Unknown database(s): {', '.join(unknown)}. "
+                    f"Available: {', '.join(sorted(available))}."
+                )
+            wanted = set(names)
+        else:
+            wanted = available
+
+        counts = self._get_view_counts()
+        fetched_at = datetime.now(timezone.utc).isoformat()
+
+        rows = []
+        for db in databases:
+            db_name = db.get("databaseName")
+            if db_name not in wanted:
+                continue
+            rows.append({
+                "db_name": db_name,
+                # "no description" arrives as None from this endpoint and
+                # as "" from browse/databases; one helper absorbs both.
+                "description": null_if_empty(db.get("description")),
+                "database_id": db.get("databaseId"),
+                "server_id": db.get("serverId", self.server_id),
+                "view_count": counts[db_name],
+                "fetched_at": fetched_at,
+                "source_env": self.source_env,
+            })
+
+        return rows
+
 
 
 
