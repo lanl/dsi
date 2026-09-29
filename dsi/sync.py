@@ -98,6 +98,7 @@ class Sync:
         
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
+        remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
