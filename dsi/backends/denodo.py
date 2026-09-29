@@ -9,6 +9,9 @@ denodo_databases, denodo_views, denodo_columns, denodo_properties.
 import os
 import webbrowser
 import json
+import html          # for normalization,  for unescape
+import logging       # for normalization, because the contract requires URLs it can't classify to be logged for review, never silently discarded.
+import re            # for normalization, for the tag and href patterns
 from pathlib import Path
 
 from collections import OrderedDict
@@ -79,6 +82,126 @@ def save_config(**settings):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
     print(f"Saved {len(settings)} setting(s) to {CONFIG_PATH}")
+
+# ----------------------------------------------------------------------
+# Normalization (DATA_CONTRACT section 3)
+#
+# Pure functions: value in, value out. Every normalization rule in this
+# file lives here, so nothing downstream re-implements them.
+# ----------------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_HREF_RE = re.compile(r'href\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+
+# Values that mean "nothing is recorded here" (contract 3.4)
+_NULL_VALUES = {"", "NOLINK"}
+
+
+def normalize_property_value(visual_value, property_type):
+    """
+    Normalize one property value or view description (contract 3.2).
+
+    The order of the steps is load-bearing:
+
+    1. Tags are stripped **only** when `property_type == "RICH_TEXT"`.
+       The type is a guard, not a detector: a RICH_TEXT value may be
+       plain text, and stripping plain text is a harmless no-op.
+    2. `html.unescape()` runs **after** stripping, for every type.
+       Entities occur in tag-free values, and unescaping first would
+       turn `&lt;b&gt;` into a real tag that stripping then deletes,
+       losing the text it wrapped.
+    3. Whitespace runs collapse to one space; an empty result is None.
+
+    Parameters
+    ----------
+    visual_value : str or None
+        A property entry's `visualValue`, or a view description.
+    property_type : str or None
+        `ENUMERATION`, `LONG_TEXT` or `RICH_TEXT`.
+
+    Returns
+    -------
+    str or None
+    """
+    if visual_value is None:
+        return None
+
+    text = _TAG_RE.sub("", visual_value) if property_type == "RICH_TEXT" else visual_value
+    text = html.unescape(text)
+
+    return " ".join(text.split()) or None
+
+
+def extract_urls(visual_value):
+    """
+    Pull href targets out of a raw value (contract 3.2 step 2).
+
+    Must run **before** any tag stripping: URLs live in attributes, and
+    stripping tags deletes them along with the markup.
+
+    Returns
+    -------
+    list of str
+        Unescaped URLs in the order they appear; empty if there are none.
+    """
+    if not visual_value:
+        return []
+
+    return [html.unescape(url) for url in _HREF_RE.findall(visual_value)]
+
+
+def null_if_empty(value):
+    """
+    Apply the null policy (contract 3.4).
+
+    `""`, `"NOLINK"` and whitespace-only strings all mean "no value".
+    """
+    if value is None:
+        return None
+
+    text = value.strip() if isinstance(value, str) else value
+
+    return None if text in _NULL_VALUES else text
+
+
+def canonical_property_name(group_name, property_name):
+    """
+    Build the canonical property name (contract 3.5).
+
+    `f"{groupName}/{propertyName}"` exactly as returned, **including
+    trailing punctuation**. No trimming, no case folding, no merging:
+    two names differing by one character are two different properties.
+    """
+    return f"{group_name}/{property_name}"
+
+
+def normalize_description(description):
+    """
+    Split a view description into clean text and its documentation URL.
+
+    The documentation URL is taken **structurally** -- it is the URL
+    embedded in the description -- rather than by matching hostnames,
+    so no site-specific value appears in this file (amends contract 3.3).
+    A description carrying more than one URL is logged rather than
+    silently reduced, which is what 3.3 asks for.
+
+    Returns
+    -------
+    (str or None, str or None)
+        The normalized description, and the documentation URL.
+    """
+    urls = extract_urls(description)
+    text = normalize_property_value(description, "RICH_TEXT")
+
+    if len(urls) > 1:
+        logger.info(
+            "Description carries %d URLs; keeping the first as documentation_url: %s",
+            len(urls), urls,
+        )
+
+    return text, (urls[0] if urls else None)
+
 
 
 # ----------------------------------------------------------------------
