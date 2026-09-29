@@ -244,16 +244,20 @@ dsi = DSI(
 | `categories` | list[int] | no filter | Restrict to these category ids |
 | `tags` | list[int] | no filter | Restrict to these tag ids |
 | `limit` | int | every match | Maximum number of views to retrieve per query |
+| `databases` | list[str] | — | Build the `denodo_databases` table instead of searching. `[]` means every database you can see; a list of names restricts it to those |
 
 ---
 
 ## Tables
 
-The backend returns one DSI table:
+The backend returns two DSI tables:
 
-1. **denodo_search_results** - View metadata from the search (one row per view returned)
+1. **denodo_search_results** - View metadata from a search (one row per view returned)
+2. **denodo_databases** - One row per database in the Data Catalog
 
-Tables for databases, views, columns and custom properties, built from the Data Catalog's view-details endpoint, are planned.
+Which one is filled depends on `params`: a search fills the first, `{"databases": [...]}` fills the second. Both tables always exist with all their columns, even when empty.
+
+Tables for views, columns and custom properties, built from the Data Catalog's view-details endpoint, are planned.
 
 ---
 
@@ -290,6 +294,51 @@ print(views_df[["name", "database_name", "categories", "tags"]])
 
 ---
 
+### denodo_databases Table:
+
+The `denodo_databases` table contains one row per database, keyed by `db_name`. Building it takes **two requests** no matter how many databases exist: one for the databases and their descriptions, one for the view counts.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"databases": []})
+dsi.display("denodo_databases")
+```
+
+| Column | Description |
+|--------|-------------|
+| db_name | Database name — the key |
+| description | The database's description, `None` when it has none |
+| database_id | Denodo's own numeric database id — assigned by the source, not a row number, and different in each environment |
+| server_id | Virtual DataPort server id |
+| view_count | Number of views in the database, counted from the views endpoint |
+| fetched_at | When the fetch ran (UTC) — one timestamp for every row of the fetch |
+| source_env | Which environment the rows came from |
+
+**Output** (illustrative):
+```text
+db_name       | description           | database_id | server_id | view_count | fetched_at                       | source_env
+--------------+-----------------------+-------------+-----------+------------+----------------------------------+-----------------
+analytics     | Reporting layer       |          10 |         1 |          0 | 2026-01-15T09:12:44.102030+00:00 | catalog.example
+reference     | Shared reference data |           5 |         1 |        820 | 2026-01-15T09:12:44.102030+00:00 | catalog.example
+staging       | None                  |          16 |         1 |          4 | 2026-01-15T09:12:44.102030+00:00 | catalog.example
+```
+
+**One database in particular:**
+
+```python
+dsi = DSI(backend_name="Denodo", params={"databases": ["reference"]})
+```
+
+A name that is not one of your databases raises before any metadata is fetched, so a typo fails fast rather than part way through a load.
+
+**Notes on the columns:**
+
+- `view_count` counts live views only; soft-deleted items are skipped. A database with no views is a normal row with `view_count = 0`, not an omission.
+- `description` is `None` whether the API returned `null`, an empty string or whitespace — the three spellings of "no description" are normalized to one.
+- `database_id` belongs to Denodo. It is stable within an environment but must not be carried between environments.
+- `fetched_at` and `source_env` are provenance: they say when the rows were read and from where, so a saved snapshot stays interpretable later.
+
+---
+
 ## Metadata
 
 ### Curated Metadata
@@ -323,7 +372,14 @@ dsi.list()
 Table: denodo_search_results
   - num of columns: 17
   - num of rows: 350
+
+Table: denodo_databases
+  - num of columns: 7
+  - num of rows: 0
 ```
+
+Both tables are listed whether or not they hold rows. Here a search was run, so
+`denodo_databases` is registered but empty.
 
 ### View Backend Summary
 
@@ -399,10 +455,22 @@ CREATE TABLE denodo_search_results (
     countDeprecations INTEGER,
     ranking INTEGER
 );
+
+CREATE TABLE denodo_databases (
+    db_name TEXT,
+    description TEXT,
+    database_id INTEGER,
+    server_id INTEGER,
+    view_count INTEGER,
+    fetched_at TEXT,
+    source_env TEXT
+);
 ```
 
 Types are inferred from the first non-null value in each column, so a column that is
-empty for the whole result set is reported as `TEXT`.
+empty for the whole result set is reported as `TEXT`. A table that was never filled
+therefore reports every column as `TEXT`: run `params={"databases": []}` and the three
+numeric columns above become `INTEGER`.
 
 ### Retrieve a Table
 
@@ -682,12 +750,28 @@ Convert a live search result into a local SQLite database for offline analysis.
 
 ---
 
+### 6. load_databases.py
+
+Load the database table: one row per database in the Data Catalog.
+
+- Pass `params={"databases": []}` for every database you can see
+- Summarize and display the table
+- Two requests regardless of how many databases exist
+- A named subset with `params={"databases": ["your_database"]}`
+- An unknown name is rejected before any metadata is fetched
+
+**Note:** this is a different path from the search examples — it calls no search endpoint, and the search table stays empty.
+
+---
+
 ## Notes
 
 - The backend is **metadata-first** and **read-only**
 - One search is one `POST /search/metadata`; no other endpoint is called
 - Large result sets are paginated internally, and the row count is checked against the server's own total
-- One table today: `denodo_search_results`
+- Two tables today: `denodo_search_results` and `denodo_databases`; which one fills depends on `params`
+- A database is identified by `db_name`; its numeric `database_id` comes from Denodo and differs between environments
+- `denodo_databases` carries provenance (`fetched_at`, `source_env`); `denodo_search_results` does not yet
 - A view is identified by `(database_name, name)`; the numeric `id` differs between environments and must not be reused across them
 - Multi-query support deduplicates results by `(database_name, name)`
 - Empty result sets return an empty table with all columns present (no errors)
