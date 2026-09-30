@@ -360,7 +360,7 @@ class Sync:
         self.copy(tool)
 
 
-    def copy(self, tool="copy"):
+    def copy(self, tool="copy", **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
         """
@@ -438,7 +438,50 @@ class Sync:
                 shutil.copy2(dbname, os.path.join(self.remote_location, dbname))
 
             print(" Data Copy Complete!")
-        
+
+        elif tool.lower() == "putty":
+            putty_session = kwargs.pop("putty_session", "")
+            if not isinstance(putty_session, str) or putty_session == "":
+                raise ValueError("The putty_session must be provided to use PuTTY for data movement")
+
+            plink = shutil.which("plink.exe") or shutil.which("plink")
+            pscp = shutil.which("pscp.exe") or shutil.which("pscp")
+
+            if not plink:
+                raise RuntimeError("plink.exe was not found; install the PuTTY tools.")
+            if not pscp:
+                raise RuntimeError("pscp.exe was not found; install the PuTTY tools.")
+
+            # making remote dir
+            if self.verbose:
+                print(f' plink -load {putty_session} "mkdir -p {self.remote_location}"' )
+            cmd = ["plink", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
+            print("Creating remote directory if it doesn't exist")
+            self.execute_cmd(cmd, "Creating remote dir")
+
+            # File movement
+            cmd = ["pscp", "-rp", self.local_location, f"{putty_session}:{self.remote_location}"]
+            if self.verbose:
+                print()
+                print(*cmd)
+            self.execute_cmd(cmd, "Moving data with PuTTY")
+            print(" DSI PuTTY data movement complete.")
+
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
+            self.t.dsi_tables.append("filesystem")
+
+            # Database movement
+            for dbname in db_list:
+                cmd = ["pscp", "-p", dbname, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
+                if self.verbose:
+                    print()
+                    print(*cmd)
+                self.execute_cmd(cmd, "Moving database with PuTTY")
+            print(" DSI PuTTY database movement complete.")
+
         elif tool.lower() == "scp":
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
