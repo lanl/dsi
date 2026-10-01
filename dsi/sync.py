@@ -458,13 +458,23 @@ class Sync:
             cmd = ["plink", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
             print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
+            # Check for valid session, "Access granted. Press return to begin session"
+
+            # Check for valid file permissions
+            
 
             # File movement
-            cmd = ["pscp", "-rp", self.local_location, f"{putty_session}:{self.remote_location}"]
+            cmd = ["pscp", "-r", "-p", self.local_location, f"{putty_session}:{self.remote_location}"]
             if self.verbose:
                 print()
                 print(*cmd)
             self.execute_cmd(cmd, "Moving data with PuTTY")
+            # Check to see if "Server refused our key"
+            # Moniker was not part of putty session (or wrong moniker was used, please check if moniker is correct in putty session)
+
+            # Check print to see if successfull i.e. if it's empty, nothing moved
+
+            
             print(" DSI PuTTY data movement complete.")
 
             # delete temp columns from filesystem table
@@ -480,6 +490,10 @@ class Sync:
                     print()
                     print(*cmd)
                 self.execute_cmd(cmd, "Moving database with PuTTY")
+                # Check to see if "Server refused our key"
+
+                # Check print to see if successfull i.e. if it's empty, nothing moved
+
             print(" DSI PuTTY database movement complete.")
 
         elif tool.lower() == "scp":
