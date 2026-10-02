@@ -95,6 +95,14 @@ logger = logging.getLogger(__name__)
 _TAG_RE = re.compile(r"<[^>]+>")
 _HREF_RE = re.compile(r'href\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
 
+_HREF_RE = re.compile(r'href\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+
+# Descriptions carry bare URLs ("Oracle Source: https://..."), property
+# values carry anchors. Both forms must be matched or the documentation
+# URL is silently lost (contract 3.3a).
+_URL_RE = re.compile(r'https?://[^\s<>"\'\\]+')
+_URL_TRAILING = ".,;:!?"
+
 # Values that mean "nothing is recorded here" (contract 3.4)
 _NULL_VALUES = {"", "NOLINK"}
 
@@ -136,10 +144,14 @@ def normalize_property_value(visual_value, property_type):
 
 def extract_urls(visual_value):
     """
-    Pull href targets out of a raw value (contract 3.2 step 2).
+    Pull every URL out of a raw value (contract 3.2 step 2, 3.3a).
 
-    Must run **before** any tag stripping: URLs live in attributes, and
-    stripping tags deletes them along with the markup.
+    Must run **before** any tag stripping: URLs in attributes are deleted
+    along with the markup.
+
+    Two forms occur, and matching only one returns [] for the other with
+    no error: property values use anchors, descriptions use bare text.
+    href targets come first so an anchor still wins when both appear.
 
     Returns
     -------
@@ -149,7 +161,17 @@ def extract_urls(visual_value):
     if not visual_value:
         return []
 
-    return [html.unescape(url) for url in _HREF_RE.findall(visual_value)]
+    urls = [html.unescape(url) for url in _HREF_RE.findall(visual_value)]
+
+    for raw in _URL_RE.findall(visual_value):
+        # Trailing sentence punctuation is not part of the URL; ")" and "/"
+        # can be, so they are left alone.
+        url = html.unescape(raw).rstrip(_URL_TRAILING)
+        if url not in urls:
+            urls.append(url)
+
+    return urls
+
 
 
 def null_if_empty(value):
@@ -367,6 +389,23 @@ class Denodo(Webserver):
         "source_env",     # provenance
     ]
 
+    # One row per view, sourced from POST /search/metadata (contract 2.2, rev 21):
+    # 45 requests for the whole catalogue, where one view-details call per view
+    # would cost 4,418.
+    VIEWS_SCHEMA: ClassVar[list[str]] = [
+        "view_name",          # key part 1
+        "db_name",            # key part 2
+        "description",        # normalized; None for the ~19% search leaves empty
+        "documentation_url",  # extracted from the description (contract 3.3a)
+        "categories",
+        "tags",
+        "element_id",         # Denodo's own id -- differs between environments
+        "last_modified_at",
+        "fetched_at",         # provenance
+        "source_env",         # provenance
+    ]
+
+
     SUPPORTED_PARAMS: ClassVar[set[str]] = {
         "keywords",      # text to search ("" = whole catalog)
         "search_in",     # name | description | properties | column_names | column_descriptions
@@ -378,6 +417,8 @@ class Denodo(Webserver):
         "view",          # existing path: one view (needs 'database')
 
         "databases",     # list of database names; [] = every visible database                 # This is for database table
+        "views",         # True for the whole catalogue, or a keyword string to narrow it     # This is for the denodo_views table
+
     }
 
     # Friendly param values -> Denodo API enums (confirmed via Swagger + probes)
@@ -511,11 +552,12 @@ class Denodo(Webserver):
             self.headers["Authorization"] = f"Bearer {self.token}"
 
         # Table registry: table name -> its columns (the shape).
-        # One table for now; the four contract tables are added here
-        # as their schemas are defined.
+        # Three tables implemented; denodo_columns and denodo_properties
+        # are added here as their schemas are defined.
         self.schemas = {
             "denodo_search_results": self.SEARCH_SCHEMA,
             "denodo_databases": self.DATABASES_SCHEMA,
+            "denodo_views": self.VIEWS_SCHEMA,
         }
 
         # Table data: table name -> column-oriented OrderedDict.
@@ -687,6 +729,7 @@ class Denodo(Webserver):
         all_views = []     # view/database paths -> full view-details dicts
         search_rows = []   # search path -> flat rows from the POST response only
         database_rows = []  # databases path -> one row per database
+        view_rows = []     # views path -> one row per view, from the search harvest
 
 
 
@@ -716,6 +759,15 @@ class Denodo(Webserver):
                 database_rows.extend(
                     self._build_database_rows(query_params["databases"])
                 )
+            elif "views" in query_params:
+                # Same POST the search path uses, but mapped to the contract's
+                # column names. 45 requests for the whole catalogue, where one
+                # view-details call per view would cost 4,418 (contract 2.2).
+                wanted = query_params["views"]
+                flat = self._run_single_query(
+                    {"keywords": wanted if isinstance(wanted, str) else ""}
+                )
+                view_rows.extend(self._build_view_rows(flat))           
             else:
                 # Search: POST /search/metadata only, no view-details calls
                 search_rows.extend(self._run_single_query(query_params))
@@ -735,7 +787,19 @@ class Denodo(Webserver):
             self._cache["denodo_databases"] = self._rows_to_table(
                 database_rows, self.DATABASES_SCHEMA
             )
+        if view_rows:
+            # Composite key (db_name, view_name) -- Principle #2. Verified
+            # unique across all 4,418 views on prod, 2026-09-29.
+            seen, unique_views = set(), []
+            for row in view_rows:
+                key = (row["db_name"], row["view_name"])
+                if key not in seen:
+                    seen.add(key)
+                    unique_views.append(row)
 
+            self._cache["denodo_views"] = self._rows_to_table(
+                unique_views, self.VIEWS_SCHEMA
+            )
 
         # The four contract tables come only from the view/database paths.
         # Skipped until _extract_tables and their schemas exist (Phase 2).
@@ -959,6 +1023,57 @@ class Denodo(Webserver):
             })
 
         return rows
+
+    def _build_view_rows(self, rows):                                # For Views table
+        """
+        Build the denodo_views rows from search results (contract 2.2, rev 21).
+
+        Takes rows already flattened to SEARCH_SCHEMA by _run_single_query,
+        not raw hits. The search response carries description, categories and
+        tags for the whole catalogue in 45 requests, where one view-details
+        call per view would cost 4,418.
+
+        The column schema and custom properties are not in this response, so
+        denodo_columns and denodo_properties are not built here.
+
+        Parameters
+        ----------
+        rows : list of dict
+            Flattened search rows, keyed by SEARCH_SCHEMA columns.
+
+        Returns
+        -------
+        list of dict
+            One dict per view, keyed by VIEWS_SCHEMA columns.
+        """
+        fetched_at = datetime.now(timezone.utc).isoformat()
+
+        view_rows = []
+        for row in rows:
+            # Returns (text, url). The URL stays in the text for bare-URL
+            # descriptions -- removing it would leave "Oracle Source: "
+            # dangling, and 3.2 says never silently discard content.
+            description, documentation_url = normalize_description(
+                row.get("description")
+            )
+
+            view_rows.append({
+                "view_name": row.get("name"),
+                "db_name": row.get("database_name"),
+                "description": description,
+                "documentation_url": documentation_url,
+                # Already joined with ", " and emptied to None by _flatten_hit.
+                # Reused as-is so this table and denodo_search_results can
+                # never disagree about the same data.
+                "categories": row.get("categories"),
+                "tags": row.get("tags"),
+                "element_id": row.get("id"),
+                "last_modified_at": row.get("lastModificationVdpData"),
+                "fetched_at": fetched_at,
+                "source_env": self.source_env,
+            })
+
+        return view_rows
 
 
 

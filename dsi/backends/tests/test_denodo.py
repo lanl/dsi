@@ -35,6 +35,11 @@ from dsi.backends.denodo import (
 # Captured before any patching, so a test can restore the real behaviour
 REAL_VALIDATE = Denodo.validate_connection
 
+# The registered tables, in registration order. One place to update when a
+# new table is added -- the tests below check consistency, not this literal.
+EXPECTED_TABLES = ["denodo_search_results", "denodo_databases", "denodo_views"]
+
+
 # ---------------------------------------------------------------------------
 # A fake catalog: one fully-populated view plus generated ones
 # ---------------------------------------------------------------------------
@@ -185,8 +190,9 @@ def test_flatten_hit_empty_lists_become_none():
 
 def test_initialization(backend):
     assert backend._loaded is True
-    assert list(backend.schemas) == ["denodo_search_results", "denodo_databases"]
     assert "denodo_search_results" in backend._cache
+    assert list(backend.schemas) == EXPECTED_TABLES
+
 
 
 # =============================================================================
@@ -299,8 +305,8 @@ def test_empty_result_still_has_every_column():
 
 
 def test_list_and_num_tables(backend):
-    assert backend.list(collection=True) == ["denodo_search_results", "denodo_databases"]
-    assert backend.num_tables() == 2
+    assert backend.list(collection=True) == list(backend.schemas)
+    assert backend.num_tables() == len(backend.schemas)
 
 
 def test_get_schema(backend):
@@ -320,7 +326,7 @@ def test_summary_is_one_row_per_column(backend):
     assert len(summary) == len(Denodo.SEARCH_SCHEMA)
 
     all_tables = backend.summary()
-    assert all_tables[0] == ["denodo_search_results", "denodo_databases"]
+    assert all_tables[0] == EXPECTED_TABLES
 
 
 def test_display_sets_max_rows(backend):
@@ -457,11 +463,24 @@ def test_normalize_property_value_handles_empty_and_none():
     assert normalize_property_value("   ", "RICH_TEXT") is None
 
 
-def test_extract_urls_reads_hrefs_before_stripping():
-    raw = '<a href="https://example.org/a">a</a> and <a href=\'https://example.org/b\'>b</a>'
-    assert extract_urls(raw) == ["https://example.org/a", "https://example.org/b"]
-    assert extract_urls(None) == []
-    assert extract_urls("no links here") == []
+@pytest.mark.parametrize(("raw", "expected"), [
+    # Anchor form -- what property values use.
+    ('<a href="https://example.org/a">a</a>', ["https://example.org/a"]),
+    # Two anchors, order preserved.
+    ('<a href="https://example.org/a">a</a> and <a href=\'https://example.org/b\'>b</a>',
+     ["https://example.org/a", "https://example.org/b"]),
+    # Bare form -- what descriptions use. Returned [] before the fix, silently.
+    ("Source: https://example.org/doc.html?c_n=x.",
+     ["https://example.org/doc.html?c_n=x"]),
+    # Both forms in one value: href first, and the bare match must not duplicate it.
+    ('<a href="https://example.org/a">a</a> see also https://example.org/b',
+     ["https://example.org/a", "https://example.org/b"]),
+    ("no links here", []),
+    (None, []),
+])
+def test_extract_urls_handles_both_url_forms(raw, expected):
+    assert extract_urls(raw) == expected
+
 
 
 @pytest.mark.parametrize(("value", "expected"), [
@@ -554,6 +573,85 @@ def test_the_databases_path_makes_exactly_two_calls():
     assert [r["endpoint"] for r in REQUESTS] == [
         "database-management/user/databases", "views",
     ]
+
+
+
+# =============================================================================
+# 8) The views table
+# =============================================================================
+def test_views_table_is_registered_and_empty_by_default():
+    """Registering a schema is enough: the table exists before any fetch."""
+    backend = make_backend(keywords="test")
+    table = backend.get_table("denodo_views")
+    assert list(table.columns) == Denodo.VIEWS_SCHEMA
+    assert table.shape == (0, len(Denodo.VIEWS_SCHEMA))
+    backend.close()
+
+
+def test_build_view_rows_maps_every_column():
+    """One flattened search row maps to one VIEWS_SCHEMA row, keys in order."""
+    backend = Denodo(url="https://example.org", token="x", only_validate=True)
+    flat = [{
+        "name": "demo_view",
+        "database_name": "demo_db",
+        "id": 101,
+        "description": "A demo table.",
+        "categories": "Reference Data",
+        "tags": None,
+        "lastModificationVdpData": "2024-01-04T16:43:49.000+00:00",
+    }]
+
+    row = backend._build_view_rows(flat)[0]
+
+    assert list(row) == Denodo.VIEWS_SCHEMA
+    assert row["view_name"] == "demo_view"
+    assert row["db_name"] == "demo_db"
+    assert row["element_id"] == 101
+    assert row["tags"] is None
+
+
+def test_build_view_rows_extracts_a_bare_url_from_the_description():
+    """The URL form descriptions actually use -- this returned None before rev 22."""
+    backend = Denodo(url="https://example.org", token="x", only_validate=True)
+    flat = [{
+        "name": "v",
+        "database_name": "db",
+        "id": 1,
+        "description": "A table. Source: https://example.org/doc.html?c_n=x.",
+    }]
+
+    row = backend._build_view_rows(flat)[0]
+
+    assert row["documentation_url"] == "https://example.org/doc.html?c_n=x"
+    # The URL stays in the prose: removing it would leave "Source: " dangling.
+    assert "https://example.org/doc.html" in row["description"]
+
+
+def test_build_view_rows_shares_one_timestamp():
+    """Provenance describes the fetch, not the row."""
+    backend = Denodo(url="https://example.org", token="x", only_validate=True)
+    flat = [{"name": f"v{i}", "database_name": "db", "id": i} for i in range(3)]
+
+    rows = backend._build_view_rows(flat)
+
+    assert len({row["fetched_at"] for row in rows}) == 1
+    assert all(row["source_env"] == "example.org" for row in rows)
+
+
+def test_views_path_fills_the_table_and_deduplicates():
+    """params={'views': ...} fills denodo_views, one row per (db_name, view_name)."""
+    backend = make_backend(views="test")
+    table = backend.get_table("denodo_views")
+
+    assert len(table) > 0
+    assert list(table.columns) == Denodo.VIEWS_SCHEMA
+    pairs = list(zip(table["db_name"], table["view_name"]))
+    assert len(pairs) == len(set(pairs))
+    backend.close()
+
+
+
+
 
 
 
