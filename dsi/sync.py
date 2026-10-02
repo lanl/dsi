@@ -13,6 +13,7 @@ from typing import Iterator
 from contextlib import redirect_stdout
 from collections import OrderedDict
 from urllib.parse import urlparse
+import posixpath
 
 from dsi.core import Terminal
 from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
@@ -25,7 +26,7 @@ class Sync:
     sync (local filesystem with remote) exist.
     """
     def __init__(self, project_name, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
-        self.project_name = project_name
+        self.project_name = project_name.replace("\\", "/")
         self.verbose = isVerbose
         self.no_parent = no_parent
         self.skip_index = skip_index
@@ -97,6 +98,7 @@ class Sync:
         
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
+        remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
@@ -109,7 +111,7 @@ class Sync:
                 fed_table = self.t.get_table("federated")
                 fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
                 if fed_local == local_loc:
-                    self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
+                    self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
                     self.local_location = local_loc
                     if fed_remote == remote_loc:
                         if self.verbose:
@@ -147,8 +149,10 @@ class Sync:
             print("Crawled "+str(file_len)+" files.")
         
         file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
-        
-        self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
+        file_list = [files.replace("\\", "/") for files in file_list] # Normalize the directories
+
+
+        self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
@@ -178,14 +182,14 @@ class Sync:
 
         for file in file_list:
             parent_rel_file = Path(file).relative_to(Path(local_loc).parent)
-            rel_file = os.path.relpath(file,local_loc) #rel path
-            filepath = os.path.join(local_loc, rel_file)
+            rel_file = os.path.relpath(file,local_loc).replace("\\", "/")
+            filepath = os.path.join(local_loc, rel_file).replace("\\", "/")
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
-                rfilepath = os.path.join(remote_loc, self.project_name, rel_file)
+                rfilepath = posixpath.join(remote_loc, self.project_name, rel_file)
             else:
-                rfilepath = os.path.join(remote_loc, self.project_name, parent_rel_file)
+                rfilepath = posixpath.join(remote_loc, self.project_name, parent_rel_file)
             st_dict['file_origin'].append(rel_file)
             st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
@@ -199,7 +203,7 @@ class Sync:
             st_dict['uid'].append(st.st_uid)
             st_dict['gid'].append(st.st_gid)
             st_dict['uuid'].append(self.gen_uuid(st))
-            st_dict['file_remote'].append(rfilepath)
+            st_dict['file_remote'].append(rfilepath.replace("\\", "/"))
             st_list.append(st)
             if self.verbose:
                 progress = int(len(st_list) / file_len * 100)
@@ -356,7 +360,7 @@ class Sync:
         self.copy(tool)
 
 
-    def copy(self, tool="copy"):
+    def copy(self, tool="copy", **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
         """
@@ -434,7 +438,64 @@ class Sync:
                 shutil.copy2(dbname, os.path.join(self.remote_location, dbname))
 
             print(" Data Copy Complete!")
-        
+
+        elif tool.lower() == "putty":
+            putty_session = kwargs.pop("putty_session", "")
+            if not isinstance(putty_session, str) or putty_session == "":
+                raise ValueError("The putty_session must be provided to use PuTTY for data movement")
+
+            plink = shutil.which("plink.exe") or shutil.which("plink")
+            pscp = shutil.which("pscp.exe") or shutil.which("pscp")
+
+            if not plink:
+                raise RuntimeError("plink.exe was not found; install the PuTTY tools.")
+            if not pscp:
+                raise RuntimeError("pscp.exe was not found; install the PuTTY tools.")
+
+            # making remote dir
+            if self.verbose:
+                print(f' plink -load {putty_session} "mkdir -p {self.remote_location}"' )
+            cmd = ["plink", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
+            print("Creating remote directory if it doesn't exist")
+            self.execute_cmd(cmd, "Creating remote dir")
+            # Check for valid session, "Access granted. Press return to begin session"
+
+            # Check for valid file permissions
+            
+
+            # File movement
+            cmd = ["pscp", "-r", "-p", self.local_location, f"{putty_session}:{self.remote_location}"]
+            if self.verbose:
+                print()
+                print(*cmd)
+            self.execute_cmd(cmd, "Moving data with PuTTY")
+            # Check to see if "Server refused our key"
+            # Moniker was not part of putty session (or wrong moniker was used, please check if moniker is correct in putty session)
+
+            # Check print to see if successfull i.e. if it's empty, nothing moved
+
+            
+            print(" DSI PuTTY data movement complete.")
+
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
+            # Database movement
+            for dbname in db_list:
+                cmd = ["pscp", "-p", dbname, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
+                if self.verbose:
+                    print()
+                    print(*cmd)
+                self.execute_cmd(cmd, "Moving database with PuTTY")
+                # Check to see if "Server refused our key"
+
+                # Check print to see if successfull i.e. if it's empty, nothing moved
+
+            print(" DSI PuTTY database movement complete.")
+
         elif tool.lower() == "scp":
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
