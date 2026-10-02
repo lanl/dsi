@@ -480,7 +480,7 @@ class Sync:
             # delete temp columns from filesystem table
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
-            self.t.overwrite_table(["federated", "filesystem"], [federated_df, filesystem_df])
+            self.t.overwrite_table("filesystem", filesystem_df)
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
