@@ -245,19 +245,23 @@ dsi = DSI(
 | `tags` | list[int] | no filter | Restrict to these tag ids |
 | `limit` | int | every match | Maximum number of views to retrieve per query |
 | `databases` | list[str] | — | Build the `denodo_databases` table instead of searching. `[]` means every database you can see; a list of names restricts it to those |
+| `views` | bool or str | — | Build the `denodo_views` table. `True` means every view in the catalogue; a string narrows it to views matching that keyword |
 
 ---
 
 ## Tables
 
-The backend returns two DSI tables:
+The backend returns three DSI tables:
 
 1. **denodo_search_results** - View metadata from a search (one row per view returned)
 2. **denodo_databases** - One row per database in the Data Catalog
+3. **denodo_views** - One row per view in the Data Catalog
 
-Which one is filled depends on `params`: a search fills the first, `{"databases": [...]}` fills the second. Both tables always exist with all their columns, even when empty.
+Which one is filled depends on `params`: a search fills the first, `{"databases": [...]}` the second, `{"views": True}` the third. All three always exist with all their columns, even when empty.
 
-Tables for views, columns and custom properties, built from the Data Catalog's view-details endpoint, are planned.
+`denodo_search_results` and `denodo_views` come from the same endpoint but answer different questions. The search table is a **snapshot of one query** and keeps the API's own field names, including columns that only mean something for that query. `denodo_views` is a **catalogue**: stable column names, no query-relative fields, and one row per view regardless of what was searched for.
+
+Tables for columns and custom properties, which need the Data Catalog's view-details endpoint, are planned.
 
 ---
 
@@ -339,6 +343,54 @@ A name that is not one of your databases raises before any metadata is fetched, 
 
 ---
 
+### denodo_views Table:
+
+The `denodo_views` table contains one row per view, keyed by `(db_name, view_name)`. It is built from the search endpoint rather than from one metadata call per view, so the whole catalogue arrives in a few dozen requests instead of thousands.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"views": True})
+dsi.display("denodo_views", num_rows=5,
+            display_cols=["view_name", "db_name", "categories", "documentation_url"])
+```
+
+| Column | Description |
+|--------|-------------|
+| view_name | View name — key part 1 |
+| db_name | Database the view belongs to — key part 2 |
+| description | The view's description, normalized; `None` where the catalog has none |
+| documentation_url | A documentation link found in the description, `None` if there is none |
+| categories | Comma-separated category names |
+| tags | Comma-separated tag names |
+| element_id | Numeric element id — a surrogate key, different in each environment |
+| last_modified_at | Last modification on the Virtual DataPort side |
+| fetched_at | When the fetch ran (UTC) — one timestamp for every row of the fetch |
+| source_env | Which environment the rows came from |
+
+**Output** (illustrative):
+```text
+view_name       | db_name   | categories        | documentation_url
+----------------+-----------+-------------------+----------------------------------
+customer_ref    | reference | Reference Data    | https://docs.example.org/customer
+order_lines     | reference | Reference Data    | None
+shipment_status | staging   | Logistics         | https://docs.example.org/shipment
+```
+
+**Narrow it to one subject area:**
+
+```python
+dsi = DSI(backend_name="Denodo", params={"views": "weather"})
+```
+
+**Notes on the columns:**
+
+- **The documentation URL usually appears in `description` as well.** Catalog descriptions store links two ways: as plain text (`"Source: https://..."`) and, less often, as an HTML anchor with a label. Normalization removes HTML, so an anchor's URL leaves the text while a plain-text one stays in the sentence. Either way it is extracted into `documentation_url`. We do not cut it out of the prose, because that would leave sentences ending in `"Source: "` with nothing after them.
+- **`documentation_url` is not unique.** Several views can point at the same documentation page, so it identifies a resource, not a view. Use `(db_name, view_name)` as the key.
+- **Descriptions repeat.** Many views carry a description identical to another view's, which is normal for generated or templated schemas — searching on description will return groups rather than single hits.
+- `element_id` belongs to Denodo and differs between environments; do not carry it across them.
+- Column-level schema and custom properties are **not** in this table. They need the view-details endpoint, and are planned as `denodo_columns` and `denodo_properties`.
+
+---
+
 ## Metadata
 
 ### Curated Metadata
@@ -376,10 +428,14 @@ Table: denodo_search_results
 Table: denodo_databases
   - num of columns: 7
   - num of rows: 0
+
+Table: denodo_views
+  - num of columns: 10
+  - num of rows: 0
 ```
 
-Both tables are listed whether or not they hold rows. Here a search was run, so
-`denodo_databases` is registered but empty.
+Every registered table is listed whether or not it holds rows. Here a search was run, so
+the other two are registered but empty.
 
 ### View Backend Summary
 
@@ -462,6 +518,19 @@ CREATE TABLE denodo_databases (
     database_id INTEGER,
     server_id INTEGER,
     view_count INTEGER,
+    fetched_at TEXT,
+    source_env TEXT
+);
+
+CREATE TABLE denodo_views (
+    view_name TEXT,
+    db_name TEXT,
+    description TEXT,
+    documentation_url TEXT,
+    categories TEXT,
+    tags TEXT,
+    element_id INTEGER,
+    last_modified_at TEXT,
     fetched_at TEXT,
     source_env TEXT
 );
@@ -764,12 +833,27 @@ Load the database table: one row per database in the Data Catalog.
 
 ---
 
+### 7. load_views.py
+
+Load the view table: one row per view in the Data Catalog.
+
+- Pass `params={"views": True}` for the whole catalogue
+- Summarize the table, then display selected columns
+- Count how many views carry a documentation link
+- Narrow it with `params={"views": "your_keyword"}`
+
+**Note:** this uses the same endpoint as the search examples, so the cost is a few dozen requests for the whole catalogue rather than one call per view. The trade-off is that column-level schema and custom properties are not included.
+
+---
+
 ## Notes
 
 - The backend is **metadata-first** and **read-only**
 - One search is one `POST /search/metadata`; no other endpoint is called
 - Large result sets are paginated internally, and the row count is checked against the server's own total
-- Two tables today: `denodo_search_results` and `denodo_databases`; which one fills depends on `params`
+- Three tables today: `denodo_search_results`, `denodo_databases` and `denodo_views`; which one fills depends on `params`
+- `denodo_views` is keyed by `(db_name, view_name)`; `documentation_url` is **not** a key, since several views can share one documentation page
+- `denodo_views` and `denodo_search_results` come from the same endpoint: the first is a catalogue, the second a snapshot of one query
 - A database is identified by `db_name`; its numeric `database_id` comes from Denodo and differs between environments
 - `denodo_databases` carries provenance (`fetched_at`, `source_env`); `denodo_search_results` does not yet
 - A view is identified by `(database_name, name)`; the numeric `id` differs between environments and must not be reused across them
