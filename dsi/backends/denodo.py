@@ -1,9 +1,41 @@
 """
 Denodo Data Catalog Backend for DSI
 
-Read-only backend that pulls metadata from the Denodo Data Catalog
-REST API and exposes it as in-memory DSI tables:
-denodo_databases, denodo_views, denodo_columns, denodo_properties.
+Read-only backend that pulls metadata from a Denodo Data Catalog REST API
+and exposes it as in-memory DSI tables. Which tables fill depends on the
+``params`` passed to the backend:
+
+=========================  ==========================================  ========================
+Table                      Filled by                                   Cost
+=========================  ==========================================  ========================
+``denodo_search_results``  ``{"keywords": "..."}``                     a few requests
+``denodo_databases``       ``{"databases": []}``                       two requests
+``denodo_views``           ``{"views": True}``                         a few dozen requests
+``denodo_columns``         ``{"columns": <scope>}``                    one request per view
+``denodo_properties``      ``{"columns": <scope>}``                    the same request
+=========================  ==========================================  ========================
+
+Every table is created with all of its columns, whether or not it holds
+rows, so ``summary()`` and ``display()`` work before anything is fetched.
+
+``denodo_columns`` and ``denodo_properties`` come from the same per-view
+request, so one harvest fills both. That request takes roughly a second
+per view, which is why a scope is required rather than defaulted: a
+keyword, ``{"database": "<name>"}``, or a list of ``"database.view"``
+names. Progress is printed while it runs, and views whose details could
+not be fetched are recorded on ``backend.failed_views``.
+
+Nothing site-specific is stored in this file. The catalog URL and the
+OAuth client settings resolve as **argument, then environment variable,
+then** ``~/.denodo/config.json``.
+
+Authentication uses the OAuth 2.0 authorization-code flow and opens a
+browser on first use. Pass ``token=...`` to reuse a token you already
+hold. Tokens expire after about an hour and are not refreshed, so build
+a new backend rather than expecting one to renew itself.
+
+See ``examples/backends/denodo/`` for runnable examples and a full
+description of every column.
 """
 
 import os
@@ -1781,10 +1813,10 @@ class Denodo(Webserver):
         case-insensitive.
 
         `row` : bool, default False
-            False -> one result per matching cell (value = the cell).
-            True  -> one result per matching row (value = list of the
-                     row's values, c_name = all columns). dsi.search()
-                     uses row=True.
+            False -> one result per matching cell, where value is the cell.
+            True -> one result per matching row, where value is a list of
+            the row's values and c_name is every column. dsi.search() uses
+            row=True.
         """
         is_str = isinstance(query_object, str)
         query_lower = query_object.lower() if is_str else None
