@@ -7,11 +7,14 @@ denodo_databases, denodo_views, denodo_columns, denodo_properties.
 """
 
 import os
+import time
 import webbrowser
 import json
 import html          # for normalization,  for unescape
 import logging       # for normalization, because the contract requires URLs it can't classify to be logged for review, never silently discarded.
 import re            # for normalization, for the tag and href patterns
+import difflib
+
 from pathlib import Path
 
 from collections import OrderedDict, Counter
@@ -405,6 +408,30 @@ class Denodo(Webserver):
         "source_env",         # provenance
     ]
 
+    # One row per column of each view, from view-details.schema (contract 2.4).
+    COLUMNS_SCHEMA: ClassVar[list[str]] = [
+        "view_name",          # key part 1
+        "db_name",            # key part 2
+        "column_name",        # key part 3
+        "ordinal_position",   # index in the schema list, 0-based
+        "data_type",          # schema[].type
+        "description",        # schema[].description, "" -> None
+        "fetched_at",         # provenance
+        "source_env",        
+    ]
+
+    # One row per custom property, long EAV form (contract 2.5, Decision 2).
+    # EAV because the property set drifts without schema migrations: prod has
+    # 43 property groups, 36 of them currently unpopulated.
+    PROPERTIES_SCHEMA: ClassVar[list[str]] = [
+        "view_name",          # key part 1
+        "db_name",            # key part 2
+        "property_name",      # key part 3: "groupName/propertyName", verbatim
+        "property_value",     # visualValue, normalized per contract 3.2
+        "fetched_at",         # provenance
+        "source_env",         # provenance
+    ]
+
 
     SUPPORTED_PARAMS: ClassVar[set[str]] = {
         "keywords",      # text to search ("" = whole catalog)
@@ -413,11 +440,12 @@ class Denodo(Webserver):
         "categories",    # category ids
         "tags",          # tag ids
         "limit",         # max rows (default: every hit)
-        "database",      # existing path: all views of one database
-        "view",          # existing path: one view (needs 'database')
+        "database",      # retired: raises with a pointer to 'views' / 'columns'
+        "view",          # retired: raises with a pointer to 'views' / 'columns'
 
-        "databases",     # list of database names; [] = every visible database                 # This is for database table
-        "views",         # True for the whole catalogue, or a keyword string to narrow it     # This is for the denodo_views table
+        "databases",      # database names; [] = every visible one -> denodo_databases
+        "views",          # True for the whole catalogue, or a keyword -> denodo_views
+        "columns",       #  required scope -> denodo_columns + denodo_properties
 
     }
 
@@ -444,6 +472,17 @@ class Denodo(Webserver):
     # Class-level constants (next to SEARCH_SCHEMA / SUPPORTED_PARAMS)
     # ----------------------------------------------------------------------
     API_PATH: ClassVar[str] = "/denodo-data-catalog/public/api"
+
+    # ----------------------------------------------------------------------
+    # Harvest tuning. SECONDS_PER_VIEW was measured on prod 2026-10-02 over a
+    # 10-view sample; it is only used for the up-front time estimate.
+    # ----------------------------------------------------------------------
+    SECONDS_PER_VIEW: ClassVar[float] = 1.3
+    PROGRESS_EVERY: ClassVar[int] = 50
+    MAX_CONSECUTIVE_FAILURES: ClassVar[int] = 10
+    # ~1.3 s per view against a token that lives about an hour; 1,500
+    # views is roughly 32 minutes, comfortably inside it (O-28).
+    MAX_SCOPE_VIEWS: ClassVar[int] = 1500
 
 
     # ----------------------------------------------------------------------
@@ -492,6 +531,12 @@ class Denodo(Webserver):
         # never open the OAuth browser popup: dsi.list_backends() does exactly
         # that to ask "is this backend reachable?"
         only_validate = kwargs.get("only_validate", False)
+        # Views whose view-details call failed, as (db_name, view_name) pairs.
+        # Declared before any early return so even a probe has it: the printed
+        # harvest summary scrolls away, and denodo_views has no fetch_status
+        # column to carry failures (contract 4.1).
+        self.failed_views = []
+
 
         DEFAULT_URL = _setting("base_url", env_var="DENODO_BASE_URL")
         base_url = url or DEFAULT_URL
@@ -558,6 +603,8 @@ class Denodo(Webserver):
             "denodo_search_results": self.SEARCH_SCHEMA,
             "denodo_databases": self.DATABASES_SCHEMA,
             "denodo_views": self.VIEWS_SCHEMA,
+            "denodo_columns": self.COLUMNS_SCHEMA,
+            "denodo_properties": self.PROPERTIES_SCHEMA,
         }
 
         # Table data: table name -> column-oriented OrderedDict.
@@ -673,6 +720,40 @@ class Denodo(Webserver):
     # ----------------------------------------------------------------------
     # Initial Data Load
     # ----------------------------------------------------------------------
+    def _validate_params(self, params):
+        """
+        Reject unknown parameter keys before any request is made.
+
+        SUPPORTED_PARAMS was declared from the start but nothing enforced it,
+        so a typo such as {"veiws": True} fell through to the search branch
+        and quietly searched the whole catalog into the wrong table. Raising
+        here turns a silent wrong answer into an obvious error.
+
+        Parameters
+        ----------
+        params : dict
+            One query dict.
+
+        Raises
+        ------
+        ValueError
+            If any key is not in SUPPORTED_PARAMS.
+        """
+        unknown = sorted(set(params) - self.SUPPORTED_PARAMS)
+        if not unknown:
+            return
+
+        hints = []
+        for key in unknown:
+            close = difflib.get_close_matches(key, self.SUPPORTED_PARAMS, n=1)
+            hints.append(f"'{key}'" + (f" (did you mean '{close[0]}'?)" if close else ""))
+
+        raise ValueError(
+            f"Unsupported Denodo params: {', '.join(hints)}. "
+            f"Supported: {sorted(self.SUPPORTED_PARAMS)}"
+        )   
+
+
     def _load_initial_data(self, params):
         """
         Loads metadata from the Data Catalog API based on query parameters.
@@ -723,36 +804,35 @@ class Denodo(Webserver):
             query_list = params
         else:
             raise TypeError("params must be a dict or a list of dicts")
+        # Validate every query before fetching anything: a typo in the third
+        # query should not be discovered after the first two have already
+        # hit the network.
+        for query_params in query_list:
+            self._validate_params(query_params)
 
 
         # Collect results from all queries
-        all_views = []     # view/database paths -> full view-details dicts
+
         search_rows = []   # search path -> flat rows from the POST response only
         database_rows = []  # databases path -> one row per database
         view_rows = []     # views path -> one row per view, from the search harvest
-
+        column_rows = []    # columns path -> one row per column of each view
+        property_rows = []  # columns path -> one row per custom property
 
 
         for query_params in query_list:
-            # Check if this is a direct view lookup
-            if "view" in query_params:
-                if not query_params.get("database"):
-                    raise ValueError(
-                        "Direct 'view' lookup requires 'database' -- a Denodo "
-                        "view is identified by database name + view name."
-                    )
-                view = self._get_view_details(
-                    query_params["view"], query_params["database"]
+            # 'view' and 'database' date from the original design, where every
+            # table came from one view-details call per view. Both tables they
+            # fed now come from cheaper sources, so they are refused with a
+            # pointer instead of silently doing nothing.
+            if "view" in query_params or "database" in query_params:
+                raise ValueError(
+                    "'view' and 'database' are no longer supported. Use "
+                    "params={'views': True} for the view table, or "
+                    "params={'columns': ['database.view', ...]} for the columns "
+                    "and custom properties of specific views."
                 )
-                if view:
-                    all_views.append(view)
-            elif "database" in query_params:
-                # All views of one database
-                all_views.extend(
-                    self._get_database_views(
-                        query_params["database"], query_params.get("limit", 100)
-                    )
-                )
+
             elif "databases" in query_params:
                 # Layer 1: one row per database. Independent of the
                 # view-details path, so it needs no view fetches.
@@ -767,7 +847,17 @@ class Denodo(Webserver):
                 flat = self._run_single_query(
                     {"keywords": wanted if isinstance(wanted, str) else ""}
                 )
-                view_rows.extend(self._build_view_rows(flat))           
+                view_rows.extend(self._build_view_rows(flat))
+            elif "columns" in query_params:
+                # One harvest feeds both tables: schema[] and propertyInfo
+                # arrive in the same view-details response (contract 2.4, 2.5).
+                targets = self._resolve_scope(query_params["columns"])
+                details, failed = self._harvest_view_details(targets)
+                self.failed_views.extend(failed)
+
+                columns, properties = self._extract_tables(details)
+                column_rows.extend(columns)
+                property_rows.extend(properties)           
             else:
                 # Search: POST /search/metadata only, no view-details calls
                 search_rows.extend(self._run_single_query(query_params))
@@ -800,34 +890,15 @@ class Denodo(Webserver):
             self._cache["denodo_views"] = self._rows_to_table(
                 unique_views, self.VIEWS_SCHEMA
             )
+        if column_rows:
+            self._cache["denodo_columns"] = self._rows_to_table(
+                column_rows, self.COLUMNS_SCHEMA
+            )
 
-        # The four contract tables come only from the view/database paths.
-        # Skipped until _extract_tables and their schemas exist (Phase 2).
-        if all_views:
-            # Deduplicate by (database, view)
-            unique_views = self._deduplicate_views(all_views)
-
-            # Extract the four contract tables from deduplicated views
-            db_rows, view_rows, column_rows, property_rows, view_map = \
-                self._extract_tables(unique_views)
-
-            # Layer 1 (database): one row per VDB
-            self._cache["denodo_databases"] = self._rows_to_table(db_rows)
-
-            # Layer 2 (view): one row per view; the Layer-3 resource lives
-            # here as the nullable documentation_url column (v1.0 decision)
-            self._cache["denodo_views"] = self._rows_to_table(view_rows)
-
-            # Layer 2.5 (schema): one row per column of each view
-            self._cache["denodo_columns"] = self._rows_to_table(column_rows)
-
-            # Layer 2 detail: 341 custom properties as a long EAV table
-            # (separate table for storage reasons only -- still Layer-2
-            # metadata). All four tables are always created, even when
-            # empty -- per DATA_CONTRACT.
-            self._cache["denodo_properties"] = self._rows_to_table(property_rows)
-
-            self._view_map = view_map
+        if property_rows:
+            self._cache["denodo_properties"] = self._rows_to_table(
+                property_rows, self.PROPERTIES_SCHEMA
+            )
 
         self._loaded = True
 
@@ -872,46 +943,7 @@ class Denodo(Webserver):
             return None
 
 
-    def _get_database_views(self, db_name, limit=100):
-        """
-        Load all views belonging to one database (up to limit).
-
-        The views list endpoint has no verified server-side database
-        filter, so the full list is fetched once and filtered
-        client-side, then each match is enriched via view-details.
-
-        Parameters
-        ----------
-        db_name : str
-            Database name
-        limit : int, default 100
-            Maximum number of views to load
-
-        Returns
-        -------
-        list of dict
-            Full view dicts for the database's views.
-        """
-        result = self._request("views", params={"serverId": self.server_id})
-
-        if isinstance(result, list):
-            all_views = result
-        else:
-            all_views = result.get("views", result.get("elements", []))
-
-        matches = [
-            v for v in all_views
-            if not v.get("deleted")
-            and (v.get("databaseName") or v.get("db")) == db_name
-        ]
-
-        views = []
-        for v in matches[:limit]:
-            view = self._get_view_details(v.get("name"), db_name)
-            if view:
-                views.append(view)
-
-        return views
+   
 
 
     def _get_databases(self):                                                # For Database table
@@ -1075,6 +1107,230 @@ class Denodo(Webserver):
 
         return view_rows
 
+    def _resolve_scope(self, spec):                                  # For Phase 2c
+        """
+        Turn a user-supplied scope into a list of (db_name, view_name) pairs.
+
+        Required because a per-view harvest costs ~1.3 s per view: the whole
+        catalogue would take about 92 minutes, so the caller must say what
+        they want (contract D-8).
+
+        Parameters
+        ----------
+        spec : str or dict or list
+            - str                     : views matching this keyword
+            - {"database": "<name>"}  : every view in one database
+            - ["db.view", ...]        : exactly these views
+
+        Returns
+        -------
+        list of tuple
+            (db_name, view_name) pairs, de-duplicated, in a stable order.
+
+        Raises
+        ------
+        ValueError
+            If the scope is empty, malformed, or names an unknown database.
+        """
+        # Explicit list: no request at all.
+        if isinstance(spec, (list, tuple)):
+            targets = []
+            for entry in spec:
+                if isinstance(entry, (list, tuple)) and len(entry) == 2:
+                    targets.append(tuple(entry))
+                elif isinstance(entry, str) and "." in entry:
+                    db_name, _, view_name = entry.partition(".")
+                    targets.append((db_name, view_name))
+                else:
+                    raise ValueError(
+                        f"Cannot read scope entry {entry!r}. Use 'database.view' "
+                        "or (database, view)."
+                    )
+
+        # One database: one /views call, filtered here.
+        elif isinstance(spec, dict) and "database" in spec:
+            db_name = spec["database"]
+            result = self._request("views", params={"serverId": self.server_id})
+            all_views = result if isinstance(result, list) else result.get("views", [])
+
+            targets = [(v.get("db"), v.get("name"))
+                       for v in all_views
+                       if v.get("db") == db_name and not v.get("deleted")]
+            if not targets:
+                available = sorted({v.get("db") for v in all_views if v.get("db")})
+                raise ValueError(
+                    f"No views found in database '{db_name}'. "
+                    f"Databases with views: {', '.join(available)}."
+                )
+
+        # Keyword: the search harvest already knows how to find views.
+        elif isinstance(spec, str) and spec.strip():
+            rows = self._run_single_query({"keywords": spec})
+            targets = [(row.get("database_name"), row.get("name")) for row in rows]
+
+        else:
+            raise ValueError(
+                "The 'columns' scope is required and cannot be empty. Pass a "
+                "keyword, {'database': '<name>'}, or a list of 'database.view' "
+                "names. A full-catalogue harvest takes about 92 minutes and is "
+                "not available as a default."
+            )
+
+        # Stable order, no duplicates: the harvest cost makes a repeat expensive.
+        targets = list(dict.fromkeys(targets))
+        # A valid scope that matches nothing is a different failure from an
+        # empty scope, and the user cannot tell a typo from an empty catalog
+        # once two blank tables come back.
+        if not targets:
+            raise ValueError(
+                f"Scope {spec!r} matched no views. Check the keyword or the "
+                "view names -- a scope that matches nothing produces empty "
+                "tables with no other explanation."
+            )
+        # The token lives about an hour and a harvest runs at ~1.3 s per view,
+        # so a scope past this size cannot finish before it expires (O-28).
+        # Refuse up front rather than fail halfway and return a partial table.
+        if len(targets) > self.MAX_SCOPE_VIEWS:
+            minutes = len(targets) * self.SECONDS_PER_VIEW / 60
+            raise ValueError(
+                f"Scope resolves to {len(targets)} views, about {minutes:.0f} "
+                f"minutes -- longer than the access token lives. Narrow the "
+                f"scope, or split it across several runs of at most "
+                f"{self.MAX_SCOPE_VIEWS} views."
+            )
+
+        return targets
+
+
+
+    def _harvest_view_details(self, targets):                        # For Phase 2c
+        """
+        Fetch view-details for every target, reporting progress as it goes.
+
+        One call per view at roughly 1.3 s each, so this is the only path in
+        the backend where a user waits minutes rather than seconds. Silence
+        would be indistinguishable from a hang (contract O-42), so the count
+        and expected duration are printed before any request is made.
+
+        Parameters
+        ----------
+        targets : list of tuple
+            (db_name, view_name) pairs from _resolve_scope.
+
+        Returns
+        -------
+        tuple
+            (details, failed) -- the view-details dicts that came back, and
+            the (db_name, view_name) pairs that did not.
+        """
+        total = len(targets)
+        seconds = total * self.SECONDS_PER_VIEW
+        estimate = (f"{seconds:.0f} seconds" if seconds < 90
+                    else f"{seconds / 60:.0f} minutes")
+        print(f"Fetching details for {total} view(s), about {estimate}...")
+
+        start = time.perf_counter()
+        details, failed = [], []
+        consecutive = 0
+
+        for index, (db_name, view_name) in enumerate(targets, start=1):
+            detail = self._get_view_details(view_name, db_name)
+
+            if detail is None:
+                failed.append((db_name, view_name))
+                consecutive += 1
+                # A run of failures is systemic -- an expired token or a server
+                # outage -- not one bad view. Stopping saves the remaining hour.
+                if consecutive >= self.MAX_CONSECUTIVE_FAILURES:
+                    print(f"  stopped at {index}/{total} after {consecutive} "
+                          f"consecutive failures; the token may have expired")
+                    break
+            else:
+                details.append(detail)
+                consecutive = 0
+
+            if index % self.PROGRESS_EVERY == 0 or index == total:
+                elapsed = (time.perf_counter() - start) / 60
+                print(f"  {index:>5} / {total}   ({elapsed:.1f} min elapsed)")
+
+        elapsed = (time.perf_counter() - start) / 60
+        print(f"  done in {elapsed:.1f} min -- {len(details)} ok, {len(failed)} failed")
+
+        if failed:
+            shown = ", ".join(f"{db}.{view}" for db, view in failed[:5])
+            more = f", and {len(failed) - 5} more" if len(failed) > 5 else ""
+            print(f"  failed: {shown}{more}")
+
+        return details, failed
+
+    def _extract_tables(self, details):                              # For Phase 2c
+        """
+        Split view-details responses into column rows and property rows.
+
+        Both tables come from the same response, so one harvest feeds both:
+        schema[] becomes denodo_columns, and the three propertyInfo maps
+        become denodo_properties in long EAV form (contract 2.4, 2.5).
+
+        Parameters
+        ----------
+        details : list of dict
+            view-details responses from _harvest_view_details.
+
+        Returns
+        -------
+        tuple
+            (column_rows, property_rows), each a list of dicts keyed by the
+            matching schema.
+        """
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        column_rows, property_rows = [], []
+
+        for detail in details:
+            view_name = detail.get("name")
+            db_name = detail.get("databaseName")
+
+            # --- columns -------------------------------------------------
+            for position, field in enumerate(detail.get("schema") or []):
+                column_rows.append({
+                    "view_name": view_name,
+                    "db_name": db_name,
+                    "column_name": field.get("name"),
+                    "ordinal_position": position,
+                    "data_type": field.get("type"),
+                    "description": null_if_empty(field.get("description")),
+                    "fetched_at": fetched_at,
+                    "source_env": self.source_env,
+                })
+
+            # --- properties ----------------------------------------------
+            # Three maps, same shape: {group name: [property, ...]}. Any of
+            # them can be absent or None on a given view (contract 4.2).
+            property_info = detail.get("propertyInfo") or {}
+            for map_name in ("summaryPropertyMap", "generalTabPropertyMap",
+                             "customTabPropertyMap"):
+                for group_name, items in (property_info.get(map_name) or {}).items():
+                    for item in items or []:
+                        value = normalize_property_value(
+                            item.get("visualValue"), item.get("propertyType")
+                        )
+                        # EAV stores what exists. An unset property adds no
+                        # information and would cost tens of thousands of rows.
+                        if value is None:
+                            continue
+
+                        property_rows.append({
+                            "view_name": view_name,
+                            "db_name": db_name,
+                            "property_name": canonical_property_name(
+                                item.get("groupName", group_name),
+                                item.get("propertyName"),
+                            ),
+                            "property_value": value,
+                            "fetched_at": fetched_at,
+                            "source_env": self.source_env,
+                        })
+
+        return column_rows, property_rows
 
 
 
@@ -1170,32 +1426,6 @@ class Denodo(Webserver):
 
 
 
-    def _deduplicate_views(self, views):
-        """
-        Remove duplicate views based on the (database, view) identity pair.
-
-        Parameters
-        ----------
-        views : list
-            List of view dicts from the Data Catalog API
-
-        Returns
-        -------
-        list
-            Deduplicated list of views
-        """
-        seen_keys = set()
-        unique_views = []
-
-        for v in views:
-            db = v.get("databaseName") or v.get("db")
-            key = (db, v.get("name"))
-
-            if key not in seen_keys:
-                seen_keys.add(key)
-                unique_views.append(v)
-
-        return unique_views
 
 
     
@@ -1697,6 +1927,7 @@ class Denodo(Webserver):
             for name, columns in self.schemas.items()
         )
         self._view_map = {}
+        self.failed_views = []
         self._loaded = False
 
 

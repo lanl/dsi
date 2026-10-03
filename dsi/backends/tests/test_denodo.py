@@ -37,7 +37,7 @@ REAL_VALIDATE = Denodo.validate_connection
 
 # The registered tables, in registration order. One place to update when a
 # new table is added -- the tests below check consistency, not this literal.
-EXPECTED_TABLES = ["denodo_search_results", "denodo_databases", "denodo_views"]
+EXPECTED_TABLES = ["denodo_search_results", "denodo_databases", "denodo_views", "denodo_columns", "denodo_properties"]
 
 
 # ---------------------------------------------------------------------------
@@ -258,12 +258,32 @@ def test_categories_and_tags_are_passed_through():
     {"keywords": "x", "search_in": ["nope"]},
     {"keywords": "x", "match": "exactly"},
 ])
+
 def test_invalid_parameter_values_are_rejected(params):
     """__init__ wraps load failures, so the ValueError arrives as RuntimeError."""
     with pytest.raises(RuntimeError) as excinfo:
         make_backend(**params)
 
     assert "Valid:" in str(excinfo.value)
+
+def test_unknown_parameter_is_rejected_with_a_suggestion():
+    """A typo must fail loudly, not fall through to a whole-catalog search."""
+    with pytest.raises(RuntimeError) as err:
+        make_backend(veiws=True)
+
+    message = str(err.value)
+    assert "veiws" in message
+    assert "did you mean 'views'" in message
+
+
+def test_unknown_parameter_is_caught_before_any_request():
+    """Validation runs before the loop, so no query in the list is executed."""
+    with pytest.raises(RuntimeError):
+        Denodo(url="https://example.org", token="t",
+               params=[{"keywords": "a"}, {"nonsense": 1}])
+
+    assert REQUESTS == []
+
 
 
 def test_duplicate_views_are_removed_across_queries():
@@ -650,6 +670,160 @@ def test_views_path_fills_the_table_and_deduplicates():
     backend.close()
 
 
+# =============================================================================
+# 9) The columns and properties tables
+# =============================================================================
+# One view-details response, trimmed to the keys the extractor reads. The
+# property maps mirror prod: a "Details" group applied to every view, with
+# visualValue carrying raw HTML that normalization has to clean.
+FAKE_DETAIL = {
+    "name": "demo_view",
+    "databaseName": "demo_db",
+    "totalFields": 2,
+    "schema": [
+        {"name": "id", "type": "int", "description": "Unique ID for the record"},
+        {"name": "label", "type": "text", "description": ""},
+    ],
+    "propertyInfo": {
+        "summaryPropertyMap": {
+            "Details": [
+                {"groupName": "Details", "propertyName": "Business Unit:",
+                 "propertyType": "ENUMERATION", "visualValue": "Operations"},
+                {"groupName": "Details", "propertyName": "Data Owner",
+                 "propertyType": "RICH_TEXT",
+                 "visualValue": '<p><strong><a href="https://example.org/p">Doe, Jane</a></strong></p>'},
+                {"groupName": "Details", "propertyName": "Unset Property",
+                 "propertyType": "LONG_TEXT", "visualValue": ""},
+            ]
+        },
+        "generalTabPropertyMap": {},
+        "customTabPropertyMap": None,      # prod returns null, not {}
+    },
+}
+
+
+def test_columns_and_properties_tables_are_registered():
+    """Both tables exist with all their columns before any harvest."""
+    backend = make_backend(keywords="test")
+    for name, schema in (("denodo_columns", Denodo.COLUMNS_SCHEMA),
+                         ("denodo_properties", Denodo.PROPERTIES_SCHEMA)):
+        table = backend.get_table(name)
+        assert list(table.columns) == schema
+        assert table.shape == (0, len(schema))
+    backend.close()
+
+
+def test_resolve_scope_reads_an_explicit_list_without_fetching():
+    """Order is preserved and duplicates dropped; no request is made."""
+    backend = make_backend(keywords="test")
+    REQUESTS.clear()
+
+    assert backend._resolve_scope(["db.v2", "db.v1", "db.v2"]) == [
+        ("db", "v2"), ("db", "v1"),
+    ]
+    assert backend._resolve_scope([("db", "v1")]) == [("db", "v1")]
+    assert REQUESTS == []
+    backend.close()
+
+
+@pytest.mark.parametrize("spec", ["", "   ", None, {}, {"nope": 1}])
+def test_resolve_scope_requires_a_scope(spec):
+    """A full harvest takes ~92 minutes, so there is no default (contract D-8)."""
+    backend = make_backend(keywords="test")
+    with pytest.raises(ValueError, match="required"):
+        backend._resolve_scope(spec)
+    backend.close()
+
+
+def test_resolve_scope_filters_one_database_and_skips_deleted():
+    backend = make_backend(keywords="test")
+    targets = backend._resolve_scope({"database": "db_a"})
+
+    assert all(db == "db_a" for db, _ in targets)
+    assert ("db_a", "gone") not in targets        # deleted views cost 1.3 s for nothing
+    backend.close()
+
+
+def test_resolve_scope_refuses_more_views_than_the_token_outlives():
+    """The token lives ~1 h; refuse up front rather than fail halfway (O-28)."""
+    backend = make_backend(keywords="test")
+    with pytest.raises(ValueError, match="longer than the access token lives"):
+        backend._resolve_scope([f"db.v{i}" for i in range(Denodo.MAX_SCOPE_VIEWS + 1)])
+    backend.close()
+
+
+def test_harvest_stops_after_consecutive_failures(monkeypatch):
+    """A run of failures is systemic -- stopping saves the remaining hour."""
+    backend = make_backend(keywords="test")
+    monkeypatch.setattr(Denodo, "_get_view_details", lambda self, v, d: None)
+
+    details, failed = backend._harvest_view_details(
+        [("db", f"v{i}") for i in range(200)]
+    )
+
+    assert details == []
+    assert len(failed) == Denodo.MAX_CONSECUTIVE_FAILURES
+    backend.close()
+
+
+def test_harvest_records_scattered_failures_without_stopping(monkeypatch):
+    """One bad view must not end the run: the counter resets on any success."""
+    backend = make_backend(keywords="test")
+    monkeypatch.setattr(
+        Denodo, "_get_view_details",
+        lambda self, v, d: None if v.endswith("3") else {"name": v, "databaseName": d},
+    )
+
+    details, failed = backend._harvest_view_details(
+        [("db", f"v{i}") for i in range(40)]
+    )
+
+    assert len(details) == 36          # v3, v13, v23, v33 fail
+    assert len(failed) == 4
+    backend.close()
+
+
+def test_extract_tables_maps_columns_and_properties():
+    backend = make_backend(keywords="test")
+    columns, properties = backend._extract_tables([FAKE_DETAIL])
+
+    assert list(columns[0]) == Denodo.COLUMNS_SCHEMA
+    assert [c["column_name"] for c in columns] == ["id", "label"]
+    assert [c["ordinal_position"] for c in columns] == [0, 1]
+    assert columns[1]["description"] is None        # "" -> None
+
+    assert list(properties[0]) == Denodo.PROPERTIES_SCHEMA
+    names = [p["property_name"] for p in properties]
+    assert "Details/Business Unit:" in names         # trailing colon kept (3.5)
+    backend.close()
+
+
+def test_extract_tables_normalizes_and_skips_unset_properties():
+    """RICH_TEXT is stripped; a property with no value is not a row at all."""
+    backend = make_backend(keywords="test")
+    _, properties = backend._extract_tables([FAKE_DETAIL])
+
+    values = {p["property_name"]: p["property_value"] for p in properties}
+    assert values["Details/Data Owner"] == "Doe, Jane"
+    assert "Details/Unset Property" not in values
+    backend.close()
+
+
+def test_extract_tables_survives_null_schema_and_property_maps():
+    """The API returns literal null, not a missing key or an empty dict."""
+    backend = make_backend(keywords="test")
+    columns, properties = backend._extract_tables(
+        [{"name": "v", "databaseName": "db", "schema": None, "propertyInfo": None}]
+    )
+    assert columns == [] and properties == []
+    backend.close()
+
+
+@pytest.mark.parametrize("params", [{"view": "v", "database": "d"}, {"database": "d"}])
+def test_retired_params_raise_with_a_pointer(params):
+    """'view' and 'database' were documented once, so they name their successors."""
+    with pytest.raises(RuntimeError, match="no longer supported"):
+        make_backend(**params)
 
 
 
