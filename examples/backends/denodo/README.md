@@ -246,18 +246,25 @@ dsi = DSI(
 | `limit` | int | every match | Maximum number of views to retrieve per query |
 | `databases` | list[str] | — | Build the `denodo_databases` table instead of searching. `[]` means every database you can see; a list of names restricts it to those |
 | `views` | bool or str | — | Build the `denodo_views` table. `True` means every view in the catalogue; a string narrows it to views matching that keyword |
+| `columns` | str, dict or list | — | Build `denodo_columns` and `denodo_properties`. **A scope is required**: a keyword, `{"database": "<name>"}`, or a list of `"database.view"` names. See *Cost* below |
+| ~~`database`~~ | — | — | Retired. Use `views` or `columns` |
+| ~~`view`~~ | — | — | Retired. Use `columns` with an explicit view list |
 
 ---
 
 ## Tables
 
-The backend returns three DSI tables:
+The backend returns five DSI tables:
 
 1. **denodo_search_results** - View metadata from a search (one row per view returned)
 2. **denodo_databases** - One row per database in the Data Catalog
 3. **denodo_views** - One row per view in the Data Catalog
+4. **denodo_columns** - One row per column of a view
+5. **denodo_properties** - One row per custom property of a view
 
-Which one is filled depends on `params`: a search fills the first, `{"databases": [...]}` the second, `{"views": True}` the third. All three always exist with all their columns, even when empty.
+Which ones fill depends on `params`: a search fills the first, `{"databases": [...]}` the second, `{"views": True}` the third, and `{"columns": <scope>}` fills the last two together. All five always exist with all their columns, even when empty.
+
+The first three are cheap - a few dozen requests at most. **The last two cost one request per view**, so they take a required scope rather than a default. See *Cost* under the `denodo_columns` section.
 
 `denodo_search_results` and `denodo_views` come from the same endpoint but answer different questions. The search table is a **snapshot of one query** and keeps the API's own field names, including columns that only mean something for that query. `denodo_views` is a **catalogue**: stable column names, no query-relative fields, and one row per view regardless of what was searched for.
 
@@ -387,7 +394,133 @@ dsi = DSI(backend_name="Denodo", params={"views": "weather"})
 - **`documentation_url` is not unique.** Several views can point at the same documentation page, so it identifies a resource, not a view. Use `(db_name, view_name)` as the key.
 - **Descriptions repeat.** Many views carry a description identical to another view's, which is normal for generated or templated schemas — searching on description will return groups rather than single hits.
 - `element_id` belongs to Denodo and differs between environments; do not carry it across them.
-- Column-level schema and custom properties are **not** in this table. They need the view-details endpoint, and are planned as `denodo_columns` and `denodo_properties`.
+- Column-level schema and custom properties are **not** in this table - they come from `denodo_columns` and `denodo_properties` below.
+
+---
+
+### denodo_columns Table:
+
+One row per column of a view, keyed by `(db_name, view_name, column_name)`.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"columns": "your_keyword"})
+dsi.display("denodo_columns")
+```
+
+| Column | Description |
+|--------|-------------|
+| view_name | View the column belongs to — key part 1 |
+| db_name | Database the view belongs to — key part 2 |
+| column_name | Column name — key part 3 |
+| ordinal_position | Position in the view's schema, 0-based and contiguous |
+| data_type | The source type name |
+| description | Column description, `None` where there is none |
+| fetched_at | When the fetch ran (UTC) — one timestamp for every row of the fetch |
+| source_env | Which environment the rows came from |
+
+**Output** (illustrative):
+```text
+view_name     | db_name   | column_name  | ordinal_position | data_type | description
+--------------+-----------+--------------+------------------+-----------+----------------
+customer_ref  | analytics | customer_id  |                0 | int       | Unique ID
+customer_ref  | analytics | display_name |                1 | text      | None
+customer_ref  | analytics | created_date |                2 | localdate | Audit Field
+```
+
+**Notes on the columns:**
+
+- **`data_type` is not a fixed vocabulary.** Alongside ordinary SQL types you will find
+  per-view generated types, particularly for geometry columns. Do not model it as an enum
+  or build a `CHECK` constraint from the values you happen to see.
+- **Column descriptions are rare.** In practice very few columns carry one, and much of
+  what exists is repeated boilerplate rather than per-column text. Check the rate on your
+  own catalogue before relying on it for search.
+- `ordinal_position` is the column's place in the view's schema, so it is stable for a
+  given view but means nothing across views.
+
+---
+
+### denodo_properties Table:
+
+One row per custom property of a view, keyed by `(db_name, view_name, property_name)`.
+This is a **long EAV table**: the property set changes without a schema migration, so
+properties are rows rather than columns.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"columns": "your_keyword"})
+dsi.display("denodo_properties")
+```
+
+| Column | Description |
+|--------|-------------|
+| view_name | View the property belongs to — key part 1 |
+| db_name | Database the view belongs to — key part 2 |
+| property_name | `"Group/Property"`, taken verbatim from the catalog — key part 3 |
+| property_value | The value, with HTML removed and entities decoded |
+| fetched_at | Provenance |
+| source_env | Provenance |
+
+**Output** (illustrative):
+```text
+view_name    | db_name   | property_name            | property_value
+-------------+-----------+--------------------------+---------------------------
+customer_ref | analytics | Governance/Data Steward  | Doe, Jane
+customer_ref | analytics | Governance/Classification| Internal
+customer_ref | analytics | Governance/Access Request| Contact support@example.org
+```
+
+**Notes on the columns:**
+
+- **`property_name` is verbatim**, including trailing punctuation. A property displayed as
+  `Business Unit:` is stored with its colon, because stripping it would stop the name
+  matching the catalog.
+- **Properties with no value are not stored.** An unset property produces no row, which is
+  the point of the EAV shape - the table holds what exists rather than every property that
+  could exist.
+- **Values are normalized.** The catalog stores several as HTML; `property_value` holds the
+  readable text, so a contact property returns a name rather than an anchor tag.
+
+---
+
+### Cost
+
+`denodo_columns` and `denodo_properties` come from the **same** per-view request, so one
+harvest fills both. That request costs roughly **1.3 seconds per view**, which makes these
+the only tables where you wait minutes rather than seconds:
+
+| Scope | Time |
+|---|---|
+| 1 view | ~1 second |
+| 20 views | ~25 seconds |
+| 100 views | ~2 minutes |
+| 500 views | ~10 minutes |
+
+Three consequences, all visible in the API:
+
+- **The scope is required.** There is no "fetch everything" default, because on a large
+  catalogue that would run for over an hour. `{"columns": ""}` raises rather than guessing.
+- **A scope that matches nothing raises too**, instead of returning two empty tables you
+  would have to diagnose.
+- **A scope larger than roughly 1,500 views is refused**, because an access token does not
+  live long enough to finish the harvest. Split it across runs.
+
+Progress is printed as it goes:
+
+```text
+Fetching details for 98 view(s), about 2 minutes...
+     50 / 98   (1.1 min elapsed)
+     98 / 98   (2.1 min elapsed)
+  done in 2.1 min -- 98 ok, 0 failed
+```
+
+A view whose details cannot be fetched is reported in that summary and recorded for later:
+
+```python
+dsi.main_backend_obj.failed_views    # [(db_name, view_name), ...]
+```
+
+The harvest stops early if many requests fail in a row, since that means something systemic
+- usually an expired token - rather than one bad view.
 
 ---
 
@@ -431,6 +564,14 @@ Table: denodo_databases
 
 Table: denodo_views
   - num of columns: 10
+  - num of rows: 0
+
+Table: denodo_columns
+  - num of columns: 8
+  - num of rows: 0
+
+Table: denodo_properties
+  - num of columns: 6
   - num of rows: 0
 ```
 
@@ -531,6 +672,26 @@ CREATE TABLE denodo_views (
     tags TEXT,
     element_id INTEGER,
     last_modified_at TEXT,
+    fetched_at TEXT,
+    source_env TEXT
+);
+
+CREATE TABLE denodo_columns (
+    view_name TEXT,
+    db_name TEXT,
+    column_name TEXT,
+    ordinal_position INTEGER,
+    data_type TEXT,
+    description TEXT,
+    fetched_at TEXT,
+    source_env TEXT
+);
+
+CREATE TABLE denodo_properties (
+    view_name TEXT,
+    db_name TEXT,
+    property_name TEXT,
+    property_value TEXT,
     fetched_at TEXT,
     source_env TEXT
 );
@@ -846,12 +1007,30 @@ Load the view table: one row per view in the Data Catalog.
 
 ---
 
+### 8. load_columns.py
+
+Load the column and property tables for a chosen set of views.
+
+- Pass a scope: a keyword, `{"database": "..."}`, or a list of `"database.view"` names
+- Summarize both tables, which come from one harvest
+- Count how many columns carry a description
+- Read `failed_views` for anything that could not be fetched
+
+**Note:** this is the only example that fetches per view, at roughly 1.3 seconds each, so
+it reports progress while it runs. Edit the keyword before running it - the placeholder
+matches nothing on purpose.
+
+---
+
 ## Notes
 
 - The backend is **metadata-first** and **read-only**
 - One search is one `POST /search/metadata`; no other endpoint is called
 - Large result sets are paginated internally, and the row count is checked against the server's own total
-- Three tables today: `denodo_search_results`, `denodo_databases` and `denodo_views`; which one fills depends on `params`
+- Five tables today: `denodo_search_results`, `denodo_databases`, `denodo_views`, `denodo_columns` and `denodo_properties`; which ones fill depends on `params`
+- The first three are cheap; `denodo_columns` and `denodo_properties` cost one request per view and therefore take a required scope
+- `denodo_columns` is keyed by `(db_name, view_name, column_name)` and `denodo_properties` by `(db_name, view_name, property_name)`
+- `database` and `view` are retired and raise with a pointer to `views` / `columns`
 - `denodo_views` is keyed by `(db_name, view_name)`; `documentation_url` is **not** a key, since several views can share one documentation page
 - `denodo_views` and `denodo_search_results` come from the same endpoint: the first is a catalogue, the second a snapshot of one query
 - A database is identified by `db_name`; its numeric `database_id` comes from Denodo and differs between environments
