@@ -1,0 +1,551 @@
+import os
+import stat
+import hashlib
+import json
+import subprocess
+import sys
+from typing import Optional
+
+if sys.platform == "win32":
+    import getpass
+    pwd = None
+    grp = None
+else:
+    import pwd
+    import grp
+
+from .vcs_db import DB_NAME, SNAPSHOTS_DIR
+
+# ─────────────────────────── METADATA HELPERS ────────────────────────────────
+
+def file_type_str(mode: int) -> str:
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISDIR(mode):
+        return "dir"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISBLK(mode):
+        return "block"
+    if stat.S_ISCHR(mode):
+        return "char"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    return "unknown"
+
+
+def permission_str(mode: int) -> str:
+    """Convert mode bits → rwxrwxrwx string (no file-type prefix)."""
+    chars = []
+    for bit, char in (
+        (stat.S_IRUSR, "r"), (stat.S_IWUSR, "w"), (stat.S_IXUSR, "x"),
+        (stat.S_IRGRP, "r"), (stat.S_IWGRP, "w"), (stat.S_IXGRP, "x"),
+        (stat.S_IROTH, "r"), (stat.S_IWOTH, "w"), (stat.S_IXOTH, "x"),
+    ):
+        chars.append(char if mode & bit else "-")
+    if mode & stat.S_ISUID:
+        chars[2] = "s" if chars[2] == "x" else "S"
+    if mode & stat.S_ISGID:
+        chars[5] = "s" if chars[5] == "x" else "S"
+    if mode & stat.S_ISVTX:
+        chars[8] = "t" if chars[8] == "x" else "T"
+    return "".join(chars)
+
+
+def owner_name(uid: int) -> str:
+    if sys.platform == "win32":
+        try:
+            return getpass.getuser()
+        except (KeyError, OSError):
+            return str(uid)
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return str(uid)
+
+
+def group_name(gid: int) -> str:
+    if sys.platform == "win32":
+        # Windows has no POSIX gid database; preserve the numeric value.
+        return str(gid)
+    try:
+        return grp.getgrgid(gid).gr_name
+    except KeyError:
+        return str(gid)
+
+
+def get_acl(path: str) -> Optional[str]:
+    """
+    Return ACL info as a normalized ';'-separated string, or None if unavailable.
+    """
+
+    if sys.platform == "darwin":
+        return _get_acl_darwin(path)
+    elif sys.platform == "linux":
+        return _get_acl_linux(path)
+    # print(f"Unsupported platform for ACL read: {sys.platform}")
+    return None
+
+
+def _get_acl_darwin(path: str) -> Optional[str]:
+    """Read ACLs on macOS via `ls -le`."""
+    try:
+        result = subprocess.run(
+            ["ls", "-le", path],
+            capture_output=True, text=True, timeout=5
+        )
+        lines = result.stdout.splitlines()
+
+        acl_entries = []
+
+        for line in lines:
+            line = line.strip()
+            if line.startswith(tuple(str(i) + ":" for i in range(10))):
+                # Example line: "0: user:azad allow read,write"
+                parts = line.split("user:")
+                if len(parts) > 1:
+                    acl_part = parts[1].strip()
+                    acl_entries.append(acl_part)
+
+        return ";".join(acl_entries) if acl_entries else None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
+def _get_acl_linux(path: str) -> Optional[str]:
+    """Read ACLs on Linux via `getfacl`."""
+    try:
+        result = subprocess.run(
+            ["getfacl", "--omit-header", "--absolute-names", path],
+            capture_output=True, text=True, timeout=5
+        )
+        lines = result.stdout.splitlines()
+
+        acl_entries = []
+
+        for line in lines:
+            line = line.strip()
+            # Only handle named user entries, e.g. "user:azad:rwx"
+            # (skip the owning-user default entry "user::rwx")
+            if line.startswith("user:") and not line.startswith("user::"):
+                parts = line.split(":")
+                if len(parts) >= 3:
+                    name = parts[1].strip()
+                    # getfacl can append "#effective:r--" when a mask
+                    # restricts permissions -- strip that off.
+                    perm_bits = parts[2].split("#")[0].strip()
+
+                    perms = []
+                    if "r" in perm_bits:
+                        perms.append("read")
+                    if "w" in perm_bits:
+                        perms.append("write")
+                    if "x" in perm_bits:
+                        perms.append("execute")
+
+                    if name and perms:
+                        acl_entries.append(f"{name} allow {','.join(perms)}")
+
+        return ";".join(acl_entries) if acl_entries else None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
+def set_acl(path: str, acl_string: str) -> None:
+    """
+    Apply ACL entries described by acl_string (as produced by get_acl).
+    """
+    if sys.platform == "darwin":
+        _set_acl_darwin(path, acl_string)
+    elif sys.platform == "linux":
+        _set_acl_linux(path, acl_string)
+    # else:
+    #     print(f"Unsupported platform for ACL write: {sys.platform}")
+
+
+def _set_acl_darwin(path: str, acl_string: str) -> None:
+    """Write ACLs on macOS via `chmod +a`."""
+    acl_list = acl_string.split(";")
+    for acl_entry in acl_list:
+        try:
+            if len(acl_entry) == 0:
+                continue
+            acls = acl_entry.split()
+            acl_perm = "user:" + acls[0] + " allow " + acls[2]
+            print(acl_perm)
+            result = subprocess.run(
+                ["chmod", "+a", acl_perm, path],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                print(f"Failed to set ACL entry '{acl_entry}' on {path}: {result.stderr}")
+        except Exception as e:
+            print(f"Error setting ACL entry '{acl_entry}' on {path}: {e}")
+
+
+def _set_acl_linux(path: str, acl_string: str) -> None:
+    """Write ACLs on Linux via `setfacl`."""
+    acl_list = acl_string.split(";")
+    for acl_entry in acl_list:
+        try:
+            if len(acl_entry) == 0:
+                continue
+            acls = acl_entry.split()
+            username = acls[0]
+            perms = acls[2].split(",") if len(acls) > 2 else []
+
+            r = "r" if "read" in perms else "-"
+            w = "w" if "write" in perms else "-"
+            x = "x" if "execute" in perms else "-"
+            rule = f"u:{username}:{r}{w}{x}"
+            print(rule)
+
+            result = subprocess.run(
+                ["setfacl", "-m", rule, path],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                print(f"Failed to set ACL entry '{acl_entry}' on {path}: {result.stderr}")
+        except Exception as e:
+            print(f"Error setting ACL entry '{acl_entry}' on {path}: {e}")
+
+
+
+
+
+
+def get_xattrs(path: str) -> Optional[str]:
+    return None
+    # """Return JSON dict of extended attributes, or None."""
+    # try:
+    #     import xattr  # pyxattr
+    #     attrs = {}
+    #     for key in xattr.listxattr(path, symlink=True):
+    #         try:
+    #             val = xattr.getxattr(path, key, symlink=True)
+    #             attrs[key] = val.decode("utf-8", errors="replace")
+    #         except OSError:
+    #             attrs[key] = "<unreadable>"
+    #     return json.dumps(attrs) if attrs else None
+    # except ImportError:
+    #     # Fallback: use getfattr
+    #     try:
+    #         result = subprocess.run(
+    #             ["getfattr", "-d", "-m", "-", "--absolute-names", path],
+    #             capture_output=True, text=True, timeout=5
+    #         )
+    #         return result.stdout.strip() or None
+    #     except FileNotFoundError:
+    #         return None
+    # except OSError:
+    #     return None
+
+
+def get_security_context(path: str) -> Optional[str]:
+    """Return SELinux/AppArmor security context if available."""
+    try:
+        result = subprocess.run(
+            ["ls", "-Z", path],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            parts = result.stdout.strip().split()
+            # ls -Z format: context file  (or just file if no context)
+            if len(parts) >= 2 and ":" in parts[0]:
+                return parts[0]
+        return None
+    except Exception:
+        return None
+
+
+def md5_hash(path: str, chunk_size: int = 1 << 20) -> Optional[str]:
+    """Stream-hash a file in 1 MB chunks. Returns None on error."""
+    h = hashlib.md5()
+    try:
+        with open(path, "rb") as f:
+            while chunk := f.read(chunk_size):
+                h.update(chunk)
+        return h.hexdigest()
+    except (PermissionError, OSError):
+        return None
+
+
+def collect_metadata(abs_path: str, root_folder: str) -> dict:
+    """
+    Gather all available metadata for a single path.
+
+    Returns a dict with two logical groups:
+      • lstat  — raw os.lstat() result stored as a nested dict (→ JSON column)
+      • all other keys — each stored in its own column
+    """
+    rel_path = os.path.relpath(abs_path, root_folder)
+
+    try:
+        s = os.lstat(abs_path)
+    except OSError as e:
+        return {"relative_path": rel_path, "error": str(e)}
+
+    mode  = s.st_mode
+    ftype = file_type_str(mode)
+
+    # ── lstat dict (raw kernel values only) ──────────────────────────────────
+    lstat_dict = {
+        "st_mode":    mode,
+        "st_ino":     s.st_ino,
+        "st_dev":     s.st_dev,
+        "st_nlink":   s.st_nlink,
+        "st_uid":     s.st_uid,
+        "st_gid":     s.st_gid,
+        "st_size":    s.st_size,
+        "st_atime":   s.st_atime,
+        "st_mtime":   s.st_mtime,
+        "st_ctime":   s.st_ctime,
+        "st_blocks":  getattr(s, "st_blocks", None),
+        "st_blksize": getattr(s, "st_blksize", None),
+    }
+
+    # ── all other (derived / external) attributes — own columns ──────────────
+    entry = {
+        "relative_path": rel_path,
+        "absolute_path": abs_path,
+        "file_name":     os.path.basename(abs_path),
+        "file_type":     ftype,
+
+        # serialised lstat dict → stored as TEXT (JSON) in a single column
+        "lstat": json.dumps(lstat_dict),
+
+        # human-readable permission strings
+        "permissions_int":   stat.S_IMODE(mode),
+        "owner_name":        owner_name(s.st_uid),
+        "group_name":        group_name(s.st_gid),
+
+        # external / subprocess-derived attributes
+        "acl_text":         get_acl(abs_path),
+        # "xattrs":           get_xattrs(abs_path),
+        "security_context": get_security_context(abs_path),
+        "symlink_target":   os.readlink(abs_path) if ftype == "symlink" else None,
+
+        # content hash — regular files only
+        "md5_hash": None,
+
+        # convenience shortcut used by walk_folder aggregation (not stored)
+        "_st_size": s.st_size,
+    }
+    return entry
+
+
+def collect_tree_metadata(scan_root: str, identity_root: str) -> list[dict]:
+    """Collect metadata under scan_root while storing paths under identity_root."""
+    entries = []
+    skip_names = {DB_NAME, SNAPSHOTS_DIR}
+
+    for dirpath, dirnames, filenames in os.walk(scan_root, followlinks=False):
+        dirnames[:] = [d for d in dirnames if d not in skip_names]
+        if dirpath != scan_root:
+            entry = collect_metadata(dirpath, scan_root)
+            if "error" in entry:
+                print(f"  [skip] {entry['relative_path']}: {entry['error']}")
+            else:
+                entry["absolute_path"] = os.path.join(identity_root, entry["relative_path"])
+                entries.append(entry)
+
+        for fname in filenames:
+            if fname in skip_names:
+                continue
+            entry = collect_metadata(os.path.join(dirpath, fname), scan_root)
+            if "error" in entry:
+                print(f"  [skip] {entry['relative_path']}: {entry['error']}")
+            else:
+                entry["absolute_path"] = os.path.join(identity_root, entry["relative_path"])
+                entries.append(entry)
+
+    return entries
+
+
+# None if permission denined, acl text if permission granted, or empty string if no acl text available
+def check_access_permission(conn, root_folder: str, commit_hash: str, relative_path: str, access: str = "read") -> dict:
+    row = conn.execute(
+        "SELECT "
+        "    mn.metadata AS metadata "
+        "FROM versions v "
+        "JOIN merkle_nodes mn "
+        "    ON mn.version_id = v.id "
+        "WHERE v.root_folder    = ? "
+        "AND v.commit_hash    = ? "
+        "AND mn.relative_path = ?",
+        (root_folder, commit_hash, relative_path),
+    ).fetchone()
+    if row is None:
+        return {}
+    metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+    acl_text = metadata.get("acl_text")
+    owner_name = metadata.get("owner_name")
+    group_name = metadata.get("group_name")
+    permissions_int = metadata.get("permissions_int")
+    if owner_name is None or group_name is None or permissions_int is None:
+        return {}
+
+    access = access.lower()
+    if access not in {"read", "write"}:
+        raise ValueError("access must be 'read' or 'write'")
+
+    if sys.platform == "win32":
+        username = getpass.getuser()
+        return metadata if username == owner_name else None
+    else:
+        try:
+            current_user = pwd.getpwuid(os.geteuid())
+            username = current_user.pw_name
+        except KeyError:
+            return {}
+
+        current_groups = set()
+        try:
+            current_groups.add(grp.getgrgid(os.getegid()).gr_name)
+        except KeyError:
+            pass
+        for gid in os.getgroups():
+            try:
+                current_groups.add(grp.getgrgid(gid).gr_name)
+            except KeyError:
+                pass
+
+    # If acl_text is available, check it first for explicit allows for the
+    # current user or any of the user's groups. On Darwin, acl_text is expected
+    # to be normalized as "username allow read,write" entries separated by ';'.
+    # On Linux, acl_text may be in raw getfacl form like "user:foo:rwx" or in
+    # the same normalized allow form.
+    if acl_text:
+        if sys.platform == "darwin":
+            for entry in acl_text.split(";"):
+                entry = entry.strip()
+                if not entry:
+                    continue
+                # Expect formats like "username allow read,write" or
+                # "groupname allow read". Be tolerant of prefixes like "user:foo".
+                parts = entry.split(None, 2)
+                if len(parts) < 2:
+                    continue
+                principal = parts[0]
+                action = parts[1].lower()
+                perms = ""
+                if len(parts) >= 3:
+                    perms = parts[2]
+
+                # Normalize principal (drop "user:" or "group:" prefixes)
+                if ":" in principal:
+                    principal = principal.split(":", 1)[1]
+
+                # Only handle allow entries here
+                if action != "allow":
+                    continue
+
+                # Check user principal
+                if principal == username:
+                    permitted = {p.strip() for p in perms.split(",") if p}
+                    if access in permitted or (access == "read" and "write" in permitted):
+                        return metadata
+                    else:
+                        return None
+
+                # Check group principal
+                if principal in current_groups:
+                    permitted = {p.strip() for p in perms.split(",") if p}
+                    if access in permitted or (access == "read" and "write" in permitted):
+                        return metadata
+                    else:
+                        return None
+        elif sys.platform == "linux":
+            for entry in acl_text.replace(";", "\n").splitlines():
+                entry = entry.strip()
+                if not entry:
+                    continue
+
+                if " allow " in entry:
+                    parts = entry.split(None, 2)
+                    if len(parts) < 2:
+                        continue
+                    principal = parts[0]
+                    action = parts[1].lower()
+                    perms = ""
+                    if len(parts) >= 3:
+                        perms = parts[2]
+
+                    if ":" in principal:
+                        principal = principal.split(":", 1)[1]
+
+                    if action != "allow":
+                        continue
+
+                    if principal == username:
+                        permitted = {p.strip() for p in perms.split(",") if p}
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        else:
+                            return None
+
+                    if principal in current_groups:
+                        permitted = {p.strip() for p in perms.split(",") if p}
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        else:
+                            return None
+
+                if entry.startswith("user:") and not entry.startswith("user::"):
+                    parts = entry.split(":", 3)
+                    if len(parts) < 3:
+                        continue
+                    principal = parts[1].strip()
+                    perm_bits = parts[2].split("#")[0].strip()
+                    permitted = set()
+                    if "r" in perm_bits:
+                        permitted.add("read")
+                    if "w" in perm_bits:
+                        permitted.add("write")
+
+                    if principal == username:
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        else:
+                            return None
+
+                if entry.startswith("group:") and not entry.startswith("group::"):
+                    parts = entry.split(":", 3)
+                    if len(parts) < 3:
+                        continue
+                    principal = parts[1].strip()
+                    perm_bits = parts[2].split("#")[0].strip()
+                    permitted = set()
+                    if "r" in perm_bits:
+                        permitted.add("read")
+                    if "w" in perm_bits:
+                        permitted.add("write")
+
+                    if principal in current_groups:
+                        if access in permitted or (access == "read" and "write" in permitted):
+                            return metadata
+                        else:
+                            return None
+        else:
+            acl_text = ""
+    else:
+        acl_text = ""
+
+    if access == "read":
+        owner_bit = stat.S_IRUSR | stat.S_IWUSR
+        group_bit = stat.S_IRGRP | stat.S_IWGRP
+        other_bit = stat.S_IROTH | stat.S_IWOTH
+    else:
+        owner_bit = stat.S_IWUSR
+        group_bit = stat.S_IWGRP
+        other_bit = stat.S_IWOTH
+
+    if username == owner_name:
+        return None if bool(permissions_int & owner_bit) is False else metadata
+
+    if group_name in current_groups:
+        return None if bool(permissions_int & group_bit) is False else metadata
+
+    return None if bool(permissions_int & other_bit) is False else metadata
