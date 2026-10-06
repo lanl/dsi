@@ -127,7 +127,8 @@ class Oceans11(Webserver):
             True if connection is valid
         """                
         try:
-            from dsi.utils.federated.federate_datasets import pull_data
+            #from dsi.utils.federated.federate_datasets import pull_data
+            from dsi.utils.data_acquisition import pull_data
             import os
             from contextlib import redirect_stdout
 
@@ -135,9 +136,9 @@ class Oceans11(Webserver):
             with redirect_stdout(fnull):
                 info = pull_data(
                     location_type="url",
-                    location=self.base_url,
-                    path=self.base_url,
-                    abs_path_workspace_folder=self.workspace,
+                    remote_location=self.base_url,
+                    remote_path=self.base_url,
+                    download_location=self.workspace,
                     username="",
                     download_limit=1024**5
                 )
@@ -456,16 +457,17 @@ class Oceans11(Webserver):
     # ------------------------------------------------------------------
     def _download_t2_db(self, t2db_url):
         """Download one Tier-2 database selected by a Tier-1 record."""
-        from dsi.utils.federated.federate_datasets import pull_data
+        #from dsi.utils.federated.federate_datasets import 
+        from dsi.utils.data_acquisition import pull_data
 
         base_url = "https://oceans11.lanl.gov/dataCatalog/"
         full_url = urljoin(base_url, t2db_url)
 
         info = pull_data(
             location_type="url",
-            location=full_url,
-            path=full_url,
-            abs_path_workspace_folder=self.workspace,
+            remote_location=full_url,
+            remote_path=full_url,
+            download_location=self.workspace,
             username="",
             download_limit=1024**5
         )

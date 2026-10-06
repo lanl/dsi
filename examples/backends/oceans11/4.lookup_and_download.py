@@ -5,7 +5,8 @@ import shutil
 from dsi.dsi import DSI
 from urllib.parse import urlparse
 # from dsi.utils.web_utils import download_web_file
-from dsi.utils.federated.federate_datasets import pull_data
+#from dsi.utils.federated.federate_datasets import pull_data
+from dsi.utils.data_acquisition import pull_data
 
 # import ssl
 # import urllib3
@@ -45,7 +46,7 @@ dsi_db.close()
 ### Download the files ###
 urls = df['url'].tolist()
 files = "./downloaded_files/"
-host_username = {}
+host_username = ""
 download_limit = 10**12  # 1 TB
 
 # If the directory exists, delete it and all its contents
@@ -73,12 +74,13 @@ for url in urls:
 
     pull_data(
         location_type="url",
-        location=url_parent,
-        path=url,
-        abs_path_workspace_folder=files,
+        remote_location=url_parent,
+        remote_path=url,
+        download_location=files,
         username=host_username,
         download_limit=download_limit,
     )
+
 
     after = set(glob.glob(os.path.join(files, "*")))
     new_dirs = list(after - before)
