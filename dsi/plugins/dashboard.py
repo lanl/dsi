@@ -95,7 +95,7 @@ def du_depth1_with_total_bytes(path: str) -> Tuple[int | None, Dict[str, int]]:
             return None, {}
     
         # Getting top-level directories
-        out2, err2, rc2 = run_cmd(["du", "-b", "--max-depth=1", path], top_path=path)
+        out2, _, rc2 = run_cmd(["du", "-b", "--max-depth=1", path], top_path=path)
         if rc2 == 0 and out2:
             for line in out2.splitlines():
                 parts = line.split(maxsplit=1)
@@ -120,7 +120,7 @@ def du_depth1_with_total_bytes(path: str) -> Tuple[int | None, Dict[str, int]]:
         try:
             for p in base.iterdir():
                 if p.is_file():
-                    out3, err3, rc3 = run_cmd(["du", "-b", str(p)], top_path=path)
+                    out3, _, rc3 = run_cmd(["du", "-b", str(p)], top_path=path)
                     if rc3 == 0 and out3:
                         try:
                             size_b = int(out3.split()[0])
@@ -147,7 +147,7 @@ def du_depth1_with_total_bytes(path: str) -> Tuple[int | None, Dict[str, int]]:
         return None, {}
     
     # Getting top-level directories
-    out2, err2, rc2 = run_cmd(["du", "-k", "-d", "1", path], top_path=path)
+    out2, _, rc2 = run_cmd(["du", "-k", "-d", "1", path], top_path=path)
     if rc2 == 0 and out2:
         for line in out2.splitlines():
             parts = line.split(maxsplit=1)
@@ -172,7 +172,7 @@ def du_depth1_with_total_bytes(path: str) -> Tuple[int | None, Dict[str, int]]:
     try:
         for p in base.iterdir():
             if p.is_file():
-                out3, err3, rc3 = run_cmd(["du", "-k", str(p)], top_path=path)
+                out3, _, rc3 = run_cmd(["du", "-k", str(p)], top_path=path)
                 if rc3 == 0 and out3:
                     try:
                         size_kib = int(out3.split()[0])

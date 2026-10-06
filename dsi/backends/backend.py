@@ -19,14 +19,6 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_table_names(self,query):
-        pass
-
-    @abstractmethod
-    def notebook(self, **kwargs):
-        pass
-
-    @abstractmethod
     def process_artifacts(self, **kwargs):
         pass
 

@@ -1056,7 +1056,7 @@ class DublinCoreDatacard(FileReader):
             self.datacard_data["dublin_core_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
         else:
-            raise ValueError("Input for the DublinCoreDatacard reader must be an XML file, dictionary or pandas DataFrame")
+            raise TypeError("Input for the DublinCoreDatacard reader must be an XML file, dictionary or pandas DataFrame")
 
 
 class SchemaOrgDatacard(FileReader):
@@ -1114,7 +1114,7 @@ class SchemaOrgDatacard(FileReader):
             self.datacard_data["schema_org_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
         else:
-            raise ValueError("Input for the SchemaOrgDatacard reader must be an JSON file, dictionary or pandas DataFrame")
+            raise TypeError("Input for the SchemaOrgDatacard reader must be an JSON file, dictionary or pandas DataFrame")
 
 
 class GoogleDatacard(YAML):
@@ -1191,7 +1191,7 @@ class GoogleDatacard(YAML):
             self.datacard_data["google_datacard"] = temp_data
             self.set_schema_2(self.datacard_data)
         else:
-            raise ValueError("Input for the GoogleDatacard reader must be an YAML file, dictionary or pandas DataFrame")
+            raise TypeError("Input for the GoogleDatacard reader must be an YAML file, dictionary or pandas DataFrame")
 
 
 class GenesisDatacard(FileReader):
@@ -1269,8 +1269,7 @@ class GenesisDatacard(FileReader):
                 value_end = value_start + end_match.start() if end_match else len(text)
 
             value = text[value_start:value_end]
-            if value.startswith('\n'):
-                value = value[1:]
+            value = value.removeprefix('\n')
             value = value.rstrip()
             if not value.strip():
                 value = ''

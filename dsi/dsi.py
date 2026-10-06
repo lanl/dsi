@@ -1,7 +1,9 @@
 from dsi.core import Terminal #, Sync
 from dsi.backends.ndp import NDP
 from dsi.backends.osti import OSTI
+from dsi.backends.rcsbpdb import RCSBPDB
 from dsi.backends.oceans11 import Oceans11
+from dsi.backends.zenodo import Zenodo
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -16,11 +18,14 @@ from datetime import datetime
 import inspect
 
 import warnings
+
 warnings.filterwarnings("ignore", category=FutureWarning)
+from urllib3.exceptions import InsecureRequestWarning
+warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
-class DSI():
+class DSI:
     '''
     A user-facing interface for DSI's Core middleware.
 
@@ -42,14 +47,16 @@ class DSI():
                 - If backend_name = "DuckDB" → .duckdb, .db
                 - If backend_name = "NDP" → No filename input (read-only backend)
                 - If backend_name = "OSTI" → No filename input (read-only backend)
+                - If backend_name = "RCSBPDB" → No filename input (read-only backend)
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
+                - If backend_name = "Zenodo" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
-            Name of the backend to activate. 
-            
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI" or "Oceans11".
-            
-            If using an external backend, provide the relative path to the Python module with the backend. 
+            Name of the backend to activate.
+
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo" or "RCSBPDB".
+
+            If using an external backend, provide the relative path to the Python module with the backend.
         """
         self.t = Terminal(debug = 0, runTable=False)
         self.t.user_wrapper = True
@@ -121,35 +128,52 @@ class DSI():
             backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
             if backend_module is None:
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo")
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
             try:
-                self.read_only_flag = getattr(backend_class, "read_only")
+                self.read_only_flag = backend_class.read_only
             except AttributeError:
                 raise RuntimeError(f"'{backend_class.__name__}' is missing required class variable 'read_only'") from None
             
-            # Handle in-memory backends (NDP, OSTI, Oceans11)
+            # Handle in-memory backends (NDP, OSTI, Oceans11, RCSBPDB, Zenodo)
             if self.read_only_flag:
                 self.database_name = None
 
                 if backend_name.lower() == "ndp":
                     backend_name = "NDP"
-                    query_params = {}
-                    ndp_param_keys = ['keywords', 'organization', 'tags', 'formats', 'limit']
+                    query_params = kwargs.pop('params', None)
                     
-                    for key in ndp_param_keys:
-                        if key in kwargs:
-                            query_params[key] = kwargs.pop(key)  # Remove from kwargs after extraction
+                    # Validate params is a dict or list of dicts
+                    if isinstance(query_params, dict): # Single query
+                        pass
+                    elif isinstance(query_params, list): # Multiple queries - validate each is a dict
+                        if not all(isinstance(p, dict) for p in query_params):
+                            raise TypeError(
+                                "'params' list must contain only dictionaries.\n"
+                                "Example: params=[{'keywords': 'temperature'}, {'organization': 'NASA'}]"
+                            )
+                    else:
+                        raise TypeError(
+                            "'params' must be a dictionary or a list of dictionaries.\n"
+                            "Single query example: params={'keywords': 'temperature', 'limit': 5}\n"
+                            "Multiple queries example: params=[{'keywords': 'temp'}, {'organization': 'NASA'}]"
+                        )
                 elif backend_name.lower() == "osti":
                     backend_name = "OSTI"
                     query_params = kwargs.pop("params", {})
                 elif backend_name.lower() == "oceans11":
                     backend_name = "Oceans11"
                     query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "rcsbpdb":
+                    backend_name = "RCSBPDB"
+                    query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "zenodo":
+                    backend_name = "Zenodo"
+                    query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, and Oceans11")
+                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo and Oceans11")
                 
                 try:
                     # Pass query params as 'params' argument
@@ -172,7 +196,13 @@ class DSI():
                 if filename == ".temp_dsi.db" and os.path.exists(filename):
                     os.remove(filename)
 
-                if filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
+                if filename != ".temp_dsi.db" and os.path.exists(filename):
+                    backend_type = self.t.identify_backend(filename)
+                    if backend_type is not None:
+                        backend_name = backend_type
+                    else:
+                        raise RuntimeError(f"Cannot initialize DSI with the file: {filename}. It is not a valid DSI backend.")
+                elif filename != ".temp_dsi.db" and backend_name.lower() == "sqlite":
                     file_extension = filename.rsplit(".", 1)[-1] if '.' in filename else ''
                     if file_extension.lower() not in ["db", "sqlite", "sqlite3"]:
                         filename += ".db"
@@ -194,14 +224,16 @@ class DSI():
                     raise
         
         self.main_backend_obj = self.t.loaded_backends[0]
+        if backend_name.lower() == "duckdb":
+            backend_name = "DuckDB"
 
         if self.read_only_flag:
-            msg = f"Created an instance of DSI with the {backend_name} read-only backend"            
+            msg = f"Created an instance of DSI with the {backend_name} read-only backend"
         elif filename != ".temp_dsi.db":
             msg = f"Created an instance of DSI with the {backend_name} backend: {filename}"
         else:
             msg = "Created an instance of DSI"
-        
+        self.vcs = None
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
 
@@ -214,15 +246,21 @@ class DSI():
         print("Sqlite : Lightweight, file-based SQL backend. Default backend used by DSI API.")
         if importlib.util.find_spec("duckdb") is not None:
             print("DuckDB : In-process SQL backend optimized for fast analytics on large datasets.")
-        n = NDP()
+        n = NDP(only_validate=True)
         if n.validate_connection():
             print("NDP : Read-only data catalog backend for discovering and querying NDP (CKAN-based) open data resources.")
-        n = OSTI()
+        n = OSTI(only_validate=True)
         if n.validate_connection():
             print("OSTI : Read-only data catalog backend for discovering and querying OSTI (REST-based) open data resources.")
+        n = RCSBPDB(only_validate=True)
+        if n.validate_connection():
+            print("RCSBPDB : Read-only metadata backend for discovering and querying RCSBPDB/RCSB structure metadata.")
         n = Oceans11(only_validate=True)
         if n.validate_connection(only_validate=True):
             print("Oceans11 : Read-only data catalog backend for discovering and querying Oceans11 (DSI-based) open data resources.")
+        n = Zenodo(only_validate=True)
+        if n.validate_connection():
+            print("Zenodo : Read-only metadata backend for discovering and querying public Zenodo records.")
         print()
 
 
@@ -292,6 +330,7 @@ class DSI():
         print("TOML                 : Loads data from standard TOML files that can have one or multiple tables per file")
         print("TOML1                : Loads data from TOML files of a certain structure")
         print("JSON                 : Loads single-table data from JSON files")
+        print("VTK                  : Loads metadata from VTK/VTI/VTM files")
         print("Ensemble             : Loads a CSV file where each row is a simulation run; creates a simulation table")
         print("Cloverleaf           : Loads data from a directory with subfolders for each simulation run's input and output data")
         print("Bueno                : Loads performance data from Bueno (github.com/lanl/bueno) (.data text file format)")
@@ -320,6 +359,7 @@ class DSI():
                 - "TOML"                 → .toml
                 - "TOML1"                → .toml
                 - "JSON"                 → .json
+                - "VTK"                  → .vtk or .vti or .vtm
                 - "Ensemble"             → .csv
                 - "Cloverleaf"           → /path/to/data/directory/
                 - "Bueno"                → .data
@@ -341,7 +381,7 @@ class DSI():
 
             Required when using the `Collection` reader to load an dictionary or pandas DataFrame representing only one table.
             
-            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, or `Ensemble` reader.
+            Recommended when the input file contains a single table for the `CSV`, `Parquet`, `JSON`, `VTK`, or `Ensemble` reader.
         """
         if self.read_only_flag:
             backend_name = self.main_backend_obj.__class__.__name__
@@ -440,17 +480,22 @@ class DSI():
                     self.t.load_module('plugin', 'Ensemble', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "json":
                     self.t.load_module('plugin', 'JSON', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
+                elif reader_name.lower() == "vtk":
+                    self.t.load_module('plugin', 'VTK_Reader', 'reader', filenames=data_sources, table_name=table_name, **kwargs)
                 elif reader_name.lower() == "cloverleaf":
                     self.t.load_module('plugin', 'Cloverleaf', 'reader', folder_path=data_sources, **kwargs)
-                elif reader_name.lower() == "collection" and isinstance(data_sources, dict):
-                    self.t.load_module('plugin', 'Dictionary', 'reader', collection=data_sources, table_name=table_name, **kwargs)
-                    if isinstance(data_sources, OrderedDict):
-                        data_sources = "the Ordered Dict"
+                elif reader_name.lower() == "collection":
+                    if isinstance(data_sources, dict):
+                        self.t.load_module('plugin', 'Dictionary', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                        if isinstance(data_sources, OrderedDict):
+                            data_sources = "the Ordered Dict"
+                        else:
+                            data_sources = "the dictionary"
+                    elif isinstance(data_sources, pd.DataFrame):
+                        self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
+                        data_sources = "the pandas DataFrame"
                     else:
-                        data_sources = "the dictionary"
-                elif reader_name.lower() == "collection" and isinstance(data_sources, pd.DataFrame):
-                    self.t.load_module('plugin', 'Dataframe', 'reader', collection=data_sources, table_name=table_name, **kwargs)
-                    data_sources = "the pandas DataFrame"
+                        raise TypeError("Input object for the 'Collection' reader must be a dictionary or pandas DataFrame")
                 else:
                     raise RuntimeError("Please check your spelling of the 'reader_name' argument as it does not exist in DSI\n"
                                        "                            View eligible readers in the output of `list_readers()`")
@@ -551,7 +596,7 @@ class DSI():
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
             if update:
-                df.insert(0, "dsi_table_name", self.t.get_table_names(statement)[0])
+                df.insert(0, "dsi_table_name", df.attrs["table_name"])
                 msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
                 logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
             return df
@@ -665,7 +710,7 @@ class DSI():
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
         if not isinstance(query, str):
-            raise RuntimeError("find() ERROR: Input must be a string.")
+            raise TypeError("find() ERROR: Input must be a string.")
         operators = ['==', '!=', '>=', '<=', '=', '<', '>', '(', "~", "~~"]
         if not any(op in query for op in operators):
             raise RuntimeError("find() ERROR: Input must contain an operator. Format: [column] [operator] [value]")
@@ -697,7 +742,7 @@ class DSI():
                 ending_ind = warn_msg.find("in this database")
                 warn_msg = warn_msg[:40] + query + warn_msg[ending_ind-2:]
             print("\n"+warn_msg.replace("database", "backend"))
-            return
+            return None
 
         table_name = None
         output_df = None
@@ -711,10 +756,11 @@ class DSI():
 
         if not collection:
             print(f'\nTable: {table_name}')
-            self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
+            if output_df is not None:
+                self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
             print()
         else:
-            if update:
+            if update and output_df is not None:
                 output_df.insert(0, "dsi_row_index", row_list)
                 output_df.insert(0, "dsi_table_name", table_name)
                 first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
@@ -824,7 +870,7 @@ class DSI():
         logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
         if not isinstance(collection, pd.DataFrame):
-            raise RuntimeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
+            raise TypeError("ERROR: update() expects a single DataFrame from find(), search(), query(), or get_table()")
         elif 'dsi_table_name' not in collection.columns:
             raise RuntimeError("update() ERROR: The 'dsi_table_name' column was not found. Ensure you set 'update'=True in the function that returned this collection")
         elif 'dsi_table_name' in collection.columns:
@@ -1199,7 +1245,7 @@ class DSI():
 
 
 
-    def num_tables(self):
+    def num_tables(self, **kwargs):
         """
         Prints the number of tables in the active backend.
         """
@@ -1208,7 +1254,9 @@ class DSI():
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot call num_tables() on an empty backend. Please ensure there is data in it.")
         try:
-            self.t.num_tables()
+            count = self.t.num_tables(**kwargs)
+            if count is not None:
+                return count
         except Exception as e:
             if e.args:
                 e.args = (f'num_tables() ERROR: {str(e.args[0])}',) + e.args[1:]
@@ -1277,3 +1325,127 @@ class DSI():
 
     def fetch(self, fname):
         pass
+    def version(self, command: str, args: str = None):
+        """
+        Internal DSI Versioning.
+
+        `command` : str
+          -  init                            # initialize a versioning repository in a root folder
+          -  add                             # add file(s) to the staging area for the next commit
+          -  remove                          # remove file(s) from the staging area without touching the actual files
+          -  delete                          # delete file(s) from the staging area for the next commit
+          -  commit                          # commit a new version with the staged file(s) and an optional message describing the version
+          -  branch                          # create a new branch with an optional starting point (commit hash)
+          -  merge                           # merge a branch into the current branch with an optional target commit hash
+          -  list-branch                     # list all branches in the versioning repository
+          -  switch                          # switch to a different branch in the versioning repository
+          -  log                             # list versions
+          -  diff                            # diff between two versions. If no version is provided, diff the current version with the previous version
+          -  restore                         # restore a version with commit hash
+          -  clone                           # clone a remote versioning repository
+          -  status                          # Show current branch, commit, and staged files
+        `args` : str        
+          -  init: A required argument with the name of the root folder for the versioning repository.
+          -  add: A required argument with the file(s) to add to the staging area for the next commit, specified as a space-separated string or list of file paths.
+          -  remove: A required argument with the file(s) to remove from the staging area without touching the actual files, specified as a space-separated string or list of file paths.
+          -  delete: A required argument with the file(s) to delete from the staging area for the next commit, specified as a space-separated string or list of file paths.
+          -  commit: An optional message describing the version being committed, specified as a string.
+          -  branch: An optional argument to specify the name of the new branch, specified as a string.
+          -  merge: A required argument with the target branch name and an optional argument with the target commit hash, specified as two space separated strings.
+          -  list-branch: No additional arguments are required for this command.
+          -  switch: A required argument to specify the branch to switch to, specified as a string.
+          -  log: Two optional arguments, one to specify the branch name and the other to indicate the number of recent versions to display. If no argument is provided, recent 10 versions are displayed for the latest branch.
+          -  diff: An optional argument to specify the versions to compare, specified as a space-separated string or list of commit hashes.
+          -  restore: A required argument to specify the version to restore, specified by its commit hash.
+          -  clone: A required argument to specify the path of the remote repository to clone and an optional argument (default is current working directory) to specify the path where the repository will be cloned.
+          -  list-branch: No additional arguments are required for this command.
+        """
+        try:
+            from dsi.utils.version_control.dsi_vcs import Version
+        except Exception:
+            raise RuntimeError("You are trying to use DSI Versioning. Please run requirements.extras.txt")
+            
+        if command == "init":
+            if args is None:
+                raise RuntimeError("version() ERROR: 'init' command requires a 'root_folder' argument specifying the name of the root folder for the versioning repository.")
+            self.vcs = Version(args)
+        elif command == "add" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'add' command requires a 'files' argument specifying the file(s) to add to the staging area for the next commit.")
+            self.vcs.cmd_add(args.split())
+        elif command == "remove" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'remove' command requires a 'files' argument specifying the file(s) to remove from the staging area for the next commit.")
+            self.vcs.cmd_remove(args.split())
+        elif command == "delete" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'delete' command requires a 'files' argument specifying the file(s) to delete from the repository.")
+            self.vcs.cmd_delete(args.split())
+        elif command == "commit" and self.vcs is not None:
+            self.vcs.cmd_commit(args)
+        elif command == "branch" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'branch' command requires a 'branch_name' argument.")
+            arg_list = args.split(maxsplit=1)
+            branch_name = arg_list[0]
+            start_point = arg_list[1] if len(arg_list) > 1 else None
+            self.vcs.cmd_branch(branch_name, start_point)
+        elif command == "merge" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'merge' command requires a 'branch_name' argument.")
+            arg_list = args.split(maxsplit=1)
+            branch_name = arg_list[0]
+            target_commit = arg_list[1] if len(arg_list) > 1 else None
+            self.vcs.cmd_merge(branch_name, target_commit)
+        elif command == "list-branch" and self.vcs is not None:
+            self.vcs.cmd_list_branch()
+        elif command == "status" and self.vcs is not None:
+            self.vcs.cmd_status()
+        elif command == "switch" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'switch' command requires a 'branch_name' argument.")
+            self.vcs.cmd_switch(args)
+        elif command == "diff" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'diff' command requires zero, one, or two commit hashes as arguments.")
+            self.vcs.cmd_diff(c1, c2)
+        elif command == "log" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'log' command requires branch name and log history limit.")
+            self.vcs.cmd_log(c1, 10 if c2 is None else int(c2))
+        elif command == "restore" and self.vcs is not None:
+            if args is None:
+                raise RuntimeError("version() ERROR: 'restore' command requires a 'commit_hash' argument specifying the version to restore.")
+            self.vcs.cmd_restore(args)
+        elif command == "clone" and self.vcs is not None:
+            c1 = None
+            c2 = None
+            if args is not None:
+                arg_list = args.split()
+                if len(arg_list) == 1:
+                    c1 = arg_list[0]
+                elif len(arg_list) == 2:
+                    c1, c2 = arg_list
+                elif len(arg_list) > 2:
+                    raise RuntimeError("version() ERROR: 'clone' command requires source path and destination path.")
+            else:
+                raise RuntimeError("version() ERROR: 'clone' command requires 'source_path' argument specifying the path of the remote repository to clone and 'destination_path' argument specifying the path where the repository will be cloned.")
+            self.vcs.cmd_clone(c1, c2)
+        else:
+            raise RuntimeError("version() ERROR: Invalid command or versioning repository not initialized. Please check the command and ensure 'init' has been called with a root folder argument.")

@@ -25,7 +25,7 @@ from dsi.utils.acquisition.utils import (
     upsert_records,
 )
 
-class Sync():
+class Sync:
     """
     A class defined to assist in data management activities for DSI
 
@@ -125,10 +125,10 @@ class Sync():
                         return
                     
                     # update remote file paths to use new remote location
-                    filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, remote_loc, regex=False)
+                    filesystem_df["file_remote"] = filesystem_df["file_remote"].str.replace(fed_remote, self.remote_location, regex=False)
                     
                     # update remote location in federated table
-                    fed_table.at[fed_table.index[0], "remote_location"] = os.path.join(remote_loc, self.project_name) + os.sep
+                    fed_table.at[fed_table.index[0], "remote_location"] = self.remote_location
 
                     self.t.dsi_tables.remove("filesystem")
                     self.t.overwrite_table(["federated", "filesystem"], [fed_table, filesystem_df])
@@ -497,7 +497,7 @@ class Sync():
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # File movement
-            self.local_location = self.local_location[:-1] if self.local_location.endswith("/") else self.local_location
+            self.local_location = self.local_location.removesuffix("/")
             cmd = ["rsync", "-av", f"--rsync-path=mkdir -p {path_part} && rsync", self.local_location, self.remote_location]
             if self.verbose:
                 print(*cmd)
@@ -525,8 +525,6 @@ class Sync():
             print(" DSI Rsync database movement complete.")
         
         elif tool.lower() == "conduit":
-            import signal
-
             # Test Kerberos
             if self.verbose:
                 print( "Testing: klist")
@@ -536,14 +534,8 @@ class Sync():
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
 
-            # Test Conduit status
-            def alarm_handler(signum, frame):
-                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.")
-            signal.signal(signal.SIGALRM, alarm_handler)
-            signal.alarm(10)
-
             result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
-            if "conduit/conduit-x86_64 (L)" not in str(result.stderr):
+            if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
             try:
@@ -554,23 +546,18 @@ class Sync():
                         conduit_cmd = conduit_cmd[idx:idx+3]
                         break
             except Exception as e:
-                raise ValueError("Conduit not available in this environment: " + str(e))
+                raise RuntimeError("Conduit not available in this environment: " + str(e)) from None
+
+            if self.verbose:
+                print("Testing Conduit: conduit get")
+            cmd = [*conduit_cmd, "get"]
+            try:
+                result = subprocess.run(cmd, timeout=15)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("Conduit not authenticated. Please type 'conduit get' to issue a ticket.") from None
 
             try:
-                if self.verbose:
-                    print("Testing Conduit: conduit get")
-                cmd = conduit_cmd.append("get")
-                stdout = self.execute_cmd(cmd, "Testing conduit get")
-
-                if "TRANSFER_ID" in stdout and self.verbose:
-                    print(" Conduit is authenticated.")
-                elif "TRANSFER_ID" not in stdout:
-                    raise RuntimeError("Conduit Error: " + str(stdout))
-            finally:
-                signal.alarm(0)
-
-            try:
-                base_cmd = conduit_cmd.extend(['cp','-r'])
+                base_cmd = [*conduit_cmd, 'cp','-r']
                 # File Movement
                 if self.verbose:
                     print("conduit cp -r " + self.local_location + " " + self.remote_location)
@@ -631,7 +618,6 @@ class Sync():
                 raise RuntimeError(f"pfcp failed with error: {str(e)} ")
         
         elif tool.lower() == "ftp":
-            pass
             # delete temp columns from filesystem table -- do after data has been moved
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
@@ -639,7 +625,6 @@ class Sync():
             self.t.dsi_tables.append("filesystem")
 
         elif tool.lower() == "git":
-            pass
             # delete temp columns from filesystem table -- do after data has been moved
             filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
             self.t.dsi_tables.remove("filesystem")
@@ -847,7 +832,7 @@ class Sync():
                     self.t.artifact_handler(interaction_type='ingest')
 
 
-    def get_data(self, db_name: str, workspace_folder: str | None = None):
+    def get_data(self, db_name: str, workspace_folder: str | None = None, subset_remote_files: list | None = None):
         curr_tables = self.t.list(True)
         if "federation" not in curr_tables or self.t.get_table("federation").empty:
             raise RuntimeError("Must first download DSI databases with the get() function")
@@ -908,29 +893,51 @@ class Sync():
                 return False
 
         if is_url(remote_loc):
-            remote_files = t2.get_table("filesystem")["file_remote"]
+            remote_files = t2.get_table("filesystem")["file_remote"].tolist()
+            if subset_remote_files is not None:
+                select_files = list(set(remote_files) & set(subset_remote_files))
+                remote_files = select_files
+                if len(subset_remote_files) != len(select_files):
+                    missing_files = list(set(subset_remote_files) - set(select_files))
+                    print("WARNING: These remote files do not exist:", ", ".join(missing_files))
+            parent_url = os.path.commonprefix(remote_files)
             for remote_url in remote_files:
-                # Downloading each file from fileystem
-                _, download_folder = create_hashed_folder_from_path(remote_url, workspace_folder)
-                try:
-                    pull_data(db_data["location_type"], db_data["location"], remote_url,
-                                download_folder, username)
-                except Exception as e:
-                    print(f"Warning: Skipping data at {db_data['location']}:{remote_url} due to error: {e}")
-                new_folder = Path(download_folder)
+                # Downloading each file from filesystem
+                db_info, username = pull_data(location_type=db_data["location_type"], 
+                                              remote_location=db_data["location"], 
+                                              remote_path=remote_url, 
+                                              download_location=workspace_folder, 
+                                              username=username, 
+                                              parent_hash=parent_url)
+                new_folder = Path(db_info.pop("new_db_folder"))
                 if new_folder.is_dir() and not any(new_folder.iterdir()):
                     new_folder.rmdir()
         else:
-            # Currently pulling all referenced data -- eventually allow user to download certain data
-            _, download_folder = create_hashed_folder_from_path(remote_loc, workspace_folder)
-            try:
-                pull_data(db_data["location_type"], db_data["location"], remote_loc,
-                            download_folder, username)
-            except Exception as e:
-                print(f"Warning: Skipping data at {db_data['location']}:{remote_loc} due to error: {e}")
-            new_folder = Path(download_folder)
-            if new_folder.is_dir() and not any(new_folder.iterdir()):
-                new_folder.rmdir()
+            if subset_remote_files is not None:
+                remote_files = t2.get_table("filesystem")["file_remote"]
+                select_files = list(set(remote_files) & set(subset_remote_files))
+                if len(subset_remote_files) != len(select_files):
+                    missing_files = list(set(subset_remote_files) - set(select_files))
+                    print("WARNING: These remote files do not exist:", ", ".join(missing_files))
+                for remote_file in select_files:
+                    db_info, username = pull_data(location_type=db_data["location_type"], 
+                                                  remote_location=db_data["location"], 
+                                                  remote_path=remote_file, 
+                                                  download_location=workspace_folder, 
+                                                  username=username)
+                    new_folder = Path(db_info.pop("new_db_folder"))
+                    if new_folder.is_dir() and not any(new_folder.iterdir()):
+                        new_folder.rmdir()
+            else:
+                # Currently pulling all referenced data -- eventually allow user to download certain data
+                db_info, username = pull_data(location_type=db_data["location_type"], 
+                                              remote_location=db_data["location"], 
+                                              remote_path=remote_loc, 
+                                              download_location=workspace_folder, 
+                                              username=username)
+                new_folder = Path(db_info.pop("new_db_folder"))
+                if new_folder.is_dir() and not any(new_folder.iterdir()):
+                    new_folder.rmdir()
 
 
     def gen_uuid(self, st):
@@ -948,54 +955,56 @@ class Sync():
 
 
 
-class TarFile():
-  def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
-    self.tar_name = tar_name
-    self.local_tmp_dir = local_tmp_dir
-    self.local_files = local_files
-    self.create_tar(self.local_files)
+class TarFile:
+    def __init__(self, tar_name, local_files, local_tmp_dir = 'tmp'):
+        self.tar_name = tar_name
+        self.local_tmp_dir = local_tmp_dir
+        self.local_files = local_files
+        self.create_tar(self.local_files)
 
-  def create_tar(self, local_files=[]):
-    """
-    Creates a tar file and returns the index
+    def create_tar(self, local_files=[]):
+        """
+        Creates a tar file and returns the index
 
-    tar_name: name of the tar file to create with .tar.gz as the extension
-    local_files: a list of files with full paths to include
+        tar_name: name of the tar file to create with .tar.gz as the extension
+        local_files: a list of files with full paths to include
 
-    The tar file will be created in the local_tmp_dir directory
-    """
+        The tar file will be created in the local_tmp_dir directory
+        """
 
-    if not os.path.exists(self.local_tmp_dir):
-        try:
-            os.mkdir(self.local_tmp_dir)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
+        if not os.path.exists(self.local_tmp_dir):
+            try:
+                os.mkdir(self.local_tmp_dir)
+            except Exception as err:
+                print(f"Unexpected {err=}, {type(err)=}")
 
-    self.tar_path = self.local_tmp_dir + "/" + self.tar_name
-    tar = tarfile.open(self.tar_path, "w:gz")
-    for f in local_files:
-        tar.add(f)
-    tar.close()
+        self.tar_path = self.local_tmp_dir + "/" + self.tar_name
+        tar = tarfile.open(self.tar_path, "w:gz")
+        for f in local_files:
+            tar.add(f)
+        tar.close()
 
-    # Create an index. Taken from: https://stackoverflow.com/questions/2018512/reading-tar-file-contents-without-untarring-it-in-python-script
-    tar = tarfile.open(self.tar_path)
-    index = {i.name: i for i in tar.getmembers()}
-    self.tar_index = ""
-    for file_name in index.keys():
-      self.tar_index += "%s : %d\n" % (file_name, index[file_name].size)
+        # Create an index. Taken from: https://stackoverflow.com/questions/2018512/reading-tar-file-contents-without-untarring-it-in-python-script
+        tar = tarfile.open(self.tar_path)
+        index = {i.name: i for i in tar.getmembers()}
+        self.tar_index = ""
+        for file_name, file_data in index.items():
+            self.tar_index += "%s : %d\n" % (file_name, file_data.size)
 
-    return True
+        return True
 
-  def get_index(self):
-    return self.tar_index
+    def get_index(self):
+        return self.tar_index
 
-  def get_full_path(self):
-      return self.tar_path
+    def get_full_path(self):
+        return self.tar_path
 
-  def get_name(self):
-      return self.tar_name
+    def get_name(self):
+        return self.tar_name
 
-class HPSSSync():
+
+
+class HPSSSync:
     """
     A class defined to assist in HPSS data management activities for DSI
 

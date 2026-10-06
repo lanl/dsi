@@ -52,7 +52,7 @@ class GAN:
 
             try:
                 if not isinstance(image_col, str):
-                    raise ValueError("Image Column input must be a string")
+                    raise TypeError("Image Column input must be a string")
                 
                 all_paths = store.query(f"SELECT {image_col} FROM {dbName}", True)
 
@@ -355,7 +355,7 @@ class GAN:
         x_labels = [f'Image {i}' for i in range(num_images)]
         x = np.arange(num_images)
 
-        fig, axes = plt.subplots(len(metrics), 1, figsize=(12, 8), squeeze=False)
+        _, axes = plt.subplots(len(metrics), 1, figsize=(12, 8), squeeze=False)
         axes = axes.flatten()
         for ax, y_values, title in zip(axes, metrics, titles):
             ax.scatter(x, y_values, marker="o")

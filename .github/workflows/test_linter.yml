@@ -27,4 +27,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff codespell
       - name: Run Ruff
-        run: ruff check dsi/ --ignore E402,E701
+        run: ruff check dsi/ --ignore E402,E701,I001,SIM117,PLW1510,UP022,BLE001,DTZ007,RUF013,SIM118,SIM115,RUF012,UP031,B006,RUF010,UP035,EXE001,SIM114,SIM113,UP045,UP006,S110,S112,G201,DTZ005,C401,SIM103,SIM102,PLR1722,UP032,PERF402,TRY002

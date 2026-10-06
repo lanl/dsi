@@ -50,7 +50,7 @@ class HPSS(Backend):
             os.chdir(new_dir)
             file_to_put = local_file.split('/')[-1]
 
-        stdout, stderr, returncode = self.run_hsi("put", [file_to_put])
+        _, _, returncode = self.run_hsi("put", [file_to_put])
         if new_dir is not None:
             os.chdir(cwd)
 
@@ -71,7 +71,7 @@ class HPSS(Backend):
             print("Error changing to temp dir: %s" % tmp_dir)
             return False
 
-        stdout, stderr, returncode = self.run_hsi("get", hpss_file)
+        _, _, returncode = self.run_hsi("get", hpss_file)
         try:
             os.chdir(cwd)
         except Exception:

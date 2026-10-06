@@ -77,7 +77,6 @@ class DSI_cli:
     def __init__(self):
         self.name = None
         self.start_dir = os.getcwd() + "/"
-        return
 
 
     def viewers_check(self):
@@ -165,11 +164,7 @@ class DSI_cli:
                         "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
-            'federate' : ("<config file> [-w workspace_folder]", 
-                          "Collects databases from sources in a YAML file, or source in a CSV file, saving it to an optional workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
-            'get_data' : ("<database_name> [-w workspace_folder]", 
-                          "Collects referenced data in a DSI database, saving it to an optional workspace folder"),
             'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
             'ls' : ("", "Lists all files in the current or specified directory."),
@@ -347,39 +342,6 @@ class DSI_cli:
         parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded sources')
         return parser
 
-
-    def federate(self, args):
-        """
-        Federate data from multiple sources using either:
-        - a YAML config file, or
-        - a CSV source file
-
-        Usage:
-        federate input.yaml [-w workspace_folder]
-        federate sources.csv [-w workspace_folder]
-        """
-        config_file = args.config_file
-
-        workspace_folder = None
-        if args.workspace_folder is not None and args.workspace_folder != "":
-            workspace_folder = args.workspace_folder
-
-        # small provision if no data in db:
-        if not self.t.valid_backend(self.t.loaded_backends[0]):
-            fnull = open(os.devnull, 'w')
-            with redirect_stdout(fnull):
-                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
-                self.t.artifact_handler(interaction_type='ingest')
-
-        try:
-            s = Sync(self.db_path)
-            s.user_wrapper = True
-            print(f"Synchronizing data from {config_file} into {workspace_folder}")
-            s.get(config_file=config_file, workspace_folder=workspace_folder)
-
-        except Exception as e:
-            print(f"federate ERROR: {str(e)}")
-            return
         
 
     def find(self, args):

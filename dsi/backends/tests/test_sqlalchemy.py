@@ -184,7 +184,7 @@ def test_jsondata_artifact_ingest():
     try:
         j = open(jsonpath)
         data = json.load(j)
-    except IOError as i:
+    except OSError as i:
         print(i)
         return
     except ValueError as v:
