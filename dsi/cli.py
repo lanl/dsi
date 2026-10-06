@@ -10,13 +10,19 @@ import textwrap
 from contextlib import redirect_stdout
 import sys
 import io
+import json
+import asyncio
 import subprocess
 import importlib.util
 import getpass
 import socket
+from pathlib import Path
+from datetime import datetime
 
 from dsi.core import Terminal
 from dsi.sync import Sync
+from dsi.utils.data_acquisition import discover_endpoints_async, download_csv_files_async, pull_data
+from dsi.utils.acquisition.utils import create_directory, combine_csv, create_hashed_folder_from_path, split_path, upsert_records
 
 from ._version import __version__
 
@@ -154,6 +160,7 @@ class DSI_cli:
 
     def help_fn(self, args):
         commands = {
+            'cd' : ("<path>", "Changes the working directory within the CLI environment."),
             'display' :("<table name> [-n num_rows] [-e filename]",
                         "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
@@ -165,9 +172,16 @@ class DSI_cli:
                           "Collects referenced data in a DSI database, saving it to an optional workspace folder"),
             'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
+            'ls' : ("", "Lists all files in the current or specified directory."),
+            'ls_endpoints' : ("<hpc_name> ... --script_path <path>",
+                              "Discovers remote DSI endpoints on one or more HPC systems and saves them to a session file."),
+            'ls_databases' : ("[--session session_file]",
+                              "Pulls the source catalogs from endpoints discovered by ls_endpoints and lists the databases found."),
+            'pull_data' : ("<location_type> <remote_location> <remote_path> [-d download_location]",
+                                      "Directly calls DSI's pull_data() to download a single file from a source. Enter 'pull_data -h' to learn the inputs."),
+            'pull_db' : ("<database_name> ... | --all [-w workspace_folder]",
+                        "Downloads one or more databases listed by ls_databases to a workspace folder."),
             'plot_table' : ("<table name> [-f filename]", "Plots numerical data from a table to an optional file name argument"),
-            #'pull_data' : ("<source_type> <source> <path>", 
-            #              "Pulls data from a source to the current directory. Enter 'pull_data -h' to learn the inputs"),
             'query' : ("<SQL query> [-n num_rows] [-e filename]",
                        "Executes a SQL query (in quotes). Optionally limit printed rows or export to CSV/Parquet"),
             'read' : ("<data source> [-t table_name]", "Reads a file or URL into the DSI database. Optionally set table name."),
@@ -176,8 +190,6 @@ class DSI_cli:
             'viewers' : ("", "Prints the available viewers for the user."),
             'view' : ("<available viewer>", "Creates an instance of the DSI viewer in another application."),
             'write' : ("<filename>", "Writes data in DSI database to a permanent location."),
-            'ls' : ("", "Lists all files in the current or specified directory."),
-            'cd' : ("<path>", "Changes the working directory within the CLI environment.")
         }
         if self.viewers_check()[0] is None:
             del commands["view"]
@@ -463,6 +475,400 @@ class DSI_cli:
         except Exception as e:
             print(f"get_data ERROR: {e}")
             return
+
+
+    def get_ls_endpoints_parser(self):
+        parser = argparse.ArgumentParser(prog='ls_endpoints')
+        parser.add_argument('hpc_names', nargs='+', help='One or more HPC hostnames to discover endpoints on')
+        parser.add_argument('--script_path', required=True, help='Path to load_dsi_endpoints.sh on the remote host')
+        parser.add_argument('--prefix', dest='prefixes', action='append',
+                             help='Endpoint env var prefix to look for (repeatable). Default: DSI_ENDPOINT_, DIANA_ENDPOINT_')
+        parser.add_argument('--username', type=str, required=False, default="", help='Username on the HPC system(s)')
+        parser.add_argument('--kerberos', action='store_true', help='Use Kerberos authentication via a jump host')
+        parser.add_argument('--jump_host', type=str, required=False, help='Jump host hostname (required with --kerberos)')
+        parser.add_argument('--jump_username', type=str, required=False, help='Username on the jump host')
+        parser.add_argument('--reticket_cmd', type=str, required=False, default='reticket',
+                             help='Kerberos ticket-init command to run on the jump host (default: reticket)')
+        parser.add_argument('--session', type=str, required=False, default="",
+                             help='Session file to write discovered endpoints to (default: .dsi_endpoints_<timestamp>.json)')
+        return parser
+
+
+    def ls_endpoints(self, args):
+        '''
+        Discovers DSI endpoints on one or more remote HPC systems and saves them to a session file
+        for use by ls_databases.
+        '''
+        if args.kerberos and not args.jump_host:
+            print("ls_endpoints ERROR: --jump_host is required when using --kerberos")
+            return
+
+        username = args.username
+        if not username:
+            username = input("Enter the username for the HPC system(s): ")
+
+        password = getpass.getpass("Password (leave blank to use SSH keys): ")
+        password = password if password else None
+
+        jump_username = args.jump_username
+        jump_password = None
+        if args.kerberos:
+            if not jump_username:
+                jump_username = input(f"Enter the username for jump host {args.jump_host}: ")
+            jump_password = getpass.getpass(f"Password for jump host {args.jump_host}: ")
+            jump_password = jump_password if jump_password else None
+
+        prefixes = args.prefixes if args.prefixes else ['DSI_ENDPOINT_', 'DIANA_ENDPOINT_']
+        hpc_type = 'kerberos' if args.kerberos else 'standard'
+
+        all_endpoints = {}
+        jump_host_required = {}
+        failed = []
+
+        for hpc_name in args.hpc_names:
+            print(f"Discovering endpoints on {hpc_name}...")
+            try:
+                endpoints = asyncio.run(discover_endpoints_async(
+                    hostname=hpc_name,
+                    username=username,
+                    script_path=args.script_path,
+                    prefixes=prefixes,
+                    password=password,
+                    hpc_type=hpc_type,
+                    jump_host=args.jump_host,
+                    jump_username=jump_username,
+                    jump_password=jump_password,
+                    reticket_cmd=args.reticket_cmd
+                ))
+            except Exception as e:
+                print(f"ls_endpoints ERROR: Failed to discover endpoints on {hpc_name}: {e}")
+                failed.append(hpc_name)
+                continue
+
+            if not endpoints:
+                print(f"  No endpoints found on {hpc_name}")
+                failed.append(hpc_name)
+                continue
+
+            for endpoint_name, endpoint_path in endpoints.items():
+                all_endpoints[f"{hpc_name}::{endpoint_name}"] = endpoint_path
+            if args.kerberos:
+                jump_host_required[hpc_name] = True
+            print(f"  Found {len(endpoints)} endpoint(s) on {hpc_name}")
+
+        if not all_endpoints:
+            print(f"\nNo endpoints found on any host. Failed: {', '.join(failed)}\n")
+            return
+
+        session_file = args.session
+        if not session_file:
+            session_file = f".dsi_endpoints_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+
+        session_data = {
+            'endpoints': all_endpoints,
+            'username': username,
+            'hpc_type': hpc_type,
+            'jump_host': args.jump_host,
+            'jump_username': jump_username,
+            'jump_host_required': jump_host_required,
+            'reticket_cmd': args.reticket_cmd,
+        }
+        with open(session_file, 'w') as f:
+            json.dump(session_data, f, indent=2)
+
+        print(f"\nDiscovered {len(all_endpoints)} endpoint(s):")
+        for name, path in all_endpoints.items():
+            print(f"  {name}: {path}")
+        print(f"\nSaved session to {session_file}")
+        print(f"Run 'ls_databases --session {session_file}' to see available databases.\n")
+
+
+    def get_ls_databases_parser(self):
+        parser = argparse.ArgumentParser(prog='ls_databases')
+        parser.add_argument('--session', type=str, required=False, default="",
+                             help='Session file produced by ls_endpoints (default: most recently modified .dsi_endpoints_*.json)')
+        return parser
+
+
+    def ls_databases(self, args):
+        '''
+        Pulls the source catalog (CSV) from each endpoint discovered by ls_endpoints,
+        and lists the databases they reference.
+        '''
+        session_file = args.session
+        if not session_file:
+            candidates = sorted(glob.glob(".dsi_endpoints_*.json"), key=os.path.getmtime, reverse=True)
+            if not candidates:
+                print("ls_databases ERROR: No endpoint session found. Run 'ls_endpoints' first.")
+                return
+            session_file = candidates[0]
+
+        if not os.path.exists(session_file):
+            print(f"ls_databases ERROR: Session file not found: {session_file}")
+            return
+
+        with open(session_file, 'r') as f:
+            session_data = json.load(f)
+
+        endpoints = session_data.get('endpoints', {})
+        if not endpoints:
+            print("ls_databases ERROR: No endpoints in session file.")
+            return
+
+        username = session_data.get('username', '')
+        jump_host = session_data.get('jump_host')
+        jump_username = session_data.get('jump_username')
+        reticket_cmd = session_data.get('reticket_cmd', 'reticket')
+        jump_host_required_map = session_data.get('jump_host_required', {})
+
+        password = getpass.getpass(f"Password for {username} (leave blank to use SSH keys): ")
+        password = password if password else None
+
+        jump_password = None
+        if jump_host:
+            jump_password = getpass.getpass(f"Password for jump host {jump_host}: ")
+            jump_password = jump_password if jump_password else None
+
+        # Group endpoints by cluster
+        cluster_endpoints = {}
+        for endpoint_name, endpoint_path in endpoints.items():
+            cluster_name, original_endpoint = endpoint_name.split('::', 1)
+            cluster_endpoints.setdefault(cluster_name, {})[original_endpoint] = endpoint_path
+
+        temp_dir = f".ls_databases_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        create_directory(dir_name=temp_dir, delete_if_exists=True)
+
+        all_databases = []
+        try:
+            for cluster_name, csv_paths in cluster_endpoints.items():
+                print(f"Pulling catalog from {cluster_name}...")
+                jump_required = jump_host_required_map.get(cluster_name, False)
+                try:
+                    downloaded_files = asyncio.run(download_csv_files_async(
+                        hostname=cluster_name,
+                        csv_paths=csv_paths,
+                        temp_folder=temp_dir,
+                        username=username,
+                        password=password,
+                        jump_host=jump_host,
+                        jump_username=jump_username,
+                        jump_password=jump_password,
+                        jump_host_required=jump_required,
+                        reticket_cmd=reticket_cmd
+                    ))
+                except Exception as e:
+                    print(f"  ls_databases ERROR: Failed to pull catalog from {cluster_name}: {e}")
+                    continue
+
+                if not downloaded_files:
+                    print(f"  No catalog files downloaded from {cluster_name}")
+                    continue
+
+                output_csv = str(Path(temp_dir) / f"output_{cluster_name}.csv")
+                try:
+                    rows = combine_csv(temp_dir, output_csv)
+                except Exception as e:
+                    print(f"  ls_databases ERROR: Failed to parse catalog from {cluster_name}: {e}")
+                    continue
+
+                for row in rows:
+                    row['cluster'] = cluster_name
+                all_databases.extend(rows)
+
+            if not all_databases:
+                print("\nNo databases found.\n")
+                return
+
+            databases_session_file = f".dsi_databases_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            with open(databases_session_file, 'w') as f:
+                json.dump(all_databases, f, indent=2)
+
+            headers = ['cluster', 'location_type', 'location', 'path', 'type', 'submitter_name']
+            rows = [[db.get(h, '') for h in headers] for db in all_databases]
+            self.t.table_print_helper(headers, rows, len(rows))
+
+            print(f"\nFound {len(all_databases)} database(s) across {len(cluster_endpoints)} cluster(s).")
+            print(f"Saved to {databases_session_file}")
+            print(f"Run 'pull_db' to download one or more of these databases.\n")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+    def get_pull_db_parser(self):
+        parser = argparse.ArgumentParser(prog='pull_db')
+        parser.add_argument('database_name', nargs='*',
+                             help='Name(s) of database file(s) to download, as listed by ls_databases. Omit with --all to download every database.')
+        parser.add_argument('--all', action='store_true', help='Download every database listed in the session')
+        parser.add_argument('--session', type=str, required=False, default="",
+                             help='Databases session file produced by ls_databases (default: most recently modified .dsi_databases_*.json)')
+        parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="",
+                             help='Folder to store downloaded databases (default: current directory)')
+        return parser
+
+
+    def pull_db(self, args):
+        '''
+        Downloads one or more databases listed by ls_databases to a workspace folder.
+        '''
+        if not args.database_name and not args.all:
+            print("pull_db ERROR: Specify one or more database names, or use --all.")
+            return
+
+        session_file = args.session
+        if not session_file:
+            candidates = sorted(glob.glob(".dsi_databases_*.json"), key=os.path.getmtime, reverse=True)
+            if not candidates:
+                print("pull_db ERROR: No databases session found. Run 'ls_databases' first.")
+                return
+            session_file = candidates[0]
+
+        if not os.path.exists(session_file):
+            print(f"pull_db ERROR: Session file not found: {session_file}")
+            return
+
+        with open(session_file, 'r') as f:
+            all_databases = json.load(f)
+
+        if not all_databases:
+            print("pull_db ERROR: No databases in session file.")
+            return
+
+        if args.all:
+            selected = all_databases
+        else:
+            by_name = {}
+            for db in all_databases:
+                by_name.setdefault(os.path.basename(db.get('path', '')), []).append(db)
+
+            selected = []
+            for name in args.database_name:
+                matches = by_name.get(name)
+                if not matches:
+                    print(f"pull_db ERROR: No database named '{name}' found in {session_file}. Run 'ls_databases' to see available databases.")
+                    return
+                selected.extend(matches)
+
+        workspace_folder = args.workspace_folder if args.workspace_folder else os.getcwd()
+        workspace_path = str(Path(workspace_folder).resolve())
+        create_directory(dir_name=workspace_path)
+
+        # Cache HPC usernames/passwords per-location so multi-database pulls only prompt once per location
+        creds_by_location = {}
+        success_count = 0
+
+        for db in selected:
+            location_type = db.get('location_type', '').strip().lower()
+            location = db.get('location')
+            remote_path = db.get('path')
+            cluster = db.get('cluster', location)
+
+            print(f"\nDownloading {location}:{remote_path}")
+
+            username = ""
+            password = None
+            if location_type == 'hpc':
+                if location not in creds_by_location:
+                    entered_username = input(f"Enter the username for {location}: ")
+                    entered_password = getpass.getpass(f"Password for {entered_username}@{location} (leave blank to use SSH keys): ")
+                    creds_by_location[location] = (entered_username, entered_password if entered_password else None)
+                username, password = creds_by_location[location]
+
+            try:
+                folder_hash, download_folder = create_hashed_folder_from_path(remote_path, workspace_path)
+                downloaded_file_path = pull_data(
+                    location_type=location_type,
+                    remote_location=location,
+                    remote_path=remote_path,
+                    download_location=download_folder,
+                    username=username,
+                    password=password
+                )
+            except Exception as e:
+                print(f"  pull_db ERROR: Failed to download {location}:{remote_path}: {e}")
+                continue
+
+            if not downloaded_file_path:
+                print(f"  pull_db ERROR: Download failed for {location}:{remote_path}")
+                continue
+
+            local_folder, local_filename = split_path(downloaded_file_path)
+            db_info = {
+                "original_location_type": location_type,
+                "original_location": location,
+                "original_path": remote_path,
+                "folder_hash": folder_hash,
+                "local_path": local_folder,
+                "name": local_filename,
+                "source_cluster": cluster,
+            }
+            upsert_records(f"{workspace_path}/dsi_database_list.json", [db_info], key="original_path")
+
+            print(f"  Downloaded to {downloaded_file_path}")
+            success_count += 1
+
+        print(f"\nDownloaded {success_count} of {len(selected)} database(s) to {workspace_path}.")
+        print(f"Use 'read {workspace_path}/dsi_database_list.json' or 'federate' to load them into DSI.\n")
+
+
+    def get_pull_data_parser(self):
+        parser = argparse.ArgumentParser(prog='pull_data')
+        parser.add_argument('location_type', help='Type of the source location (e.g. "hpc", "url", "github", "s3", "local")')
+        parser.add_argument('remote_location', help='Location of the data (e.g. hostname for HPC, URL for web, bucket for S3)')
+        parser.add_argument('remote_path', help='Path to the data at the remote location')
+        parser.add_argument('-d', '--download_location', type=str, required=False, default="",
+                             help='Folder to download the file to (default: current directory)')
+        parser.add_argument('-u', '--username', type=str, required=False, default="", help='Username, for HPC access')
+        parser.add_argument('--download_limit', type=int, required=False, default=10485760,
+                             help='Max file size in bytes to download without confirmation; 0 for no limit (default: 10485760)')
+        parser.add_argument('--jump_host', type=str, required=False, help='Jump host hostname, for Kerberos authentication')
+        parser.add_argument('--jump_username', type=str, required=False, help='Username on the jump host')
+        parser.add_argument('--jump_host_required', action='store_true', help='Whether the jump host is required to reach remote_location')
+        parser.add_argument('--reticket_cmd', type=str, required=False, default='reticket',
+                             help='Kerberos ticket-init command to run on the jump host (default: reticket)')
+        return parser
+
+
+    def pull_data_fn(self, args):
+        '''
+        Thin wrapper around dsi.utils.data_acquisition.pull_data: downloads a single file
+        from a source (hpc, url, github, s3, local) using the given arguments directly.
+        '''
+        download_location = args.download_location if args.download_location else os.getcwd()
+        create_directory(dir_name=download_location)
+
+        password = None
+        if args.location_type.strip().lower() == 'hpc':
+            password = getpass.getpass(f"Password for {args.username or 'user'}@{args.remote_location} (leave blank to use SSH keys): ")
+            password = password if password else None
+
+        jump_password = None
+        if args.jump_host:
+            jump_password = getpass.getpass(f"Password for jump host {args.jump_host}: ")
+            jump_password = jump_password if jump_password else None
+
+        try:
+            downloaded_file_path = pull_data(
+                location_type=args.location_type,
+                remote_location=args.remote_location,
+                remote_path=args.remote_path,
+                download_location=download_location,
+                username=args.username,
+                password=password,
+                download_limit=args.download_limit,
+                jump_host=args.jump_host,
+                jump_username=args.jump_username,
+                jump_password=jump_password,
+                jump_host_required=args.jump_host_required,
+                reticket_cmd=args.reticket_cmd
+            )
+        except Exception as e:
+            print(f"pull_data ERROR: {e}")
+            return
+
+        if downloaded_file_path:
+            print(f"\nDownloaded to {downloaded_file_path}\n")
+        else:
+            print("\npull_data ERROR: Download failed.\n")
 
 
     def list_tables(self, args):
@@ -917,6 +1323,10 @@ COMMANDS = {
     'get_data' : (cli.get_data_parser, cli.get_data),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
+    'ls_endpoints' : (cli.get_ls_endpoints_parser, cli.ls_endpoints),
+    'ls_databases' : (cli.get_ls_databases_parser, cli.ls_databases),
+    'pull_db' : (cli.get_pull_db_parser, cli.pull_db),
+    'pull_data' : (cli.get_pull_data_parser, cli.pull_data_fn),
     'plot_table' : (cli.get_plot_table_parser, cli.plot_table),
     'query' : (cli.get_query_parser, cli.query),
     'read' : (cli.get_read_parser, cli.read),
