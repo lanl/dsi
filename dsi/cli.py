@@ -16,6 +16,7 @@ import subprocess
 import importlib.util
 import getpass
 import socket
+import yaml
 from pathlib import Path
 from datetime import datetime
 
@@ -1280,9 +1281,7 @@ COMMANDS = {
     'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
-    'federate' : (cli.get_federate_parser, cli.federate),
     'find' : (None, cli.find),
-    'get_data' : (cli.get_data_parser, cli.get_data),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
     'ls_endpoints' : (cli.get_ls_endpoints_parser, cli.ls_endpoints),
