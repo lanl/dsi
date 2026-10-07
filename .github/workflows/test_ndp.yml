@@ -31,6 +31,6 @@ jobs:
     - name: Test NDP Backend
       run: |
         pip install pytest
-        pytest dsi/backends/tests/test_ndp.py -v --tb=short
+        pytest dsi/backends/tests/test_ndp.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO
       env:
         PYTHONUNBUFFERED: 1
