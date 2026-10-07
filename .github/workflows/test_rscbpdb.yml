@@ -31,6 +31,6 @@ jobs:
 
       - name: Test RCSBPDB Backend
         run: |
-          pytest dsi/backends/tests/test_rcsbpdb.py -v --tb=short
+          pytest dsi/backends/tests/test_rcsbpdb.py -vv -s --maxfail=1 --full-trace --log-cli-level=INFO
         env:
           PYTHONUNBUFFERED: 1

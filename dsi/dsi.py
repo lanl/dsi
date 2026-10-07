@@ -127,6 +127,8 @@ class DSI:
         else:
             backend_module = self.t.module_collection['backend'].get(f"dsi.backends.{backend_name.lower()}")
             if backend_module is None:
+                if backend_name.lower() == "duckdb":
+                    raise RuntimeError("To use the DuckDB backend, download the DuckDB package with 'pip install duckdb'")
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
                                     "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo")
             
