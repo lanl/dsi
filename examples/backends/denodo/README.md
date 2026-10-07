@@ -42,7 +42,7 @@ No other endpoint is called: one search is one POST, plus one page of POSTs for 
 ## Configuration
 
 Nothing site-specific is stored in this repository. Every setting resolves as
-**argument → environment variable → `~/.denodo/config.json`**.
+**argument → environment variable → config file**.
 
 | Setting | Environment variable | Config-file key |
 |---|---|---|
@@ -50,20 +50,64 @@ Nothing site-specific is stored in this repository. Every setting resolves as
 | authorize URL | `AUTH_URL` | `auth_url` |
 | token URL | `TOKEN_URL` | `token_url` |
 | client id | `AUTH_FLOW_CLIENT_ID` | `client_id` |
-| client secret | `AUTH_FLOW_CLIENT_SECRET` | `client_secret` |
 | redirect URI | `REDIRECT_URI` | `redirect_uri` |
 | scope | `SCOPE` | `scope` |
+| client secret | `AUTH_FLOW_CLIENT_SECRET` | — *(see below)* |
 
-Request the OAuth client settings from your Data Catalog administrator, then either set them as environment variables or store them once:
+Request these from your Data Catalog administrator.
+
+### Where the config file lives
+
+The file defaults to `~/.denodo/config.json`, but the path is a parameter, so
+it can sit beside the code that uses it:
+
+```python
+from pathlib import Path
+from dsi.dsi import DSI
+
+CONFIG = Path(__file__).with_name("denodo_config.json")
+
+dsi = DSI(backend_name="Denodo", config=CONFIG, params={"views": True})
+```
+
+Use `Path(__file__).with_name(...)` rather than a bare filename: a relative
+path resolves against the working directory, not the script's folder, so a
+bare name breaks as soon as the script is run from somewhere else.
+
+`denodo_config.example.json` in this directory shows the expected shape. Copy
+it, fill in your site's values, and keep your copy out of version control —
+`.gitignore` already excludes `denodo_config.json`.
+
+A path that does not exist raises `Config file not found`, so a typo is
+reported as a typo rather than surfacing later as missing OAuth configuration.
+A missing *default* file is tolerated, since the settings may all be in the
+environment.
+
+### The client secret
+
+**`client_secret` belongs in the environment, not in the config file.** A
+config file is meant to be copied, shared, and in some deployments committed,
+and git history would make a committed secret effectively permanent.
+
+The client id is different. OAuth sends it in the clear as a query parameter
+in the browser's authorize URL, so it already appears in the address bar and
+in any proxy log; there is nothing to protect. The client secret never leaves
+the server-to-server token exchange, and it is the one value worth keeping out
+of a file.
+
+To store the six non-secret settings once:
 
 ```python
 from dsi.backends.denodo import save_config
 
 save_config(base_url="https://<data-catalog-host>",
-            client_id="...", client_secret="...",
+            client_id="...",
             auth_url="...", token_url="...",
             redirect_uri="...", scope="...")
 ```
+
+`save_config` accepts `path=` to write somewhere other than
+`~/.denodo/config.json`.
 
 Check that a machine is ready:
 
