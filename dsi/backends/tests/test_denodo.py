@@ -444,7 +444,8 @@ def test_probe_without_configuration(monkeypatch):
 
     monkeypatch.setattr(Denodo, "validate_connection", REAL_VALIDATE)
     monkeypatch.delenv("DENODO_BASE_URL", raising=False)
-    monkeypatch.setattr(denodo_module, "_load_config", lambda: {})
+    monkeypatch.setattr(denodo_module, "_load_config", lambda path=None: {})
+
 
     probe = Denodo(only_validate=True)
 
@@ -826,6 +827,59 @@ def test_retired_params_raise_with_a_pointer(params):
         make_backend(**params)
 
 
+# =============================================================================
+# 10) Configuration file resolution
+# =============================================================================
+# The config file path is a parameter, not a fixed location: the real settings
+# live in an internal repository while the open repository ships a dummy file
+# carrying the same keys. These tests pin that behaviour down.
+
+
+def test_load_config_reads_an_explicit_path(tmp_path):
+    """A config file outside the home directory is read when passed."""
+    import dsi.backends.denodo as denodo_module
+
+    path = tmp_path / "settings.json"
+    path.write_text('{"base_url": "https://example.org"}', encoding="utf-8")
+
+    assert denodo_module._load_config(path)["base_url"] == "https://example.org"
+
+
+def test_load_config_missing_explicit_path_raises(tmp_path):
+    """A mistyped path fails loudly rather than resolving to nothing.
+
+    Returning {} would surface later as "missing OAuth configuration", which
+    sends the reader looking in the wrong place entirely.
+    """
+    import dsi.backends.denodo as denodo_module
+
+    with pytest.raises(ValueError, match="not found"):
+        denodo_module._load_config(tmp_path / "no-such-file.json")
+
+
+def test_load_config_missing_default_returns_empty(monkeypatch, tmp_path):
+    """A missing default file is tolerated: the settings may be elsewhere."""
+    import dsi.backends.denodo as denodo_module
+
+    monkeypatch.setattr(denodo_module, "CONFIG_PATH", tmp_path / "absent.json")
+
+    assert denodo_module._load_config() == {}
+
+
+def test_config_kwarg_overrides_the_default_file(monkeypatch, tmp_path):
+    """config= must actually be used, not merely accepted.
+
+    The environment variable is cleared first so the assertion can only pass
+    if the value travelled from the file that was passed in.
+    """
+    monkeypatch.delenv("DENODO_BASE_URL", raising=False)
+
+    path = tmp_path / "settings.json"
+    path.write_text('{"base_url": "https://from-the-file.org"}', encoding="utf-8")
+
+    backend = Denodo(only_validate=True, config=path)
+
+    assert backend.base_url == "https://from-the-file.org"
 
 
 

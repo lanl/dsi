@@ -78,15 +78,30 @@ CONFIG_DIR = Path.home() / ".denodo"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 
 
-def _load_config():
-    """Read the optional local config file. Returns {} if absent."""
+def _load_config(path=None):
+    """
+    Read a JSON config file. Returns {} if the default file is absent.
+
+    `path` overrides the default ~/.denodo/config.json so that a config
+    file can live beside the script that uses it -- including inside a
+    repository, which a fixed home-directory path cannot support.
+
+    A missing file is only tolerated for the default location. An
+    explicit path that does not exist is a typo, and saying so beats
+    failing later with "missing OAuth configuration".
+    """
+    explicit = path is not None
+    path = Path(path) if explicit else CONFIG_PATH
     try:
-        with open(CONFIG_PATH, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
+        if explicit:
+            raise ValueError(f"Config file not found: {path}") from None
         return {}
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in {CONFIG_PATH}: {e}") from e
+        raise ValueError(f"Invalid JSON in {path}: {e}") from e
+
 
 
 def _setting(name, env_var=None, config=None, default=None):
@@ -100,24 +115,47 @@ def _setting(name, env_var=None, config=None, default=None):
     return config.get(name, default)
 
 
-def save_config(**settings):
+def save_config(path=None, **settings):
     """
-    Create or update ~/.denodo/config.json (one-time setup helper).
+    Create or update a JSON config file (one-time setup helper).
+
+    Writes to ``~/.denodo/config.json`` by default, or to `path`.
+    Settings already in the file are kept: only the keys passed here
+    are added or replaced.
+
+    Parameters
+    ----------
+    `path` : str or Path, optional
+        File to write. Defaults to ``~/.denodo/config.json``.
+    `**settings` : dict
+        Settings to store. Any value of None is ignored.
+
+    Note
+    ----
+    `client_secret` is deliberately absent from the example below. It
+    is the one setting that does not belong in a file, because a config
+    file is meant to be shared or committed; keep it in the
+    AUTH_FLOW_CLIENT_SECRET environment variable instead.
 
     Example
     -------
     >>> from dsi.backends.denodo import save_config
     >>> save_config(base_url="https://<data-catalog-host>",
-    ...             client_id="...", client_secret="...",
+    ...             client_id="...",
     ...             auth_url="...", token_url="...",
     ...             redirect_uri="...", scope="...")
     """
-    CONFIG_DIR.mkdir(exist_ok=True)
-    config = _load_config()
-    config.update({k: v for k, v in settings.items() if v is not None})
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+    path = Path(path) if path else CONFIG_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # _load_config raises when an explicit path is missing, which is
+    # right for reading but wrong here: creating the file is the point.
+    config = _load_config(path) if path.exists() else {}
+    stored = {k: v for k, v in settings.items() if v is not None}
+    config.update(stored)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
-    print(f"Saved {len(settings)} setting(s) to {CONFIG_PATH}")
+    print(f"Saved {len(stored)} setting(s) to {path}")
+
 
 # ----------------------------------------------------------------------
 # Normalization (DATA_CONTRACT section 3)
@@ -293,13 +331,15 @@ class ValueObject:
 # ----------------------------------------------------------------------
 # OAuth helper (module-level)
 # ----------------------------------------------------------------------
-def get_token():
+def get_token(config=None):
+
     """
     Run the OAuth 2.0 authorization-code flow and return a Bearer token.
 
     Reads the OAuth client configuration from environment variables
-    first, then falls back to the local config file
-    ``~/.denodo/config.json`` (see README "Configuration"):
+    first, then falls back to a JSON config file -- by default
+    ``~/.denodo/config.json``, or the file named by `config`
+    (see README "Configuration"):
 
         ==================  =========================
         Environment var     Config file key
@@ -315,6 +355,13 @@ def get_token():
     Opens the system browser for the login, then exchanges the
     returned authorization code for an access token.
 
+    Parameters
+    ----------
+    `config` : dict or str or Path, optional
+        Pre-loaded settings, or a path to a JSON config file. If None,
+        ~/.denodo/config.json is used.
+
+
     Returns
     -------
     str
@@ -327,7 +374,9 @@ def get_token():
         pasted redirect URL contains no authorization code.
     """
 
-    config = _load_config()
+    if not isinstance(config, dict):
+        config = _load_config(config)
+
 
     auth_url = _setting("auth_url", "AUTH_URL", config)
     token_url = _setting("token_url", "TOKEN_URL", config)
@@ -542,6 +591,12 @@ class Denodo(Webserver):
                   (default: 100)
         `**kwargs` : dict
             Additional keyword arguments:
+                - config : str or Path, optional
+                    Path to a JSON config file. Overrides the default
+                    ~/.denodo/config.json. Lets a project keep its
+                    settings beside its code instead of in the home
+                    directory.
+
                 - token : str, optional
                     OAuth Bearer token. If not provided, the OAuth
                     authorization-code flow runs automatically
@@ -570,7 +625,12 @@ class Denodo(Webserver):
         self.failed_views = []
 
 
-        DEFAULT_URL = _setting("base_url", env_var="DENODO_BASE_URL")
+        # The config file location is a parameter, not a fixed path: the
+        # real settings live in an internal repository, while this public
+        # repository ships a dummy file carrying the same keys.
+        config = _load_config(kwargs.get("config"))
+
+        DEFAULT_URL = _setting("base_url", "DENODO_BASE_URL", config)
         base_url = url or DEFAULT_URL
 
         # ----------------------------------------------------------------------
@@ -609,7 +669,7 @@ class Denodo(Webserver):
         self.token = kwargs.get("token")
         self._auth_probe = only_validate and not self.token
         if not self.token and not only_validate:
-            self.token = get_token()
+            self.token = get_token(config)
         self.server_id = kwargs.get("server_id", 1)
         self.verify_ssl = kwargs.get("verify_ssl", True)
 
@@ -619,7 +679,7 @@ class Denodo(Webserver):
         # and nothing site-specific enters this file.
         self.source_env = (                             # This is for database table
             kwargs.get("source_env")
-            or _setting("source_env", env_var="DENODO_SOURCE_ENV")
+            or _setting("source_env", "DENODO_SOURCE_ENV", config)
             or urlparse(self.base_url).netloc
         )
 
