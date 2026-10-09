@@ -1,0 +1,1142 @@
+# Denodo Backend for DSI
+
+A read-only backend for accessing a Denodo Data Catalog via its REST API. Metadata is retrieved and exposed as a DSI-compatible table: `denodo_search_results`.
+
+Denodo is a data virtualization platform: it exposes tables from many underlying systems as *views* inside *virtual databases*, and its Data Catalog adds descriptions, tags, categories and custom properties on top of them. This backend sends one metadata search to the Data Catalog, normalizes the response, and exposes it as a DSI table with one row per view returned.
+
+Useful Denodo resources:
+
+- [Denodo Data Catalog documentation](https://community.denodo.com/docs/html/browse/latest/en/vdp/data_catalog/index): Overview of the Data Catalog, its metadata model, and its search features.
+- [Denodo Data Catalog REST API](https://community.denodo.com/docs/html/browse/latest/en/vdp/data_catalog/appendix/rest_api/rest_api): Official API reference.
+- Your own Data Catalog instance: browse the same views in the web UI to see how a search result looks to a human.
+
+> **Note:** This backend is read-only. It retrieves and organizes metadata but does not modify anything in Denodo.
+
+> **Note:** A Denodo Data Catalog is usually an internal service protected by OAuth. Read **Configuration** before running anything.
+
+<details>
+<summary><b>API Reference (for developers)</b></summary>
+
+The backend uses one Data Catalog endpoint:
+
+- Base URL: taken from your configuration, never hard-coded (see **Configuration**)
+- API prefix: `/denodo-data-catalog/public/api`
+- Main endpoint: `POST /search/metadata`
+- Connection check: `GET /home`
+
+The request body is built from the `params` you pass. Fields that are fixed by the backend:
+
+| Body field | Value | Why |
+|---|---|---|
+| `elementType` | `"VIEWS"` | the only element type this API serves for search |
+| `withEndorsements`, `withWarnings`, `withDeprecations` | `False` | despite the names, these *filter* to only elements having that flag |
+| `categoryIds`, `tagIds`, `databaseIds` | present, empty unless filtered | omitting any of them returns HTTP 400 |
+| `offset`, `limit` | managed internally | pagination is automatic, and the total is checked against the server's own count |
+
+No other endpoint is called: one search is one POST, plus one page of POSTs for large results.
+
+</details>
+
+---
+
+## Configuration
+
+Nothing site-specific is stored in this repository. Every setting resolves as
+**argument → environment variable → config file**.
+
+| Setting | Environment variable | Config-file key |
+|---|---|---|
+| base URL | `DENODO_BASE_URL` | `base_url` |
+| authorize URL | `AUTH_URL` | `auth_url` |
+| token URL | `TOKEN_URL` | `token_url` |
+| client id | `AUTH_FLOW_CLIENT_ID` | `client_id` |
+| redirect URI | `REDIRECT_URI` | `redirect_uri` |
+| scope | `SCOPE` | `scope` |
+| client secret | `AUTH_FLOW_CLIENT_SECRET` | — *(see below)* |
+
+Request these from your Data Catalog administrator.
+
+### Where the config file lives
+
+The file defaults to `~/.denodo/config.json`, but the path is a parameter, so
+it can sit beside the code that uses it:
+
+```python
+from pathlib import Path
+from dsi.dsi import DSI
+
+CONFIG = Path(__file__).with_name("denodo_config.json")
+
+dsi = DSI(backend_name="Denodo", config=CONFIG, params={"views": True})
+```
+
+Use `Path(__file__).with_name(...)` rather than a bare filename: a relative
+path resolves against the working directory, not the script's folder, so a
+bare name breaks as soon as the script is run from somewhere else.
+
+`denodo_config.example.json` in this directory shows the expected shape. Copy
+it, fill in your site's values, and keep your copy out of version control —
+`.gitignore` already excludes `denodo_config.json`.
+
+A path that does not exist raises `Config file not found`, so a typo is
+reported as a typo rather than surfacing later as missing OAuth configuration.
+A missing *default* file is tolerated, since the settings may all be in the
+environment.
+
+### The client secret
+
+**`client_secret` belongs in the environment, not in the config file.** A
+config file is meant to be copied, shared, and in some deployments committed,
+and git history would make a committed secret effectively permanent.
+
+The client id is different. OAuth sends it in the clear as a query parameter
+in the browser's authorize URL, so it already appears in the address bar and
+in any proxy log; there is nothing to protect. The client secret never leaves
+the server-to-server token exchange, and it is the one value worth keeping out
+of a file.
+
+To store the six non-secret settings once:
+
+```python
+from dsi.backends.denodo import save_config
+
+save_config(base_url="https://<data-catalog-host>",
+            client_id="...",
+            auth_url="...", token_url="...",
+            redirect_uri="...", scope="...")
+```
+
+`save_config` accepts `path=` to write somewhere other than
+`~/.denodo/config.json`.
+
+Check that a machine is ready:
+
+```python
+from dsi.backends.denodo import Denodo
+
+print(Denodo(only_validate=True).validate_connection())   # True = configured and reachable
+```
+
+### Authentication
+
+The backend uses the OAuth 2.0 authorization-code flow:
+
+1. The first request opens your browser at the authorize URL.
+2. After you log in, the identity provider redirects to the registered `redirect_uri` with a one-time code.
+3. Paste that full redirect URL back at the prompt; the backend exchanges the code for an access token.
+
+> **Note:** The redirect URI is registered with your identity provider and may point at a different host than the catalog you query.
+
+To reuse a token you already have, pass it in and skip the browser entirely:
+
+```python
+dsi = DSI(backend_name="Denodo", token="<access token>", params={"keywords": "..."})
+```
+
+Tokens expire (typically after an hour). A backend created with a token keeps that token: build a new backend rather than expecting a refresh.
+
+---
+
+## Quick Start
+
+### Initialize the Backend
+
+```python
+from dsi.dsi import DSI
+
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "CUI", "search_in": ["properties"], "match": "substring"}
+)
+```
+
+### List Available Tables
+
+```python
+dsi.list()
+```
+
+### Access the Table
+
+```python
+views_df = dsi.get_table("denodo_search_results", collection=True)
+print(views_df)
+```
+
+### Close the Backend
+
+```python
+dsi.close()
+```
+
+---
+
+## Supported Search Parameters
+
+The backend supports flexible querying through a unified `params` interface.
+
+### Keyword Search
+
+Search for text. An empty string returns the whole catalog:
+
+```python
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "waste"}
+)
+```
+
+### Choosing Where to Search
+
+`search_in` selects which part of a view is searched. The same word gives different results in each scope:
+
+```python
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "area", "search_in": ["column_names"]}
+)
+```
+
+| `search_in` value | Searches |
+|---|---|
+| `name` | the view name |
+| `description` | the view's description |
+| `properties` | the values of custom properties attached to the view |
+| `column_names` | the names of the view's columns |
+| `column_descriptions` | the descriptions of those columns |
+
+> **Note:** Custom properties are searchable by **value** only, not by property name.
+
+Scopes can be combined; a view matches if it matches in any of them:
+
+```python
+params={"keywords": "area", "search_in": ["name", "description"]}
+```
+
+### Choosing How to Match
+
+`match` selects how the words in `keywords` are matched:
+
+```python
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "area type", "search_in": ["name"], "match": "all_words"}
+)
+```
+
+| `match` value | Rule |
+|---|---|
+| `substring` | the whole string must appear as one case-insensitive substring |
+| `all_words` | every word must appear, in any order (AND) |
+| `any_words` | any one word is enough (OR) |
+
+> **Note:** `substring` is literal. View names often use underscores, so a phrase typed with spaces may match nothing while `all_words` finds it.
+
+### Category and Tag Filters
+
+Restrict a search to views carrying particular categories or tags, by id:
+
+```python
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "", "categories": [80], "tags": [599]}
+)
+```
+
+Ids come from the `categories` and `tags` columns of an earlier result, or from the Data Catalog UI.
+
+### Limiting Results
+
+Without `limit`, every matching view is retrieved, paginating internally:
+
+```python
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "area", "limit": 25}
+)
+```
+
+### Multiple Independent Queries
+
+Run several queries and combine the results. Rows are deduplicated by `(database_name, name)`:
+
+```python
+dsi = DSI(
+    backend_name="Denodo",
+    params=[
+        # Query 1: views whose name mentions area
+        {"keywords": "area", "search_in": ["name"]},
+
+        # Query 2: views carrying CUI in a custom property value
+        {"keywords": "CUI", "search_in": ["properties"], "match": "substring"},
+
+        # Query 3: views with a column about dates
+        {"keywords": "date", "search_in": ["column_names"], "limit": 10}
+    ]
+)
+```
+
+---
+
+## Supported Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `keywords` | str | `""` (whole catalog) | Text to search for |
+| `search_in` | list[str] | `["name", "description"]` | Where to search: `name`, `description`, `properties`, `column_names`, `column_descriptions` |
+| `match` | str | `"any_words"` | How to match: `substring`, `all_words`, `any_words` |
+| `categories` | list[int] | no filter | Restrict to these category ids |
+| `tags` | list[int] | no filter | Restrict to these tag ids |
+| `limit` | int | every match | Maximum number of views to retrieve per query |
+| `databases` | list[str] | — | Build the `denodo_databases` table instead of searching. `[]` means every database you can see; a list of names restricts it to those |
+| `views` | bool or str | — | Build the `denodo_views` table. `True` means every view in the catalogue; a string narrows it to views matching that keyword |
+| `columns` | str, dict or list | — | Build `denodo_columns` and `denodo_properties`. **A scope is required**: a keyword, `{"database": "<name>"}`, or a list of `"database.view"` names. See *Cost* below |
+| ~~`database`~~ | — | — | Retired. Use `views` or `columns` |
+| ~~`view`~~ | — | — | Retired. Use `columns` with an explicit view list |
+
+---
+
+## Tables
+
+The backend returns five DSI tables:
+
+1. **denodo_search_results** - View metadata from a search (one row per view returned)
+2. **denodo_databases** - One row per database in the Data Catalog
+3. **denodo_views** - One row per view in the Data Catalog
+4. **denodo_columns** - One row per column of a view
+5. **denodo_properties** - One row per custom property of a view
+
+Which ones fill depends on `params`: a search fills the first, `{"databases": [...]}` the second, `{"views": True}` the third, and `{"columns": <scope>}` fills the last two together. All five always exist with all their columns, even when empty.
+
+The first three are cheap - a few dozen requests at most. **The last two cost one request per view**, so they take a required scope rather than a default. See *Cost* under the `denodo_columns` section.
+
+`denodo_search_results` and `denodo_views` come from the same endpoint but answer different questions. The search table is a **snapshot of one query** and keeps the API's own field names, including columns that only mean something for that query. `denodo_views` is a **catalogue**: stable column names, no query-relative fields, and one row per view regardless of what was searched for.
+
+Tables for columns and custom properties, which need the Data Catalog's view-details endpoint, are planned.
+
+---
+
+### denodo_search_results Table:
+
+The `denodo_search_results` table contains one row per view returned by the search. A view is identified by the pair `(database_name, name)`.
+
+| Column | Description |
+|--------|-------------|
+| name | View name |
+| database_name | Virtual database (VDB) the view belongs to |
+| id | Numeric element id — a surrogate key, different in each environment |
+| database_id | Numeric database id |
+| description | The view's description, may be empty |
+| descriptionType | Description format — always empty in search results |
+| categories | Comma-separated list of category names |
+| tags | Comma-separated list of tag names |
+| lastModificationVdpData | Last modification on the Virtual DataPort side |
+| lastModificationIsstData | Last modification on the catalog side |
+| matchedFields | How many columns matched *this* query |
+| matchedCustomProperties | How many custom properties matched *this* query |
+| matchedFieldsTagged | How many tagged columns matched *this* query |
+| countEndorsements | Number of endorsements on the view |
+| countWarnings | Number of warnings on the view |
+| countDeprecations | Number of deprecations on the view |
+| ranking | Search ranking for *this* query |
+
+**Example:**
+
+```python
+views_df = dsi.get_table("denodo_search_results", collection=True)
+print(views_df[["name", "database_name", "categories", "tags"]])
+```
+
+---
+
+### denodo_databases Table:
+
+The `denodo_databases` table contains one row per database, keyed by `db_name`. Building it takes **two requests** no matter how many databases exist: one for the databases and their descriptions, one for the view counts.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"databases": []})
+dsi.display("denodo_databases")
+```
+
+| Column | Description |
+|--------|-------------|
+| db_name | Database name — the key |
+| description | The database's description, `None` when it has none |
+| database_id | Denodo's own numeric database id — assigned by the source, not a row number, and different in each environment |
+| server_id | Virtual DataPort server id |
+| view_count | Number of views in the database, counted from the views endpoint |
+| fetched_at | When the fetch ran (UTC) — one timestamp for every row of the fetch |
+| source_env | Which environment the rows came from |
+
+**Output** (illustrative):
+```text
+db_name       | description           | database_id | server_id | view_count | fetched_at                       | source_env
+--------------+-----------------------+-------------+-----------+------------+----------------------------------+-----------------
+analytics     | Reporting layer       |          10 |         1 |          0 | 2026-01-15T09:12:44.102030+00:00 | catalog.example
+reference     | Shared reference data |           5 |         1 |        820 | 2026-01-15T09:12:44.102030+00:00 | catalog.example
+staging       | None                  |          16 |         1 |          4 | 2026-01-15T09:12:44.102030+00:00 | catalog.example
+```
+
+**One database in particular:**
+
+```python
+dsi = DSI(backend_name="Denodo", params={"databases": ["reference"]})
+```
+
+A name that is not one of your databases raises before any metadata is fetched, so a typo fails fast rather than part way through a load.
+
+**Notes on the columns:**
+
+- `view_count` counts live views only; soft-deleted items are skipped. A database with no views is a normal row with `view_count = 0`, not an omission.
+- `description` is `None` whether the API returned `null`, an empty string or whitespace — the three spellings of "no description" are normalized to one.
+- `database_id` belongs to Denodo. It is stable within an environment but must not be carried between environments.
+- `fetched_at` and `source_env` are provenance: they say when the rows were read and from where, so a saved snapshot stays interpretable later.
+
+---
+
+### denodo_views Table:
+
+The `denodo_views` table contains one row per view, keyed by `(db_name, view_name)`. It is built from the search endpoint rather than from one metadata call per view, so the whole catalogue arrives in a few dozen requests instead of thousands.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"views": True})
+dsi.display("denodo_views", num_rows=5,
+            display_cols=["view_name", "db_name", "categories", "documentation_url"])
+```
+
+| Column | Description |
+|--------|-------------|
+| view_name | View name — key part 1 |
+| db_name | Database the view belongs to — key part 2 |
+| description | The view's description, normalized; `None` where the catalog has none |
+| documentation_url | A documentation link found in the description, `None` if there is none |
+| categories | Comma-separated category names |
+| tags | Comma-separated tag names |
+| element_id | Numeric element id — a surrogate key, different in each environment |
+| last_modified_at | Last modification on the Virtual DataPort side |
+| fetched_at | When the fetch ran (UTC) — one timestamp for every row of the fetch |
+| source_env | Which environment the rows came from |
+
+**Output** (illustrative):
+```text
+view_name       | db_name   | categories        | documentation_url
+----------------+-----------+-------------------+----------------------------------
+customer_ref    | reference | Reference Data    | https://docs.example.org/customer
+order_lines     | reference | Reference Data    | None
+shipment_status | staging   | Logistics         | https://docs.example.org/shipment
+```
+
+**Narrow it to one subject area:**
+
+```python
+dsi = DSI(backend_name="Denodo", params={"views": "weather"})
+```
+
+**Notes on the columns:**
+
+- **The documentation URL usually appears in `description` as well.** Catalog descriptions store links two ways: as plain text (`"Source: https://..."`) and, less often, as an HTML anchor with a label. Normalization removes HTML, so an anchor's URL leaves the text while a plain-text one stays in the sentence. Either way it is extracted into `documentation_url`. We do not cut it out of the prose, because that would leave sentences ending in `"Source: "` with nothing after them.
+- **`documentation_url` is not unique.** Several views can point at the same documentation page, so it identifies a resource, not a view. Use `(db_name, view_name)` as the key.
+- **Descriptions repeat.** Many views carry a description identical to another view's, which is normal for generated or templated schemas — searching on description will return groups rather than single hits.
+- `element_id` belongs to Denodo and differs between environments; do not carry it across them.
+- Column-level schema and custom properties are **not** in this table - they come from `denodo_columns` and `denodo_properties` below.
+
+---
+
+### denodo_columns Table:
+
+One row per column of a view, keyed by `(db_name, view_name, column_name)`.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"columns": "your_keyword"})
+dsi.display("denodo_columns")
+```
+
+| Column | Description |
+|--------|-------------|
+| view_name | View the column belongs to — key part 1 |
+| db_name | Database the view belongs to — key part 2 |
+| column_name | Column name — key part 3 |
+| ordinal_position | Position in the view's schema, 0-based and contiguous |
+| data_type | The source type name |
+| description | Column description, `None` where there is none |
+| fetched_at | When the fetch ran (UTC) — one timestamp for every row of the fetch |
+| source_env | Which environment the rows came from |
+
+**Output** (illustrative):
+```text
+view_name     | db_name   | column_name  | ordinal_position | data_type | description
+--------------+-----------+--------------+------------------+-----------+----------------
+customer_ref  | analytics | customer_id  |                0 | int       | Unique ID
+customer_ref  | analytics | display_name |                1 | text      | None
+customer_ref  | analytics | created_date |                2 | localdate | Audit Field
+```
+
+**Notes on the columns:**
+
+- **`data_type` is not a fixed vocabulary.** Alongside ordinary SQL types you will find
+  per-view generated types, particularly for geometry columns. Do not model it as an enum
+  or build a `CHECK` constraint from the values you happen to see.
+- **Column descriptions are rare.** In practice very few columns carry one, and much of
+  what exists is repeated boilerplate rather than per-column text. Check the rate on your
+  own catalogue before relying on it for search.
+- `ordinal_position` is the column's place in the view's schema, so it is stable for a
+  given view but means nothing across views.
+
+---
+
+### denodo_properties Table:
+
+One row per custom property of a view, keyed by `(db_name, view_name, property_name)`.
+This is a **long EAV table**: the property set changes without a schema migration, so
+properties are rows rather than columns.
+
+```python
+dsi = DSI(backend_name="Denodo", params={"columns": "your_keyword"})
+dsi.display("denodo_properties")
+```
+
+| Column | Description |
+|--------|-------------|
+| view_name | View the property belongs to — key part 1 |
+| db_name | Database the view belongs to — key part 2 |
+| property_name | `"Group/Property"`, taken verbatim from the catalog — key part 3 |
+| property_value | The value, with HTML removed and entities decoded |
+| fetched_at | Provenance |
+| source_env | Provenance |
+
+**Output** (illustrative):
+```text
+view_name    | db_name   | property_name            | property_value
+-------------+-----------+--------------------------+---------------------------
+customer_ref | analytics | Governance/Data Steward  | Doe, Jane
+customer_ref | analytics | Governance/Classification| Internal
+customer_ref | analytics | Governance/Access Request| Contact support@example.org
+```
+
+**Notes on the columns:**
+
+- **`property_name` is verbatim**, including trailing punctuation. A property displayed as
+  `Business Unit:` is stored with its colon, because stripping it would stop the name
+  matching the catalog.
+- **Properties with no value are not stored.** An unset property produces no row, which is
+  the point of the EAV shape - the table holds what exists rather than every property that
+  could exist.
+- **Values are normalized.** The catalog stores several as HTML; `property_value` holds the
+  readable text, so a contact property returns a name rather than an anchor tag.
+
+---
+
+### Cost
+
+`denodo_columns` and `denodo_properties` come from the **same** per-view request, so one
+harvest fills both. That request costs roughly **1.3 seconds per view**, which makes these
+the only tables where you wait minutes rather than seconds:
+
+| Scope | Time |
+|---|---|
+| 1 view | ~1 second |
+| 20 views | ~25 seconds |
+| 100 views | ~2 minutes |
+| 500 views | ~10 minutes |
+
+Three consequences, all visible in the API:
+
+- **The scope is required.** There is no "fetch everything" default, because on a large
+  catalogue that would run for over an hour. `{"columns": ""}` raises rather than guessing.
+- **A scope that matches nothing raises too**, instead of returning two empty tables you
+  would have to diagnose.
+- **A scope larger than roughly 1,500 views is refused**, because an access token does not
+  live long enough to finish the harvest. Split it across runs.
+
+Progress is printed as it goes:
+
+```text
+Fetching details for 98 view(s), about 2 minutes...
+     50 / 98   (1.1 min elapsed)
+     98 / 98   (2.1 min elapsed)
+  done in 2.1 min -- 98 ok, 0 failed
+```
+
+A view whose details cannot be fetched is reported in that summary and recorded for later:
+
+```python
+dsi.main_backend_obj.failed_views    # [(db_name, view_name), ...]
+```
+
+The harvest stops early if many requests fail in a row, since that means something systemic
+- usually an expired token - rather than one bad view.
+
+---
+
+## Metadata
+
+### Curated Metadata
+
+Every field the search endpoint returns becomes a column, so the table is a faithful image of the API response. Nested values are flattened so that each cell holds a single value:
+
+| API response | Table columns |
+|---|---|
+| `database` (object) | `database_name`, `database_id` |
+| `categories` (list of objects) | `categories` — names joined with `", "` |
+| `tags` (list of objects) | `tags` — names joined with `", "` |
+
+Empty lists become empty values rather than empty strings, so `dsi.find("tags ~~ 'x'")` and `WHERE tags LIKE '%x%'` behave predictably.
+
+### Query-relative Columns
+
+Four columns describe the **query**, not the view: `matchedFields`, `matchedCustomProperties`, `matchedFieldsTagged` and `ranking`. They change with the search and are often constant within one result set. They are kept because they are evidence of *why* a view matched, but they should not be compared across different queries.
+
+---
+
+## Common DSI Operations
+
+### List Tables
+
+```python
+dsi.list()
+```
+
+**Output:**
+```
+Table: denodo_search_results
+  - num of columns: 17
+  - num of rows: 350
+
+Table: denodo_databases
+  - num of columns: 7
+  - num of rows: 0
+
+Table: denodo_views
+  - num of columns: 10
+  - num of rows: 0
+
+Table: denodo_columns
+  - num of columns: 8
+  - num of rows: 0
+
+Table: denodo_properties
+  - num of columns: 6
+  - num of rows: 0
+```
+
+Every registered table is listed whether or not it holds rows. Here a search was run, so
+the other two are registered but empty.
+
+### View Backend Summary
+
+```python
+dsi.summary("denodo_search_results")
+```
+
+**Output** (illustrative — one row per column):
+```text
+Table: denodo_search_results
+
+column                   | type   | unique | min                           | max                           | avg     | std_dev
+-------------------------+--------+--------+-------------------------------+-------------------------------+---------+--------
+name                     | OBJECT | 350    | area_type_ref                 | zone_workpath                 | nan     | nan
+database_name            | OBJECT | 1      | sample_db                     | sample_db                     | nan     | nan
+id                       | INT64  | 350    | 1000                          | 4200                          | 2480.51 | 545.80
+database_id              | INT64  | 1      | 5                             | 5                             | 5.0     | 0.0
+description              | OBJECT | 190    | None                          | None                          | nan     | nan
+descriptionType          | OBJECT | 0      | None                          | None                          | nan     | nan
+categories               | OBJECT | 6      | Facilities                    | Reference Data                | nan     | nan
+tags                     | OBJECT | 98     | None                          | None                          | nan     | nan
+lastModificationVdpData  | OBJECT | 300    | 2024-01-04T16:42:41.000+00:00 | 2025-03-04T20:01:42.000+00:00 | nan     | nan
+lastModificationIsstData | OBJECT | 1      | 2025-09-09T14:55:55.000+00:00 | 2025-09-09T14:55:55.000+00:00 | nan     | nan
+matchedFields            | INT64  | 1      | 0                             | 0                             | 0.0     | 0.0
+matchedCustomProperties  | INT64  | 1      | 1                             | 1                             | 1.0     | 0.0
+matchedFieldsTagged      | INT64  | 1      | 0                             | 0                             | 0.0     | 0.0
+countEndorsements        | INT64  | 1      | 0                             | 0                             | 0.0     | 0.0
+countWarnings            | INT64  | 1      | 0                             | 0                             | 0.0     | 0.0
+countDeprecations        | INT64  | 1      | 0                             | 0                             | 0.0     | 0.0
+ranking                  | INT64  | 1      | 6                             | 6                             | 6.0     | 0.0
+```
+
+**How to read it:**
+
+- **`unique` is the most informative column.** A count of `0` means the column is empty
+  for every row — above, `descriptionType` is never populated in search results. A count
+  of `1` means the column is the same in every row: here one database, one modification
+  timestamp on the catalog side, and no endorsements, warnings or deprecations anywhere
+  in the result.
+- **The four query-relative columns are usually constant.** `matchedFields`,
+  `matchedCustomProperties`, `matchedFieldsTagged` and `ranking` describe how this query
+  matched. Above, every view matched exactly one custom property and no columns — which
+  is what a `properties` search should produce.
+- **Long text has no min/max.** `description` shows `None` because values over 80
+  characters are skipped; `unique` still tells you how many distinct descriptions exist.
+- **Numeric columns get `avg` and `std_dev`.** For `id` they are meaningless — it is a
+  surrogate key — but for `countWarnings` or `ranking` they summarise the result set.
+
+### View Table Schema
+
+```python
+print(dsi.schema())     # takes no table name; returns this backend's schema
+```
+
+**Output:**
+```sql
+CREATE TABLE denodo_search_results (
+    name TEXT,
+    database_name TEXT,
+    id INTEGER,
+    database_id INTEGER,
+    description TEXT,
+    descriptionType TEXT,
+    categories TEXT,
+    tags TEXT,
+    lastModificationVdpData TEXT,
+    lastModificationIsstData TEXT,
+    matchedFields INTEGER,
+    matchedCustomProperties INTEGER,
+    matchedFieldsTagged INTEGER,
+    countEndorsements INTEGER,
+    countWarnings INTEGER,
+    countDeprecations INTEGER,
+    ranking INTEGER
+);
+
+CREATE TABLE denodo_databases (
+    db_name TEXT,
+    description TEXT,
+    database_id INTEGER,
+    server_id INTEGER,
+    view_count INTEGER,
+    fetched_at TEXT,
+    source_env TEXT
+);
+
+CREATE TABLE denodo_views (
+    view_name TEXT,
+    db_name TEXT,
+    description TEXT,
+    documentation_url TEXT,
+    categories TEXT,
+    tags TEXT,
+    element_id INTEGER,
+    last_modified_at TEXT,
+    fetched_at TEXT,
+    source_env TEXT
+);
+
+CREATE TABLE denodo_columns (
+    view_name TEXT,
+    db_name TEXT,
+    column_name TEXT,
+    ordinal_position INTEGER,
+    data_type TEXT,
+    description TEXT,
+    fetched_at TEXT,
+    source_env TEXT
+);
+
+CREATE TABLE denodo_properties (
+    view_name TEXT,
+    db_name TEXT,
+    property_name TEXT,
+    property_value TEXT,
+    fetched_at TEXT,
+    source_env TEXT
+);
+```
+
+Types are inferred from the first non-null value in each column, so a column that is
+empty for the whole result set is reported as `TEXT`. A table that was never filled
+therefore reports every column as `TEXT`: run `params={"databases": []}` and the three
+numeric columns above become `INTEGER`.
+
+### Retrieve a Table
+
+```python
+views_df = dsi.get_table("denodo_search_results", collection=True)
+```
+
+### Search Loaded Metadata
+
+```python
+# Prints ALL cells from rows containing "waste"
+dsi.search("waste")
+```
+
+**Note:** `search()` displays complete matching rows (all columns), not just matched cells. Searches across:
+- Table names
+- Column names
+- Cell values
+
+### Filter Data
+
+```python
+# Views whose name contains "area"
+results = dsi.find("name ~~ 'area'")
+
+# Views from one database, as a DataFrame
+results = dsi.find("database_name == 'my_database'", collection=True)
+```
+
+Supports operators: `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~` (contains), and `(low, high)` ranges
+
+> **Note:** `find()` and `search()` work on the table already in memory. Neither sends another request to Denodo.
+
+### Display Table Preview
+
+```python
+dsi.display("denodo_search_results", num_rows=5)
+```
+
+**Note:** `display()` shows ALL 17 columns by default, which is wide. Use `display_cols` to limit them:
+
+```python
+dsi.display("denodo_search_results", num_rows=10,
+            display_cols=["name", "database_name", "description", "categories", "tags"])
+```
+
+**Output** (illustrative):
+```text
+Table: denodo_search_results
+
+name             | database_name | description                                  | categories     | tags
+-----------------+---------------+----------------------------------------------+----------------+--------------------
+area_type_ref    | sample_db     | Area type reference table (e...              | Reference Data | Reference
+admin_form_log   | sample_db     | General administrative forms edit log. Ad... | Reference Data | Operations
+ancillary_ref    | sample_db     | Ancillary type reference table. This anc...  | Reference Data | Type, Reference
+announcement     | sample_db     | Project and application announcements, in... | Reference Data | Notification
+annual_summary   | sample_db     | This table tracks deliverables and any ne... | Planning       | Annual
+    ... showing 5 of 350 rows
+```
+
+Two things this shows:
+
+- **Long values are truncated with `...`** so rows stay on one line. The full text is in
+  the DataFrame from `get_table(..., collection=True)`, not in `display()`.
+- **The last line reports the full size**, not the number of rows shown, so you always
+  know how much you are not looking at.
+
+### Process to Writable Backend
+
+Convert read-only Denodo data to a local database:
+
+```python
+# Query from Denodo
+dsi = DSI(
+    backend_name="Denodo",
+    params={"keywords": "CUI", "search_in": ["properties"], "match": "substring"}
+)
+
+# Process the result into a local SQLite database
+dsi.process(
+    backend_name="Sqlite",
+    filename="denodo_cui.db"
+)
+dsi.close()
+
+# Load the newly created database
+local_dsi = DSI(
+    backend_name="Sqlite",
+    filename="denodo_cui.db"
+)
+
+# Query the local database with SQL (not supported in the Denodo backend)
+rows = local_dsi.query(
+    "SELECT name, database_name FROM denodo_search_results "
+    "WHERE tags LIKE '%Reference%' ORDER BY name",
+    collection=True
+)
+local_dsi.close()
+```
+
+**Output** (illustrative):
+```text
+Saved denodo_cui.db
+Closing this instance of DSI()
+Created an instance of DSI with the Sqlite backend: denodo_cui.db
+
+Printing the result of the query: SELECT name, database_name, categories FROM
+denodo_search_results WHERE tags LIKE '%Reference%' ORDER BY name LIMIT 10
+
+name              | database_name | categories
+------------------+---------------+----------------
+analysis_ref      | sample_db     | Reference Data
+area_type_ref     | sample_db     | Reference Data
+ancillary_ref     | sample_db     | Reference Data
+asset_register    | sample_db     | Reference Data
+cost_code_ref     | sample_db     | Reference Data
+```
+
+The snapshot is an ordinary SQLite file: the table keeps its name and all 17 columns, so
+any SQL tool can read it. Because `tags` and `categories` are stored as comma-joined
+names, membership tests use `LIKE '%value%'` rather than `=`.
+
+> **Note:** the snapshot file is written to the directory you run from. Keep it out of
+> version control.
+
+### Export Data
+
+Write the table to an external format:
+
+```python
+dsi.write(
+    filename="views.csv",
+    writer_name="Csv",
+    table_name="denodo_search_results"
+)
+```
+
+---
+
+## Example Scripts
+
+The following example scripts demonstrate common workflows with the Denodo backend. All scripts are in `examples/backends/denodo/`.
+
+### 1. load_basic.py
+
+Initialize the Denodo backend with a property search and inspect what was loaded.
+
+- Basic query with the `keywords`, `search_in` and `match` parameters
+- Use `list()` to see the loaded table and its size
+- Use `summary()` to view per-column statistics
+- Use `schema()` to see the table as a `CREATE TABLE` statement
+- Introduction to the `denodo_search_results` table
+
+**Note:** this script authenticates from scratch. The first run opens a browser window to log in,
+then asks you to paste the redirect URL back at the prompt.
+
+**Example output** (illustrative):
+
+```text
+Opening browser for login...
+After logging in, paste the full redirect URL here: ...
+Created an instance of DSI with the Denodo read-only backend
+
+Table List:
+
+Table: denodo_search_results
+  - num of columns: 17
+  - num of rows: 350
+
+Table Summary:
+... one row per column, see "View Backend Summary" below ...
+
+Schema:
+CREATE TABLE denodo_search_results (
+    name TEXT,
+    database_name TEXT,
+    ...
+);
+Closing this instance of DSI()
+```
+
+---
+
+### 2. search_parameters.py
+
+Explore the two parameters that shape every query: where to search, and how to match.
+
+- All five `search_in` scopes on the same word, with the count each returns
+- The three `match` modes on a two-word phrase, showing substring vs AND vs OR
+- An empty `keywords` value to return the whole catalog
+- Authenticate once and reuse the token across queries, instead of logging in each time
+- Shows why `match="substring"` is needed for exact-phrase searches
+
+**Scopes:** `name`, `description`, `properties`, `column_names`, `column_descriptions`
+**Match modes:** `substring` (whole phrase), `all_words` (AND), `any_words` (OR)
+
+**Example output** (illustrative — the counts depend entirely on your own catalog):
+
+```text
+search_in=['name']                 'area' -> 18 views
+search_in=['description']          'area' -> 31 views
+search_in=['properties']           'area' -> 0 views
+search_in=['column_names']         'area' -> 164 views
+search_in=['column_descriptions']  'area' -> 25 views
+
+match='substring'   'area type' -> 0 views
+match='all_words'   'area type' -> 4 views
+match='any_words'   'area type' -> 176 views
+
+keywords=''  (whole catalog) -> 3500 views
+```
+
+Three things to read out of that:
+
+- **The scopes are strict.** One word gives five different answers, and a term absent
+  from view names may be common among column names. A search that returns nothing is
+  often searching the wrong scope, not a term that does not exist.
+- **`substring` is literal.** `'area type'` typed with a space matches no view name,
+  because view names use underscores, while `all_words` finds the views containing both
+  words. The zero is the demonstration, not a failure.
+- **An empty keyword returns everything**, which is the cheapest way to see how large
+  the catalog is before narrowing a search.
+
+---
+
+### 3. display_columns.py
+
+Preview table data with different column configurations, and hand it to pandas.
+
+- Default behavior shows ALL 17 columns
+- Use the `display_cols` parameter to select specific columns
+- Create a narrow, readable view of the columns people ask about most
+- Retrieve the table as a DataFrame with `get_table(..., collection=True)`
+- Use pandas operations on the result, such as `value_counts()`
+
+**Example output** (illustrative, final part):
+
+```text
+Shape: (350, 17)
+
+Views per database:
+database_name
+sample_db    350
+Name: count, dtype: int64
+```
+
+A single database in `value_counts()` is normal: a narrow search often lands entirely in
+one virtual database. Widen the search, or search `column_names`, to see more.
+
+---
+
+### 4. find_and_search.py
+
+Filter and search inside the loaded table, without making another API call.
+
+- Use `find()` for a condition on one named column
+- Partial string match with `~~` (contains) and exact match with `==`
+- Return results as a DataFrame with `collection=True`
+- Use `search()` for free text across table names, column names and every cell
+- **Important:** `search()` returns complete matching rows (ALL columns), not just matched cells
+
+**Supported operators:** `>`, `<`, `>=`, `<=`, `==`, `!=`, `~~` (contains), and `(low, high)` ranges
+
+---
+
+### 5. save_snapshot.py
+
+Convert a live search result into a local SQLite database for offline analysis.
+
+- Load a search result from the Data Catalog
+- Convert the read-only backend to a writable Sqlite file with `process()`
+- Reopen the snapshot as a Sqlite backend
+- Query the snapshot with SQL, which the Denodo backend itself does not support
+- Offline workflow: no Denodo connection and no token needed once the snapshot exists
+
+**Note:** `tags` and `categories` are stored as comma-joined names, so SQL uses `WHERE tags LIKE '%Waste%'` rather than an equality test.
+
+---
+
+### 6. load_databases.py
+
+Load the database table: one row per database in the Data Catalog.
+
+- Pass `params={"databases": []}` for every database you can see
+- Summarize and display the table
+- Two requests regardless of how many databases exist
+- A named subset with `params={"databases": ["your_database"]}`
+- An unknown name is rejected before any metadata is fetched
+
+**Note:** this is a different path from the search examples — it calls no search endpoint, and the search table stays empty.
+
+---
+
+### 7. load_views.py
+
+Load the view table: one row per view in the Data Catalog.
+
+- Pass `params={"views": True}` for the whole catalogue
+- Summarize the table, then display selected columns
+- Count how many views carry a documentation link
+- Narrow it with `params={"views": "your_keyword"}`
+
+**Note:** this uses the same endpoint as the search examples, so the cost is a few dozen requests for the whole catalogue rather than one call per view. The trade-off is that column-level schema and custom properties are not included.
+
+---
+
+### 8. load_columns.py
+
+Load the column and property tables for a chosen set of views.
+
+- Pass a scope: a keyword, `{"database": "..."}`, or a list of `"database.view"` names
+- Summarize both tables, which come from one harvest
+- Count how many columns carry a description
+- Read `failed_views` for anything that could not be fetched
+
+**Note:** this is the only example that fetches per view, at roughly 1.3 seconds each, so
+it reports progress while it runs. Edit the keyword before running it - the placeholder
+matches nothing on purpose.
+
+---
+
+## Notes
+
+- The backend is **metadata-first** and **read-only**
+- One search is one `POST /search/metadata`; no other endpoint is called
+- Large result sets are paginated internally, and the row count is checked against the server's own total
+- Five tables today: `denodo_search_results`, `denodo_databases`, `denodo_views`, `denodo_columns` and `denodo_properties`; which ones fill depends on `params`
+- The first three are cheap; `denodo_columns` and `denodo_properties` cost one request per view and therefore take a required scope
+- `denodo_columns` is keyed by `(db_name, view_name, column_name)` and `denodo_properties` by `(db_name, view_name, property_name)`
+- `database` and `view` are retired and raise with a pointer to `views` / `columns`
+- `denodo_views` is keyed by `(db_name, view_name)`; `documentation_url` is **not** a key, since several views can share one documentation page
+- `denodo_views` and `denodo_search_results` come from the same endpoint: the first is a catalogue, the second a snapshot of one query
+- A database is identified by `db_name`; its numeric `database_id` comes from Denodo and differs between environments
+- `denodo_databases` carries provenance (`fetched_at`, `source_env`); `denodo_search_results` does not yet
+- A view is identified by `(database_name, name)`; the numeric `id` differs between environments and must not be reused across them
+- Multi-query support deduplicates results by `(database_name, name)`
+- Empty result sets return an empty table with all columns present (no errors)
+- Results are permission-scoped: the token identifies you, so two users may legitimately see different views
+
+---
+
+## Troubleshooting
+
+### Nothing is configured
+
+```python
+from dsi.backends.denodo import Denodo
+probe = Denodo(only_validate=True)
+print(probe.validate_connection())   # False
+print(probe.validate_error_msg)      # says what is missing
+```
+
+Set `DENODO_BASE_URL` or run `save_config(base_url=...)`, and check the OAuth settings (see **Configuration**).
+
+### Authentication rejected (HTTP 401)
+
+The token has expired or lacks the required scope. Build the backend again to re-authenticate, or pass a fresh `token=`.
+
+### A browser window opens when you did not expect it
+
+Any `DSI(backend_name="Denodo", ...)` without `token=` starts the OAuth flow. In a loop, authenticate once and reuse the token:
+
+```python
+first = DSI(backend_name="Denodo", params={"keywords": "area"})
+token = first.main_backend_obj.token
+# ... pass token=token to every later DSI(...)
+```
+
+### Empty results
+
+```python
+dsi.list()
+# Output: denodo_search_results: (0 rows, 17 cols)
+```
+
+Try:
+- Broadening the search term, or using `keywords=""` to see the whole catalog
+- Searching a different scope — a term that is absent from names may be present in properties
+- Switching `match` to `any_words`
+- Checking that category and tag ids exist
+
+### `query()` raises NotImplementedError
+
+The Denodo backend holds in-memory tables, not SQL. Use `find()` and `search()`, or save a snapshot with `process()` and query that.
+
+---
+
+## Performance Tips
+
+- Narrow the scope: searching one `search_in` value is faster than several
+- Use `limit` when exploring, and drop it when you need the complete result
+- Authenticate once and reuse the token across queries
+- Cache results locally using `process()` for repeated analysis
+- Use `display_cols` in `display()` to keep output readable
+- Filter DataFrames after retrieval for conditions `find()` does not express
