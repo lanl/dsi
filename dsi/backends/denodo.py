@@ -54,7 +54,6 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs, urlencode
 from typing import ClassVar  
 
-import numpy as np
 import pandas as pd
 import requests
 

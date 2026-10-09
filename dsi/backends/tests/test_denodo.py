@@ -23,7 +23,6 @@ import pytest
 from dsi.backends.denodo import Denodo
 
 from dsi.backends.denodo import (
-    Denodo,
     canonical_property_name,
     extract_urls,
     normalize_description,
