@@ -1,8 +1,34 @@
 import os
 import sqlite3
 
-from contextlib import closing
+from collections import OrderedDict
+from contextlib import closing, redirect_stdout
 #from pandasql import sqldf
+
+
+def ingest_or_overwrite_table(terminal, table_name, df):
+    '''
+    Loads df into a Terminal instance under table_name, overwriting if it already exists.
+
+    Args:
+        terminal: a dsi.core.Terminal instance (e.g. DSI(...).t, or a CLI's own self.t).
+        table_name: destination table name.
+        df: pandas DataFrame to load.
+    '''
+    try:
+        existing = terminal.list(True)
+    except Exception:
+        existing = []
+
+    fnull = open(os.devnull, 'w')
+    with redirect_stdout(fnull):
+        if table_name in existing:
+            terminal.overwrite_table(table_name, df)
+        else:
+            terminal.load_module('plugin', "Dataframe", "reader", collection=df, table_name=table_name)
+            terminal.artifact_handler(interaction_type='ingest')
+            terminal.active_metadata = OrderedDict()
+
 
 def is_valid_sqlite_with_data(path: str) -> tuple[bool, str]:
     """
