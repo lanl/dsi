@@ -27,6 +27,9 @@ version = {attr = "dsi._version.__version__"}
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.package-data]
+dsi = ["utils/webserver_crosswalk.json", "utils/hpc_schema_crosswalk.json"]
+
 [project.scripts]
 dsi = "dsi.cli:main"
 dsi-vcs = "dsi.utils.version_control.cli:main"

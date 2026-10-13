@@ -1,0 +1,30 @@
+{
+  "NDP": {
+    "field_map": {"keyword": "keywords", "author": "creator", "id": "id", "limit": "limit"},
+    "primary_table": "datasets",
+    "pk": "id",
+    "fk": "dataset_id"
+  },
+  "OSTI": {
+    "field_map": {"keyword": "q", "author": "author", "title": "title", "doi": "doi", "id": "osti_id", "limit": "rows"},
+    "primary_table": "records",
+    "pk": "osti_id"
+  },
+  "Oceans11": {
+    "field_map": {"keyword": "keyword", "author": "author", "title": "title", "doi": "doi", "id": "osti_id", "limit": "rows"},
+    "primary_table": "records",
+    "pk": "osti_id"
+  },
+  "RCSBPDB": {
+    "field_map": {"keyword": "keywords", "author": "authors", "doi": "doi", "id": "pdb_id", "limit": "limit"},
+    "primary_table": "datasets",
+    "pk": "dataset_id",
+    "fk": "dataset_id"
+  },
+  "Zenodo": {
+    "field_map": {"keyword": "keywords", "doi": "doi", "id": "record_id", "limit": "limit"},
+    "primary_table": "datasets",
+    "pk": "dataset_id",
+    "fk": "dataset_id"
+  }
+}

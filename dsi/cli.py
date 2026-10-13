@@ -24,6 +24,9 @@ from dsi.core import Terminal
 from dsi.sync import Sync
 from dsi.utils.data_acquisition import discover_endpoints_async, download_csv_files_async, pull_data
 from dsi.utils.acquisition.utils import create_directory, combine_csv, create_hashed_folder_from_path, split_path, upsert_records
+from dsi.dsi import DSI
+from dsi.dsi_scout import DSIScout, FED_QUERY_ALLOWED_FIELDS
+from dsi.utils.utils import ingest_or_overwrite_table
 
 from ._version import __version__
 
@@ -78,6 +81,7 @@ class DSI_cli:
     def __init__(self):
         self.name = None
         self.start_dir = os.getcwd() + "/"
+        self.scout = DSIScout(store_filename=".temp_dsi_scout.db", verbose=True)
 
 
     def viewers_check(self):
@@ -165,6 +169,15 @@ class DSI_cli:
                         "Displays a table's data. Optionally limit displayed rows and export to CSV/Parquet"),
             'draw' :("[-f filename]", "Draws an ER diagram of all tables in the current DSI database"),
             'exit': ("", "Exits the DSI Command Line Interface (CLI)"),
+            'scout_add' : ("<webserver_name> | --location-type T --location L --path P",
+                        "Registers a webserver backend or HPC source for federation (in-memory, this session only)."),
+            'scout_list' : ("", "Lists all registered federated backends/sources."),
+            'scout_delete' : ("<webserver_name> | --location-type T --location L --path P",
+                        "Deletes a registered federated backend/source. Use the same arguments given to scout_add."),
+            'scout_fetch' : ("key:value [key:value ...]",
+                        "Queries all registered webserver backends (keyword/author/title/doi/id/limit) and pulls all registered HPC catalog sources, merging non-empty results."),
+            'federate' : ("<config file> [-w workspace_folder]",
+                          "Collects databases from sources in a YAML file, or source in a CSV file, saving it to an optional workspace folder."),
             'find' : ("<condition>", "Finds all rows of a table that match a column-level condition."),
             'help': ("", "Shows this help message. For help with a command, enter <command name> -h"),
             'list' : ("", "Lists all tables in the current DSI database"),
@@ -286,6 +299,7 @@ class DSI_cli:
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
             self.t.close()
+            self.scout.close()
         exit(0)
 
 
@@ -337,13 +351,147 @@ class DSI_cli:
         self.t.active_metadata = OrderedDict()
 
 
+    def get_scout_parser(self, prog):
+        parser = argparse.ArgumentParser(prog=prog)
+        parser.add_argument('webserver_name', nargs='?', default=None, help='Webserver backend name (e.g. OSTI, NDP, Zenodo)')
+        parser.add_argument('--location-type', type=str, required=False, help='HPC source location type: github, hpc, hpc-kerberos, url, s3, local')
+        parser.add_argument('--location', type=str, required=False, help='HPC source location (hostname, bucket, etc.)')
+        parser.add_argument('--path', type=str, required=False, help='HPC source path')
+        parser.add_argument('--submitter-name', type=str, required=False, default='', help='HPC source submitter name')
+        return parser
+
+
+    def get_scout_add_parser(self):
+        return self.get_scout_parser('scout_add')
+
+
+    def get_scout_delete_parser(self):
+        return self.get_scout_parser('scout_delete')
+
+
+    def scout_add(self, args):
+        '''
+        Registers a federated backend (webserver) or HPC source in memory for this session.
+        '''
+        try:
+            entry = self.scout.add_source(
+                webserver_name=args.webserver_name, location_type=args.location_type,
+                location=args.location, path=args.path, submitter_name=args.submitter_name)
+        except ValueError as e:
+            print(f"scout_add ERROR: {e}")
+            return
+        if entry["kind"] == "webserver":
+            print(f"Added webserver backend '{entry['backend_name']}'")
+        else:
+            print(f"Added HPC source '{entry['location_type']}:{entry['location']}:{entry['path']}'")
+
+
+    def scout_list(self, args):
+        '''
+        Lists all registered federated backends/sources for this session.
+        '''
+        sources = self.scout.list_sources()
+        if not sources:
+            print("No federated backends registered.")
+            return
+        for entry in sources:
+            if entry["kind"] == "webserver":
+                print(f"webserver backend = {entry['backend_name']}")
+            else:
+                print(f"hpc source = {entry['location_type']}:{entry['location']}:{entry['path']}")
+
+
+    def scout_delete(self, args):
+        '''
+        Deletes a registered federated backend/source. Takes the same arguments used in scout_add.
+        '''
+        try:
+            entry = self.scout.delete_source(
+                webserver_name=args.webserver_name, location_type=args.location_type,
+                location=args.location, path=args.path, submitter_name=args.submitter_name)
+        except ValueError as e:
+            print(f"scout_delete ERROR: {e}")
+            return
+        if entry["kind"] == "webserver":
+            print(f"Deleted webserver backend '{entry['backend_name']}'")
+        else:
+            print(f"Deleted HPC source '{entry['location_type']}:{entry['location']}:{entry['path']}'")
+
+
+    def scout_fetch(self, args):
+        '''
+        Queries all registered webserver backends and HPC catalog sources via DSIScout.query(), and
+        ingests the returned tables ('fed_results' plus any secondary tables) into this CLI session.
+        Use list()/summary()/display() to inspect everything afterward.
+        '''
+        fields = {}
+        for token in args:
+            if ":" not in token:
+                print(f"scout_fetch ERROR: '{token}' is not in key:value format.")
+                return
+            key, _, value = token.partition(":")
+            if key not in FED_QUERY_ALLOWED_FIELDS:
+                print(f"scout_fetch ERROR: '{key}' is not a supported field. Supported: {', '.join(sorted(FED_QUERY_ALLOWED_FIELDS))}")
+                return
+            fields[key] = value
+
+        if not fields:
+            print("Usage: scout_fetch keyword:<value> [author:<value>] [title:<value>] [doi:<value>] [id:<value>] [limit:<value>]")
+            return
+
+        try:
+            results = self.scout.query(**fields)
+        except ValueError as e:
+            print(f"scout_fetch ERROR: {e}")
+            return
+
+        if not results:
+            return
+
+        for table_name, df in results.items():
+            ingest_or_overwrite_table(self.t, table_name, df)
+
+
     def get_federate_parser(self):
         parser = argparse.ArgumentParser(prog='federate')
         parser.add_argument('config_file', help='YAML config file that lists all data sources to download')
         parser.add_argument('-w', '--workspace_folder', type=str, required=False, default="", help='folder to store all downloaded sources')
         return parser
 
-        
+
+    def federate(self, args):
+        """
+        Federate data from multiple sources using either:
+        - a YAML config file, or
+        - a CSV source file
+
+        Usage:
+        federate input.yaml [-w workspace_folder]
+        federate sources.csv [-w workspace_folder]
+        """
+        config_file = args.config_file
+
+        workspace_folder = None
+        if args.workspace_folder is not None and args.workspace_folder != "":
+            workspace_folder = args.workspace_folder
+
+        # small provision if no data in db:
+        if not self.t.valid_backend(self.t.loaded_backends[0]):
+            fnull = open(os.devnull, 'w')
+            with redirect_stdout(fnull):
+                self.t.load_module('plugin', "Dictionary", "reader", collection={'location_type': ""}, table_name="federation")
+                self.t.artifact_handler(interaction_type='ingest')
+
+        try:
+            s = Sync(self.db_path)
+            s.user_wrapper = True
+            print(f"Synchronizing data from {config_file} into {workspace_folder}")
+            s.get(config_file=config_file, workspace_folder=workspace_folder)
+
+        except Exception as e:
+            print(f"federate ERROR: {str(e)}")
+            return
+
 
     def find(self, args):
         '''
@@ -1281,6 +1429,11 @@ COMMANDS = {
     'display' : (cli.get_display_parser, cli.display),
     'draw' : (cli.get_draw_parser, cli.draw_schema),
     'exit': (None, cli.exit_cli),
+    'scout_add' : (cli.get_scout_add_parser, cli.scout_add),
+    'scout_list' : (None, cli.scout_list),
+    'scout_delete' : (cli.get_scout_delete_parser, cli.scout_delete),
+    'scout_fetch' : (None, cli.scout_fetch),
+    'federate' : (cli.get_federate_parser, cli.federate),
     'find' : (None, cli.find),
     'help': (None, cli.help_fn),
     'list' : (None, cli.list_tables),
