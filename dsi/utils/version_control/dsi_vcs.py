@@ -263,7 +263,7 @@ class Version:
 
         staged = 0
         stage_entries = []
-        txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        txn_id = f"staging-{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d%H%M%S%f')}"
 
         def stage_path(abs_path: str):
             nonlocal staged
@@ -308,7 +308,7 @@ class Version:
 
         staged = 0
         stage_entries = []
-        txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        txn_id = f"staging-{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d%H%M%S%f')}"
 
         def stage_path(abs_path: str):
             nonlocal staged
@@ -353,7 +353,7 @@ class Version:
 
         removed = 0
         stage_entries = []
-        txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        txn_id = f"staging-{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d%H%M%S%f')}"
 
         def stage_path(abs_path: str):
             nonlocal removed
