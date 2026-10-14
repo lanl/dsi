@@ -8,7 +8,7 @@ import time
 import itertools
 import shutil
 import pandas as pd
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterator
 from contextlib import redirect_stdout
 from collections import OrderedDict
@@ -26,6 +26,8 @@ class Sync:
     sync (local filesystem with remote) exist.
     """
     def __init__(self, project_name, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
+        if "../" in project_name:
+            raise ValueError("Error: Please use absolute paths instead of relative")
         self.project_name = project_name.replace("\\", "/")
         self.verbose = isVerbose
         self.no_parent = no_parent
@@ -93,13 +95,13 @@ class Sync:
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        if "../" in local_loc or "../" in remote_loc:
-            raise ValueError("Error: Please use absolute paths instead of relative")
-        
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
         remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
+
+        if "../" in local_loc or "../" in remote_loc:
+            raise ValueError("Error: Please use absolute paths instead of relative")
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
@@ -506,7 +508,8 @@ class Sync:
 
             # Database movement
             for dbname in db_list:
-                cmd = [pscp, "-p", dbname, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
+                full_db_path = str(PurePosixPath(os.getcwd().replace("\\", "/")) / dbname)
+                cmd = [pscp, "-p", full_db_path, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
                 if self.verbose:
                     print()
                     print(*cmd)
