@@ -100,8 +100,12 @@ class Sync:
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
         remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
 
-        if "../" in local_loc or "../" in remote_loc:
+        if not Path(local_loc).is_absolute() or not Path(remote_loc).is_absolute():
             raise ValueError("Error: Please use absolute paths instead of relative")
+
+        loc_path = Path(local_loc)
+        if not loc_path.exists() or not loc_path.is_dir():
+            raise ValueError("Input local path must be an path to an existing directory.")
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
@@ -512,7 +516,9 @@ class Sync:
             counter=0
             for index, dbname in enumerate(db_list):
                 if index == 0:
-                    self.t.unload_module('backend', self.backend_name, 'back-write')
+                    fnull = open(os.devnull, 'w')
+                    with redirect_stdout(fnull):
+                        self.t.unload_module('backend', self.backend_name, 'back-write')
                 full_db_path = str(Path.cwd() / dbname)
                 full_remote_db_path = str(PurePosixPath(self.remote_location) / dbname)
                 cmd = [pscp, "-p", full_db_path, f"{putty_session}:{full_remote_db_path}"]
