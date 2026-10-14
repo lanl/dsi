@@ -461,7 +461,7 @@ class Sync:
                 print(f' plink -v -no-antispoof -load {putty_session} "mkdir -p {self.remote_location}"' )
             cmd = [plink, "-v", "-no-antispoof", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=15)
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=20)
             except subprocess.TimeoutExpired as exc:
                 def as_text(value):
                     if value is None:
@@ -481,8 +481,10 @@ class Sync:
                     "6. Select 'Cancel' to close the app and set CAPI Cert for all sessions") from None
                 if "Using username" not in stderr:
                     raise RuntimeError("The PuTTY session's Host Name must be 'username@hpc_name'. Update the Host Name field in the PuTTY app") from None
-                if "The host key is not cached for this server":
+                elif any("The host key is not cached for this server" in text for text in (stdout, stderr)):
                     raise RuntimeError("If first connection to this HPC, you must first click 'Open' in the PuTTY app to trust the host") from None
+                else:
+                    raise RuntimeError("Timed out in creating remote directory. Try again.")
             if "Host does not exist" in result.stderr:
                 raise RuntimeError("The PuTTY session or Host Name does not exist. Please check spelling and that the session is saved in the PuTTY app")
             if "Using username" not in result.stderr:
