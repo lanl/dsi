@@ -97,6 +97,7 @@ class Sync:
             raise ValueError("Error: Please use absolute paths instead of relative")
         
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
+        local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
         remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
 
@@ -300,7 +301,7 @@ class Sync:
         t.unload_module('backend', 'Sqlite', 'back-read')
 
         # GUFI Query
-#        with redirect_stdout(fnull):
+        # with redirect_stdout(fnull):
         t.load_module('backend', 'Gufi', 'back-read', gufi_prefix=gufi_prefix, gufi_index=gufi_index, dsi_table_name=f"{dsi_table_name}", 
                       dsi_columns=dsi_columns, gufi_columns=gufi_columns, collection_name=collection_name,
                       dsi_db=f)
@@ -336,7 +337,7 @@ class Sync:
         """Change group permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
             cmd = ["chgrp", "-R", user_group, local_loc]
-            self.execute_cmd(cmd, "changing user group for data", True)
+            self.execute_cmd(cmd, "changing user group for data", timer=True)
 
             cmd = ["chgrp", user_group, self.full_db_name]
             self.execute_cmd(cmd, "changing user group for database")
@@ -348,7 +349,7 @@ class Sync:
         """Change read permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
             cmd = ["chmod", "-R", "750", local_loc] # 770 to make read/write to all. 750 to make read to all
-            self.execute_cmd(cmd, "changing read permissions for data", True)
+            self.execute_cmd(cmd, "changing read permissions for data", timer=True)
 
             cmd = ["chmod", "750", self.full_db_name]
             self.execute_cmd(cmd, "changing read permissions for database")
@@ -454,27 +455,49 @@ class Sync:
 
             # making remote dir
             if self.verbose:
-                print(f' plink -load {putty_session} "mkdir -p {self.remote_location}"' )
-            cmd = ["plink", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
+                print(f' plink -v -no-antispoof -load {putty_session} "mkdir -p {self.remote_location}"' )
+            cmd = ["plink", "-v", "-no-antispoof", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
             print("Creating remote directory if it doesn't exist")
-            self.execute_cmd(cmd, "Creating remote dir")
-            # Check for valid session, "Access granted. Press return to begin session"
-
-            # Check for valid file permissions
-            
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=15)
+            except subprocess.TimeoutExpired as exc:
+                def as_text(value):
+                    if value is None:
+                        return ""
+                    if isinstance(value, bytes):
+                        return value.decode(errors="replace")
+                    return value
+                stdout = as_text(exc.stdout)
+                stderr = as_text(exc.stderr)
+                if "GSSAPI authentication initialisation failed" in stderr:
+                    raise RuntimeError("Need to set CAPI Cert for all sessions in PuTTY app:\n\n"
+                    "1. Open PuTTY app, select a session, click 'Load'\n"
+                    "2. On the left bar, go to Connection -> SSH -> Certificate screen\n"
+                    "3. Select 'Set CAPI Cert' and follow pop-up window prompts\n"
+                    "4. On the left bar, go to Sessions\n"
+                    "5. For the previously loaded session, select 'Save'\n"
+                    "6. Select 'Cancel' to close the app and set CAPI Cert for all sessions") from None
+                if "Using username" not in stderr:
+                    raise RuntimeError("The PuTTY session's Host Name must be 'username@hpc_name'. Update the Host Name field in the PuTTY app") from None
+                if "The host key is not cached for this server":
+                    raise RuntimeError("If first connection to this HPC, you must first click 'Open' in the PuTTY app to trust the host") from None
+            if "Host does not exist" in result.stderr:
+                raise RuntimeError("The PuTTY session or Host Name does not exist. Please check spelling and that the session is saved in the PuTTY app")
+            if "Using username" not in result.stderr:
+                raise RuntimeError("The PuTTY session's Host Name must be 'username@hpc_name'. Update the Host Name field in the PuTTY app")
+            if any(msg in (result.stdout + result.stderr) for msg in ("Connection abandoned.", "User aborted at host key verification")):
+                raise RuntimeError("On first connection to this HPC, you must enter 'y' to trust the host. Try again.")
+            if result.returncode != 0:
+                raise RuntimeError(f"Creating remote dir failed: \n{result.stderr}") from None
 
             # File movement
             cmd = ["pscp", "-r", "-p", self.local_location, f"{putty_session}:{self.remote_location}"]
             if self.verbose:
                 print()
                 print(*cmd)
-            self.execute_cmd(cmd, "Moving data with PuTTY")
-            # Check to see if "Server refused our key"
-            # Moniker was not part of putty session (or wrong moniker was used, please check if moniker is correct in putty session)
-
-            # Check print to see if successfull i.e. if it's empty, nothing moved
-
-            
+            stdout = self.execute_cmd(cmd, "Moving data with PuTTY")
+            if "successful" not in stdout.lower():
+                raise RuntimeError(f"PuTTY data movement was not successful. Please try again")
             print(" DSI PuTTY data movement complete.")
 
             # delete temp columns from filesystem table
@@ -489,11 +512,9 @@ class Sync:
                 if self.verbose:
                     print()
                     print(*cmd)
-                self.execute_cmd(cmd, "Moving database with PuTTY")
-                # Check to see if "Server refused our key"
-
-                # Check print to see if successfull i.e. if it's empty, nothing moved
-
+                stdout = self.execute_cmd(cmd, "Moving database with PuTTY")
+                if "successful" not in stdout.lower():
+                    raise RuntimeError(f"PuTTY database movement was not successful. Please try again")
             print(" DSI PuTTY database movement complete.")
 
         elif tool.lower() == "scp":
