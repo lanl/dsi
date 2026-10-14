@@ -27,7 +27,7 @@ from __future__ import annotations
 import enum
 import uuid
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -78,7 +78,7 @@ def ns_to_datetime_parts(timestamp_ns: int) -> dict:
     """
     seconds, _nanosecond = divmod(timestamp_ns, 1_000_000_000)
 
-    dt = datetime.fromtimestamp(seconds, tz=timezone.utc)
+    dt = datetime.fromtimestamp(seconds, tz=UTC)
     return dt
     # return {
     #     "year": dt.year,
@@ -122,7 +122,7 @@ def datetime_parts_to_ns(
         hour,
         minute,
         second,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
 
     return (
