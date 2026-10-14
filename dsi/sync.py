@@ -484,7 +484,7 @@ class Sync:
                 elif any("The host key is not cached for this server" in text for text in (stdout, stderr)):
                     raise RuntimeError("If first connection to this HPC, you must first click 'Open' in the PuTTY app to trust the host") from None
                 else:
-                    raise RuntimeError("Timed out in creating remote directory. Try again.")
+                    raise RuntimeError("Timed out in creating remote directory. Try again.") from None
             if "Host does not exist" in result.stderr:
                 raise RuntimeError("The PuTTY session or Host Name does not exist. Please check spelling and that the session is saved in the PuTTY app")
             if "Using username" not in result.stderr:
@@ -510,17 +510,16 @@ class Sync:
 
             # Database movement
             counter=0
-            for dbname in db_list:
-                if counter == 0:
+            for index, dbname in enumerate(db_list):
+                if index == 0:
                     self.t.unload_module('backend', self.backend_name, 'back-write')
-                full_db_path = str(PurePosixPath(os.getcwd().replace("\\", "/")) / dbname)
+                full_db_path = str(Path.cwd() / dbname)
                 full_remote_db_path = str(PurePosixPath(self.remote_location) / dbname)
                 cmd = [pscp, "-p", full_db_path, f"{putty_session}:{full_remote_db_path}"]
                 if self.verbose:
                     print()
                     print(*cmd)
                 stdout = self.execute_cmd(cmd, "Moving database with PuTTY")
-                counter += 1
             print(" DSI PuTTY database movement complete.")
 
         elif tool.lower() == "scp":
