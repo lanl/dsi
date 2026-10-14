@@ -454,10 +454,10 @@ class Sync:
                 raise RuntimeError("pscp.exe was not found; install the PuTTY tools.")
 
             # making remote dir
+            print("Creating remote directory if it doesn't exist")
             if self.verbose:
                 print(f' plink -v -no-antispoof -load {putty_session} "mkdir -p {self.remote_location}"' )
-            cmd = ["plink", "-v", "-no-antispoof", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
-            print("Creating remote directory if it doesn't exist")
+            cmd = [plink, "-v", "-no-antispoof", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=15)
             except subprocess.TimeoutExpired as exc:
@@ -491,7 +491,7 @@ class Sync:
                 raise RuntimeError(f"Creating remote dir failed: \n{result.stderr}") from None
 
             # File movement
-            cmd = ["pscp", "-r", "-p", self.local_location, f"{putty_session}:{self.remote_location}"]
+            cmd = [pscp, "-r", "-p", self.local_location, f"{putty_session}:{self.remote_location}"]
             if self.verbose:
                 print()
                 print(*cmd)
@@ -506,7 +506,7 @@ class Sync:
 
             # Database movement
             for dbname in db_list:
-                cmd = ["pscp", "-p", dbname, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
+                cmd = [pscp, "-p", dbname, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
                 if self.verbose:
                     print()
                     print(*cmd)
@@ -523,10 +523,10 @@ class Sync:
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # making remote dir
+            print("Creating remote directory if it doesn't exist")
             if self.verbose:
                 print(" ssh "+ str(host_part) + " \"mkdir -p " + path_part + "\"" )
             cmd = ["ssh", host_part, f'mkdir -p \"{path_part}\"']
-            print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
 
             # File movement
