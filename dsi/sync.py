@@ -71,16 +71,16 @@ class Sync:
         if create_bool is False:
             raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
     
-        backend_name = self.t.identify_backend(self.full_db_name)
+        self.backend_name = self.t.identify_backend(self.full_db_name)
         # Allows an empty database to be created, autoselect SQLite for the user
-        if backend_name is None:
+        if self.backend_name is None:
             #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
             print("Auto-selecting sqlite backend.")
-            backend_name = "Sqlite"
+            self.backend_name = "Sqlite"
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
+            self.t.load_module('backend', self.backend_name, 'back-write', filename=self.full_db_name)
 
         # Actually create a database and add a placeholder table
         if not self.t.valid_backend(self.t.loaded_backends[0]):
@@ -509,13 +509,18 @@ class Sync:
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
+            counter=0
             for dbname in db_list:
+                if counter == 0:
+                    self.t.unload_module('backend', self.backend_name, 'back-write')
                 full_db_path = str(PurePosixPath(os.getcwd().replace("\\", "/")) / dbname)
-                cmd = [pscp, "-p", full_db_path, f"{putty_session}:{os.path.join(self.remote_location, dbname)}"]
+                full_remote_db_path = str(PurePosixPath(self.remote_location) / dbname)
+                cmd = [pscp, "-p", full_db_path, f"{putty_session}:{full_remote_db_path}"]
                 if self.verbose:
                     print()
                     print(*cmd)
                 stdout = self.execute_cmd(cmd, "Moving database with PuTTY")
+                counter += 1
             print(" DSI PuTTY database movement complete.")
 
         elif tool.lower() == "scp":
