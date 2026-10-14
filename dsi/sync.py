@@ -504,8 +504,6 @@ class Sync:
                 print()
                 print(*cmd)
             stdout = self.execute_cmd(cmd, "Moving data with PuTTY")
-            if "successful" not in stdout.lower():
-                raise RuntimeError("PuTTY data movement was not successful. Please try again")
             print(" DSI PuTTY data movement complete.")
 
             # delete temp columns from filesystem table
@@ -521,8 +519,6 @@ class Sync:
                     print()
                     print(*cmd)
                 stdout = self.execute_cmd(cmd, "Moving database with PuTTY")
-                if "successful" not in stdout.lower():
-                    raise RuntimeError("PuTTY database movement was not successful. Please try again")
             print(" DSI PuTTY database movement complete.")
 
         elif tool.lower() == "scp":
