@@ -60,6 +60,13 @@ Webserver Backends
 ~~~~~~~~~~~~~~~~~~
 Webserver backends enable a user to connect to a remote data platform and interact with retrieved data in-memory.
 
+Denodo (Read-only)
+------------------
+
+.. automodule:: dsi.backends.denodo
+   :members: Denodo
+   :special-members: __init__
+
 NDP (Read-only)
 ---------------
 

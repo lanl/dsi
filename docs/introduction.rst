@@ -108,6 +108,7 @@ Filesystem Backends - Create a permanent database file in the user's local direc
   - DuckDB: In-process SQL database designed for fast queries on large data files. Supports POSIX-enforced file permissions.
 
 Webserver Backends - Create a connection to a remote data platform for users to retrieve data in-memory:
+  - Denodo (Read-only): Connection to a `Denodo Data Catalog <https://www.denodo.com/>`_ instance. Site-specific settings, including the catalog URL, are read from the user's environment or configuration file rather than stored in DSI.
   - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
   - Oceans11 (Read-only): Connection to data on DSI's `open data server: <https://oceans11.lanl.gov/>`_
   - OSTI (Read-only): Connection to data hosted by the Department of Energy's `Office of Scientific and Technical Information <https://www.osti.gov/>`_

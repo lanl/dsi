@@ -1,0 +1,8 @@
+{
+  "auth_url":     "https://<identity-provider>/as/authorization.oauth2",
+  "token_url":    "https://<identity-provider>/as/token.oauth2",
+  "client_id":    "<client id from your Denodo administrator>",
+  "redirect_uri": "https://<redirect-host>/oauth/2.0/redirectURL.jsp",
+  "scope":        "<scope>",
+  "base_url":     "https://<data-catalog-host>"
+}

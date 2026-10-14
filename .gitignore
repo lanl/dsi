@@ -3,6 +3,11 @@
 *.db
 #*.csv
 
+# Denodo: a filled-in config must never reach the open repository.
+# Only denodo_config.example.json, with placeholder values, is tracked.
+denodo_config.json
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -84,3 +89,4 @@ dsi.egg-info/
 .DS_Store
 _tmp*
 dsi_data/
+docs/images/cli_output.txt
