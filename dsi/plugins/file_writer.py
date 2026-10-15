@@ -158,13 +158,22 @@ class ER_Diagram(FileWriter):
         if manual_dot:
             dot_file.write("}")
             dot_file.close()
-            subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
-            os.remove(self.output_filename + ".dot")
+            try:
+                subprocess.run(["dot", "-T", file_type[1:], "-o", self.output_filename + file_type, self.output_filename + ".dot"])
+                os.remove(self.output_filename + ".dot")
+            except Exception as e:
+                if "No such file or directory: 'dot'" in str(e):
+                    raise OSError("Graphviz executable must be downloaded to global environment using sudo or homebrew.") from None
+
+                raise RuntimeError(str(e)) from None
         else:
             try:
                 dot.render(self.output_filename, cleanup=True)
-            except Exception:
-                raise OSError("Graphviz executable must be downloaded to global environment using sudo or homebrew.")
+            except Exception as e:
+                if "failed to execute PosixPath('dot'), make sure the Graphviz executables" in str(e):
+                    raise ValueError("Graphviz executable must be downloaded to global environment using sudo or homebrew.") from None
+                
+                raise RuntimeError(str(e)) from None
 
 class Csv_Writer(FileWriter):
     """
