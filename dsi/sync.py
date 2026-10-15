@@ -506,7 +506,7 @@ class Sync:
                 raise RuntimeError(f"Creating remote dir failed: \n{result.stderr}") from None
 
             # File movement
-            cmd = [pscp, "-r", "-p", f'"{self.local_location}"', f"{putty_session}:{self.remote_location}"]
+            cmd = [pscp, "-r", "-p", f'"{self.local_location}"', f'"{putty_session}:{self.remote_location}"']
             if self.verbose:
                 print()
                 print(*cmd)
@@ -527,7 +527,7 @@ class Sync:
                         self.t.unload_module('backend', self.backend_name, 'back-write')
                 full_db_path = str(Path.cwd() / dbname)
                 full_remote_db_path = str(PurePosixPath(self.remote_location) / dbname)
-                cmd = [pscp, "-p", full_db_path, f"{putty_session}:{full_remote_db_path}"]
+                cmd = [pscp, "-p", f'"{full_db_path}"', f'"{putty_session}:{full_remote_db_path}"']
                 if self.verbose:
                     print()
                     print(*cmd)
