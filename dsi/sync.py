@@ -453,7 +453,7 @@ class Sync:
             putty_session = kwargs.pop("putty_session", "")
             if not isinstance(putty_session, str) or putty_session == "":
                 raise ValueError("The putty_session must be provided to use PuTTY for data movement")
-
+            putty_session = f'"{putty_session}"'
             plink = shutil.which("plink.exe") or shutil.which("plink")
             pscp = shutil.which("pscp.exe") or shutil.which("pscp")
 
