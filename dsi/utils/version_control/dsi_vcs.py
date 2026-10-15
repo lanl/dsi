@@ -29,6 +29,7 @@ import json
 import datetime
 import shutil
 import tempfile
+import uuid
 from typing import Optional
 
 if sys.platform == "win32":
@@ -40,7 +41,10 @@ else:
     import grp
 
 from .vcs_db import DB_NAME, SNAPSHOTS_DIR, open_db
-from .vcs_metadata_helper import collect_metadata, owner_name, check_access_permission, set_acl
+from .vcs_metadata_helper import (
+    collect_metadata, owner_name, check_access_permission, set_acl,
+    check_metadata_access, access_identity, stat_fingerprint,
+)
 from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
 from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
 from .repolog.repository_log import RepositoryLog
@@ -195,20 +199,45 @@ class Version:
         if not os.path.isdir(self.root_folder):
             sys.exit(f"Error: '{self.root_folder}' is not a directory.")
 
-        conn = open_db(self.root_folder)
-        conn.close()
         self.repo_log = RepositoryLog(
             os.path.join(self.root_folder, SNAPSHOTS_DIR),
             repository_id="repo-123",
         )
+        conn = open_db(self.root_folder)
+        try:
+            state = conn.execute("SELECT commit_location FROM repository_state WHERE id=1").fetchone()
+            if state is None:
+                # One-time migration for repositories written before checkpoints.
+                location = None
+                if conn.execute("SELECT 1 FROM versions LIMIT 1").fetchone():
+                    for offset, record in self.repo_log.iter_records():
+                        if record.kind == RecordKind.COMMIT:
+                            location = offset
+                conn.execute("INSERT INTO repository_state VALUES (1, ?)", (location,))
+                conn.commit()
+            else:
+                location = state["commit_location"]
+            self.repo_log.latest_commit_location = location
+        finally:
+            conn.close()
         print(f"Initialized dsi-vcs repository in: {self.root_folder}")
         print(f"Versions are recorded in folder: {SNAPSHOTS_DIR}")
 
-    def _load_pending_stage_entries(self) -> dict[str, tuple[object, str]]:
+    def _load_pending_stage_entries(self, conn=None) -> dict[str, tuple[object, str]]:
+        own_connection = conn is None
+        conn = open_db(self.root_folder) if own_connection else conn
+        try:
+            state = conn.execute("SELECT commit_location FROM repository_state WHERE id=1").fetchone()
+            location = state["commit_location"] if state else None
+        finally:
+            if own_connection:
+                conn.close()
+        self.repo_log.latest_commit_location = location
         pending: dict[str, tuple[object, str]] = {}
-        for _, record in self.repo_log.iter_records(self.repo_log.latest_commit_location or 0):
+        for _, record in self.repo_log.iter_records(location or 0):
             if record.kind == RecordKind.COMMIT:
-                pending.clear()
+                # Only the SQL checkpoint establishes durability. A marker past
+                # it may belong to a commit whose SQL transaction rolled back.
                 continue
             if record.kind != RecordKind.DATA or not record.file_path:
                 continue
@@ -233,18 +262,24 @@ class Version:
 
         print(f"Staged paths ({len(staged)}):")
         for rel_path, (_record, action) in sorted(
-            ((os.path.relpath(path, self.root_folder), entry) for path, entry in staged.items()),
+            staged.items(),
             key=lambda item: item[0],
         ):
             print(f"  {rel_path} [{action}]")
 
-    def _check_path_validity(self, abs_path: str):
+    def _check_path_validity(self, abs_path: str, require_exists=True):
         rel_path = os.path.relpath(abs_path, self.root_folder)
-        if not os.path.lexists(abs_path):
+        if require_exists and not os.path.lexists(abs_path):
             print(f"  [skip] {abs_path}: path does not exist.")
             return False
-        if os.path.commonpath([os.path.realpath(rel_path), self.root_folder]) != self.root_folder:
+        if os.path.commonpath([os.path.abspath(abs_path), self.root_folder]) != self.root_folder:
             print(f"  [skip] {abs_path}: path is not under root folder.")
+            return False
+        if any(part in self.skip_names for part in rel_path.split(os.sep)):
+            return False
+        parent = os.path.realpath(os.path.dirname(abs_path))
+        if abs_path != self.root_folder and os.path.commonpath([parent, os.path.realpath(self.root_folder)]) != os.path.realpath(self.root_folder):
+            print(f"  [skip] {abs_path}: parent is outside root folder.")
             return False
         return True
 
@@ -283,10 +318,15 @@ class Version:
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
 
-            if os.path.isdir(abs_path):
+            if os.path.isdir(abs_path) and not os.path.islink(abs_path):
                 # Expand directory recursively
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
+                    if dirpath != self.root_folder:
+                        stage_path(dirpath)
+                    for dirname in dirnames:
+                        if os.path.islink(os.path.join(dirpath, dirname)):
+                            stage_path(os.path.join(dirpath, dirname))
                     for fname in filenames:
                         if fname in self.skip_names or dirpath == os.path.join(self.root_folder, SNAPSHOTS_DIR):
                             continue
@@ -313,7 +353,7 @@ class Version:
         def stage_path(abs_path: str):
             nonlocal staged
             rel_path = os.path.relpath(abs_path, self.root_folder)
-            if(self._check_path_validity(abs_path)):    
+            if self._check_path_validity(abs_path, require_exists=False):
                 stage_entries.append(
                     {
                         "file_path": rel_path,
@@ -328,10 +368,15 @@ class Version:
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
 
-            if os.path.isdir(abs_path):
+            if os.path.isdir(abs_path) and not os.path.islink(abs_path):
                 # Expand directory recursively
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
+                    if dirpath != self.root_folder:
+                        stage_path(dirpath)
+                    for dirname in dirnames:
+                        if os.path.islink(os.path.join(dirpath, dirname)):
+                            stage_path(os.path.join(dirpath, dirname))
                     for fname in filenames:
                         if fname in self.skip_names or dirpath == os.path.join(self.root_folder, SNAPSHOTS_DIR):
                             continue
@@ -358,7 +403,7 @@ class Version:
         def stage_path(abs_path: str):
             nonlocal removed
             rel_path = os.path.relpath(abs_path, self.root_folder)
-            if(self._check_path_validity(abs_path)):    
+            if self._check_path_validity(abs_path, require_exists=False):
                 stage_entries.append(
                     {
                         "file_path": rel_path,
@@ -373,10 +418,15 @@ class Version:
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
 
-            if os.path.isdir(abs_path):
+            if os.path.isdir(abs_path) and not os.path.islink(abs_path):
                 # Expand directory recursively
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
+                    if dirpath != self.root_folder:
+                        stage_path(dirpath)
+                    for dirname in dirnames:
+                        if os.path.islink(os.path.join(dirpath, dirname)):
+                            stage_path(os.path.join(dirpath, dirname))
                     for fname in filenames:
                         if fname in self.skip_names or dirpath == os.path.join(self.root_folder, SNAPSHOTS_DIR):
                             continue
@@ -506,18 +556,26 @@ class Version:
         conn.close()
         print(f"Merged branch '{branch_name}' into {child_commit_hash[:12]}")
 
-    def cmd_commit(self, message: str = ""):
+    def cmd_commit(self, message: str = "", *, rehash: bool = False):
         db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
         if not os.path.isfile(db_path):
             sys.exit("No dsi-vcs repo found. Run 'init' first.")
 
         conn = open_db(self.root_folder)
+        try:
+            self._commit_staged(conn, message, rehash=rehash)
+        finally:
+            # Closing also rolls back failed commits; pending log records remain
+            # recoverable because their SQL checkpoint was not advanced.
+            conn.close()
+
+    def _commit_staged(self, conn, message, *, rehash=False):
         cur = conn.cursor()
 
         # ── Load staged paths from the repository log ─────────────────────────
-        pending_entries = self._load_pending_stage_entries()
+        conn.execute("BEGIN IMMEDIATE")
+        pending_entries = self._load_pending_stage_entries(conn)
         if not pending_entries:
-            conn.close()
             sys.exit("Nothing staged. Use 'add' or 'delete' before committing.")
 
         staged_adds = [path for path, (_record, action) in pending_entries.items() if action == "add"]
@@ -533,45 +591,111 @@ class Version:
         else:
             running_user = owner_name(os.getuid())
         snapshots_root = os.path.join(self.root_folder, SNAPSHOTS_DIR)
-        entries_in_last_commit = set(self._get_entries_in_commit(conn, parent_commit_hash) if parent_commit_hash else [])
-
-        for added_paths in staged_adds:
-            entries_in_last_commit.add(os.path.relpath(added_paths, start=self.root_folder))
-        for deleted_paths in staged_deletes:
-            entries_in_last_commit.discard(os.path.relpath(deleted_paths, start=self.root_folder))
-
-        # ── Collect metadata for the complete committed tree ───────────────────
-        entries = []
-        for rel_path in entries_in_last_commit:
-            e = check_access_permission(conn, self.root_folder, parent_commit_hash, rel_path, "write")
-            if e is None:
-                print(f"  [skip] {rel_path}: write access denied")
+        parent_nodes = {
+            row["relative_path"]: dict(row) for row in conn.execute(
+                "SELECT mn.* FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
+                "WHERE v.root_folder=? AND v.commit_hash=?",
+                (self.root_folder, parent_commit_hash),
+            )
+        }
+        entries_by_path = {}
+        file_hashes, chunk_length = {}, {}
+        for path, node in parent_nodes.items():
+            if path == ".":
                 continue
+            entry = json.loads(node["metadata"])
+            entry.update(absolute_path=os.path.join(self.root_folder, path),
+                         _st_size=node["subtree_total_bytes"],
+                         stat_fingerprint=node["stat_fingerprint"])
+            entries_by_path[path] = entry
+            if node["file_type"] == "file":
+                file_hashes[path] = node["content_hash_sha256"]
+                chunk_length[path] = node["child_count"]
 
-            temp_meta = collect_metadata(os.path.join(self.root_folder, rel_path), self.root_folder)
-            if len(e) == 0 or ("owner_name" in e and running_user == e["owner_name"]): # only owner can update metadata
-                e = temp_meta
+        identity = access_identity()
+        name_cache = {}
+        changed_paths = set()
+        changed_entries = []
+        reused_paths = set(entries_by_path)
+        for path in staged_deletes:
+            # Log paths are already relative to the repository, not the CWD.
+            targets = [p for p in entries_by_path if p == path or p.startswith(path + os.sep)]
+            for target in targets:
+                if check_metadata_access(json.loads(parent_nodes[target]["metadata"]), "write", identity) is None:
+                    sys.exit(f"Write access denied: {target}")
+            for target in targets:
+                entries_by_path.pop(target)
+                reused_paths.discard(target)
+                changed_paths.add(target)
+
+        # Add missing ancestors so nested files and empty directories are real
+        # members of the tree. Unstaged existing paths retain their parent state.
+        adds = set(staged_adds)
+        for path in staged_adds:
+            parent = parent_path(path)
+            while parent != ".":
+                if parent not in entries_by_path:
+                    adds.add(parent)
+                parent = parent_path(parent)
+        for path in sorted(adds, key=lambda p: (p.count(os.sep), p)):
+            old_node = parent_nodes.get(path)
+            old_meta = json.loads(old_node["metadata"]) if old_node else {}
+            abs_path = os.path.join(self.root_folder, path)
+            try:
+                fingerprint = stat_fingerprint(abs_path)
+            except OSError as error:
+                sys.exit(f"Cannot commit {path}: {error}")
+            if not rehash and path in reused_paths and old_node["stat_fingerprint"] == fingerprint:
+                continue
+            if check_metadata_access(old_meta, "write", identity) is None:
+                sys.exit(f"Write access denied: {path}")
+            temp_meta = collect_metadata(abs_path, self.root_folder, name_cache=name_cache)
+            if "error" in temp_meta:
+                sys.exit(f"Cannot commit {path}: {temp_meta['error']}")
+            if not old_meta or running_user == old_meta.get("owner_name"):
+                entry = temp_meta
             else:
-                e["absolute_path"] = temp_meta["absolute_path"]
-                e["_st_size"] = temp_meta["_st_size"]
-                e["file_type"] = temp_meta["file_type"]
-                e["relative_path"] = temp_meta["relative_path"]
-                e["file_name"] = temp_meta["file_name"]
-            if "error" in e:
-                print(f"  [skip] {e['relative_path']}: {e['error']}")
-            else:
-                entries.append(e)
+                entry = dict(old_meta)
+                for key in ("absolute_path", "_st_size", "file_type", "relative_path", "file_name"):
+                    entry[key] = temp_meta[key]
+            entry["stat_fingerprint"] = fingerprint
+            entries_by_path[path] = entry
+            changed_entries.append(entry)
+            changed_paths.add(path)
+            reused_paths.discard(path)
+            # Replacing a directory with a file removes its old descendants.
+            if entry["file_type"] != "dir":
+                for descendant in list(entries_by_path):
+                    if descendant.startswith(path + os.sep):
+                        if check_metadata_access(json.loads(parent_nodes[descendant]["metadata"]), "write", identity) is None:
+                            sys.exit(f"Write access denied: {descendant}")
+                        entries_by_path.pop(descendant)
+                        reused_paths.discard(descendant)
+                        changed_paths.add(descendant)
+
+        entries = list(entries_by_path.values())
 
         total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
         file_count  = sum(1 for e in entries if e.get("file_type") == "file")
         print(f"  {file_count} file(s), {total_bytes:,} bytes")
 
-        if len(entries) == 0:
-            conn.close()
+        if len(entries) == 0 and not parent_nodes:
             sys.exit("No files to commit after filtering for access permissions.")
 
-        file_hashes, chunk_hashes, chunk_length = store_chunks_for_snapshot(conn, snapshots_root, entries)
-        root_tree_hash, merkle_nodes = build_merkle_tree(entries, file_hashes, chunk_length)
+        pending_commit = "pending-" + uuid.uuid4().hex
+        new_hashes, _chunk_hashes, new_lengths = store_chunks_for_snapshot(
+            conn, snapshots_root, changed_entries, pending_commit=pending_commit,
+        )
+        file_hashes.update(new_hashes)
+        chunk_length.update(new_lengths)
+        for entry in changed_entries:
+            if stat_fingerprint(entry["absolute_path"]) != entry["stat_fingerprint"]:
+                conn.rollback()
+                sys.exit(f"File changed while committing: {entry['relative_path']}; retry the commit.")
+        root_tree_hash, merkle_nodes = build_merkle_tree(
+            entries, file_hashes, chunk_length,
+            parent_nodes=parent_nodes, changed_paths=changed_paths,
+        )
         commit_hash = merkle_commit_hash(
             root_tree_hash=root_tree_hash,
             parent_commit_hash=parent_commit_hash,
@@ -583,11 +707,17 @@ class Version:
         )
 
         # ── update chunk store with commit hash ──────────────────────────────────
-        batch_size = 32000
-        update_sql = "UPDATE chunk_store SET commit_hash=? WHERE commit_hash = 'UPDATE' AND chunk_hash = ?"
-        update_params = [(commit_hash, chunk_hash) for chunk_hash in chunk_hashes]
-        for i in range(0, len(update_params), batch_size):
-            cur.executemany(update_sql, update_params[i:i + batch_size])
+        cur.execute("UPDATE chunk_store SET commit_hash=? WHERE commit_hash=?", (commit_hash, pending_commit))
+        # Preserve the complete manifest for restore, without reading file data
+        # or copying the references through Python for every unchanged file.
+        conn.execute("CREATE TEMP TABLE reused_paths (path TEXT PRIMARY KEY)")
+        conn.executemany("INSERT INTO reused_paths VALUES (?)", ((p,) for p in reused_paths))
+        conn.execute(
+            "INSERT INTO chunk_store (chunk_hash, chunk_size, created_at, commit_hash, relative_file_path, chunk_index) "
+            "SELECT chunk_hash, chunk_size, created_at, ?, relative_file_path, chunk_index "
+            "FROM chunk_store WHERE commit_hash=? AND relative_file_path IN (SELECT path FROM reused_paths)",
+            (commit_hash, parent_commit_hash),
+        )
         # ── Insert version row ───────────────────────────────────────────────────
         cur.execute(
             """INSERT INTO versions
@@ -603,6 +733,7 @@ class Version:
             "version_id", "root_folder", "relative_path", "file_type",
             "node_hash", "metadata", "content_hash_sha256",
             "subtree_file_count", "subtree_total_bytes", "child_count",
+            "stat_fingerprint",
         ]
         merkle_placeholders = ",".join("?" * len(merkle_cols))
         merkle_col_str = ",".join(merkle_cols)
@@ -623,7 +754,8 @@ class Version:
         commit_records = [record for record, _action in sorted(
             pending_entries.values(), key=lambda item: item[0].sequence
         )]
-        self.repo_log.commit(commit_records)
+        marker = self.repo_log.commit(commit_records)
+        conn.execute("UPDATE repository_state SET commit_location=? WHERE id=1", (marker.location,))
 
         branch_name = self._get_latest_branch_name(conn) or "main"
         branch_row = conn.execute(
@@ -645,15 +777,14 @@ class Version:
                 (self.root_folder, branch_name),
             )
             conn.execute(
-                "UPDATE branches SET is_latest=1, tracked_commit_hash=? WHERE root_folder=? AND branch_name=?",
-                (commit_hash, self.root_folder, branch_name),
+                "UPDATE branches SET is_latest=1, head_commit_hash=?, tracked_commit_hash=? WHERE root_folder=? AND branch_name=?",
+                (commit_hash, commit_hash, self.root_folder, branch_name),
             )
             conn.execute(
                 "INSERT INTO branch_links (parent_commit_hash, child_commit_hash, child_branch_name, created_at) VALUES (?, ?, ?, ?)",
                 (parent_commit_hash, commit_hash, branch_name, committed_at),
             )
         conn.commit()
-        conn.close()
 
         print(f"\n Committed {commit_hash} at {committed_at}")
         print(f"  Short hash : {commit_hash[:12]}")

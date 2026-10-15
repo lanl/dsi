@@ -26,6 +26,7 @@ def main():
 
     p_commit = sub.add_parser("commit", help="Snapshot and commit staged paths")
     p_commit.add_argument("message", nargs="?", default="Committed at " + datetime.datetime.now().isoformat())
+    p_commit.add_argument("--rehash", action="store_true", help="Refresh metadata and rehash every staged path instead of using its stat cache")
 
     p_branch = sub.add_parser("branch", help="Create a branch")
     p_branch.add_argument("branch_name")
@@ -74,7 +75,7 @@ def main():
         vcs.cmd_remove(args.files)
     elif args.command == "commit":
         vcs = Version(os.getcwd())
-        vcs.cmd_commit(args.message)
+        vcs.cmd_commit(args.message, rehash=args.rehash)
     elif args.command == "branch":
         vcs = Version(os.getcwd())
         vcs.cmd_branch(args.branch_name, args.start_point)

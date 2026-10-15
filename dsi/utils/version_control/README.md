@@ -72,6 +72,32 @@ dsi-vcs commit
 dsi-vcs commit "Initial data import"
 ```
 
+Consecutive commits reuse the previous snapshot for unstaged paths. Changes to
+tracked files are included only after staging them with `add`; deletions must
+be staged with `delete`. Directories, including empty directories, are tracked.
+
+When staging an entire directory again, unchanged files reuse their metadata,
+content hashes, and chunks. The local change detector checks device/inode,
+mode, ownership, link count, size, and nanosecond modification/change times.
+Access time is excluded so reading a file does not invalidate the cache.
+Changed paths are checked against the parent's recorded write permissions;
+a denied change aborts the commit and leaves staging intact.
+
+On filesystems with unreliable change timestamps, or to explicitly refresh all
+staged metadata and content, bypass the cache:
+
+```bash
+dsi-vcs add .
+dsi-vcs commit --rehash "Verify staged content"
+```
+
+Existing databases migrate automatically on open. The first staged commit for
+an older path refreshes its missing fingerprint; later commits can reuse it.
+The committed log checkpoint is persisted with the snapshot transaction, so
+new CLI processes replay pending staging records rather than the full history.
+Full manifests remain stored per version for compatibility with restore/diff;
+unchanged file content is neither read nor re-chunked during reuse.
+
 ### Branch Management
 
 **Create a new branch:**
@@ -450,6 +476,7 @@ Stores the content-addressed tree node for each committed path, including the sy
 | file_type           | TEXT       | file/dir/symlink/etc                               |
 | node_hash           | TEXT       | SHA-256 hash for this path node                    |
 | metadata            | TEXT       | file metadata in json                              |
+| stat_fingerprint    | TEXT       | Local stat change detector; excluded from node hash |
 | content_hash_sha256 | TEXT       | SHA-256 file content hash (NULL for directories)   |
 | subtree_file_count  | INTEGER    | File count below this node                         |
 | subtree_total_bytes | INTEGER    | Total bytes below this node                        |
@@ -463,6 +490,10 @@ Stores the content-addressed tree node for each committed path, including the sy
 
 - `idx_merkle_nodes_root_path` ON `(root_folder, version_id, relative_path)`
 - `idx_merkle_nodes_hash` ON `(root_folder, node_hash)`
+
+The `repository_state` table stores one `commit_location` byte offset for the
+last durably committed repository-log marker. It is updated in the same SQLite
+transaction as the version, Merkle nodes, chunk references, and branch head.
 
 ---
 

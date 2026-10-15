@@ -93,7 +93,7 @@ def _get_acl_darwin(path: str) -> Optional[str]:
     """Read ACLs on macOS via `ls -le`."""
     try:
         result = subprocess.run(
-            ["ls", "-le", path],
+            ["ls", "-led", path],
             capture_output=True, text=True, timeout=5
         )
         lines = result.stdout.splitlines()
@@ -245,9 +245,11 @@ def get_xattrs(path: str) -> Optional[str]:
 
 def get_security_context(path: str) -> Optional[str]:
     """Return SELinux/AppArmor security context if available."""
+    if sys.platform != "linux":
+        return None
     try:
         result = subprocess.run(
-            ["ls", "-Z", path],
+            ["ls", "-Zd", path],
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
@@ -272,7 +274,16 @@ def md5_hash(path: str, chunk_size: int = 1 << 20) -> Optional[str]:
         return None
 
 
-def collect_metadata(abs_path: str, root_folder: str) -> dict:
+def stat_fingerprint(path: str) -> str:
+    """Change detector for the local working tree; deliberately excludes atime."""
+    s = os.lstat(path)
+    return json.dumps([
+        s.st_dev, s.st_ino, s.st_mode, s.st_uid, s.st_gid, s.st_nlink,
+        s.st_size, s.st_mtime_ns, s.st_ctime_ns,
+    ], separators=(",", ":"))
+
+
+def collect_metadata(abs_path: str, root_folder: str, name_cache=None) -> dict:
     """
     Gather all available metadata for a single path.
 
@@ -307,6 +318,14 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
     }
 
     # ── all other (derived / external) attributes — own columns ──────────────
+    def cached_name(kind, value, lookup):
+        if name_cache is None:
+            return lookup(value)
+        key = (kind, value)
+        if key not in name_cache:
+            name_cache[key] = lookup(value)
+        return name_cache[key]
+
     entry = {
         "relative_path": rel_path,
         "absolute_path": abs_path,
@@ -318,8 +337,8 @@ def collect_metadata(abs_path: str, root_folder: str) -> dict:
 
         # human-readable permission strings
         "permissions_int":   stat.S_IMODE(mode),
-        "owner_name":        owner_name(s.st_uid),
-        "group_name":        group_name(s.st_gid),
+        "owner_name":        cached_name("uid", s.st_uid, owner_name),
+        "group_name":        cached_name("gid", s.st_gid, group_name),
 
         # external / subprocess-derived attributes
         "acl_text":         get_acl(abs_path),
@@ -365,7 +384,7 @@ def collect_tree_metadata(scan_root: str, identity_root: str) -> list[dict]:
 
 
 # None if permission denined, acl text if permission granted, or empty string if no acl text available
-def check_access_permission(conn, root_folder: str, commit_hash: str, relative_path: str, access: str = "read") -> dict:
+def check_access_permission(conn, root_folder: str, commit_hash: str, relative_path: str, access: str = "read") -> Optional[dict]:
     row = conn.execute(
         "SELECT "
         "    mn.metadata AS metadata "
@@ -380,6 +399,28 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
     if row is None:
         return {}
     metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+    return check_metadata_access(metadata, access)
+
+
+def access_identity():
+    """Resolve once per command, rather than once per committed path."""
+    if sys.platform == "win32":
+        return getpass.getuser(), frozenset()
+    try:
+        username = pwd.getpwuid(os.geteuid()).pw_name
+    except KeyError:
+        return None
+    groups = set()
+    for gid in set(os.getgroups()) | {os.getegid()}:
+        try:
+            groups.add(grp.getgrgid(gid).gr_name)
+        except KeyError:
+            pass
+    return username, frozenset(groups)
+
+
+def check_metadata_access(metadata: dict, access: str = "read", identity=None) -> Optional[dict]:
+    """Authorize already-loaded metadata without another SQL or identity lookup."""
     acl_text = metadata.get("acl_text")
     owner_name = metadata.get("owner_name")
     group_name = metadata.get("group_name")
@@ -391,26 +432,12 @@ def check_access_permission(conn, root_folder: str, commit_hash: str, relative_p
     if access not in {"read", "write"}:
         raise ValueError("access must be 'read' or 'write'")
 
+    identity = access_identity() if identity is None else identity
+    if identity is None:
+        return {}
+    username, current_groups = identity
     if sys.platform == "win32":
-        username = getpass.getuser()
         return metadata if username == owner_name else None
-    else:
-        try:
-            current_user = pwd.getpwuid(os.geteuid())
-            username = current_user.pw_name
-        except KeyError:
-            return {}
-
-        current_groups = set()
-        try:
-            current_groups.add(grp.getgrgid(os.getegid()).gr_name)
-        except KeyError:
-            pass
-        for gid in os.getgroups():
-            try:
-                current_groups.add(grp.getgrgid(gid).gr_name)
-            except KeyError:
-                pass
 
     # If acl_text is available, check it first for explicit allows for the
     # current user or any of the user's groups. On Darwin, acl_text is expected

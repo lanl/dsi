@@ -2,7 +2,7 @@ import hashlib
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from .log_record import _utcnow
 from .content_chunking.npy_chunking import NPY_MAGIC, chunk_npy_file, NpyFormatError
 from .content_chunking.db_chunking import SQLITE_MAGIC, chunk_sqlite_file, SQLiteFormatError
@@ -259,25 +259,15 @@ def _find_fastcdc_cut(
     return scan_length
 
 
-def chunk_file_fastcdc(
+def iter_file_fastcdc(
     path: str | os.PathLike[str],
-) -> list[dict[str, object]]:
+) -> Iterator[dict[str, object]]:
     """
-    Split a file into FastCDC chunks.
+    Stream a file as FastCDC chunks.
 
-    The return structure is compatible with the previous implementation:
-
-        [
-            {
-                "sha256": "<hex digest>",
-                "size": 65536,
-                "data": b"...",
-            },
-            ...
-        ]
+    Yield dictionaries with ``sha256``, ``size`` and ``data`` fields.
+    Boundary selection is identical to the compatibility list API.
     """
-    chunks: list[dict[str, object]] = []
-
     # Bytes before buffer_start have already been emitted.
     buffer = bytearray()
     buffer_start = 0
@@ -325,7 +315,7 @@ def chunk_file_fastcdc(
                 ]
             )
 
-            chunks.append(
+            yield (
                 {
                     "sha256": hashlib.sha256(
                         chunk_data
@@ -347,7 +337,10 @@ def chunk_file_fastcdc(
                 del buffer[:buffer_start]
                 buffer_start = 0
 
-    return chunks
+
+def chunk_file_fastcdc(path):
+    """Compatibility list API; snapshot storage uses the streaming iterator."""
+    return list(iter_file_fastcdc(path))
 
 
 def _has_npy_magic(path: str | os.PathLike[str]) -> bool:
@@ -364,7 +357,7 @@ def is_sqlite_file(path):
     except OSError:
         return False
 
-def chunk_file(path):
+def chunk_file(path, *, streaming=False):
     path = Path(path)
     f_suffix = path.suffix.lower()
 
@@ -404,7 +397,7 @@ def chunk_file(path):
         except XMLFormatError:
             pass
 
-    return chunk_file_fastcdc(path)
+    return iter_file_fastcdc(path) if streaming else chunk_file_fastcdc(path)
 
 
 def chunk_file_rolling_hash(path):
@@ -453,7 +446,7 @@ def chunk_file_rolling_hash(path):
     return chunks
 
 # ─────────────────────────── CHUNK-BASED STORAGE ───────────────────────────
-def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any]]) -> tuple[dict[str, str], set, dict[str, int]]:
+def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any]], *, pending_commit="UPDATE") -> tuple[dict[str, str], set, dict[str, int]]:
     chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
     os.makedirs(chunk_dir, exist_ok=True)
     file_hashes = {}
@@ -462,12 +455,14 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
     for entry in entries:
 
         file_path = entry['absolute_path']
-        if not os.path.isfile(file_path):
+        if entry.get('file_type') != 'file':
             continue
 
         h = hashlib.sha256()
-        all_chunks = chunk_file(file_path)
+        all_chunks = chunk_file(file_path, streaming=True)
+        count = 0
         for i, chunk in enumerate(all_chunks):
+            count += 1
             chunk_path = os.path.join(chunk_dir, chunk['sha256'])
             h.update(chunk['sha256'].encode('utf-8'))
             if not os.path.exists(chunk_path):
@@ -490,11 +485,11 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
             conn.execute(
                 "INSERT INTO chunk_store "
                 "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, "UPDATE"),
+                (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, pending_commit),
             )
             chunk_hashes.add(chunk['sha256'])
         file_hashes[entry['relative_path']] = h.hexdigest()
-        chunk_length[entry['relative_path']] = len(all_chunks)
+        chunk_length[entry['relative_path']] = count
     return file_hashes, chunk_hashes, chunk_length
 
 def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_hash: str, file_hash: str, output_path: str) -> bool:

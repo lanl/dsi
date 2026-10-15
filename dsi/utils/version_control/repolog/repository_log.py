@@ -54,7 +54,7 @@ class RepositoryLog:
 
     def __init__(self, log_file_dir: str | Path, repository_id: str):
         self.log_file = os.path.join(log_file_dir, f"{repository_id}.log")
-        self.latest_commit_location: Optional[Location] = None # this is stored in version sql table
+        self.latest_commit_location: Optional[Location] = None  # restored from repository_state by Version
         self.repository_id = repository_id
         self.store = LogFileStore(self.log_file)        
         self._lock = threading.Lock()
@@ -132,7 +132,7 @@ class RepositoryLog:
             prev_hash = tail[1].record_hash if tail else None
             next_sequence = tail[1].sequence + 1 if tail else 0
 
-            results: list[AppendResult] = []
+            results: list[LogRecord] = []
             for entry in entries:
                 record = LogRecord(
                     sequence=next_sequence,
@@ -149,14 +149,16 @@ class RepositoryLog:
                 record.record_hash = compute_record_hash(
                     record.hashable_payload(), prev_hash
                 )
-                location = self.store.append(record.model_dump_json().encode("utf-8"))
-                results.append(AppendResult(record=record, location=location))
+                results.append(record)
 
                 prev_hash = record.record_hash
                 next_sequence += 1
 
-            self._tail_cache = (results[-1].location, results[-1].record)
-            return results
+            locations = self.store.append_many(r.model_dump_json().encode("utf-8") for r in results)
+            appended = [AppendResult(record=r, location=loc) for r, loc in zip(results, locations)]
+            if appended:
+                self._tail_cache = (appended[-1].location, appended[-1].record)
+            return appended
 
     # -- commit boundaries (append-only "commit", section 4) -----------------
 

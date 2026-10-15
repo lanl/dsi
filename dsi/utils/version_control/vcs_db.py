@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS merkle_nodes (
     file_type           TEXT    NOT NULL,
     node_hash           TEXT    NOT NULL,
     metadata            TEXT    DEFAULT NULL,
+    stat_fingerprint    TEXT,
     content_hash_sha256 TEXT,
     subtree_file_count  INTEGER NOT NULL,
     subtree_total_bytes INTEGER NOT NULL,
@@ -77,6 +78,11 @@ CREATE TABLE IF NOT EXISTS chunk_store (
 CREATE INDEX IF NOT EXISTS idx_chunk_store_commit_file
     ON chunk_store (commit_hash, relative_file_path, chunk_index);
 
+CREATE TABLE IF NOT EXISTS repository_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    commit_location INTEGER
+);
+
 """
 
 
@@ -89,5 +95,8 @@ def open_db(root_folder: str) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(merkle_nodes)")}
+    if "stat_fingerprint" not in columns:
+        conn.execute("ALTER TABLE merkle_nodes ADD COLUMN stat_fingerprint TEXT")
     conn.commit()
     return conn

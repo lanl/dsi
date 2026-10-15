@@ -13,7 +13,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterable, Iterator, Optional
 
 from .exceptions import CorruptFrameError, RecordNotFoundError
 from .frame_codec import decode_frame_backward, decode_frame_forward, encode_frame
@@ -47,14 +47,22 @@ class LogFileStore:
 
     def append(self, payload: bytes) -> Location:
         """Append one frame to the log file, fsync, and return its offset."""
+        return self.append_many([payload])[0]
+
+    def append_many(self, payloads: Iterable[bytes]) -> list[Location]:
+        """Write a durable batch with one open and fsync, retaining frame offsets."""
+        frames = [encode_frame(payload) for payload in payloads]
+        if not frames:
+            return []
         with self._write_lock:
-            frame = encode_frame(payload)
+            offsets = []
             with open(self.log_file_path, "ab") as f:
-                offset = f.tell()
-                f.write(frame)
+                for frame in frames:
+                    offsets.append(f.tell())
+                    f.write(frame)
                 f.flush()
                 os.fsync(f.fileno())
-            return offset
+            return offsets
 
     # -- reading ----------------------------------------------------------
 

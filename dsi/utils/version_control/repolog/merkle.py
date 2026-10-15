@@ -61,8 +61,15 @@ def _stable_metadata(entry: dict[str, Any], relative_path: str) -> dict[str, Any
     }
 
 
-def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str], chunk_length: dict[str, int]) -> tuple[str, list[dict[str, Any]]]:
+def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str], chunk_length: dict[str, int], *, parent_nodes=None, changed_paths=None) -> tuple[str, list[dict[str, Any]]]:
     entries_by_path = {entry["relative_path"]: entry for entry in entries}
+    # Every leaf must be reachable from the root, even when callers only
+    # supplied files. Commit callers collect real metadata for these parents.
+    for path in list(entries_by_path):
+        parent = parent_path(path)
+        while parent != ".":
+            entries_by_path.setdefault(parent, {"relative_path": parent, "file_type": "dir"})
+            parent = parent_path(parent)
     children_by_parent: dict[str, list[tuple[str, str]]] = {".": []}
 
     for relative_path in entries_by_path:
@@ -70,7 +77,16 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
         children_by_parent.setdefault(parent, []).append((os.path.basename(relative_path), relative_path))
         children_by_parent.setdefault(relative_path, [])
 
-    nodes: dict[str, dict[str, Any]] = {}
+    dirty = {"."}
+    for path in changed_paths if changed_paths is not None else entries_by_path:
+        dirty.add(path)
+        while path != ".":
+            path = parent_path(path)
+            dirty.add(path)
+    nodes: dict[str, dict[str, Any]] = {
+        path: dict(node) for path, node in (parent_nodes or {}).items()
+        if path in entries_by_path and path not in dirty
+    }
 
     def build_node(relative_path: str) -> dict[str, Any]:
         if relative_path in nodes:
@@ -135,6 +151,7 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
             "file_type": file_type,
             "node_hash": node_hash,
             "metadata": metadata,
+            "stat_fingerprint": entry.get("stat_fingerprint"),
             "content_hash_sha256": content_hash,
             "subtree_file_count": subtree_file_count,
             "subtree_total_bytes": subtree_total_bytes,
