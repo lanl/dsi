@@ -513,7 +513,6 @@ class Sync:
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
-            counter=0
             for index, dbname in enumerate(db_list):
                 if index == 0:
                     fnull = open(os.devnull, 'w')
