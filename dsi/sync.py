@@ -506,6 +506,7 @@ class Sync:
                 raise RuntimeError(f"Creating remote dir failed: \n{result.stderr}") from None
 
             # File movement
+            self.local_location = self.local_location.removesuffix("/")
             cmd = [pscp, "-r", "-p", f'{self.local_location}', f'{putty_session}:{self.remote_location}']
             if self.verbose:
                 print()
