@@ -481,12 +481,12 @@ class Sync:
                     "2. Select 'Default Settings' session and click 'Load'\n"
                     "3. On the left bar, go to Connection -> SSH -> Certificate screen\n"
                     "4. Check box for 'Attempt certificate authentication"
-                    "4. Select 'Set CAPI Cert' and follow pop-up window prompts\n"
-                    "5. On the left bar, scroll up to 'Session'\n"
-                    "6. Select 'Default Settings' session again and click 'Save'\n"
-                    "7. Delete your previous session (if any)."
-                    "8. Select 'Default Settings' session and click 'Load'"
-                    "9. Enter in 'Host Name' and 'Saved Sessions' Name and click 'Save'") from None
+                    "5. Select 'Set CAPI Cert' and follow pop-up window prompts\n"
+                    "6. On the left bar, scroll up to 'Session'\n"
+                    "7. Select 'Default Settings' session again and click 'Save'\n"
+                    "8. Delete your previous session (if any)."
+                    "9. Select 'Default Settings' session and click 'Load'"
+                    "10. Enter in 'Host Name' and 'Saved Sessions' Name and click 'Save'") from None
                 if "Using username" not in stderr:
                     raise RuntimeError("The PuTTY session's Host Name must be 'username@hpc_name'. Update the Host Name field in the PuTTY app") from None
                 elif any("The host key is not cached for this server" in text for text in (stdout, stderr)):
