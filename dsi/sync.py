@@ -388,6 +388,9 @@ class Sync:
         
         file_list = filesystem_df["file_abs"].tolist()
         rfile_list = filesystem_df["file_remote"].tolist()
+
+        if tool.lower not in ["copy", "scp", "rsync", "putty", "conduit", "pfcp"]:
+            raise RuntimeError(f"Copy tool '{tool}' not supported")
         
         # Test remote location validity and try creating folders
         # TODO: iterate through remote/server list here, for now:
