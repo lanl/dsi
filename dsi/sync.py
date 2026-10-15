@@ -98,10 +98,10 @@ class Sync:
         if not Path(local_loc).is_absolute() or not PurePosixPath(remote_loc).is_absolute():
             raise ValueError("Please use absolute paths instead of relative")
 
-        local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
-        remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
+        local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
+        remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
 
         loc_path = Path(local_loc)
         if not loc_path.exists() or not loc_path.is_dir():
@@ -453,7 +453,7 @@ class Sync:
             putty_session = kwargs.pop("putty_session", "")
             if not isinstance(putty_session, str) or putty_session == "":
                 raise ValueError("The putty_session must be provided to use PuTTY for data movement")
-            putty_session = f'"{putty_session}"'
+
             plink = shutil.which("plink.exe") or shutil.which("plink")
             pscp = shutil.which("pscp.exe") or shutil.which("pscp")
 
