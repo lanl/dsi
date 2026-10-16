@@ -1,0 +1,18 @@
+{
+  "alexandria": {
+    "signature": {"table": "alexandria_dataset", "required_column": "unique_persistent_identifier_(pid)"},
+    "primary_table": "alexandria_dataset",
+    "field_map": {"keyword": "keyword", "author": "creator", "title": "title", "id": "unique_persistent_identifier_(pid)"}
+  },
+  "oceans11": {
+    "signature": {"table": "records", "required_column": "t2db_url"},
+    "primary_table": "records",
+    "field_map": {
+      "keyword": ["title", "authors", "subjects", "description", "doi", "report_number"],
+      "author": "authors",
+      "title": "title",
+      "doi": "doi",
+      "id": "osti_id"
+    }
+  }
+}

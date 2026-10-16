@@ -115,8 +115,10 @@ class OSTI(Webserver):
         self.base_url = base_url.rstrip("/")
 
         # OSTI public API does not require authentication,
-        # but we allow optional API key for future or private endpoints
-        self.headers = {}
+        # but we allow optional API key for future or private endpoints.
+        # Explicitly request JSON - without this, OSTI's API inconsistently
+        # (non-deterministically) returns XML for the same request.
+        self.headers = {"Accept": "application/json"}
         if self.api_key:
             self.headers["Authorization"] = self.api_key
 
