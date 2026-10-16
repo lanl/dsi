@@ -8,11 +8,12 @@ import time
 import itertools
 import shutil
 import pandas as pd
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterator
 from contextlib import redirect_stdout
 from collections import OrderedDict
 from urllib.parse import urlparse
+import posixpath
 
 from dsi.core import Terminal
 from dsi.utils.federated.federate_datasets import federate_datasets, pull_data
@@ -25,7 +26,9 @@ class Sync:
     sync (local filesystem with remote) exist.
     """
     def __init__(self, project_name, isVerbose = False, no_parent = False, skip_index = False, **kwargs):
-        self.project_name = project_name
+        if "../" in project_name:
+            raise ValueError("Error: Please use absolute paths instead of relative")
+        self.project_name = project_name.replace("\\", "/")
         self.verbose = isVerbose
         self.no_parent = no_parent
         self.skip_index = skip_index
@@ -68,16 +71,16 @@ class Sync:
         if create_bool is False:
             raise RuntimeError(f"Cannot open the {project_name} database due to write permissions. Please try elsewhere.")
     
-        backend_name = self.t.identify_backend(self.full_db_name)
+        self.backend_name = self.t.identify_backend(self.full_db_name)
         # Allows an empty database to be created, autoselect SQLite for the user
-        if backend_name is None:
+        if self.backend_name is None:
             #raise ValueError("Unsupported DSI database type. Currently supporting: Sqlite, DuckDB")
             print("Auto-selecting sqlite backend.")
-            backend_name = "Sqlite"
+            self.backend_name = "Sqlite"
 
         fnull = open(os.devnull, 'w')
         with redirect_stdout(fnull):
-            self.t.load_module('backend', backend_name, 'back-write', filename=self.full_db_name)
+            self.t.load_module('backend', self.backend_name, 'back-write', filename=self.full_db_name)
 
         # Actually create a database and add a placeholder table
         if not self.t.valid_backend(self.t.loaded_backends[0]):
@@ -92,11 +95,17 @@ class Sync:
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        if "../" in local_loc or "../" in remote_loc:
-            raise ValueError("Error: Please use absolute paths instead of relative")
-        
+        if not Path(local_loc).is_absolute() or not PurePosixPath(remote_loc).is_absolute():
+            raise ValueError("Please use absolute paths instead of relative")
+
+        local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
+        remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
+
+        loc_path = Path(local_loc)
+        if not loc_path.exists() or not loc_path.is_dir():
+            raise ValueError("Input local path must be an path to an existing directory.")
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
@@ -109,7 +118,7 @@ class Sync:
                 fed_table = self.t.get_table("federated")
                 fed_remote, fed_local = fed_table.loc[0, ["remote_location", "local_location"]]
                 if fed_local == local_loc:
-                    self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
+                    self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
                     self.local_location = local_loc
                     if fed_remote == remote_loc:
                         if self.verbose:
@@ -147,8 +156,10 @@ class Sync:
             print("Crawled "+str(file_len)+" files.")
         
         file_list = list(file_list) # save as list since dircrawl2() returns an iterator 
-        
-        self.remote_location = os.path.join(remote_loc, self.project_name) + os.sep
+        file_list = [files.replace("\\", "/") for files in file_list] # Normalize the directories
+
+
+        self.remote_location = posixpath.join(remote_loc, self.project_name) + "/"
         self.local_location = local_loc
         # populate st_list to hold all filesystem attributes
         st_list = []
@@ -178,14 +189,14 @@ class Sync:
 
         for file in file_list:
             parent_rel_file = Path(file).relative_to(Path(local_loc).parent)
-            rel_file = os.path.relpath(file,local_loc) #rel path
-            filepath = os.path.join(local_loc, rel_file)
+            rel_file = os.path.relpath(file,local_loc).replace("\\", "/")
+            filepath = os.path.join(local_loc, rel_file).replace("\\", "/")
             st = os.stat(filepath)
             # append future location to st
             if self.no_parent: # exclude parent dir of every file in remote location
-                rfilepath = os.path.join(remote_loc, self.project_name, rel_file)
+                rfilepath = posixpath.join(remote_loc, self.project_name, rel_file)
             else:
-                rfilepath = os.path.join(remote_loc, self.project_name, parent_rel_file)
+                rfilepath = posixpath.join(remote_loc, self.project_name, parent_rel_file)
             st_dict['file_origin'].append(rel_file)
             st_dict['file_abs'].append(file) # Temporary column for unix copy
             st_dict['size'].append(st.st_size)
@@ -199,7 +210,7 @@ class Sync:
             st_dict['uid'].append(st.st_uid)
             st_dict['gid'].append(st.st_gid)
             st_dict['uuid'].append(self.gen_uuid(st))
-            st_dict['file_remote'].append(rfilepath)
+            st_dict['file_remote'].append(rfilepath.replace("\\", "/"))
             st_list.append(st)
             if self.verbose:
                 progress = int(len(st_list) / file_len * 100)
@@ -296,7 +307,7 @@ class Sync:
         t.unload_module('backend', 'Sqlite', 'back-read')
 
         # GUFI Query
-#        with redirect_stdout(fnull):
+        # with redirect_stdout(fnull):
         t.load_module('backend', 'Gufi', 'back-read', gufi_prefix=gufi_prefix, gufi_index=gufi_index, dsi_table_name=f"{dsi_table_name}", 
                       dsi_columns=dsi_columns, gufi_columns=gufi_columns, collection_name=collection_name,
                       dsi_db=f)
@@ -332,7 +343,7 @@ class Sync:
         """Change group permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
             cmd = ["chgrp", "-R", user_group, local_loc]
-            self.execute_cmd(cmd, "changing user group for data", True)
+            self.execute_cmd(cmd, "changing user group for data", timer=True)
 
             cmd = ["chgrp", user_group, self.full_db_name]
             self.execute_cmd(cmd, "changing user group for database")
@@ -344,7 +355,7 @@ class Sync:
         """Change read permissions for data and db. Only works for OS with Unix (not Windows)"""
         try:
             cmd = ["chmod", "-R", "750", local_loc] # 770 to make read/write to all. 750 to make read to all
-            self.execute_cmd(cmd, "changing read permissions for data", True)
+            self.execute_cmd(cmd, "changing read permissions for data", timer=True)
 
             cmd = ["chmod", "750", self.full_db_name]
             self.execute_cmd(cmd, "changing read permissions for database")
@@ -356,7 +367,7 @@ class Sync:
         self.copy(tool)
 
 
-    def copy(self, tool="copy"):
+    def copy(self, tool="copy", **kwargs):
         """
         Helper function to perform the data copy over using a preferred API
         """
@@ -377,10 +388,13 @@ class Sync:
         
         file_list = filesystem_df["file_abs"].tolist()
         rfile_list = filesystem_df["file_remote"].tolist()
+
+        if tool.lower() not in ["copy", "scp", "rsync", "putty", "conduit", "pfcp"]:
+            raise RuntimeError(f"Copy tool '{tool}' not supported")
         
         # Test remote location validity and try creating folders
         # TODO: iterate through remote/server list here, for now:
-        if tool.lower() not in ["scp", "rsync"]: # Exclude scp and rsync since they create folders differently
+        if tool.lower() not in ["scp", "rsync", "putty"]: # Exclude scp and rsync since they create folders differently
             remote_list = [self.remote_location]
             for remote in remote_list:
                 if self.verbose:
@@ -434,7 +448,93 @@ class Sync:
                 shutil.copy2(dbname, os.path.join(self.remote_location, dbname))
 
             print(" Data Copy Complete!")
-        
+
+        elif tool.lower() == "putty":
+            putty_session = kwargs.pop("putty_session", "")
+            if not isinstance(putty_session, str) or putty_session == "":
+                raise ValueError("The putty_session must be provided to use PuTTY for data movement")
+
+            plink = shutil.which("plink.exe") or shutil.which("plink")
+            pscp = shutil.which("pscp.exe") or shutil.which("pscp")
+
+            if not plink:
+                raise RuntimeError("plink.exe was not found; install the PuTTY tools.")
+            if not pscp:
+                raise RuntimeError("pscp.exe was not found; install the PuTTY tools.")
+
+            # making remote dir
+            print("Creating remote directory if it doesn't exist")
+            if self.verbose:
+                print(f' plink -v -no-antispoof -load {putty_session} "mkdir -p {self.remote_location}"' )
+            cmd = [plink, "-v", "-no-antispoof", "-load", putty_session, f'mkdir -p \"{self.remote_location}\"']
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=20)
+            except subprocess.TimeoutExpired as exc:
+                def as_text(value):
+                    if value is None:
+                        return ""
+                    if isinstance(value, bytes):
+                        return value.decode(errors="replace")
+                    return value
+                stdout = as_text(exc.stdout)
+                stderr = as_text(exc.stderr)
+                if "GSSAPI authentication initialisation failed" in stderr:
+                    raise RuntimeError("Need to set CAPI Cert for your session in PuTTY app:\n\n"
+                    "1. Open PuTTY app, select the session you were using and 'Load' it. Remember the Host Name field.\n"
+                    "2. Select 'Default Settings' session and click 'Load'\n"
+                    "3. On the left bar, go to Connection -> SSH -> Certificate screen\n"
+                    "4. Check box for 'Attempt certificate authentication'"
+                    "5. Select 'Set CAPI Cert' and follow pop-up window prompts\n"
+                    "6. On the left bar, scroll up to 'Session'\n"
+                    "7. Select 'Default Settings' session again and click 'Save'\n"
+                    "8. Delete your previous session (if any)."
+                    "9. Select 'Default Settings' session and click 'Load'"
+                    "10. Complete 'Host Name' & 'Saved Sessions' fields for your PuTTY session and click 'Save'") from None
+                if "Using username" not in stderr:
+                    raise RuntimeError("The PuTTY session's Host Name must be 'username@hpc_name'. Update the Host Name field in the PuTTY app") from None
+                elif any("The host key is not cached for this server" in text for text in (stdout, stderr)):
+                    raise RuntimeError("If first connection to this HPC, you must first click 'Open' in the PuTTY app to trust the host") from None
+                else:
+                    raise RuntimeError("Timed out in creating remote directory. Try again.") from None
+            if "Host does not exist" in result.stderr:
+                raise RuntimeError("The PuTTY session or Host Name does not exist. Please check spelling and that the session is saved in the PuTTY app")
+            if "Using username" not in result.stderr:
+                raise RuntimeError("The PuTTY session's Host Name must be 'username@hpc_name'. Update the Host Name field in the PuTTY app")
+            if any(msg in (result.stdout + result.stderr) for msg in ("Connection abandoned.", "User aborted at host key verification")):
+                raise RuntimeError("On first connection to this HPC, you must enter 'y' to trust the host. Try again.")
+            if result.returncode != 0:
+                raise RuntimeError(f"Creating remote dir failed: \n{result.stderr}") from None
+
+            # File movement
+            self.local_location = self.local_location.removesuffix("/")
+            cmd = [pscp, "-r", "-p", f'{self.local_location}', f'{putty_session}:{self.remote_location}']
+            if self.verbose:
+                print()
+                print(*cmd)
+            stdout = self.execute_cmd(cmd, "Moving data with PuTTY")
+            print(" DSI PuTTY data movement complete.")
+
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
+            # Database movement
+            for index, dbname in enumerate(db_list):
+                if index == 0:
+                    fnull = open(os.devnull, 'w')
+                    with redirect_stdout(fnull):
+                        self.t.unload_module('backend', self.backend_name, 'back-write')
+                full_db_path = str(Path.cwd() / dbname)
+                full_remote_db_path = str(PurePosixPath(self.remote_location) / dbname)
+                cmd = [pscp, "-p", f'{full_db_path}', f'{putty_session}:{full_remote_db_path}']
+                if self.verbose:
+                    print()
+                    print(*cmd)
+                stdout = self.execute_cmd(cmd, "Moving database with PuTTY")
+            print(" DSI PuTTY database movement complete.")
+
         elif tool.lower() == "scp":
             try:
                 host_part, path_part = self.remote_location.split(":", 1)
@@ -445,10 +545,10 @@ class Sync:
                 raise ValueError("Remote path must be absolute (starting with /)")
             
             # making remote dir
+            print("Creating remote directory if it doesn't exist")
             if self.verbose:
                 print(" ssh "+ str(host_part) + " \"mkdir -p " + path_part + "\"" )
             cmd = ["ssh", host_part, f'mkdir -p \"{path_part}\"']
-            print("Creating remote directory if it doesn't exist")
             self.execute_cmd(cmd, "Creating remote dir")
 
             # File movement

@@ -2,7 +2,7 @@ import math
 import os
 from collections import OrderedDict
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any, Iterable
 try:
@@ -298,7 +298,7 @@ class VTK_Reader(FileReader):
                 "format": file_format,
                 "size_bytes": stat.st_size,
                 "modified_utc": datetime.fromtimestamp(
-                    stat.st_mtime, tz=timezone.utc
+                    stat.st_mtime, tz=UTC
                 ).isoformat(),
                 "legacy_header": None,
                 "legacy_encoding": None,

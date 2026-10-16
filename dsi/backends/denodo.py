@@ -50,7 +50,7 @@ import difflib
 from pathlib import Path
 
 from collections import OrderedDict, Counter
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from urllib.parse import urlparse, parse_qs, urlencode
 from typing import ClassVar  
 
@@ -1126,7 +1126,7 @@ class Denodo(Webserver):
             wanted = available
 
         counts = self._get_view_counts()
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(UTC).isoformat()
 
         rows = []
         for db in databases:
@@ -1169,7 +1169,7 @@ class Denodo(Webserver):
         list of dict
             One dict per view, keyed by VIEWS_SCHEMA columns.
         """
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(UTC).isoformat()
 
         view_rows = []
         for row in rows:
@@ -1373,7 +1373,7 @@ class Denodo(Webserver):
             (column_rows, property_rows), each a list of dicts keyed by the
             matching schema.
         """
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(UTC).isoformat()
         column_rows, property_rows = [], []
 
         for detail in details:
