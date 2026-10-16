@@ -17,7 +17,6 @@ import socket
 
 from dsi.core import Terminal
 from dsi.sync import Sync
-from dsi.dsi import DSI
 from dsi.dsi_scout import DSIScout, FED_QUERY_ALLOWED_FIELDS
 from dsi.utils.dsi_utils import ingest_or_overwrite_table
 

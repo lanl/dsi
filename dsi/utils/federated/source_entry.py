@@ -10,7 +10,7 @@ def webserver_backend_names(module_collection):
     Returns valid webserver backend names by inspecting a Terminal's module_collection['backend'].
     '''
     names = []
-    for mod_name, mod in module_collection.items():
+    for mod in module_collection.values():
         for _, cls in inspect.getmembers(mod, inspect.isclass):
             if cls.__module__ == mod.__name__ and issubclass(cls, Webserver) and cls is not Webserver:
                 names.append(cls.__name__)
