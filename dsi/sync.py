@@ -95,7 +95,7 @@ class Sync:
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        if not Path(local_loc).is_absolute() or "../" in remote_loc or "..\" in remote_loc:
+        if not Path(local_loc).is_absolute() or "../" in remote_loc or "..\\" in remote_loc:
             raise ValueError("Please use absolute paths instead of relative")
 
         local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
