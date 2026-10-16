@@ -24,7 +24,6 @@ from dsi.core import Terminal
 from dsi.sync import Sync
 from dsi.utils.data_acquisition import discover_endpoints_async, download_csv_files_async, pull_data
 from dsi.utils.acquisition.utils import create_directory, combine_csv, create_hashed_folder_from_path, split_path, upsert_records
-from dsi.dsi import DSI
 from dsi.dsi_scout import DSIScout, FED_QUERY_ALLOWED_FIELDS
 from dsi.utils.utils import ingest_or_overwrite_table
 
