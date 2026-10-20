@@ -92,3 +92,5 @@ dsi_data/
 .continueignore
 .claude
 .gitattributes
+
+uv.lock
