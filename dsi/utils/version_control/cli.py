@@ -17,6 +17,7 @@ def main():
 
     p_add = sub.add_parser("add", help="add file or directory to staging")
     p_add.add_argument('files', nargs='+', type=str)
+    p_add.add_argument("-v", "--verbose", action="store_true", help="List all staged paths after adding")
 
     p_delete = sub.add_parser("delete", help="stage file or directory deletion")
     p_delete.add_argument('files', nargs='+', type=str)
@@ -66,7 +67,7 @@ def main():
         vcs = Version(os.getcwd())
     elif args.command == "add":
         vcs = Version(os.getcwd())
-        vcs.cmd_add(args.files)
+        vcs.cmd_add(args.files, verbose=args.verbose)
     elif args.command == "delete":
         vcs = Version(os.getcwd())
         vcs.cmd_delete(args.files)

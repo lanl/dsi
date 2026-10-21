@@ -29,7 +29,17 @@ dsi-vcs init
 dsi-vcs add <path> [<path> ...]
 dsi-vcs add ./data
 dsi-vcs add file1.txt file2.txt
+dsi-vcs add --verbose ./data
 ```
+
+By default, `add` prints only the number of newly staged paths. Use `--verbose`
+(`-v`) to list all staged paths. Overlapping inputs and paths already staged for
+addition do not create duplicate log records. A pending deletion can still be
+replaced by an addition. File contents are read at commit time, so editing an
+already staged file does not require another staging record.
+
+See [add performance measurements](plots/add-performance.md) for the benchmark
+workloads, results, and reproduction command.
 
 **Stage files for deletion:**
 

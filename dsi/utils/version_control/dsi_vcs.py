@@ -267,8 +267,12 @@ class Version:
         ):
             print(f"  {rel_path} [{action}]")
 
-    def _check_path_validity(self, abs_path: str, require_exists=True):
-        rel_path = os.path.relpath(abs_path, self.root_folder)
+    def _check_path_validity(
+        self, abs_path: str, require_exists=True, *,
+        rel_path=None, real_root=None, parent_cache=None,
+    ):
+        if rel_path is None:
+            rel_path = os.path.relpath(abs_path, self.root_folder)
         if require_exists and not os.path.lexists(abs_path):
             print(f"  [skip] {abs_path}: path does not exist.")
             return False
@@ -277,17 +281,26 @@ class Version:
             return False
         if any(part in self.skip_names for part in rel_path.split(os.sep)):
             return False
-        parent = os.path.realpath(os.path.dirname(abs_path))
-        if abs_path != self.root_folder and os.path.commonpath([parent, os.path.realpath(self.root_folder)]) != os.path.realpath(self.root_folder):
+        if real_root is None:
+            real_root = os.path.realpath(self.root_folder)
+        parent_path = os.path.dirname(abs_path)
+        if parent_cache is None:
+            parent = os.path.realpath(parent_path)
+        else:
+            if parent_path not in parent_cache:
+                parent_cache[parent_path] = os.path.realpath(parent_path)
+            parent = parent_cache[parent_path]
+        if abs_path != self.root_folder and os.path.commonpath([parent, real_root]) != real_root:
             print(f"  [skip] {abs_path}: parent is outside root folder.")
             return False
         return True
 
-    def cmd_add(self, paths: list[str]):
+    def cmd_add(self, paths: list[str], *, verbose: bool = False):
         """
         Stage one or more files/directories for the next commit.
-        Directories are expanded recursively; each resolved file is inserted into
-        the staging table.  Adding an already-staged path is a silent no-op.
+        Directories are expanded recursively into staging log records.
+        Paths whose pending action is already add are not appended again.
+        Set verbose to print the full list of staged paths.
         paths should be a list of relative paths to root_folder.
         """
         # print(f"Staging {len(paths)} path(s) for commit…")
@@ -298,12 +311,29 @@ class Version:
 
         staged = 0
         stage_entries = []
+        pending = None
+        seen_paths = set()
+        walked_dirs = set()
+        # These caches live for one traversal, so later commands resolve any
+        # changed symlink targets afresh.
+        real_root = os.path.realpath(self.root_folder)
+        parent_cache = {}
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
 
         def stage_path(abs_path: str):
-            nonlocal staged
+            nonlocal staged, pending
+            if abs_path in seen_paths:
+                return
+            seen_paths.add(abs_path)
             rel_path = os.path.relpath(abs_path, self.root_folder)
-            if(self._check_path_validity(abs_path)):    
+            if self._check_path_validity(
+                abs_path, rel_path=rel_path, real_root=real_root,
+                parent_cache=parent_cache,
+            ):
+                if pending is None:
+                    pending = self._load_pending_stage_entries()
+                if rel_path in pending and pending[rel_path][1] == "add":
+                    return
                 stage_entries.append(
                     {
                         "file_path": rel_path,
@@ -317,10 +347,18 @@ class Version:
 
         for raw in paths:
             abs_path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(self.root_folder, raw))
+            if not self._check_path_validity(
+                abs_path, real_root=real_root, parent_cache=parent_cache,
+            ):
+                continue
 
             if os.path.isdir(abs_path) and not os.path.islink(abs_path):
                 # Expand directory recursively
                 for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=False):
+                    if dirpath in walked_dirs:
+                        dirnames[:] = []
+                        continue
+                    walked_dirs.add(dirpath)
                     dirnames[:] = [d for d in dirnames if d not in self.skip_names]
                     if dirpath != self.root_folder:
                         stage_path(dirpath)
@@ -338,7 +376,8 @@ class Version:
             self.repo_log.append_many(stage_entries, transaction_id=txn_id)
 
         print(f"  {staged} path(s) added to staging.")
-        self._print_staged_paths()
+        if verbose:
+            self._print_staged_paths()
 
     def cmd_delete(self, paths: list[str]):
         """Stage path(s) for deletion in the next commit."""

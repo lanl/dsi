@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `dsi-vcs add --verbose` (`-v`) to display the full list of staged paths.
+- Print only the number of newly staged paths after `add` by default.
+
+### Fixed
+
+- Avoid duplicate staging records for overlapping inputs and paths already staged for addition, including across CLI invocations. Re-adding an already staged directory no longer grows the log.
+- Preserve additions that replace pending deletions or re-stage removed paths.
+
 ## [1.0.1] - 2026-10-15
 
 ### Performance
@@ -13,9 +25,7 @@
   unchanged references within SQLite.
 - Batch staging-log writes with one fsync and stream general FastCDC chunks
   without changing their boundaries.
-- Local benchmarks reduced median consecutive commit time from 9.191 s to
-  0.187 s for one changed file among 500 files, and from 2.215 s to 0.686 s for
-  the binary workload. See [benchmark details](plots/consecutive-commit-improvements.md)
+- Local benchmarks reduced median consecutive commit time from 9.191 s to 0.187 s for one changed file among 500 files, and from 2.215 s to 0.686 s for the binary workload. See [benchmark details](plots/consecutive-commit-improvements.md)
   for workloads, methodology, and limitations.
 
 ### Added
