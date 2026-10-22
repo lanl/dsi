@@ -106,6 +106,246 @@ del _dsi_method_name
 
 
 ########################################################################
+#### Task timing / profiling
+#
+# Generic wall-clock profiler for finding where time goes within one benchmark task run
+# (agent reasoning vs. tool execution vs. DSI calls vs. LLM-judge scoring), independent of
+# the DSI-call logging above. Mirrors the _dsi_call_log pattern: reset_timing_log() at the
+# start of a task, instrument phases with timed(...)/record_timing(), then get_timing_log()
+# at the end to pull everything recorded since the last reset.
+#
+# Entries look like: {"phase": "tool:query_dsi_tool", "elapsed_sec": 0.42, ...}. Phase names
+# use "category:detail" (e.g. "tool:<name>", "llm_call", "score:<step>", "step:<n>") so they
+# can be grouped either coarsely (split on ":") or finely in analysis.
+
+import threading
+import uuid
+from contextlib import contextmanager
+
+try:
+    from langchain_core.callbacks import BaseCallbackHandler
+except ImportError:  # pragma: no cover - callback handler just won't be available
+    BaseCallbackHandler = object
+
+_timing_log: List[Dict[str, Any]] = []
+_timing_lock = threading.Lock()
+
+
+def reset_timing_log() -> None:
+    """Clear the recorded timing log. Call before each benchmark task (alongside reset_dsi_call_log)."""
+    with _timing_lock:
+        _timing_log.clear()
+
+
+def get_timing_log() -> List[Dict[str, Any]]:
+    """Return a copy of every timing entry recorded since the last reset_timing_log()."""
+    with _timing_lock:
+        return list(_timing_log)
+
+
+def record_timing(phase: str, elapsed: float, **meta: Any) -> None:
+    """Append one timing entry. `phase` should be a short, groupable label (see module docstring)."""
+    entry: Dict[str, Any] = {"phase": phase, "elapsed_sec": round(elapsed, 4)}
+    entry.update(meta)
+    with _timing_lock:
+        _timing_log.append(entry)
+
+
+@contextmanager
+def timed(phase: str, **meta: Any):
+    """Context manager: record how long the wrapped block took under `phase`.
+
+    Usage:
+        with timed("step:1", query=turn_query[:60]):
+            ...
+    Records even on exception (tagged with error=...), then re-raises.
+    """
+    start = time.time()
+    try:
+        yield
+    except Exception as e:
+        record_timing(phase, time.time() - start, error=str(e), **meta)
+        raise
+    else:
+        record_timing(phase, time.time() - start, **meta)
+
+
+def _is_nested_phase(phase: str) -> bool:
+    """True for phases recorded *inside* a step:*/setup_query invocation (llm_call, tool:*
+    -- see TimingCallbackHandler) rather than top-level sequential phases (step:*, setup_query,
+    score:*). Nested phases are sub-components of their parent's duration, not additional
+    wall-clock time -- see format_timing_summary()'s "double-counting" note below.
+    """
+    return phase == "llm_call" or phase.startswith("tool:")
+
+
+def summarize_timing(timing_log: List[Dict[str, Any]]) -> "pd.DataFrame":
+    """Aggregate a task's timing_log by phase: total/mean/count, sorted by total descending.
+
+    This is a FLAT summary across every entry regardless of nesting -- useful for cross-task
+    aggregation (e.g. timing_breakdown_dataframe().groupby("phase").sum() to total up LLM-call
+    time across an entire benchmark sweep) where "double counting" isn't a concern because
+    you're summing one specific phase, not computing an overall total. For a single task's
+    "where did the real wall-clock time go" view (which must NOT double-count nested phases),
+    use format_timing_summary() or wall_clock_total() instead.
+    """
+    import pandas as pd
+
+    if not timing_log:
+        return pd.DataFrame(columns=["phase", "total_sec", "mean_sec", "count"])
+    df = pd.DataFrame(timing_log)
+    out = (
+        df.groupby("phase")["elapsed_sec"]
+        .agg(total_sec="sum", mean_sec="mean", count="count")
+        .reset_index()
+        .sort_values("total_sec", ascending=False)
+        .reset_index(drop=True)
+    )
+    return out
+
+
+def wall_clock_total(timing_log: List[Dict[str, Any]]) -> float:
+    """Sum of only the non-overlapping, sequential top-level phases (step:*, setup_query,
+    score:*) in a task's timing_log -- i.e. the task's real wall-clock duration.
+
+    Excludes "llm_call"/"tool:*" entries, which TimingCallbackHandler records *inside* each
+    step:*/setup_query invocation and are therefore already counted within that phase's own
+    elapsed_sec; including them again (as the original implementation of this module did)
+    double-counts and inflates the apparent total.
+    """
+    return sum(
+        e.get("elapsed_sec", 0.0) for e in timing_log if not _is_nested_phase(e.get("phase", ""))
+    )
+
+
+def format_timing_summary(timing_log: List[Dict[str, Any]], top_n: int = 5) -> str:
+    """Two-tier, nesting-aware "where did the time go" summary for one task.
+
+    Tier 1 (top-level timeline): step:*/setup_query/score:* phases. These are sequential and
+    non-overlapping, so they sum to the task's real wall_clock_total() -- percentages here are
+    of that real total.
+
+    Tier 2 (nested breakdown): llm_call/tool:* entries recorded *inside* each step:*/
+    setup_query invocation (see TimingCallbackHandler's `scope` tag), grouped by which parent
+    phase they belong to and shown as a percentage of THAT PARENT's own time -- never of the
+    overall total, since they're already included in it. This fixes the earlier bug where the
+    headline total double-counted nested llm_call/tool:* time on top of the step:* phase that
+    already contains it.
+    """
+    if not timing_log:
+        return "(no timing data)"
+
+    import pandas as pd
+
+    df = pd.DataFrame(timing_log)
+    if "scope" not in df.columns:
+        df["scope"] = ""
+    df["scope"] = df["scope"].fillna("")
+
+    nested_mask = df["phase"].apply(_is_nested_phase)
+    top_level = df[~nested_mask]
+    nested = df[nested_mask]
+
+    total = top_level["elapsed_sec"].sum()
+    lines = [f"Wall-clock total: {total:.2f}s"]
+
+    top_summary = (
+        top_level.groupby("phase")["elapsed_sec"]
+        .agg(total_sec="sum", mean_sec="mean", count="count")
+        .sort_values("total_sec", ascending=False)
+    )
+    for phase, row in top_summary.head(top_n).iterrows():
+        pct = (row["total_sec"] / total * 100) if total else 0.0
+        lines.append(
+            f"  {phase:<32} {row['total_sec']:>7.2f}s  ({pct:5.1f}%)  "
+            f"x{int(row['count'])} calls, avg {row['mean_sec']:.2f}s"
+        )
+
+    if not nested.empty:
+        lines.append(
+            "  -- nested within the phases above (llm/tool calls inside each step/setup_query;"
+            " not additional wall-clock time) --"
+        )
+        # scope ties each nested entry back to the step:*/setup_query invocation it happened
+        # during (set by invoke_agent's TimingCallbackHandler), so calls from different steps
+        # of a multi-turn Level 2/3 task aren't incorrectly merged together.
+        for scope, group in nested.groupby("scope"):
+            scope_label = scope if scope else "(unlabeled)"
+            parent_total = top_level.loc[top_level["phase"] == scope, "elapsed_sec"].sum()
+            denom = parent_total if parent_total else group["elapsed_sec"].sum()
+            lines.append(f"    within {scope_label} ({parent_total:.2f}s):")
+            scope_summary = (
+                group.groupby("phase")["elapsed_sec"]
+                .agg(total_sec="sum", mean_sec="mean", count="count")
+                .sort_values("total_sec", ascending=False)
+            )
+            for phase, row in scope_summary.head(top_n).iterrows():
+                pct = (row["total_sec"] / denom * 100) if denom else 0.0
+                lines.append(
+                    f"      {phase:<28} {row['total_sec']:>7.2f}s  ({pct:5.1f}% of {scope_label})  "
+                    f"x{int(row['count'])} calls, avg {row['mean_sec']:.2f}s"
+                )
+    return "\n".join(lines)
+
+
+class TimingCallbackHandler(BaseCallbackHandler):
+    """LangChain callback handler that times every LLM call and tool call triggered during
+    one agent graph invocation, recording each into the shared timing log (get_timing_log()).
+
+    Pass an instance via config={"callbacks": [...]} to app.invoke()/ainvoke() -- see
+    invoke_agent() in the benchmark notebooks. Tool calls are recorded as "tool:<name>" and
+    LLM calls as "llm_call", so DSI-tool time (query_dsi_tool, load_dsi_tool, ...) can be told
+    apart from raw model-thinking time in the aggregated summary.
+
+    `scope` should be the enclosing top-level phase name (e.g. "step:1", "setup_query") that
+    this invocation runs inside of -- it's stamped onto every entry this handler records, so
+    format_timing_summary() can correctly attribute nested llm_call/tool:* entries back to the
+    specific step/setup_query they happened during, instead of merging calls from every step
+    of a multi-turn Level 2/3 task into one undifferentiated bucket.
+
+    Keyed by run_id (a UUID LangChain assigns per callback invocation) rather than a single
+    start time, since a graph step can in principle overlap multiple concurrent tool calls.
+    """
+
+    def __init__(self, scope: str = "") -> None:
+        super().__init__()
+        self.scope = scope
+        self._starts: Dict[str, tuple] = {}
+
+    # -- LLM calls --------------------------------------------------------
+    def on_llm_start(self, serialized, prompts, *, run_id, **kwargs: Any) -> None:
+        self._starts[str(run_id)] = (time.time(), "llm_call")
+
+    def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs: Any) -> None:
+        self._starts[str(run_id)] = (time.time(), "llm_call")
+
+    def on_llm_end(self, response, *, run_id, **kwargs: Any) -> None:
+        self._finish(run_id)
+
+    def on_llm_error(self, error, *, run_id, **kwargs: Any) -> None:
+        self._finish(run_id, error=error)
+
+    # -- Tool calls ---------------------------------------------------------
+    def on_tool_start(self, serialized, input_str, *, run_id, **kwargs: Any) -> None:
+        name = (serialized or {}).get("name") or kwargs.get("name") or "tool"
+        self._starts[str(run_id)] = (time.time(), f"tool:{name}")
+
+    def on_tool_end(self, output, *, run_id, **kwargs: Any) -> None:
+        self._finish(run_id)
+
+    def on_tool_error(self, error, *, run_id, **kwargs: Any) -> None:
+        self._finish(run_id, error=error)
+
+    def _finish(self, run_id: Any, error: Optional[BaseException] = None) -> None:
+        entry = self._starts.pop(str(run_id), None)
+        if entry is None:
+            return
+        start, phase = entry
+        kwargs = {"error": str(error)} if error is not None else {}
+        record_timing(phase, time.time() - start, scope=self.scope, **kwargs)
+
+
+########################################################################
 #### Utility functions
 
 def load_db_description(db_path: str) -> str:
@@ -173,8 +413,8 @@ def get_db_info(db_path: str) -> tuple[list, dict, str]:
     schema = {}
     desc = ""
     
-    if check_db_valid(db_path) == False:
-        return tables, schema, desc
+    # if check_db_valid(db_path) == False:
+    #     return tables, schema, desc
     
     try:
         with redirect_stdout(_NULL), redirect_stderr(_NULL):
@@ -252,8 +492,8 @@ def load_dsi(path: str, run_path: str = "", master_db_folder: str = "") -> dict:
     logger.info(f"\n\n!!!load_dsi :: loading database at: {data_path}\n\n")
 
 
-    if not check_db_valid(data_path):
-        return f"Failed to load DSI database at: {data_path}. Please check the path and ensure it points to a valid DSI .db file."
+    # if not check_db_valid(data_path):
+    #     return f"Failed to load DSI database at: {data_path}. Please check the path and ensure it points to a valid DSI .db file."
             
     try:
         _, _db_schema, _db_description = get_db_info(data_path)
