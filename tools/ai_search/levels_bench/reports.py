@@ -4,8 +4,8 @@ from __future__ import annotations
 import textwrap
 from typing import Iterable, List, Optional
 
-import pandas as pd
-from IPython.display import HTML, Markdown, display
+import polars as pl
+from IPython.display import Markdown, display
 
 from .core import BenchmarkTask, TaskResult
 from .results import timing_breakdown_dataframe
@@ -13,58 +13,75 @@ from .results import timing_breakdown_dataframe
 STYLE_ORDER = ["standard", "novice", "expert", "terse", "verbose", "casual"]
 
 
-def _mean_or_nan(df: pd.DataFrame, col: str) -> pd.Series:
-    return df[col] if col in df.columns else pd.Series(float("nan"), index=df.index)
+def _ensure_float_col(df: pl.DataFrame, col: str) -> pl.DataFrame:
+    if col in df.columns:
+        return df.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+    return df.with_columns(pl.lit(None).cast(pl.Float64).alias(col))
+
+
+def _round_floats(df: pl.DataFrame, n: int) -> pl.DataFrame:
+    float_cols = [c for c, dt in df.schema.items() if dt.is_float()]
+    return df.with_columns([pl.col(c).round(n) for c in float_cols]) if float_cols else df
+
+
+def _order_by(df: pl.DataFrame, col: str, order: List[str]) -> pl.DataFrame:
+    """Stable sort of `col` into `order`, dropping values that aren't in the list."""
+    ranking = pl.DataFrame({col: order}).with_row_index("_ord")
+    return df.join(ranking, on=col, how="inner").sort("_ord").drop("_ord")
+
+
+def _select_existing(df: pl.DataFrame, cols: Iterable[str]) -> List[str]:
+    return [c for c in cols if c in df.columns]
 
 
 def task_table(tasks: Iterable[BenchmarkTask]) -> None:
     """Compact overview of a task list."""
-    display(pd.DataFrame([{
+    display(pl.DataFrame([{
         "task_id": t.task_id, "level": t.level, "category": t.category,
         "turns": len(t.turns), "network": t.requires_network,
         "variants": len(t.prompt_variants), "query": textwrap.shorten(t.query, 90),
     } for t in tasks]))
 
 
-def model_summary(df: pd.DataFrame, extra_judge_cols: Optional[List[str]] = None) -> None:
+def model_summary(df: pl.DataFrame, extra_judge_cols: Optional[List[str]] = None) -> None:
     """Per-model pass rate / score / efficiency / cost, pass rate by category, and the
     task x model pass matrix."""
-    df = df.copy()
-    df["judge_efficiency_score"] = _mean_or_nan(df, "judge_efficiency_score")
-    aggs = dict(
-        pass_rate=("passed", "mean"),
-        avg_score=("score", "mean"),
-        avg_efficiency=("judge_efficiency_score", "mean"),
-        avg_tokens=("tokens", "mean"),
-        avg_elapsed_sec=("elapsed_sec", "mean"),
-        n_tasks=("task_id", "count"),
-        n_errors=("status", lambda s: int(s.isin(["ERROR", "TIMEOUT"]).sum())),
-    )
+    df = _ensure_float_col(df, "judge_efficiency_score")
+    df = df.with_columns(pl.col("passed").cast(pl.Float64, strict=False))
+    aggs = [
+        pl.col("passed").mean().alias("pass_rate"),
+        pl.col("score").mean().alias("avg_score"),
+        pl.col("judge_efficiency_score").mean().alias("avg_efficiency"),
+        pl.col("tokens").mean().alias("avg_tokens"),
+        pl.col("elapsed_sec").mean().alias("avg_elapsed_sec"),
+        pl.col("task_id").count().alias("n_tasks"),
+        pl.col("status").is_in(["ERROR", "TIMEOUT"]).sum().alias("n_errors"),
+    ]
     for col in extra_judge_cols or []:
         if col in df.columns:
-            aggs[col.removeprefix("judge_")] = (col, "mean")
-    df["passed"] = df["passed"].astype(float)
+            aggs.append(pl.col(col).mean().alias(col.removeprefix("judge_")))
 
     display(Markdown("### Overall summary by model"))
-    display(df.groupby("model").agg(**aggs).round(2).sort_values("pass_rate", ascending=False))
+    display(_round_floats(df.group_by("model").agg(aggs), 2).sort("pass_rate", descending=True))
 
     display(Markdown("### Pass rate by model and category"))
-    display(df.pivot_table(index="model", columns="category", values="passed", aggfunc="mean").round(2))
+    display(_round_floats(
+        df.pivot(index="model", on="category", values="passed", aggregate_function="mean"), 2
+    ))
 
     display(Markdown("### Pass/fail matrix by task and model"))
-    pivot = df.pivot_table(index="task_id", columns="model", values="status", aggfunc="first")
-    display(HTML(pivot.to_html(escape=False)))
+    display(df.pivot(index="task_id", on="model", values="status", aggregate_function="first"))
 
 
-def failures(df: pd.DataFrame) -> None:
+def failures(df: pl.DataFrame) -> None:
     """Failed / errored rows with the scorer's notes and the judged root cause."""
-    cols = [c for c in ["model", "task_id", "status", "score", "notes", "failure_category"] if c in df.columns]
-    bad = df[df["status"] != "PASS"][cols]
-    display(Markdown(f"### Non-passing runs ({len(bad)})"))
-    if bad.empty:
+    cols = _select_existing(df, ["model", "task_id", "status", "score", "notes", "failure_category"])
+    bad = df.filter(pl.col("status") != "PASS").select(cols)
+    display(Markdown(f"### Non-passing runs ({bad.height})"))
+    if bad.is_empty():
         print("(none)")
     else:
-        with pd.option_context("display.max_colwidth", 200):
+        with pl.Config(fmt_str_lengths=200, tbl_width_chars=200):
             display(bad)
 
 
@@ -73,71 +90,89 @@ def timing_breakdown(results: Iterable[TaskResult]) -> None:
     nested llm_call/tool:* time is shown separately because it is already inside a step."""
     tdf = timing_breakdown_dataframe(results)
     display(Markdown("### Where does the time go?"))
-    if tdf.empty:
+    if tdf.is_empty():
         print("(no timing data)")
         return
-    top = tdf[~tdf["is_nested"]]
-    agg = dict(total_sec="sum", mean_sec="mean", count="count")
+    top = tdf.filter(~pl.col("is_nested"))
+    phase_aggs = [
+        pl.col("elapsed_sec").sum().alias("total_sec"),
+        pl.col("elapsed_sec").mean().alias("mean_sec"),
+        pl.col("elapsed_sec").count().alias("count"),
+    ]
     display(Markdown("#### Top-level phases (real wall-clock, no double counting)"))
-    display(top.groupby("phase_group")["elapsed_sec"].agg(**agg).round(3).sort_values("total_sec", ascending=False))
+    display(_round_floats(top.group_by("phase_group").agg(phase_aggs), 3).sort("total_sec", descending=True))
     display(Markdown("#### By model x top-level phase group (total seconds)"))
-    display(top.groupby(["model", "phase_group"])["elapsed_sec"].sum().unstack("phase_group").round(2))
-    nested = tdf[tdf["is_nested"]]
-    if not nested.empty:
+    display(_round_floats(
+        top.group_by(["model", "phase_group"]).agg(pl.col("elapsed_sec").sum())
+        .pivot(index="model", on="phase_group", values="elapsed_sec", aggregate_function="first"),
+        2,
+    ))
+    nested = tdf.filter(pl.col("is_nested"))
+    if not nested.is_empty():
         display(Markdown("#### Nested inside steps (already counted above)"))
-        display(nested.groupby("phase")["elapsed_sec"].agg(**agg).round(3).sort_values("total_sec", ascending=False))
+        display(_round_floats(nested.group_by("phase").agg(phase_aggs), 3).sort("total_sec", descending=True))
 
 
-def level3_facets(df: pd.DataFrame) -> None:
-    cols = [c for c in ["judge_context_score", "judge_variables_score", "judge_relationship_score"] if c in df.columns]
+def level3_facets(df: pl.DataFrame) -> None:
+    cols = _select_existing(df, ["judge_context_score", "judge_variables_score", "judge_relationship_score"])
     if not cols:
         return
+    scored = df.filter(pl.any_horizontal([pl.col(c).is_not_null() for c in cols]))
+    if scored.is_empty():
+        return
     display(Markdown("### Hypothesis facet scores (mean across judges)"))
-    display(df.pivot_table(index="task_id", columns="model", values=cols).round(2))
+    display(_round_floats(
+        scored.pivot(index="task_id", on="model", values=cols, aggregate_function="mean"), 2
+    ))
 
 
-def calibration(df: pd.DataFrame) -> None:
+def calibration(df: pl.DataFrame) -> None:
     display(Markdown("### Abstention accuracy by model (share of trap tasks correctly abstained on)"))
-    display(df.groupby("model")
-              .agg(abstention_accuracy=("passed", "mean"),
-                   hallucinations=("hallucination_detected", "sum"),
-                   n_traps=("task_id", "count"))
-              .round(2))
+    display(_round_floats(df.group_by("model").agg(
+        pl.col("passed").mean().alias("abstention_accuracy"),
+        pl.col("hallucination_detected").sum().alias("hallucinations"),
+        pl.col("task_id").count().alias("n_traps"),
+    ), 2))
     display(Markdown("### Hallucinated (overconfident) responses"))
-    hallucinated = df[df["hallucination_detected"]][["model", "task_id", "response"]]
-    if hallucinated.empty:
+    hallucinated = df.filter(pl.col("hallucination_detected")).select("model", "task_id", "response")
+    if hallucinated.is_empty():
         print("(none)")
     else:
         display(hallucinated)
 
 
-def prompt_styles(df: pd.DataFrame) -> None:
+def prompt_styles(df: pl.DataFrame) -> None:
     """RQ: does phrasing matter? Pass rate by style, per task, and per-model sensitivity."""
-    df = df.copy()
-    df["passed"] = df["passed"].astype(float)
+    df = df.with_columns(pl.col("passed").cast(pl.Float64, strict=False))
+    present = [s for s in STYLE_ORDER if s in df.get_column("prompt_style").unique().to_list()]
+
     display(Markdown("### Pass rate / avg score by prompt style (all tasks and models)"))
-    display(df.groupby("prompt_style")
-              .agg(pass_rate=("passed", "mean"), avg_score=("score", "mean"), n=("task_id", "count"))
-              .round(3)
-              .reindex([s for s in STYLE_ORDER if s in set(df["prompt_style"])]))
+    display(_round_floats(_order_by(df.group_by("prompt_style").agg(
+        pl.col("passed").mean().alias("pass_rate"),
+        pl.col("score").mean().alias("avg_score"),
+        pl.col("task_id").count().alias("n"),
+    ), "prompt_style", present), 3))
 
     display(Markdown("### Pass rate by base task and prompt style"))
-    pivot = df.pivot_table(index="base_task_id", columns="prompt_style", values="passed", aggfunc="mean")
-    display(pivot[[c for c in STYLE_ORDER if c in pivot.columns]])
+    pivot = df.pivot(index="base_task_id", on="prompt_style", values="passed", aggregate_function="mean")
+    display(pivot.select(["base_task_id"] + [c for c in STYLE_ORDER if c in pivot.columns]))
 
     display(Markdown(
         "### Phrasing sensitivity (spread in pass rate across styles)\n\n"
         "0 = same outcome regardless of wording; higher = more sensitive to how the task was asked."
     ))
     sensitivity = (
-        df.groupby(["base_task_id", "model", "prompt_style"])["passed"].mean().reset_index()
-          .groupby(["base_task_id", "model"])["passed"].agg(lambda s: s.max() - s.min())
-          .reset_index(name="pass_rate_spread")
-          .sort_values("pass_rate_spread", ascending=False)
+        df.group_by(["base_task_id", "model", "prompt_style"])
+        .agg(pl.col("passed").mean())
+        .group_by(["base_task_id", "model"])
+        .agg((pl.col("passed").max() - pl.col("passed").min()).alias("pass_rate_spread"))
+        .sort("pass_rate_spread", descending=True)
     )
     display(sensitivity)
     display(Markdown("### Mean sensitivity by model"))
-    display(sensitivity.groupby("model")["pass_rate_spread"].mean().round(3))
+    display(_round_floats(
+        sensitivity.group_by("model").agg(pl.col("pass_rate_spread").mean()), 3
+    ))
 
 
 def transcript(results: Iterable[TaskResult], task_id: str, model: Optional[str] = None) -> None:
@@ -152,50 +187,52 @@ def transcript(results: Iterable[TaskResult], task_id: str, model: Optional[str]
         print(f"No results for task {task_id!r}" + (f" and model {model!r}" if model else ""))
 
 
-def effective_productivity(df: pd.DataFrame) -> pd.DataFrame:
+def effective_productivity(df: pl.DataFrame) -> pl.DataFrame:
     """RQ1: a task is a productivity win only if the agent passed AND beat the human
     reference_time_sec. Needs reference_time_sec on the tasks."""
-    if "time_ratio" not in df.columns or df["time_ratio"].dropna().empty:
+    if "time_ratio" not in df.columns or df.filter(pl.col("time_ratio").is_not_null()).is_empty():
         print("No reference_time_sec set on any task yet; a human must time each task's "
               "reference_path once (see BENCHMARK_METHODOLOGY.md, RQ1).")
-        return pd.DataFrame()
-    sub = df.dropna(subset=["time_ratio"])
-    return (
-        sub.groupby("model")
-        .apply(lambda g: pd.Series({
-            "pass_rate": g["passed"].mean(),
-            "mean_productivity_gain_when_passed": g.loc[g["passed"] == True, "productivity_gain"].mean(),
-            "effective_productivity": g["passed"].mean() * g.loc[g["passed"] == True, "productivity_gain"].mean(),
-            "n_tasks": len(g),
-        }))
-        .round(3)
-    )
+        return pl.DataFrame()
+    sub = df.filter(pl.col("time_ratio").is_not_null())
+    return _round_floats(sub.group_by("model").agg(
+        pl.col("passed").mean().alias("pass_rate"),
+        pl.col("productivity_gain").filter(pl.col("passed").cast(pl.Boolean, strict=False)).mean().alias("mean_productivity_gain_when_passed"),
+        pl.len().alias("n_tasks"),
+    ).with_columns(
+        (pl.col("pass_rate") * pl.col("mean_productivity_gain_when_passed")).alias("effective_productivity")
+    ), 3)
 
 
-def research_questions(summary_df: pd.DataFrame) -> None:
+def research_questions(summary_df: pl.DataFrame) -> None:
     """Cross-level RQ1-RQ7 tables for the combined results of every level."""
-    if summary_df.empty:
+    if summary_df.is_empty():
         print("No results loaded; run the level notebooks first.")
         return
-    df = summary_df.copy()
-    df["passed"] = df["passed"].astype(float)
-    df["judge_efficiency_score"] = _mean_or_nan(df, "judge_efficiency_score")
-    leveled = df[df["level"].isin([1, 2, 3]) & ~df["expects_abstention"].astype(bool)]
+    df = _ensure_float_col(summary_df, "judge_efficiency_score")
+    df = df.with_columns(pl.col("passed").cast(pl.Float64, strict=False))
+    leveled = df.filter(pl.col("level").is_in([1, 2, 3]) & ~pl.col("expects_abstention").fill_null(False))
 
     display(Markdown("### RQ2 — Pass rate / score / efficiency / latency by complexity level and model"))
-    display(leveled.groupby(["model", "level"]).agg(
-        pass_rate=("passed", "mean"), avg_score=("score", "mean"),
-        avg_efficiency=("judge_efficiency_score", "mean"),
-        avg_elapsed_sec=("elapsed_sec", "mean"), avg_tokens=("tokens", "mean"),
-        n_tasks=("task_id", "count"),
-    ).round(2))
+    display(_round_floats(leveled.group_by(["model", "level"]).agg(
+        pl.col("passed").mean().alias("pass_rate"),
+        pl.col("score").mean().alias("avg_score"),
+        pl.col("judge_efficiency_score").mean().alias("avg_efficiency"),
+        pl.col("elapsed_sec").mean().alias("avg_elapsed_sec"),
+        pl.col("tokens").mean().alias("avg_tokens"),
+        pl.col("task_id").count().alias("n_tasks"),
+    ).sort(["model", "level"]), 2))
     try:
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(figsize=(6, 4))
-        for model_name, g in leveled.groupby("model"):
-            by_level = g.groupby("level")["passed"].mean()
-            ax.plot(by_level.index, by_level.values, marker="o", label=model_name)
+        for model_name in leveled.get_column("model").unique().to_list():
+            by_level = (
+                leveled.filter(pl.col("model") == model_name)
+                .group_by("level").agg(pl.col("passed").mean())
+                .sort("level")
+            )
+            ax.plot(by_level["level"].to_list(), by_level["passed"].to_list(), marker="o", label=model_name)
         ax.set_xlabel("Complexity level")
         ax.set_ylabel("Pass rate")
         ax.set_xticks([1, 2, 3])
@@ -205,28 +242,31 @@ def research_questions(summary_df: pd.DataFrame) -> None:
     except Exception as e:
         print(f"(skipping plot: {e!r})")
 
-    cal = df[df["expects_abstention"].astype(bool)]
-    if not cal.empty:
+    cal = df.filter(pl.col("expects_abstention").fill_null(False))
+    if not cal.is_empty():
         display(Markdown("### RQ4 — Calibration: abstention accuracy on trap tasks"))
-        display(cal.groupby("model").agg(
-            abstention_accuracy=("passed", "mean"),
-            hallucinations=("hallucination_detected", "sum"),
-            n_traps=("task_id", "count"),
-        ).round(2))
+        display(_round_floats(cal.group_by("model").agg(
+            pl.col("passed").mean().alias("abstention_accuracy"),
+            pl.col("hallucination_detected").sum().alias("hallucinations"),
+            pl.col("task_id").count().alias("n_traps"),
+        ), 2))
 
-    failed = df[df["passed"] == 0]
-    if not failed.empty:
+    failed = df.filter(pl.col("passed") == 0)
+    if not failed.is_empty():
         display(Markdown("### RQ5 — Failure-category distribution by model"))
-        display(failed.pivot_table(index="model", columns="failure_category", values="task_id",
-                                   aggfunc="count", fill_value=0))
+        display(
+            failed.group_by(["model", "failure_category"]).agg(pl.len().alias("n"))
+            .pivot(index="model", on="failure_category", values="n", aggregate_function="first")
+            .fill_null(0)
+        )
 
     display(Markdown("### RQ3/RQ7 — Checkpoint-opportunity counts vs. outcome"))
-    display(df.groupby("model").agg(
-        avg_checkpoint_opportunities=("checkpoint_opportunity_count", "mean"),
-        avg_high_stakes_actions=("high_stakes_action_count", "mean"),
-        avg_hedge_language=("hedge_language_count", "mean"),
-        pass_rate=("passed", "mean"),
-    ).round(2))
+    display(_round_floats(df.group_by("model").agg(
+        pl.col("checkpoint_opportunity_count").mean().alias("avg_checkpoint_opportunities"),
+        pl.col("high_stakes_action_count").mean().alias("avg_high_stakes_actions"),
+        pl.col("hedge_language_count").mean().alias("avg_hedge_language"),
+        pl.col("passed").mean().alias("pass_rate"),
+    ), 2))
 
     display(Markdown("### RQ1 — Productivity vs. human baseline"))
     display(effective_productivity(df))

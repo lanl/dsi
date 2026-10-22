@@ -9,7 +9,7 @@ Notebook usage:
     results = run_benchmark(LEVEL1_TASKS, "level1_atomic")
 
 Agent/LLM modules (agent, scoring) are imported lazily inside the workers, so importing
-this package only needs pandas and IPython.
+this package only needs polars and IPython.
 """
 from .config import CONFIG, POSSIBLE_MODELS, configure, init, make_llm
 from .core import BenchmarkTask, TaskResult, expand_prompt_variants

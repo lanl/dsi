@@ -179,29 +179,30 @@ def _is_nested_phase(phase: str) -> bool:
     return phase == "llm_call" or phase.startswith("tool:")
 
 
-def summarize_timing(timing_log: List[Dict[str, Any]]) -> "pd.DataFrame":
+def summarize_timing(timing_log: List[Dict[str, Any]]):
     """Aggregate a task's timing_log by phase: total/mean/count, sorted by total descending.
 
     This is a FLAT summary across every entry regardless of nesting -- useful for cross-task
-    aggregation (e.g. timing_breakdown_dataframe().groupby("phase").sum() to total up LLM-call
-    time across an entire benchmark sweep) where "double counting" isn't a concern because
-    you're summing one specific phase, not computing an overall total. For a single task's
-    "where did the real wall-clock time go" view (which must NOT double-count nested phases),
-    use format_timing_summary() or wall_clock_total() instead.
+    aggregation (e.g. grouping timing_breakdown_dataframe() by phase) where "double counting"
+    isn't a concern because you're summing one specific phase, not computing an overall total.
+    For a single task's "where did the real wall-clock time go" view (which must NOT
+    double-count nested phases), use format_timing_summary() or wall_clock_total() instead.
     """
-    import pandas as pd
+    import polars as pl
 
+    schema = {"phase": pl.Utf8, "total_sec": pl.Float64, "mean_sec": pl.Float64, "count": pl.UInt32}
     if not timing_log:
-        return pd.DataFrame(columns=["phase", "total_sec", "mean_sec", "count"])
-    df = pd.DataFrame(timing_log)
-    out = (
-        df.groupby("phase")["elapsed_sec"]
-        .agg(total_sec="sum", mean_sec="mean", count="count")
-        .reset_index()
-        .sort_values("total_sec", ascending=False)
-        .reset_index(drop=True)
+        return pl.DataFrame(schema=schema)
+    return (
+        pl.DataFrame(timing_log)
+        .group_by("phase")
+        .agg(
+            pl.col("elapsed_sec").sum().alias("total_sec"),
+            pl.col("elapsed_sec").mean().alias("mean_sec"),
+            pl.col("elapsed_sec").count().alias("count"),
+        )
+        .sort("total_sec", descending=True)
     )
-    return out
 
 
 def wall_clock_total(timing_log: List[Dict[str, Any]]) -> float:
@@ -235,33 +236,35 @@ def format_timing_summary(timing_log: List[Dict[str, Any]], top_n: int = 5) -> s
     if not timing_log:
         return "(no timing data)"
 
-    import pandas as pd
+    import polars as pl
 
-    df = pd.DataFrame(timing_log)
+    df = pl.DataFrame(timing_log)
     if "scope" not in df.columns:
-        df["scope"] = ""
-    df["scope"] = df["scope"].fillna("")
+        df = df.with_columns(pl.lit("").alias("scope"))
+    df = df.with_columns(pl.col("scope").fill_null(""))
+    df = df.with_columns(
+        ((pl.col("phase") == "llm_call") | pl.col("phase").str.starts_with("tool:")).alias("_nested")
+    )
 
-    nested_mask = df["phase"].apply(_is_nested_phase)
-    top_level = df[~nested_mask]
-    nested = df[nested_mask]
-
-    total = top_level["elapsed_sec"].sum()
+    top_level = df.filter(~pl.col("_nested"))
+    nested = df.filter(pl.col("_nested"))
+    total = float(top_level["elapsed_sec"].sum() or 0.0)
     lines = [f"Wall-clock total: {total:.2f}s"]
 
-    top_summary = (
-        top_level.groupby("phase")["elapsed_sec"]
-        .agg(total_sec="sum", mean_sec="mean", count="count")
-        .sort_values("total_sec", ascending=False)
-    )
-    for phase, row in top_summary.head(top_n).iterrows():
+    phase_aggs = [
+        pl.col("elapsed_sec").sum().alias("total_sec"),
+        pl.col("elapsed_sec").mean().alias("mean_sec"),
+        pl.col("elapsed_sec").count().alias("count"),
+    ]
+    top_summary = top_level.group_by("phase").agg(phase_aggs).sort("total_sec", descending=True)
+    for row in top_summary.head(top_n).iter_rows(named=True):
         pct = (row["total_sec"] / total * 100) if total else 0.0
         lines.append(
-            f"  {phase:<32} {row['total_sec']:>7.2f}s  ({pct:5.1f}%)  "
+            f"  {row['phase']:<32} {row['total_sec']:>7.2f}s  ({pct:5.1f}%)  "
             f"x{int(row['count'])} calls, avg {row['mean_sec']:.2f}s"
         )
 
-    if not nested.empty:
+    if not nested.is_empty():
         lines.append(
             "  -- nested within the phases above (llm/tool calls inside each step/setup_query;"
             " not additional wall-clock time) --"
@@ -269,20 +272,19 @@ def format_timing_summary(timing_log: List[Dict[str, Any]], top_n: int = 5) -> s
         # scope ties each nested entry back to the step:*/setup_query invocation it happened
         # during (set by invoke_agent's TimingCallbackHandler), so calls from different steps
         # of a multi-turn Level 2/3 task aren't incorrectly merged together.
-        for scope, group in nested.groupby("scope"):
+        for key, group in nested.group_by("scope"):
+            scope = key[0] if isinstance(key, tuple) else key
             scope_label = scope if scope else "(unlabeled)"
-            parent_total = top_level.loc[top_level["phase"] == scope, "elapsed_sec"].sum()
-            denom = parent_total if parent_total else group["elapsed_sec"].sum()
-            lines.append(f"    within {scope_label} ({parent_total:.2f}s):")
-            scope_summary = (
-                group.groupby("phase")["elapsed_sec"]
-                .agg(total_sec="sum", mean_sec="mean", count="count")
-                .sort_values("total_sec", ascending=False)
+            parent_total = float(
+                top_level.filter(pl.col("phase") == scope)["elapsed_sec"].sum() or 0.0
             )
-            for phase, row in scope_summary.head(top_n).iterrows():
+            denom = parent_total if parent_total else float(group["elapsed_sec"].sum() or 0.0)
+            lines.append(f"    within {scope_label} ({parent_total:.2f}s):")
+            scope_summary = group.group_by("phase").agg(phase_aggs).sort("total_sec", descending=True)
+            for row in scope_summary.head(top_n).iter_rows(named=True):
                 pct = (row["total_sec"] / denom * 100) if denom else 0.0
                 lines.append(
-                    f"      {phase:<28} {row['total_sec']:>7.2f}s  ({pct:5.1f}% of {scope_label})  "
+                    f"      {row['phase']:<28} {row['total_sec']:>7.2f}s  ({pct:5.1f}% of {scope_label})  "
                     f"x{int(row['count'])} calls, avg {row['mean_sec']:.2f}s"
                 )
     return "\n".join(lines)

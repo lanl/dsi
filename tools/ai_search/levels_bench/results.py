@@ -1,4 +1,4 @@
-"""Saving, loading and flattening benchmark results (pandas only; no agent imports)."""
+"""Saving, loading and flattening benchmark results (Polars only; no agent imports)."""
 from __future__ import annotations
 
 import json
@@ -7,10 +7,22 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-import pandas as pd
+import polars as pl
 
 from .config import AI_SEARCH_DIR, CONFIG, snapshot
 from .core import TaskResult
+
+TIMING_SCHEMA = {
+    "model": pl.Utf8,
+    "task_id": pl.Utf8,
+    "level": pl.Int64,
+    "phase": pl.Utf8,
+    "phase_group": pl.Utf8,
+    "is_nested": pl.Boolean,
+    "scope": pl.Utf8,
+    "elapsed_sec": pl.Float64,
+    "error": pl.Utf8,
+}
 
 
 def _git_commit() -> str:
@@ -82,7 +94,7 @@ def load_results(label: str, run_id: Optional[str] = None) -> List[TaskResult]:
     return [TaskResult.from_dict(d) for d in json.loads(path.read_text(encoding="utf-8"))]
 
 
-def results_to_dataframe(results: Iterable[TaskResult]) -> pd.DataFrame:
+def results_to_dataframe(results: Iterable[TaskResult]) -> pl.DataFrame:
     """One row per result, with per-check and judge-score columns flattened out."""
     rows = []
     for r in results:
@@ -120,14 +132,16 @@ def results_to_dataframe(results: Iterable[TaskResult]) -> pd.DataFrame:
             if isinstance(v, (int, float, str, bool)):
                 row[f"judge_{k}"] = v
         rows.append(row)
-    return pd.DataFrame(rows)
+    if not rows:
+        return pl.DataFrame()
+    return pl.DataFrame(rows, infer_schema_length=None, strict=False)
 
 
 def _is_nested_phase(phase: str) -> bool:
     return phase == "llm_call" or phase.startswith("tool:")
 
 
-def timing_breakdown_dataframe(results: Iterable[TaskResult]) -> pd.DataFrame:
+def timing_breakdown_dataframe(results: Iterable[TaskResult]) -> pl.DataFrame:
     """Long format: one row per recorded phase per task. Nested phases (llm_call, tool:*)
     are already included in their step:*/setup_query parent, so filter `~is_nested` before
     summing for wall-clock totals."""
@@ -142,12 +156,13 @@ def timing_breakdown_dataframe(results: Iterable[TaskResult]) -> pd.DataFrame:
                 "phase": phase,
                 "phase_group": phase.split(":", 1)[0],
                 "is_nested": _is_nested_phase(phase),
-                "scope": entry.get("scope", ""),
+                "scope": entry.get("scope") or "",
                 "elapsed_sec": entry.get("elapsed_sec", 0.0),
                 "error": entry.get("error"),
             })
-    return pd.DataFrame(rows, columns=["model", "task_id", "level", "phase", "phase_group",
-                                       "is_nested", "scope", "elapsed_sec", "error"])
+    if not rows:
+        return pl.DataFrame(schema=TIMING_SCHEMA)
+    return pl.DataFrame(rows, schema=TIMING_SCHEMA)
 
 
 def flatten(model_results: Dict[str, List[TaskResult]]) -> List[TaskResult]:

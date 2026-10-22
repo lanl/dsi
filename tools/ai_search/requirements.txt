@@ -1,4 +1,5 @@
 feedparser
+polars
 requests
 rich
 beautifulsoup4
