@@ -643,6 +643,53 @@ class Terminal:
 
         return output
 
+    def search(self, params, download=False):
+        """
+        **Only for Webserver backends**
+        
+        Retrieves metadata or data for entries in a specified collection/dataset/database.
+
+        Parameters
+        ----------
+        `params` : dict
+            Identifies the dataset and, optionally, a specific entry.
+            For example, {"database_id": 1} retrieves metadata for all entries
+            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
+            data for a specific entry (if supported).
+
+        `download` : bool, optional, default=False
+            If True, downloads specified data to a local directory.
+            If False, returns dataset's entry metadata when no entry is specified, 
+            or references to a specified entry's data for separate download.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Metadata for the matching entries, including data references where applicable.
+        """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error("Searching for a collection's metadata in the first loaded backend")
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error("Need to load a valid backend to be able to search across a collection's metadata")
+            raise NotImplementedError("Need to load a valid backend to be able to search across a collection's metadata")
+        backend = self.loaded_backends[0]
+        if not self.valid_backend(backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to search across a collection's metadata")
+            raise RuntimeError("First loaded backend needs to have data to search across a collection's metadata")
+        start = datetime.now(UTC)
+
+        search_output = backend.search(params, download)
+        search_output_df = pd.DataFrame(search_output)
+
+        end = datetime.now(UTC)
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        return search_output_df
+
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
@@ -1447,72 +1494,25 @@ class Terminal:
                     return True
                 return False
         elif parent_name == "Webserver":
-            if backend.__class__.__name__ == "NDP":
-                # NDP is valid if data is loaded and connection works
-                if not backend._loaded:
-                    return False
-                
-                if backend.validate_connection():
-                    return True
-                else:
-                    if self.debug_level != 0:
-                        self.logger.warning("NDP backend connection failed")
-                    return False
-            if backend.__class__.__name__ == "OSTI":
-                # OSTI is valid if data is loaded and connection works
-                if not backend._loaded:
-                    return False
-                
-                if backend.validate_connection():
-                    return True
-                else:
-                    if self.debug_level != 0:
-                        self.logger.warning("OSTI backend connection failed")
-                    return False
-            if backend.__class__.__name__ == "RCSBPDB":
-                # RCSBPDB is valid if data is loaded and RCSB connection works
-                if not backend._loaded:
-                    return False
+            # webserver backends are valid if data is loaded and connection works
+            if not backend._loaded:
+                return False
 
-                if backend.validate_connection():
-                    return True
-                else:
-                    if self.debug_level != 0:
-                        self.logger.warning("RCSBPDB backend connection failed.")
-                    return False
-            if backend.__class__.__name__ == "Zenodo":
-                # Zenodo is valid if data is loaded and connection works
-                if not backend._loaded:
-                    return False
-
-                if backend.validate_connection():
-                    return True
-                else:
-                    if self.debug_level != 0:
-                        self.logger.warning("Zenodo backend connection failed.")
-                    return False
-            if backend.__class__.__name__ == "Denodo":
-                # Denodo is valid if data is loaded and the Data Catalog answers
-                if not backend._loaded:
-                    return False
-
-                if backend.validate_connection():
-                    return True
-                else:
-                    if self.debug_level != 0:
-                        self.logger.warning("Denodo backend connection failed.")
-                    return False
-            if backend.__class__.__name__ == "Oceans11":
-                # Oceans11 is valid if data is loaded and connection works
-                if not backend._loaded:
-                    return False
-                
+            if backend.__class__.__name__ == "Oceans11":                
                 if backend.validate_connection(only_validate=True) and backend.catalog_path is not None:
                     return True
                 else:
                     if self.debug_level != 0:
                         self.logger.warning("Oceans11 backend connection failed")
                     return False
+
+            # for all other dsi-supported and external webserver backends
+            if backend.validate_connection():
+                return True
+            else:
+                if self.debug_level != 0:
+                    self.logger.warning(f"{backend.__class__.__name__} backend connection failed")
+                return False
         return True
 
     # Internal function that returns if a user can create a file/db in a specified location
