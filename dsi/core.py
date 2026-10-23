@@ -643,6 +643,53 @@ class Terminal:
 
         return output
 
+    def search(self, params, download=False):
+        """
+        **Only for Webserver backends**
+        
+        Retrieves metadata or data for entries in a specified collection/dataset/database.
+
+        Parameters
+        ----------
+        `params` : dict
+            Identifies the dataset and, optionally, a specific entry.
+            For example, {"database_id": 1} retrieves metadata for all entries
+            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
+            data for a specific entry (if supported).
+
+        `download` : bool, optional, default=False
+            If True, downloads specified data to a local directory.
+            If False, returns dataset's entry metadata when no entry is specified, 
+            or references to a specified entry's data for separate download.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Metadata for the matching entries, including data references where applicable.
+        """
+        if self.debug_level != 0:
+            self.logger.info("-------------------------------------")
+            self.logger.error("Searching for a collection's metadata in the first loaded backend")
+        if len(self.loaded_backends) == 0:
+            if self.debug_level != 0:
+                self.logger.error("Need to load a valid backend to be able to search across a collection's metadata")
+            raise NotImplementedError("Need to load a valid backend to be able to search across a collection's metadata")
+        backend = self.loaded_backends[0]
+        if not self.valid_backend(backend):
+            if self.debug_level != 0:
+                self.logger.error("First loaded backend needs to have data to search across a collection's metadata")
+            raise RuntimeError("First loaded backend needs to have data to search across a collection's metadata")
+        start = datetime.now(UTC)
+
+        search_output = backend.search(params, download)
+        search_output_df = pd.DataFrame(search_output)
+
+        end = datetime.now(UTC)
+        if self.debug_level != 0:
+            self.logger.info(f"Runtime: {end-start}")
+
+        return search_output_df
+
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
