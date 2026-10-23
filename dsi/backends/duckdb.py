@@ -1003,7 +1003,7 @@ class DuckDB(Filesystem):
                         AVG("{col_name}"),
                         STDDEV_SAMP("{col_name}")
                     FROM {table_name}
-                    WHERE "{col_name}" IS NOT NULL
+                    WHERE isfinite("{col_name}")
                 """).fetchone()
             else:
                 min_val = max_val = avg_val = std_dev = None
