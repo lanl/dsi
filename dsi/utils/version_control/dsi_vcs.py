@@ -195,7 +195,7 @@ class Version:
 
     def __init__(self, folder: str):
         self.root_folder = os.path.abspath(folder)
-        self.skip_names = {DB_NAME, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR}
+        self.skip_names = {DB_NAME, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, ".git"}
         if not os.path.isdir(self.root_folder):
             sys.exit(f"Error: '{self.root_folder}' is not a directory.")
 
@@ -950,7 +950,7 @@ class Version:
         def get_files_in_root_folder():
             files = {}
             for dirpath, dirnames, filenames in os.walk(root_folder, followlinks=False):
-                dirnames[:] = [d for d in dirnames if d not in {DB_NAME, SNAPSHOTS_DIR}]
+                dirnames[:] = [d for d in dirnames if d not in self.skip_names]
                 if dirpath != root_folder:
                     abs_path = dirpath
                     rel_path = os.path.relpath(abs_path, root_folder)
@@ -958,7 +958,7 @@ class Version:
                     files[rel_path]["absolute_path"] = abs_path
                     files[rel_path]["lstat"] = json.loads(files[rel_path]["lstat"]) if files[rel_path]["lstat"] else {}
                 for fname in filenames:
-                    if fname not in {DB_NAME, SNAPSHOTS_DIR}:
+                    if fname not in self.skip_names:
                         abs_path = os.path.join(dirpath, fname)
                         rel_path = os.path.relpath(abs_path, root_folder)
                         files[rel_path] = collect_metadata(abs_path, self.root_folder)

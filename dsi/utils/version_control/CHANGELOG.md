@@ -2,13 +2,22 @@
 
 ## [Unreleased]
 
+### Performance
+
+- Use read-only mmap for generic FastCDC chunking, hashing memoryviews directly
+  and copying only returned chunk data. Preserve chunk boundaries, hashes, and
+  empty-file behavior without maintaining a read-ahead bytearray.
+
 ### Added
 
+- Install a `git-dsi-vcs` entry point so all DSI version-control commands are
+  available through `git dsi-vcs` as well as `dsi-vcs`.
 - `dsi-vcs add --verbose` (`-v`) to display the full list of staged paths.
 - Print only the number of newly staged paths after `add` by default.
 
 ### Fixed
 
+- Exclude `.git` directories and worktree pointer files from DSI snapshots.
 - Avoid duplicate staging records for overlapping inputs and paths already staged for addition, including across CLI invocations. Re-adding an already staged directory no longer grows the log.
 - Preserve additions that replace pending deletions or re-stage removed paths.
 

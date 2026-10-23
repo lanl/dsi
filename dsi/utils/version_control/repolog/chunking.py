@@ -1,4 +1,5 @@
 import hashlib
+import mmap
 import os
 import tempfile
 from pathlib import Path
@@ -55,9 +56,6 @@ class RollingHash:
 # After AVG_CHUNK:
 #   fewer bits make a boundary more likely.
 NORMALIZATION_LEVEL = 2
-
-# Amount read from disk at a time.
-READ_SIZE = 1024 * 1024
 
 UINT64_MASK = (1 << 64) - 1
 
@@ -184,7 +182,7 @@ def _gear_update(fingerprint: int, value: int) -> int:
 
 
 def _find_fastcdc_cut(
-    buffer: bytearray,
+    buffer: bytearray | mmap.mmap,
     start: int,
     available: int,
 ) -> int:
@@ -263,79 +261,43 @@ def iter_file_fastcdc(
     path: str | os.PathLike[str],
 ) -> Iterator[dict[str, object]]:
     """
-    Stream a file as FastCDC chunks.
+    Stream a read-only memory-mapped file as FastCDC chunks.
 
     Yield dictionaries with ``sha256``, ``size`` and ``data`` fields.
     Boundary selection is identical to the compatibility list API.
     """
-    # Bytes before buffer_start have already been emitted.
-    buffer = bytearray()
-    buffer_start = 0
-    end_of_file = False
-
     with open(path, "rb") as file:
-        while True:
-            available = len(buffer) - buffer_start
+        # mmap cannot map an empty file; preserve the empty chunk sequence.
+        if os.fstat(file.fileno()).st_size == 0:
+            return
 
-            # Keep enough data available to find any boundary up to
-            # MAX_CHUNK. Reading ahead does not alter chunk boundaries.
-            while not end_of_file and available < MAX_CHUNK:
-                read_length = min(
-                    READ_SIZE,
-                    MAX_CHUNK - available,
+        with mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ) as mapped_file:
+            position = 0
+            file_size = len(mapped_file)
+            while position < file_size:
+                chunk_size = _find_fastcdc_cut(
+                    buffer=mapped_file,
+                    start=position,
+                    available=file_size - position,
                 )
 
-                block = file.read(read_length)
+                if chunk_size <= 0:
+                    raise RuntimeError("FastCDC produced an invalid chunk size")
 
-                if not block:
-                    end_of_file = True
-                    break
+                view = memoryview(mapped_file)[position:position + chunk_size]
+                try:
+                    chunk = {
+                        "sha256": hashlib.sha256(view).hexdigest(),
+                        "size": chunk_size,
+                        "data": bytes(view),
+                    }
+                finally:
+                    # Release before yielding so exhaustion, close(), and errors
+                    # can close the mmap without an exported-buffer error.
+                    view.release()
 
-                buffer.extend(block)
-                available += len(block)
-
-            if available == 0:
-                break
-
-            chunk_size = _find_fastcdc_cut(
-                buffer=buffer,
-                start=buffer_start,
-                available=available,
-            )
-
-            if chunk_size <= 0:
-                raise RuntimeError(
-                    "FastCDC produced an invalid chunk size"
-                )
-
-            chunk_data = bytes(
-                buffer[
-                    buffer_start:
-                    buffer_start + chunk_size
-                ]
-            )
-
-            yield (
-                {
-                    "sha256": hashlib.sha256(
-                        chunk_data
-                    ).hexdigest(),
-                    "size": chunk_size,
-                    "data": chunk_data,
-                }
-            )
-
-            buffer_start += chunk_size
-
-            # Reclaim processed buffer space without shifting the
-            # remaining bytes after every small chunk.
-            if buffer_start == len(buffer):
-                buffer.clear()
-                buffer_start = 0
-
-            elif buffer_start >= MAX_CHUNK:
-                del buffer[:buffer_start]
-                buffer_start = 0
+                position += chunk_size
+                yield chunk
 
 
 def chunk_file_fastcdc(path):

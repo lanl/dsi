@@ -6,8 +6,9 @@ import os
 from .dsi_vcs import Version
 from . import __version__
 
-def main():
+def main(*, prog=None):
     parser = argparse.ArgumentParser(
+        prog=prog,
         description=f"dsi-vcs (v{__version__}) — content defined version control with file metadata"
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -104,6 +105,11 @@ def main():
     elif args.command == "status":
         vcs = Version(os.getcwd())
         vcs.cmd_status()
+
+def git_main():
+    """Entry point for Git's external-command discovery (git-dsi-vcs)."""
+    main(prog="git dsi-vcs")
+
 
 if __name__ == "__main__":
     # print("\n=== dsi-vcs: rsync-based file version control ===\n")

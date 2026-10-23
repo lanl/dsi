@@ -15,6 +15,36 @@
 
 ## CLI Commands
 
+### Git Extension
+
+Installing the package also installs `git-dsi-vcs`, so Git can discover it as
+`git dsi-vcs`. From the project checkout, install it into the active environment:
+
+```bash
+conda activate cdsi
+python -m pip install -e .
+git dsi-vcs -h
+```
+
+Run the same commands through Git:
+
+```bash
+git dsi-vcs init
+git dsi-vcs add ./data
+git dsi-vcs commit "Initial data import"
+git dsi-vcs log
+```
+
+The environment's executable directory must be on `PATH`. No Git alias is
+needed. The standalone `dsi-vcs` command remains available. DSI keeps its own
+snapshots and history; invoking it through Git does not create Git commits.
+Commands operate in the current directory, or the directory selected with
+`git -C /path/to/dataset dsi-vcs <command>`. They also work outside Git repositories.
+
+When using both tools in the same directory, DSI skips `.git` metadata,
+including the `.git` file used by Git worktrees. Add `__dsi_vcs/` to that
+repository's `.gitignore` to keep DSI snapshots out of Git commits.
+
 Initialize dsi-vcs in the current directory:
 
 ```bash
