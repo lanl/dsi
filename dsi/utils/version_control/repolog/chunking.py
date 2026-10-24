@@ -96,6 +96,9 @@ def _build_gear_table() -> tuple[int, ...]:
 
 
 GEAR_TABLE = _build_gear_table()
+# Keep bit 64: the first-byte boundary mask is shifted by one bit too.
+# Truncating this table to 64 bits would change tests of the original top bit.
+GEAR_TABLE_LS = tuple(value << 1 for value in GEAR_TABLE)
 
 
 def _make_spread_mask(bit_count: int) -> int:
@@ -204,6 +207,9 @@ def _find_fastcdc_cut(
 
         MAX_CHUNK
           forced boundary
+
+    Roll two bytes per iteration with a shifted Gear table and mask for the
+    first byte. Test both bytes, preserving the single-byte chunk boundaries.
     """
     if available <= 0:
         return 0
@@ -217,41 +223,36 @@ def _find_fastcdc_cut(
     normal_end = min(AVG_CHUNK, scan_length)
 
     fingerprint = 0
-    position = MIN_CHUNK
+    position = start + MIN_CHUNK
+    gear = GEAR_TABLE
+    gear_ls = GEAR_TABLE_LS
+    uint64_mask = UINT64_MASK
 
-    # -----------------------------
-    # Region 1: MIN -> AVG
-    #
-    # More mask bits make boundaries harder to find,
-    # reducing undersized chunks.
-    # -----------------------------
-    while position < normal_end:
-        fingerprint = _gear_update(
-            fingerprint,
-            buffer[start + position],
-        )
+    for end, mask in (
+        (start + normal_end, STRICT_MASK),
+        (start + scan_length, EAGER_MASK),
+    ):
+        shifted_mask = mask << 1
+        pair_end = end - 1
+        while position < pair_end:
+            # This is twice the first byte's fingerprint. The shifted mask
+            # checks the same bits without a separate one-byte hash update.
+            fingerprint = (fingerprint << 2) + gear_ls[buffer[position]]
+            if (fingerprint & shifted_mask) == 0:
+                return position - start
 
-        if (fingerprint & STRICT_MASK) == 0:
-            return position
+            # Complete the pair and restore the normal 64-bit fingerprint.
+            fingerprint = (fingerprint + gear[buffer[position + 1]]) & uint64_mask
+            if (fingerprint & mask) == 0:
+                return position + 1 - start
+            position += 2
 
-        position += 1
-
-    # -----------------------------
-    # Region 2: AVG -> MAX
-    #
-    # Fewer mask bits make boundaries easier to find,
-    # reducing oversized chunks.
-    # -----------------------------
-    while position < scan_length:
-        fingerprint = _gear_update(
-            fingerprint,
-            buffer[start + position],
-        )
-
-        if (fingerprint & EAGER_MASK) == 0:
-            return position
-
-        position += 1
+        # Do not let a pair cross the normalization transition or file end.
+        if position < end:
+            fingerprint = _gear_update(fingerprint, buffer[position])
+            if (fingerprint & mask) == 0:
+                return position - start
+            position += 1
 
     # No content-defined boundary was found.
     return scan_length

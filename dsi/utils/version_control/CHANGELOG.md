@@ -4,6 +4,8 @@
 
 ### Performance
 
+- Roll two bytes per FastCDC iteration using a shifted Gear table and boundary
+  mask, checking both byte positions and retaining existing chunk boundaries.
 - Use read-only mmap for generic FastCDC chunking, hashing memoryviews directly
   and copying only returned chunk data. Preserve chunk boundaries, hashes, and
   empty-file behavior without maintaining a read-ahead bytearray.
