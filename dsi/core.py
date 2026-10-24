@@ -666,6 +666,9 @@ class Terminal:
         -------
         pandas.DataFrame
             Metadata for the matching entries, including data references where applicable.
+
+        None
+            If no metadata found or data downloaded (download=True) then returns None
         """
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
@@ -682,13 +685,12 @@ class Terminal:
         start = datetime.now(UTC)
 
         search_output = backend.search(params, download)
-        search_output_df = pd.DataFrame(search_output)
 
         end = datetime.now(UTC)
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
-        return search_output_df
+        return search_output
 
     def find(self, query_object):
         """

@@ -734,8 +734,11 @@ class OSTI(Webserver):
 
         Returns
         -------
-        OrderedDict
-            Metadata for the matching entries, including data references where applicable.
+        pandas.DataFrame
+            Metadata for a dataset's entries or data references for a specified entry.
+
+        None
+            If no metadata found or data directly downloaded with (download=True)
         """
         raise NotImplementedError
 
