@@ -285,13 +285,9 @@ class Terminal:
                         if mod_type == "backend":
                             self.loaded_backends.append(class_object)
                     except Exception as e:
-                        if "runTable flag is only valid" in str(e):
-                            if self.debug_level != 0:
-                                self.logger.error(str(e))
-                            raise
                         if self.debug_level != 0:
-                            self.logger.error(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
-                        raise ValueError(f'Specified parameters for {mod_name} {mod_function} {mod_type} were incorrect. Check the class again')
+                            self.logger.error(str(e))
+                        raise
                 
                 if not self.user_wrapper:
                     if mod_type == "backend":
