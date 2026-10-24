@@ -121,7 +121,6 @@ class DSI:
                 self.t.add_external_python_module('backend', external_backend_name, backend_name)
                 self.t.load_module('backend', external_backend_name, 'back-write', **updated, **kwargs)
             except Exception as e:
-                logger.error(f"backend ERROR: {e}", exc_info=True)
                 if e.args:
                     e.args = (f'backend ERROR: {str(e.args[0])}',) + e.args[1:]
                 raise
@@ -186,7 +185,6 @@ class DSI:
                     # Pass query params as 'params' argument
                     self.t.load_module('backend', backend_name, 'back-read', params=query_params, **kwargs)
                 except Exception as e:
-                    logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
                     raise
@@ -221,15 +219,14 @@ class DSI:
 
                 try:
                     if backend_name.lower() == 'sqlite':
-                        self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
+                        self.t.load_module('backend','Sqlite','back-write', filenames=filename, **kwargs)
                     elif backend_name.lower() == 'duckdb':
                         self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
                 except Exception as e:
-                    logger.error(f"backend ERROR: {e}", exc_info=True)
                     if e.args:
                         e.args = (f"backend ERROR: {str(e.args[0])}",) + e.args[1:]
                     raise
-        
+
         self.main_backend_obj = self.t.loaded_backends[0]
         if backend_name.lower() == "duckdb":
             backend_name = "DuckDB"
@@ -806,6 +803,7 @@ class DSI:
         default_search = True
         try:
             try:
+                # if a backend's search() is implemented, it must have a check that input is a dict
                 search_result = self.t.search(query)
             except (AttributeError, NotImplementedError):
                 val = f"'{query}'" if isinstance(query, str) else query
@@ -823,13 +821,15 @@ class DSI:
             raise
 
         if default_search:
-            if search_result is None:
+            if search_result is None: # eventually remove this check if adding download=True here because it will be None then
                 print("WARNING: Input search params were not found in this backend")
                 return
             if not collection:
-                print(f"Metadata for {next(iter(query))}")
+                print(f"\nMetadata for {next(iter(query))}")
                 self.t.table_print_helper(search_result.columns.tolist(), search_result.values.tolist(), search_result.shape[0])
                 print()
+            else:
+                return search_result
         else:
             if find_cell is None and find_col is None and find_table is None:
                 print(f"WARNING: {val} was not found in this backend\n")
@@ -1016,7 +1016,6 @@ class DSI:
                 else:
                     correct_backend = False
         except Exception as e:
-            logger.error(f"process() ERROR: {e}", exc_info=True)
             if e.args:
                 e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
@@ -1039,7 +1038,6 @@ class DSI:
                 self.t.unload_module('backend',backend_name,'back-write')
                 self.t.load_module('backend',backend_name,'back-write', filename=filename)
         except Exception as e: # there really shouldn't be an error here
-            logger.error(f"process() ERROR: {e}", exc_info=True)
             if e.args:
                 e.args = (f'process() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
