@@ -129,7 +129,7 @@ Diff two commits (shows added, modified, deleted files).
 
 Parameters:
 
-- Provide upto two commit hash as paramerter.
+- Provide upto two commit hash as parameter.
 - No parameter will compare with the latest changes with the last commit.
 - One parameter will compare with the latest change with the provided commit version.
 - Two parameters will compare between the provided versions.
@@ -173,7 +173,7 @@ dsi-vcs restore abc123def456
 
 ### Clone a DSI-VCS Repository
 
-Clone a previously initialized DSI-VCS repostory to the current working directory:
+Clone a previously initialized DSI-VCS repository to the current working directory:
 
 ```Shell
 dsi-vcs clone pathe_to_repository
@@ -329,7 +329,7 @@ obj.version("log")            # shows logs in descending date order
 obj.version("log", "feature") # shows logs from feature branch only
 ```
 
-**Args (optional):** A traget branch name (Defaults is the latest branch) and the number of recent versions to display (Defaults is `10`).
+**Args (optional):** A target branch name (Defaults is the latest branch) and the number of recent versions to display (Defaults is `10`).
 
 ---
 

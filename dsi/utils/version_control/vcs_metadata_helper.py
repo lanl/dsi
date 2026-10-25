@@ -364,7 +364,7 @@ def collect_tree_metadata(scan_root: str, identity_root: str) -> list[dict]:
     return entries
 
 
-# None if permission denined, acl text if permission granted, or empty string if no acl text available
+# None if permission denied, acl text if permission granted, or empty string if no acl text available
 def check_access_permission(conn, root_folder: str, commit_hash: str, relative_path: str, access: str = "read") -> dict:
     row = conn.execute(
         "SELECT "

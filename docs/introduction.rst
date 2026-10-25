@@ -86,7 +86,7 @@ DSI Backends
 Backends are an interface between the DSI Core and a storage medium designed to support a user-needed functionality.
 DSI's default backend is **SQLite**, but users can load other ones instead.
 
-Users can interact with a backend by ingesting data into one with DSI, querying its data through abstracted find functions, or processing its data into DSI.
+Users can interact with a backend by ingesting data into one, querying its data through abstracted find functions, or processing its data into DSI.
 Users can also find instances of an object in a backend, display a table's data, or view statistics of each table in a backend.
 
 Certain backends are read-only so data cannot be ingested or updated, only queried.
@@ -108,10 +108,12 @@ Filesystem Backends - Create a permanent database file in the user's local direc
   - DuckDB: In-process SQL database designed for fast queries on large data files. Supports POSIX-enforced file permissions.
 
 Webserver Backends - Create a connection to a remote data platform for users to retrieve data in-memory:
-  - Denodo (Read-only): Connection to a `Denodo Data Catalog <https://www.denodo.com/>`_ instance. Site-specific settings, including the catalog URL, are read from the user's environment or configuration file rather than stored in DSI.
-  - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
   - Oceans11 (Read-only): Connection to data on DSI's `open data server: <https://oceans11.lanl.gov/>`_
   - OSTI (Read-only): Connection to data hosted by the Department of Energy's `Office of Scientific and Technical Information <https://www.osti.gov/>`_
+  - Zenodo (Read-only): Connection to data on the open `Zenodo Data Repository <https://zenodo.org/>`_
+  - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
+  - Denodo (Read-only): Connection to a specific `Denodo Data Catalog <https://www.denodo.com/>`_ instance. 
+  - RCSBPDB (Read-only): Connection to data on the `Research Collaboratory for Structural Bioinformatics Protein Data Bank <https://www.rcsb.org/>`_
 
 DSI Core
 ~~~~~~~~
