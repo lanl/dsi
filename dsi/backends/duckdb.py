@@ -358,7 +358,7 @@ class DuckDB(Filesystem):
             self.cur.execute(create_query)
             units_data = artifacts["dsi_units"]
             for table_val, col_val, unit_val in zip(units_data["table_name"], units_data["column_name"], units_data["unit"]):
-                unit_result = self.cur.execute(f"""SELECT unit FROM dsi_units WHERE 
+                unit_result = self.cur.execute("""SELECT unit FROM dsi_units WHERE 
                                                 table_name = ? AND column_name = ?;""", [table_val, col_val]).fetchone()
                 if unit_result and unit_result[0] != unit_val: #checks if unit for same table and col exists in db and if units match
                     self.cur.execute("ROLLBACK")
