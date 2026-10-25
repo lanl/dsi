@@ -219,7 +219,7 @@ class DSI:
 
                 try:
                     if backend_name.lower() == 'sqlite':
-                        self.t.load_module('backend','Sqlite','back-write', filenames=filename, **kwargs)
+                        self.t.load_module('backend','Sqlite','back-write', filename=filename, **kwargs)
                     elif backend_name.lower() == 'duckdb':
                         self.t.load_module('backend','DuckDB','back-write', filename=filename, **kwargs)
                 except Exception as e:
