@@ -282,7 +282,7 @@ def _make_source_world_readable_but_not_writable(repo: Path) -> None:
             current_mode = stat.S_IMODE(file_path.stat().st_mode)
             os.chmod(file_path, 0o555 if current_mode & stat.S_IXUSR else 0o444)
 
-# commented out the follwoing line to avoid ruff linter fail
+# commented out the following line to avoid ruff linter fail
 # @pytest.fixture(scope="session")
 def git_env() -> Iterable[GitTestEnvironment]:
     if sys.platform != "linux":
@@ -417,7 +417,7 @@ def test_clone_preserves_posix_metadata_for_shared_group_member(
     assert cloned_file.read_text(encoding="utf-8") == "version 1\n"
     # assert cloned_stat.st_uid == source_stat.st_uid
     # assert cloned_stat.st_gid == source_stat.st_gid
-    # Git assigns all read permission which is regular linux file create beahvior.
+    # Git assigns all read permission which is regular linux file create behavior.
     # change != into == in line 422 to avoid testing this behavior
     assert stat.S_IMODE(source_stat.st_mode) != stat.S_IMODE(cloned_stat.st_mode)
     # Also, acl check should fail

@@ -8,7 +8,7 @@
 - Merkle Tree per version.
 - File Chunking Hash for deduplication.
   - FastCDC chunking in general. 
-  - File format specifc chunking for `npy`, `csv`, `db`, `sqlite`, `sqlitle3`, `json`, `xml`, and `xlsx`.
+  - File format specific chunking for `npy`, `csv`, `db`, `sqlite`, `sqlitle3`, `json`, `xml`, and `xlsx`.
 - Basic versioning commands: .
   -  init: initialize a versioning repository in a root folder
   -  add : add file(s) to the staging area for the next commit

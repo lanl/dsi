@@ -266,7 +266,7 @@ def _version_count(repo: Path) -> int:
     assert row is not None
     return int(row[0])
 
-# commented out the follwoing line to avoid ruff linter fail
+# commented out the following line to avoid ruff linter fail
 # @pytest.fixture(scope="session")
 def dsi_env() -> Iterable[DsiTestEnvironment]:
     if sys.platform != "linux":
