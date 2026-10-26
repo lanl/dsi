@@ -1,4 +1,4 @@
-name: jupyternotebook test
+name: tutorial_notebook test
 
 on:
   push:
