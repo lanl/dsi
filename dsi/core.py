@@ -660,8 +660,9 @@ class Terminal:
 
         Returns
         -------
-        pandas.DataFrame
-            Metadata for the matching entries, including data references where applicable.
+        pandas.DataFrame or list of pandas.DataFrame
+            Metadata for the matching entries, including data references where applicable. 
+            Returns a list of DataFrames when the metadata spans multiple tables.
 
         None
             If no metadata found or data downloaded (download=True) then returns None
@@ -681,6 +682,10 @@ class Terminal:
         start = datetime.now(UTC)
 
         search_output = backend.search(params, download)
+        if not isinstance(search_output, (list, pd.DataFrame)):
+            if self.debug_level != 0:
+                self.logger.error("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
+            raise ValueError("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
 
         end = datetime.now(UTC)
         if self.debug_level != 0:
