@@ -786,7 +786,7 @@ class DSI:
             Else, `query` is the value to search for in all rows across all tables.
 
         `collection` : bool, optional, default False. 
-            If True and using default params search, returns one pandas DataFrame representing metadata/data for a specified table.
+            If True and using default params search, returns a pandas DataFrame (or list) representing metadata/data for a specified collection.
 
             If True and using old value search, returns a list of pandas DataFrames representing a subset of tables where `query` is found.
 
@@ -825,10 +825,18 @@ class DSI:
                 print("WARNING: Input search params were not found in this backend")
                 return
             if not collection:
-                print(f"\nMetadata for {next(iter(query))}")
-                self.t.table_print_helper(search_result.columns.tolist(), search_result.values.tolist(), search_result.shape[0])
-                print()
+                if isinstance(search_result, list):
+                    print(f"\nMetadata for {next(iter(query))} is represented by {len(search_result)} tables")
+                    for tbl in search_result:
+                        self.t.table_print_helper(tbl.columns.tolist(), tbl.values.tolist(), tbl.shape[0])
+                        print()
+                else:
+                    print(f"\nMetadata for {next(iter(query))}:")
+                    self.t.table_print_helper(search_result.columns.tolist(), search_result.values.tolist(), search_result.shape[0])
+                    print()
             else:
+                msg = f"Return object for search() is a list of {len(search_result)} pandas.DataFrame"
+                logger.log(logging.INFO, msg) if isinstance(search_result, list) and self.silence_messages else print(msg)
                 return search_result
         else:
             if find_cell is None and find_col is None and find_table is None:

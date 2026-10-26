@@ -1826,8 +1826,9 @@ class Denodo(Webserver):
 
         Returns
         -------
-        pandas.DataFrame
+        pandas.DataFrame or list of pandas.DataFrame
             Metadata for a dataset's entries or data references for a specified entry.
+            Returns a list of DataFrames when the metadata spans multiple tables.
 
         None
             If no metadata found or data directly downloaded with (download=True)
