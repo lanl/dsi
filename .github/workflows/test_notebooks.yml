@@ -31,8 +31,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install . -r requirements.extras.txt
     - name: Test Jupyter
+      working-directory: ./examples
       run: |
         pip install pytest
         pip install nbmake
         pip install jupyter
-        pytest --nbmake "examples/dsi_tutorial.ipynb"
+        pytest --nbmake "dsi_tutorial.ipynb"
