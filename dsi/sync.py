@@ -95,17 +95,15 @@ class Sync:
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        if not Path(local_loc).is_absolute() or "../" in remote_loc or "..\\" in remote_loc:
-            raise ValueError("Please use absolute local and remote paths, not relative paths")
+        if not (Path(local_loc).is_absolute() and Path(local_loc).exists() and Path(local_loc).is_dir()):
+            raise ValueError("Input local path must be an absolute path to an existing directory.")
+        if "../" in remote_loc or "..\\" in remote_loc:
+            raise ValueError("Please use an absolute remote path, not relative.")
 
         local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
-
-        loc_path = Path(local_loc)
-        if not loc_path.exists() or not loc_path.is_dir():
-            raise ValueError("Input local path must be an path to an existing directory.")
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
