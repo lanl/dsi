@@ -685,7 +685,7 @@ class Terminal:
         if not isinstance(search_output, (list, pd.DataFrame)):
             if self.debug_level != 0:
                 self.logger.error("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
-            raise ValueError("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
+            raise TypeError("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
 
         end = datetime.now(UTC)
         if self.debug_level != 0:
