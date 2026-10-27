@@ -624,7 +624,8 @@ class Sync:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
 
-            result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
+            shell = os.environ.get("SHELL")
+            result = subprocess.run(["module avail conduit"], shell=True, executable=shell, capture_output=True)
             if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
@@ -687,7 +688,8 @@ class Sync:
                 # File Movement
                 if self.verbose:
                     print("pfcp -R " + self.local_location + " " + self.remote_location)
-                cmd = ['pfcp','-R',self.local_location, self.remote_location]
+                pfcp_data_cmd = f"module load marfs && pfcp -R {self.local_location} {self.remote_location}"
+                cmd = ["bash", "-lc", pfcp_data_cmd]
                 self.execute_cmd(cmd, "pfcp move data")
                 print(" DSI submitted pfcp data movement job.")
 
@@ -701,7 +703,8 @@ class Sync:
                 for dbname in db_list:
                     if self.verbose:
                         print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
-                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, dbname)]
+                    pfcp_db_cmd = f"module load marfs && pfcp {dbname} {os.path.join(self.remote_location, dbname)}"
+                    cmd = ["bash", "-lc", pfcp_db_cmd]
                     self.execute_cmd(cmd, "pfcp move database")
                     print(" DSI submitted pfcp database movement job.")
             except Exception as e:
