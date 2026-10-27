@@ -5,6 +5,7 @@ from dsi.backends.rcsbpdb import RCSBPDB
 from dsi.backends.oceans11 import Oceans11
 from dsi.backends.zenodo import Zenodo
 from dsi.backends.denodo import Denodo
+from dsi.backends.navdat import NAVDAT
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -52,11 +53,12 @@ class DSI:
                 - If backend_name = "Oceans11" → No filename input (read-only backend)
                 - If backend_name = "Zenodo" → No filename input (read-only backend)
                 - If backend_name = "Denodo" → No filename input (read-only backend)
+                - If backend_name = "NAVDAT" → No filename input (read-only backend)
             
         `backend_name` : str, optional, default is "Sqlite".
             Name of the backend to activate.
 
-            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo", "Denodo" or "RCSBPDB".
+            If using a DSI-supported backend, must be either "Sqlite", "DuckDB", "NDP", "OSTI", "Oceans11", "Zenodo", "Denodo", "NAVDAT" or "RCSBPDB".
 
             If using an external backend, provide the relative path to the Python module with the backend.
         """
@@ -131,7 +133,7 @@ class DSI:
                 if backend_name.lower() == "duckdb":
                     raise RuntimeError("To use the DuckDB backend, download the DuckDB package with 'pip install duckdb'")
                 raise RuntimeError("Please check the 'backend_name' argument as it is not supported by DSI\n"
-                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo")
+                                    "Eligible backend_names are: Sqlite, DuckDB, NDP, OSTI, Oceans11, RCSBPDB, Zenodo, NAVDAT")
             
             backend_class = next(cls for name, cls in inspect.getmembers(backend_module, inspect.isclass)
                                  if cls.__module__ == backend_module.__name__ and cls.__name__.lower() == backend_name.lower())
@@ -178,8 +180,11 @@ class DSI:
                 elif backend_name.lower() == "denodo":
                     backend_name = "Denodo"
                     query_params = kwargs.pop("params", {})
+                elif backend_name.lower() == "navdat":
+                    backend_name = "NAVDAT"
+                    query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo, Denodo and Oceans11")
+                    raise NotImplementedError("The currently supported read-only backends are Oceans11, OSTI, Zenodo, NDP, Denodo, RCSBPDB and NAVDAT")
                 
                 try:
                     # Pass query params as 'params' argument
@@ -268,6 +273,9 @@ class DSI:
         n = Zenodo(only_validate=True)
         if n.validate_connection():
             print("Zenodo : Read-only metadata backend for discovering and querying public Zenodo records.")
+        n = NAVDAT(only_validate=True)
+        if n.validate_connection():
+            print("NAVDAT : Read-only metadata backend for discovering and querying NAVDAT/federated PetDB geochemistry data.")
         print()
 
 
@@ -835,8 +843,9 @@ class DSI:
                     self.t.table_print_helper(search_result.columns.tolist(), search_result.values.tolist(), search_result.shape[0])
                     print()
             else:
-                msg = f"Return object for search() is a list of {len(search_result)} pandas.DataFrame"
-                logger.log(logging.INFO, msg) if isinstance(search_result, list) and self.silence_messages else print(msg)
+                if isinstance(search_result, list):
+                    msg = f"Return object for search() is a list of {len(search_result)} pandas.DataFrame"
+                    logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
                 return search_result
         else:
             if find_cell is None and find_col is None and find_table is None:
@@ -1280,7 +1289,7 @@ class DSI:
 
     def num_tables(self, **kwargs):
         """
-        Prints the number of tables in the active backend.
+        Prints and returns the number of tables in the active backend.
         """
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")

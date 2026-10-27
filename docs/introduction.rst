@@ -114,6 +114,7 @@ Webserver Backends - Create a connection to a remote data platform for users to 
   - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
   - Denodo (Read-only): Connection to a specific `Denodo Data Catalog <https://www.denodo.com/>`_ instance. 
   - RCSBPDB (Read-only): Connection to data on the `Research Collaboratory for Structural Bioinformatics Protein Data Bank <https://www.rcsb.org/>`_
+  - NAVDAT (Read-only): Connection to data on the `North American Volcanic and Intrusive Rock Database <https://www.navdat.org/>`_
 
 DSI Core
 ~~~~~~~~

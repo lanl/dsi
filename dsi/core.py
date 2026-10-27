@@ -27,7 +27,7 @@ class Terminal:
     for more information.
     """
     BACKEND_PREFIX = ['dsi.backends']
-    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11', 'rcsbpdb', 'zenodo', 'denodo']
+    BACKEND_IMPLEMENTATIONS = ['gufi', 'sqlite', 'duckdb', 'hpss', 'ndp', 'osti', 'oceans11', 'rcsbpdb', 'zenodo', 'navdat', 'denodo']
     PLUGIN_PREFIX = ['dsi.plugins']
     PLUGIN_IMPLEMENTATIONS = ['env', 'file_reader', 'file_writer', 'collection_reader', 'vtk_reader']
     VALID_ENV = ['Hostname', 'SystemKernel', 'GitInfo']
@@ -36,7 +36,7 @@ class Terminal:
     VALID_DATACARDS = ['DublinCoreDatacard', 'SchemaOrgDatacard', 'GoogleDatacard', 'GenesisDatacard']
     VALID_WRITERS = ['ER_Diagram', 'Table_Plot', 'Csv_Writer', 'Parquet_Writer']
     VALID_PLUGINS = VALID_ENV + VALID_READERS + VALID_WRITERS + VALID_DATACARDS
-    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11', 'RCSBPDB', 'Zenodo', 'Denodo']
+    VALID_BACKENDS = ['Gufi', 'Sqlite', 'DuckDB', 'SqlAlchemy', 'HPSS', 'NDP', 'OSTI', 'Oceans11', 'RCSBPDB', 'Zenodo', 'NAVDAT', 'Denodo']
     VALID_MODULES = VALID_PLUGINS + VALID_BACKENDS
     VALID_MODULE_FUNCTIONS = {'plugin': ['reader', 'writer'],
                               'backend': ['back-read', 'back-write']}
