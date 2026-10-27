@@ -173,7 +173,7 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
 
 
 def materialize_commit_to_worktree(conn, commit_hash: str, chunk_root: str, root_folder: str) -> None:
-    # TODO: implemente stash, then uncomment the follwoing.
+    # TODO: implement stash, then uncomment the following.
     # for entry in os.listdir(root_folder):
     #     if entry in {DB_NAME, SNAPSHOTS_DIR}:
     #         continue

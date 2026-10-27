@@ -794,8 +794,36 @@ class Oceans11(Webserver):
         return self._cache
 
     # ------------------------------------------------------------------
-    # Find Methods
+    # Search/Find Methods
     # ------------------------------------------------------------------
+    def search(self, params, download=False):
+        """
+        Retrieves metadata or data for entries in a specified dataset.
+
+        Parameters
+        ----------
+        `params` : dict
+            Identifies the dataset and, optionally, a specific entry.
+            For example, {"database_id": 1} retrieves metadata for all entries
+            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
+            data for a specific entry (if supported).
+
+        `download` : bool, optional, default=False
+            If True, downloads specified data to a local directory.
+            If False, returns dataset's entry metadata when no entry is specified, 
+            or references to a specified entry's data for separate download.
+
+        Returns
+        -------
+        pandas.DataFrame or list of pandas.DataFrame
+            Metadata for a dataset's entries or data references for a specified entry.
+            Returns a list of DataFrames when the metadata spans multiple tables.
+
+        None
+            If no metadata found or data directly downloaded with (download=True)
+        """
+        raise NotImplementedError
+
     def find(self, query_object, **kwargs):
         """Search for a value across table, column, and cell levels."""
         if not self._loaded:

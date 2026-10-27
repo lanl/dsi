@@ -60,26 +60,13 @@ Webserver Backends
 ~~~~~~~~~~~~~~~~~~
 Webserver backends enable a user to connect to a remote data platform and interact with retrieved data in-memory.
 
-Denodo (Read-only)
-------------------
-
-.. automodule:: dsi.backends.denodo
-   :members: Denodo
-   :special-members: __init__
-
-NDP (Read-only)
----------------
-
-.. automodule:: dsi.backends.ndp
-   :members: NDP
-   :special-members: __init__
-
 Oceans11 (Read-only)
 --------------------
 
 .. automodule:: dsi.backends.oceans11
    :members: Oceans11
    :special-members: __init__
+
 
 OSTI (Read-only)
 ----------------
@@ -88,7 +75,32 @@ OSTI (Read-only)
    :members: OSTI
    :special-members: __init__
 
-RCSBPDP (Read-only)
+
+Zenodo (Read-only)
+------------------
+
+.. automodule:: dsi.backends.zenodo
+   :members: Zenodo
+   :special-members: __init__
+
+
+NDP (Read-only)
+---------------
+
+.. automodule:: dsi.backends.ndp
+   :members: NDP
+   :special-members: __init__
+
+
+Denodo (Read-only)
+------------------
+
+.. automodule:: dsi.backends.denodo
+   :members: Denodo
+   :special-members: __init__
+
+
+RCSBPDB (Read-only)
 -------------------
 
 .. automodule:: dsi.backends.rcsbpdb

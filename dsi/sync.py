@@ -95,17 +95,15 @@ class Sync:
         Helper function to gather filesystem information, local and remote locations
         to create a filesystem entry in a new or existing database
         """
-        if not Path(local_loc).is_absolute() or not PurePosixPath(remote_loc).is_absolute():
-            raise ValueError("Please use absolute paths instead of relative")
+        if not (Path(local_loc).is_absolute() and Path(local_loc).exists() and Path(local_loc).is_dir()):
+            raise ValueError("Input local path must be an absolute path to an existing directory.")
+        if "../" in remote_loc or "..\\" in remote_loc:
+            raise ValueError("Please use an absolute remote path, not relative.")
 
         local_loc = local_loc.replace("\\", "/") # convert to posix path for local location
         local_loc = local_loc if local_loc.endswith("/") else local_loc + "/"
         remote_loc = remote_loc.replace("\\", "/") # convert to posix path for remote location
         remote_loc = remote_loc if remote_loc.endswith("/") else remote_loc + "/"
-
-        loc_path = Path(local_loc)
-        if not loc_path.exists() or not loc_path.is_dir():
-            raise ValueError("Input local path must be an path to an existing directory.")
 
         if self.verbose:
             print("loc: " + local_loc + " rem: " + remote_loc)
@@ -330,7 +328,9 @@ class Sync:
 
         stdout, stderr = process.communicate()
         if process.returncode != 0:
-            if "too many authentication failures" in str(stderr).lower():
+            if 'The following module(s) are unknown: "marfs"' in str(stderr):
+                raise RuntimeError("pfcp is not available on this machine")
+            elif "too many authentication failures" in str(stderr).lower():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
             elif "No credentials" in stderr:
                 raise RuntimeError("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.\n"
@@ -626,7 +626,8 @@ class Sync:
                 print("Kerberos authentication error: No credentials found. Please type 'conduit get' to reissue a ticket.")
                 raise RuntimeError("Kerberos message: " + str(stdout))
 
-            result = subprocess.run(["module avail conduit"], shell=True, executable="/bin/bash", capture_output=True)
+            shell = os.environ.get("SHELL")
+            result = subprocess.run(["module avail conduit"], shell=True, executable=shell, capture_output=True)
             if "conduit/conduit-x86_64" not in str(result.stderr):
                 raise RuntimeError("Conduit not available in this environment")
             
@@ -685,29 +686,28 @@ class Sync:
                 raise RuntimeError(f"Conduit failed with error: {str(e)} ")
 
         elif tool.lower() == "pfcp":
-            try:
-                # File Movement
+            # File Movement
+            if self.verbose:
+                print("pfcp -R " + self.local_location + " " + self.remote_location)
+            pfcp_data_cmd = f"module load marfs && pfcp -R {self.local_location} {self.remote_location}"
+            cmd = ["bash", "-lc", pfcp_data_cmd]
+            self.execute_cmd(cmd, "pfcp move data")
+            print(" DSI submitted pfcp data movement job.")
+
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
+            # Database Movement
+            for dbname in db_list:
                 if self.verbose:
-                    print("pfcp -R " + self.local_location + " " + self.remote_location)
-                cmd = ['pfcp','-R',self.local_location, self.remote_location]
-                self.execute_cmd(cmd, "pfcp move data")
-                print(" DSI submitted pfcp data movement job.")
-
-                # delete temp columns from filesystem table
-                filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
-                self.t.dsi_tables.remove("filesystem")
-                self.t.overwrite_table("filesystem", filesystem_df)
-                self.t.dsi_tables.append("filesystem")
-
-                # Database Movement
-                for dbname in db_list:
-                    if self.verbose:
-                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
-                    cmd = ['pfcp', dbname, os.path.join(self.remote_location, dbname)]
-                    self.execute_cmd(cmd, "pfcp move database")
-                    print(" DSI submitted pfcp database movement job.")
-            except Exception as e:
-                raise RuntimeError(f"pfcp failed with error: {str(e)} ")
+                    print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                pfcp_db_cmd = f"module load marfs && pfcp {dbname} {os.path.join(self.remote_location, dbname)}"
+                cmd = ["bash", "-lc", pfcp_db_cmd]
+                self.execute_cmd(cmd, "pfcp move database")
+                print(" DSI submitted pfcp database movement job.")
         
         elif tool.lower() == "ftp":
             # delete temp columns from filesystem table -- do after data has been moved

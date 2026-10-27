@@ -193,7 +193,7 @@ def plot_metric(results: pd.DataFrame, output: Path, title: str, dpi: int, metri
     axes[-1].set_xlabel("Commit Iteration", fontsize=16)
     handles, labels = axes[0].get_legend_handles_labels()
     if metric == "total_ms":
-        title = "Versioning Time Comparision per Iteration"
+        title = "Versioning Time Comparison per Iteration"
         fig.legend(
             handles,
             labels,
@@ -203,7 +203,7 @@ def plot_metric(results: pd.DataFrame, output: Path, title: str, dpi: int, metri
             fontsize=14,
         )
     else:
-        title = "Versioning Space Comparision per Iteration"
+        title = "Versioning Space Comparison per Iteration"
         fig.legend(
             handles,
             labels,
