@@ -15,21 +15,34 @@ from dsi.backends.osti import OSTI
 
 pytestmark = pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
 
-# Open one shared OSTI backend using one combined query.
-# OSTI initialization performs one validate_connection request and one data request.
-backend = OSTI(
-    params={
-        "q": "wildfire",
-        "author": "Linn",
-        "title": "wildfire",
-        "rows": 6,
-        "page": 1,
-    }
-)
-
 # =============================================================================
 # 0) pytest initialization to avoid additional OSTI calls
 # =============================================================================
+
+# Open one shared OSTI backend using one combined query.
+# OSTI initialization performs one validate_connection request and one data request.
+
+@pytest.fixture(scope="session")
+def backend():
+    """Create one shared OSTI backend, skipping if unavailable."""
+    try:
+        instance = OSTI(
+            params={
+                "q": "wildfire",
+                "author": "Linn",
+                "title": "wildfire",
+                "rows": 6,
+                "page": 1,
+            }
+        )
+    except ConnectionError as e:
+        pytest.skip(f"OSTI is unavailable: {e}")
+
+    try:
+        yield instance
+    finally:
+        if instance._loaded:
+            instance.close()
 
 # No rate-limit delay is needed because all tests below reuse the shared backend.
 # Any method that would make another network request is mocked in its test.
@@ -39,14 +52,14 @@ backend = OSTI(
 # =============================================================================
 
 
-def test_osti_initialization():
+def test_osti_initialization(backend):
     """Test OSTI backend initializes correctly."""
     assert backend._loaded is True
     assert len(backend._cache) > 0
     assert "records" in backend._cache
 
 
-def test_osti_validate_connection():
+def test_osti_validate_connection(backend):
     """Successful initialization confirms validate_connection already passed."""
     assert backend._loaded is True
     assert backend.base_url == "https://www.osti.gov/api/v1"
@@ -63,7 +76,7 @@ def test_osti_invalid_url():
 # =============================================================================
 
 
-def test_osti_load_initial_data():
+def test_osti_load_initial_data(backend):
     """Test that initial data load creates proper structure."""
     assert isinstance(backend._cache, OrderedDict)
     assert "records" in backend._cache
@@ -77,7 +90,7 @@ def test_osti_load_initial_data():
     assert "has_fulltext" in record_cols
 
 
-def test_osti_combined_query_result():
+def test_osti_combined_query_result(backend):
     """Test that the combined q, author, and title request returns matching records."""
     df = backend.get_table("records", dict_return=False)
 
@@ -111,13 +124,13 @@ def test_osti_bad_params_type():
 # =============================================================================
 
 
-def test_osti_query_artifacts():
+def test_osti_query_artifacts(backend):
     """OSTI is a non-SQL backend, so query_artifacts is not supported."""
     with pytest.raises(NotImplementedError):
         backend.query_artifacts("title.notnull()")
 
 
-def test_osti_get_table():
+def test_osti_get_table(backend):
     """Test getting table data as DataFrame or OrderedDict."""
     df = backend.get_table("records", dict_return=False)
     assert isinstance(df, pd.DataFrame)
@@ -128,13 +141,13 @@ def test_osti_get_table():
     assert len(dict_data) > 0
 
 
-def test_osti_get_table_invalid_name():
+def test_osti_get_table_invalid_name(backend):
     """Test that requesting a non-records table raises ValueError."""
     with pytest.raises(ValueError):
         backend.get_table("fake_table")
 
 
-def test_osti_get_schema():
+def test_osti_get_schema(backend):
     """Test that get_schema returns informative schema."""
     schema = backend.get_schema()
 
@@ -151,13 +164,13 @@ def test_osti_get_schema():
 # =============================================================================
 
 
-def test_osti_find():
+def test_osti_find(backend):
     """Test general find operation across all levels."""
     results = backend.find("title")
     assert isinstance(results, list)
 
 
-def test_osti_find_table():
+def test_osti_find_table(backend):
     """Test finding tables by name."""
     tables_found = backend.find_table("records")
 
@@ -166,7 +179,7 @@ def test_osti_find_table():
     assert any("records" in t.t_name for t in tables_found)
 
 
-def test_osti_find_column():
+def test_osti_find_column(backend):
     """Test finding columns by name."""
     columns_found = backend.find_column("title")
 
@@ -175,7 +188,7 @@ def test_osti_find_column():
     assert any("title" in c.c_name for c in columns_found)
 
 
-def test_osti_find_cell():
+def test_osti_find_cell(backend):
     """Test finding cells by value."""
     cells_found = backend.find_cell("FIRETEC")
 
@@ -184,7 +197,7 @@ def test_osti_find_cell():
     assert all(hasattr(cell, "type") and cell.type == "cell" for cell in cells_found)
 
 
-def test_osti_find_relation():
+def test_osti_find_relation(backend):
     """Test relation finding against the loaded FIRETEC records."""
     results = backend.find_relation("title", "~FIRETEC")
 
@@ -198,7 +211,7 @@ def test_osti_find_relation():
 # =============================================================================
 
 
-def test_osti_validate_urls():
+def test_osti_validate_urls(backend):
     """Test URL validation without making additional external requests."""
     local = OSTI.__new__(OSTI)
     local._loaded = True
@@ -232,7 +245,7 @@ def test_osti_validate_urls():
 # =============================================================================
 
 
-def test_osti_list():
+def test_osti_list(backend):
     """Test list method returns table names."""
     table_names = backend.list(collection=True)
 
@@ -240,12 +253,12 @@ def test_osti_list():
     assert isinstance(table_names, list)
 
 
-def test_osti_num_tables():
+def test_osti_num_tables(backend):
     """Test num_tables does not raise exception."""
     backend.num_tables()
 
 
-def test_osti_summary():
+def test_osti_summary(backend):
     """Test summary returns table metadata."""
     summary_list = backend.summary()
 
@@ -262,13 +275,13 @@ def test_osti_summary():
     assert "osti_id" in summary_single["column"].tolist()
 
 
-def test_osti_summary_invalid_table():
+def test_osti_summary_invalid_table(backend):
     """Test summary rejects invalid table names."""
     with pytest.raises(ValueError):
         backend.summary("fake_table")
 
 
-def test_osti_display():
+def test_osti_display(backend):
     """Test display method for records table."""
     result = backend.display("records", num_rows=10)
 
@@ -276,7 +289,7 @@ def test_osti_display():
     assert len(result) <= 10
 
 
-def test_osti_display_cols():
+def test_osti_display_cols(backend):
     """Test display with selected columns."""
     result = backend.display(
         "records",
@@ -288,7 +301,7 @@ def test_osti_display_cols():
     assert list(result.columns) == ["osti_id", "title"]
 
 
-def test_osti_display_invalid_table():
+def test_osti_display_invalid_table(backend):
     """Test display rejects invalid table names."""
     with pytest.raises(ValueError):
         backend.display("fake_table")
@@ -299,7 +312,7 @@ def test_osti_display_invalid_table():
 # =============================================================================
 
 
-def test_osti_process_artifacts():
+def test_osti_process_artifacts(backend):
     """Test that processed artifacts have correct structure."""
     artifacts = backend.process_artifacts()
 
@@ -313,7 +326,7 @@ def test_osti_process_artifacts():
 # =============================================================================
 
 
-def test_osti_ingest_artifacts():
+def test_osti_ingest_artifacts(backend):
     """Test that ingest_artifacts raises NotImplementedError."""
     with pytest.raises(NotImplementedError):
         backend.ingest_artifacts({})
@@ -324,19 +337,19 @@ def test_osti_ingest_artifacts():
 # =============================================================================
 
 
-def test_osti_author_filter():
+def test_osti_author_filter(backend):
     """Test author filter is included in the combined query."""
     params = backend._build_request_params({"author": "Linn", "rows": 5})
     assert params["author"] == "Linn"
 
 
-def test_osti_title_filter():
+def test_osti_title_filter(backend):
     """Test title filter is included in the combined query."""
     params = backend._build_request_params({"title": "FIRETEC", "rows": 5})
     assert params["title"] == "FIRETEC"
 
 
-def test_osti_subject_filter():
+def test_osti_subject_filter(backend):
     """Test subject filter is included in the combined query."""
     params = backend._build_request_params(
         {"subject": "54 ENVIRONMENTAL SCIENCES", "rows": 5}
@@ -344,13 +357,13 @@ def test_osti_subject_filter():
     assert params["subject"] == "54 ENVIRONMENTAL SCIENCES"
 
 
-def test_osti_fulltext_filter():
+def test_osti_fulltext_filter(backend):
     """Test has_fulltext filter is included in the combined query."""
     params = backend._build_request_params({"has_fulltext": "true", "rows": 5})
     assert params["has_fulltext"] == "true"
 
 
-def test_osti_combined_filters():
+def test_osti_combined_filters(backend):
     """Test all requested filters can be stacked into one OSTI request."""
     params = backend._build_request_params(
         {
@@ -380,7 +393,7 @@ def test_osti_combined_filters():
 # =============================================================================
 
 
-def test_osti_notebook():
+def test_osti_notebook(backend):
     """Test that notebook() throws NotImplementedError."""
     try:
         backend.notebook()

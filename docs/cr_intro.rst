@@ -45,9 +45,12 @@ Filesystem Backends - Create a permanent database file in the user's local direc
     GUFI is a fast, secure metadata search across a filesystem accessible to both privileged and unprivileged users.
 
 Webserver Backends - Create a connection to a remote data platform for users to retrieve data in-memory:
-  - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
   - Oceans11 (Read-only): Connection to data on DSI's `open data server: <https://oceans11.lanl.gov/>`_
   - OSTI (Read-only): Connection to data hosted by the Department of Energy's `Office of Scientific and Technical Information <https://www.osti.gov/>`_
+  - Zenodo (Read-only): Connection to data on the open `Zenodo Data Repository <https://zenodo.org/>`_
+  - NDP (Read-only): Connection to data on the `National Data Platform <https://nationaldataplatform.org/>`_
+  - Denodo (Read-only): Connection to a specific `Denodo Data Catalog <https://www.denodo.com/>`_ instance. 
+  - RCSBPDB (Read-only): Connection to data on the `Research Collaboratory for Structural Bioinformatics Protein Data Bank <https://www.rcsb.org/>`_
 
 DSI Core
 ~~~~~~~~

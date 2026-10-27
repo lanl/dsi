@@ -33,25 +33,27 @@ TEST_OSTI_ID = "3022783"
 # =============================================================================
 # Fixtures
 # =============================================================================
-
 @pytest.fixture(scope="session")
 def backend(tmp_path_factory):
     """Create one live Oceans11 backend for the entire test session."""
     workspace = tmp_path_factory.mktemp("oceans11")
 
-    instance = Oceans11(
-        params=[
-            {"osti_id": TEST_OSTI_ID, "rows": 1},
-            {"osti_id": TEST_OSTI_ID, "rows": 1},
-        ],
-        workspace=str(workspace),
-    )
+    try:
+        instance = Oceans11(
+            params=[
+                {"osti_id": TEST_OSTI_ID, "rows": 1},
+                {"osti_id": TEST_OSTI_ID, "rows": 1},
+            ],
+            workspace=str(workspace),
+        )
+    except ConnectionError as e:
+        pytest.skip(f"Oceans11 is unavailable: {e}")
 
-    yield instance
-
-    if instance._loaded:
-        instance.close()
-
+    try:
+        yield instance
+    finally:
+        if instance._loaded:
+            instance.close()
 
 @pytest.fixture(scope="session")
 def record(backend):

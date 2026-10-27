@@ -32,6 +32,10 @@ class Webserver(Backend, ABC):
         pass
 
     @abstractmethod
+    def search(self, params, **kwargs):
+        pass
+
+    @abstractmethod
     def find(self, query_object, **kwargs):
         pass
 
