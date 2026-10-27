@@ -74,7 +74,7 @@ class NAVDAT(Webserver):
 
         if not self.validate_connection():
             self._loaded = False
-            raise ConnectionError(self.validate_error_msg or "Failed to connect to the PetDB v4 API")
+            raise ConnectionError(self.validate_error_msg or "Failed to connect to the NAVDAT API")
 
         if self.params:
             try:
@@ -115,7 +115,8 @@ class NAVDAT(Webserver):
         except requests.exceptions.RequestException as e:
             self.validate_error_msg = f"Failed to validate connection to {self.base_url}: {str(e)}"
             return False
-        except Exception:
+        except Exception as e:
+            self.validate_error_msg = f"Unable to connect to NAVDAT API: {e}"
             return False
 
     def _load_initial_data(self, params):

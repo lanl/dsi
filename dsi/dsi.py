@@ -1288,7 +1288,7 @@ class DSI:
 
     def num_tables(self, **kwargs):
         """
-        Prints the number of tables in the active backend.
+        Prints and returns the number of tables in the active backend.
         """
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot call num_tables() until all associated data is loaded after a complex schema")

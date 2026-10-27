@@ -106,3 +106,11 @@ RCSBPDB (Read-only)
 .. automodule:: dsi.backends.rcsbpdb
    :members: RCSBPDB
    :special-members: __init__
+
+
+NAVDAT (Read-only)
+-------------------
+
+.. automodule:: dsi.backends.navdat
+   :members: NAVDAT
+   :special-members: __init__
