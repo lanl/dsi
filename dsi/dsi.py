@@ -184,7 +184,7 @@ class DSI:
                     backend_name = "NAVDAT"
                     query_params = kwargs.pop("params", {})
                 else:
-                    raise NotImplementedError("The currently supported read-only backends are NDP, OSTI, RCSBPDB, Zenodo, Oceans11, Denodo and NAVDAT")
+                    raise NotImplementedError("The currently supported read-only backends are Oceans11, OSTI, Zenodo, NDP, Denodo, RCSBPDB and NAVDAT")
                 
                 try:
                     # Pass query params as 'params' argument
