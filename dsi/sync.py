@@ -328,7 +328,9 @@ class Sync:
 
         stdout, stderr = process.communicate()
         if process.returncode != 0:
-            if "too many authentication failures" in str(stderr).lower():
+            if 'The following module(s) are unknown: "marfs"' in str(stderr):
+                raise RuntimeError("pfcp is not available on this machine")
+            elif "too many authentication failures" in str(stderr).lower():
                 raise RuntimeError(f"{cmd_name} failed due to multiple incorrect password attempts. Check the password and remote path.") from None
             elif "No credentials" in stderr:
                 raise RuntimeError("Kerberos authentication error: No credentials found. Please type 'conduit get' to issue a ticket.\n"
