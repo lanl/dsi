@@ -7,6 +7,7 @@ name="dsi-workflow"
 license= "BSD-3-Clause"
 description="A Data Science Infrastructure Project"
 readme = "README.rst"
+requires-python = ">=3.11"
 authors=[
 	{name = 'Jesus Pulido', 	email = 'pulido@lanl.gov'},
 	{name = 'James Ahrens', 	email = 'ahrens@lanl.gov'},
