@@ -684,31 +684,28 @@ class Sync:
                 raise RuntimeError(f"Conduit failed with error: {str(e)} ")
 
         elif tool.lower() == "pfcp":
-            try:
-                # File Movement
+            # File Movement
+            if self.verbose:
+                print("pfcp -R " + self.local_location + " " + self.remote_location)
+            pfcp_data_cmd = f"module load marfs && pfcp -R {self.local_location} {self.remote_location}"
+            cmd = ["bash", "-lc", pfcp_data_cmd]
+            self.execute_cmd(cmd, "pfcp move data")
+            print(" DSI submitted pfcp data movement job.")
+
+            # delete temp columns from filesystem table
+            filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
+            self.t.dsi_tables.remove("filesystem")
+            self.t.overwrite_table("filesystem", filesystem_df)
+            self.t.dsi_tables.append("filesystem")
+
+            # Database Movement
+            for dbname in db_list:
                 if self.verbose:
-                    print("pfcp -R " + self.local_location + " " + self.remote_location)
-                pfcp_data_cmd = f"module load marfs && pfcp -R {self.local_location} {self.remote_location}"
-                cmd = ["bash", "-lc", pfcp_data_cmd]
-                self.execute_cmd(cmd, "pfcp move data")
-                print(" DSI submitted pfcp data movement job.")
-
-                # delete temp columns from filesystem table
-                filesystem_df = filesystem_df.drop(columns=["file_abs"], errors="ignore")
-                self.t.dsi_tables.remove("filesystem")
-                self.t.overwrite_table("filesystem", filesystem_df)
-                self.t.dsi_tables.append("filesystem")
-
-                # Database Movement
-                for dbname in db_list:
-                    if self.verbose:
-                        print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
-                    pfcp_db_cmd = f"module load marfs && pfcp {dbname} {os.path.join(self.remote_location, dbname)}"
-                    cmd = ["bash", "-lc", pfcp_db_cmd]
-                    self.execute_cmd(cmd, "pfcp move database")
-                    print(" DSI submitted pfcp database movement job.")
-            except Exception as e:
-                raise RuntimeError(f"pfcp failed with error: {str(e)} ")
+                    print("pfcp " + dbname + " " + os.path.join(self.remote_location, dbname))
+                pfcp_db_cmd = f"module load marfs && pfcp {dbname} {os.path.join(self.remote_location, dbname)}"
+                cmd = ["bash", "-lc", pfcp_db_cmd]
+                self.execute_cmd(cmd, "pfcp move database")
+                print(" DSI submitted pfcp database movement job.")
         
         elif tool.lower() == "ftp":
             # delete temp columns from filesystem table -- do after data has been moved
