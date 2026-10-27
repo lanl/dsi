@@ -1,0 +1,61 @@
+name: User Stories test
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    # strategy:
+    #   matrix:
+    #     python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v5
+    # - name: Set up Python ${{ matrix.python-version }}
+    #   uses: actions/setup-python@v6
+    #   with:
+    #     python-version: ${{ matrix.python-version }}
+    - name: Check user stories structure
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        [[ -d tools ]] || {
+          echo "::error::tools/ directory does not exist."
+          exit 1
+        }
+
+        failed=0
+
+        while IFS= read -r -d '' tool_dir; do
+          has_readme=0
+
+          for file in "$tool_dir"/*; do
+            [[ -f "$file" ]] || continue
+
+            filename="${file##*/}"
+            if [[ "${filename,,}" == "readme.md" ]]; then
+              has_readme=1
+              break
+            fi
+          done
+
+          if [[ "$has_readme" -eq 0 ]]; then
+            echo "::error file=$tool_dir::A README file is required (README.md or readme.md)."
+            failed=1
+          fi
+
+          if [[ ! -f "$tool_dir/requirements.txt" ]]; then
+            echo "::error file=$tool_dir::requirements.txt is required."
+            failed=1
+          fi
+        done < <(find tools -mindepth 1 -maxdepth 1 -type d -print0)
+
+        exit "$failed"
