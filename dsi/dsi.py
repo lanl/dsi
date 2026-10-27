@@ -843,8 +843,9 @@ class DSI:
                     self.t.table_print_helper(search_result.columns.tolist(), search_result.values.tolist(), search_result.shape[0])
                     print()
             else:
-                msg = f"Return object for search() is a list of {len(search_result)} pandas.DataFrame"
-                logger.log(logging.INFO, msg) if isinstance(search_result, list) and self.silence_messages else print(msg)
+                if isinstance(search_result, list):
+                    msg = f"Return object for search() is a list of {len(search_result)} pandas.DataFrame"
+                    logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
                 return search_result
         else:
             if find_cell is None and find_col is None and find_table is None:
