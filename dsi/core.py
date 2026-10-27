@@ -1516,7 +1516,6 @@ class Terminal:
                 if self.debug_level != 0:
                     self.logger.warning(f"{backend.__class__.__name__} backend connection failed")
                 return False
->>>>>>> origin/main
         return True
 
     # Internal function that returns if a user can create a file/db in a specified location
