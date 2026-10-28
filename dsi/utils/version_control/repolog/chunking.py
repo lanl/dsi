@@ -3,14 +3,18 @@ import mmap
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 from .log_record import _utcnow
-from .content_chunking.npy_chunking import NPY_MAGIC, chunk_npy_file, NpyFormatError
-from .content_chunking.db_chunking import SQLITE_MAGIC, chunk_sqlite_file, SQLiteFormatError
-from .content_chunking.csv_chunking import CSVFormatError, chunk_csv_file
-from .content_chunking.xlsx_chunking import XLSXFormatError, chunk_xlsx_file
-from .content_chunking.json_chunking import JSONFormatError, chunk_json_file
-from .content_chunking.xml_chunking import XMLFormatError, chunk_xml_file
+from .content_chunking.npy_chunking import (
+    NPY_MAGIC, NpyFormatError, chunk_npy_file, iter_npy_file,
+)
+from .content_chunking.db_chunking import (
+    SQLITE_MAGIC, SQLiteFormatError, chunk_sqlite_file, iter_sqlite_file,
+)
+from .content_chunking.csv_chunking import CSVFormatError, chunk_csv_file, iter_csv_file
+from .content_chunking.xlsx_chunking import XLSXFormatError, chunk_xlsx_file, iter_xlsx_file
+from .content_chunking.json_chunking import JSONFormatError, chunk_json_file, iter_json_file
+from .content_chunking.xml_chunking import XMLFormatError, chunk_xml_file, iter_xml_file
 
 # -----------------------------
 # Rolling hash parameters
@@ -260,12 +264,16 @@ def _find_fastcdc_cut(
 
 def iter_file_fastcdc(
     path: str | os.PathLike[str],
+    *,
+    needs_data: Callable[[str], bool] | None = None,
 ) -> Iterator[dict[str, object]]:
     """
     Stream a read-only memory-mapped file as FastCDC chunks.
 
     Yield dictionaries with ``sha256``, ``size`` and ``data`` fields.
-    Boundary selection is identical to the compatibility list API.
+    Boundary selection is identical to the compatibility list API. If
+    needs_data rejects a chunk hash, return data=None without copying its
+    payload. No exported mmap views survive a yield.
     """
     with open(path, "rb") as file:
         # mmap cannot map an empty file; preserve the empty chunk sequence.
@@ -287,10 +295,13 @@ def iter_file_fastcdc(
 
                 view = memoryview(mapped_file)[position:position + chunk_size]
                 try:
+                    digest = hashlib.sha256(view).hexdigest()
                     chunk = {
-                        "sha256": hashlib.sha256(view).hexdigest(),
+                        "sha256": digest,
                         "size": chunk_size,
-                        "data": bytes(view),
+                        "data": (
+                            bytes(view) if needs_data is None or needs_data(digest) else None
+                        ),
                     }
                 finally:
                     # Release before yielding so exhaustion, close(), and errors
@@ -320,47 +331,64 @@ def is_sqlite_file(path):
     except OSError:
         return False
 
-def chunk_file(path, *, streaming=False):
+def chunk_file(path, *, streaming=False, needs_data: Callable[[str], bool] | None = None):
+    """Chunk a file; streaming mmap chunkers can omit already-stored payloads.
+
+    needs_data is a hash predicate used only with streaming=True. Supported
+    format chunkers validate their layout before yielding any payloads.
+    """
     path = Path(path)
     f_suffix = path.suffix.lower()
 
     if (f_suffix == ".npy" and _has_npy_magic(path)):
         try:
+            if streaming:
+                return iter_npy_file(path, needs_data=needs_data)
             return chunk_npy_file(path)
         except NpyFormatError:
             pass
 
     if (f_suffix in {".db", ".sqlite", ".sqlite3"} and is_sqlite_file(path)):
         try:
+            if streaming:
+                return iter_sqlite_file(path, needs_data=needs_data)
             return chunk_sqlite_file(path)
         except SQLiteFormatError:
             pass
 
     if f_suffix == ".csv":
         try:
+            if streaming:
+                return iter_csv_file(path, needs_data=needs_data)
             return chunk_csv_file(path)
         except CSVFormatError:
             pass
 
     if f_suffix == ".xlsx":
         try:
+            if streaming:
+                return iter_xlsx_file(path, needs_data=needs_data)
             return chunk_xlsx_file(path)
         except XLSXFormatError:
             pass
 
     if f_suffix == ".json":
         try:
+            if streaming:
+                return iter_json_file(path, needs_data=needs_data)
             return chunk_json_file(path)
         except JSONFormatError:
             pass
 
     if f_suffix == ".xml":
         try:
+            if streaming:
+                return iter_xml_file(path, needs_data=needs_data)
             return chunk_xml_file(path)
         except XMLFormatError:
             pass
 
-    return iter_file_fastcdc(path) if streaming else chunk_file_fastcdc(path)
+    return iter_file_fastcdc(path, needs_data=needs_data) if streaming else chunk_file_fastcdc(path)
 
 
 def chunk_file_rolling_hash(path):
@@ -415,6 +443,10 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
     file_hashes = {}
     chunk_length = {}
     chunk_hashes = set()
+
+    def needs_data(digest):
+        return not os.path.exists(os.path.join(chunk_dir, digest))
+
     for entry in entries:
 
         file_path = entry['absolute_path']
@@ -422,35 +454,41 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
             continue
 
         h = hashlib.sha256()
-        all_chunks = chunk_file(file_path, streaming=True)
+        all_chunks = chunk_file(file_path, streaming=True, needs_data=needs_data)
         count = 0
-        for i, chunk in enumerate(all_chunks):
-            count += 1
-            chunk_path = os.path.join(chunk_dir, chunk['sha256'])
-            h.update(chunk['sha256'].encode('utf-8'))
-            if not os.path.exists(chunk_path):
-                fd, temp_path = tempfile.mkstemp(
-                    dir=chunk_dir, prefix=f".{chunk['sha256']}.", suffix=".tmp"
+        try:
+            for i, chunk in enumerate(all_chunks):
+                count += 1
+                chunk_path = os.path.join(chunk_dir, chunk['sha256'])
+                h.update(chunk['sha256'].encode('utf-8'))
+                if chunk['data'] is not None and not os.path.exists(chunk_path):
+                    fd, temp_path = tempfile.mkstemp(
+                        dir=chunk_dir, prefix=f".{chunk['sha256']}.", suffix=".tmp"
+                    )
+                    try:
+                        os.chmod(temp_path, 0o644)
+                        with os.fdopen(fd, "wb") as handle:
+                            fd = None
+                            handle.write(chunk['data'])
+                            handle.flush()
+                            os.fsync(handle.fileno())
+                        os.replace(temp_path, chunk_path)
+                    finally:
+                        if fd is not None:
+                            os.close(fd)
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                conn.execute(
+                    "INSERT INTO chunk_store "
+                    "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) VALUES (?, ?, ?, ?, ?, ?)",
+                    (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, pending_commit),
                 )
-                try:
-                    os.chmod(temp_path, 0o644)
-                    with os.fdopen(fd, "wb") as handle:
-                        fd = None
-                        handle.write(chunk['data'])
-                        handle.flush()
-                        os.fsync(handle.fileno())
-                    os.replace(temp_path, chunk_path)
-                finally:
-                    if fd is not None:
-                        os.close(fd)
-                    if os.path.exists(temp_path):
-                        os.unlink(temp_path)
-            conn.execute(
-                "INSERT INTO chunk_store "
-                "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, pending_commit),
-            )
-            chunk_hashes.add(chunk['sha256'])
+                chunk_hashes.add(chunk['sha256'])
+        finally:
+            # Release the source mapping even if writing or SQL insertion fails.
+            close = getattr(all_chunks, "close", None)
+            if close is not None:
+                close()
         file_hashes[entry['relative_path']] = h.hexdigest()
         chunk_length[entry['relative_path']] = count
     return file_hashes, chunk_hashes, chunk_length

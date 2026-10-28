@@ -4,6 +4,18 @@
 
 ### Performance
 
+- Reuse the shared mmap chunk streamer for numeric NPY files, preserving header
+  and array-aligned boundaries, hashes, and duplicate-payload avoidance.
+- Stream CSV, SQLite (`.db`, `.sqlite`, `.sqlite3`), JSON, XLSX, and XML chunk
+  payloads and check for existing hashes before copying their mmap data. Retain
+  only byte ranges and format metadata while planning chunks; validate formats
+  before storing references so unsupported inputs still fall back to FastCDC.
+- Parse XML directly from its mmap buffer instead of copying the whole document
+  for Expat, and scan CSV quote parity without copying record slices.
+- Check chunk hashes against existing storage before copying mmap payloads for
+  FastCDC and numeric NPY files. Duplicate chunks retain their references without
+  allocating payload bytes. Stream numeric NPY chunks instead of retaining the
+  entire file's chunks, preserving existing boundaries, hashes, and storage format.
 - Roll two bytes per FastCDC iteration using a shifted Gear table and boundary
   mask, checking both byte positions and retaining existing chunk boundaries.
 - Use read-only mmap for generic FastCDC chunking, hashing memoryviews directly
@@ -19,6 +31,8 @@
 
 ### Fixed
 
+- Emit a JSON file's final full-size chunk group once, avoiding duplicated bytes
+  during reconstruction when the last group reaches the target chunk size.
 - Exclude `.git` directories and worktree pointer files from DSI snapshots.
 - Avoid duplicate staging records for overlapping inputs and paths already staged for addition, including across CLI invocations. Re-adding an already staged directory no longer grows the log.
 - Preserve additions that replace pending deletions or re-stage removed paths.

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 import mmap
 import os
 from pathlib import Path
+from typing import Iterator
+
+from .mapped_chunking import ChunkRange, PayloadPredicate, iter_mapped_chunks
 
 
 JSON_TARGET_CHUNK = 8 * 1024 * 1024  # 8 MiB
@@ -18,32 +20,6 @@ JSON_WHITESPACE = {
 
 class JSONFormatError(ValueError):
     pass
-
-
-def _make_json_chunk(
-    view: memoryview,
-    *,
-    kind: str,
-    start_unit: int | None = None,
-    unit_count: int | None = None,
-) -> dict[str, object]:
-
-    digest = hashlib.sha256(view).hexdigest()
-
-    result = {
-        "sha256": digest,
-        "size": len(view),
-        "data": bytes(view),
-        "kind": kind,
-    }
-
-    if start_unit is not None:
-        result["start_unit"] = start_unit
-
-    if unit_count is not None:
-        result["unit_count"] = unit_count
-
-    return result
 
 
 def _skip_whitespace(
@@ -292,294 +268,54 @@ def _find_json_structure(
     )
 
 
-def chunk_json_file(
+def chunk_json_file(path, target_chunk_size=JSON_TARGET_CHUNK):
+    """Return chunks preserving JSON bytes and top-level unit boundaries."""
+    return list(iter_json_file(path, target_chunk_size))
+
+
+def iter_json_file(
     path: str | os.PathLike[str],
     target_chunk_size: int = JSON_TARGET_CHUNK,
-) -> list[dict[str, object]]:
-    """
-    Structure-aware JSON chunking.
-
-    Top-level array:
-        chunks contain complete array elements.
-
-    Top-level object:
-        chunks contain complete object members.
-
-    The original JSON bytes are preserved exactly.
-
-    Concatenating chunk["data"] in returned order recreates
-    the original file byte-for-byte.
-    """
-
-    path = Path(path)
-
+    *,
+    needs_data: PayloadPredicate | None = None,
+) -> Iterator[dict[str, object]]:
+    """Validate JSON structure before streaming hashes and needed payloads."""
     if target_chunk_size <= 0:
-        raise ValueError(
-            "target_chunk_size must be positive"
-        )
+        raise ValueError("target_chunk_size must be positive")
+    if Path(path).stat().st_size == 0:
+        raise JSONFormatError("Cannot chunk an empty JSON file")
+    return iter_mapped_chunks(
+        path, lambda mapped: _json_ranges(mapped, target_chunk_size), needs_data=needs_data,
+    )
 
-    file_size = path.stat().st_size
 
-    if file_size == 0:
-        raise JSONFormatError(
-            "Cannot chunk an empty JSON file"
-        )
-
-    chunks: list[dict[str, object]] = []
-
-    with open(path, "rb") as file:
-
-        with mmap.mmap(
-            file.fileno(),
-            length=0,
-            access=mmap.ACCESS_READ,
-        ) as mapped:
-
-            (
-                root_type,
-                content_start,
-                root_close,
-                unit_starts,
-            ) = _find_json_structure(mapped)
-
-            # --------------------------------
-            # Scalar JSON
-            # --------------------------------
-
-            if root_type == "scalar":
-
-                view = memoryview(mapped)
-
-                try:
-                    chunks.append(
-                        _make_json_chunk(
-                            view,
-                            kind="json-scalar",
-                        )
-                    )
-                finally:
-                    view.release()
-
-                return chunks
-
-            # --------------------------------
-            # Empty [] or {}
-            # --------------------------------
-
-            if not unit_starts:
-
-                view = memoryview(mapped)
-
-                try:
-                    chunks.append(
-                        _make_json_chunk(
-                            view,
-                            kind=(
-                                f"json-{root_type}"
-                            ),
-                        )
-                    )
-                finally:
-                    view.release()
-
-                return chunks
-
-            # --------------------------------
-            # Prefix
-            #
-            # Includes:
-            #   BOM
-            #   whitespace
-            #   root "[" / "{"
-            #   whitespace before first unit
-            # --------------------------------
-
-            if content_start > 0:
-
-                prefix = memoryview(
-                    mapped
-                )[0:content_start]
-
-                try:
-                    chunks.append(
-                        _make_json_chunk(
-                            prefix,
-                            kind="json-prefix",
-                        )
-                    )
-                finally:
-                    prefix.release()
-
-            # --------------------------------
-            # Array elements / object members
-            # --------------------------------
-
-            group_start = unit_starts[0]
-            group_first_unit = 0
-
-            for unit_index in range(
-                len(unit_starts)
-            ):
-
-                unit_start = unit_starts[
-                    unit_index
-                ]
-
-                if (
-                    unit_index + 1
-                    < len(unit_starts)
-                ):
-                    unit_end = unit_starts[
-                        unit_index + 1
-                    ]
-                else:
-                    unit_end = root_close
-
-                prospective_size = (
-                    unit_end - group_start
-                )
-
-                # Current unit would push the
-                # group over the target.
-                if (
-                    unit_index > group_first_unit
-                    and prospective_size
-                    > target_chunk_size
-                ):
-
-                    view = memoryview(
-                        mapped
-                    )[group_start:unit_start]
-
-                    try:
-                        chunks.append(
-                            _make_json_chunk(
-                                view,
-                                kind=(
-                                    "json-elements"
-                                    if root_type == "array"
-                                    else "json-members"
-                                ),
-                                start_unit=(
-                                    group_first_unit
-                                ),
-                                unit_count=(
-                                    unit_index
-                                    - group_first_unit
-                                ),
-                            )
-                        )
-                    finally:
-                        view.release()
-
-                    group_start = unit_start
-                    group_first_unit = unit_index
-
-                # Emit immediately if the current
-                # group reaches the target.
-                current_size = (
-                    unit_end - group_start
-                )
-
-                if (
-                    current_size
-                    >= target_chunk_size
-                ):
-
-                    view = memoryview(
-                        mapped
-                    )[group_start:unit_end]
-
-                    try:
-                        chunks.append(
-                            _make_json_chunk(
-                                view,
-                                kind=(
-                                    "json-elements"
-                                    if root_type == "array"
-                                    else "json-members"
-                                ),
-                                start_unit=(
-                                    group_first_unit
-                                ),
-                                unit_count=(
-                                    unit_index
-                                    - group_first_unit
-                                    + 1
-                                ),
-                            )
-                        )
-                    finally:
-                        view.release()
-
-                    if (
-                        unit_index + 1
-                        < len(unit_starts)
-                    ):
-                        group_start = (
-                            unit_starts[
-                                unit_index + 1
-                            ]
-                        )
-
-                        group_first_unit = (
-                            unit_index + 1
-                        )
-
-            # --------------------------------
-            # Remaining units
-            # --------------------------------
-
-            if group_first_unit < len(
-                unit_starts
-            ):
-
-                if group_start < root_close:
-
-                    view = memoryview(
-                        mapped
-                    )[group_start:root_close]
-
-                    try:
-                        chunks.append(
-                            _make_json_chunk(
-                                view,
-                                kind=(
-                                    "json-elements"
-                                    if root_type == "array"
-                                    else "json-members"
-                                ),
-                                start_unit=(
-                                    group_first_unit
-                                ),
-                                unit_count=(
-                                    len(unit_starts)
-                                    - group_first_unit
-                                ),
-                            )
-                        )
-                    finally:
-                        view.release()
-
-            # --------------------------------
-            # Suffix
-            #
-            # Includes closing "]" / "}"
-            # and trailing whitespace.
-            # --------------------------------
-
-            suffix = memoryview(
-                mapped
-            )[root_close:file_size]
-
-            try:
-                chunks.append(
-                    _make_json_chunk(
-                        suffix,
-                        kind="json-suffix",
-                    )
-                )
-            finally:
-                suffix.release()
-
-    return chunks
+def _json_ranges(mapped, target_chunk_size) -> Iterator[ChunkRange]:
+    root_type, content_start, root_close, starts = _find_json_structure(mapped)
+    if root_type == "scalar" or not starts:
+        kind = "json-scalar" if root_type == "scalar" else f"json-{root_type}"
+        yield 0, len(mapped), {"kind": kind}
+        return
+    if content_start > 0:
+        yield 0, content_start, {"kind": "json-prefix"}
+    kind = "json-elements" if root_type == "array" else "json-members"
+    group_start = starts[0]
+    first_unit = 0
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else root_close
+        if index > first_unit and end - group_start > target_chunk_size:
+            yield group_start, start, {
+                "kind": kind, "start_unit": first_unit, "unit_count": index - first_unit,
+            }
+            group_start = start
+            first_unit = index
+        if end - group_start >= target_chunk_size:
+            yield group_start, end, {
+                "kind": kind, "start_unit": first_unit, "unit_count": index - first_unit + 1,
+            }
+            group_start = end
+            first_unit = index + 1
+    if first_unit < len(starts) and group_start < root_close:
+        yield group_start, root_close, {
+            "kind": kind, "start_unit": first_unit, "unit_count": len(starts) - first_unit,
+        }
+    yield root_close, len(mapped), {"kind": "json-suffix"}

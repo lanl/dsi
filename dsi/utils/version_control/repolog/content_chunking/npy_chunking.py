@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import ast
-import hashlib
-import mmap
 import os
 import struct
-from typing import Any
+from typing import Any, Iterator
 
 import numpy as np
 
+from .mapped_chunking import ChunkRange, PayloadPredicate, iter_mapped_chunks
 
 NPY_MAGIC = b"\x93NUMPY"
 
@@ -211,20 +210,6 @@ def _aligned_chunk_size(
     )
 
 
-def _make_chunk(view: memoryview) -> dict[str, object]:
-    """
-    Produce the dictionary expected by the existing dsi-vcs chunk store.
-
-    The memoryview is hashed directly. One bytes copy is then made for
-    the returned chunk data.
-    """
-    return {
-        "sha256": hashlib.sha256(view).hexdigest(),
-        "size": len(view),
-        "data": bytes(view),
-    }
-
-
 def chunk_npy_file(
     path: str | os.PathLike[str],
     target_chunk_size: int = NPY_TARGET_CHUNK,
@@ -244,6 +229,20 @@ def chunk_npy_file(
         chunk 0: complete NPY header
         chunk 1+: fixed, array-aligned payload chunks
     """
+    return list(iter_npy_file(path, target_chunk_size))
+
+
+def iter_npy_file(
+    path: str | os.PathLike[str],
+    target_chunk_size: int = NPY_TARGET_CHUNK,
+    *,
+    needs_data: PayloadPredicate | None = None,
+) -> Iterator[dict[str, object]]:
+    """Validate eagerly, then stream aligned NPY chunks from a read-only mmap.
+
+    A rejected hash has data=None; public list callers still receive bytes.
+    Eager validation lets dispatch fall back to FastCDC for unsupported NPYs.
+    """
     metadata = _read_npy_metadata(path)
 
     data_offset = metadata["data_offset"]
@@ -261,38 +260,20 @@ def chunk_npy_file(
         alignment=alignment,
     )
 
-    chunks: list[dict[str, object]] = []
+    return iter_mapped_chunks(
+        path,
+        lambda mapped: _npy_ranges(data_offset, payload_size, payload_chunk_size),
+        needs_data=needs_data,
+    )
 
-    with open(path, "rb") as file:
-        with mmap.mmap(
-            file.fileno(),
-            length=0,
-            access=mmap.ACCESS_READ,
-        ) as mapped_file:
-            # Keep the complete NPY header as an independent chunk.
-            header_view = memoryview(mapped_file)[0:data_offset]
 
-            try:
-                chunks.append(_make_chunk(header_view))
-            finally:
-                header_view.release()
-
-            payload_end = data_offset + payload_size
-            position = data_offset
-
-            while position < payload_end:
-                end = min(
-                    position + payload_chunk_size,
-                    payload_end,
-                )
-
-                payload_view = memoryview(mapped_file)[position:end]
-
-                try:
-                    chunks.append(_make_chunk(payload_view))
-                finally:
-                    payload_view.release()
-
-                position = end
-
-    return chunks
+def _npy_ranges(
+    data_offset: int,
+    payload_size: int,
+    payload_chunk_size: int,
+) -> Iterator[ChunkRange]:
+    # Keep the complete NPY header as an independent chunk.
+    yield 0, data_offset, {}
+    payload_end = data_offset + payload_size
+    for start in range(data_offset, payload_end, payload_chunk_size):
+        yield start, min(start + payload_chunk_size, payload_end), {}

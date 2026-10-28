@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import mmap
 import os
-from pathlib import Path
 from typing import Iterator
+
+from .mapped_chunking import ChunkRange, PayloadPredicate, iter_mapped_chunks
 
 
 CSV_TARGET_CHUNK = 8 * 1024 * 1024  # 8 MiB
@@ -12,20 +12,6 @@ CSV_TARGET_CHUNK = 8 * 1024 * 1024  # 8 MiB
 
 class CSVFormatError(ValueError):
     pass
-
-
-def _make_chunk(
-    view: memoryview,
-    **metadata,
-) -> dict[str, object]:
-    digest = hashlib.sha256(view).hexdigest()
-
-    return {
-        "sha256": digest,
-        "size": len(view),
-        "data": bytes(view),
-        **metadata,
-    }
 
 
 def _csv_record_ends(
@@ -59,11 +45,12 @@ def _csv_record_ends(
         else:
             segment_end = newline + 1
 
-        segment = mapped[position:segment_end]
-
-        # Odd number of quotes toggles quoted-field state.
-        if segment.count(b'"') % 2:
+        # Count quote parity in place, including escaped pairs. Slicing the
+        # record would allocate its payload even when its chunk already exists.
+        quote = mapped.find(b'"', position, segment_end)
+        while quote != -1:
             in_quotes = not in_quotes
+            quote = mapped.find(b'"', quote + 1, segment_end)
 
         if not in_quotes:
             yield segment_end
@@ -79,176 +66,46 @@ def _csv_record_ends(
         )
 
 
-def chunk_csv_file(
+def chunk_csv_file(path, target_chunk_size=CSV_TARGET_CHUNK, isolate_header=True):
+    """Return byte-preserving chunks ending at complete CSV records."""
+    return list(iter_csv_file(path, target_chunk_size, isolate_header))
+
+
+def iter_csv_file(
     path: str | os.PathLike[str],
     target_chunk_size: int = CSV_TARGET_CHUNK,
     isolate_header: bool = True,
-) -> list[dict[str, object]]:
-    """
-    Chunk a CSV file only at complete record boundaries.
-
-    Concatenating chunk["data"] recreates the original file exactly.
-
-    By default:
-        chunk 0 = header record
-        chunk 1+ = groups of complete rows totaling approximately 8 MiB
-    """
-    path = Path(path)
-
+    *,
+    needs_data: PayloadPredicate | None = None,
+) -> Iterator[dict[str, object]]:
+    """Validate record boundaries, then copy only requested chunk payloads."""
     if target_chunk_size <= 0:
-        raise ValueError(
-            "target_chunk_size must be positive"
-        )
+        raise ValueError("target_chunk_size must be positive")
+    return iter_mapped_chunks(
+        path, lambda mapped: _csv_ranges(mapped, target_chunk_size, isolate_header),
+        needs_data=needs_data,
+    )
 
-    file_size = path.stat().st_size
 
-    if file_size == 0:
-        return []
-
-    chunks = []
-
-    with open(path, "rb") as file:
-
-        with mmap.mmap(
-            file.fileno(),
-            length=0,
-            access=mmap.ACCESS_READ,
-        ) as mapped:
-
-            record_ends = _csv_record_ends(mapped)
-
-            chunk_start = 0
-            chunk_first_record = 1
-            record_number = 0
-
-            try:
-                first_end = next(record_ends)
-            except StopIteration:
-                return []
-
-            record_number = 1
-
-            # -----------------------------------
-            # Header
-            # -----------------------------------
-
-            if isolate_header:
-
-                view = memoryview(
-                    mapped
-                )[0:first_end]
-
-                try:
-                    chunks.append(
-                        _make_chunk(
-                            view,
-                            kind="header",
-                            start_record=1,
-                            record_count=1,
-                        )
-                    )
-                finally:
-                    view.release()
-
-                chunk_start = first_end
-                chunk_first_record = 2
-
-            else:
-                # First record belongs to normal chunk.
-                chunk_start = 0
-                chunk_first_record = 1
-
-                if (
-                    first_end - chunk_start
-                    >= target_chunk_size
-                ):
-                    view = memoryview(
-                        mapped
-                    )[chunk_start:first_end]
-
-                    try:
-                        chunks.append(
-                            _make_chunk(
-                                view,
-                                kind="records",
-                                start_record=1,
-                                record_count=1,
-                            )
-                        )
-                    finally:
-                        view.release()
-
-                    chunk_start = first_end
-                    chunk_first_record = 2
-
-            # -----------------------------------
-            # Remaining records
-            # -----------------------------------
-
-            for record_end in record_ends:
-
-                record_number += 1
-
-                chunk_size = (
-                    record_end - chunk_start
-                )
-
-                if chunk_size >= target_chunk_size:
-
-                    view = memoryview(
-                        mapped
-                    )[chunk_start:record_end]
-
-                    try:
-                        chunks.append(
-                            _make_chunk(
-                                view,
-                                kind="records",
-                                start_record=(
-                                    chunk_first_record
-                                ),
-                                record_count=(
-                                    record_number
-                                    - chunk_first_record
-                                    + 1
-                                ),
-                            )
-                        )
-                    finally:
-                        view.release()
-
-                    chunk_start = record_end
-
-                    chunk_first_record = (
-                        record_number + 1
-                    )
-
-            # -----------------------------------
-            # Final partial chunk
-            # -----------------------------------
-
-            if chunk_start < file_size:
-
-                view = memoryview(
-                    mapped
-                )[chunk_start:file_size]
-
-                try:
-                    chunks.append(
-                        _make_chunk(
-                            view,
-                            kind="records",
-                            start_record=(
-                                chunk_first_record
-                            ),
-                            record_count=(
-                                record_number
-                                - chunk_first_record
-                                + 1
-                            ),
-                        )
-                    )
-                finally:
-                    view.release()
-
-    return chunks
+def _csv_ranges(mapped, target_chunk_size, isolate_header) -> Iterator[ChunkRange]:
+    record_ends = _csv_record_ends(mapped)
+    chunk_start = 0
+    first_record = 1
+    record_number = 0
+    for record_number, record_end in enumerate(record_ends, 1):
+        if isolate_header and record_number == 1:
+            yield 0, record_end, {"kind": "header", "start_record": 1, "record_count": 1}
+        elif record_end - chunk_start >= target_chunk_size:
+            yield chunk_start, record_end, {
+                "kind": "records", "start_record": first_record,
+                "record_count": record_number - first_record + 1,
+            }
+        else:
+            continue
+        chunk_start = record_end
+        first_record = record_number + 1
+    if chunk_start < len(mapped):
+        yield chunk_start, len(mapped), {
+            "kind": "records", "start_record": first_record,
+            "record_count": record_number - first_record + 1,
+        }

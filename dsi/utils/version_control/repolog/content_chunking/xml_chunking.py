@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 import mmap
 import os
-from pathlib import Path
+from typing import Iterator
 from xml.parsers import expat
+
+from .mapped_chunking import ChunkRange, PayloadPredicate, iter_mapped_chunks
 
 
 XML_TARGET_CHUNK = 8 * 1024 * 1024
@@ -12,22 +13,6 @@ XML_TARGET_CHUNK = 8 * 1024 * 1024
 
 class XMLFormatError(ValueError):
     pass
-
-def _make_chunk(
-    view: memoryview,
-    **metadata,
-) -> dict[str, object]:
-    """
-    Create a DSI-VCS-compatible chunk.
-    """
-    digest = hashlib.sha256(view).hexdigest()
-
-    return {
-        "sha256": digest,
-        "size": len(view),
-        "data": bytes(view),
-        **metadata,
-    }
 
 def _xml_element_end(
     data: mmap.mmap,
@@ -154,7 +139,7 @@ def _find_xml_top_level_elements(
 
     try:
         parser.Parse(
-            data[:],
+            data,
             True,
         )
 
@@ -166,207 +151,49 @@ def _find_xml_top_level_elements(
 
     return elements, root_closing_start
 
-def chunk_xml_file(
+
+def chunk_xml_file(path, target_chunk_size=XML_TARGET_CHUNK):
+    """Return chunks preserving XML bytes at root-child boundaries."""
+    return list(iter_xml_file(path, target_chunk_size))
+
+
+def iter_xml_file(
     path: str | os.PathLike[str],
     target_chunk_size: int = XML_TARGET_CHUNK,
-) -> list[dict[str, object]]:
-    """
-    Chunk XML at root-child element boundaries.
+    *,
+    needs_data: PayloadPredicate | None = None,
+) -> Iterator[dict[str, object]]:
+    """Validate XML before streaming chunks and copying only needed payloads."""
+    return iter_mapped_chunks(
+        path, lambda mapped: _xml_ranges(mapped, target_chunk_size), needs_data=needs_data,
+    )
 
-    Result remains byte-for-byte reconstructable simply by
-    concatenating chunk data.
-    """
 
-    path = Path(path)
-
-    file_size = path.stat().st_size
-
-    if file_size == 0:
-        return []
-
-    chunks = []
-
-    with open(path, "rb") as file:
-
-        with mmap.mmap(
-            file.fileno(),
-            length=0,
-            access=mmap.ACCESS_READ,
-        ) as mapped:
-
-            elements, root_close = (
-                _find_xml_top_level_elements(
-                    mapped
-                )
-            )
-
-            # XML with no root children:
-            # simply store whole file.
-            if not elements:
-
-                view = memoryview(mapped)
-
-                try:
-                    chunks.append(
-                        _make_chunk(
-                            view,
-                            kind="xml-document",
-                        )
-                    )
-                finally:
-                    view.release()
-
-                return chunks
-
-            # --------------------------------
-            # XML prologue + root opening tag
-            # --------------------------------
-
-            first_child_start = (
-                elements[0][0]
-            )
-
-            if first_child_start > 0:
-
-                view = memoryview(
-                    mapped
-                )[0:first_child_start]
-
-                try:
-                    chunks.append(
-                        _make_chunk(
-                            view,
-                            kind="xml-prefix",
-                        )
-                    )
-                finally:
-                    view.release()
-
-            # --------------------------------
-            # Root child elements
-            # --------------------------------
-
-            chunk_start = first_child_start
-
-            element_start_index = 0
-
-            for index, (
-                element_start,
-                element_end,
-            ) in enumerate(elements):
-
-                # Cut at the beginning of the
-                # next element so whitespace
-                # remains with the previous unit.
-
-                if index + 1 < len(elements):
-
-                    possible_end = (
-                        elements[index + 1][0]
-                    )
-
-                else:
-
-                    possible_end = (
-                        root_close
-                        if root_close is not None
-                        else element_end
-                    )
-
-                size = (
-                    possible_end
-                    - chunk_start
-                )
-
-                if size >= target_chunk_size:
-
-                    view = memoryview(
-                        mapped
-                    )[
-                        chunk_start:
-                        possible_end
-                    ]
-
-                    try:
-                        chunks.append(
-                            _make_chunk(
-                                view,
-                                kind="xml-elements",
-                                first_element=(
-                                    element_start_index
-                                ),
-                                element_count=(
-                                    index
-                                    - element_start_index
-                                    + 1
-                                ),
-                            )
-                        )
-                    finally:
-                        view.release()
-
-                    chunk_start = (
-                        possible_end
-                    )
-
-                    element_start_index = (
-                        index + 1
-                    )
-
-            # Remaining XML elements.
-            if (
-                root_close is not None
-                and chunk_start < root_close
-            ):
-
-                view = memoryview(
-                    mapped
-                )[
-                    chunk_start:
-                    root_close
-                ]
-
-                try:
-                    chunks.append(
-                        _make_chunk(
-                            view,
-                            kind="xml-elements",
-                            first_element=(
-                                element_start_index
-                            ),
-                            element_count=(
-                                len(elements)
-                                - element_start_index
-                            ),
-                        )
-                    )
-                finally:
-                    view.release()
-
-            # --------------------------------
-            # </root> + trailing whitespace
-            # --------------------------------
-
-            if (
-                root_close is not None
-                and root_close < file_size
-            ):
-
-                view = memoryview(
-                    mapped
-                )[
-                    root_close:
-                    file_size
-                ]
-
-                try:
-                    chunks.append(
-                        _make_chunk(
-                            view,
-                            kind="xml-suffix",
-                        )
-                    )
-                finally:
-                    view.release()
-
-    return chunks
+def _xml_ranges(mapped, target_chunk_size) -> Iterator[ChunkRange]:
+    elements, root_close = _find_xml_top_level_elements(mapped)
+    if not elements:
+        yield 0, len(mapped), {"kind": "xml-document"}
+        return
+    chunk_start = elements[0][0]
+    if chunk_start > 0:
+        yield 0, chunk_start, {"kind": "xml-prefix"}
+    first_element = 0
+    for index, (_, element_end) in enumerate(elements):
+        if index + 1 < len(elements):
+            end = elements[index + 1][0]
+        else:
+            end = root_close if root_close is not None else element_end
+        if end - chunk_start >= target_chunk_size:
+            yield chunk_start, end, {
+                "kind": "xml-elements", "first_element": first_element,
+                "element_count": index - first_element + 1,
+            }
+            chunk_start = end
+            first_element = index + 1
+    if root_close is not None and chunk_start < root_close:
+        yield chunk_start, root_close, {
+            "kind": "xml-elements", "first_element": first_element,
+            "element_count": len(elements) - first_element,
+        }
+    if root_close is not None and root_close < len(mapped):
+        yield root_close, len(mapped), {"kind": "xml-suffix"}
