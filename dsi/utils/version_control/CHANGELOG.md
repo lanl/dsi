@@ -4,6 +4,10 @@
 
 ### Performance
 
+- Batch chunk-reference inserts in groups of up to 1,000 within the existing
+  commit transaction. Cache up to 8,192 chunk-existence results per storage call,
+  updating the cache after successful writes to avoid repeated filesystem checks
+  and payload copies for duplicates without retaining an unbounded index.
 - Reuse the shared mmap chunk streamer for numeric NPY files, preserving header
   and array-aligned boundaries, hashes, and duplicate-payload avoidance.
 - Stream CSV, SQLite (`.db`, `.sqlite`, `.sqlite3`), JSON, XLSX, and XML chunk

@@ -2,6 +2,7 @@ import hashlib
 import mmap
 import os
 import tempfile
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, Iterator
 from .log_record import _utcnow
@@ -30,6 +31,8 @@ MAX_CHUNK = 64 * 1024 * 1024     # 64 MB
 
 MASK = AVG_CHUNK - 1      # AVG_CHUNK must be power of 2
 CHUNK_STORAGE_DIR = "dsi_vcs_chunks"
+CHUNK_INSERT_BATCH_SIZE = 1000
+CHUNK_EXISTENCE_CACHE_SIZE = 8192
 
 class RollingHash:
     def __init__(self, window_size):
@@ -443,9 +446,30 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
     file_hashes = {}
     chunk_length = {}
     chunk_hashes = set()
+    pending_rows = []
+    existence_cache = OrderedDict()
+    insert_sql = (
+        "INSERT INTO chunk_store "
+        "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) "
+        "VALUES (?, ?, ?, ?, ?, ?)"
+    )
+
+    def remember_exists(digest, exists):
+        existence_cache[digest] = exists
+        existence_cache.move_to_end(digest)
+        if len(existence_cache) > CHUNK_EXISTENCE_CACHE_SIZE:
+            existence_cache.popitem(last=False)
+
+    def chunk_exists(digest):
+        try:
+            exists = existence_cache[digest]
+        except KeyError:
+            exists = os.path.exists(os.path.join(chunk_dir, digest))
+        remember_exists(digest, exists)
+        return exists
 
     def needs_data(digest):
-        return not os.path.exists(os.path.join(chunk_dir, digest))
+        return not chunk_exists(digest)
 
     for entry in entries:
 
@@ -461,7 +485,7 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
                 count += 1
                 chunk_path = os.path.join(chunk_dir, chunk['sha256'])
                 h.update(chunk['sha256'].encode('utf-8'))
-                if chunk['data'] is not None and not os.path.exists(chunk_path):
+                if chunk['data'] is not None and not chunk_exists(chunk['sha256']):
                     fd, temp_path = tempfile.mkstemp(
                         dir=chunk_dir, prefix=f".{chunk['sha256']}.", suffix=".tmp"
                     )
@@ -473,16 +497,19 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
                             handle.flush()
                             os.fsync(handle.fileno())
                         os.replace(temp_path, chunk_path)
+                        # Cache presence only after the chunk has been published.
+                        remember_exists(chunk['sha256'], True)
                     finally:
                         if fd is not None:
                             os.close(fd)
                         if os.path.exists(temp_path):
                             os.unlink(temp_path)
-                conn.execute(
-                    "INSERT INTO chunk_store "
-                    "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                    (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, pending_commit),
+                pending_rows.append(
+                    (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, pending_commit)
                 )
+                if len(pending_rows) >= CHUNK_INSERT_BATCH_SIZE:
+                    conn.executemany(insert_sql, pending_rows)
+                    pending_rows.clear()
                 chunk_hashes.add(chunk['sha256'])
         finally:
             # Release the source mapping even if writing or SQL insertion fails.
@@ -491,6 +518,8 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
                 close()
         file_hashes[entry['relative_path']] = h.hexdigest()
         chunk_length[entry['relative_path']] = count
+    if pending_rows:
+        conn.executemany(insert_sql, pending_rows)
     return file_hashes, chunk_hashes, chunk_length
 
 def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_hash: str, file_hash: str, output_path: str) -> bool:
