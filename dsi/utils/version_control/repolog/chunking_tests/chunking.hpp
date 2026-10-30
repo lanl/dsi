@@ -1,0 +1,222 @@
+// chunking.hpp -- C++ port of repolog/chunking.py
+//
+// Contents:
+//   * RollingHash + gear-table FastCDC boundary detector (the heart of the
+//     module), reproduced bit-for-bit (the 128-bit gear math mirrors Python's
+//     arbitrary-precision int arithmetic so the boundaries match exactly).
+//   * A streaming iterator (iter_file_fastcdc / chunk_file) and a *multicore*
+//     batch path (chunk_file_parallel) that SHA-256s every chunk on a pool of
+//     worker threads.
+//   * File-only chunk storage (store / rebuild) -- the original Python writes
+//     chunk blobs to <chunk_root>/dsi_vcs_chunks/<sha256> AND inserts a row into
+//     a SQL `chunk_store` table. Per the task we DROP the SQL side (and the
+//     NPY/SQLite magic detection that fed it) and keep only the on-disk blob
+//     store with atomic temp-file + rename publication dedup.
+//
+// SHA-256 is delegated to a library (CommonCrypto / OpenSSL, see sha256.hpp);
+// this file never hand-rolls the digest algorithm.
+
+#pragma once
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <set>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include <sys/mman.h> // MAP_FAILED
+
+namespace chunking {
+
+// A single content-defined chunk. Mirrors the dict
+//   {"sha256": <hex>, "size": <int>, "data": <bytes|None>}
+// `data` is std::nullopt when the payload was not copied (mirrors the
+// needs_data predicate short-circuiting the copy).
+struct Chunk {
+    std::string          sha256;   // 64-char lowercase hex digest
+    std::size_t          size = 0;  // byte length of the chunk
+    std::optional<std::string> data;  // payload, or nullopt when omitted
+};
+
+// A byte range [offset, offset+length) within a mapped file.
+struct SizeRange {
+    std::size_t offset = 0;
+    std::size_t length = 0;
+};
+
+// A file to store -- subset of the Python `entry` dict we actually use.
+struct FileEntry {
+    std::string absolutePath;     // entry['absolute_path']
+    std::string relativePath;     // entry['relative_path']
+    std::string fileType = "file"; // only "file" entries are chunked
+};
+
+// Result of store(), mirroring
+//   (file_hashes, chunk_hashes, chunk_length)
+// The SQL `chunk_store` insertion (and its pending_commit/pending_rows)
+// is intentionally absent -- this is a file-only store per the task.
+struct StoreResult {
+    std::unordered_map<std::string, std::string> fileHashes;   // rel_path -> per-file hash
+    std::set<std::string>                         chunkHashes;  // dedup'd set of blob hashes
+    std::unordered_map<std::string, std::size_t>  chunkLength;  // rel_path -> chunk count
+};
+
+// needs_data predicate: given a chunk's hex digest, should we copy its payload?
+// (Empty => always copy, matching the Python `None` default.)
+using NeedsData = std::function<bool(const std::string&)>;
+
+// -------------------------------------------------------------------------
+// mmap-backed read-only view of a file (the C++ analogue of Python's mmap).
+// Movable but not copyable so it can be held by the iterator by-value.
+// -------------------------------------------------------------------------
+class MappedChunkFile {
+public:
+    MappedChunkFile() = default;
+    ~MappedChunkFile();
+    MappedChunkFile(const MappedChunkFile&) = delete;
+    MappedChunkFile& operator=(const MappedChunkFile&) = delete;
+    MappedChunkFile(MappedChunkFile&& o) noexcept;
+    MappedChunkFile& operator=(MappedChunkFile&& o) noexcept;
+
+    // Open a file read-only and memory-map it. Empty files map nothing
+    // (mmap cannot map 0 bytes, just as Python guards that) but still open
+    // successfully -- size() reports 0 and the chunk iterators yield nothing.
+    void open(const std::string& path);
+
+    const std::uint8_t* data() const;
+    std::size_t         size() const { return len_; }
+    bool                isMapped() const { return addr_ != MAP_FAILED; }
+
+    void close();
+
+private:
+    int      fd_    = -1;
+    void*    addr_  = MAP_FAILED;
+    std::size_t len_ = 0;
+};
+
+// -------------------------------------------------------------------------
+// FastCDC boundary detection -- the sequential core.
+// -------------------------------------------------------------------------
+
+// Return the byte ranges that segment `data[0..size)` into FastCDC chunks.
+// Identical boundaries to the streaming iterator below.
+std::vector<SizeRange> findChunkBoundaries(const std::uint8_t* data,
+                                           std::size_t size);
+
+// Compute SHA-256 (as hex) of every range, in parallel across `threads`
+// worker threads (0 or 1 => serial). This is the multicore hot path.
+std::vector<std::string>
+hashRangesParallel(const std::uint8_t* base,
+                   const std::vector<SizeRange>& ranges,
+                   std::size_t threads = 0);
+
+// -------------------------------------------------------------------------
+// Streaming iterator -- faithful port of iter_file_fastcdc().
+// -------------------------------------------------------------------------
+class FastCdcChunkIterator {
+public:
+    // Mappable but the underlying mmap makes moving unsafe, so this type is
+    // non-copyable / non-movable -- iterate it in place (hasMore/next/close).
+    FastCdcChunkIterator(std::string path, NeedsData needs = {});
+    ~FastCdcChunkIterator();
+    FastCdcChunkIterator(const FastCdcChunkIterator&) = delete;
+    FastCdcChunkIterator& operator=(const FastCdcChunkIterator&) = delete;
+
+    bool        hasMore() const;
+    Chunk       next();                 // advances; throws if exhausted
+    void        close();                // unmap early (like an early break)
+    std::vector<Chunk> materialize();   // drain to a vector
+
+private:
+    MappedChunkFile map_;
+    std::size_t pos_ = 0;
+    std::size_t fileSize_ = 0;
+    NeedsData   needs_;
+    bool        closed_ = false;
+};
+
+// -------------------------------------------------------------------------
+// High-level entry points -- mirror the Python functions.
+// -------------------------------------------------------------------------
+
+// chunk_file_fastcdc(path)  -> list[Chunk]  (snapshots every byte)
+std::vector<Chunk> chunkFileFastCdc(const std::string& path);
+
+// chunk_file(path, streaming=..., needs_data=...):
+//   streaming == false -> materialise the list (default).
+//   streaming == true  -> invoke cb(Chunk) per chunk, lazily, with the mmap
+//                         held until finished (mirrors the generator form).
+// Both use the needs_data predicate to decide whether to copy payloads.
+std::vector<Chunk> chunkFile(const std::string& path, NeedsData needs = {});
+void               chunkFileStream(const std::string& path,
+                                   NeedsData needs,
+                                   const std::function<void(const Chunk&)>& cb);
+
+// chunk_file_rolling_hash(path) -- the legacy (non-FastCDC) rolling-hash path
+// kept for parity; reproduces chunk_file_rolling_hash() exactly.
+std::vector<Chunk> chunkFileRollingHash(const std::string& path);
+
+// -------------------------------------------------------------------------
+// Multicore batch API (new, not in the original Python -- the parallelism
+// the task asked for). Produces the same chunks as the iterator but
+// SHA-256s every chunk concurrently.
+// -------------------------------------------------------------------------
+struct ParallelOptions {
+    std::size_t threads = 0;          // 0 => std::thread::hardware_concurrency
+    bool        requestData = false;  // copy every chunk's payload
+};
+std::vector<Chunk> chunkFileParallel(const std::string& path,
+                                     ParallelOptions opt = {});
+
+// -------------------------------------------------------------------------
+// File-only chunk storage (SQL removed).
+// -------------------------------------------------------------------------
+
+// storeChunksForSnapshot():
+//   for each "file" entry, chunk it, write any not-yet-published chunk blobs to
+//   <chunk_root>/dsi_vcs_chunks/<sha256> via atomic temp-file+rename, and
+//   compute the per-file hash (sha256 over the ordered chunk hex digests).
+// `threads` > 0 parallelises the SHA-256 hot path. `pendingCommit` is kept in
+// the signature for API parity with the Python original but is unused now that
+// the `chunk_store` SQL insert is gone.
+StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
+                                   const std::vector<FileEntry>& entries,
+                                   const std::string& pendingCommit = "UPDATE",
+                                   std::size_t threads = 0);
+
+// rebuildFileFromChunks():
+//   verify the ordered chunk digests reproduce `fileHash`, then concatenate the
+//   blob payloads (from the on-disk store) into <output_path>/<relative_path>.
+// The ordered chunk list stands in for the rows the original read from the now
+// removed `chunk_store` SQL table. Returns false on any mismatch / missing blob.
+// `commitHash` is kept for signature parity (unused: no DB to filter on).
+bool rebuildFileFromChunks(const std::string& chunkRoot,
+                           const std::string& relativePath,
+                           const std::string& commitHash,
+                           const std::string& fileHash,
+                           const std::string& outputPath,
+                           const std::vector<std::string>& orderedChunkHashes);
+
+// -------------------------------------------------------------------------
+// Diagnostics -- exposes the internal parameter tables so the cross-check
+// harness (pycheck.py) can diff them against the Python original's
+// GEAR_TABLE / GEAR_TABLE_LS / STRICT_MASK / EAGER_MASK / AVERAGE_BITS.
+// Not part of the chunking logic itself.
+// -------------------------------------------------------------------------
+struct ChunkerDiagnostics {
+    std::array<std::uint64_t, 256> gearTable{};    // Python GEAR_TABLE
+    std::array<std::uint64_t, 256> gearTableLs{};  // low 64 bits of GEAR_TABLE_LS
+    std::uint64_t                  strictMask = 0; // Python STRICT_MASK
+    std::uint64_t                  eagerMask  = 0; // Python EAGER_MASK
+    int                            averageBits = 0; // Python AVERAGE_BITS
+    // GEAR_TABLE_LS in full 65-bit precision (carries Python's bit 64).
+    std::array<unsigned __int128, 256> gearTableLsWide{};
+};
+ChunkerDiagnostics chunkerDiagnostics();
+
+}  // namespace chunking
