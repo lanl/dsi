@@ -341,55 +341,6 @@ def chunk_file(path, *, streaming=False, needs_data: Callable[[str], bool] | Non
     format chunkers validate their layout before yielding any payloads.
     """
     path = Path(path)
-    f_suffix = path.suffix.lower()
-
-    if (f_suffix == ".npy" and _has_npy_magic(path)):
-        try:
-            if streaming:
-                return iter_npy_file(path, needs_data=needs_data)
-            return chunk_npy_file(path)
-        except NpyFormatError:
-            pass
-
-    if (f_suffix in {".db", ".sqlite", ".sqlite3"} and is_sqlite_file(path)):
-        try:
-            if streaming:
-                return iter_sqlite_file(path, needs_data=needs_data)
-            return chunk_sqlite_file(path)
-        except SQLiteFormatError:
-            pass
-
-    if f_suffix == ".csv":
-        try:
-            if streaming:
-                return iter_csv_file(path, needs_data=needs_data)
-            return chunk_csv_file(path)
-        except CSVFormatError:
-            pass
-
-    if f_suffix == ".xlsx":
-        try:
-            if streaming:
-                return iter_xlsx_file(path, needs_data=needs_data)
-            return chunk_xlsx_file(path)
-        except XLSXFormatError:
-            pass
-
-    if f_suffix == ".json":
-        try:
-            if streaming:
-                return iter_json_file(path, needs_data=needs_data)
-            return chunk_json_file(path)
-        except JSONFormatError:
-            pass
-
-    if f_suffix == ".xml":
-        try:
-            if streaming:
-                return iter_xml_file(path, needs_data=needs_data)
-            return chunk_xml_file(path)
-        except XMLFormatError:
-            pass
 
     return iter_file_fastcdc(path, needs_data=needs_data) if streaming else chunk_file_fastcdc(path)
 

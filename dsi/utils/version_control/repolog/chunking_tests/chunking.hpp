@@ -6,7 +6,8 @@
 //     arbitrary-precision int arithmetic so the boundaries match exactly).
 //   * A streaming iterator (iter_file_fastcdc / chunk_file) and a *multicore*
 //     batch path (chunk_file_parallel) that SHA-256s every chunk on a pool of
-//     worker threads.
+//     worker threads -- all fed by a bounded sliding window (<= MAX_CHUNK),
+//     not by a whole-file mmap, so files far larger than RAM chunk fine.
 //   * File-only chunk storage (store / rebuild) -- the original Python writes
 //     chunk blobs to <chunk_root>/dsi_vcs_chunks/<sha256> AND inserts a row into
 //     a SQL `chunk_store` table. Per the task we DROP the SQL side (and the
@@ -28,8 +29,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <sys/mman.h> // MAP_FAILED
-
 namespace chunking {
 
 // A single content-defined chunk. Mirrors the dict
@@ -42,7 +41,7 @@ struct Chunk {
     std::optional<std::string> data;  // payload, or nullopt when omitted
 };
 
-// A byte range [offset, offset+length) within a mapped file.
+// A byte range [offset, offset+length) within a caller-supplied buffer.
 struct SizeRange {
     std::size_t offset = 0;
     std::size_t length = 0;
@@ -70,36 +69,6 @@ struct StoreResult {
 using NeedsData = std::function<bool(const std::string&)>;
 
 // -------------------------------------------------------------------------
-// mmap-backed read-only view of a file (the C++ analogue of Python's mmap).
-// Movable but not copyable so it can be held by the iterator by-value.
-// -------------------------------------------------------------------------
-class MappedChunkFile {
-public:
-    MappedChunkFile() = default;
-    ~MappedChunkFile();
-    MappedChunkFile(const MappedChunkFile&) = delete;
-    MappedChunkFile& operator=(const MappedChunkFile&) = delete;
-    MappedChunkFile(MappedChunkFile&& o) noexcept;
-    MappedChunkFile& operator=(MappedChunkFile&& o) noexcept;
-
-    // Open a file read-only and memory-map it. Empty files map nothing
-    // (mmap cannot map 0 bytes, just as Python guards that) but still open
-    // successfully -- size() reports 0 and the chunk iterators yield nothing.
-    void open(const std::string& path);
-
-    const std::uint8_t* data() const;
-    std::size_t         size() const { return len_; }
-    bool                isMapped() const { return addr_ != MAP_FAILED; }
-
-    void close();
-
-private:
-    int      fd_    = -1;
-    void*    addr_  = MAP_FAILED;
-    std::size_t len_ = 0;
-};
-
-// -------------------------------------------------------------------------
 // FastCDC boundary detection -- the sequential core.
 // -------------------------------------------------------------------------
 
@@ -117,11 +86,16 @@ hashRangesParallel(const std::uint8_t* base,
 
 // -------------------------------------------------------------------------
 // Streaming iterator -- faithful port of iter_file_fastcdc().
+//
+// The file is consumed sequentially through a bounded sliding window of at
+// most MAX_CHUNK bytes: every refill covers exactly the FastCDC lookahead
+// range, so cut positions are bit-for-bit identical to a whole-file view,
+// while the resident set peaks at one window regardless of file size.
 // -------------------------------------------------------------------------
 class FastCdcChunkIterator {
 public:
-    // Mappable but the underlying mmap makes moving unsafe, so this type is
-    // non-copyable / non-movable -- iterate it in place (hasMore/next/close).
+    // Streams a file read-only. Iterate it in place (hasMore/next/close); the
+    // type is non-copyable / non-movable.
     FastCdcChunkIterator(std::string path, NeedsData needs = {});
     ~FastCdcChunkIterator();
     FastCdcChunkIterator(const FastCdcChunkIterator&) = delete;
@@ -129,15 +103,22 @@ public:
 
     bool        hasMore() const;
     Chunk       next();                 // advances; throws if exhausted
-    void        close();                // unmap early (like an early break)
+    void        close();                // closes the fd early (like an early break)
     std::vector<Chunk> materialize();   // drain to a vector
 
 private:
-    MappedChunkFile map_;
-    std::size_t pos_ = 0;
-    std::size_t fileSize_ = 0;
-    NeedsData   needs_;
-    bool        closed_ = false;
+    // Slide the window to pos_ and refill it from the fd with as many bytes
+    // as remain (at most MAX_CHUNK).
+    void fillWindow();
+
+    int          fd_ = -1;
+    std::size_t  fileSize_ = 0;
+    std::vector<std::uint8_t> buffer_;  // sliding window, <= MAX_CHUNK bytes
+    std::size_t  bufStart_ = 0;         // file offset of buffer_[0]
+    std::size_t  bufLen_   = 0;         // valid bytes currently in buffer_
+    std::size_t  pos_      = 0;         // start (file offset) of the next chunk
+    NeedsData    needs_;
+    bool         closed_   = false;
 };
 
 // -------------------------------------------------------------------------
@@ -149,8 +130,8 @@ std::vector<Chunk> chunkFileFastCdc(const std::string& path);
 
 // chunk_file(path, streaming=..., needs_data=...):
 //   streaming == false -> materialise the list (default).
-//   streaming == true  -> invoke cb(Chunk) per chunk, lazily, with the mmap
-//                         held until finished (mirrors the generator form).
+//   streaming == true  -> invoke cb(Chunk) per chunk, lazily, with the open
+//                         fd held until finished (mirrors the generator form).
 // Both use the needs_data predicate to decide whether to copy payloads.
 std::vector<Chunk> chunkFile(const std::string& path, NeedsData needs = {});
 void               chunkFileStream(const std::string& path,
@@ -163,8 +144,10 @@ std::vector<Chunk> chunkFileRollingHash(const std::string& path);
 
 // -------------------------------------------------------------------------
 // Multicore batch API (new, not in the original Python -- the parallelism
-// the task asked for). Produces the same chunks as the iterator but
-// SHA-256s every chunk concurrently.
+// the task asked for). The file is still streamed sequentially through the
+// bounded iterator; each chunk's digest is computed on a worker pool, with a
+// bounded in-flight queue so RAM use stays proportional to the thread count
+// (never to the file size). Output is identical to the sequential iterator.
 // -------------------------------------------------------------------------
 struct ParallelOptions {
     std::size_t threads = 0;          // 0 => std::thread::hardware_concurrency

@@ -38,7 +38,7 @@ CLI modes (also used for cross-checking against the Python original):
 | File          | Contents |
 |---------------|----------|
 | `sha256.hpp/.cpp` | SHA-256 backend: one-shot `sha256Hex` + streaming `Sha256Ctx` (non-destructive `hexdigest`, like `hashlib.sha256()`). |
-| `chunking.hpp/.cpp` | The port: gear table, rolling hash, FastCDC boundaries, mmap streaming iterator, parallel hashing, file-only store/rebuild. |
+| `chunking.hpp/.cpp` | The port: gear table, rolling hash, FastCDC boundaries, bounded-window streaming iterator, parallel hashing pipeline, file-only store/rebuild. |
 | `main.cpp`    | Self-test suite + `--gen/--dump/--meta/--store/--rebuild` CLI modes. |
 | `pycheck.py`  | Cross-check harness that runs the **unmodified** `../chunking.py` (copied into a scratch package with stubbed `.log_record` / `.content_chunking` imports) so both engines can be diffed. |
 | `pystore_check.py` | Storage-half cross-check: runs the original `store_chunks_for_snapshot` / `rebuild_file_from_chunks` (SQL intact, in-memory SQLite) against the C++ file-only store, including blob-dir interop in both directions. |
@@ -59,7 +59,7 @@ CLI modes (also used for cross-checking against the Python original):
 | `needs_data` predicate | `NeedsData` (`std::function<bool(const std::string&)>`) |
 | `store_chunks_for_snapshot` | `storeChunksForSnapshot` (SQL removed; `pendingCommit` kept for parity, unused) |
 | `rebuild_file_from_chunks` | `rebuildFileFromChunks` (ordered chunk-hash list replaces the DB rows; verifies the order reproduces `fileHash`) |
-| existence cache (`OrderdCB`, 8192) | `ExistenceCache` LRU (cap `CHUNK_EXISTENCE_CACHE_SIZE`) |
+| existence cache (`OrderdCB`, 8192) | `ExistenceCache` — HyperLogLog register probe (zero ⇒ not exist) → LRU of disk-verified answers (cap `CHUNK_EXISTENCE_CACHE_SIZE`) → stat() on LRU miss |
 | `removed` | `_has_npy_magic`, `is_sqlite_file`, magic constants, `CHUNK_INSERT_BATCH_SIZE` |
 | *new* | `chunkFileParallel` / `hashRangesParallel` — same digests computed on a thread pool |
 

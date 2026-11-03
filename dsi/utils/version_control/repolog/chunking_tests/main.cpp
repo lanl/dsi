@@ -251,7 +251,7 @@ int runSelfTest(std::uint64_t mainSize) {
     // ------------------------------------------------------------------
     {
         const auto chunks = chunking::chunkFileFastCdc(fEmpty);
-        check(chunks.empty(), "empty file yields no chunks (mmap guard)");
+        check(chunks.empty(), "empty file yields no chunks (empty-file guard)");
     }
     {
         const auto chunks = chunking::chunkFileFastCdc(fSmall);
