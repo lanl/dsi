@@ -583,6 +583,87 @@ manifest object under `dsi_vcs_manifests/`. Leaf pages contain ordered binary
 aggregate chunk/byte counts. Unchanged pages are content-addressed and reused
 by later versions and branches, without storing one SQL row per chunk.
 
+#### What a packed manifest stores
+
+A manifest describes how to assemble a file. It stores chunk references in file
+order, while the actual bytes remain in the shared chunk payload store. The
+`manifest_hash` in a file's Merkle node identifies the manifest's root page;
+small files can use a single leaf page as their root.
+
+Each page is a separate binary object named by the SHA-256 hash of its serialized
+contents. Once published, its contents never change. Updating a reference
+produces a new page with a new hash, leaving the old page available to earlier
+versions. Identical pages have identical hashes and can be shared across files,
+versions, and branches.
+
+The current format uses up to 4,096 entries per page:
+
+| Page component | Stored fields | Size |
+| --- | --- | --- |
+| Header | Format magic/version, page kind, entry count, total chunk count, total byte count | 29 bytes |
+| Leaf entry | Raw SHA-256 chunk hash, chunk byte length | 40 bytes |
+| Internal entry | Child-page hash, subtree chunk count, subtree byte count | 48 bytes |
+
+"Packed" means these fields are serialized as binary records: a hash occupies
+32 bytes rather than 64 hexadecimal characters. A full leaf page occupies
+163,869 bytes, including its header. Here, each manifest page is an individual
+object file; the implementation does not combine multiple objects into a Git-style
+packfile.
+
+#### Example: sharing pages between versions
+
+Suppose `data.bin` contains six chunks, `A` through `F`. For readability, this
+example uses three references per leaf page. Labels such as `P1` and `R1` stand
+for object hashes, and each chunk reference also includes its byte length.
+
+```text
+Version 1: data.bin Merkle node, manifest_hash = R1
+
+R1 (internal page)
+  ├── P1 (leaf page): [A, B, C]
+  └── P2 (leaf page): [D, E, F]
+
+Chunk payload objects: A, B, C, D, E, F
+```
+
+Now change chunk `E` to `X`, keeping the chunk count and page boundaries the
+same. The second version has a different second leaf page and root:
+
+```text
+Version 1: manifest_hash = R1       Version 2: manifest_hash = R2
+
+R1                                 R2
+  ├── P1: [A, B, C] (shared)          ├── P1: [A, B, C] (shared)
+  └── P2: [D, E, F]                   └── P3: [D, X, F]
+```
+
+Only payload `X` (if absent), manifest page `P3`, and root page `R2` need new
+objects on disk. `P1` and the other payloads are reused. Version 1 continues to
+reference `R1`, so it still restores chunk `E`; version 2 references `R2` and
+restores chunk `X`. Additional internal levels follow the same sharing rule.
+
+#### Commit, restore, and scale
+
+During commit, missing chunk payloads are written first. Manifest pages are
+written to temporary files, flushed and synced, then atomically published under
+their content hashes. The version's Merkle node records the resulting root hash.
+Objects referenced by retained versions must remain available.
+
+During restore, the root identifies the complete chunk sequence for that file
+version. The reader verifies each manifest object's hash, traverses child pages
+in order, and streams the referenced payloads into the output file. It does not
+need to search commit ancestors or choose chunk rows by timestamp. Reading all
+`C` chunk references costs `O(C)` metadata work, plus the file's payload I/O;
+the reader loads pages along the traversal path rather than the entire manifest.
+
+Page sharing reduces storage growth but does not eliminate all commit work.
+The current builder scans the complete chunk sequence for a changed file and
+rebuilds its manifest, reusing existing objects by hash. It is not yet a tree
+editor that updates only the affected path. It also retains leaf-page references
+while building internal levels. At a billion chunks, leaf entries alone occupy
+about 40 GB before headers and internal pages. Insertions that shift page
+boundaries can change many later pages, reducing reuse.
+
 ---
 
 ## Directory Structure

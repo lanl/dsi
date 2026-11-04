@@ -2084,7 +2084,7 @@ def test_ndp_num_datasets(ndp_dsi_basic):
 #     # wpath = "/Users/ssakin/Public/versioning-test/clover-demo"
 #     wpath = os.getcwd()
 #     test.version("init", wpath)
-#     assert os.path.exists(wpath + "/.dsi_vcs_snapshots/.dsi_vcs.db")
+#     assert os.path.exists(wpath + "/" + SNAPSHOTS_DIR + "/.dsi_vcs.db")
 
 #     test.version("add", os.path.join(wpath, "a_dummy_file"))
 #     print(">Single file added.")

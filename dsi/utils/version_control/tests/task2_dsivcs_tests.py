@@ -44,8 +44,7 @@ REQUIRED_COMMANDS = (
     "setfacl",
     "getfacl",
 )
-SNAPSHOTS_DIR = ".dsi_vcs_snapshots"
-DB_NAME = ".dsi_vcs.db"
+from dsi.utils.version_control.vcs_db import SNAPSHOTS_DIR, DB_NAME
 
 
 @dataclass(frozen=True)
