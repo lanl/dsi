@@ -209,22 +209,22 @@ Example output:
 
 ```shell
 Diff f826177ae78f4e48a8c08054e2bb9a71 → latest  (./root_folder)  
-                                            
-STATUS     PATH                             
+                                          
+STATUS     PATH                           
 ──────────────────────────────────────────────────────────────────────  
-MODIFIED   file_new  [owner]                
-MODIFIED   file_schema.json  [owner]        
-diff result: 2c2                            
-<    "genesis_datacard": {                  
----                                         
->    2"genesis_datacard": {                 
-26c26                                       
-< }                                         
-\ No newline at end of file                 
----                                         
-> }                                         
-MODIFIED   schema2.json  [content, size]    
-                                            
+MODIFIED   file_new  [owner]              
+MODIFIED   file_schema.json  [owner]      
+diff result: 2c2                          
+<    "genesis_datacard": {                
+---                                       
+>    2"genesis_datacard": {               
+26c26                                     
+< }                                       
+\ No newline at end of file               
+---                                       
+> }                                       
+MODIFIED   schema2.json  [content, size]  
+                                          
 Summary: +0 added  -0 deleted  ~3 modified  =4 unchanged
 ```
 
@@ -507,20 +507,20 @@ Stores metadata for each committed version.
 
 Stores the content-addressed tree node for each committed path, including the synthetic root path `.`.
 
-| Column              | Type       | Description                                        |
-| ------------------- | ---------- | -------------------------------------------------- |
-| id                  | INTEGER PK | Auto-increment                                     |
-| version_id          | INTEGER FK | References`versions(id)` ON DELETE CASCADE       |
-| root_folder         | TEXT       | Partition key                                      |
-| relative_path       | TEXT       | Path relative to root                              |
-| file_type           | TEXT       | file/dir/symlink/etc                               |
-| node_hash           | TEXT       | SHA-256 hash for this path node                    |
-| metadata            | TEXT       | file metadata in json                              |
+| Column              | Type       | Description                                         |
+| ------------------- | ---------- | --------------------------------------------------- |
+| id                  | INTEGER PK | Auto-increment                                      |
+| version_id          | INTEGER FK | References`versions(id)` ON DELETE CASCADE        |
+| root_folder         | TEXT       | Partition key                                       |
+| relative_path       | TEXT       | Path relative to root                               |
+| file_type           | TEXT       | file/dir/symlink/etc                                |
+| node_hash           | TEXT       | SHA-256 hash for this path node                     |
+| metadata            | TEXT       | file metadata in json                               |
 | stat_fingerprint    | TEXT       | Local stat change detector; excluded from node hash |
-| content_hash_sha256 | TEXT       | SHA-256 file content hash (NULL for directories)   |
-| subtree_file_count  | INTEGER    | File count below this node                         |
-| subtree_total_bytes | INTEGER    | Total bytes below this node                        |
-| child_count         | INTEGER    | For directories: immediate children; Files: chunks |
+| content_hash_sha256 | TEXT       | SHA-256 file content hash (NULL for directories)    |
+| subtree_file_count  | INTEGER    | File count below this node                          |
+| subtree_total_bytes | INTEGER    | Total bytes below this node                         |
+| child_count         | INTEGER    | For directories: immediate children; Files: chunks  |
 
 **Constraints:**
 
@@ -598,11 +598,11 @@ versions, and branches.
 
 The current format uses up to 4,096 entries per page:
 
-| Page component | Stored fields | Size |
-| --- | --- | --- |
-| Header | Format magic/version, page kind, entry count, total chunk count, total byte count | 29 bytes |
-| Leaf entry | Raw SHA-256 chunk hash, chunk byte length | 40 bytes |
-| Internal entry | Child-page hash, subtree chunk count, subtree byte count | 48 bytes |
+| Page component | Stored fields                                                                     | Size     |
+| -------------- | --------------------------------------------------------------------------------- | -------- |
+| Header         | Format magic/version, page kind, entry count, total chunk count, total byte count | 29 bytes |
+| Leaf entry     | Raw SHA-256 chunk hash, chunk byte length                                         | 40 bytes |
+| Internal entry | Child-page hash, subtree chunk count, subtree byte count                          | 48 bytes |
 
 "Packed" means these fields are serialized as binary records: a hash occupies
 32 bytes rather than 64 hexadecimal characters. A full leaf page occupies
@@ -670,7 +670,7 @@ boundaries can change many later pages, reducing reuse.
 
 ```
 root_folder/
-└── .dsi_vcs_snapshots/      # Snapshot and metadata directory
+└── __dsi_vcs/      # Snapshot and metadata directory
     ├── .dsi_vcs.db          # SQLite metadata database
     ├── .dsi_vcs_chunks/     # Deduplicated chunk storage (content-addressed)
     │   ├── ab235232452.     # Chunk file named by hash
