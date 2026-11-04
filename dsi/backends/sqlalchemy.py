@@ -50,12 +50,15 @@ class SqlAlchemy(Filesystem):
     def get_schema(self):
         pass
     
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         pass
     
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         pass
 
+    ## DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         pass
     

@@ -26,14 +26,17 @@ class Backend(ABC):
     def get_schema(self):
         pass
 
+    ## DEPRECATING SOON
     @abstractmethod
     def find(self, query_object, **kwargs):
         pass
 
+    ## DEPRECATING SOON
     @abstractmethod
     def find_table(self, query_object, **kwargs):
         pass
 
+    ## DEPRECATING SOON
     @abstractmethod
     def find_column(self, query_object, **kwargs):
         pass

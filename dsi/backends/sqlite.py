@@ -636,6 +636,7 @@ class Sqlite(Filesystem):
 
         return artifact
 
+    ## DEPRECATING SOON
     def find(self, query_object):
         """
         Searches for all instances of `query_object` in the SQLite database at the table, column, and cell levels. 
@@ -664,7 +665,8 @@ class Sqlite(Filesystem):
             return all_return
         else:
             return f"{query_object} was not found in this database"
-        
+
+    ## DEPRECATING SOON
     def find_table(self, query_object):
         """
         Finds all tables whose names match or partially match the given `query_object`.
@@ -704,6 +706,7 @@ class Sqlite(Filesystem):
             return f"{query_object} is not a table name in this database"
         return f"{query_object} needs to be a string if finding among table names"
     
+    ## DEPRECATING SOON
     def find_column(self, query_object, range = False):
         """
         Finds all columns whose names match or partially match the given `query_object`.
