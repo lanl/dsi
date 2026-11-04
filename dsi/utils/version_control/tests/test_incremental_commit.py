@@ -11,6 +11,7 @@ import pytest
 from dsi.utils.version_control import dsi_vcs, vcs_metadata_helper as metadata
 from dsi.utils.version_control.dsi_vcs import Version
 from dsi.utils.version_control.repolog import chunking
+from dsi.utils.version_control.repolog.manifest import iter_manifest_chunks
 from dsi.utils.version_control.vcs_db import DB_NAME, SNAPSHOTS_DIR
 
 
@@ -29,15 +30,19 @@ def latest(root):
 
 def content(root, commit, path):
     with db(root) as conn:
-        rows = conn.execute(
-            "SELECT chunk_hash FROM chunk_store WHERE commit_hash=? AND relative_file_path=? ORDER BY chunk_index",
+        row = conn.execute(
+            "SELECT mn.manifest_hash FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
+            "WHERE v.commit_hash=? AND mn.relative_path=? AND mn.file_type='file'",
             (commit, path),
-        ).fetchall()
+        ).fetchone()
+    assert row is not None and row["manifest_hash"]
     return b"".join(
         (
-            root / SNAPSHOTS_DIR / chunking.CHUNK_STORAGE_DIR / r["chunk_hash"]
+            root / SNAPSHOTS_DIR / chunking.CHUNK_STORAGE_DIR / chunk_hash
         ).read_bytes()
-        for r in rows
+        for chunk_hash, _chunk_size in iter_manifest_chunks(
+            str(root / SNAPSHOTS_DIR), row["manifest_hash"]
+        )
     )
 
 
@@ -147,13 +152,10 @@ def test_unstage_directory_and_commit_deleted_tree(tmp_path):
                 (version["id"],),
             )
         ] == ["."]
-        assert (
-            conn.execute(
-                "SELECT count(*) FROM chunk_store WHERE commit_hash=?",
-                (version["commit_hash"],),
-            ).fetchone()[0]
-            == 0
-        )
+        assert conn.execute(
+            "SELECT count(*) FROM merkle_nodes WHERE version_id=? AND manifest_hash IS NOT NULL",
+            (version["id"],),
+        ).fetchone()[0] == 0
 
 
 def test_denied_staged_write_is_atomic_and_keeps_staging(tmp_path):
@@ -391,7 +393,7 @@ def test_incremental_tree_matches_fresh_tree_and_restores_nested_files(tmp_path)
             )
         ]
     entries = []
-    hashes, counts = {}, {}
+    hashes, counts, manifests = {}, {}, {}
     for node in nodes:
         if node["relative_path"] == ".":
             continue
@@ -400,7 +402,8 @@ def test_incremental_tree_matches_fresh_tree_and_restores_nested_files(tmp_path)
         entries.append(entry)
         hashes[node["relative_path"]] = node["content_hash_sha256"]
         counts[node["relative_path"]] = node["child_count"]
-    fresh_root, _ = build_merkle_tree(entries, hashes, counts)
+        manifests[node["relative_path"]] = node["manifest_hash"]
+    fresh_root, _ = build_merkle_tree(entries, hashes, counts, file_manifests=manifests)
     assert fresh_root == version["root_tree_hash"]
     (tmp_path / "data" / "a").unlink()
     (tmp_path / "data" / "b").unlink()

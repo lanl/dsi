@@ -574,27 +574,14 @@ Stores parent-child relationships between commits across branches.
 
 ---
 
-### `chunk_store` Table
+### Packed file manifests
 
-Stores content-addressable chunks for deduplicated file storage.
-
-| Column             | Type       | Description                                     |
-| ------------------ | ---------- | ----------------------------------------------- |
-| id                 | INTEGER PK | Auto-increment ID                               |
-| chunk_hash         | TEXT       | Hash of the chunk content                       |
-| chunk_size         | INTEGER    | Size of the chunk in bytes                      |
-| created_at         | INTEGER    | UTC timestamp (seconds since epoch)             |
-| commit_hash        | TEXT       | Commit hash (NULL until commit is finalized)    |
-| relative_file_path | TEXT       | Relative path of the file this chunk belongs to |
-| chunk_index        | INTEGER    | Index of this chunk within the file             |
-
-**Constraints:**
-
-- `UNIQUE(chunk_hash, commit_hash)`
-
-**Indexes:**
-
-- `idx_chunk_store_commit_file` ON `(commit_hash, relative_file_path, chunk_index)`
+Chunk payloads are content-addressed files under `dsi_vcs_chunks/`. Each file
+Merkle leaf stores a `manifest_hash`, which identifies an immutable packed
+manifest object under `dsi_vcs_manifests/`. Leaf pages contain ordered binary
+`(chunk_hash, chunk_size)` entries; internal pages contain child-page hashes and
+aggregate chunk/byte counts. Unchanged pages are content-addressed and reused
+by later versions and branches, without storing one SQL row per chunk.
 
 ---
 
@@ -607,6 +594,8 @@ root_folder/
     ├── .dsi_vcs_chunks/     # Deduplicated chunk storage (content-addressed)
     │   ├── ab235232452.     # Chunk file named by hash
     │   └── de2453453...
+    ├── .dsi_vcs_manifests/  # Immutable packed manifest pages
+    │   └── 7cae4d...
     └── repo-123.log	     # Repository log file maintains append only records
 ```
 

@@ -4,7 +4,7 @@ import os
 # ─────────────────────────── CONFIG ──────────────────────────────────────────
 
 DB_NAME = "dsi_vcs.db"           # SQLite DB stored inside the root folder
-SNAPSHOTS_DIR = "__dsi_vcs"  # rsync snapshot copies live here
+SNAPSHOTS_DIR = "__dsi_vcs"      # dsi versioning internal files live here
 
 # ─────────────────────────── DATABASE ────────────────────────────────────────
 
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS merkle_nodes (
     metadata            TEXT    DEFAULT NULL,
     stat_fingerprint    TEXT,
     content_hash_sha256 TEXT,
+    manifest_hash       TEXT,
     subtree_file_count  INTEGER NOT NULL,
     subtree_total_bytes INTEGER NOT NULL,
     child_count         INTEGER NOT NULL,       -- for directory, number of immediate children, for files total chunk count
@@ -65,19 +66,6 @@ CREATE TABLE IF NOT EXISTS branch_links (
     UNIQUE(parent_commit_hash, child_commit_hash, child_branch_name)
 );
 
-CREATE TABLE IF NOT EXISTS chunk_store (
-    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    chunk_hash           TEXT    NOT NULL,
-    chunk_size           INTEGER NOT NULL,
-    created_at           INTEGER NOT NULL,
-    commit_hash          TEXT DEFAULT NULL,   -- allow default null as commit hash may not be known at the time of chunk creation
-    relative_file_path   TEXT NOT NULL,
-    chunk_index          INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_chunk_store_commit_file
-    ON chunk_store (commit_hash, relative_file_path, chunk_index);
-
 CREATE TABLE IF NOT EXISTS repository_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     commit_location INTEGER
@@ -98,5 +86,7 @@ def open_db(root_folder: str) -> sqlite3.Connection:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(merkle_nodes)")}
     if "stat_fingerprint" not in columns:
         conn.execute("ALTER TABLE merkle_nodes ADD COLUMN stat_fingerprint TEXT")
+    if "manifest_hash" not in columns:
+        conn.execute("ALTER TABLE merkle_nodes ADD COLUMN manifest_hash TEXT")
     conn.commit()
     return conn

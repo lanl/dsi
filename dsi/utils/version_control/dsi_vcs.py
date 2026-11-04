@@ -29,7 +29,6 @@ import json
 import datetime
 import shutil
 import tempfile
-import uuid
 from typing import Optional
 
 if sys.platform == "win32":
@@ -48,7 +47,12 @@ from .vcs_metadata_helper import (
 from .repolog.log_record import OperationType, RecordKind, _utcnow, ns_to_datetime_parts
 from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as merkle_commit_hash, parent_path
 from .repolog.repository_log import RepositoryLog
-from .repolog.chunking import CHUNK_STORAGE_DIR, store_chunks_for_snapshot, rebuild_file_from_chunks
+from .repolog.chunking import (
+    CHUNK_STORAGE_DIR,
+    manifest_from_legacy_chunk_store,
+    rebuild_file_from_chunks,
+    store_chunks_for_snapshot,
+)
 
 def snapshot_target(snapshot_path: str, relative_path: str) -> str:
     target = os.path.abspath(os.path.join(snapshot_path, relative_path))
@@ -75,10 +79,10 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         os.makedirs(target_tree, exist_ok=True)
         return False
 
-    chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
-    rows = conn.execute(
-        "SELECT chunk_hash, relative_file_path, chunk_index FROM chunk_store "
-        "WHERE commit_hash=? ORDER BY relative_file_path, chunk_index",
+    file_rows = conn.execute(
+        "SELECT mn.relative_path, mn.content_hash_sha256 FROM merkle_nodes mn JOIN versions v "
+        "ON mn.version_id=v.id WHERE v.commit_hash=? AND mn.file_type='file' "
+        "ORDER BY mn.relative_path",
         (commit_hash,),
     ).fetchall()
 
@@ -89,38 +93,26 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         (commit_hash,),
     ).fetchall()
 
-    grouped: dict[str, list[tuple[str, int]]] = {}
     access_checked = dict[str, str]()
-    for row in rows:
-        if row["relative_file_path"] not in access_checked:
-            metadata = check_access_permission(conn, target_tree, commit_hash, row["relative_file_path"], "read")
+    for file_row in file_rows:
+        rel_path = file_row["relative_path"]
+        if rel_path not in access_checked:
+            metadata = check_access_permission(conn, target_tree, commit_hash, rel_path, "read")
             if metadata is not None:
-                print(f"---> access granted: {row['relative_file_path']}")
+                print(f"---> access granted: {rel_path}")
             else:
-                print(f"---> access denied: {row['relative_file_path']}")
-            access_checked[row["relative_file_path"]] = metadata
-        if access_checked[row["relative_file_path"]] is not None:    
-            grouped.setdefault(row["relative_file_path"], []).append((row["chunk_hash"], row["chunk_index"]))
-        
-
-    try:
-        for rel_path, chunks in grouped.items():
-            target_path = snapshot_target(target_tree, rel_path)
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            with open(target_path, "wb") as handle:
-                for chunk_hash, _chunk_index in sorted(chunks, key=lambda item: item[1]):
-                    chunk_path = os.path.join(chunk_dir, chunk_hash)
-                    if not os.path.exists(chunk_path):
-                        print(f"---> Chunk not found for chunk hash: {chunk_path}")
-                        return False
-                    with open(chunk_path, "rb") as chunk_handle:
-                        shutil.copyfileobj(chunk_handle, handle)
-    except Exception as e:
-        print(f"---> Error occurred which rebuilding chunks: {e}")
-        return False
+                print(f"---> access denied: {rel_path}")
+            access_checked[rel_path] = metadata
+        if access_checked[rel_path] is not None:
+            if not rebuild_file_from_chunks(
+                conn, chunk_root, rel_path, commit_hash,
+                file_row["content_hash_sha256"], target_tree,
+            ):
+                print(f"---> Error occurred while rebuilding chunks for: {rel_path}")
+                return False
 
     '''
-    Always create directories: chunk_store only contains file content
+    Always create directories: manifests only contain file content
     so we would otherwise miss empty directories.
     '''
     for row in dir_rows:
@@ -295,7 +287,7 @@ class Version:
             return False
         return True
 
-    def cmd_add(self, paths: list[str], *, verbose: bool = False):
+    def cmd_add(self, paths: list[str]):
         """
         Stage one or more files/directories for the next commit.
         Directories are expanded recursively into staging log records.
@@ -376,8 +368,7 @@ class Version:
             self.repo_log.append_many(stage_entries, transaction_id=txn_id)
 
         print(f"  {staged} path(s) added to staging.")
-        if verbose:
-            self._print_staged_paths()
+        self._print_staged_paths()
 
     def cmd_delete(self, paths: list[str]):
         """Stage path(s) for deletion in the next commit."""
@@ -721,9 +712,20 @@ class Version:
         if len(entries) == 0 and not parent_nodes:
             sys.exit("No files to commit after filtering for access permissions.")
 
-        pending_commit = "pending-" + uuid.uuid4().hex
+        manifest_roots = {}
+        for path, node in parent_nodes.items():
+            if node["file_type"] != "file":
+                continue
+            manifest_hash = node["manifest_hash"] or manifest_from_legacy_chunk_store(
+                conn, snapshots_root, path, parent_commit_hash,
+            )
+            if manifest_hash:
+                manifest_roots[path] = manifest_hash
+            else:
+                sys.exit(f"Missing manifest for inherited file: {path}")
         new_hashes, _chunk_hashes, new_lengths = store_chunks_for_snapshot(
-            conn, snapshots_root, changed_entries, pending_commit=pending_commit,
+            conn, snapshots_root, changed_entries,
+            manifest_roots=manifest_roots,
         )
         file_hashes.update(new_hashes)
         chunk_length.update(new_lengths)
@@ -733,6 +735,7 @@ class Version:
                 sys.exit(f"File changed while committing: {entry['relative_path']}; retry the commit.")
         root_tree_hash, merkle_nodes = build_merkle_tree(
             entries, file_hashes, chunk_length,
+            file_manifests=manifest_roots,
             parent_nodes=parent_nodes, changed_paths=changed_paths,
         )
         commit_hash = merkle_commit_hash(
@@ -745,18 +748,6 @@ class Version:
             total_bytes=total_bytes,
         )
 
-        # ── update chunk store with commit hash ──────────────────────────────────
-        cur.execute("UPDATE chunk_store SET commit_hash=? WHERE commit_hash=?", (commit_hash, pending_commit))
-        # Preserve the complete manifest for restore, without reading file data
-        # or copying the references through Python for every unchanged file.
-        conn.execute("CREATE TEMP TABLE reused_paths (path TEXT PRIMARY KEY)")
-        conn.executemany("INSERT INTO reused_paths VALUES (?)", ((p,) for p in reused_paths))
-        conn.execute(
-            "INSERT INTO chunk_store (chunk_hash, chunk_size, created_at, commit_hash, relative_file_path, chunk_index) "
-            "SELECT chunk_hash, chunk_size, created_at, ?, relative_file_path, chunk_index "
-            "FROM chunk_store WHERE commit_hash=? AND relative_file_path IN (SELECT path FROM reused_paths)",
-            (commit_hash, parent_commit_hash),
-        )
         # ── Insert version row ───────────────────────────────────────────────────
         cur.execute(
             """INSERT INTO versions
@@ -772,7 +763,7 @@ class Version:
             "version_id", "root_folder", "relative_path", "file_type",
             "node_hash", "metadata", "content_hash_sha256",
             "subtree_file_count", "subtree_total_bytes", "child_count",
-            "stat_fingerprint",
+            "stat_fingerprint", "manifest_hash",
         ]
         merkle_placeholders = ",".join("?" * len(merkle_cols))
         merkle_col_str = ",".join(merkle_cols)
@@ -1074,43 +1065,6 @@ class Version:
             ).fetchone()
             return row["count"] if row else 0
 
-        def compare_lists(list_a, list_b):
-            equal = []
-            different = []
-            added_to_a = []
-            added_to_b = []
-            i = 0
-            j = 0
-
-            while i < len(list_a) and j < len(list_b):
-                if list_a[i] == list_b[j]:
-                    equal.append((i, j))
-                    i += 1
-                    j += 1
-                    continue
-                try:
-                    next_j = list_b.index(list_a[i], j + 1)
-                except ValueError:
-                    next_j = None
-                try:
-                    next_i = list_a.index(list_b[j], i + 1)
-                except ValueError:
-                    next_i = None
-
-                if next_j is not None and (next_i is None or next_j - j <= next_i - i):
-                    added_to_b.extend(range(j, next_j))
-                    j = next_j
-                elif next_i is not None:
-                    added_to_a.extend(range(i, next_i))
-                    i = next_i
-                else:
-                    different.append((i, j))
-                    i += 1
-                    j += 1
-            added_to_a.extend(range(i, len(list_a)))
-            added_to_b.extend(range(j, len(list_b)))
-            return equal, different, added_to_a, added_to_b
-
         def compare_file_contents(commit1, file_entry1, commit2, file_entry2):
             tmpdir = tempfile.mkdtemp()
             first_file = file_entry1["absolute_path"]
@@ -1160,39 +1114,9 @@ class Version:
                 return False
 
             shutil.rmtree(tmpdir)
-            if f1_hash == f2_hash:
-                return True
-            old_rows = conn.execute(
-                "SELECT chunk_hash "
-                "FROM chunk_store "
-                "WHERE commit_hash LIKE ? AND relative_file_path = ? "
-                "ORDER BY chunk_index;",
-                (commit1 + "%", file_entry1["relative_path"])
-            ).fetchall()
-
-            new_rows = conn.execute(
-                "SELECT chunk_hash "
-                "FROM chunk_store "
-                "WHERE commit_hash LIKE ? AND relative_file_path = ? "
-                "ORDER BY chunk_index;",
-                (commit2 + "%", file_entry2["relative_path"])
-            ).fetchall()
-
-            list_old = [row[0] for row in old_rows]
-            list_new = [row[0] for row in new_rows]
-            _, different, added_a, added_b = compare_lists(list_old, list_new)
-
-            # print(different, added_a, added_b)
-            for diff in different:
-                first_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, list_old[diff[0]])
-                second_file = os.path.join(self.root_folder, SNAPSHOTS_DIR, CHUNK_STORAGE_DIR, list_new[diff[1]])
-                result = subprocess.run(['diff', first_file, second_file], capture_output=True, text=True)
-                print(f"diff result: {result.stdout.strip()}")
-            if len(added_a) > 0:
-                print(f"New content added in {commit1}")
-            if len(added_b) > 0:
-                print(f"New content added in {commit2}")
-            return (len(different) + len(added_a) + len(added_b)) == 0
+            # A content hash is computed from the ordered manifest entries, so
+            # it is the exact content comparison when neither side is materialized.
+            return f1_hash == f2_hash
 
         files1 = files2 = {}
         unchanged = 0

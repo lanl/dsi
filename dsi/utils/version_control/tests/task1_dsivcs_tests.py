@@ -16,6 +16,9 @@ import subprocess
 
 import pytest
 
+from dsi.utils.version_control.vcs_db import DB_NAME, SNAPSHOTS_DIR
+from dsi.utils.version_control.repolog.chunking import CHUNK_STORAGE_DIR
+
 COMMIT_HASH_RE = re.compile(r"Committed (\S+) at")
 FILE_COUNT_RE = re.compile(r"(\d+) file\(s\),")
 
@@ -106,7 +109,7 @@ class TestDsiVcsWorkflow:
         result = run_dsi_vcs(["init"], cwd=origin)
         report("init", result)
         assert result.returncode == 0, result.stderr
-        assert (origin / ".dsi_vcs_snapshots").is_dir()
+        assert (origin / SNAPSHOTS_DIR).is_dir()
 
     def test_02_dsi_vcs_add(self, paths):
         origin = paths["origin"]

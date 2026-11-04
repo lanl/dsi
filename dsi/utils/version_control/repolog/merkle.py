@@ -61,7 +61,16 @@ def _stable_metadata(entry: dict[str, Any], relative_path: str) -> dict[str, Any
     }
 
 
-def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str], chunk_length: dict[str, int], *, parent_nodes=None, changed_paths=None) -> tuple[str, list[dict[str, Any]]]:
+def build_merkle_tree(
+    entries: list[dict[str, Any]],
+    file_hashes: dict[str, str],
+    chunk_length: dict[str, int],
+    *,
+    file_manifests: dict[str, str] | None = None,
+    parent_nodes=None,
+    changed_paths=None,
+) -> tuple[str, list[dict[str, Any]]]:
+    file_manifests = file_manifests or {}
     entries_by_path = {entry["relative_path"]: entry for entry in entries}
     # Every leaf must be reachable from the root, even when callers only
     # supplied files. Commit callers collect real metadata for these parents.
@@ -128,6 +137,7 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
             )
         elif file_type == "file":
             content_hash = file_hashes.get(relative_path)
+            manifest_hash = file_manifests.get(relative_path)
             subtree_file_count = 1
             subtree_total_bytes = entry.get("_st_size") or 0
             node_hash = hash_payload(
@@ -135,6 +145,7 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
                     "object": "dsi-vcs-file-v1",
                     "metadata_hash": metadata_hash,
                     "content_hash_sha256": content_hash,
+                    "manifest_hash": manifest_hash,
                 }
             )
         else:
@@ -153,6 +164,7 @@ def build_merkle_tree(entries: list[dict[str, Any]], file_hashes: dict[str, str]
             "metadata": metadata,
             "stat_fingerprint": entry.get("stat_fingerprint"),
             "content_hash_sha256": content_hash,
+            "manifest_hash": file_manifests.get(relative_path) if file_type == "file" else None,
             "subtree_file_count": subtree_file_count,
             "subtree_total_bytes": subtree_total_bytes,
             "child_count": len(child_rows) if file_type == "dir" else chunk_length.get(relative_path, 0),
