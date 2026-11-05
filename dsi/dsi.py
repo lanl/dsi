@@ -568,7 +568,10 @@ class DSI:
             raise RuntimeError("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
-        if self.read_only_flag and collection and update:
+        if self.read_only_flag and update:
+            backend_name = self.main_backend_obj.__class__.__name__
+            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
+        if collection and update:
             print("query() WARNING: The returned collection object will include an extra DSI metadata column")
         
         output = None
@@ -635,7 +638,10 @@ class DSI:
             raise RuntimeError("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
-        if self.read_only_flag and collection and update:
+        if self.read_only_flag and update:
+            backend_name = self.main_backend_obj.__class__.__name__
+            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
+        if collection and update:
             print("get_table() WARNING: The returned collection object will include an extra DSI metadata column")
         
         output = None
@@ -674,7 +680,7 @@ class DSI:
             return df
 
 
-
+    # DEPRECATED SOON
     def find(self, query, collection = False, update = False):
         """
         Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
@@ -706,6 +712,7 @@ class DSI:
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
+        print("WARNING: FIND() IS DEPRECATED. Please use dsi.query() instead. See the documentation for more details.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot find() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
@@ -776,7 +783,7 @@ class DSI:
             return output_df
 
 
-
+    # DEPRECATED SOON
     def search(self, query, collection = False):
         """
         Finds all rows across all tables in the active backend where `query` can be found.
@@ -792,6 +799,7 @@ class DSI:
 
             If False (default), prints the matches to the console.
         """
+        print("WARNING: FIND() IS DEPRECATED. Please use dsi.query() instead. See the documentation for more details.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot search() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):

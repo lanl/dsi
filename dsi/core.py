@@ -639,60 +639,7 @@ class Terminal:
 
         return output
 
-    def search(self, params, download=False):
-        """
-        **Only for Webserver backends**
-        
-        Retrieves metadata or data for entries in a specified collection/dataset/database.
-
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for the matching entries, including data references where applicable. 
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data downloaded (download=True) then returns None
-        """
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.error("Searching for a collection's metadata in the first loaded backend")
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error("Need to load a valid backend to be able to search across a collection's metadata")
-            raise NotImplementedError("Need to load a valid backend to be able to search across a collection's metadata")
-        backend = self.loaded_backends[0]
-        if not self.valid_backend(backend):
-            if self.debug_level != 0:
-                self.logger.error("First loaded backend needs to have data to search across a collection's metadata")
-            raise RuntimeError("First loaded backend needs to have data to search across a collection's metadata")
-        start = datetime.now(UTC)
-
-        search_output = backend.search(params, download)
-        if not isinstance(search_output, (list, pd.DataFrame)):
-            if self.debug_level != 0:
-                self.logger.error("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
-            raise TypeError("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
-
-        end = datetime.now(UTC)
-        if self.debug_level != 0:
-            self.logger.info(f"Runtime: {end-start}")
-
-        return search_output
-
+    ## DEPRECATING SOON - USE QUERY INSTEAD
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
@@ -723,6 +670,7 @@ class Terminal:
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
 
+    ## DEPRECATING SOON - USE QUERY INSTEAD
     def find_table(self, query_object):
         """
         Find all tables whose name matches `query_object` in the first loaded backend.
@@ -753,6 +701,7 @@ class Terminal:
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
 
+    ## DEPRECATING SOON - USE QUERY INSTEAD
     def find_column(self, query_object, range = False):
         """
         Find all columns whose name matches `query_object` in the first loaded backend.
