@@ -11,8 +11,8 @@
 //   * File-only chunk storage (store / rebuild) -- the original Python writes
 //     chunk blobs to <chunk_root>/dsi_vcs_chunks/<sha256> AND inserts a row into
 //     a SQL `chunk_store` table. Per the task we DROP the SQL side (and the
-//     NPY/SQLite magic detection that fed it) and keep only the on-disk blob
-//     store with atomic temp-file + rename publication dedup.
+//     NPY/SQLite magic detection that fed it). Payloads and immutable manifest
+//     pages live in content-addressed object stores.
 //
 // SHA-256 is delegated to a library (CommonCrypto / OpenSSL, see sha256.hpp);
 // this file never hand-rolls the digest algorithm.
@@ -62,6 +62,7 @@ struct StoreResult {
     std::unordered_map<std::string, std::string> fileHashes;   // rel_path -> per-file hash
     std::set<std::string>                         chunkHashes;  // dedup'd set of blob hashes
     std::unordered_map<std::string, std::size_t>  chunkLength;  // rel_path -> chunk count
+    std::unordered_map<std::string, std::string> manifestRoots; // rel_path -> immutable root
 };
 
 // needs_data predicate: given a chunk's hex digest, should we copy its payload?
@@ -167,10 +168,23 @@ std::vector<Chunk> chunkFileParallel(const std::string& path,
 // `threads` > 0 parallelises the SHA-256 hot path. `pendingCommit` is kept in
 // the signature for API parity with the Python original but is unused now that
 // the `chunk_store` SQL insert is gone.
+// Returns manifestRoots for the caller to persist in its file-version metadata.
+// Supply the previous version's roots to preserve page boundaries across edits.
+// Automatic sequence matching uses bounded lookahead; known-position edits can
+// use FileManifest directly without scanning a complete file (see manifest.hpp).
 StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                                    const std::vector<FileEntry>& entries,
                                    const std::string& pendingCommit = "UPDATE",
-                                   std::size_t threads = 0);
+                                   std::size_t threads = 0,
+                                   const std::unordered_map<std::string, std::string>& baseManifestRoots = {});
+
+// Stream a file version directly from its manifest root; no complete chunk list
+// or commit ancestry lookup is required. The legacy vector overload remains.
+bool rebuildFileFromManifest(const std::string& chunkRoot,
+                             const std::string& relativePath,
+                             const std::string& manifestRoot,
+                             const std::string& fileHash,
+                             const std::string& outputPath);
 
 // rebuildFileFromChunks():
 //   verify the ordered chunk digests reproduce `fileHash`, then concatenate the

@@ -94,7 +94,7 @@ bool filesEqual(const std::string& a, const std::string& b) {
 // Field-by-field comparison (StoreResult has no operator==).
 bool sameStore(const chunking::StoreResult& a, const chunking::StoreResult& b) {
     return a.fileHashes == b.fileHashes && a.chunkLength == b.chunkLength &&
-           a.chunkHashes == b.chunkHashes;
+           a.chunkHashes == b.chunkHashes && a.manifestRoots == b.manifestRoots;
 }
 
 // u128 -> decimal (for printing GEAR_TABLE_LS values that exceed 64 bits).
@@ -351,6 +351,12 @@ int runSelfTest(std::uint64_t mainSize) {
                   ordered),
               "rebuild: correct hashes rebuild");
         check(filesEqual(rebuilt, fMain), "rebuild: bytes match the original");
+        check(chunking::rebuildFileFromManifest(
+                  chunkRoot, entry.relativePath, res.manifestRoots.at(entry.relativePath),
+                  res.fileHashes.at(entry.relativePath), work + "/manifest-out"),
+              "manifest: root streams a complete file version");
+        check(filesEqual(work + "/manifest-out/" + entry.relativePath, fMain),
+              "manifest: reconstructed bytes match the original");
 
         // Wrong file hash -> rejected before any output is written.
         check(!chunking::rebuildFileFromChunks(
@@ -371,7 +377,8 @@ int runSelfTest(std::uint64_t mainSize) {
 
         // Second snapshot: everything dedups (first-occurrence / existence
         // cache path), and results stay stable.
-        const auto res2 = chunking::storeChunksForSnapshot(chunkRoot, entries);
+        const auto res2 = chunking::storeChunksForSnapshot(
+            chunkRoot, entries, "UPDATE", 0, res.manifestRoots);
         check(sameStore(res2, res), "store: second snapshot is stable & dedup'd");
 
         // A non-"file" entry is skipped entirely.
@@ -471,6 +478,20 @@ int main(int argc, char** argv) {
                             res.chunkHashes.size());
                 return 0;
             }
+            if (mode == "--store-manifest" && (argc == 5 || argc == 6)) {
+                chunking::FileEntry entry{argv[3], argv[4], "file"};
+                std::unordered_map<std::string, std::string> base;
+                if (argc == 6) base[argv[4]] = argv[5];
+                const auto result = chunking::storeChunksForSnapshot(argv[2], {entry}, "UPDATE", 0, base);
+                std::printf("%s\n%s\n%zu\n", result.manifestRoots.at(argv[4]).c_str(),
+                            result.fileHashes.at(argv[4]).c_str(), result.chunkLength.at(argv[4]));
+                return 0;
+            }
+            if (mode == "--rebuild-manifest" && argc == 7) {
+                const bool ok = chunking::rebuildFileFromManifest(argv[2], argv[3], argv[4], argv[5], argv[6]);
+                std::printf("%d\n", ok ? 0 : 1);
+                return ok ? 0 : 3;
+            }
             if (mode == "--rebuild" && argc == 7) {
                 // usage: --rebuild <chunkRoot> <relPath> <fileHash> <outDir>
                 //        <hash,hash,...>   (ordered chunk hashes, the
@@ -494,9 +515,11 @@ int main(int argc, char** argv) {
                          "  %s --dump <fastcdc|rolling> <path>\n"
                          "  %s --meta\n"
                          "  %s --store <chunkRoot> <absPath> <relativePath>\n"
-                         "  %s --rebuild <chunkRoot> <relPath> <fileHash> <outDir> <hash,hash,...>\n",
+                         "  %s --rebuild <chunkRoot> <relPath> <fileHash> <outDir> <hash,hash,...>\n"
+                         "  %s --store-manifest <chunkRoot> <absPath> <relPath> [baseRoot]\n"
+                         "  %s --rebuild-manifest <chunkRoot> <relPath> <root> <fileHash> <outDir>\n",
                          argv[0], argv[0], argv[0], argv[0], argv[0], argv[0],
-                         argv[0]);
+                         argv[0], argv[0], argv[0]);
             return 2;
         }
         return runSelfTest(20u * 1024 * 1024 + 4567);  // default main file size

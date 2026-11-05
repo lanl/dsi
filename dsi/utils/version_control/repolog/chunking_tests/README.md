@@ -35,14 +35,21 @@ CLI modes (also used for cross-checking against the Python original):
 
 ## Files
 
+The C++ persistent manifest implementation and its split/merge example are
+documented separately in [manifest_docs/README.md](manifest_docs/README.md). Run
+`make manifest-test` for its focused tests. `storeChunksForSnapshot` now also
+returns per-file manifest roots; legacy chunk-list restore APIs remain available.
+
 | File          | Contents |
 |---------------|----------|
 | `sha256.hpp/.cpp` | SHA-256 backend: one-shot `sha256Hex` + streaming `Sha256Ctx` (non-destructive `hexdigest`, like `hashlib.sha256()`). |
 | `chunking.hpp/.cpp` | The port: gear table, rolling hash, FastCDC boundaries, bounded-window streaming iterator, parallel hashing pipeline, file-only store/rebuild. |
+| `manifest.hpp/.cpp` | Persistent packed manifest tree with local splits/merges, immutable root publication, bounded clean-page caching, and internal-only recovery. |
+| `manifest_test.cpp` | Manifest invariants, history/sharing, randomized edits, integrity checks, and storage integration tests. |
 | `main.cpp`    | Self-test suite + `--gen/--dump/--meta/--store/--rebuild` CLI modes. |
 | `pycheck.py`  | Cross-check harness that runs the **unmodified** `../chunking.py` (copied into a scratch package with stubbed `.log_record` / `.content_chunking` imports) so both engines can be diffed. |
 | `pystore_check.py` | Storage-half cross-check: runs the original `store_chunks_for_snapshot` / `rebuild_file_from_chunks` (SQL intact, in-memory SQLite) against the C++ file-only store, including blob-dir interop in both directions. |
-| `Makefile`    | CommonCrypto default Build, `OPENSSL=1` variant, `test/run/clean`. |
+| `Makefile`    | CommonCrypto default build, `OPENSSL=1` variant, `test/manifest-test/run/clean`. |
 
 ## Python → C++ mapping
 

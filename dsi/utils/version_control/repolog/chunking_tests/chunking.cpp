@@ -12,7 +12,8 @@
 //          persist as files under <chunk_root>/dsi_vcs_chunks/<sha256>, exactly
 //          like the Python's blob half of the writer (mkstemp + chmod 0644 +
 //          fsync + os.replace). The ordered chunk-hash list argument to
-//          rebuild() stands in for the rows the Python read from the DB.
+//          rebuild() remains available for legacy callers. New callers receive
+//          an immutable manifest root and stream reconstruction from that root.
 //   * NPY_MAGIC / SQLITE_MAGIC magic detection (_has_npy_magic, is_sqlite_file)
 //       -> dropped per the task; chunk_file always routes to FastCDC.
 //   * CHUNK_INSERT_BATCH_SIZE -> SQL-only constant, dropped.
@@ -21,6 +22,7 @@
 // (Apple default) or OpenSSL (-DUSE_OPENSSL).
 
 #include "chunking.hpp"
+#include "manifest.hpp"
 
 #include "sha256.hpp"
 
@@ -34,6 +36,7 @@
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <filesystem>
 #include <list>
 #include <mutex>
 #include <stdexcept>
@@ -994,7 +997,8 @@ std::vector<Chunk> chunkFileParallel(const std::string& path,
 StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                                    const std::vector<FileEntry>& entries,
                                    const std::string& pendingCommit,
-                                   std::size_t threads) {
+                                   std::size_t threads,
+                                   const std::unordered_map<std::string, std::string>& baseManifestRoots) {
     (void)pendingCommit;  // SQL-only parameter, kept for signature parity.
 
     const std::string chunkDir = chunkRoot + "/" + kChunkStorageDir;
@@ -1026,6 +1030,48 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         const std::string& fileRel = entry.relativePath;
         Sha256Ctx h;
         std::size_t count = 0;
+        const auto base = baseManifestRoots.find(fileRel);
+        FileManifest manifest(chunkRoot, {}, base == baseManifestRoots.end() ? "" : base->second);
+        std::deque<ManifestChunk> pending;
+        std::uint64_t position = 0;
+        constexpr std::size_t lookahead = 64;
+        std::uint64_t checkpointOperations = 0;
+
+        // Resolve a bounded window of old/new chunk references. Exact edit
+        // callers can use FileManifest directly; snapshotting must discover
+        // edits from a freshly chunked stream. Prefer nearby matching anchors
+        // to avoid shifting the page grouping of an unchanged suffix.
+        auto reconcile = [&] {
+            const auto countBefore = manifest.summary().chunkCount;
+            const auto next = pending.front();
+            if (position < countBefore && manifest.at(position) == next) {
+                ++position;
+            } else {
+                std::size_t oldMatch = lookahead, newMatch = lookahead;
+                for (std::size_t i = 1; i < lookahead && i < countBefore - position; ++i) {
+                    if (manifest.at(position + i) == next) { oldMatch = i; break; }
+                }
+                if (position < countBefore) {
+                    const auto old = manifest.at(position);
+                    for (std::size_t i = 1; i < pending.size(); ++i) {
+                        if (pending[i] == old) { newMatch = i; break; }
+                    }
+                }
+                if (oldMatch < lookahead && oldMatch <= newMatch) {
+                    for (std::size_t i = 0; i < oldMatch; ++i) manifest.erase(position);
+                } else if (newMatch < lookahead || position == countBefore) {
+                    manifest.insert(position, next);
+                } else {
+                    manifest.update(position, next);
+                }
+                ++position;
+            }
+            pending.pop_front();
+            if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
+                manifest.snapshot();  // Bound retained dirty metadata on huge files.
+                checkpointOperations = manifest.stats().operations;
+            }
+        };
 
         auto body = [&](const Chunk& chunk) {
             ++count;
@@ -1039,6 +1085,8 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                 remember(chunk.sha256, true);
             }
             res.chunkHashes.insert(chunk.sha256);
+            pending.push_back({chunk.sha256, static_cast<std::uint64_t>(chunk.size)});
+            if (pending.size() >= lookahead) reconcile();
         };
 
         if (threads > 1) {
@@ -1058,8 +1106,18 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                             body);
         }
 
+        while (!pending.empty()) reconcile();
+        while (manifest.summary().chunkCount > position) {
+            manifest.erase(position);
+            if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
+                manifest.snapshot();
+                checkpointOperations = manifest.stats().operations;
+            }
+        }
+
         res.fileHashes[fileRel] = h.hexdigest();
         res.chunkLength[fileRel] = count;
+        res.manifestRoots[fileRel] = manifest.snapshot();
     }
 
     // Persist the HyperLogLog sketch for the next call.  Best-effort: a
@@ -1071,6 +1129,77 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
     }
 
     return res;
+}
+
+bool rebuildFileFromManifest(const std::string& chunkRoot,
+                             const std::string& relativePath,
+                             const std::string& manifestRoot,
+                             const std::string& fileHash,
+                             const std::string& outputPath) {
+    struct TemporaryOutput {
+        int fd = -1;
+        std::string path;
+        ~TemporaryOutput() {
+            if (fd >= 0) ::close(fd);
+            if (!path.empty()) ::unlink(path.c_str());
+        }
+    } temporary;
+    try {
+        if (manifestRoot.empty()) return false;
+        const std::filesystem::path relative(relativePath);
+        if (relative.empty() || relative.is_absolute()) return false;
+        for (const auto& part : relative) if (part == "..") return false;
+        FileManifest manifest(chunkRoot, {}, manifestRoot);
+        Sha256Ctx digest;
+        manifest.forEach([&](const ManifestChunk& c) { digest.update(c.hash); });
+        if (digest.hexdigest() != fileHash) return false;
+        const auto target = std::filesystem::path(outputPath) / relative;
+        std::filesystem::create_directories(target.parent_path());
+        std::string pattern = (target.parent_path() / ".restore-XXXXXX").string();
+        std::vector<char> name(pattern.begin(), pattern.end());
+        name.push_back('\0');
+        temporary.fd = ::mkstemp(name.data());
+        if (temporary.fd < 0) return false;
+        temporary.path = name.data();
+        if (::fchmod(temporary.fd, 0644) != 0) return false;
+        std::array<char, 65536> buffer;
+        manifest.forEach([&](const ManifestChunk& chunk) {
+            std::ifstream input(chunkRoot + "/" + kChunkStorageDir + "/" + chunk.hash, std::ios::binary);
+            if (!input) throw std::runtime_error("missing manifest chunk payload");
+            Sha256Ctx payloadHash;
+            std::uint64_t size = 0;
+            while (input) {
+                input.read(buffer.data(), buffer.size());
+                const auto got = input.gcount();
+                if (static_cast<std::uint64_t>(got) > chunk.size - size)
+                    throw std::runtime_error("manifest chunk payload too large");
+                size += static_cast<std::uint64_t>(got);
+                payloadHash.update(buffer.data(), static_cast<std::size_t>(got));
+                std::size_t offset = 0;
+                while (offset < static_cast<std::size_t>(got)) {
+                    auto written = ::write(temporary.fd, buffer.data() + offset,
+                                           static_cast<std::size_t>(got) - offset);
+                    if (written < 0 && errno == EINTR) continue;
+                    if (written <= 0) throw std::runtime_error("manifest restore write failed");
+                    offset += static_cast<std::size_t>(written);
+                }
+            }
+            if (!input.eof() || size != chunk.size || payloadHash.hexdigest() != chunk.hash)
+                throw std::runtime_error("manifest chunk payload mismatch");
+        });
+        if (::fsync(temporary.fd) != 0) return false;
+        const int closeResult = ::close(temporary.fd);
+        temporary.fd = -1;
+        if (closeResult != 0 || ::rename(temporary.path.c_str(), target.c_str()) != 0) return false;
+        temporary.path.clear();
+        const int directoryFd = ::open(target.parent_path().c_str(), O_RDONLY | O_DIRECTORY);
+        if (directoryFd < 0) return false;
+        const int synced = ::fsync(directoryFd);
+        ::close(directoryFd);
+        return synced == 0;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 bool rebuildFileFromChunks(const std::string& chunkRoot,

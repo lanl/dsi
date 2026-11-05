@@ -89,9 +89,8 @@ private:
 #if defined(USE_OPENSSL)
     EVP_MD_CTX* ctx_ = nullptr;   // OpenSSL streaming context
 #else
-    // Apple CommonCrypto is one-shot, so we accumulate the message here.
-    // (Per-file hashes feed only small hex digests, so this stays tiny.)
-    std::string buf_;
+    // Incremental state keeps manifest/file hashing bounded for huge files.
+    CC_SHA256_CTX ctx_{};
 #endif
 };
 

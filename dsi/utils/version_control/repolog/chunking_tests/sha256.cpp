@@ -1,12 +1,11 @@
 // sha256.cpp -- implementation of the SHA-256 backend declared in sha256.hpp.
 //
 // Two interchangeable backends are compiled from one source; see the header
-// for the selection rules. The streaming context differs: OpenSSL uses a real
-// EVP_MD_CTX, while Apple CommonCrypto is one-shot so the context accumulates
-// the message and finalises on demand.
+// for the selection rules. Both backends retain incremental digest state.
 
 #include "sha256.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
@@ -96,20 +95,27 @@ std::array<std::uint8_t, 32> Sha256Ctx::rawdigest() const {
 
 std::string Sha256Ctx::hexdigest() const { return toHexDigest(rawdigest()); }
 
-#else  // __APPLE__ -> CommonCrypto (one-shot; accumulate then finalise)
+#else  // __APPLE__ -> incremental CommonCrypto
 
-Sha256Ctx::Sha256Ctx() {}
+Sha256Ctx::Sha256Ctx() { reset(); }
 Sha256Ctx::~Sha256Ctx() {}
 
 void Sha256Ctx::update(const void* data, std::size_t len) {
-    buf_.append(static_cast<const char*>(data), len);
+    auto bytes = static_cast<const unsigned char*>(data);
+    while (len > 0) {
+        const auto take = static_cast<CC_LONG>(std::min<std::size_t>(len, UINT32_MAX));
+        CC_SHA256_Update(&ctx_, bytes, take);
+        bytes += take;
+        len -= take;
+    }
 }
 
-void Sha256Ctx::reset() { buf_.clear(); }
+void Sha256Ctx::reset() { CC_SHA256_Init(&ctx_); }
 
 std::array<std::uint8_t, 32> Sha256Ctx::rawdigest() const {
     std::array<std::uint8_t, 32> out;
-    CC_SHA256(buf_.data(), static_cast<CC_LONG>(buf_.size()), out.data());
+    auto copy = ctx_;
+    CC_SHA256_Final(out.data(), &copy);
     return out;
 }
 
