@@ -7,6 +7,7 @@
 #   all    build ./chunking_test and ./manifest_test
 #   test   runs per-file rules; see below
 #   manifest-test   run only manifest tests
+#   benchmark       build ./manifest_benchmark (run explicitly)
 #   run    alias for test
 #   clean  remove objects and the binary
 
@@ -17,6 +18,7 @@ LIBS      =
 OBJS := sha256.o manifest.o chunking.o main.o
 BIN  := chunking_test
 MANIFEST_BIN := manifest_test
+BENCHMARK_BIN := manifest_benchmark
 
 ifeq ($(OPENSSL),1)
   CXXFLAGS += -DUSE_OPENSSL $(shell pkg-config --cflags openssl)
@@ -40,6 +42,13 @@ manifest_test.o: manifest_test.cpp manifest.hpp chunking.hpp sha256.hpp
 $(MANIFEST_BIN): sha256.o manifest.o chunking.o manifest_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
+manifest_benchmark.o: manifest_benchmark.cpp manifest.hpp chunking.hpp sha256.hpp
+
+$(BENCHMARK_BIN): sha256.o manifest.o chunking.o manifest_benchmark.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+
+benchmark: $(BENCHMARK_BIN)
+
 test: $(BIN) $(MANIFEST_BIN)
 	./$(BIN)
 	./$(MANIFEST_BIN)
@@ -50,6 +59,6 @@ manifest-test: $(MANIFEST_BIN)
 run: test
 
 clean:
-	rm -f $(OBJS) $(BIN) manifest_test.o $(MANIFEST_BIN)
+	rm -f $(OBJS) $(BIN) manifest_test.o $(MANIFEST_BIN) manifest_benchmark.o $(BENCHMARK_BIN)
 
-.PHONY: all test manifest-test run clean
+.PHONY: all test manifest-test benchmark run clean
