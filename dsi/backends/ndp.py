@@ -895,7 +895,7 @@ class NDP(Webserver):
                 vo.c_name = list(df.columns)
                 vo.row_num = int(idx) + 1
                 vo.value = row.tolist()
-                vo.type = "cell"
+                vo.type = "relation"
                 matches.append(vo)
         
         return matches

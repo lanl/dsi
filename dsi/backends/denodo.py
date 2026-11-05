@@ -1948,7 +1948,7 @@ class Denodo(Webserver):
                 val.c_name = list(df.columns)
                 val.row_num = int(idx)
                 val.value = row.tolist()
-                val.type = "row"
+                val.type = "relation"
                 matches.append(val)
         return matches
 
