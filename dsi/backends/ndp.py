@@ -1221,9 +1221,9 @@ class NDP(Webserver):
             cols = list(table_data.keys())
             df = pd.DataFrame(table_data)  # Convert to DataFrame for easier access
 
-            for row_idx, row in df.iterrows():
+            for row_idx, row_val in df.iterrows():
                 for col in cols:
-                    cell = row[col]
+                    cell = row_val[col]
 
                     match = False
 
@@ -1247,7 +1247,7 @@ class NDP(Webserver):
                             val.t_name = table_name
                             val.c_name = cols
                             val.row_num = row_idx
-                            val.value = row.tolist()
+                            val.value = row_val.tolist()
                             val.type = "row"
                         else:
                             val = self.ValueObject()

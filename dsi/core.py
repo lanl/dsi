@@ -843,7 +843,6 @@ class Terminal:
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
-        print("WARNING: DEPRECATING CORE.FIND_RELATION() SOON. USE QUERY INSTEAD")
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.error(f'Finding all rows in the first table of the first loaded backend where {query_object}')

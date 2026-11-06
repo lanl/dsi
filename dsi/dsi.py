@@ -791,7 +791,6 @@ class DSI:
 
         `return` : If there are no matches found, then nothing is returned or printed
         """
-        print("WARNING: FIND() IS DEPRECATED. Please use dsi.query() instead. See the documentation for more details.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot find() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
@@ -878,7 +877,6 @@ class DSI:
 
             If False (default), prints the matches to the console.
         """
-        print("WARNING: FIND() IS DEPRECATED. Please use dsi.query() instead. See the documentation for more details.")
         if self.schema_read:
             raise RuntimeError("ERROR: Cannot search() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
