@@ -1561,7 +1561,6 @@ def test_find_relation_error_duckdb_backend():
     f = io.StringIO()
     with redirect_stdout(f):
         find_df = test.query(statement="a", collection=True, update=True)
-    output = f.getvalue()
     assert find_df is not None
 
     try:
