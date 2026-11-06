@@ -673,7 +673,7 @@ class DSI:
                 raise ValueError("Query returns incorrect DSI type")
 
         else:
-            raise ValueError("DSI Backend returned a type that cannot be parsed", type(query_data))
+            raise TypeError("DSI Backend returned a type that cannot be parsed", type(query_data))
 
 
 
