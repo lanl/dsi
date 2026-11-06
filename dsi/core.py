@@ -681,7 +681,6 @@ class Terminal:
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
-        print("WARNING: DEPRECATING FIND() SOON. USE QUERY INSTEAD")
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.error(f'Finding `{query_object}` across all tables, columns, and cells in the first loaded backend')
@@ -714,7 +713,6 @@ class Terminal:
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
-        print("WARNING: DEPRECATING FIND_TABLE() SOON. USE QUERY INSTEAD")
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.error(f'Finding all tables whose name matches `{query_object}` in the first loaded backend')
@@ -752,7 +750,6 @@ class Terminal:
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
-        print("WARNING: DEPRECATING FIND_COLUMN() SOON. USE QUERY INSTEAD")
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.error(f'Finding all columns whose name matches `{query_object}` in the first loaded backend')
@@ -790,7 +787,6 @@ class Terminal:
 
             - Refer to the first loaded backend's documentation to understand the structure of the objects in this list
         """
-        print("WARNING: DEPRECATING CORE.FIND_CELL() SOON. USE QUERY INSTEAD")
         if self.debug_level != 0:
             self.logger.info("-------------------------------------")
             self.logger.error(f'Finding all cells which match `{query_object}` in the first loaded backend')
