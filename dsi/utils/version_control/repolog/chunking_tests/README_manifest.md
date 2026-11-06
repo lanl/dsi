@@ -143,6 +143,15 @@ edit sequence, reducing page sharing; reconstructed bytes remain correct.
 Known-position `FileManifest` edits provide the local-update guarantee directly.
 Automatic discovery of arbitrary edits is not a logarithmic operation.
 
+The fourth `storeChunksForSnapshot` argument selects its execution path: `0`
+or `1` uses sequential, Python-compatible chunking; a value greater than `1`
+uses the direct parallel-storage workers. Those workers write missing payload
+objects and return only chunk metadata to the parent before the manifest is
+updated. This internal path is named `storeFileParallel`; it does **not** call
+`chunkFileParallel`. Use `chunkFileParallel` only when an application needs an
+in-memory ordered `std::vector<Chunk>` rather than a stored snapshot. The
+full comparison and examples are in [README.md](README.md#choosing-a-parallel-api).
+
 Dirty pages are coalesced between snapshots. The streaming store checkpoints
 after approximately `2B` edits to bound dirty metadata, and uses a bounded LRU
 for clean pages. These checkpoints may leave unreferenced intermediate objects;

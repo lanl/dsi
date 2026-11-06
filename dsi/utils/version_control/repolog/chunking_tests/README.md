@@ -87,6 +87,35 @@ count; `processes` takes precedence. For `storeChunksForSnapshot`, its legacy
 one still selects the sequential path. Switching layouts may therefore change
 the manifest and per-file chunk hash even when file bytes are unchanged.
 
+## Choosing a parallel API
+
+Both parallel paths use the same independent-unit FastCDC layout, but they are
+not wrappers around one another and serve different ownership models:
+
+| Need | Public API | Result and data movement |
+| --- | --- | --- |
+| Obtain an ordered in-memory chunk list for another consumer | `chunkFileParallel(path, options)` | Returns `std::vector<Chunk>`. Set `requestData = true` only when the caller needs every payload byte; otherwise chunks contain hashes and sizes only. It does not write a chunk store. |
+| Snapshot files into the on-disk chunk store and update manifests | `storeChunksForSnapshot(root, entries, "UPDATE", processes, previousRoots)` | Returns `StoreResult` with file hashes, unique hashes, counts, and manifest roots. With `processes > 1`, the internal `storeFileParallel` worker path writes missing blobs itself and returns metadata only to the parent. |
+
+`storeFileParallel` is an internal helper, not a public API. Call
+`storeChunksForSnapshot` to use it. It never calls `chunkFileParallel`: doing
+so would unnecessarily return payloads or chunk records to the parent before
+storage. Conversely, `chunkFileParallel` deliberately has no chunk-root,
+deduplication, blob-publication, or manifest behavior.
+
+```cpp
+// Consume chunk metadata (and optionally bytes) yourself.
+chunking::ParallelOptions options;
+options.processes = 4;
+options.requestData = false;
+auto chunks = chunking::chunkFileParallel(inputPath, options);
+
+// Persist chunks and obtain a manifest root for a file version.
+chunking::FileEntry entry{inputPath, "data/input.bin", "file"};
+auto stored = chunking::storeChunksForSnapshot(chunkRoot, {entry}, "UPDATE", 4);
+const auto& root = stored.manifestRoots.at(entry.relativePath);
+```
+
 ## Worker-owned chunk storage
 
 `storeChunksForSnapshot(root, files, "UPDATE", 4)` uses a direct-storage path.
