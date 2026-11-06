@@ -54,28 +54,6 @@ except ImportError:
 from dsi.backends.webserver import Webserver
 
 
-class ValueObject:
-    """
-    Container for search results returned by find* methods.
-    """
-
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
-    def to_dict(self):
-        return {
-            "t_name": self.t_name,
-            "c_name": self.c_name,
-            "row_num": self.row_num,
-            "value": self.value,
-            "type": self.type,
-        }
-
-
 class TruststoreAdapter(HTTPAdapter):
     """
     Optional TLS adapter for environments that prefer OS trust stores.
@@ -468,7 +446,7 @@ class Zenodo(Webserver):
 
         for table_name, table_data in self._cache.items():
             if query in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.row_num = None
@@ -496,7 +474,7 @@ class Zenodo(Webserver):
         for table_name, table_data in self._cache.items():
             for col_name, col_data in table_data.items():
                 if query in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.row_num = None
@@ -572,7 +550,7 @@ class Zenodo(Webserver):
                         row_matched = True
                         break
 
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col]
                     val.row_num = int(row_idx)
@@ -709,7 +687,7 @@ class Zenodo(Webserver):
                     filtered = self._apply_pandas_filter(df, query, operator, value)
 
                     for idx, row in filtered.iterrows():
-                        vo = ValueObject()
+                        vo = self.ValueObject()
                         vo.t_name = table_name
                         vo.c_name = list(df.columns)
                         vo.row_num = int(idx) + 1
@@ -750,7 +728,7 @@ class Zenodo(Webserver):
                         )
 
                         for idx, row in filtered.iterrows():
-                            vo = ValueObject()
+                            vo = self.ValueObject()
                             vo.t_name = table_name
                             vo.c_name = list(df.columns)
                             vo.row_num = int(idx) + 1
@@ -1312,9 +1290,8 @@ class Zenodo(Webserver):
     # Find helper methods
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _row_to_value_object(table_name, row_num, row, value_type="row"):
-        val = ValueObject()
+    def _row_to_value_object(self, table_name, row_num, row, value_type="row"):
+        val = self.ValueObject()
         val.t_name = table_name
         val.c_name = list(row.keys())
         val.row_num = row_num

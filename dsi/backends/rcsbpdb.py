@@ -83,25 +83,6 @@ from urllib3.util.retry import Retry
 from dsi.backends.webserver import Webserver
 
 
-class ValueObject:
-    """Container used by find/find_table/find_column/find_cell."""
-
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "t_name": self.t_name,
-            "c_name": self.c_name,
-            "row_num": self.row_num,
-            "value": self.value,
-            "type": self.type,
-        }
-
 
 @dataclass
 class FileResource:
@@ -1382,7 +1363,7 @@ class RCSBPDB(Webserver):
 
         for table_name, table_data in self.tables.items():
             if query_object in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.value = table_data
@@ -1402,7 +1383,7 @@ class RCSBPDB(Webserver):
         for table_name, table_data in self.tables.items():
             for col_name, col_data in table_data.items():
                 if query_object in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.value = col_data
@@ -1475,7 +1456,7 @@ class RCSBPDB(Webserver):
                         row_matched = True
                         break
 
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col]
                     val.row_num = int(row_idx)
@@ -1491,7 +1472,7 @@ class RCSBPDB(Webserver):
 
                     seen_rows.add(key)
 
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = cols
                     val.row_num = int(row_idx)
@@ -1538,7 +1519,7 @@ class RCSBPDB(Webserver):
                     filtered = self._apply_pandas_filter(df, query, operator, value)
 
                     for idx, row in filtered.iterrows():
-                        vo = ValueObject()
+                        vo = self.ValueObject()
                         vo.t_name = table_name
                         vo.c_name = list(df.columns)
                         vo.row_num = int(idx) + 1
@@ -1579,7 +1560,7 @@ class RCSBPDB(Webserver):
                         )
 
                         for idx, row in filtered.iterrows():
-                            vo = ValueObject()
+                            vo = self.ValueObject()
                             vo.t_name = table_name
                             vo.c_name = list(df.columns)
                             vo.row_num = int(idx) + 1

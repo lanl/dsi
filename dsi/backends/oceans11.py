@@ -18,19 +18,6 @@ from dsi.backends.webserver import Webserver
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
-class ValueObject:
-    """Container for search results returned by find* methods."""
-
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
 
 # ----------------------------------------------------------------------
 # Oceans11 Backend (Webserver - read only)
@@ -819,7 +806,7 @@ class Oceans11(Webserver):
         matches = []
         for table_name, table_data in self._cache.items():
             if query_object.lower() in table_name.lower():
-                value = ValueObject()
+                value = self.ValueObject()
                 value.t_name = table_name
                 value.c_name = list(table_data.keys())
                 value.value = table_data
@@ -838,7 +825,7 @@ class Oceans11(Webserver):
         for table_name, table_data in self._cache.items():
             for column_name, column_data in table_data.items():
                 if query_object.lower() in column_name.lower():
-                    value = ValueObject()
+                    value = self.ValueObject()
                     value.t_name = table_name
                     value.c_name = [column_name]
                     value.value = column_data
@@ -890,7 +877,7 @@ class Oceans11(Webserver):
                     if not match:
                         continue
 
-                    value = ValueObject()
+                    value = self.ValueObject()
                     value.t_name = table_name
                     value.row_num = row_idx
 
@@ -956,7 +943,7 @@ class Oceans11(Webserver):
             )
 
             for idx, row_data in filtered.iterrows():
-                value_object = ValueObject()
+                value_object = self.ValueObject()
                 value_object.t_name = table_name
                 value_object.c_name = list(df.columns)
                 value_object.row_num = int(idx) + 1

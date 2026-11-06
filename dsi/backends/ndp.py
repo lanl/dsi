@@ -18,33 +18,6 @@ from dsi.backends.webserver import Webserver
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
-class ValueObject:
-    """
-    Container for search results returned by find* methods
-
-    Attributes
-    ----------
-    t_name : str
-        Table name
-    c_name : list
-        Column name(s)
-    row_num : int or None
-        Row index (if applicable)
-    value : any
-        Matched value
-    type : str
-        {'table', 'column', 'cell'}
-    """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
 
 # ----------------------------------------------------------------------
 # NDP Backend (Webserver - Read only)
@@ -890,7 +863,7 @@ class NDP(Webserver):
             
             # Convert to ValueObjects
             for idx, row in filtered.iterrows():
-                vo = ValueObject()
+                vo = self.ValueObject()
                 vo.t_name = table_name
                 vo.c_name = list(df.columns)
                 vo.row_num = int(idx) + 1
@@ -1149,7 +1122,7 @@ class NDP(Webserver):
 
         for table_name, table_data in self._cache.items():
             if query_object in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.value = table_data
@@ -1203,7 +1176,7 @@ class NDP(Webserver):
             for col_name, col_data in table_data.items():
 
                 if query_object in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.value = col_data
@@ -1214,7 +1187,7 @@ class NDP(Webserver):
         return matches
 
 
-    def find_cell(self, query_object, **kwargs):
+    def find_cell(self, query_object, row=False, **kwargs):
         """
         Finds all cells that match the given query_object.
         
@@ -1269,12 +1242,20 @@ class NDP(Webserver):
                             match = True
 
                     if match:
-                        val = ValueObject()
-                        val.t_name = table_name
-                        val.c_name = cols
-                        val.row_num = row_idx
-                        val.value = row.tolist()
-                        val.type = "cell"
+                        if row:
+                            val = self.ValueObject()
+                            val.t_name = table_name
+                            val.c_name = cols
+                            val.row_num = row_idx
+                            val.value = row.tolist()
+                            val.type = "row"
+                        else:
+                            val = self.ValueObject()
+                            val.t_name = table_name
+                            val.c_name = [col]
+                            val.row_num = row_idx
+                            val.value = cell
+                            val.type = "cell"
 
                         matches.append(val)
 
