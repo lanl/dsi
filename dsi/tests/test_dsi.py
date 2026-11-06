@@ -1773,7 +1773,7 @@ def test_find_relation_error_duckdb_backend():
 
 
 def test_schema_duckdb_backend():
-    dbpath = 'data.db'
+    dbpath = 'data1.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
@@ -1784,7 +1784,7 @@ def test_schema_duckdb_backend():
 
 
 def test_query_update_schema_duckdb_backend():
-    dbpath = 'data.db'
+    dbpath = 'data2.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
@@ -1810,7 +1810,7 @@ def test_query_update_schema_duckdb_backend():
 
 
 def test_overwrite_schema_duckdb_backend():
-    dbpath = 'data.db'
+    dbpath = 'data3.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
@@ -1838,7 +1838,7 @@ def test_overwrite_schema_duckdb_backend():
 
 
 def test_fail_overwrite_schema_duckdb_backend():
-    dbpath = 'data.db'
+    dbpath = 'data4.db'
     if os.path.exists(dbpath):
         os.remove(dbpath)
 
