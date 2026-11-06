@@ -365,12 +365,12 @@ class Sqlite(Filesystem):
         if isinstance(check_sql_result, bool) and not check_sql_result:
             operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~"]
             # if no operators, fall back to find_cell
-            if not any(op in query for op in operators) and not re.search(r"\([^()]*,[^()]*\)", query):
+            if not any(op in query for op in operators) and not re.search(r"\([^)]*\)", query):
                 return self.find_cell(query, row=True)
 
             # if operator, then do find_relation
-            column_name, relation = self.check_no_sql_query(query, operators)
-            return self.find_relation(column_name, relation)
+            column_name, relation = self.check_relational_query(query, operators)
+            return self.find_relation(column_name, relation, original_query=query)
         elif isinstance(check_sql_result, tuple) and not check_sql_result[0]:
             raise ValueError(check_sql_result[1])
         elif isinstance(check_sql_result, tuple) and check_sql_result[0]:
@@ -825,13 +825,14 @@ class Sqlite(Filesystem):
                 query = f"SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, {middle} FROM {table} AS t1 WHERE "
                 # query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
                 if isinstance(query_object, str):
-                    query += f"{col_name} LIKE '%{query_object}%'" 
+                    query += f"{col_name} LIKE ?" 
                 else:
-                    query += f"CAST({col_name} AS TEXT) LIKE '%{query_object}%'" 
+                    query += f"CAST({col_name} AS TEXT) LIKE ?" 
                 row_list.append(query)
 
             table_row_query = " UNION ".join(row_list) + ";"
-            table_row_return = self.cur.execute(table_row_query).fetchall()
+            params = (f"%{query_object}%",) * len(row_list)
+            table_row_return = self.cur.execute(table_row_query, params).fetchall()
             query_list += table_row_return
 
         if len(query_list) > 0:
@@ -851,12 +852,12 @@ class Sqlite(Filesystem):
 
             return value_obj_list
 
-        return f"{query_object} is not a cell in this database"
+        print(f"WARNING: {query_object} is not a value in this database")
 
 
 
     # RENAMING SOON TO QUERY_RELATION
-    def find_relation(self, column_name, relation):
+    def find_relation(self, column_name, relation, original_query = None):
         """
         Finds all rows in the first table of the database that satisfy the relation applied to the given column.
 
@@ -893,8 +894,8 @@ class Sqlite(Filesystem):
 
         if len(all_tables) == 0:
             if (user_column[0] == "'" and user_column[-1] == "'") or (user_column[0] == '"' and user_column[-1] == '"'):
-                return f"{user_column} is not a column in this database. Ensure the column is written first."
-            return f"'{user_column}' is not a column in this database. Ensure the column is written first."
+                print(f"WARNING: {user_column} is not a column in this database. Ensure the column is written first.")
+            print(f"WARNING: '{user_column}' is not a column in this database. Ensure the column is written first.")
         old_relation = relation
         old_col_name = column_name
         if relation[0] == '(' and relation[-1] == ')':
@@ -915,10 +916,13 @@ class Sqlite(Filesystem):
 
         if not output_data and len(all_tables) == 1:
             val = f' {old_col_name} {old_relation} '
-            return f"Could not find any rows where {val} in this database."
+            print(f"WARNING: Could not find any rows where  {original_query if original_query is not None else val}  in this database.")
         if len(all_tables) > 1:
-            query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
-            return query_list
+            print(f"WARNING: '{old_col_name}' appeared in more than one table. Can only do a relational query on one table")
+            print("Use `dsi.query('SQL QUERY')` to retrieve the matching rows for a specific table")
+            print(f"These are possible SQL queries based on the '{old_col_name}':")
+            for tb in all_tables:
+                print(f" - SELECT * FROM {tb} WHERE {column_name} {relation}")
 
         return_list = []
         for row in output_data:

@@ -571,8 +571,6 @@ class DSI:
         if self.read_only_flag and update:
             backend_name = self.main_backend_obj.__class__.__name__
             raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
-        if collection and update:
-            print("query() WARNING: The returned collection object will include an extra DSI metadata column")
 
         output = None
         try:
@@ -584,20 +582,9 @@ class DSI:
             new_args = (f"query() ERROR: {e}",) + e.args[1:]
             raise type(e)(*new_args) from None
 
-        # this is warning output check for query_artifacts, find_relation and find_cell
+        # this is warning output check
         if output and "WARNING" in output:
-            warn_msg = output[output.find("WARNING"):]
-            if "artifact_handler" in warn_msg:
-                lines = warn_msg.splitlines()
-                start = lines[1].find('`')
-                between = lines[1][start + 1 : lines[1].find('`', start + 1)]
-                lines[1] = lines[1].replace(between, "dsi.query()")
-                lines[2] = lines[2].replace(lines[2][lines[2].find('artifact'):-1], "query()")
-                warn_msg = '\n'.join(lines)
-            elif "Could not find" in warn_msg:
-                ending_ind = warn_msg.find("in this database")
-                warn_msg = warn_msg[:40] + statement + warn_msg[ending_ind-2:]
-            
+            warn_msg = output[output.find("WARNING"):]            
             msg = "\n" + warn_msg.replace("database", "backend")
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
@@ -605,9 +592,7 @@ class DSI:
                 return query_data
             return None
 
-        # at this point, if no warning, then query_output has to be some value
-        
-        # there's no way query_output can be none here
+        # if user does SQL update/alter query, it returns None
         if query_data is None:
             return
 
@@ -688,7 +673,7 @@ class DSI:
                 raise ValueError("Query returns incorrect DSI type")
 
         else:
-            raise ValueError("DSI Backend returned a type that cannot be parsed")
+            raise ValueError("DSI Backend returned a type that cannot be parsed", type(query_data))
 
 
 
@@ -720,8 +705,6 @@ class DSI:
         if self.read_only_flag and update:
             backend_name = self.main_backend_obj.__class__.__name__
             raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
-        if collection and update:
-            print("get_table() WARNING: The returned collection object will include an extra DSI metadata column")
         
         output = None
         try:

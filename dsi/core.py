@@ -575,8 +575,9 @@ class Terminal:
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
             if interaction_type in ['query']:
+                # query can return df/dict (from normal query), list of ValueObjects (from find_relation/find_cell), None (sql update query)
                 is_other_query_return = isinstance(query_data, list) and all(isinstance(x, Backend.ValueObject) for x in query_data)
-                if isinstance(query_data, (pd.DataFrame, OrderedDict)) or is_other_query_return:
+                if query_data is None or isinstance(query_data, (pd.DataFrame, OrderedDict)) or is_other_query_return:
                     return query_data
                 else:
                     msg = "Query returned an unexpected data type. Please check the backend's query_artifacts() implementation."
