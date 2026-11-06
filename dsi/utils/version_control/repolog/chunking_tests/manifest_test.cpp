@@ -341,7 +341,16 @@ void streamingSequenceMatching() {
     require(deleted.manifestRoots == first.manifestRoots,
             "automatic deletion matching failed to recover original manifest");
     const auto parallel = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 2, first.manifestRoots);
-    require(parallel.manifestRoots == first.manifestRoots, "parallel nonempty manifest differs");
+    ParallelOptions options;
+    options.processes = 2;
+    std::vector<ManifestChunk> processExpected;
+    for (const auto& chunk : chunkFileParallel(source.string(), options)) {
+        processExpected.push_back({chunk.sha256, chunk.size});
+    }
+    FileManifest processManifest(repo.string(), {}, parallel.manifestRoots.at(file.relativePath));
+    require(values(processManifest) == processExpected, "parallel manifest differs from process layout");
+    const auto parallelAgain = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 3, parallel.manifestRoots);
+    require(parallelAgain.manifestRoots == parallel.manifestRoots, "parallel manifest changed with worker count");
     require(rebuildFileFromManifest(repo.string(), file.relativePath,
                                     added.manifestRoots.at(file.relativePath),
                                     added.fileHashes.at(file.relativePath), (dir.path / "added").string()),

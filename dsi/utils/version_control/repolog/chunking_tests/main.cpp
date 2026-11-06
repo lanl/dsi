@@ -3,8 +3,9 @@
 // Modes:
 //   chunking_test                       run the built-in self-test suite
 //   chunking_test --gen <size> <path>   write a deterministic synthetic file
-//   chunking_test --dump <mode> <path>  print "<size> <sha256>" per chunk
-//                                       (mode: fastcdc | rolling)
+//   chunking_test --dump <mode> <path> [processes]
+//                                       print "<size> <sha256>" per chunk
+//                                       (processes applies to parallel mode)
 //   chunking_test --meta                print AVERAGE_BITS / masks / gear
 //                                       tables, for diffing against pycheck.py
 //
@@ -15,6 +16,7 @@
 //                   concatenated, truncated to the requested size.
 
 #include "chunking.hpp"
+#include "manifest.hpp"
 #include "sha256.hpp"
 
 #include <algorithm>
@@ -26,6 +28,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -130,14 +133,19 @@ void printMeta() {
     std::printf("GEAR_TABLE_LS %s\n", gearLs.c_str());
 }
 
-void dumpChunks(const std::string& mode, const std::string& path) {
+void dumpChunks(const std::string& mode, const std::string& path,
+                 std::size_t processes = 0) {
     std::vector<chunking::Chunk> chunks;
     if (mode == "fastcdc") {
         chunks = chunking::chunkFileFastCdc(path);
     } else if (mode == "rolling") {
         chunks = chunking::chunkFileRollingHash(path);
+    } else if (mode == "parallel") {
+        chunking::ParallelOptions options;
+        options.processes = processes;
+        chunks = chunking::chunkFileParallel(path, options);
     } else {
-        std::fprintf(stderr, "unknown dump mode: %s (fastcdc|rolling)\n",
+        std::fprintf(stderr, "unknown dump mode: %s (fastcdc|rolling|parallel)\n",
                      mode.c_str());
         std::exit(2);
     }
@@ -164,6 +172,239 @@ void verifyChunkShapes(const std::string& label,
     }
     ok = ok && total == fileSize;
     check(ok, label + ": chunk shapes (coverage/size limits)");
+}
+
+// Independent byte-at-a-time oracle: deliberately does not use the optimized
+// pair scanner or any production boundary/merge helper.
+std::vector<chunking::SizeRange> referenceProcessRanges(const std::string& bytes) {
+    const auto d = chunking::chunkerDiagnostics();
+    std::vector<chunking::SizeRange> result;
+    for (std::size_t unit = 0; unit < bytes.size(); unit += MAX_CHUNK) {
+        const auto end = unit + std::min(MAX_CHUNK, bytes.size() - unit);
+        std::size_t start = unit;
+        while (start < end) {
+            std::uint64_t fp = 0;
+            std::size_t cut = end;
+            for (std::size_t i = start + MIN_CHUNK; i < end; ++i) {
+                fp = (fp << 1) + d.gearTable[static_cast<unsigned char>(bytes[i])];
+                const auto mask = i - start < AVG_CHUNK ? d.strictMask : d.eagerMask;
+                if ((fp & mask) == 0) { cut = i + 1; break; }
+            }
+            // Reject the most recent match if its tail cannot form a chunk.
+            if (end - cut < MIN_CHUNK) cut = end;
+            result.push_back({start, cut - start});
+            start = cut;
+            if (end - start <= 2 * MIN_CHUNK) {
+                if (start < end) result.push_back({start, end - start});
+                break;
+            }
+        }
+    }
+    if (result.size() > 1 && result.back().length < MIN_CHUNK) {
+        const auto tail = result.back().length;
+        result.pop_back();
+        result.back().length += tail;
+    }
+    return result;
+}
+
+std::vector<chunking::Chunk> verifyProcessFile(const std::string& path,
+                                               const std::string& bytes,
+                                               std::size_t processes,
+                                               bool requestData,
+                                               const std::string& label) {
+    const auto ranges = referenceProcessRanges(bytes);
+    chunking::ParallelOptions options;
+    options.processes = processes;
+    options.requestData = requestData;
+    const auto chunks = chunking::chunkFileParallel(path, options);
+    bool ok = chunks.size() == ranges.size();
+    for (std::size_t i = 0; ok && i < chunks.size(); ++i) {
+        const auto& range = ranges[i];
+        const auto& chunk = chunks[i];
+        ok = chunk.size == range.length && chunk.sha256 ==
+             chunking::sha256Hex(bytes.data() + range.offset, range.length);
+        ok = ok && chunk.data.has_value() == requestData;
+        if (requestData) {
+            ok = ok && *chunk.data == bytes.substr(range.offset, range.length);
+        }
+        ok = ok && (bytes.size() < MIN_CHUNK || chunk.size >= MIN_CHUNK);
+        ok = ok && chunk.size < MAX_CHUNK + MIN_CHUNK;
+    }
+    check(ok, label + ": bytewise oracle, SHA-256, ordered coverage, payload policy");
+    return chunks;
+}
+
+void testProcessChunking(const std::string& work) {
+    const auto path = work + "/process.bin";
+    auto write = [&](const std::string& bytes) {
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        if (!out) throw std::runtime_error("write process fixture failed");
+    };
+    std::size_t fixture = 0;
+    auto verifyStore = [&](const std::string& bytes) {
+        const auto root = work + "/direct-store-" + std::to_string(fixture++);
+        const chunking::FileEntry file{path, "input.bin", "file"};
+        const auto stored = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 2);
+        const auto ranges = referenceProcessRanges(bytes);
+        chunking::FileManifest manifest(root, {}, stored.manifestRoots.at(file.relativePath));
+        std::unordered_set<std::string> hashes;
+        std::size_t index = 0;
+        bool ok = true;
+        manifest.forEach([&](const chunking::ManifestChunk& chunk) {
+            if (index >= ranges.size()) { ok = false; return; }
+            const auto& range = ranges[index++];
+            const auto hash = chunking::sha256Hex(bytes.data() + range.offset, range.length);
+            ok = ok && chunk.hash == hash && chunk.size == range.length;
+            hashes.insert(hash);
+        });
+        std::size_t objects = 0;
+        for (const auto& item : std::filesystem::directory_iterator(root + "/dsi_vcs_chunks")) {
+            const auto name = item.path().filename().string();
+            if (name.size() == 64 && name.find_first_not_of("0123456789abcdef") == std::string::npos) {
+                ++objects;
+                ok = ok && hashes.count(name) == 1;
+            }
+        }
+        check(ok && index == ranges.size() && objects == hashes.size(),
+              "direct workers: oracle hashes/order; only final chunks published");
+        check(chunking::rebuildFileFromManifest(root, file.relativePath,
+                  stored.manifestRoots.at(file.relativePath), stored.fileHashes.at(file.relativePath),
+                  root + "/restore") && filesEqual(path, root + "/restore/input.bin"),
+              "direct workers: boundary fixture restores every byte");
+    };
+    for (const auto size : {std::size_t(0), MIN_CHUNK - 1, MIN_CHUNK,
+                            MIN_CHUNK + 1, 2 * MIN_CHUNK}) {
+        const std::string bytes(size, '\0');
+        write(bytes);
+        const auto chunks = verifyProcessFile(path, bytes, 3, true, "empty/minimum boundary");
+        check(size == 0 ? chunks.empty() : chunks.size() == 1,
+              "no-match small unit is emitted whole");
+        verifyStore(bytes);
+    }
+
+    // Build a real eager-mask matching signature. Sixty-four preceding bytes
+    // fully determine the Gear fingerprint, so it can be placed near a unit's
+    // end to exercise exact tail thresholds without changing the masks.
+    std::uint64_t random = 123456789, fp = 0;
+    const auto d = chunking::chunkerDiagnostics();
+    std::string signature;
+    std::string sample(32 * 1024 * 1024, '\0');
+    for (char& byte : sample) {
+        random ^= random << 13; random ^= random >> 7; random ^= random << 17;
+        byte = static_cast<char>(random >> 32);
+    }
+    for (std::size_t i = MIN_CHUNK; i < sample.size(); ++i) {
+        fp = (fp << 1) + d.gearTable[static_cast<unsigned char>(sample[i])];
+        if (i >= AVG_CHUNK && (fp & d.eagerMask) == 0) {
+            signature = sample.substr(i + 1 - 64, 64);
+            break;
+        }
+    }
+    if (signature.empty()) throw std::runtime_error("fixture did not find an eager fingerprint");
+
+    for (const auto tail : {std::size_t(0), std::size_t(1), MIN_CHUNK - 1, MIN_CHUNK, 2 * MIN_CHUNK,
+                            2 * MIN_CHUNK + 1}) {
+        std::string bytes(MAX_CHUNK, '\0');
+        const auto cut = MAX_CHUNK - tail;
+        bytes.replace(cut - signature.size(), signature.size(), signature);
+        write(bytes);
+        const auto chunks = verifyProcessFile(path, bytes, 2, false, "fingerprint tail threshold");
+        check(tail < MIN_CHUNK ? chunks.size() == 1 :
+                  chunks.size() == 2 && chunks.front().size == cut && chunks.back().size == tail,
+              "short tail cancels last cut; tail at least MIN_CHUNK stays separate");
+        verifyStore(bytes);
+    }
+    {
+        const std::string bytes(2 * MAX_CHUNK + MIN_CHUNK - 1, '\0');
+        write(bytes);
+        const auto chunks = verifyProcessFile(path, bytes, 2, true, "no-match units and EOF tail");
+        check(chunks.size() == 2 && chunks.front().size == MAX_CHUNK &&
+                  chunks.back().size == MAX_CHUNK + MIN_CHUNK - 1,
+              "no fingerprints: whole units; short final unit merged backward");
+        verifyStore(bytes);
+    }
+    {
+        std::string bytes(2 * MAX_CHUNK + MIN_CHUNK - 1, '\0');
+        const auto cut = MAX_CHUNK - (MIN_CHUNK - 1);
+        bytes.replace(cut - signature.size(), signature.size(), signature);
+        write(bytes);
+        for (std::size_t processes : {std::size_t(1), std::size_t(2), std::size_t(3)}) {
+            const auto chunks = verifyProcessFile(path, bytes, processes, processes == 3,
+                                                   "local cut cancellation and short final unit");
+            check(chunks.size() == 2 && chunks.front().size == MAX_CHUNK &&
+                      chunks.back().size == MAX_CHUNK + MIN_CHUNK - 1,
+                  "interior short tail stays in its unit; only whole short EOF unit crosses backward");
+        }
+        verifyStore(bytes);
+    }
+    {
+        // Keep an earlier valid cut, reject only the final cut, and leave the
+        // next unit's first chunk intact. No EOF merge can hide a forward merge.
+        std::string bytes(2 * MAX_CHUNK, '\0');
+        const auto firstCut = AVG_CHUNK + MIN_CHUNK;
+        const auto rejectedCut = MAX_CHUNK - (MIN_CHUNK - 1);
+        bytes.replace(firstCut - signature.size(), signature.size(), signature);
+        bytes.replace(rejectedCut - signature.size(), signature.size(), signature);
+        write(bytes);
+        for (const bool data : {false, true}) {
+            const auto chunks = verifyProcessFile(path, bytes, 2, data, "interior short-tail regression");
+            check(chunks.size() == 3 && chunks[0].size == firstCut &&
+                      chunks[1].size == MAX_CHUNK - firstCut && chunks[2].size == MAX_CHUNK,
+                  "cancel only the latest cut and preserve the following unit");
+        }
+        verifyStore(bytes);
+    }
+    {
+        // More units than workers tests process reuse and ordered pipe draining.
+        std::string bytes(3 * MAX_CHUNK + 17, '\0');
+        for (std::size_t unit = 0; unit < 3; ++unit) {
+            bytes.replace(unit * MAX_CHUNK, sample.size(), sample);
+        }
+        write(bytes);
+        verifyProcessFile(path, bytes, 2, false, "multiple fingerprints and worker reuse");
+        verifyProcessFile(path, bytes, 0, true, "automatic process count");
+
+        const auto root = work + "/parallel-repo";
+        const chunking::FileEntry file{path, "parallel.bin", "file"};
+        const auto stored = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 2);
+        std::unordered_map<std::string, std::filesystem::file_time_type> modified;
+        for (const auto& hash : stored.chunkHashes)
+            modified.emplace(hash, std::filesystem::last_write_time(root + "/dsi_vcs_chunks/" + hash));
+        check(chunking::rebuildFileFromManifest(root, file.relativePath,
+                  stored.manifestRoots.at(file.relativePath), stored.fileHashes.at(file.relativePath),
+                  work + "/parallel-out") && filesEqual(path, work + "/parallel-out/parallel.bin"),
+              "multiprocess store + manifest rebuild preserves every byte");
+        const auto again = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 3, stored.manifestRoots);
+        check(sameStore(stored, again), "process count does not change stored chunks or manifest");
+        bool unchanged = true;
+        for (const auto& item : modified)
+            unchanged = unchanged && item.second == std::filesystem::last_write_time(root + "/dsi_vcs_chunks/" + item.first);
+        check(unchanged, "new snapshot cache epoch reuses blobs without rewriting");
+
+        // A worker-side publication failure must propagate, release locks,
+        // stop/reap the pool, and leave the next independent call usable.
+        const auto brokenRoot = work + "/broken-parallel-repo";
+        const auto ranges = referenceProcessRanges(bytes);
+        const auto& first = ranges.front();
+        const auto collision = brokenRoot + "/dsi_vcs_chunks/" +
+            chunking::sha256Hex(bytes.data() + first.offset, first.length);
+        std::filesystem::create_directories(collision);
+        bool failed = false;
+        try { chunking::storeChunksForSnapshot(brokenRoot, {file}, "UPDATE", 2); }
+        catch (const std::exception&) { failed = true; }
+        check(failed, "worker publication errors propagate without returning a manifest root");
+        std::filesystem::remove(collision);
+        const auto recovered = chunking::storeChunksForSnapshot(brokenRoot, {file}, "UPDATE", 2);
+        check(sameStore(stored, recovered), "parallel store recovers after worker publication failure");
+    }
+    {
+        bool failed = false;
+        try { chunking::chunkFileParallel(work + "/missing.bin"); }
+        catch (const std::exception&) { failed = true; }
+        check(failed, "multiprocess missing input reports an error");
+    }
 }
 
 int runSelfTest(std::uint64_t mainSize) {
@@ -247,7 +488,7 @@ int runSelfTest(std::uint64_t mainSize) {
     }
 
     // ------------------------------------------------------------------
-    // FastCDC chunking + parallel equivalence
+    // FastCDC chunking + independent multiprocess layout
     // ------------------------------------------------------------------
     {
         const auto chunks = chunking::chunkFileFastCdc(fEmpty);
@@ -269,13 +510,9 @@ int runSelfTest(std::uint64_t mainSize) {
         std::printf("       fastcdc: %zu chunks\n", mainChunks.size());
     }
     {
-        const auto par = chunking::chunkFileParallel(fMain, {});
-        bool same = par.size() == mainChunks.size();
-        for (std::size_t i = 0; same && i < par.size(); ++i) {
-            same = par[i].sha256 == mainChunks[i].sha256 &&
-                   par[i].size == mainChunks[i].size;
-        }
-        check(same, "parallel digests identical to sequential digests");
+        std::ifstream in(fMain, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(in)), {});
+        const auto par = verifyProcessFile(fMain, bytes, 0, false, "multiprocess main fixture");
         std::printf("       parallel: %zu chunks\n", par.size());
     }
     {
@@ -296,6 +533,8 @@ int runSelfTest(std::uint64_t mainSize) {
     // Later checks only need digests/sizes; drop the (possibly huge) payload
     // copies so a 500 MB test file does not sit twice in RAM.
     for (chunking::Chunk& c : mainChunks) c.data.reset();
+
+    testProcessChunking(work);
 
     // ------------------------------------------------------------------
     // File-only store + rebuild round trip (SQL logic removed)
@@ -418,8 +657,8 @@ int runSelfTest(std::uint64_t mainSize) {
     // ------------------------------------------------------------------
     {
         const auto t0 = std::chrono::steady_clock::now();
-        // Same hashing work, payload copies suppressed so the two timings
-        // measure the boundary+digest path rather than memcpy.
+        // Compare the two layouts with payload copies suppressed. Files must
+        // exceed MAX_CHUNK to give the process path multiple units to scan.
         chunking::chunkFile(fMain, [](const std::string&) { return false; });
         const auto t1 = std::chrono::steady_clock::now();
         chunking::chunkFileParallel(fMain, {});
@@ -452,8 +691,9 @@ int main(int argc, char** argv) {
                 genSynthetic(argv[3], std::stoull(argv[2]));
                 return 0;
             }
-            if (mode == "--dump" && argc == 4) {
-                dumpChunks(argv[2], argv[3]);
+            if (mode == "--dump" &&
+                (argc == 4 || (argc == 5 && std::string(argv[2]) == "parallel"))) {
+                dumpChunks(argv[2], argv[3], argc == 5 ? std::stoull(argv[4]) : 0);
                 return 0;
             }
             if (mode == "--meta" && argc == 2) {
@@ -512,7 +752,7 @@ int main(int argc, char** argv) {
                          "  %s\n"
                          "  %s --selftest <main-file-size-bytes>\n"
                          "  %s --gen <size> <path>\n"
-                         "  %s --dump <fastcdc|rolling> <path>\n"
+                         "  %s --dump <fastcdc|rolling|parallel> <path> [processes]\n"
                          "  %s --meta\n"
                          "  %s --store <chunkRoot> <absPath> <relativePath>\n"
                          "  %s --rebuild <chunkRoot> <relPath> <fileHash> <outDir> <hash,hash,...>\n"

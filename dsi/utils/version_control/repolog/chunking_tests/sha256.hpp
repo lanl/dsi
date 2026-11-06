@@ -18,8 +18,8 @@
 //       a seam; not available on Apple Silicon.
 //
 // NOTE: the SHA-256 primitive is the "library that we are welcome to use".
-// The *multi-core* aspect is provided by the thread pool in chunking.cpp,
-// which computes the digest of every chunk concurrently. On Apple Silicon
+// The multicore file path uses OS processes in chunking.cpp to scan units
+// and hash their chunks concurrently. On Apple Silicon
 // CC_SHA256 already routes to the SoC's crypto engine, so the two combine
 // for a genuine multicore + hardware-accelerated hash path.
 //

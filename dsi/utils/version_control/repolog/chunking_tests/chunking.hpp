@@ -4,10 +4,9 @@
 //   * RollingHash + gear-table FastCDC boundary detector (the heart of the
 //     module), reproduced bit-for-bit (the 128-bit gear math mirrors Python's
 //     arbitrary-precision int arithmetic so the boundaries match exactly).
-//   * A streaming iterator (iter_file_fastcdc / chunk_file) and a *multicore*
-//     batch path (chunk_file_parallel) that SHA-256s every chunk on a pool of
-//     worker threads -- all fed by a bounded sliding window (<= MAX_CHUNK),
-//     not by a whole-file mmap, so files far larger than RAM chunk fine.
+//   * A Python-compatible streaming iterator and a multicore batch path
+//     (chunkFileParallel) with independent MAX_CHUNK units read, scanned,
+//     and SHA-256 hashed by separate OS processes.
 //   * File-only chunk storage (store / rebuild) -- the original Python writes
 //     chunk blobs to <chunk_root>/dsi_vcs_chunks/<sha256> AND inserts a row into
 //     a SQL `chunk_store` table. Per the task we DROP the SQL side (and the
@@ -144,15 +143,25 @@ void               chunkFileStream(const std::string& path,
 std::vector<Chunk> chunkFileRollingHash(const std::string& path);
 
 // -------------------------------------------------------------------------
-// Multicore batch API (new, not in the original Python -- the parallelism
-// the task asked for). The file is still streamed sequentially through the
-// bounded iterator; each chunk's digest is computed on a worker pool, with a
-// bounded in-flight queue so RAM use stays proportional to the thread count
-// (never to the file size). Output is identical to the sequential iterator.
+// Multiprocess batch API: partition into kMaxChunk units. Workers scan each
+// unit sequentially, emitting through matching byte i. If the remaining tail
+// is < kMinChunk, cancel that cut and include the tail in its preceding chunk
+// within the unit. A tail in [kMinChunk, 2*kMinChunk] is emitted separately;
+// otherwise resume chunking. Without another match emit only the unexported
+// remainder. Only a whole final unit < kMinChunk merges across a unit boundary,
+// backward at EOF. A file < kMinChunk stays whole. Unit-local chunks are at
+// most kMaxChunk; the EOF merge stays below kMaxChunk+kMinChunk.
+// Results are deterministic across process counts but differ from the Python
+// sequential layout. Working memory is O(processes*kMaxChunk), plus returned
+// metadata and, if requestData is true, all returned payloads.
+// Parent polls all result pipes, incrementally appends complete chunks to
+// per-worker lists, and merges those lists by file offset after workers exit.
+// POSIX fork/pipe workers: invoke from a single-threaded calling process.
 // -------------------------------------------------------------------------
 struct ParallelOptions {
-    std::size_t threads = 0;          // 0 => std::thread::hardware_concurrency
+    std::size_t threads = 0;          // legacy alias for process count
     bool        requestData = false;  // copy every chunk's payload
+    std::size_t processes = 0;        // overrides threads; both 0 => CPU count
 };
 std::vector<Chunk> chunkFileParallel(const std::string& path,
                                      ParallelOptions opt = {});
@@ -165,7 +174,17 @@ std::vector<Chunk> chunkFileParallel(const std::string& path,
 //   for each "file" entry, chunk it, write any not-yet-published chunk blobs to
 //   <chunk_root>/dsi_vcs_chunks/<sha256> via atomic temp-file+rename, and
 //   compute the per-file hash (sha256 over the ordered chunk hex digests).
-// `threads` > 0 parallelises the SHA-256 hot path. `pendingCommit` is kept in
+// `threads` > 1 selects the multiprocess layout (legacy parameter name).
+// Workers open the filename, read bounded ranges into private buffers, hash,
+// check a process-shared existence cache, and atomically publish new blobs.
+// Parent/worker IPC carries only range descriptors and ordered chunk metadata.
+// Replies are collected as ready into separate worker lists; an available
+// worker receives its next unit without waiting for earlier units to finish.
+// Boundary spans are finalized in workers after tail merges are resolved.
+// Requires a single-threaded caller and stable input files during this call;
+// observed source changes or worker errors fail the call without returning roots.
+// Payload memory is O(threads*kMaxChunk); returned/working metadata is O(chunks).
+// 0 or 1 keeps the Python-compatible sequential layout. `pendingCommit` is kept in
 // the signature for API parity with the Python original but is unused now that
 // the `chunk_store` SQL insert is gone.
 // Returns manifestRoots for the caller to persist in its file-version metadata.

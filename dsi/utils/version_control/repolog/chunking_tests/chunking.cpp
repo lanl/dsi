@@ -23,6 +23,8 @@
 
 #include "chunking.hpp"
 #include "manifest.hpp"
+#include "shared_existence_cache.hpp"
+#include "worker_results.hpp"
 
 #include "sha256.hpp"
 
@@ -31,14 +33,12 @@
 #include <atomic>
 #include <cerrno>
 #include <cmath>
-#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <deque>
 #include <fstream>
 #include <filesystem>
 #include <list>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -46,7 +46,10 @@
 #include <vector>
 
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace chunking {
@@ -218,7 +221,7 @@ private:
 // arbitrary-precision arithmetic exactly.
 // ---------------------------------------------------------------------------
 std::size_t findFastCdcCut(const std::uint8_t* buffer, std::size_t start,
-                           std::size_t available) {
+                           std::size_t available, bool includeMatchedByte = false) {
     if (available == 0) {
         return 0;
     }
@@ -254,7 +257,7 @@ std::size_t findFastCdcCut(const std::uint8_t* buffer, std::size_t start,
                 ((unsigned __int128)fingerprint << 2) +
                 kGearTableLs[buffer[position]];
             if ((shifted & shiftedMask) == 0) {
-                return position - start;
+                return position - start + (includeMatchedByte ? 1 : 0);
             }
 
             // Complete the pair and restore the normal 64-bit fingerprint.
@@ -262,7 +265,7 @@ std::size_t findFastCdcCut(const std::uint8_t* buffer, std::size_t start,
                                            kGearTable[buffer[position + 1]]) &
                                           kUint64Mask);
             if ((fingerprint & mask) == 0) {
-                return position + 1 - start;
+                return position + 1 - start + (includeMatchedByte ? 1 : 0);
             }
             position += 2;
         }
@@ -274,7 +277,7 @@ std::size_t findFastCdcCut(const std::uint8_t* buffer, std::size_t start,
             fingerprint = (fingerprint << 1) + kGearTable[buffer[position]];
             fingerprint &= kUint64Mask;
             if ((fingerprint & mask) == 0) {
-                return position - start;
+                return position - start + (includeMatchedByte ? 1 : 0);
             }
             position += 1;
         }
@@ -282,6 +285,107 @@ std::size_t findFastCdcCut(const std::uint8_t* buffer, std::size_t start,
 
     // No content-defined boundary was found.
     return scanLength;
+}
+
+// The process path includes the matching byte i in the emitted prefix, then
+// treats [i + 1, unitEnd] as the tail. The legacy sequential path above keeps
+// its Python-compatible convention. All ranges here use exclusive ends.
+std::vector<SizeRange> findUnitBoundaries(const std::uint8_t* data,
+                                          std::size_t size) {
+    std::vector<SizeRange> ranges;
+    std::size_t start = 0;
+    while (start < size) {
+        const std::size_t length = findFastCdcCut(data, start, size - start, true);
+        // Cancel this cut if it would leave an undersized tail. Keep those
+        // bytes in the preceding chunk within this same processing unit.
+        if (size - start - length < kMinChunk) {
+            ranges.push_back({start, size - start});
+            break;
+        }
+        ranges.push_back({start, length});
+        start += length;
+        if (size - start <= 2 * kMinChunk) {
+            if (start < size) ranges.push_back({start, size - start});
+            break;
+        }
+    }
+    return ranges;
+}
+
+// EINTR/short-transfer safe I/O, shared by the process worker protocol and
+// independent sequential reads of individual file units.
+void readFileRange(int fd, void* data, std::size_t size, std::size_t offset) {
+    auto* bytes = static_cast<std::uint8_t*>(data);
+    std::size_t done = 0;
+    while (done < size) {
+        const ssize_t got = ::pread(fd, bytes + done, size - done,
+                                     static_cast<off_t>(offset + done));
+        if (got < 0 && errno == EINTR) continue;
+        if (got < 0) throw std::runtime_error("read file unit: " + std::string(std::strerror(errno)));
+        if (got == 0) throw std::runtime_error("unexpected EOF reading file unit");
+        done += static_cast<std::size_t>(got);
+    }
+}
+
+void transferPipe(int fd, void* data, std::size_t size, bool writing) {
+    auto* bytes = static_cast<std::uint8_t*>(data);
+    std::size_t done = 0;
+    while (done < size) {
+        const ssize_t got = writing ? ::write(fd, bytes + done, size - done)
+                                    : ::read(fd, bytes + done, size - done);
+        if (got < 0 && errno == EINTR) continue;
+        if (got < 0) throw std::runtime_error("worker pipe: " + std::string(std::strerror(errno)));
+        if (got == 0) throw std::runtime_error("FastCDC worker closed its result pipe unexpectedly");
+        done += static_cast<std::size_t>(got);
+    }
+}
+
+// Own only this call's children and descriptors. On errors, stop every child
+// before reaping it so a worker blocked on a full pipe cannot hang cleanup.
+struct ProcessWorkers {
+    struct Worker { int input = -1; int output = -1; pid_t pid = -1; };
+    int file = -1;
+    std::vector<Worker> workers;
+
+    ~ProcessWorkers() {
+        for (auto& worker : workers) {
+            if (worker.input >= 0) ::close(worker.input);
+            if (worker.output >= 0) ::close(worker.output);
+            if (worker.pid > 0) ::kill(worker.pid, SIGKILL);
+        }
+        for (auto& worker : workers) {
+            if (worker.pid > 0) {
+                while (::waitpid(worker.pid, nullptr, 0) < 0 && errno == EINTR) {}
+            }
+        }
+        if (file >= 0) ::close(file);
+    }
+};
+
+struct ChunkReply {
+    std::uint64_t offset = 0, length = 0;
+    std::array<char, 64> hash{};
+};
+
+void runUnitWorker(int fd, int output, std::size_t worker,
+                   std::size_t workers, std::size_t units,
+                   std::size_t fileSize, bool requestData) {
+    std::vector<std::uint8_t> buffer(std::min(kMaxChunk, fileSize));
+    for (std::size_t unit = worker; unit < units; unit += workers) {
+        const std::size_t offset = unit * kMaxChunk;
+        const std::size_t size = std::min(kMaxChunk, fileSize - offset);
+        readFileRange(fd, buffer.data(), size, offset);
+        const auto ranges = findUnitBoundaries(buffer.data(), size);
+        for (const auto& range : ranges) {
+            ChunkReply reply{offset + range.offset, range.length, {}};
+            const auto hash = sha256Hex(buffer.data() + range.offset, range.length);
+            std::copy(hash.begin(), hash.end(), reply.hash.begin());
+            transferPipe(output, &reply, sizeof reply, true);
+            if (requestData) {
+                transferPipe(output, buffer.data() + range.offset, range.length, true);
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -325,45 +429,7 @@ bool pathExists(const std::string& path) {
 // Any failure removes the temp file and throws.
 void writeChunkBlob(const std::string& chunkDir, const std::string& digest,
                     const char* data, std::size_t len) {
-    const std::string chunkPath = chunkDir + "/" + digest;
-    std::string tmpl = chunkDir + "/." + digest + ".tmpXXXXXX";
-    std::vector<char> tmplBuf(tmpl.begin(), tmpl.end());
-    tmplBuf.push_back('\0');
-
-    int fd = ::mkstemp(tmplBuf.data());
-    if (fd < 0) {
-        throw std::runtime_error(std::string("mkstemp for chunk failed: ") +
-                                 std::strerror(errno));
-    }
-    const std::string tempPath(tmplBuf.data());
-
-    auto fail = [&](const char* what) {
-        if (fd >= 0) {
-            ::close(fd);
-        }
-        ::unlink(tempPath.c_str());
-        throw std::runtime_error(std::string("writing chunk blob failed (") +
-                                 what + "): " + std::strerror(errno));
-    };
-
-    if (::fchmod(fd, 0644) != 0) fail("fchmod");
-
-    std::size_t written = 0;
-    while (written < len) {
-        const ssize_t n = ::write(fd, data + written, len - written);
-        if (n <= 0) {
-            if (n < 0 && errno == EINTR) continue;
-            fail("write");
-        }
-        written += (std::size_t)n;
-    }
-    if (::fsync(fd) != 0) fail("fsync");
-    if (::close(fd) != 0) {
-        fd = -1;
-        fail("close");
-    }
-    fd = -1;
-    if (::rename(tempPath.c_str(), chunkPath.c_str()) != 0) fail("rename");
+    detail::publishChunkBlob(chunkDir, digest, data, len);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,17 +437,7 @@ void writeChunkBlob(const std::string& chunkDir, const std::string& digest,
 // hash and a HyperLogLog counter.
 // ---------------------------------------------------------------------------
 std::uint64_t hashDigest(const std::string& digest, std::uint64_t salt) {
-    std::uint64_t h = 14695981039346656037ULL;  // FNV-1a 64 offset basis
-    h ^= salt * 0x9E3779B97F4A7C15ULL;
-    for (const unsigned char byte : digest) {
-        h ^= byte;
-        h *= 0x100000001B3ULL;
-    }
-    // splitmix64 finalizer, to even out FNV's bit distribution.
-    h ^= h >> 33; h *= 0xFF51AFD7ED558CCDULL;
-    h ^= h >> 33; h *= 0xC4CEB9FE1A85EC53ULL;
-    h ^= h >> 33;
-    return h;
+    return detail::cacheDigestHash(digest, salt);
 }
 
 // HyperLogLog over the same digest hashes: estimates how many DISTINCT
@@ -397,7 +453,7 @@ public:
         const std::uint64_t rest = h << kHllPrecision;
         const std::size_t rank = rest == 0
             ? 64 - kHllPrecision + 1
-            : (std::size_t)__builtin_clzll(rest) - kHllPrecision + 1;
+            : (std::size_t)__builtin_clzll(rest) + 1;
 
         const std::size_t current = registers_[index];
         if (rank <= current) return;
@@ -543,6 +599,7 @@ bool loadHllState(const std::string& dir, HyperLogLog& hll) {
                  (std::streamsize)registers.size())) {
         return false;
     }
+    if (std::any_of(registers.begin(), registers.end(), [](auto rank) { return rank > 53; })) return false;
     hll.assignRegisters(registers);
     return true;
 }
@@ -665,6 +722,318 @@ private:
     // cumulative count of distinct digests recorded.
     HyperLogLog seen_;
 };
+
+// Metadata-only direct-storage worker protocol. The public materializing
+// chunkFileParallel API below remains available for callers requesting bytes.
+struct StoreTask { std::uint64_t kind = 0, offset = 0, bytes = 0; }; // 0 stop, 1 scan, 2 finalize
+struct StoreRecord {
+    std::uint64_t offset = 0, bytes = 0, ready = 0;
+    std::array<char, 64> hash{};
+};
+struct StoreReply { std::uint64_t error = 0, count = 0; };
+
+void transferSocket(int fd, void* data, std::size_t size, bool writing) {
+    auto* bytes = static_cast<char*>(data);
+    int flags = 0;
+#ifdef MSG_NOSIGNAL
+    flags = MSG_NOSIGNAL;
+#endif
+    while (size) {
+        const auto n = writing ? ::send(fd, bytes, size, flags) : ::recv(fd, bytes, size, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) throw std::runtime_error("storage worker transport failed/closed");
+        bytes += n; size -= static_cast<std::size_t>(n);
+    }
+}
+
+bool sameInput(const struct stat& a, const struct stat& b) {
+#ifdef __APPLE__
+    const auto am = a.st_mtimespec, bm = b.st_mtimespec;
+    const auto ac = a.st_ctimespec, bc = b.st_ctimespec;
+#else
+    const auto am = a.st_mtim, bm = b.st_mtim;
+    const auto ac = a.st_ctim, bc = b.st_ctim;
+#endif
+    return a.st_dev == b.st_dev && a.st_ino == b.st_ino && a.st_size == b.st_size &&
+           am.tv_sec == bm.tv_sec && am.tv_nsec == bm.tv_nsec &&
+           ac.tv_sec == bc.tv_sec && ac.tv_nsec == bc.tv_nsec;
+}
+
+struct Descriptor {
+    int fd = -1;
+    ~Descriptor() { if (fd >= 0) ::close(fd); }
+};
+
+void directStoreWorker(int socket, const struct stat& expected,
+                       detail::SharedExistenceCache& cache) {
+    std::uint64_t nameSize = 0;
+    transferSocket(socket, &nameSize, sizeof nameSize, false);
+    if (!nameSize || nameSize > 1024 * 1024) throw std::runtime_error("invalid worker filename");
+    std::string path(static_cast<std::size_t>(nameSize), '\0');
+    transferSocket(socket, path.data(), path.size(), false);
+    Descriptor source{::open(path.c_str(), O_RDONLY | O_CLOEXEC)};
+    if (source.fd < 0) throw std::runtime_error("worker cannot open source file");
+    auto verify = [&] {
+        struct stat now {};
+        if (::fstat(source.fd, &now) != 0 || !sameInput(expected, now))
+            throw std::runtime_error("source changed during parallel storage");
+    };
+    verify();
+    const auto fileSize = static_cast<std::uint64_t>(expected.st_size);
+    std::vector<std::uint8_t> buffer;
+    for (;;) {
+        StoreTask task;
+        transferSocket(socket, &task, sizeof task, false);
+        if (task.kind == 0) return;
+        if ((task.kind != 1 && task.kind != 2) || task.offset > fileSize ||
+            !task.bytes || task.bytes > fileSize - task.offset ||
+            task.bytes > kMaxChunk + kMinChunk || (task.kind == 1 && task.bytes > kMaxChunk))
+            throw std::runtime_error("invalid storage worker range");
+        verify();
+        buffer.resize(static_cast<std::size_t>(task.bytes));
+        readFileRange(source.fd, buffer.data(), buffer.size(), static_cast<std::size_t>(task.offset));
+        verify();
+        std::vector<StoreRecord> records;
+        auto publish = [&](StoreRecord& record, std::size_t offset) {
+            const auto digest = sha256Hex(buffer.data() + offset, static_cast<std::size_t>(record.bytes));
+            cache.store(digest, reinterpret_cast<const char*>(buffer.data() + offset),
+                        static_cast<std::size_t>(record.bytes));
+            std::copy(digest.begin(), digest.end(), record.hash.begin());
+            record.ready = 1;
+        };
+        if (task.kind == 1) {
+            const auto ranges = findUnitBoundaries(buffer.data(), buffer.size());
+            const auto finalUnitSize = fileSize % kMaxChunk;
+            const bool shortFinalUnit = fileSize > kMaxChunk &&
+                finalUnitSize > 0 && finalUnitSize < kMinChunk;
+            for (std::size_t i = 0; i < ranges.size(); ++i) {
+                const auto& range = ranges[i];
+                StoreRecord record{task.offset + range.offset, range.length, 0, {}};
+                // Local short tails already canceled their preceding cut.
+                // Only a whole undersized final unit and the last chunk of
+                // its preceding unit need deferred EOF backward merging.
+                const bool boundary = shortFinalUnit && i + 1 == ranges.size() &&
+                    fileSize - task.offset - task.bytes < kMinChunk;
+                if (!boundary) publish(record, range.offset);
+                records.push_back(record);
+            }
+        } else {
+            StoreRecord record{task.offset, task.bytes, 0, {}};
+            publish(record, 0);
+            records.push_back(record);
+        }
+        verify();
+        StoreReply header{0, records.size()};
+        transferSocket(socket, &header, sizeof header, true);
+        transferSocket(socket, records.data(), records.size() * sizeof(StoreRecord), true);
+    }
+}
+
+class DirectStoreWorkers {
+    struct Worker { int parent = -1, child = -1; pid_t pid = -1; };
+    std::vector<Worker> workers_;
+    std::vector<detail::WorkerReplyReader<StoreReply>> readers_;
+    void cleanup() noexcept {
+        for (auto& w : workers_) {
+            if (w.parent >= 0) { ::close(w.parent); w.parent = -1; }
+            if (w.child >= 0) { ::close(w.child); w.child = -1; }
+            if (w.pid > 0) ::kill(w.pid, SIGKILL);
+        }
+        for (auto& w : workers_) if (w.pid > 0) {
+            while (::waitpid(w.pid, nullptr, 0) < 0 && errno == EINTR) {}
+            w.pid = -1;
+        }
+    }
+public:
+    DirectStoreWorkers(std::size_t count, const std::string& path,
+                        const struct stat& expected, int parentSource,
+                        detail::SharedExistenceCache& cache) : workers_(count), readers_(count) {
+        try {
+            for (auto& w : workers_) {
+                int sockets[2];
+                if (::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
+                    throw std::runtime_error("storage socketpair failed");
+                w.parent = sockets[0]; w.child = sockets[1];
+#ifdef SO_NOSIGPIPE
+                const int enabled = 1;
+                for (int fd : sockets) if (::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof enabled) != 0)
+                    throw std::runtime_error("cannot suppress storage SIGPIPE");
+#endif
+            }
+            for (std::size_t i = 0; i < workers_.size(); ++i) {
+                auto pid = ::fork();
+                if (pid < 0) throw std::runtime_error("storage worker fork failed");
+                if (pid == 0) {
+                    for (std::size_t j = 0; j < workers_.size(); ++j) {
+                        ::close(workers_[j].parent);
+                        if (j != i) ::close(workers_[j].child);
+                    }
+                    ::close(parentSource); // Worker opens the received filename itself.
+                    int status = 0;
+                    try { directStoreWorker(workers_[i].child, expected, cache); }
+                    catch (const std::exception& error) {
+                        status = 1;
+                        try {
+                            std::string message(error.what());
+                            message.resize(std::min<std::size_t>(message.size(), 1024));
+                            StoreReply header{1, message.size()};
+                            transferSocket(workers_[i].child, &header, sizeof header, true);
+                            transferSocket(workers_[i].child, message.data(), message.size(), true);
+                        } catch (...) {}
+                    } catch (...) { status = 1; }
+                    ::close(workers_[i].child);
+                    ::_exit(status);
+                }
+                workers_[i].pid = pid;
+            }
+            for (auto& w : workers_) {
+                ::close(w.child); w.child = -1;
+                auto length = static_cast<std::uint64_t>(path.size());
+                transferSocket(w.parent, &length, sizeof length, true);
+                transferSocket(w.parent, const_cast<char*>(path.data()), path.size(), true);
+            }
+        } catch (...) { cleanup(); throw; }
+    }
+    ~DirectStoreWorkers() { cleanup(); }
+    void submit(std::size_t worker, StoreTask task) {
+        transferSocket(workers_.at(worker).parent, &task, sizeof task, true);
+    }
+    template<class Consume>
+    void receiveReady(const std::vector<bool>& active, Consume consume) {
+        std::vector<pollfd> channels(workers_.size());
+        for (std::size_t w = 0; w < workers_.size(); ++w)
+            channels[w] = {active[w] ? workers_[w].parent : -1, POLLIN, 0};
+        detail::waitForWorkerResults(channels);
+        for (std::size_t w = 0; w < workers_.size(); ++w) {
+            if (!channels[w].revents) continue;
+            const bool eof = readers_[w].drain(channels[w].fd, true,
+                [](const StoreReply& header) -> std::size_t {
+                    if (header.error) {
+                        if (header.count > 1024) throw std::runtime_error("invalid storage error reply");
+                        return static_cast<std::size_t>(header.count);
+                    }
+                    if (!header.count || header.count > kMaxChunk / kMinChunk + 1)
+                        throw std::runtime_error("invalid storage worker chunk count");
+                    return static_cast<std::size_t>(header.count) * sizeof(StoreRecord);
+                },
+                [&](const StoreReply& header, std::string&& body) {
+                    if (header.error) throw std::runtime_error("storage worker: " + body);
+                    std::vector<StoreRecord> records(static_cast<std::size_t>(header.count));
+                    std::memcpy(records.data(), body.data(), body.size());
+                    consume(w, std::move(records));
+                });
+            if (eof) throw std::runtime_error("storage worker closed its result channel unexpectedly");
+        }
+    }
+    void finish() {
+        for (std::size_t i = 0; i < workers_.size(); ++i) submit(i, {});
+        for (auto& w : workers_) {
+            int status = 0; pid_t waited;
+            do { waited = ::waitpid(w.pid, &status, 0); } while (waited < 0 && errno == EINTR);
+            if (waited < 0) throw std::runtime_error("storage worker wait failed");
+            w.pid = -1;
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+                throw std::runtime_error("storage worker failed");
+        }
+    }
+};
+
+void storeFileParallel(const std::string& filename, std::size_t count,
+                        detail::SharedExistenceCache& cache,
+                        const std::function<void(const Chunk&)>& visitor) {
+    const auto path = std::filesystem::absolute(filename).string();
+    Descriptor source{::open(path.c_str(), O_RDONLY | O_CLOEXEC)};
+    struct stat expected {};
+    if (source.fd < 0 || ::fstat(source.fd, &expected) != 0 ||
+        !S_ISREG(expected.st_mode) || expected.st_size < 0)
+        throw std::runtime_error("parallel store requires a readable regular file");
+    const auto fileSize = static_cast<std::size_t>(expected.st_size);
+    if (!fileSize) return;
+    const auto units = 1 + (fileSize - 1) / kMaxChunk;
+    count = std::min(std::max<std::size_t>(1, count), units);
+    DirectStoreWorkers pool(count, path, expected, source.fd, cache);
+    auto unitTask = [&](std::size_t unit) {
+        return StoreTask{1, unit * kMaxChunk, std::min(kMaxChunk, fileSize - unit * kMaxChunk)};
+    };
+    std::vector<std::vector<StoreRecord>> workerChunks(count);
+    std::vector<std::size_t> currentUnit(count);
+    std::vector<bool> active(count, true);
+    for (std::size_t i = 0; i < count; ++i) {
+        currentUnit[i] = i;
+        pool.submit(i, unitTask(i));
+    }
+    auto merge = [](StoreRecord& left, const StoreRecord& right) {
+        if (left.ready || right.ready || left.offset + left.bytes != right.offset)
+            throw std::logic_error("storage boundary ownership invariant failed");
+        left.bytes += right.bytes;
+    };
+    std::size_t completed = 0;
+    while (completed < units) {
+        pool.receiveReady(active, [&](std::size_t worker, std::vector<StoreRecord>&& records) {
+            if (!active[worker]) throw std::runtime_error("unexpected storage worker reply");
+            const auto task = unitTask(currentUnit[worker]);
+            std::uint64_t covered = 0;
+            for (const auto& record : records) {
+                if (!record.bytes || record.bytes > task.bytes - covered ||
+                    record.offset != task.offset + covered || record.ready > 1)
+                    throw std::runtime_error("invalid stored unit coverage");
+                covered += record.bytes;
+                workerChunks[worker].push_back(record);
+            }
+            if (covered != task.bytes) throw std::runtime_error("incomplete stored unit");
+            ++completed;
+            currentUnit[worker] += count;
+            if (currentUnit[worker] < units) pool.submit(worker, unitTask(currentUnit[worker]));
+            else active[worker] = false;
+        });
+    }
+    // Every worker has completed its scan tasks. Restore file order before
+    // resolving the EOF span; no worker's progress depended on an earlier unit.
+    auto final = detail::mergeWorkerLists(workerChunks);
+    if (final.size() > 1 && final.back().bytes < kMinChunk) {
+        const auto tail = final.back(); final.pop_back(); merge(final.back(), tail);
+    }
+    std::vector<std::size_t> deferred;
+    for (std::size_t i = 0; i < final.size(); ++i) if (!final[i].ready) deferred.push_back(i);
+    // Reuse the same processes for final boundary spans. At most one bounded
+    // request/reply per worker is outstanding; no payload crosses the socket.
+    std::vector<std::size_t> pending(count);
+    std::size_t dispatched = 0, finalized = 0;
+    auto finalizeNext = [&](std::size_t worker) {
+        active[worker] = dispatched < deferred.size();
+        if (active[worker]) {
+            pending[worker] = deferred[dispatched++];
+            const auto& r = final[pending[worker]];
+            pool.submit(worker, {2, r.offset, r.bytes});
+        }
+    };
+    for (std::size_t w = 0; w < count; ++w) finalizeNext(w);
+    while (finalized < deferred.size()) {
+        pool.receiveReady(active, [&](std::size_t worker, std::vector<StoreRecord>&& replies) {
+            if (!active[worker]) throw std::runtime_error("unexpected finalized boundary reply");
+            auto& r = final[pending[worker]];
+            if (replies.size() != 1 || replies[0].offset != r.offset || replies[0].bytes != r.bytes || !replies[0].ready)
+                throw std::runtime_error("invalid finalized boundary reply");
+            r = replies[0];
+            ++finalized;
+            finalizeNext(worker);
+        });
+    }
+    pool.finish();
+    struct stat now {}, named {};
+    if (::fstat(source.fd, &now) != 0 || ::stat(path.c_str(), &named) != 0 ||
+        !sameInput(expected, now) || !sameInput(expected, named))
+        throw std::runtime_error("source changed during parallel storage");
+    std::uint64_t covered = 0;
+    for (const auto& r : final) {
+        const std::string hash(r.hash.data(), r.hash.size());
+        if (!r.ready || r.offset != covered || hash.find_first_not_of("0123456789abcdef") != std::string::npos)
+            throw std::runtime_error("invalid finalized chunk metadata");
+        covered += r.bytes;
+        visitor(Chunk{hash, static_cast<std::size_t>(r.bytes), std::nullopt});
+    }
+    if (covered != fileSize) throw std::runtime_error("incomplete stored file");
+}
 
 // Read a whole blob (used only by rebuild).
 std::string readWholeFile(const std::string& path) {
@@ -890,103 +1259,145 @@ std::vector<Chunk> chunkFileRollingHash(const std::string& path) {
 
 std::vector<Chunk> chunkFileParallel(const std::string& path,
                                      ParallelOptions opt) {
-    std::size_t workerCount = opt.threads;
-    if (workerCount == 0) {
-        workerCount = std::thread::hardware_concurrency();
+    ProcessWorkers state;
+    state.file = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (state.file < 0) throw std::runtime_error("open " + path + ": " + std::strerror(errno));
+    struct ::stat st {};
+    if (::fstat(state.file, &st) != 0) {
+        throw std::runtime_error("fstat " + path + ": " + std::strerror(errno));
     }
-    if (workerCount == 0) workerCount = 1;
-
-    FastCdcChunkIterator it(path);
-
-    // Nothing to parallelize with a single worker: drain sequentially.
-    if (workerCount == 1) {
-        std::vector<Chunk> out = it.materialize();
-        it.close();
-        return out;
+    if (!S_ISREG(st.st_mode) || st.st_size < 0) {
+        throw std::runtime_error("parallel FastCDC requires a regular file");
     }
+    const auto fileSize = static_cast<std::size_t>(st.st_size);
+    if (fileSize == 0) return {};
+    const std::size_t units = 1 + (fileSize - 1) / kMaxChunk;
+    std::size_t workerCount = opt.processes ? opt.processes : opt.threads;
+    if (workerCount == 0) workerCount = std::thread::hardware_concurrency();
+    workerCount = std::min(std::max<std::size_t>(1, workerCount), units);
 
-    // Bounded producer/consumer pipeline: the producing thread still streams
-    // the file sequentially (one sliding window), handing each freshly cut
-    // chunk to a worker pool for hashing -- the whole file is never held in
-    // RAM at once.  The in-flight queue is capped so peak memory is
-    // ~cap * kMaxChunk, independent of the file size (this is what replaced
-    // the old whole-file mmap path in the >100 GB regime).
-    struct Item {
-        std::size_t index = 0;
-        Chunk       chunk;
-        bool        stop = false;
-    };
-
-    std::mutex              mu;
-    std::condition_variable cvFull, cvEmpty;
-    std::deque<Item>        work;
-    const std::size_t       cap = 2 * workerCount;
-
-    auto push = [&](Item&& item) {
-        std::unique_lock<std::mutex> lock(mu);
-        cvFull.wait(lock, [&] { return work.size() < cap; });
-        work.push_back(std::move(item));
-        cvEmpty.notify_one();
-    };
-    auto pop = [&]() -> Item {
-        std::unique_lock<std::mutex> lock(mu);
-        cvEmpty.wait(lock, [&] { return !work.empty(); });
-        Item item = std::move(work.front());
-        work.pop_front();
-        cvFull.notify_one();
-        return item;
-    };
-
-    // Per-worker results, keyed by chunk index and merged in order after
-    // the join (each index is written by exactly one thread, so the merge
-    // after join() is race-free).
-    struct Slot {
-        std::size_t index = 0;
-        std::string digest;
-        std::size_t size = 0;
-        std::optional<std::string> data;
-    };
-    std::vector<std::vector<Slot>> slots(workerCount);
-
-    std::vector<std::thread> pool;
-    pool.reserve(workerCount);
+    state.workers.resize(workerCount);
+    for (auto& worker : state.workers) {
+        int descriptors[2];
+        if (::pipe(descriptors) != 0) {
+            throw std::runtime_error("create FastCDC worker pipe: " + std::string(std::strerror(errno)));
+        }
+        worker.input = descriptors[0];
+        worker.output = descriptors[1];
+    }
     for (std::size_t w = 0; w < workerCount; ++w) {
-        pool.emplace_back([&, w] {
-            std::vector<Slot>& mine = slots[w];
-            for (;;) {
-                Item item = pop();
-                if (item.stop) return;
-                Slot slot;
-                slot.index = item.index;
-                slot.digest = sha256Hex(item.chunk.data->data(),
-                                        item.chunk.size);
-                slot.size = item.chunk.size;
-                if (opt.requestData) {
-                    slot.data = std::move(item.chunk.data);
-                }
-                mine.push_back(std::move(slot));
+        const pid_t pid = ::fork();
+        if (pid < 0) throw std::runtime_error("fork FastCDC worker: " + std::string(std::strerror(errno)));
+        if (pid == 0) {
+            // Keep exactly one result writer. Closing every unrelated pipe
+            // end is essential for EOF/error detection in the parent.
+            for (std::size_t j = 0; j < workerCount; ++j) {
+                ::close(state.workers[j].input);
+                if (j != w) ::close(state.workers[j].output);
             }
-        });
+            int status = 0;
+            try {
+                runUnitWorker(state.file, state.workers[w].output, w,
+                              workerCount, units, fileSize, opt.requestData);
+            } catch (...) {
+                status = 1;  // Parent detects EOF or a nonzero exit status.
+            }
+            ::close(state.workers[w].output);
+            ::close(state.file);
+            ::_exit(status);
+        }
+        state.workers[w].pid = pid;
+    }
+    for (auto& worker : state.workers) {
+        ::close(worker.output);
+        worker.output = -1;
+        detail::makeResultPipeNonblocking(worker.input);
     }
 
-    std::size_t produced = 0;
-    while (it.hasMore()) {
-        Chunk chunk = it.next();  // payload materialised for hashing
-        push({produced++, std::move(chunk), false});
+    struct OffsetChunk { std::size_t offset; Chunk chunk; };
+    std::vector<std::vector<OffsetChunk>> workerChunks(workerCount);
+    std::vector<detail::WorkerReplyReader<ChunkReply>> readers(workerCount);
+    std::vector<std::size_t> currentUnit(workerCount), unitCovered(workerCount, 0);
+    std::vector<pollfd> channels(workerCount);
+    for (std::size_t w = 0; w < workerCount; ++w) {
+        currentUnit[w] = w;
+        channels[w] = {state.workers[w].input, POLLIN, 0};
     }
-    it.close();
-    for (std::size_t w = 0; w < workerCount; ++w) push(Item{0, Chunk{}, true});
-    for (auto& t : pool) t.join();
-
-    std::vector<Chunk> chunks(produced);
-    for (std::vector<Slot>& mine : slots) {
-        for (Slot& slot : mine) {
-            chunks[slot.index].sha256 = std::move(slot.digest);
-            chunks[slot.index].size = slot.size;
-            if (opt.requestData) {
-                chunks[slot.index].data = std::move(slot.data);
+    std::size_t active = workerCount;
+    while (active) {
+        detail::waitForWorkerResults(channels);
+        for (std::size_t w = 0; w < workerCount; ++w) {
+            if (!channels[w].revents) continue;
+            const bool eof = readers[w].drain(channels[w].fd, false,
+                [&](const ChunkReply& reply) -> std::size_t {
+                    if (currentUnit[w] >= units) throw std::runtime_error("unexpected extra worker chunk");
+                    const auto start = currentUnit[w] * kMaxChunk;
+                    const auto size = std::min(kMaxChunk, fileSize - start);
+                    const std::string hash(reply.hash.data(), reply.hash.size());
+                    if (!reply.length || reply.length > size - unitCovered[w] ||
+                        reply.offset != start + unitCovered[w] ||
+                        hash.find_first_not_of("0123456789abcdef") != std::string::npos)
+                        throw std::runtime_error("invalid FastCDC worker chunk");
+                    return opt.requestData ? static_cast<std::size_t>(reply.length) : 0;
+                },
+                [&](const ChunkReply& reply, std::string&& data) {
+                    Chunk chunk;
+                    chunk.sha256.assign(reply.hash.data(), reply.hash.size());
+                    chunk.size = static_cast<std::size_t>(reply.length);
+                    if (opt.requestData) chunk.data = std::move(data);
+                    workerChunks[w].push_back({static_cast<std::size_t>(reply.offset), std::move(chunk)});
+                    unitCovered[w] += static_cast<std::size_t>(reply.length);
+                    const auto start = currentUnit[w] * kMaxChunk;
+                    if (unitCovered[w] == std::min(kMaxChunk, fileSize - start)) {
+                        currentUnit[w] += workerCount;
+                        unitCovered[w] = 0;
+                    }
+                });
+            if (eof) {
+                if (currentUnit[w] < units || unitCovered[w])
+                    throw std::runtime_error("FastCDC worker closed before finishing its units");
+                channels[w].fd = -1;
+                --active;
             }
         }
+    }
+    for (auto& worker : state.workers) {
+        int status = 0;
+        pid_t waited;
+        do { waited = ::waitpid(worker.pid, &status, 0); } while (waited < 0 && errno == EINTR);
+        if (waited < 0) throw std::runtime_error("wait for FastCDC worker: " + std::string(std::strerror(errno)));
+        worker.pid = -1;
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            throw std::runtime_error("FastCDC worker failed");
+        }
+    }
+    // All children have finished. Merge their interleaved unit lists only now.
+    auto ordered = detail::mergeWorkerLists(workerChunks);
+    std::vector<Chunk> chunks;
+    chunks.reserve(ordered.size());
+    std::size_t covered = 0;
+    for (auto& record : ordered) {
+        if (record.offset != covered) throw std::runtime_error("incomplete FastCDC output coverage");
+        covered += record.chunk.size;
+        chunks.push_back(std::move(record.chunk));
+    }
+    if (covered != fileSize) throw std::runtime_error("incomplete FastCDC output");
+    // A whole final unit smaller than kMinChunk has no local cut to cancel.
+    // Merge it backward into the preceding unit's last chunk at EOF.
+    if (chunks.size() > 1 && chunks.back().size < kMinChunk) {
+        Chunk tail = std::move(chunks.back());
+        chunks.pop_back();
+        auto& previous = chunks.back();
+        const auto length = previous.size + tail.size;
+        if (opt.requestData) {
+            previous.data->append(*tail.data);
+            previous.sha256 = sha256Hex(*previous.data);
+        } else {
+            std::vector<std::uint8_t> buffer(length);
+            readFileRange(state.file, buffer.data(), length, covered - length);
+            previous.sha256 = sha256Hex(buffer.data(), length);
+        }
+        previous.size = length;
     }
     return chunks;
 }
@@ -1015,6 +1426,10 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
     // distinct-count estimate stays cumulative.  A missing or unreadable
     // state file just starts the sketch fresh.
     loadHllState(chunkDir, cache.seenHll());
+    std::unique_ptr<detail::SharedExistenceCache> sharedCache;
+    if (threads > 1) {
+        sharedCache = std::make_unique<detail::SharedExistenceCache>(chunkDir, cache.seenHll().registers());
+    }
 
     auto chunkExists = [&](const std::string& digest) -> bool {
         return cache.get(digest);
@@ -1090,13 +1505,9 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         };
 
         if (threads > 1) {
-            // Multicore hashing path (same chunks, same boundaries; the per-
-            // file hash is over the ordered hex digests either way).
-            ParallelOptions po;
-            po.threads = threads;
-            po.requestData = true;
-            const std::vector<Chunk> all = chunkFileParallel(entry.absolutePath, po);
-            for (const Chunk& chunk : all) body(chunk);
+            // Workers read their own source ranges, share cache state, and
+            // publish finalized objects. The parent receives metadata only.
+            storeFileParallel(entry.absolutePath, threads, *sharedCache, body);
         } else {
             // Faithful streaming path: skip payloads already in the store.
             chunkFileStream(entry.absolutePath,
@@ -1117,6 +1528,9 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
 
         res.fileHashes[fileRel] = h.hexdigest();
         res.chunkLength[fileRel] = count;
+        Descriptor chunkDirectory{::open(chunkDir.c_str(), O_RDONLY | O_DIRECTORY)};
+        if (chunkDirectory.fd < 0 || ::fsync(chunkDirectory.fd) != 0)
+            throw std::runtime_error("chunk directory sync failed");
         res.manifestRoots[fileRel] = manifest.snapshot();
     }
 
@@ -1124,6 +1538,7 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
     // failed save (full disk, read-only root, ...) must not fail a
     // snapshot that has already been stored correctly.
     try {
+        if (sharedCache) cache.seenHll().assignRegisters(sharedCache->registers());
         saveHllState(chunkDir, cache.seenHll());
     } catch (const std::exception&) {
     }
