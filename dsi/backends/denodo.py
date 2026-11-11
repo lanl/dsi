@@ -300,34 +300,6 @@ def normalize_description(description):
 
 
 # ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
-class ValueObject:
-    """
-    Container for search results returned by find* methods
-
-    Attributes
-    ----------
-    t_name : str
-        Table name
-    c_name : list
-        Column name(s)
-    row_num : int or None
-        Row index (if applicable)
-    value : any
-        Matched value
-    type : str
-        {'table', 'column', 'cell'}
-    """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
-
-# ----------------------------------------------------------------------
 # OAuth helper (module-level)
 # ----------------------------------------------------------------------
 def get_token(config=None):
@@ -1807,34 +1779,8 @@ class Denodo(Webserver):
     # ----------------------------------------------------------------------
     # DSI Interface: Search/Find
     # ----------------------------------------------------------------------
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
 
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
-
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """Search table names, column names and cell values."""
         return (
@@ -1844,6 +1790,7 @@ class Denodo(Webserver):
         )
 
 
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         """Tables whose name contains `query_object` (case-insensitive)."""
         if not isinstance(query_object, str):
@@ -1852,7 +1799,7 @@ class Denodo(Webserver):
         matches = []
         for name, table in self._cache.items():
             if query_object.lower() in name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = name
                 val.c_name = list(table.keys())
                 val.value = table
@@ -1861,6 +1808,7 @@ class Denodo(Webserver):
         return matches
 
 
+    ## DEPRECATING SOON
     def find_column(self, query_object, range=False, **kwargs):
         """
         Columns whose name contains `query_object` (case-insensitive).
@@ -1878,7 +1826,7 @@ class Denodo(Webserver):
                 if query_object.lower() not in col.lower():
                     continue
 
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = name
                 val.c_name = [col]
                 val.value = values
@@ -1921,7 +1869,7 @@ class Denodo(Webserver):
                     continue
 
                 if row:
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = name
                     val.c_name = cols
                     val.row_num = row_num
@@ -1930,7 +1878,7 @@ class Denodo(Webserver):
                     matches.append(val)
                 else:
                     for col in hit_cols:
-                        val = ValueObject()
+                        val = self.ValueObject()
                         val.t_name = name
                         val.c_name = [col]
                         val.row_num = row_num
@@ -1967,12 +1915,12 @@ class Denodo(Webserver):
                 series = pd.to_numeric(series, errors="coerce")   # non-numbers -> NaN -> no match
 
             for idx, row in df[self._relation_mask(series, operator, value)].iterrows():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = name
                 val.c_name = list(df.columns)
                 val.row_num = int(idx)
                 val.value = row.tolist()
-                val.type = "row"
+                val.type = "relation"
                 matches.append(val)
         return matches
 

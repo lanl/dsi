@@ -972,7 +972,7 @@ def test_zenodo_find_relation_condition_string_local(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "datasets" for match in matches)
-    assert all(match.type == "cell" for match in matches)
+    assert all(match.type == "relation" for match in matches)
     assert all(isinstance(match.value, list) for match in matches)
 
 
@@ -982,7 +982,7 @@ def test_zenodo_find_relation_condition_split_args_local(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "datasets" for match in matches)
-    assert all(match.type == "cell" for match in matches)
+    assert all(match.type == "relation" for match in matches)
 
 
 def test_zenodo_find_relation_contains(loaded_backend):
@@ -991,7 +991,7 @@ def test_zenodo_find_relation_contains(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "datasets" for match in matches)
-    assert all(match.type == "cell" for match in matches)
+    assert all(match.type == "relation" for match in matches)
 
     title_index = Zenodo.DATASET_COLUMNS.index("title")
 
@@ -1007,7 +1007,7 @@ def test_zenodo_find_relation_numeric_resource_size(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "resources" for match in matches)
-    assert all(match.type == "cell" for match in matches)
+    assert all(match.type == "relation" for match in matches)
 
 
 def test_zenodo_find_relation_format_exact(loaded_backend):
@@ -1016,7 +1016,7 @@ def test_zenodo_find_relation_format_exact(loaded_backend):
     assert isinstance(matches, list)
     assert len(matches) >= 1
     assert all(match.t_name == "resources" for match in matches)
-    assert all(match.type == "cell" for match in matches)
+    assert all(match.type == "relation" for match in matches)
 
     format_index = Zenodo.RESOURCE_COLUMNS.index("format")
 

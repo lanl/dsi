@@ -130,14 +130,20 @@ class Gufi(Filesystem):
         raise NotImplementedError("No connection to close for the GUFI backend")
     def display(self):
         raise NotImplementedError("Cannot display data with the GUFI backend")
+    
+    ## DEPRECATING SOON
     def find(self):
         raise NotImplementedError("Cannot find data with the GUFI backend")
     def find_cell(self):
         raise NotImplementedError("Cannot find cell data with the GUFI backend")
+    
+    ## DEPRECATING SOON
     def find_column(self):
         raise NotImplementedError("Cannot find column data with the GUFI backend")
     def find_relation(self):
         raise NotImplementedError("Cannot find data on a relation with the GUFI backend")
+    
+    ## DEPRECATING SOON
     def find_table(self):
         raise NotImplementedError("Cannot find table data with the GUFI backend")
     def get_schema(self):

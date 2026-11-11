@@ -18,19 +18,6 @@ from dsi.backends.webserver import Webserver
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
-class ValueObject:
-    """Container for search results returned by find* methods."""
-
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
 
 # ----------------------------------------------------------------------
 # Oceans11 Backend (Webserver - read only)
@@ -796,34 +783,8 @@ class Oceans11(Webserver):
     # ------------------------------------------------------------------
     # Search/Find Methods
     # ------------------------------------------------------------------
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
 
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
-
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """Search for a value across table, column, and cell levels."""
         if not self._loaded:
@@ -836,6 +797,7 @@ class Oceans11(Webserver):
             + self.find_cell(query_object)
         )
 
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         """Find cached tables whose names contain ``query_object``."""
         if not self._loaded or not isinstance(query_object, str):
@@ -844,7 +806,7 @@ class Oceans11(Webserver):
         matches = []
         for table_name, table_data in self._cache.items():
             if query_object.lower() in table_name.lower():
-                value = ValueObject()
+                value = self.ValueObject()
                 value.t_name = table_name
                 value.c_name = list(table_data.keys())
                 value.value = table_data
@@ -853,6 +815,7 @@ class Oceans11(Webserver):
 
         return matches
 
+    ## DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         """Find cached columns whose names contain ``query_object``."""
         if not self._loaded or not isinstance(query_object, str):
@@ -862,7 +825,7 @@ class Oceans11(Webserver):
         for table_name, table_data in self._cache.items():
             for column_name, column_data in table_data.items():
                 if query_object.lower() in column_name.lower():
-                    value = ValueObject()
+                    value = self.ValueObject()
                     value.t_name = table_name
                     value.c_name = [column_name]
                     value.value = column_data
@@ -914,7 +877,7 @@ class Oceans11(Webserver):
                     if not match:
                         continue
 
-                    value = ValueObject()
+                    value = self.ValueObject()
                     value.t_name = table_name
                     value.row_num = row_idx
 
@@ -942,9 +905,7 @@ class Oceans11(Webserver):
         Searches every loaded table containing ``column_name``.
         """
         if not self._loaded:
-            raise RuntimeError(
-                "find_relation() ERROR: Cannot search an empty backend."
-            )
+            raise RuntimeError("find_relation() ERROR: Cannot search an empty backend.")
 
         # Find every loaded table containing this column.
         matching_tables = [
@@ -954,10 +915,7 @@ class Oceans11(Webserver):
         ]
 
         if not matching_tables:
-            return (
-                f"'{column_name}' is not a column in this database. "
-                "Ensure the column is written first."
-            )
+            print(f"WARNING: '{column_name}' is not a column in this database. Ensure the column is written first.")
 
         if len(matching_tables) > 1:
             return [
@@ -980,7 +938,7 @@ class Oceans11(Webserver):
             )
 
             for idx, row_data in filtered.iterrows():
-                value_object = ValueObject()
+                value_object = self.ValueObject()
                 value_object.t_name = table_name
                 value_object.c_name = list(df.columns)
                 value_object.row_num = int(idx) + 1
@@ -989,10 +947,7 @@ class Oceans11(Webserver):
                 matches.append(value_object)
 
         if not matches:
-            return (
-                f"Could not find any rows where "
-                f" {column_name} {relation}  in this database."
-            )
+            print(f"WARNING: Could not find any rows where {column_name} {relation} in this database.")
 
         return matches 
 

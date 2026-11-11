@@ -4,6 +4,7 @@ import subprocess
 from datetime import datetime
 import textwrap
 import pandas as pd
+from sqlglot import parse_one, exp
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -19,24 +20,7 @@ class DataType:
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
 
-class ValueObject:
-    """
-    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, ``find_cell``, or ``find_relation``
 
-        - t_name: table name 
-        - c_name: column name as a list. The length of the list varies based on the find function. 
-          Read the description of each one to understand the differences
-        - row_num: row number. Useful when finding a value in find_cell, find_relation, or find (includes results from find_cell)
-        - type: type of match for this specific ValueObject. {table, column, range, cell, row, relation}
-    """
-    t_name = "" # table name
-    c_name = [] # column name(s) 
-    row_num = None # row number
-    value = None # value stored from that match. Ex: table data, col data, cell data etc.
-    type = "" #type of match, {table, column, range, cell, row}
-
-    # implement this later once filesystem table filesystem into dsi
-    # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with SQL
 class Sqlite(Filesystem):
@@ -69,6 +53,8 @@ class Sqlite(Filesystem):
                                 "TRIGGER", "UNBOUNDED", "UNION", "UNIQUE", "UPDATE", "USING", "VACUUM", "VALUES", "VIEW", "VIRTUAL", "WHEN", 
                                 "WHERE", "WINDOW", "WITH", "WITHOUT"]
 
+
+
     def sql_type(self, input_list):
         """
         **Internal use only. Do not call**
@@ -91,11 +77,15 @@ class Sqlite(Filesystem):
         elif all(isinstance(x, float) for x in input_list if x is not None):
             return " FLOAT", input_list
         return " VARCHAR", [str(x) if x is not None else x for x in input_list]
-    
+
+
+
     def sqlite_compatible_name(self, name):
         if (name.startswith('"') and name.endswith('"')) or (name.upper() not in self.sqlite_keywords and name.isidentifier()):
             return name
         return f'"{name}"'
+
+
 
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
@@ -151,7 +141,8 @@ class Sqlite(Filesystem):
                 raise sqlite3.Error(e)
             self.types = types
 
-    
+
+
     def ingest_artifacts(self, collection, isVerbose=False):
         """
         Primary function to ingest a collection of tables into the defined SQLite database.
@@ -342,6 +333,7 @@ class Sqlite(Filesystem):
             raise sqlite3.Error(e)
 
 
+
     def query_artifacts(self, query, isVerbose=False, dict_return = False, **kwargs):
         """
         Executes a SQL query on the SQLite backend.
@@ -366,9 +358,26 @@ class Sqlite(Filesystem):
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("Input query must be a nonempty string.")
+
+        check_sql_result = self.check_sql(query, "sqlite")
+        if isinstance(check_sql_result, bool) and not check_sql_result:
+            operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~"]
+            # if no operators, fall back to find_cell
+            if not any(op in query for op in operators) and not re.search(r"\([^)]*\)", query):
+                return self.find_cell(query, row=True)
+
+            # if operator, then do find_relation
+            column_name, relation = self.check_relational_query(query, operators)
+            return self.find_relation(column_name, relation, original_query=query)
+        elif isinstance(check_sql_result, tuple) and not check_sql_result[0]:
+            raise ValueError(check_sql_result[1])
+        elif isinstance(check_sql_result, tuple) and check_sql_result[0]:
+            command = check_sql_result[1]
+        
         data = None
-        command = query.strip().split(None, 1)[0].lower()
-        if command in {"select", "pragma"}:
+        if command in {"SELECT", "PRAGMA"}:
             try:
                 data = pd.read_sql_query(query, self.con) 
                 if isVerbose:
@@ -382,7 +391,7 @@ class Sqlite(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
-        elif command in {"update", "alter"}:
+        elif command in {"UPDATE", "ALTER"}:
             query_params = kwargs.pop("params", ())
             try:
                 self.cur.execute(query, query_params)
@@ -436,16 +445,10 @@ class Sqlite(Filesystem):
 
         Return: list of str
             List of table names referenced in the query.
-        """
-        try:
-            from sqlglot import parse_one, exp
-            tree = parse_one(query, dialect="sqlite")
-            cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
-            query_tables = [table.name for table in tree.find_all(exp.Table) if table.name not in cte_names]
-
-        except ModuleNotFoundError:
-            all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
-            query_tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
+        """            
+        tree = parse_one(query, dialect="sqlite")
+        cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
+        query_tables = [table.name for table in tree.find_all(exp.Table) if table.name not in cte_names]
 
         return query_tables[0] if query_tables else None
 
@@ -576,7 +579,8 @@ class Sqlite(Filesystem):
             with open(html_filename, 'w', encoding='utf-8') as fh:
                 fh.write(html_content)
 
-    
+
+
     def process_artifacts(self, only_units_relations = False):
         """
         Reads data from the SQLite database into a nested OrderedDict.
@@ -636,6 +640,9 @@ class Sqlite(Filesystem):
 
         return artifact
 
+
+
+    ## DEPRECATING SOON
     def find(self, query_object):
         """
         Searches for all instances of `query_object` in the SQLite database at the table, column, and cell levels. 
@@ -664,7 +671,10 @@ class Sqlite(Filesystem):
             return all_return
         else:
             return f"{query_object} was not found in this database"
-        
+
+
+
+    ## DEPRECATING SOON
     def find_table(self, query_object):
         """
         Finds all tables whose names match or partially match the given `query_object`.
@@ -692,7 +702,7 @@ class Sqlite(Filesystem):
                     colData = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
                     col_names = [self.sqlite_compatible_name(column[1]) for column in colData]
                     table_data = self.cur.execute(f"SELECT * FROM {table};").fetchall()
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table
                     val.c_name = col_names
                     val.value = table_data
@@ -703,7 +713,10 @@ class Sqlite(Filesystem):
                 return table_return_list
             return f"{query_object} is not a table name in this database"
         return f"{query_object} needs to be a string if finding among table names"
-    
+
+
+
+    ## DEPRECATING SOON
     def find_column(self, query_object, range = False):
         """
         Finds all columns whose names match or partially match the given `query_object`.
@@ -744,7 +757,7 @@ class Sqlite(Filesystem):
                         colData = [row[0] for row in returned_col]
                         not_numeric = any(isinstance(item, str) for item in colData)
 
-                        val = ValueObject()
+                        val = self.ValueObject()
                         val.t_name = table
                         val.c_name = [col_name]
                         if range and not not_numeric:
@@ -762,6 +775,9 @@ class Sqlite(Filesystem):
             return f"{query_object} is not a column name in this database"
         return f"{query_object} needs to be a string if finding among column names"
 
+
+
+    # RENAMING SOON TO QUERY_VALUE
     def find_cell(self, query_object, row = False):
         """
         Finds all cells in the database that match or partially match the given `query_object`.
@@ -809,19 +825,20 @@ class Sqlite(Filesystem):
                 query = f"SELECT '{table}', (SELECT COUNT(*) FROM {table} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num, {middle} FROM {table} AS t1 WHERE "
                 # query = f"SELECT '{table}', rowid, {middle} FROM {table} WHERE "
                 if isinstance(query_object, str):
-                    query += f"{col_name} LIKE '%{query_object}%'" 
+                    query += f"{col_name} LIKE ?" 
                 else:
-                    query += f"CAST({col_name} AS TEXT) LIKE '%{query_object}%'" 
+                    query += f"CAST({col_name} AS TEXT) LIKE ?" 
                 row_list.append(query)
 
             table_row_query = " UNION ".join(row_list) + ";"
-            table_row_return = self.cur.execute(table_row_query).fetchall()
+            params = (f"%{query_object}%",) * len(row_list)
+            table_row_return = self.cur.execute(table_row_query, params).fetchall()
             query_list += table_row_return
 
         if len(query_list) > 0:
             value_obj_list = []
             for value_row in query_list:
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = value_row[0]
                 val.row_num = value_row[1]
                 val.c_name = [value_row[2]]
@@ -835,9 +852,12 @@ class Sqlite(Filesystem):
 
             return value_obj_list
 
-        return f"{query_object} is not a cell in this database"
-    
-    def find_relation(self, column_name, relation):
+        print(f"WARNING: {query_object} is not a value in this database")
+
+
+
+    # RENAMING SOON TO QUERY_RELATION
+    def find_relation(self, column_name, relation, original_query = None):
         """
         Finds all rows in the first table of the database that satisfy the relation applied to the given column.
 
@@ -871,11 +891,11 @@ class Sqlite(Filesystem):
             if pragma_col_name in columns:
                 all_tables.append(table)
                 col_list = columns
-        
+
         if len(all_tables) == 0:
             if (user_column[0] == "'" and user_column[-1] == "'") or (user_column[0] == '"' and user_column[-1] == '"'):
-                return f"{user_column} is not a column in this database. Ensure the column is written first."
-            return f"'{user_column}' is not a column in this database. Ensure the column is written first."
+                print(f"WARNING: {user_column} is not a column in this database. Ensure the column is written first.")
+            print(f"WARNING: '{user_column}' is not a column in this database. Ensure the column is written first.")
         old_relation = relation
         old_col_name = column_name
         if relation[0] == '(' and relation[-1] == ')':
@@ -893,25 +913,30 @@ class Sqlite(Filesystem):
         row_id_select = f"(SELECT COUNT(*) FROM {all_tables[0]} AS t2 WHERE t2.rowid <= t1.rowid) AS row_num"
         query = f"SELECT {row_id_select}, * FROM {all_tables[0]} as t1 WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()
-        
+
         if not output_data and len(all_tables) == 1:
             val = f' {old_col_name} {old_relation} '
-            return f"Could not find any rows where {val} in this database."
+            print(f"WARNING: Could not find any rows where  {original_query if original_query is not None else val}  in this database.")
         if len(all_tables) > 1:
-            query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
-            return query_list
-        
+            print(f"WARNING: '{old_col_name}' appeared in more than one table. Can only do a relational query on one table")
+            print("Use `dsi.query('SQL QUERY')` to retrieve the matching rows for a specific table")
+            print(f"These are possible SQL queries based on the '{old_col_name}':")
+            for tb in all_tables:
+                print(f" - SELECT * FROM {tb} WHERE {column_name} {relation}")
+
         return_list = []
         for row in output_data:
-            temp = ValueObject()
+            temp = self.ValueObject()
             temp.t_name = all_tables[0]
             temp.c_name = col_list
             temp.row_num = int(row[0])
             temp.type = "relation"
             temp.value = list(row[1:])
             return_list.append(temp)
-        
+
         return return_list
+
+
 
     def list(self, collection = False):
         """
@@ -941,7 +966,9 @@ class Sqlite(Filesystem):
                 print(f"  - num of columns: {table[1]}")
                 print(f"  - num of rows: {table[2]}")
             print()
-    
+
+
+
     def num_tables(self):
         """
         Prints number of tables in this backend
@@ -951,7 +978,9 @@ class Sqlite(Filesystem):
             print(f"Database now has {table_count[0]} tables")
         else:
             print(f"Database now has {table_count[0]} table")
-    
+
+
+
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Returns all data from a specified table in this SQLite backend.
@@ -981,7 +1010,9 @@ class Sqlite(Filesystem):
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
         df = df.astype(object).where(df.notna(), None)
         return df
-    
+
+
+
     def summary(self, table_name = None):
         """
         Returns numerical metadata from tables in the first activated backend.
@@ -1008,6 +1039,8 @@ class Sqlite(Filesystem):
                 raise ValueError(f"'{table_name}' does not exist in this SQLite database")
             headers, rows = self.summary_helper(table_name)
             return pd.DataFrame(rows, columns=headers, dtype=object)
+
+
 
     def summary_helper(self, table_name):
         """
@@ -1061,6 +1094,8 @@ class Sqlite(Filesystem):
             rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
+
+
 
     def overwrite_table(self, table_name, collection):
         """
@@ -1139,7 +1174,9 @@ class Sqlite(Filesystem):
 
         if temp_runTable_bool:
             self.runTable = True
-            
+
+
+
     # Closes connection to server
     def close(self):
         """

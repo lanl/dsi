@@ -2,6 +2,7 @@ import duckdb
 import re
 from datetime import datetime
 import pandas as pd
+from sqlglot import parse_one, exp
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -17,24 +18,7 @@ class DataType:
     properties = {}
     unit_keys = [] #should be same length as number of keys in properties
 
-class ValueObject:
-    """
-    Data Structure used when returning search results from ``find``, ``find_table``, ``find_column``, ``find_cell``, or ``find_relation``
 
-        - t_name: table name 
-        - c_name: column name as a list. The length of the list varies based on the find function. 
-          Read the description of each one to understand the differences
-        - row_num: row number. Useful when finding a value in find_cell, find_relation, or find (includes results from find_cell)
-        - type: type of match for this specific ValueObject. {table, column, range, cell, row, relation}
-    """
-    t_name = "" # table name
-    c_name = [] # column name(s) 
-    row_num = None # row number
-    value = None # value stored from that match. Ex: table data, col data, cell data etc.
-    type = "" #type of match, {table, column, range, cell, row}
-
-    # implement this later once filesystem table incorporated into dsi
-    # filesystem_match = [] #list of all elements in that matching row in filesystem table
 
 # Main storage class, interfaces with DuckDB
 class DuckDB(Filesystem):
@@ -56,6 +40,8 @@ class DuckDB(Filesystem):
         keywords_df = self.cur.execute("SELECT * FROM duckdb_keywords();").fetchdf()
         filtered_df = keywords_df[keywords_df['keyword_category'] != 'unreserved']
         self.duckdb_keywords = filtered_df["keyword_name"].tolist()
+
+
 
     def sql_type(self, input_list):
         """
@@ -132,7 +118,9 @@ class DuckDB(Filesystem):
 
             return f" {elem_type}[]", coerced_lists
         return " VARCHAR", [None if x is None else str(x) for x in input_list]
-    
+
+
+
     def duckdb_compatible_name(self, name):
         pattern = r"^[A-Za-z_][A-Za-z_0-9_]*$"
         if ((name.startswith('"') and name.endswith('"')) 
@@ -141,7 +129,9 @@ class DuckDB(Filesystem):
             and (re.match(pattern, name) is not None)):
             return name
         return f'"{name}"'
-    
+
+
+
     def ingest_table_helper(self, types, foreign_query = None, isVerbose=False):
         """
         **Internal use only. Do not call**
@@ -201,7 +191,8 @@ class DuckDB(Filesystem):
                 raise duckdb.Error(e)
             self.types = types
 
-    
+
+
     def ingest_artifacts(self, collection, isVerbose=False):    
         """
         Primary function to ingest a collection of tables into the defined DuckDB database.
@@ -379,7 +370,8 @@ class DuckDB(Filesystem):
             self.cur.execute("FORCE CHECKPOINT")
             raise duckdb.Error(e)
 
-    
+
+
     def query_artifacts(self, query, isVerbose=False, dict_return = False, **kwargs):
         """
         Executes a SQL query on the DuckDB backend.
@@ -404,9 +396,26 @@ class DuckDB(Filesystem):
             - If `dict_return` is False: returns a DataFrame
             - If `dict_return` is True: returns an OrderedDict
         """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("Input query must be a nonempty string.")
+
+        check_sql_result = self.check_sql(query, "duckdb")
+        if isinstance(check_sql_result, bool) and not check_sql_result:
+            operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~"]
+            # if no operators, fall back to find_cell
+            if not any(op in query for op in operators) and not re.search(r"\([^)]*\)", query):
+                return self.find_cell(query, row=True)
+
+            # if operator, then do find_relation
+            column_name, relation = self.check_relational_query(query, operators)
+            return self.find_relation(column_name, relation, original_query=query)
+        elif isinstance(check_sql_result, tuple) and not check_sql_result[0]:
+            raise ValueError(check_sql_result[1])
+        elif isinstance(check_sql_result, tuple) and check_sql_result[0]:
+            command = check_sql_result[1]
+
         data = None
-        command = query.strip().split(None, 1)[0].lower()
-        if command in {"select", "pragma", "with"}:
+        if command in {"SELECT", "PRAGMA"}:
             try:
                 data = self.cur.execute(query).fetch_df()
                 if isVerbose:
@@ -420,7 +429,7 @@ class DuckDB(Filesystem):
                         return OrderedDict()
                     return pd.DataFrame()
                 raise
-        elif command in {"update", "alter"}:
+        elif command in {"UPDATE", "ALTER"}:
             query_params = kwargs.pop("params", ())
             try:
                 self.cur.execute("BEGIN TRANSACTION")
@@ -481,15 +490,9 @@ class DuckDB(Filesystem):
         Return: list of str
             List of table names referenced in the query.
         """
-        try:
-            from sqlglot import parse_one, exp
-            tree = parse_one(query, dialect="duckdb")
-            cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
-            query_tables = [table.name for table in tree.find_all(exp.Table) if table.name not in cte_names]
-
-        except ModuleNotFoundError:
-            all_names = re.findall(r'FROM\s+["\']?([\w\-]+)["\']?|JOIN\s+["\']?([\w\-]+)["\']?', query, re.IGNORECASE)
-            query_tables = [table for from_tbl, join_tbl in all_names if (table := from_tbl or join_tbl)]
+        tree = parse_one(query, dialect="duckdb")
+        cte_names = {cte.alias_or_name for cte in tree.find_all(exp.CTE)}
+        query_tables = [table.name for table in tree.find_all(exp.Table) if table.name not in cte_names]
 
         return query_tables[0] if query_tables else None
 
@@ -573,6 +576,9 @@ class DuckDB(Filesystem):
 
         return artifact
 
+
+
+    ## DEPRECATING SOON
     def find(self, query_object):
         """
         Searches for all instances of `query_object` in the DuckDB database at the table, column, and cell levels. 
@@ -601,7 +607,10 @@ class DuckDB(Filesystem):
             return all_return
         else:
             return f"{query_object} was not found in this database"
-        
+
+
+
+    ## DEPRECATING SOON
     def find_table(self, query_object):
         """
         Finds all tables whose names match or partially match the given `query_object`.
@@ -632,7 +641,7 @@ class DuckDB(Filesystem):
                     colData = self.cur.execute(f"PRAGMA table_info({table});").fetchall()
                     col_names = [self.duckdb_compatible_name(column[1]) for column in colData]
                     table_data = self.cur.execute(f"SELECT * FROM {table};").fetchall()
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table
                     val.c_name = col_names
                     val.value = table_data
@@ -643,7 +652,10 @@ class DuckDB(Filesystem):
                 return table_return_list
             return f"{query_object} is not a table name in this database"
         return f"{query_object} needs to be a string if finding among table names"
-    
+
+
+
+    ## DEPRECATING SOON
     def find_column(self, query_object, range = False):
         """
         Finds all columns whose names match or partially match the given `query_object`.
@@ -687,7 +699,7 @@ class DuckDB(Filesystem):
                         colData = [row[0] for row in returned_col]
                         not_numeric = any(isinstance(item, str) for item in colData)
 
-                        val = ValueObject()
+                        val = self.ValueObject()
                         val.t_name = table
                         val.c_name = [col_name]
                         if range and not not_numeric:
@@ -705,6 +717,9 @@ class DuckDB(Filesystem):
             return f"{query_object} is not a column name in this database"
         return f"{query_object} needs to be a string if finding among column names"
 
+
+
+    # RENAMING SOON TO QUERY_VALUE
     def find_cell(self, query_object, row = False):
         """
         Finds all cells in the database that match or partially match the given `query_object`.
@@ -749,7 +764,7 @@ class DuckDB(Filesystem):
                 table_row_query = f"""SELECT '{table}', ROW_NUMBER() OVER () AS row_number, '{result}', *
                                       FROM {table} WHERE """
                 for col in all_cols:
-                    table_row_query += f"CAST({col} AS TEXT) ILIKE '%{query_object}%' OR "
+                    table_row_query += f"CAST({col} AS TEXT) ILIKE ? OR "
                 table_row_query = table_row_query[:-4] + ";"
             else:
                 casted_cols = ""
@@ -759,14 +774,16 @@ class DuckDB(Filesystem):
                 table_row_query = f"""SELECT '{table}', original_row_num, column_name, column_value
                 FROM ( SELECT * FROM (SELECT ROW_NUMBER() OVER () AS original_row_num, {casted_cols} FROM {table} )
                 UNPIVOT (column_value FOR column_name IN ({result}))) AS unpvt
-                WHERE column_value ILIKE '%{query_object}%';"""
-            table_row_return = self.cur.execute(table_row_query).fetchall()
+                WHERE column_value ILIKE ?;"""
+
+            params = (f"%{query_object}%",) * (len(all_cols) if row else 1)
+            table_row_return = self.cur.execute(table_row_query, params).fetchall()
             query_list += table_row_return
 
         if len(query_list) > 0:
             value_obj_list = []
             for value_row in query_list:
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = value_row[0]
                 val.row_num = value_row[1]
                 if row:
@@ -786,9 +803,12 @@ class DuckDB(Filesystem):
                 value_obj_list.append(val)
             return value_obj_list
 
-        return f"{query_object} is not a cell in this database"
+        print(f"WARNING: {query_object} is not a value in this database")
 
-    def find_relation(self, column_name, relation):
+
+
+    # RENAMING SOON TO QUERY_RELATION
+    def find_relation(self, column_name, relation, original_query = None):
         """
         Finds all rows in the first table of the database that satisfy the relation applied to the given column.
 
@@ -824,11 +844,11 @@ class DuckDB(Filesystem):
             if pragma_col_name in columns:
                 all_tables.append(table)
                 col_list = columns        
-        
+
         if len(all_tables) == 0:
             if (user_column[0] == "'" and user_column[-1] == "'") or (user_column[0] == '"' and user_column[-1] == '"'):
-                return f"{user_column} is not a column in this database. Ensure the column is written first."
-            return f"'{user_column}' is not a column in this database. Ensure the column is written first."
+                print(f"WARNING: {user_column} is not a column in this database. Ensure the column is written first.")
+            print(f"WARNING: '{user_column}' is not a column in this database. Ensure the column is written first.")
         old_relation = relation
         old_col_name = column_name
         if relation[0] == '(' and relation[-1] == ')':
@@ -842,29 +862,34 @@ class DuckDB(Filesystem):
             if relation[0] == "'" and relation[-1] == "'":
                 relation = relation[1:-1]
             relation = f"ILIKE '%{relation}%'"
-        
+
         query = f"SELECT * FROM (SELECT ROW_NUMBER() OVER () AS row_num, * FROM {all_tables[0]}) WHERE {column_name} {relation}"
         output_data = self.cur.execute(query).fetchall()
-        
+
         if not output_data and len(all_tables) == 1:
             val = f' {old_col_name} {old_relation} '
-            return f"Could not find any rows where {val} in this database."
+            print(f"WARNING: Could not find any rows where  {original_query if original_query is not None else val}  in this database.")
         if len(all_tables) > 1:
-            query_list = [f"SELECT * FROM {tb} WHERE {column_name} {relation}" for tb in all_tables]
-            return query_list
-        
+            print(f"WARNING: '{old_col_name}' appeared in more than one table. Can only do a relational query on one table")
+            print("Use `dsi.query('SQL QUERY')` to retrieve the matching rows for a specific table")
+            print(f"These are possible SQL queries based on the '{old_col_name}':")
+            for tb in all_tables:
+                print(f" - SELECT * FROM {tb} WHERE {column_name} {relation}")
+
         return_list = []
         for row in output_data:
-            temp = ValueObject()
+            temp = self.ValueObject()
             temp.t_name = all_tables[0]
             temp.c_name = col_list
             temp.row_num = int(row[0])
             temp.type = "relation"
             temp.value = list(row[1:])
             return_list.append(temp)
-        
+
         return return_list
-    
+
+
+
     def list(self, collection = False):
         """
         Return a list of all tables and their dimensions from this DuckDB backend
@@ -896,7 +921,9 @@ class DuckDB(Filesystem):
                 print(f"  - num of columns: {table[1]}")
                 print(f"  - num of rows: {table[2]}")
             print()
-    
+
+
+
     def num_tables(self):
         """
             Prints number of tables in this backend
@@ -910,7 +937,9 @@ class DuckDB(Filesystem):
             print(f"Database now has {table_count} tables")
         else:
             print(f"Database now has {table_count} table")
-    
+
+
+
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
         Returns all data from a specified table in this DuckDB backend.
@@ -942,7 +971,9 @@ class DuckDB(Filesystem):
         df.attrs["max_rows"] = self.cur.execute(f"SELECT COUNT(*) FROM {table_name};").fetchone()[0]
         df = df.astype(object).where(df.notna(), None)
         return df
-    
+
+
+
     def summary(self, table_name = None):
         """
         Returns numerical metadata from tables in the first activated backend.
@@ -974,6 +1005,8 @@ class DuckDB(Filesystem):
                 raise ValueError(f"'{table_name}' does not exist in this DuckDB database")
             headers, rows = self.summary_helper(table_name)
             return pd.DataFrame(rows, columns=headers, dtype=object)
+
+
 
     def summary_helper(self, table_name):
         """
@@ -1012,6 +1045,8 @@ class DuckDB(Filesystem):
             rows.append([display_name, col_type, unique_vals, min_val, max_val, avg_val, std_dev])
 
         return headers, rows
+
+
 
     def overwrite_table(self, table_name, collection):
         """
@@ -1101,7 +1136,9 @@ class DuckDB(Filesystem):
 
         if temp_runTable_bool:
             self.runTable = True
-        
+
+
+
     def check_table_relations(self, tables, relation_dict):
         """
         **Internal use only. Do not call.**
@@ -1172,6 +1209,8 @@ class DuckDB(Filesystem):
                     queue.append(parent)
 
         return False, ordered_tables
+
+
 
     # Closes connection to server
     def close(self):

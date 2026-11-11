@@ -692,7 +692,7 @@ def test_rcsbpdb_find_relation_condition_string(loaded_backend):
     ]
 
     assert len(dataset_matches) == 1
-    assert dataset_matches[0].type == "cell"
+    assert dataset_matches[0].type == "relation"
 
     dataset_idx = dataset_matches[0].c_name.index("dataset_id")
     assert dataset_matches[0].value[dataset_idx] == "1CBS"
@@ -710,7 +710,7 @@ def test_rcsbpdb_find_relation_condition_split_args(loaded_backend):
     ]
 
     assert len(dataset_matches) == 1
-    assert dataset_matches[0].type == "cell"
+    assert dataset_matches[0].type == "relation"
 
     dataset_idx = dataset_matches[0].c_name.index("dataset_id")
     assert dataset_matches[0].value[dataset_idx] == "1CBS"

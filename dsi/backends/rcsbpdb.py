@@ -83,25 +83,6 @@ from urllib3.util.retry import Retry
 from dsi.backends.webserver import Webserver
 
 
-class ValueObject:
-    """Container used by find/find_table/find_column/find_cell."""
-
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "t_name": self.t_name,
-            "c_name": self.c_name,
-            "row_num": self.row_num,
-            "value": self.value,
-            "type": self.type,
-        }
-
 
 @dataclass
 class FileResource:
@@ -1357,34 +1338,8 @@ class RCSBPDB(Webserver):
         self._loaded = True
         return self.tables
 
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
 
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
-
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """
         Searches for all instances of query_object across all loaded tables.
@@ -1399,6 +1354,7 @@ class RCSBPDB(Webserver):
             + self.find_cell(query_object)
         )
 
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         if not isinstance(query_object, str):
             raise TypeError("find_table() ERROR: query_object must be a string")
@@ -1407,7 +1363,7 @@ class RCSBPDB(Webserver):
 
         for table_name, table_data in self.tables.items():
             if query_object in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.value = table_data
@@ -1417,6 +1373,7 @@ class RCSBPDB(Webserver):
 
         return matches
 
+    ## DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         if not isinstance(query_object, str):
             raise TypeError("find_column() ERROR: query_object must be a string")
@@ -1426,7 +1383,7 @@ class RCSBPDB(Webserver):
         for table_name, table_data in self.tables.items():
             for col_name, col_data in table_data.items():
                 if query_object in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.value = col_data
@@ -1499,7 +1456,7 @@ class RCSBPDB(Webserver):
                         row_matched = True
                         break
 
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col]
                     val.row_num = int(row_idx)
@@ -1515,7 +1472,7 @@ class RCSBPDB(Webserver):
 
                     seen_rows.add(key)
 
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = cols
                     val.row_num = int(row_idx)
@@ -1562,12 +1519,12 @@ class RCSBPDB(Webserver):
                     filtered = self._apply_pandas_filter(df, query, operator, value)
 
                     for idx, row in filtered.iterrows():
-                        vo = ValueObject()
+                        vo = self.ValueObject()
                         vo.t_name = table_name
                         vo.c_name = list(df.columns)
                         vo.row_num = int(idx) + 1
                         vo.value = row.tolist()
-                        vo.type = "cell"
+                        vo.type = "relation"
                         matches.append(vo)
 
                 return matches
@@ -1603,12 +1560,12 @@ class RCSBPDB(Webserver):
                         )
 
                         for idx, row in filtered.iterrows():
-                            vo = ValueObject()
+                            vo = self.ValueObject()
                             vo.t_name = table_name
                             vo.c_name = list(df.columns)
                             vo.row_num = int(idx) + 1
                             vo.value = row.tolist()
-                            vo.type = "cell"
+                            vo.type = "relation"
                             matches.append(vo)
 
                     return matches
