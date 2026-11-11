@@ -912,17 +912,12 @@ class OSTI(Webserver):
             - type : 'relation'
         """
         if not self._loaded or "records" not in self._cache:
-            raise RuntimeError(
-                "find_relation() ERROR: Cannot search an empty backend."
-            )
+            raise RuntimeError("find_relation() ERROR: Cannot search an empty backend.")
 
         df = pd.DataFrame(self._cache["records"])
 
         if column_name not in df.columns:
-            return (
-                f"'{column_name}' is not a column in this database. "
-                "Ensure the column is written first."
-            )
+            print(f"WARNING: '{column_name}' is not a column in this database. Ensure the column is written first.")
 
         operator, value = self._parse_relation(relation)
 
@@ -934,10 +929,7 @@ class OSTI(Webserver):
         )
 
         if filtered.empty:
-            return (
-                f"Could not find any rows where "
-                f" {column_name} {relation}  in this database."
-            )
+            print(f"WARNING: Could not find any rows where {column_name} {relation} in this database.")
 
         matches = []
 

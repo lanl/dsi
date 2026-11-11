@@ -839,10 +839,7 @@ class NDP(Webserver):
         Find rows where column matches relation (e.g., 'num_resources > 5').
         """
         if not self._loaded:
-            raise RuntimeError(
-                "find_relation() ERROR: Cannot search an empty backend. "
-                "Ensure data is loaded first."
-            )
+            raise RuntimeError("find_relation() ERROR: Cannot search an empty backend. Ensure data is loaded first.")
         
         operator, value = self._parse_relation(relation)
         matches = []

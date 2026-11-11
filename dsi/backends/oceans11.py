@@ -905,9 +905,7 @@ class Oceans11(Webserver):
         Searches every loaded table containing ``column_name``.
         """
         if not self._loaded:
-            raise RuntimeError(
-                "find_relation() ERROR: Cannot search an empty backend."
-            )
+            raise RuntimeError("find_relation() ERROR: Cannot search an empty backend.")
 
         # Find every loaded table containing this column.
         matching_tables = [
@@ -917,10 +915,7 @@ class Oceans11(Webserver):
         ]
 
         if not matching_tables:
-            return (
-                f"'{column_name}' is not a column in this database. "
-                "Ensure the column is written first."
-            )
+            print(f"WARNING: '{column_name}' is not a column in this database. Ensure the column is written first.")
 
         if len(matching_tables) > 1:
             return [
@@ -952,10 +947,7 @@ class Oceans11(Webserver):
                 matches.append(value_object)
 
         if not matches:
-            return (
-                f"Could not find any rows where "
-                f" {column_name} {relation}  in this database."
-            )
+            print(f"WARNING: Could not find any rows where {column_name} {relation} in this database.")
 
         return matches 
 
