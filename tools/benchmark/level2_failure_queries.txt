@@ -1,0 +1,118 @@
+Unique failing prompts across all Level 2 benchmark runs: 29
+(63 total failure instances across models/runs collapse to 29 distinct task+prompt combinations)
+
+[1] L2_cross_db_record_compare
+    "Compare the number of discrete records in the NIF dataset vs. the Poisson dataset."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0), aws-gov.gpt-5.4 (score=0.045)
+
+[2] L2_cross_db_record_compare__casual
+    "so which one's got more records, and by how many"
+    failed for: aws-gov.gpt-5.4 (score=0.08)
+
+[3] L2_dsi_database_link_audit
+    "For every dataset in the Ocean 11 catalog, check whether it has a linked DSI sub-database (the dsi_database field) and report how many of the 9 datasets are missing one."
+    failed for: aws-gov.gpt-5.4 (score=0.205), aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0), aws-gov.gpt-5.4 (score=0.26)
+
+[4] L2_medical_theme_comparison
+    "Compare the manufacturing-themed datasets in Ocean 11 to the medical-themed datasets."
+    failed for: anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[5] L2_most_recent_drilldown
+    "Find the most recently updated dataset in the Ocean 11 catalog, then check whether it has a linked DSI sub-database (the dsi_database field) that you could load for more detail."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[6] L2_nif_dens_max_extremum
+    "Across all 20 timesteps of the NIF simulation, which timestep has the highest maximum density (dens_max), and what is that value?"
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[7] L2_nif_dens_max_extremum__expert
+    "Across all nif_metadata rows, identify the timestep with the maximum value of dens_max and report that value."
+    failed for: aws-gov.gpt-5.4 (score=0.325)
+
+[8] L2_nif_num_arrays_tie
+    "Which timestep in the NIF simulation has the most data arrays recorded (num_arrays), and by how many more than the next-highest timestep?"
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[9] L2_nif_num_arrays_tie__terse
+    "max num_arrays timestep + margin over 2nd?"
+    failed for: aws-gov.gpt-5.4 (score=0.045), aws-gov.gpt-5.4 (score=0.02)
+
+[10] L2_physics_contact_report
+    "List the titles of every physics-themed dataset in the Ocean 11 catalog (case-insensitive) along with each one's point of contact, and tell me which contact person appears most often among them."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0), aws-gov.gpt-5.4 (score=0.28), aws-gov.gpt-5.4 (score=0.458)
+
+[11] L2_physics_contact_report__casual
+    "can u list out all the physics datasets in oceans11 plus their contacts and tell me who pops up most"
+    failed for: aws-gov.gpt-5.4 (score=0.49), aws-gov.gpt-5.4 (score=0.255)
+
+[12] L2_physics_contact_report__novice
+    "Can you list all the physics datasets in Ocean 11 along with who's in charge of each one, and tell me which person shows up the most?"
+    failed for: aws-gov.gpt-5.4 (score=0.443), aws-gov.gpt-5.4 (score=0.46)
+
+[13] L2_physics_contact_report__terse
+    "list physics datasets + contacts, who's most frequent?"
+    failed for: aws-gov.gpt-5.4 (score=0.487), aws-gov.gpt-5.4 (score=0.435), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.23)
+
+[14] L2_physics_contact_report__verbose
+    "I'm compiling a stakeholder report and need the complete list of titles for every dataset in the Ocean 11 catalog that falls under the physics theme or category, regardless of capitalization, along with the point of contact listed for each one; additionally, once you have that list, please identify which single contact person is associated with the largest number of those physics datasets."
+    failed for: aws-gov.gpt-5.4 (score=0.255), aws-gov.gpt-5.4 (score=0.417)
+
+[15] L2_poisson_args_filename_facts
+    "Download the Poisson dataset's simulation-arguments file (the 'argements' field in the Poisson catalog record) and, from its filename or contents, report the grid size and number of samples in this dataset."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[16] L2_poisson_field_completeness
+    "Load the Poisson database and check whether its single record has a value in every field. Report the number of empty, null, or missing fields you find."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[17] L2_poisson_field_completeness__novice
+    "Can you open the Poisson database and check if its one record has everything filled in, or if anything's missing?"
+    failed for: aws-gov.gpt-5.4 (score=0.443), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.49), aws-gov.gpt-5.4 (score=0.458), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.495)
+
+[18] L2_poisson_glossary_audit
+    "The Poisson dataset has a field glossary (poisson_description.yaml) describing its columns as: name, LAUR, example, environment, data, statistics. Load poisson.db, compare its ACTUAL table schema against that documented list of fields, and report any column that exists in the real data but is NOT documented in the glossary."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0), aws-gov.gpt-5.4 (score=0.255)
+
+[19] L2_poisson_glossary_audit_1
+    "The Poisson dataset has a field glossary (poisson_description.yaml) describing its columns as: name, LAUR, example, environment, data, statistics. Load poisson.db, compare its ACTUAL table schema against that documented list of fields, and report any column that exists in the real data but is NOT documented in the glossary."
+    failed for: aws-gov.gpt-5.4 (score=0.255)
+
+[20] L2_poisson_glossary_audit_2
+    "The Poisson dataset has a field glossary (poisson_description.yaml) describing its columns as: name, LAUR, example, environment, data, statistics. Load poisson.db, compare its ACTUAL table schema against that documented list of fields, and report any column that exists in the real data but is NOT documented in the glossary."
+    failed for: aws-gov.gpt-5.4 (score=0.145), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.42), aws-gov.gpt-5.4 (score=0.395), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.445)
+
+[21] L2_search_download_summarize
+    "Find the NIF simulation dataset in the Ocean 11 catalog, download the file for sim name nifcylxyz_hdf5_plt_cnt_0000.flash, and then report who owns the dataset and how many discrete timesteps the simulation has."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0)
+
+[22] L2_search_download_summarize__expert
+    "Resolve the NIF dataset record in the Ocean 11 catalog, retrieve the artifact for sim_name=nifcylxyz_hdf5_plt_cnt_0000.flash via download_file_tool, then report the dataset's point-of-contact and the distinct timestep count."
+    failed for: aws-gov.gpt-5.4 (score=0.305)
+
+[23] L2_search_download_summarize__novice
+    "Can you find the NIF dataset in the Ocean 11 catalog, grab the file for the simulation named nifcylxyz_hdf5_plt_cnt_0000.flash, and then tell me who owns it and how many timesteps it has?"
+    failed for: aws-gov.gpt-5.4 (score=0.16), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.185), aws-gov.gpt-5.4 (score=0.13)
+
+[24] L2_simulation_tag_contacts
+    "Find every dataset in the Ocean 11 catalog whose keywords/tags mention 'simulation', list each one's point-of-contact owner, and tell me if any contact owns more than one of them."
+    failed for: aws-gov.gpt-5.4 (score=0.0), anthropic.claude-sonnet-4-5-20250929-v1:0 (score=0.0), aws-gov.gpt-5.4 (score=0.497), aws-gov.gpt-5.4 (score=0.497)
+
+[25] L2_simulation_tag_contacts__casual
+    "can u find all the 'simulation' tagged datasets in oceans11, list their owners, and tell me if anyone's got more than one"
+    failed for: aws-gov.gpt-5.4 (score=0.497)
+
+[26] L2_simulation_tag_contacts__expert
+    "Filter the Ocean 11 catalog for records whose Keywords/Tag field contains the substring 'simulation', list each record's Contact_Point_, and identify any contact appearing on more than one matching record."
+    failed for: aws-gov.gpt-5.4 (score=0.5)
+
+[27] L2_simulation_tag_contacts__novice
+    "Can you find all the datasets in Ocean 11 that have 'simulation' somewhere in their tags, list who owns each one, and tell me if anyone owns more than one?"
+    failed for: aws-gov.gpt-5.4 (score=0.497)
+
+[28] L2_simulation_tag_contacts__terse
+    "find datasets tagged 'simulation', list contacts, any contact own >1?"
+    failed for: aws-gov.gpt-5.4 (score=0.497), aws-gov.gpt-5.4 (score=0.495)
+
+[29] L2_simulation_tag_contacts__verbose
+    "I'm trying to understand ownership concentration among simulation-related holdings, so I need you to search through the Ocean 11 catalog for every dataset whose keywords or tags mention the word 'simulation' in any form, list the point-of-contact owner for each one you find, and then let me know whether any single contact person is responsible for more than one of those datasets."
+    failed for: aws-gov.gpt-5.4 (score=0.255)

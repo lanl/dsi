@@ -31,7 +31,10 @@ POSSIBLE_MODELS = [
 
 
 def find_ai_search_dir() -> Path:
-    """Locate tools/ai_search from this file, the cwd, or any parent of the cwd."""
+    """Locate tools/ai_search (where dsi_explorer_agent.py, tool_utils.py, data/, and the
+    portal API key live) from this file's location, the cwd, or any parent of the cwd. This
+    package (levels_bench) lives in a sibling folder (tools/benchmark), not inside
+    tools/ai_search itself, so this always falls through to the search loop below."""
     here = Path(__file__).resolve().parent.parent
     if (here / "dsi_explorer_agent.py").is_file():
         return here
@@ -46,6 +49,10 @@ def find_ai_search_dir() -> Path:
 
 AI_SEARCH_DIR = find_ai_search_dir()
 
+# Where this levels_bench package itself lives (tools/benchmark), used for benchmark output
+# (results, logs, workspaces) so it's kept separate from tools/ai_search's agent/runtime code.
+BENCHMARK_DIR = Path(__file__).resolve().parent.parent
+
 
 @dataclass
 class BenchConfig:
@@ -59,7 +66,7 @@ class BenchConfig:
     use_mcp: bool = False  # True if levels_mcp_server.py is running
     mcp_url: str = "http://127.0.0.1:8000/mcp"
     master_db: str = "data/oceans_11/ocean_11_datasets.db"
-    results_dir: str = str(AI_SEARCH_DIR / "levels_benchmark_results")
+    results_dir: str = str(BENCHMARK_DIR / "levels_benchmark_results")
     run_id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
     # Parallelism: number of worker processes running agent tasks concurrently. Bounded by
     # the AI portal's rate limits rather than local CPU, since tasks are network-bound.
@@ -106,10 +113,12 @@ def load_api_key(key_file: str = "portal_api_key.txt") -> None:
 
 
 def init(load_key: bool = True, **overrides: Any) -> BenchConfig:
-    """Notebook entry point: put tools/ai_search on sys.path and make it the cwd, load the
-    API key, and apply config overrides."""
-    if str(AI_SEARCH_DIR) not in sys.path:
-        sys.path.insert(0, str(AI_SEARCH_DIR))
+    """Notebook entry point: put tools/ai_search (and this package's own tools/benchmark
+    directory) on sys.path, chdir to tools/ai_search so relative agent/data paths resolve,
+    load the API key, and apply config overrides."""
+    for d in (AI_SEARCH_DIR, BENCHMARK_DIR):
+        if str(d) not in sys.path:
+            sys.path.insert(0, str(d))
     os.chdir(AI_SEARCH_DIR)
     if load_key:
         load_api_key()

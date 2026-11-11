@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from multiprocessing.connection import wait
 from typing import Callable, Dict, List, Optional, Sequence
 
-from .config import AI_SEARCH_DIR, CONFIG, snapshot
+from .config import AI_SEARCH_DIR, BENCHMARK_DIR, CONFIG, snapshot
 from .core import BenchmarkTask, TaskResult, failed_result
 from .results import append_partial, load_partial, partial_path, save_results
 
@@ -52,9 +52,10 @@ class _Worker:
     received: set = field(default_factory=set)
 
 
-def _worker_main(conn, cfg: dict, ai_search_dir: str, log_path: str) -> None:
-    if ai_search_dir not in sys.path:
-        sys.path.insert(0, ai_search_dir)
+def _worker_main(conn, cfg: dict, ai_search_dir: str, benchmark_dir: str, log_path: str) -> None:
+    for d in (ai_search_dir, benchmark_dir):
+        if d not in sys.path:
+            sys.path.insert(0, d)
     os.chdir(ai_search_dir)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     log = open(log_path, "a", buffering=1, encoding="utf-8")
@@ -125,8 +126,9 @@ def _run_in_pool(jobs: List[_Job], n_workers: int, on_result: Callable[[TaskResu
     ctx = mp.get_context("spawn")
     cfg = snapshot()
     os.chdir(AI_SEARCH_DIR)
-    if str(AI_SEARCH_DIR) not in sys.path:
-        sys.path.insert(0, str(AI_SEARCH_DIR))
+    for d in (AI_SEARCH_DIR, BENCHMARK_DIR):
+        if str(d) not in sys.path:
+            sys.path.insert(0, str(d))
 
     pending = list(jobs)
     workers: List[_Worker] = []
@@ -136,7 +138,11 @@ def _run_in_pool(jobs: List[_Job], n_workers: int, on_result: Callable[[TaskResu
         nonlocal spawned
         parent_conn, child_conn = ctx.Pipe()
         log_path = str(CONFIG.run_dir / "logs" / f"worker_{spawned:02d}.log")
-        proc = ctx.Process(target=_worker_main, args=(child_conn, cfg, str(AI_SEARCH_DIR), log_path), daemon=True)
+        proc = ctx.Process(
+            target=_worker_main,
+            args=(child_conn, cfg, str(AI_SEARCH_DIR), str(BENCHMARK_DIR), log_path),
+            daemon=True,
+        )
         proc.start()
         child_conn.close()
         spawned += 1
