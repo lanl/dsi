@@ -64,6 +64,17 @@ struct StoreResult {
     std::unordered_map<std::string, std::string> manifestRoots; // rel_path -> immutable root
 };
 
+// Result of an explicit pack compaction. The caller atomically replaces its
+// file-version manifest roots with `manifestRoots` after this returns. Old
+// packs are deliberately retained: roots outside the supplied live set may
+// still reference them and can be collected only after repository-wide reachability
+// is known.
+struct PackGcResult {
+    std::unordered_map<std::string, std::string> manifestRoots;
+    std::size_t liveChunks = 0;
+    std::size_t rewrittenPacks = 0;
+};
+
 // needs_data predicate: given a chunk's hex digest, should we copy its payload?
 // (Empty => always copy, matching the Python `None` default.)
 using NeedsData = std::function<bool(const std::string&)>;
@@ -167,17 +178,21 @@ std::vector<Chunk> chunkFileParallel(const std::string& path,
                                      ParallelOptions opt = {});
 
 // -------------------------------------------------------------------------
-// File-only chunk storage (SQL removed).
+// File-only chunk storage (SQL removed). New payloads are appended to private
+// temporary packs, then committed through a repository-wide digest index;
+// legacy loose objects remain readable during migration.
 // -------------------------------------------------------------------------
 
 // storeChunksForSnapshot():
-//   for each "file" entry, chunk it, write any not-yet-published chunk blobs to
-//   <chunk_root>/dsi_vcs_chunks/<sha256> via atomic temp-file+rename, and
-//   compute the per-file hash (sha256 over the ordered chunk hex digests).
+//   for each "file" entry, chunk it, append any not-yet-published payloads to
+//   worker-private temporary packs, atomically publish winning packs and the
+//   digest index, then publish immutable manifest pages carrying pack id,
+//   offset, and stored length. It computes the per-file hash (sha256 over the
+//   ordered chunk hex digests).
 // `threads` > 1 selects the multiprocess layout (legacy parameter name).
 // Workers open the filename, read bounded ranges into private buffers, hash,
-// check a process-shared existence cache, and atomically publish new blobs.
-// Parent/worker IPC carries only range descriptors and ordered chunk metadata.
+// and stage data in private pack fragments. The repository index transaction
+// resolves competing writers before the manifest is published.
 // Replies are collected as ready into separate worker lists; an available
 // worker receives its next unit without waiting for earlier units to finish.
 // Boundary spans are finalized in workers after tail merges are resolved.
@@ -197,6 +212,14 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                                    std::size_t threads = 0,
                                    const std::unordered_map<std::string, std::string>& baseManifestRoots = {});
 
+// Repack the chunks reachable from the supplied manifest roots into fresh
+// immutable pack(s), atomically swap the repository hash index, and return
+// replacement roots whose entries name the new physical locations.  The map
+// key is caller metadata (normally relative path) and is preserved verbatim.
+PackGcResult garbageCollectPacks(
+    const std::string& chunkRoot,
+    const std::unordered_map<std::string, std::string>& liveManifestRoots);
+
 // Stream a file version directly from its manifest root; no complete chunk list
 // or commit ancestry lookup is required. The legacy vector overload remains.
 bool rebuildFileFromManifest(const std::string& chunkRoot,
@@ -207,7 +230,8 @@ bool rebuildFileFromManifest(const std::string& chunkRoot,
 
 // rebuildFileFromChunks():
 //   verify the ordered chunk digests reproduce `fileHash`, then concatenate the
-//   blob payloads (from the on-disk store) into <output_path>/<relative_path>.
+//   packed (or legacy loose) payloads from the on-disk store into
+//   <output_path>/<relative_path>.
 // The ordered chunk list stands in for the rows the original read from the now
 // removed `chunk_store` SQL table. Returns false on any mismatch / missing blob.
 // `commitHash` is kept for signature parity (unused: no DB to filter on).

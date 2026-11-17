@@ -19,8 +19,12 @@
 
 namespace chunking {
 namespace {
-constexpr const char* kMagic = "DSIMCP01";
+constexpr const char* kMagicV1 = "DSIMCP01";
+constexpr const char* kMagicV2 = "DSIMCP02";
 constexpr std::size_t kHeaderSize = 41;
+constexpr std::size_t kLeafEntryV1Size = 40;
+constexpr std::size_t kLeafEntryV2Size = 88;
+constexpr std::size_t kInternalEntrySize = 56;
 
 std::uint64_t checkedAdd(std::uint64_t a, std::uint64_t b) {
     if (b > std::numeric_limits<std::uint64_t>::max() - a)
@@ -89,6 +93,9 @@ struct FileManifest::Impl {
     struct AppendChunk {
         std::array<std::uint8_t, 32> hash{};
         std::uint64_t size = 0;
+        std::array<std::uint8_t, 32> packId{};
+        std::uint64_t packOffset = 0;
+        std::uint64_t storedSize = 0;
     };
     struct Cached {
         std::shared_ptr<Node> node;
@@ -165,7 +172,7 @@ struct FileManifest::Impl {
         std::ifstream in(path, std::ios::binary | std::ios::ate);
         if (!in) throw std::runtime_error("cannot open manifest object: " + path);
         const auto length = in.tellg();
-        const auto maximum = kHeaderSize + splitAt() * 56;
+        const auto maximum = kHeaderSize + splitAt() * kLeafEntryV2Size;
         if (length < static_cast<std::streamoff>(kHeaderSize) ||
             length > static_cast<std::streamoff>(maximum))
             throw std::runtime_error("invalid manifest object length");
@@ -174,7 +181,9 @@ struct FileManifest::Impl {
         if (!in.read(payload.data(), static_cast<std::streamsize>(payload.size())))
             throw std::runtime_error("cannot read manifest object");
         if (sha256Hex(payload) != hash) throw std::runtime_error("manifest checksum mismatch");
-        if (payload.compare(0, 8, kMagic) != 0)
+        const bool v1 = payload.compare(0, 8, kMagicV1) == 0;
+        const bool v2 = payload.compare(0, 8, kMagicV2) == 0;
+        if (!v1 && !v2)
             throw std::runtime_error("unsupported manifest format");
         std::size_t pos = 8;
         if (get(payload, pos, 4) != options.pageEntries)
@@ -187,7 +196,8 @@ struct FileManifest::Impl {
         advertised.byteCount = get(payload, pos, 8);
         advertised.minDepth = static_cast<std::uint32_t>(get(payload, pos, 4));
         advertised.maxDepth = static_cast<std::uint32_t>(get(payload, pos, 4));
-        if (count >= splitAt() || payload.size() != kHeaderSize + count * (kind == 0 ? 40 : 56))
+        const auto entrySize = kind == 0 ? (v1 ? kLeafEntryV1Size : kLeafEntryV2Size) : kInternalEntrySize;
+        if (count >= splitAt() || payload.size() != kHeaderSize + count * entrySize)
             throw std::runtime_error("invalid manifest entry count");
         auto node = std::make_shared<Node>();
         node->leaf = kind == 0;
@@ -196,7 +206,18 @@ struct FileManifest::Impl {
             if (node->leaf) {
                 auto size = get(payload, pos, 8);
                 if (size == 0) throw std::runtime_error("zero-length manifest chunk");
-                node->chunks.push_back({std::move(digest), size});
+                ManifestChunk chunk{std::move(digest), size};
+                if (v2) {
+                    chunk.packId = getHash(payload, pos);
+                    chunk.packOffset = get(payload, pos, 8);
+                    chunk.storedSize = get(payload, pos, 8);
+                    if (chunk.packId == std::string(64, '0') && !chunk.packOffset && !chunk.storedSize) {
+                        chunk.packId.clear();
+                    } else if (chunk.storedSize != chunk.size) {
+                        throw std::runtime_error("invalid packed manifest chunk");
+                    }
+                }
+                node->chunks.push_back(std::move(chunk));
             } else {
                 ManifestSummary s;
                 s.chunkCount = get(payload, pos, 8);
@@ -258,6 +279,16 @@ struct FileManifest::Impl {
         for (std::size_t i = 0; i < packed.hash.size(); ++i)
             packed.hash[i] = static_cast<std::uint8_t>(nibble(chunk.hash[i * 2]) * 16 +
                                                        nibble(chunk.hash[i * 2 + 1]));
+        if (!chunk.packId.empty()) {
+            checkHash(chunk.packId);
+            if (chunk.storedSize != chunk.size)
+                throw std::invalid_argument("packed manifest chunk stored size mismatch");
+            for (std::size_t i = 0; i < packed.packId.size(); ++i)
+                packed.packId[i] = static_cast<std::uint8_t>(nibble(chunk.packId[i * 2]) * 16 +
+                                                             nibble(chunk.packId[i * 2 + 1]));
+            packed.packOffset = chunk.packOffset;
+            packed.storedSize = chunk.storedSize;
+        }
         return packed;
     }
 
@@ -268,7 +299,18 @@ struct FileManifest::Impl {
             hash[i * 2] = hex[packed.hash[i] >> 4];
             hash[i * 2 + 1] = hex[packed.hash[i] & 15];
         }
-        return {std::move(hash), packed.size};
+        ManifestChunk chunk{std::move(hash), packed.size};
+        if (packed.storedSize) {
+            std::string packId(64, '0');
+            for (std::size_t i = 0; i < packed.packId.size(); ++i) {
+                packId[i * 2] = hex[packed.packId[i] >> 4];
+                packId[i * 2 + 1] = hex[packed.packId[i] & 15];
+            }
+            chunk.packId = std::move(packId);
+            chunk.packOffset = packed.packOffset;
+            chunk.storedSize = packed.storedSize;
+        }
+        return chunk;
     }
 
     void refreshAppendDepth() {
@@ -404,7 +446,7 @@ struct FileManifest::Impl {
 
     std::string encode(const Node& node) const {
         const auto s = summarize(node);
-        std::string payload(kMagic, 8);
+        std::string payload(kMagicV2, 8);
         put(payload, options.pageEntries, 4);
         put(payload, node.leaf ? 0 : 1, 1);
         put(payload, node.size(), 4);
@@ -413,7 +455,20 @@ struct FileManifest::Impl {
         put(payload, s.minDepth, 4);
         put(payload, s.maxDepth, 4);
         if (node.leaf) {
-            for (const auto& c : node.chunks) { putHash(payload, c.hash); put(payload, c.size, 8); }
+            for (const auto& c : node.chunks) {
+                putHash(payload, c.hash); put(payload, c.size, 8);
+                // New manifests always use the v2 record layout.  Empty
+                // locations keep hand-built manifests readable as legacy
+                // loose-object references during migration.
+                if (c.packId.empty()) {
+                    payload.append(32, '\0'); put(payload, 0, 8); put(payload, 0, 8);
+                } else {
+                    checkHash(c.packId);
+                    if (c.storedSize != c.size)
+                        throw std::runtime_error("packed manifest chunk stored size mismatch");
+                    putHash(payload, c.packId); put(payload, c.packOffset, 8); put(payload, c.storedSize, 8);
+                }
+            }
         } else {
             for (const auto& c : node.children) {
                 putHash(payload, c.hash);

@@ -58,8 +58,11 @@ std::string sha256Hex(const std::string& s) { return sha256Hex(s.data(), s.size(
 Sha256Ctx::Sha256Ctx() {
     ctx_ = EVP_MD_CTX_new();
     if (ctx_ == nullptr) throw std::runtime_error("EVP_MD_CTX_new failed");
-    if (EVP_DigestInit_ex(ctx_, EVP_sha256(), nullptr) != 1)
+    if (EVP_DigestInit_ex(ctx_, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(ctx_);
+        ctx_ = nullptr;
         throw std::runtime_error("EVP_DigestInit_ex failed");
+    }
 }
 
 Sha256Ctx::~Sha256Ctx() {
@@ -74,10 +77,12 @@ void Sha256Ctx::update(const void* data, std::size_t len) {
 void Sha256Ctx::reset() {
     EVP_MD_CTX* c = EVP_MD_CTX_new();
     if (c == nullptr) throw std::runtime_error("EVP_MD_CTX_new failed");
+    if (EVP_DigestInit_ex(c, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(c);
+        throw std::runtime_error("EVP_DigestInit_ex failed");
+    }
     EVP_MD_CTX_free(ctx_);
     ctx_ = c;
-    if (EVP_DigestInit_ex(ctx_, EVP_sha256(), nullptr) != 1)
-        throw std::runtime_error("EVP_DigestInit_ex failed");
 }
 
 std::array<std::uint8_t, 32> Sha256Ctx::rawdigest() const {

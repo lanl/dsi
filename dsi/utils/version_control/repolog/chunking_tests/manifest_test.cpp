@@ -277,6 +277,23 @@ void storageRoundTrip() {
     FileEntry file{source.string(), relative, "file"};
     auto first = storeChunksForSnapshot(repo.string(), {file});
     require(first.manifestRoots.size() == 1, "store did not return root");
+    FileManifest firstManifest(repo.string(), {}, first.manifestRoots.at(relative));
+    const auto firstChunk = firstManifest.at(0);
+    require(!firstChunk.packId.empty() && firstChunk.storedSize == firstChunk.size,
+            "stored manifest chunk lacks packed location");
+    require(fs::exists(repo / "dsi_vcs_packs" / "packs" / (firstChunk.packId + ".pack")),
+            "stored pack is not published");
+    require(!fs::exists(repo / "dsi_vcs_chunks" / firstChunk.hash),
+            "new storage unexpectedly published a loose chunk blob");
+    const auto compacted = garbageCollectPacks(repo.string(), {{relative, first.manifestRoots.at(relative)}});
+    require(compacted.liveChunks > 0 && compacted.liveChunks <= firstManifest.summary().chunkCount &&
+                compacted.rewrittenPacks == 1,
+            "pack GC did not rewrite the live chunk set");
+    require(rebuildFileFromManifest(repo.string(), relative, compacted.manifestRoots.at(relative),
+                                   first.fileHashes.at(relative), (dir.path / "compacted").string()),
+            "compacted manifest restore failed");
+    require(read(dir.path / "compacted" / relative) == initial,
+            "compacted manifest restored wrong bytes");
     auto same = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
     require(same.manifestRoots == first.manifestRoots, "unchanged file did not reuse root");
     auto checkRestore = [&](const StoreResult& result, const std::string& expected, const std::string& name) {
@@ -310,7 +327,7 @@ void storageRoundTrip() {
                                     first.fileHashes.at(relative), dir.path.string()), "escaping path accepted");
     // Correct manifest and file hash must still reject damaged payload bytes.
     FileManifest stored(repo.string(), {}, first.manifestRoots.at(relative));
-    auto payload = repo / "dsi_vcs_chunks" / stored.at(0).hash;
+    auto payload = repo / "dsi_vcs_packs" / "packs" / (stored.at(0).packId + ".pack");
     write(payload, "bad bytes");
     require(!rebuildFileFromManifest(repo.string(), relative, first.manifestRoots.at(relative),
                                     first.fileHashes.at(relative), (dir.path / "old").string()),

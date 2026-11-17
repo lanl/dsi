@@ -14,7 +14,14 @@ inline constexpr const char* MANIFEST_STORAGE_DIR = "dsi_vcs_manifests";
 struct ManifestChunk {
     std::string hash;
     std::uint64_t size = 0;
+    // Empty means a legacy loose object at dsi_vcs_chunks/<hash>.  Packed
+    // entries name an immutable pack and a byte range within it.
+    std::string packId;
+    std::uint64_t packOffset = 0;
+    std::uint64_t storedSize = 0;
     bool operator==(const ManifestChunk& other) const {
+        // Logical equality deliberately ignores physical placement.  This is
+        // what lets a new snapshot reuse a chunk already stored in a pack.
         return hash == other.hash && size == other.size;
     }
     bool operator!=(const ManifestChunk& other) const { return !(*this == other); }

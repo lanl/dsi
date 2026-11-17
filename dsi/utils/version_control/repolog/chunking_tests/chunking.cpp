@@ -16,9 +16,12 @@
 #include <fstream>
 #include <filesystem>
 #include <list>
+#include <map>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -54,6 +57,8 @@ constexpr std::uint64_t     kRollingMod         = ((std::uint64_t)1 << 61) - 1;
 
 // Storage layout (file-only).
 const std::string kChunkStorageDir = "dsi_vcs_chunks";
+const std::string kPackStorageDir = "dsi_vcs_packs";
+const std::string kPackFilesDir = "packs";
 constexpr std::size_t kExistenceCacheCap = 8192;   // CHUNK_EXISTENCE_CACHE_SIZE
 
 // HyperLogLog parameters: the top kHllPrecision bits of the 64-bit hash pick
@@ -403,6 +408,282 @@ std::string dirNameOf(const std::string& path) {
 bool pathExists(const std::string& path) {
     struct ::stat st {};
     return ::stat(path.c_str(), &st) == 0;
+}
+
+std::string readWholeFile(const std::string& path);
+
+void writeAllFd(int fd, const char* data, std::size_t size, const char* what) {
+    std::size_t offset = 0;
+    while (offset < size) {
+        const auto written = ::write(fd, data + offset, size - offset);
+        if (written < 0 && errno == EINTR) continue;
+        if (written <= 0) throw std::runtime_error(std::string(what) + ": " + std::strerror(errno));
+        offset += static_cast<std::size_t>(written);
+    }
+}
+
+void syncDirectory(const std::string& path, const char* what) {
+    const int fd = ::open(path.c_str(), O_RDONLY | O_DIRECTORY);
+    if (fd < 0) throw std::runtime_error(std::string(what) + ": " + std::strerror(errno));
+    const int result = ::fsync(fd);
+    const int saved = errno;
+    ::close(fd);
+    if (result != 0) throw std::runtime_error(std::string(what) + ": " + std::strerror(saved));
+}
+
+// A physical location is immutable once its pack is published.  The manifest
+// stores this information redundantly so reconstruction does not require the
+// mutable global index; the index is only for dedup/existence lookup.
+struct PackLocation {
+    std::string packId;
+    std::uint64_t offset = 0;
+    std::uint64_t storedSize = 0;
+    bool operator==(const PackLocation& other) const {
+        return packId == other.packId && offset == other.offset && storedSize == other.storedSize;
+    }
+    bool operator!=(const PackLocation& other) const { return !(*this == other); }
+};
+
+class IndexLock {
+public:
+    explicit IndexLock(const std::string& path) {
+        fd_ = ::open(path.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+        if (fd_ < 0) throw std::runtime_error("pack index lock open failed");
+        struct flock lock {};
+        lock.l_type = F_WRLCK; lock.l_whence = SEEK_SET; lock.l_len = 1;
+        while (::fcntl(fd_, F_SETLKW, &lock) != 0) {
+            if (errno != EINTR) {
+                const int saved = errno;
+                ::close(fd_);
+                fd_ = -1;
+                throw std::runtime_error("pack index lock failed: " + std::string(std::strerror(saved)));
+            }
+        }
+    }
+    ~IndexLock() {
+        if (fd_ < 0) return;
+        struct flock lock {};
+        lock.l_type = F_UNLCK; lock.l_whence = SEEK_SET; lock.l_len = 1;
+        while (::fcntl(fd_, F_SETLK, &lock) != 0 && errno == EINTR) {}
+        ::close(fd_);
+    }
+    IndexLock(const IndexLock&) = delete;
+private:
+    int fd_ = -1;
+};
+
+class TemporaryPack {
+public:
+    TemporaryPack(const std::string& packsDir, std::string id)
+        : packsDir_(packsDir), id_(std::move(id)) {
+        std::string pattern = packsDir_ + "/." + id_ + ".tmpXXXXXX";
+        std::vector<char> name(pattern.begin(), pattern.end()); name.push_back('\0');
+        fd_ = ::mkstemp(name.data());
+        if (fd_ < 0) throw std::runtime_error("pack mkstemp failed");
+        temporaryPath_ = name.data();
+        if (::fchmod(fd_, 0644) != 0) {
+            const int saved = errno; ::close(fd_); fd_ = -1; ::unlink(temporaryPath_.c_str());
+            throw std::runtime_error("pack chmod failed: " + std::string(std::strerror(saved)));
+        }
+    }
+    ~TemporaryPack() {
+        if (fd_ >= 0) ::close(fd_);
+        if (!temporaryPath_.empty()) ::unlink(temporaryPath_.c_str());
+    }
+    TemporaryPack(const TemporaryPack&) = delete;
+
+    PackLocation append(const std::string& hash, const char* bytes, std::size_t size) {
+        if (fd_ < 0 || !size) throw std::runtime_error("cannot append a closed/empty pack record");
+        const PackLocation location{id_, offset_, static_cast<std::uint64_t>(size)};
+        writeAllFd(fd_, bytes, size, "pack write");
+        offset_ += size;
+        (void)hash;  // Digest-to-location ownership belongs to PackRepository's index.
+        return location;
+    }
+    void seal() {
+        if (fd_ < 0) return;
+        if (::fsync(fd_) != 0) throw std::runtime_error("pack fsync failed: " + std::string(std::strerror(errno)));
+        if (::close(fd_) != 0) { fd_ = -1; throw std::runtime_error("pack close failed"); }
+        fd_ = -1;
+    }
+    void publish() {
+        if (!offset_) return;
+        seal();
+        const auto destination = packsDir_ + "/" + id_ + ".pack";
+        if (::rename(temporaryPath_.c_str(), destination.c_str()) != 0)
+            throw std::runtime_error("pack rename failed: " + std::string(std::strerror(errno)));
+        temporaryPath_.clear();
+        syncDirectory(packsDir_, "pack directory fsync failed");
+    }
+    void discard() {
+        if (fd_ >= 0) { ::close(fd_); fd_ = -1; }
+        if (!temporaryPath_.empty()) { ::unlink(temporaryPath_.c_str()); temporaryPath_.clear(); }
+    }
+    bool empty() const { return offset_ == 0; }
+    const std::string& id() const { return id_; }
+private:
+    std::string packsDir_, id_, temporaryPath_;
+    std::uint64_t offset_ = 0;
+    int fd_ = -1;
+};
+
+class PackRepository {
+public:
+    explicit PackRepository(const std::string& root)
+        : root_(root + "/" + kPackStorageDir), packsDir_(root_ + "/" + kPackFilesDir),
+          indexPath_(root_ + "/index"), lockPath_(root_ + "/index.lock") {
+        mkdirP(packsDir_);
+        index_ = readIndex();
+    }
+    std::optional<PackLocation> lookup(const std::string& hash) const {
+        const auto found = index_.find(hash);
+        if (found == index_.end()) return std::nullopt;
+        return found->second;
+    }
+    const std::string& packsDir() const { return packsDir_; }
+    std::string nextPackId(std::size_t worker) {
+        static std::atomic<std::uint64_t> sequence{0};
+        return sha256Hex(root_ + ":" + std::to_string(::getpid()) + ":" +
+                         std::to_string(sequence.fetch_add(1)) + ":" + std::to_string(worker));
+    }
+
+    // Seal all writer-owned temporary packs, choose a single global location
+    // for each digest under the repository lock, publish only winning packs,
+    // then atomically replace the global index.  A crash before the index swap
+    // leaves only ignored temporary files; a crash afterwards may leave an
+    // unreferenced pack/index entry, which is safe and reclaimed by GC.
+    std::unordered_map<std::string, PackLocation> commit(
+        std::vector<std::unique_ptr<TemporaryPack>>& packs,
+        const std::unordered_map<std::string, PackLocation>& proposed) {
+        for (auto& pack : packs) pack->seal();
+        IndexLock lock(lockPath_);
+        auto merged = readIndex();  // includes concurrent writers committed since construction
+        for (const auto& item : proposed)
+            if (merged.find(item.first) == merged.end()) merged.emplace(item.first, item.second);
+
+        std::set<std::string> winners;
+        for (const auto& item : proposed) {
+            const auto chosen = merged.at(item.first);
+            if (chosen.packId == item.second.packId && chosen.offset == item.second.offset)
+                winners.insert(chosen.packId);
+        }
+        for (auto& pack : packs) {
+            if (winners.count(pack->id())) pack->publish();
+            else pack->discard();
+        }
+        if (merged != index_) writeIndex(merged);
+        index_ = std::move(merged);
+
+        std::unordered_map<std::string, PackLocation> resolved;
+        resolved.reserve(proposed.size());
+        for (const auto& item : proposed) resolved.emplace(item.first, index_.at(item.first));
+        return resolved;
+    }
+
+    void replaceIndex(std::vector<std::unique_ptr<TemporaryPack>>& packs,
+                      const std::unordered_map<std::string, PackLocation>& live) {
+        for (auto& pack : packs) pack->seal();
+        IndexLock lock(lockPath_);
+        for (auto& pack : packs) {
+            if (!pack->empty()) pack->publish();
+            else pack->discard();
+        }
+        writeIndex(live);
+        index_ = live;
+    }
+
+private:
+    std::unordered_map<std::string, PackLocation> readIndex() const {
+        std::unordered_map<std::string, PackLocation> out;
+        std::ifstream input(indexPath_);
+        if (!input) {
+            if (errno == ENOENT) return out;
+            return out;  // absent index is the normal first-store case
+        }
+        std::string header;
+        if (!std::getline(input, header) || header != "DSI_PACK_INDEX_V1")
+            throw std::runtime_error("invalid pack index header");
+        std::string hash, pack, offset, length;
+        while (input >> hash >> pack >> offset >> length) {
+            if (hash.size() != 64 || pack.size() != 64 ||
+                hash.find_first_not_of("0123456789abcdef") != std::string::npos ||
+                pack.find_first_not_of("0123456789abcdef") != std::string::npos)
+                throw std::runtime_error("invalid pack index digest");
+            PackLocation location{pack, std::stoull(offset), std::stoull(length)};
+            if (!location.storedSize || !out.emplace(hash, location).second)
+                throw std::runtime_error("invalid/duplicate pack index record");
+        }
+        if (!input.eof()) throw std::runtime_error("truncated pack index");
+        return out;
+    }
+    void writeIndex(const std::unordered_map<std::string, PackLocation>& index) const {
+        std::vector<std::string> hashes;
+        hashes.reserve(index.size());
+        for (const auto& item : index) hashes.push_back(item.first);
+        std::sort(hashes.begin(), hashes.end());
+        std::string payload("DSI_PACK_INDEX_V1\n");
+        for (const auto& hash : hashes) {
+            const auto& location = index.at(hash);
+            payload += hash + " " + location.packId + " " + std::to_string(location.offset) +
+                       " " + std::to_string(location.storedSize) + "\n";
+        }
+        std::string pattern = root_ + "/.index.tmpXXXXXX";
+        std::vector<char> name(pattern.begin(), pattern.end()); name.push_back('\0');
+        int fd = ::mkstemp(name.data());
+        if (fd < 0) throw std::runtime_error("pack index mkstemp failed");
+        try {
+            if (::fchmod(fd, 0644) != 0) throw std::runtime_error("pack index chmod failed");
+            writeAllFd(fd, payload.data(), payload.size(), "pack index write");
+            if (::fsync(fd) != 0) throw std::runtime_error("pack index fsync failed");
+            if (::close(fd) != 0) { fd = -1; throw std::runtime_error("pack index close failed"); }
+            fd = -1;
+            if (::rename(name.data(), indexPath_.c_str()) != 0) throw std::runtime_error("pack index rename failed");
+            syncDirectory(root_, "pack index directory fsync failed");
+        } catch (...) {
+            if (fd >= 0) ::close(fd);
+            ::unlink(name.data());
+            throw;
+        }
+    }
+
+    std::string root_, packsDir_, indexPath_, lockPath_;
+    std::unordered_map<std::string, PackLocation> index_;
+};
+
+std::string readPackedPayload(const std::string& chunkRoot, const ManifestChunk& chunk) {
+    if (chunk.packId.empty()) return readWholeFile(chunkRoot + "/" + kChunkStorageDir + "/" + chunk.hash);
+    if (chunk.packId.size() != 64 ||
+        chunk.packId.find_first_not_of("0123456789abcdef") != std::string::npos ||
+        chunk.storedSize != chunk.size)
+        throw std::runtime_error("invalid packed chunk location");
+    const auto path = chunkRoot + "/" + kPackStorageDir + "/" + kPackFilesDir + "/" + chunk.packId + ".pack";
+    int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) throw std::runtime_error("missing packed chunk payload");
+    struct stat info {};
+    if (::fstat(fd, &info) != 0 || info.st_size < 0 ||
+        chunk.packOffset > static_cast<std::uint64_t>(info.st_size) ||
+        chunk.storedSize > static_cast<std::uint64_t>(info.st_size) - chunk.packOffset) {
+        ::close(fd);
+        throw std::runtime_error("invalid packed chunk range");
+    }
+    try {
+        std::string payload(static_cast<std::size_t>(chunk.storedSize), '\0');
+        std::size_t done = 0;
+        while (done < payload.size()) {
+            const auto count = ::pread(fd, payload.data() + done, payload.size() - done,
+                                       static_cast<off_t>(chunk.packOffset + done));
+            if (count < 0 && errno == EINTR) continue;
+            if (count <= 0) throw std::runtime_error("packed chunk read failed");
+            done += static_cast<std::size_t>(count);
+        }
+        const int closeResult = ::close(fd);
+        fd = -1;
+        if (closeResult != 0) throw std::runtime_error("packed chunk close failed");
+        return payload;
+    } catch (...) {
+        if (fd >= 0) ::close(fd);
+        throw;
+    }
 }
 
 // Atomic blob publication: temp file in the chunk dir (mkstemp) + chmod 0644 +
@@ -1395,10 +1676,11 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
 
     const std::string chunkDir = chunkRoot + "/" + kChunkStorageDir;
     mkdirP(chunkDir);
+    PackRepository repository(chunkRoot);
 
     StoreResult res;
     ExistenceCache cache([&](const std::string& digest) {
-        return pathExists(chunkDir + "/" + digest);
+        return repository.lookup(digest).has_value() || pathExists(chunkDir + "/" + digest);
     });
 
     // Persistence: reload the HyperLogLog sketch saved by the previous
@@ -1407,25 +1689,107 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
     // distinct-count estimate stays cumulative.  A missing or unreadable
     // state file just starts the sketch fresh.
     loadHllState(chunkDir, cache.seenHll());
-    std::unique_ptr<detail::SharedExistenceCache> sharedCache;
-    if (threads > 1) {
-        sharedCache = std::make_unique<detail::SharedExistenceCache>(chunkDir, cache.seenHll().registers());
-    }
-
     auto chunkExists = [&](const std::string& digest) -> bool {
-        return cache.get(digest);
+        // Keep the HLL/LRU cache's publication rule: this call does not add
+        // a positive entry for a merely staged or index-only pack record.
+        // The index fallback keeps dedup correct after a crash between the
+        // index transaction and a caller's manifest-root commit.
+        return cache.get(digest) || repository.lookup(digest).has_value() ||
+               pathExists(chunkDir + "/" + digest);
     };
 
-    auto remember = [&](const std::string& digest, bool exists) {
-        cache.put(digest, exists);
+    struct RecordedFile {
+        const FileEntry* entry = nullptr;
+        std::vector<ManifestChunk> chunks;
+        std::string fileHash;
     };
+    std::vector<RecordedFile> files;
+    const std::size_t workerCount = std::max<std::size_t>(1, threads);
+    std::vector<std::unique_ptr<TemporaryPack>> pendingPacks;
+    pendingPacks.reserve(workerCount);
+    for (std::size_t worker = 0; worker < workerCount; ++worker)
+        pendingPacks.push_back(std::make_unique<TemporaryPack>(repository.packsDir(), repository.nextPackId(worker)));
+    std::unordered_map<std::string, PackLocation> proposed;
+    std::size_t nextWriter = 0;
 
     for (const FileEntry& entry : entries) {
         if (entry.fileType != "file") continue;
-
-        const std::string& fileRel = entry.relativePath;
+        RecordedFile file;
+        file.entry = &entry;
         Sha256Ctx h;
-        std::size_t count = 0;
+        auto body = [&](const Chunk& chunk) {
+            h.update(chunk.sha256);
+            ManifestChunk stored{chunk.sha256, static_cast<std::uint64_t>(chunk.size)};
+            if (const auto existing = repository.lookup(chunk.sha256)) {
+                stored.packId = existing->packId;
+                stored.packOffset = existing->offset;
+                stored.storedSize = existing->storedSize;
+            } else if (const auto pending = proposed.find(chunk.sha256); pending != proposed.end()) {
+                stored.packId = pending->second.packId;
+                stored.packOffset = pending->second.offset;
+                stored.storedSize = pending->second.storedSize;
+            } else if (pathExists(chunkDir + "/" + chunk.sha256)) {
+                // Read-only compatibility with repositories produced by the
+                // former loose-object writer. New payloads are never loose.
+            } else {
+                if (!chunk.data) throw std::runtime_error("new packed chunk payload was not retained");
+                auto& writer = *pendingPacks[nextWriter++ % pendingPacks.size()];
+                const auto location = writer.append(chunk.sha256, chunk.data->data(), chunk.data->size());
+                proposed.emplace(chunk.sha256, location);
+                stored.packId = location.packId;
+                stored.packOffset = location.offset;
+                stored.storedSize = location.storedSize;
+            }
+            res.chunkHashes.insert(chunk.sha256);
+            file.chunks.push_back(std::move(stored));
+        };
+
+        if (threads > 1) {
+            // Workers return metadata only.  Retaining requestData for every
+            // returned Chunk copied an entire input into the parent's result
+            // vector before packing it.  Read only a bounded payload for a
+            // genuinely new digest, and keep all duplicate chunks metadata-only.
+            ParallelOptions options;
+            options.processes = threads;
+            options.requestData = false;
+            auto chunks = chunkFileParallel(entry.absolutePath, options);
+            Descriptor source{::open(entry.absolutePath.c_str(), O_RDONLY | O_CLOEXEC)};
+            if (source.fd < 0) throw std::runtime_error("parallel packed store cannot open source");
+            std::uint64_t offset = 0;
+            for (auto& chunk : chunks) {
+                const bool alreadyStaged = proposed.find(chunk.sha256) != proposed.end();
+                if (!alreadyStaged && !chunkExists(chunk.sha256) &&
+                    !pathExists(chunkDir + "/" + chunk.sha256)) {
+                    chunk.data.emplace(chunk.size, '\0');
+                    readFileRange(source.fd, reinterpret_cast<std::uint8_t*>(chunk.data->data()),
+                                  chunk.size, static_cast<std::size_t>(offset));
+                }
+                body(chunk);
+                offset += chunk.size;
+            }
+        } else {
+            chunkFileStream(entry.absolutePath,
+                            [&](const std::string& digest) {
+                                return !chunkExists(digest);
+                            },
+                            body);
+        }
+        file.fileHash = h.hexdigest();
+        files.push_back(std::move(file));
+    }
+
+    const auto committed = repository.commit(pendingPacks, proposed);
+    for (auto& file : files) for (auto& chunk : file.chunks) {
+        const auto replacement = committed.find(chunk.hash);
+        if (replacement != committed.end()) {
+            chunk.packId = replacement->second.packId;
+            chunk.packOffset = replacement->second.offset;
+            chunk.storedSize = replacement->second.storedSize;
+        }
+    }
+
+    for (const auto& file : files) {
+        const std::string& fileRel = file.entry->relativePath;
         const auto base = baseManifestRoots.find(fileRel);
         const bool hasBaseManifest = base != baseManifestRoots.end();
         FileManifest manifest(chunkRoot, {}, hasBaseManifest ? base->second : "");
@@ -1435,109 +1799,41 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         bool exactInheritedPrefix = hasBaseManifest;
         bool appendingNewSuffix = false;
         constexpr std::size_t lookahead = 64;
-        std::uint64_t checkpointOperations = 0;
-
-        // Resolve a bounded window of old/new chunk references. Exact edit
-        // callers can use FileManifest directly; snapshotting must discover
-        // edits from a freshly chunked stream. Prefer nearby matching anchors
-        // to avoid shifting the page grouping of an unchanged suffix.
         auto reconcile = [&] {
             const auto countBefore = manifest.summary().chunkCount;
             const auto next = pending.front();
-            // A byte-for-byte unchanged inherited prefix followed by a new
-            // suffix is common for log/checkpoint files. Once the prefix is
-            // exhausted, append immutable leaves instead of applying one
-            // copy-on-write insertion per suffix chunk.
-            if (appendingNewSuffix ||
-                (exactInheritedPrefix && position == inheritedChunkCount)) {
-                manifest.append(next);
-                appendingNewSuffix = true;
-                ++position;
+            if (appendingNewSuffix || (exactInheritedPrefix && position == inheritedChunkCount)) {
+                manifest.append(next); appendingNewSuffix = true; ++position;
             } else if (position < countBefore && manifest.at(position) == next) {
                 ++position;
             } else {
                 exactInheritedPrefix = false;
                 std::size_t oldMatch = lookahead, newMatch = lookahead;
-                for (std::size_t i = 1; i < lookahead && i < countBefore - position; ++i) {
+                for (std::size_t i = 1; i < lookahead && i < countBefore - position; ++i)
                     if (manifest.at(position + i) == next) { oldMatch = i; break; }
-                }
                 if (position < countBefore) {
                     const auto old = manifest.at(position);
-                    for (std::size_t i = 1; i < pending.size(); ++i) {
+                    for (std::size_t i = 1; i < pending.size(); ++i)
                         if (pending[i] == old) { newMatch = i; break; }
-                    }
                 }
-                if (oldMatch < lookahead && oldMatch <= newMatch) {
+                if (oldMatch < lookahead && oldMatch <= newMatch)
                     for (std::size_t i = 0; i < oldMatch; ++i) manifest.erase(position);
-                } else if (newMatch < lookahead || position == countBefore) {
-                    manifest.insert(position, next);
-                } else {
-                    manifest.update(position, next);
-                }
+                else if (newMatch < lookahead || position == countBefore) manifest.insert(position, next);
+                else manifest.update(position, next);
                 ++position;
             }
             pending.pop_front();
-            if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
-                manifest.snapshot();  // Bound retained dirty metadata on huge files.
-                checkpointOperations = manifest.stats().operations;
-            }
         };
-
-        auto body = [&](const Chunk& chunk) {
-            ++count;
-            h.update(chunk.sha256);
-            // Blob half of the Python writer: publish only payloads whose
-            // digest is not already on disk. (The INSERT side is gone.)
-            if (chunk.data && !chunkExists(chunk.sha256)) {
-                writeChunkBlob(chunkDir, chunk.sha256, chunk.data->data(),
-                               chunk.data->size());
-                // Cache presence only after the chunk has been published.
-                remember(chunk.sha256, true);
-            }
-            res.chunkHashes.insert(chunk.sha256);
-            if (!hasBaseManifest) {
-                // Initial imports are an ordered stream. Bypass reconciliation
-                // and the random-edit copy-on-write path entirely.
-                manifest.append({chunk.sha256, static_cast<std::uint64_t>(chunk.size)});
-                if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
-                    manifest.snapshot();
-                    checkpointOperations = manifest.stats().operations;
-                }
-                return;
-            }
-            pending.push_back({chunk.sha256, static_cast<std::uint64_t>(chunk.size)});
-            if (pending.size() >= lookahead) reconcile();
-        };
-
-        if (threads > 1) {
-            // Workers read their own source ranges, share cache state, and
-            // publish finalized objects. The parent receives metadata only.
-            storeFileParallel(entry.absolutePath, threads, *sharedCache, body);
-        } else {
-            // Faithful streaming path: skip payloads already in the store.
-            chunkFileStream(entry.absolutePath,
-                            [&](const std::string& digest) {
-                                return !chunkExists(digest);
-                            },
-                            body);
+        for (const auto& chunk : file.chunks) {
+            if (!hasBaseManifest) manifest.append(chunk);
+            else { pending.push_back(chunk); if (pending.size() >= lookahead) reconcile(); }
         }
-
         if (hasBaseManifest) {
             while (!pending.empty()) reconcile();
-            while (manifest.summary().chunkCount > position) {
-                manifest.erase(position);
-                if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
-                    manifest.snapshot();
-                    checkpointOperations = manifest.stats().operations;
-                }
-            }
+            while (manifest.summary().chunkCount > position) manifest.erase(position);
         }
-
-        res.fileHashes[fileRel] = h.hexdigest();
-        res.chunkLength[fileRel] = count;
-        Descriptor chunkDirectory{::open(chunkDir.c_str(), O_RDONLY | O_DIRECTORY)};
-        if (chunkDirectory.fd < 0 || ::fsync(chunkDirectory.fd) != 0)
-            throw std::runtime_error("chunk directory sync failed");
+        res.fileHashes[fileRel] = file.fileHash;
+        res.chunkLength[fileRel] = file.chunks.size();
         res.manifestRoots[fileRel] = manifest.snapshot();
     }
 
@@ -1545,12 +1841,65 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
     // failed save (full disk, read-only root, ...) must not fail a
     // snapshot that has already been stored correctly.
     try {
-        if (sharedCache) cache.seenHll().assignRegisters(sharedCache->registers());
+        // A positive cache entry is installed only after both the pack/index
+        // transaction and every manifest that refers to the stored chunk have
+        // been published successfully.
+        for (const auto& hash : res.chunkHashes) cache.put(hash, true);
         saveHllState(chunkDir, cache.seenHll());
     } catch (const std::exception&) {
     }
 
     return res;
+}
+
+PackGcResult garbageCollectPacks(
+    const std::string& chunkRoot,
+    const std::unordered_map<std::string, std::string>& liveManifestRoots) {
+    PackRepository repository(chunkRoot);
+    struct LiveManifest {
+        std::string key;
+        std::vector<ManifestChunk> chunks;
+    };
+    std::vector<LiveManifest> manifests;
+    std::unordered_map<std::string, PackLocation> locations;
+    std::vector<std::unique_ptr<TemporaryPack>> packs;
+    packs.push_back(std::make_unique<TemporaryPack>(repository.packsDir(), repository.nextPackId(0)));
+
+    for (const auto& root : liveManifestRoots) {
+        if (root.second.empty()) throw std::invalid_argument("GC received an empty manifest root");
+        FileManifest manifest(chunkRoot, {}, root.second);
+        LiveManifest live{root.first, {}};
+        manifest.forEach([&](const ManifestChunk& chunk) {
+            auto found = locations.find(chunk.hash);
+            if (found == locations.end()) {
+                const auto payload = readPackedPayload(chunkRoot, chunk);
+                if (payload.size() != chunk.size || sha256Hex(payload) != chunk.hash)
+                    throw std::runtime_error("GC encountered corrupt chunk payload");
+                const auto location = packs.front()->append(chunk.hash, payload.data(), payload.size());
+                found = locations.emplace(chunk.hash, location).first;
+            }
+            ManifestChunk rewritten{chunk.hash, chunk.size};
+            rewritten.packId = found->second.packId;
+            rewritten.packOffset = found->second.offset;
+            rewritten.storedSize = found->second.storedSize;
+            live.chunks.push_back(std::move(rewritten));
+        });
+        manifests.push_back(std::move(live));
+    }
+
+    // The new pack/index is made durable before the returned manifest roots
+    // can be published by the caller. Existing packs are not deleted here:
+    // they remain valid for historical roots outside the supplied live set.
+    repository.replaceIndex(packs, locations);
+    PackGcResult result;
+    result.liveChunks = locations.size();
+    result.rewrittenPacks = locations.empty() ? 0 : 1;
+    for (const auto& live : manifests) {
+        FileManifest rewritten(chunkRoot);
+        for (const auto& chunk : live.chunks) rewritten.append(chunk);
+        result.manifestRoots.emplace(live.key, rewritten.snapshot());
+    }
+    return result;
 }
 
 bool rebuildFileFromManifest(const std::string& chunkRoot,
@@ -1584,30 +1933,11 @@ bool rebuildFileFromManifest(const std::string& chunkRoot,
         if (temporary.fd < 0) return false;
         temporary.path = name.data();
         if (::fchmod(temporary.fd, 0644) != 0) return false;
-        std::array<char, 65536> buffer;
         manifest.forEach([&](const ManifestChunk& chunk) {
-            std::ifstream input(chunkRoot + "/" + kChunkStorageDir + "/" + chunk.hash, std::ios::binary);
-            if (!input) throw std::runtime_error("missing manifest chunk payload");
-            Sha256Ctx payloadHash;
-            std::uint64_t size = 0;
-            while (input) {
-                input.read(buffer.data(), buffer.size());
-                const auto got = input.gcount();
-                if (static_cast<std::uint64_t>(got) > chunk.size - size)
-                    throw std::runtime_error("manifest chunk payload too large");
-                size += static_cast<std::uint64_t>(got);
-                payloadHash.update(buffer.data(), static_cast<std::size_t>(got));
-                std::size_t offset = 0;
-                while (offset < static_cast<std::size_t>(got)) {
-                    auto written = ::write(temporary.fd, buffer.data() + offset,
-                                           static_cast<std::size_t>(got) - offset);
-                    if (written < 0 && errno == EINTR) continue;
-                    if (written <= 0) throw std::runtime_error("manifest restore write failed");
-                    offset += static_cast<std::size_t>(written);
-                }
-            }
-            if (!input.eof() || size != chunk.size || payloadHash.hexdigest() != chunk.hash)
+            const auto payload = readPackedPayload(chunkRoot, chunk);
+            if (payload.size() != chunk.size || sha256Hex(payload) != chunk.hash)
                 throw std::runtime_error("manifest chunk payload mismatch");
+            writeAllFd(temporary.fd, payload.data(), payload.size(), "manifest restore write");
         });
         if (::fsync(temporary.fd) != 0) return false;
         const int closeResult = ::close(temporary.fd);
@@ -1650,10 +1980,23 @@ bool rebuildFileFromChunks(const std::string& chunkRoot,
         std::ofstream out(target, std::ios::binary | std::ios::trunc);
         if (!out) return false;
 
+        PackRepository repository(chunkRoot);
         for (const std::string& hash : orderedChunkHashes) {
-            const std::string chunkPath = chunkDir + "/" + hash;
-            if (!pathExists(chunkPath)) return false;
-            std::string content = readWholeFile(chunkPath);
+            ManifestChunk chunk{hash, 0};
+            if (const auto location = repository.lookup(hash)) {
+                chunk.size = location->storedSize;
+                chunk.packId = location->packId;
+                chunk.packOffset = location->offset;
+                chunk.storedSize = location->storedSize;
+            } else {
+                const std::string chunkPath = chunkDir + "/" + hash;
+                if (!pathExists(chunkPath)) return false;
+                struct stat info {};
+                if (::stat(chunkPath.c_str(), &info) != 0 || info.st_size < 0) return false;
+                chunk.size = static_cast<std::uint64_t>(info.st_size);
+            }
+            std::string content = readPackedPayload(chunkRoot, chunk);
+            if (sha256Hex(content) != hash) return false;
             out.write(content.data(), (std::streamsize)content.size());
             if (!out) return false;
         }

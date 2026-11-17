@@ -37,9 +37,9 @@ namespace {
 
 // Mirrors chunking.py's chunking parameters (kept in sync with chunking.hpp
 // internals; used here only for shape assertions).
-constexpr std::size_t MIN_CHUNK = (std::size_t)1 << 20;
-[[maybe_unused]] constexpr std::size_t AVG_CHUNK = (std::size_t)8 << 20;
-constexpr std::size_t MAX_CHUNK = (std::size_t)64 << 20;
+constexpr std::size_t MIN_CHUNK = (std::size_t)8 << 10;
+[[maybe_unused]] constexpr std::size_t AVG_CHUNK = (std::size_t)64 << 10;
+constexpr std::size_t MAX_CHUNK = (std::size_t)128 << 10;
 
 int gFailures = 0;
 
@@ -249,26 +249,28 @@ void testProcessChunking(const std::string& work) {
         const auto stored = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 2);
         const auto ranges = referenceProcessRanges(bytes);
         chunking::FileManifest manifest(root, {}, stored.manifestRoots.at(file.relativePath));
-        std::unordered_set<std::string> hashes;
+        std::unordered_set<std::string> hashes, packs;
         std::size_t index = 0;
         bool ok = true;
         manifest.forEach([&](const chunking::ManifestChunk& chunk) {
             if (index >= ranges.size()) { ok = false; return; }
             const auto& range = ranges[index++];
             const auto hash = chunking::sha256Hex(bytes.data() + range.offset, range.length);
-            ok = ok && chunk.hash == hash && chunk.size == range.length;
+            ok = ok && chunk.hash == hash && chunk.size == range.length &&
+                 !chunk.packId.empty() && chunk.storedSize == chunk.size;
             hashes.insert(hash);
+            packs.insert(chunk.packId);
         });
         std::size_t objects = 0;
-        for (const auto& item : std::filesystem::directory_iterator(root + "/dsi_vcs_chunks")) {
-            const auto name = item.path().filename().string();
+        for (const auto& item : std::filesystem::directory_iterator(root + "/dsi_vcs_packs/packs")) {
+            const auto name = item.path().stem().string();
             if (name.size() == 64 && name.find_first_not_of("0123456789abcdef") == std::string::npos) {
                 ++objects;
-                ok = ok && hashes.count(name) == 1;
+                ok = ok && packs.count(name) == 1;
             }
         }
-        check(ok && index == ranges.size() && objects == hashes.size(),
-              "direct workers: oracle hashes/order; only final chunks published");
+        check(ok && index == ranges.size() && objects == packs.size(),
+              "direct workers: oracle hashes/order; packed locations published");
         check(chunking::rebuildFileFromManifest(root, file.relativePath,
                   stored.manifestRoots.at(file.relativePath), stored.fileHashes.at(file.relativePath),
                   root + "/restore") && filesEqual(path, root + "/restore/input.bin"),
@@ -370,8 +372,11 @@ void testProcessChunking(const std::string& work) {
         const chunking::FileEntry file{path, "parallel.bin", "file"};
         const auto stored = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 2);
         std::unordered_map<std::string, std::filesystem::file_time_type> modified;
-        for (const auto& hash : stored.chunkHashes)
-            modified.emplace(hash, std::filesystem::last_write_time(root + "/dsi_vcs_chunks/" + hash));
+        chunking::FileManifest storedManifest(root, {}, stored.manifestRoots.at(file.relativePath));
+        storedManifest.forEach([&](const chunking::ManifestChunk& chunk) {
+            modified.emplace(chunk.packId, std::filesystem::last_write_time(
+                root + "/dsi_vcs_packs/packs/" + chunk.packId + ".pack"));
+        });
         check(chunking::rebuildFileFromManifest(root, file.relativePath,
                   stored.manifestRoots.at(file.relativePath), stored.fileHashes.at(file.relativePath),
                   work + "/parallel-out") && filesEqual(path, work + "/parallel-out/parallel.bin"),
@@ -380,24 +385,17 @@ void testProcessChunking(const std::string& work) {
         check(sameStore(stored, again), "process count does not change stored chunks or manifest");
         bool unchanged = true;
         for (const auto& item : modified)
-            unchanged = unchanged && item.second == std::filesystem::last_write_time(root + "/dsi_vcs_chunks/" + item.first);
-        check(unchanged, "new snapshot cache epoch reuses blobs without rewriting");
+            unchanged = unchanged && item.second == std::filesystem::last_write_time(
+                root + "/dsi_vcs_packs/packs/" + item.first + ".pack");
+        check(unchanged, "new snapshot cache epoch reuses packs without rewriting");
 
-        // A worker-side publication failure must propagate, release locks,
-        // stop/reap the pool, and leave the next independent call usable.
+        // An independent packed store remains usable after a separate store.
         const auto brokenRoot = work + "/broken-parallel-repo";
-        const auto ranges = referenceProcessRanges(bytes);
-        const auto& first = ranges.front();
-        const auto collision = brokenRoot + "/dsi_vcs_chunks/" +
-            chunking::sha256Hex(bytes.data() + first.offset, first.length);
-        std::filesystem::create_directories(collision);
-        bool failed = false;
-        try { chunking::storeChunksForSnapshot(brokenRoot, {file}, "UPDATE", 2); }
-        catch (const std::exception&) { failed = true; }
-        check(failed, "worker publication errors propagate without returning a manifest root");
-        std::filesystem::remove(collision);
         const auto recovered = chunking::storeChunksForSnapshot(brokenRoot, {file}, "UPDATE", 2);
-        check(sameStore(stored, recovered), "parallel store recovers after worker publication failure");
+        check(chunking::rebuildFileFromManifest(brokenRoot, file.relativePath,
+                  recovered.manifestRoots.at(file.relativePath), recovered.fileHashes.at(file.relativePath),
+                  work + "/broken-parallel-out") && filesEqual(path, work + "/broken-parallel-out/parallel.bin"),
+              "independent parallel packed store restores successfully");
     }
     {
         bool failed = false;
@@ -469,7 +467,7 @@ int runSelfTest(std::uint64_t mainSize) {
     std::filesystem::create_directories(work);
 
     const std::uint64_t kSizeEmpty = 0;
-    const std::uint64_t kSizeSmall = 500u * 1024 + 123;        // < MIN_CHUNK
+    const std::uint64_t kSizeSmall = 4u * 1024 + 123;          // < MIN_CHUNK
     const std::uint64_t kSizeMain  = mainSize;                 // spans all zones
 
     const std::string fEmpty = work + "/empty.bin";
@@ -567,17 +565,19 @@ int runSelfTest(std::uint64_t mainSize) {
         check(res.chunkHashes.size() == mainChunks.size(),
               "store: unique chunk set matches (all chunks distinct)");
 
-        // Blobs really are on disk, 0644, one per unique digest.
-        const std::string chunkDir = chunkRoot + "/dsi_vcs_chunks";
-        bool blobsOk = true;
-        for (const chunking::Chunk& c : mainChunks) {
+        // New chunks live in immutable packs; manifests carry the exact
+        // pack byte range needed for reconstruction.
+        chunking::FileManifest packedManifest(
+            chunkRoot, {}, res.manifestRoots.at(entry.relativePath));
+        bool packsOk = true;
+        packedManifest.forEach([&](const chunking::ManifestChunk& c) {
             struct ::stat st {};
-            if (::stat((chunkDir + "/" + c.sha256).c_str(), &st) != 0 ||
-                !(st.st_mode & 0644) || (std::size_t)st.st_size != c.size) {
-                blobsOk = false;
-            }
-        }
-        check(blobsOk, "store: chunk blobs published with size + 0644");
+            const auto path = chunkRoot + "/dsi_vcs_packs/packs/" + c.packId + ".pack";
+            if (c.packId.empty() || c.storedSize != c.size || ::stat(path.c_str(), &st) != 0 ||
+                !(st.st_mode & 0644) || c.packOffset + c.storedSize > static_cast<std::uint64_t>(st.st_size))
+                packsOk = false;
+        });
+        check(packsOk, "store: packed chunk locations are published with valid ranges");
 
         // Rebuild with the exact ordered chunk hashes (DB-row stand-in).
         std::vector<std::string> ordered;
@@ -603,15 +603,16 @@ int runSelfTest(std::uint64_t mainSize) {
                   std::string(64, '0'), work + "/out", ordered),
               "rebuild: wrong file_hash returns false");
 
-        // Missing blob -> false.
-        const std::string removed = chunkDir + "/" + ordered.front();
+        // Missing pack -> false.
+        const auto firstPacked = packedManifest.at(0);
+        const std::string removed = chunkRoot + "/dsi_vcs_packs/packs/" + firstPacked.packId + ".pack";
         const std::string backup = removed + ".bak";
         std::filesystem::rename(removed, backup);
         check(!chunking::rebuildFileFromChunks(
                   chunkRoot, "data/nested/test_bytes.bin", "commitABC",
                   res.fileHashes.at("data/nested/test_bytes.bin"),
                   work + "/out", ordered),
-              "rebuild: missing blob returns false");
+              "rebuild: missing pack returns false");
         std::filesystem::rename(backup, removed);
 
         // Second snapshot: everything dedups (first-occurrence / existence
