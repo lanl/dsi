@@ -1,214 +1,135 @@
-# C++ persistent file manifest
+# DSI-VCS C++ persistent manifests
 
-`../manifest.hpp` and `../manifest.cpp` implement an ordered tree of chunk
-references. `../chunking.cpp` stores payloads, returns a manifest root for each
-file version, and can reconstruct a file by streaming that root. No SQL table or
-commit-ancestor search is required. Python files and their storage format are
-unchanged.
+`manifest.hpp` and `manifest.cpp` implement an immutable ordered tree of chunk
+references for one file version. Payload bytes live in DSI-VCS packs;
+`chunking.cpp` owns pack publication, snapshot reconciliation, reconstruction,
+and repacking.
 
-## Objects and versions
+## Manifest and pack relationship
+
+```text
+version metadata
+  -> manifest root page -> internal pages -> leaf pages
+  -> ordered chunk references
+       (digest, logical size, pack ID, offset, stored length)
+  -> immutable packfiles
+```
+
+A manifest leaf is a logical page, not a payload container. It can refer to
+chunks from several packs, and the same pack can serve leaves in multiple files
+and versions. There is no one-leaf/one-pack rule.
+
+For default page target `B = 4,096`, a new sequential import seals an append
+leaf every `B` chunk references. More than `B` chunks therefore gives a file
+multiple leaves even if one process stored every payload in exactly one pack.
+Conversely, a small edit can create a new small pack without increasing leaf
+count.
+
+## On-disk objects and manifest-v2 format
 
 ```text
 chunk_root/
-  dsi_vcs_chunks/<chunk SHA-256>        actual file bytes
-  dsi_vcs_manifests/<page SHA-256>  packed manifest objects
-
-file-version metadata -> manifest root -> internal pages -> leaf pages
-                                                            |
-                                                  ordered chunk references
+  dsi_vcs_packs/index
+  dsi_vcs_packs/packs/<pack-id>.pack
+  dsi_vcs_manifests/<page-content-sha256>
 ```
 
-A leaf stores `(SHA-256, byte length)` references in file order. An internal
-page stores child hashes, subtree chunk counts, subtree byte counts, and minimum
-and maximum leaf depths. Positions are derived from subtree counts; inserting a
-chunk does not renumber or rewrite subsequent leaves.
+Manifest pages are immutable, content-addressed objects named by SHA-256 of the
+complete encoded page. New pages use big-endian format magic `DSIMCP02`:
 
-Objects are immutable. A working edit copies the affected leaf and ancestor
-path. `snapshot()` publishes dirty descendants before their parents and returns
-the root hash. Unchanged pages remain shared across versions and branches. The
-caller must durably record the returned root in its own version/Merkle metadata;
-this standalone C++ implementation does not modify the Python database.
+| Component | Fields | Bytes |
+| --- | --- | ---: |
+| Header | magic, `B`, kind, entry count, subtree chunk count, byte count, min/max depth | 41 |
+| Leaf entry | chunk SHA-256, logical length, pack SHA-256 ID, offset, stored length | 88 |
+| Internal entry | child SHA-256, subtree chunk count, byte count, min/max depth | 56 |
 
-## Page rules
+`stored length` currently equals logical length because payloads are not
+compressed. Keeping it explicit permits independent validation of the physical
+extent and leaves room for a future encoding.
 
-Let `B = MANIFEST_PAGE_ENTRIES`, default 4,096. Options allow 4 through 65,536.
+## Page rules and immutable updates
 
-| Rule                       | Leaves                         | Internal pages                 |
-| -------------------------- | ------------------------------ | ------------------------------ |
-| Minimum non-root occupancy | `ceil(B/2)` chunk references | `ceil(B/2)` child references |
-| Split threshold            | `2B` references              | `2B` children                |
-| Split result               | Two consecutive halves         | Two consecutive halves         |
+`ManifestOptions::pageEntries` defaults to 4,096 and permits 4 through 65,536.
 
-Insert a reference into its existing leaf. Split only when the threshold is
-reached, and propagate any resulting parent split toward the root. Root splitting
-creates another level.
+| Rule | Leaves | Internal pages |
+| --- | --- | --- |
+| Minimum non-root occupancy | `ceil(B / 2)` chunk references | `ceil(B / 2)` child references |
+| Generic-edit split threshold | `2B` references | `2B` children |
+| Split result | two consecutive halves | two consecutive halves |
 
-After deletion, a page below minimum occupancy always combines with its left
-sibling if available, otherwise its right sibling. Siblings share a parent. If
-the combined page has fewer than `2B` entries, replace the pair with one page.
-Otherwise, split the combined sequence into two evenly sized pages. Repair an
-underfull parent recursively using the same rules. Promoting an internal root's
-only child shortens the entire tree; an empty file uses a canonical empty leaf.
+The common initial-import/pure-append path buffers one leaf and seals it at `B`
+entries. At snapshot, an underfull trailing leaf is balanced with its
+predecessor; only new leaves and a compact upper hierarchy are written.
 
-Every successful `insert`, `erase`, and `update` performs a depth check after
-local repairs. If `root.maxDepth - root.minDepth` exceeds
-`ManifestOptions::maxDepthDifference` (default 2), rebuild internal levels while
-retaining existing leaf pages. Correct local edits preserve equal leaf depths,
-so this safeguard does not normally trigger. Recovery costs `O(P)` leaf-page
-references and auxiliary memory for `P` leaves, rather than repacking all `C`
-chunk references. Cached depth metadata identifies leaves without reading their
-objects; only internal objects are read and rebuilt. `rebalanceInternal()` exposes this operation
-for maintenance. It assumes existing leaves already meet occupancy requirements.
+Known-position `insert`, `update`, and `erase` use copy-on-write. They copy the
+affected leaf and ancestor path, retain untouched page hashes, split at the
+generic threshold, and merge/redistribute below minimum occupancy. An internal
+root with one child collapses. A depth-difference safeguard can rebuild internal
+levels while retaining leaves.
 
-## Example: insertion and consecutive deletion
+Automatic snapshot reconciliation rechunks the complete file and uses bounded
+64-entry lookahead to match old/new reference sequences. Local edits normally
+retain a suffix of old pages. Repeated patterns or changes outside that window
+can reduce sharing but cannot change reconstructed bytes.
 
-Use `B = 4` for this example: merge below 2 entries and split at 8.
-
-```text
-Version 1:
-R1 -> P1[A B C D], P2[E F G H], P3[I J K L]
-
-Insert X after A:
-R2 -> P4[A X B C D], P2[E F G H], P3[I J K L]
-                       shared          shared
-```
-
-Only `P4` and the root are new objects. If the first leaf reaches eight entries,
-it becomes two leaves of four; subsequent leaves still retain their hashes.
-
-Starting again from version 1, delete E, F, then G. Each deletion receives its
-own repair and balance check. P2 reaches one entry `[H]`, so it combines with its
-left sibling despite also having a right sibling:
-
-```text
-R3 -> P5[A B C D H], P3[I J K L]
-                         shared
-```
-
-If the left sibling instead had seven entries, combining it with `[H]` would
-reach eight entries and immediately produce two pages of four. The parent loses
-a child only when the pair becomes one page. Old roots R1 and R2 remain readable.
-
-## API
+## Roots and reconstruction
 
 ```cpp
-#include "manifest.hpp"
+chunking::FileManifest manifest(chunkRoot);
+manifest.append({chunkHash, logicalBytes, packId, packOffset, storedBytes});
+const std::string root = manifest.snapshot();
 
-chunking::FileManifest tree(chunkRoot); // Initially empty.
-tree.insert(0, {chunkHashA, sizeA});      // Payload must be stored separately.
-tree.insert(1, {chunkHashB, sizeB});
-const auto version1 = tree.snapshot();
-
-chunking::FileManifest next(chunkRoot, {}, version1);
-next.insert(1, {chunkHashX, sizeX});
-next.update(0, {chunkHashY, sizeY});
-next.erase(2);
-const auto version2 = next.snapshot();
-
-// The previous version still yields A, B.
-chunking::FileManifest previous(chunkRoot, {}, version1);
-previous.forEach([](const chunking::ManifestChunk& chunk) {
-    // Read chunk.hash from the payload store and stream chunk.size bytes.
-});
+chunking::FileManifest next(chunkRoot, {}, root);
+next.insert(index, replacement);
+const std::string nextRoot = next.snapshot();
 ```
 
-Indexes are zero-based. Insertion allows `index == chunkCount`; lookup, deletion,
-and replacement require `index < chunkCount`. Chunk sizes must be positive and
-hashes must be 64 lowercase hexadecimal characters. Aggregate count overflow is
-rejected. Reopening a root requires the same `pageEntries` used to create it.
+Indexes are zero-based. Insertion permits `index == chunkCount`; lookup,
+replacement, and deletion require `index < chunkCount`. Logical sizes must be
+positive and hashes must be lowercase 64-hex-character SHA-256 values.
 
-`forEach` streams the references. `validate()` performs an expensive full-tree
-occupancy/depth/count verification intended for tests and diagnostics. Normal
-operations use cached subtree summaries rather than a full validation scan.
+`snapshot()` writes dirty children before parents and returns a root hash. The
+application must atomically attach that root to version metadata. Historical
+roots remain readable while their pages and referenced packs are retained.
 
-## Chunk-store integration and CLI
+`forEach()` streams entries in file order. `validate()` is an expensive full-tree
+occupancy/depth/count diagnostic; normal operations use cached summaries.
 
-`StoreResult::manifestRoots` maps each relative file path to its new root.
-Pass the previous map as the fifth argument to `storeChunksForSnapshot` to edit
-existing manifests:
+`rebuildFileFromManifest` streams each referenced pack range, validates its
+length and digest, verifies the ordered chunk-digest file hash, then atomically
+publishes the reconstructed output. The file hash is SHA-256 over ordered
+lowercase-hex chunk digests, not original-file bytes.
 
-```cpp
-auto first = chunking::storeChunksForSnapshot(chunkRoot, entries);
-auto next = chunking::storeChunksForSnapshot(
-    chunkRoot, entries, "UPDATE", 0, first.manifestRoots);
-bool restored = chunking::rebuildFileFromManifest(
-    chunkRoot, relativePath, next.manifestRoots.at(relativePath),
-    next.fileHashes.at(relativePath), outputDirectory);
-```
+## GC/repacking contract
 
-Snapshotting re-chunks the input and matches old/new references with a bounded
-64-reference lookahead. Nearby insertions and deletions reuse matching suffix
-pages. Ambiguous repeats or changes beyond that window can select a different
-edit sequence, reducing page sharing; reconstructed bytes remain correct.
-Known-position `FileManifest` edits provide the local-update guarantee directly.
-Automatic discovery of arbitrary edits is not a logarithmic operation.
+`garbageCollectPacks(chunkRoot, liveManifestRoots)` walks every supplied live
+manifest, copies each distinct reachable payload once into a fresh pack, swaps
+the digest index, and returns replacement manifest roots. The caller must
+atomically replace corresponding version roots with those results.
 
-The fourth `storeChunksForSnapshot` argument selects its execution path: `0`
-or `1` uses sequential, Python-compatible chunking; a value greater than `1`
-uses the direct parallel-storage workers. Those workers write missing payload
-objects and return only chunk metadata to the parent before the manifest is
-updated. This internal path is named `storeFileParallel`; it does **not** call
-`chunkFileParallel`. Use `chunkFileParallel` only when an application needs an
-in-memory ordered `std::vector<Chunk>` rather than a stored snapshot. The
-full comparison and examples are in [README.md](README.md#choosing-a-parallel-api).
+GC does not delete old packs. Safe deletion needs repository-wide reachability,
+completed metadata migration, and no readers using old roots. Provide every
+retained root if future global deduplication must recognize its payloads. The
+current implementation creates at most one replacement pack per call.
 
-Dirty pages are coalesced between snapshots. The streaming store checkpoints
-after approximately `2B` edits to bound dirty metadata, and uses a bounded LRU
-for clean pages. These checkpoints may leave unreferenced intermediate objects;
-garbage collection is not implemented. The existing `chunkHashes` result still
-retains distinct payload hashes, and the existing parallel chunker materializes
-its results; those legacy APIs are not constant-memory at billion-chunk scale.
+## Complexity and assumptions
 
-From `chunking_tests/`:
-
-```sh
-make
-./chunking_test --store-manifest /tmp/repo /absolute/path/data.bin data.bin
-# Prints three lines: manifest root, file hash, chunk count.
-# Supply a previous root as the final argument for the next version:
-./chunking_test --store-manifest /tmp/repo /absolute/path/data.bin data.bin PREVIOUS_ROOT
-./chunking_test --rebuild-manifest /tmp/repo data.bin ROOT FILE_HASH /tmp/restored
-make manifest-test
-make test
-```
-
-The legacy `--store` output and `--rebuild` chunk-list mode remain available.
-
-## Binary format and integrity
-
-Pages use big-endian integers and the version magic `DSIMCP01`:
-
-| Component      | Fields                                                                     | Bytes |
-| -------------- | -------------------------------------------------------------------------- | ----- |
-| Header         | Magic, B, kind, entry count, chunk count, byte count, min depth, max depth | 41    |
-| Leaf entry     | Raw SHA-256, byte length                                                   | 40    |
-| Internal entry | Raw child SHA-256, chunk count, byte count, min depth, max depth           | 56    |
-
-Each individual object file is named by the SHA-256 of its complete contents.
-The format has its own directory and is not interchangeable with Python's
-`DSIMAN01` format. These are packed page objects, not a Git-style container of
-multiple objects in one packfile.
-
-Publication uses a temporary file, file fsync, atomic rename, and directory
-fsync. Readers verify object checksums, lengths, format, capacity, and aggregate
-metadata. Restoration checks the ordered-reference file hash and each payload's
-size and checksum. Output is staged in a temporary file and published only after
-verification, so a missing/corrupt payload does not overwrite an existing file.
-Retain all objects reachable from historical roots; removal from a new manifest does not
-delete an object.
-
-For a known edit location and tree height `h`, edits touch `O(h)` pages, with
-`O(Bh)` encoding/hashing work when published. Restore visits `O(C)` references
-and reads the payload bytes. Identical content reached through different edit
-histories can have different manifest tree shapes and root hashes; the separate
-ordered-chunk file hash still identifies the same chunk sequence.
+- Appending `C` references creates `O(C / B)` leaves and a small fan-out `B`
+  internal hierarchy.
+- A known-position edit in height `h` touches `O(h)` pages and has `O(Bh)`
+  encoding/hashing work when published.
+- Reconstruction visits `O(C)` references and reads reconstructed bytes.
+- Snapshotting retains logical chunk metadata; parallel payload buffering stays
+  bounded even though metadata remains `O(chunk count)`.
+- Input files must not change while chunked. Source checks detect ordinary
+  concurrent changes but do not make an atomic filesystem snapshot.
 
 ## Tests
 
-`manifest_test.cpp` exercises boundary splits, cascading internal splits and
-merges, root collapse, canonical emptiness, left sibling preference, right
-fallback, merge-then-split redistribution, unchanged suffix sharing, divergent
-versions, persistence/reopening, odd and even capacities, overflow, malformed
-and missing objects, and historical file restoration. It also compares 12,000
-deterministic random edits with a vector model and verifies the per-operation
-balance-check count.
+`manifest_test.cpp` covers split/merge behavior, root collapse, persistence,
+randomized edits, malformed pages, packed locations, GC integration, and
+historical restoration.
+
+```sh
+make manifest-test
+```
