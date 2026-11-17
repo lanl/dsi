@@ -2,6 +2,7 @@
 #include "sha256.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
@@ -85,6 +86,10 @@ struct FileManifest::Impl {
         std::vector<Link> children;
         std::size_t size() const { return leaf ? chunks.size() : children.size(); }
     };
+    struct AppendChunk {
+        std::array<std::uint8_t, 32> hash{};
+        std::uint64_t size = 0;
+    };
     struct Cached {
         std::shared_ptr<Node> node;
         std::list<std::string>::iterator position;
@@ -97,12 +102,22 @@ struct FileManifest::Impl {
     mutable std::list<std::string> lru;
     mutable std::unordered_map<std::string, Cached> cache;
 
+    // Sequential construction is the common initial-import and pure-append
+    // case. Do not turn every streamed chunk into a random tree edit: keep
+    // one bounded leaf buffer, retain immutable old leaves, and construct only
+    // the small internal hierarchy when publishing a root.
+    bool appendMode = false;
+    std::vector<Link> appendLeaves;
+    std::vector<AppendChunk> appendBuffer;
+    ManifestSummary appendSummary;
+
     Impl(std::string chunkRoot, ManifestOptions opt, const std::string& hash)
         : directory(std::move(chunkRoot) + "/" + MANIFEST_STORAGE_DIR), options(opt) {
         if (options.pageEntries < 4 || options.pageEntries > 65536)
             throw std::invalid_argument("manifest pageEntries must be between 4 and 65536");
         if (options.cachedPages == 0)
             throw std::invalid_argument("manifest cache must hold at least one page");
+        appendBuffer.reserve(options.pageEntries);
         std::filesystem::create_directories(directory);
         if (hash.empty()) root = link(std::make_shared<Node>());
         else {
@@ -211,6 +226,180 @@ struct FileManifest::Impl {
         if (!sameSummary(summarize(*node), value.summary))
             throw std::runtime_error("manifest child summary mismatch");
         return node;
+    }
+
+    void collectLeaves(const Link& value, std::vector<Link>& leaves) const {
+        if (value.summary.chunkCount == 0) return;
+        if (value.summary.maxDepth == 0) {
+            leaves.push_back(value);
+            return;
+        }
+        const auto node = load(value);
+        for (const auto& child : node->children) collectLeaves(child, leaves);
+    }
+
+    void beginAppend() {
+        if (appendMode) return;
+        appendLeaves.clear();
+        appendBuffer.clear();
+        if (root.summary.chunkCount) collectLeaves(root, appendLeaves);
+        appendSummary = root.summary;
+        appendMode = true;
+        refreshAppendDepth();
+    }
+
+    static AppendChunk packAppendChunk(const ManifestChunk& chunk) {
+        checkHash(chunk.hash);
+        AppendChunk packed;
+        packed.size = chunk.size;
+        auto nibble = [](char c) -> std::uint8_t {
+            return static_cast<std::uint8_t>(c <= '9' ? c - '0' : c - 'a' + 10);
+        };
+        for (std::size_t i = 0; i < packed.hash.size(); ++i)
+            packed.hash[i] = static_cast<std::uint8_t>(nibble(chunk.hash[i * 2]) * 16 +
+                                                       nibble(chunk.hash[i * 2 + 1]));
+        return packed;
+    }
+
+    static ManifestChunk unpackAppendChunk(const AppendChunk& packed) {
+        static constexpr char hex[] = "0123456789abcdef";
+        std::string hash(64, '0');
+        for (std::size_t i = 0; i < packed.hash.size(); ++i) {
+            hash[i * 2] = hex[packed.hash[i] >> 4];
+            hash[i * 2 + 1] = hex[packed.hash[i] & 15];
+        }
+        return {std::move(hash), packed.size};
+    }
+
+    void refreshAppendDepth() {
+        std::size_t levelCount = appendLeaves.size() + (!appendBuffer.empty() ? 1 : 0);
+        std::uint32_t depth = 0;
+        while (levelCount > 1) {
+            levelCount = (levelCount + options.pageEntries - 1) / options.pageEntries;
+            ++depth;
+        }
+        appendSummary.minDepth = depth;
+        appendSummary.maxDepth = depth;
+    }
+
+    void sealAppendBuffer() {
+        if (appendBuffer.empty()) return;
+        auto leaf = std::make_shared<Node>();
+        leaf->chunks.reserve(appendBuffer.size());
+        for (const auto& chunk : appendBuffer)
+            leaf->chunks.push_back(unpackAppendChunk(chunk));
+        appendBuffer.clear();
+        appendBuffer.reserve(options.pageEntries);
+        appendLeaves.push_back(link(std::move(leaf)));
+        refreshAppendDepth();
+    }
+
+    void balanceAppendTail() {
+        if (appendLeaves.size() < 2) return;
+        const auto tail = load(appendLeaves.back());
+        if (tail->chunks.size() >= low()) return;
+        const auto previous = load(appendLeaves[appendLeaves.size() - 2]);
+        if (!tail->leaf || !previous->leaf)
+            throw std::logic_error("append leaf collection contains an internal node");
+
+        std::vector<ManifestChunk> combined;
+        combined.reserve(previous->chunks.size() + tail->chunks.size());
+        combined.insert(combined.end(), previous->chunks.begin(), previous->chunks.end());
+        combined.insert(combined.end(), tail->chunks.begin(), tail->chunks.end());
+
+        auto makeLeaf = [](std::vector<ManifestChunk> chunks) {
+            auto leaf = std::make_shared<Node>();
+            leaf->chunks = std::move(chunks);
+            return leaf;
+        };
+        appendLeaves.pop_back();
+        appendLeaves.pop_back();
+        if (combined.size() <= options.pageEntries) {
+            appendLeaves.push_back(link(makeLeaf(std::move(combined))));
+            refreshAppendDepth();
+            return;
+        }
+        const auto middle = combined.size() / 2;
+        std::vector<ManifestChunk> right(combined.begin() + static_cast<std::ptrdiff_t>(middle),
+                                         combined.end());
+        combined.resize(middle);
+        appendLeaves.push_back(link(makeLeaf(std::move(combined))));
+        appendLeaves.push_back(link(makeLeaf(std::move(right))));
+        refreshAppendDepth();
+    }
+
+    Link appendRoot() const {
+        if (appendLeaves.empty()) return link(std::make_shared<Node>());
+        auto level = appendLeaves;
+        while (level.size() > 1) {
+            std::vector<Link> next;
+            const auto groups = (level.size() + options.pageEntries - 1) / options.pageEntries;
+            const auto each = level.size() / groups;
+            const auto extra = level.size() % groups;
+            next.reserve(groups);
+            std::size_t start = 0;
+            for (std::size_t group = 0; group < groups; ++group) {
+                auto node = std::make_shared<Node>();
+                node->leaf = false;
+                const auto count = each + (group < extra ? 1 : 0);
+                const auto end = start + count;
+                node->children.assign(level.begin() + static_cast<std::ptrdiff_t>(start),
+                                      level.begin() + static_cast<std::ptrdiff_t>(end));
+                next.push_back(link(std::move(node)));
+                start = end;
+            }
+            level = std::move(next);
+        }
+        return level.front();
+    }
+
+    void materializeAppend() {
+        if (!appendMode) return;
+        sealAppendBuffer();
+        balanceAppendTail();
+        root = appendRoot();
+        appendMode = false;
+    }
+
+    void append(const ManifestChunk& chunk) {
+        if (chunk.size == 0) throw std::invalid_argument("manifest chunk size must be positive");
+        beginAppend();
+        appendBuffer.push_back(packAppendChunk(chunk));
+        appendSummary.chunkCount = checkedAdd(appendSummary.chunkCount, 1);
+        appendSummary.byteCount = checkedAdd(appendSummary.byteCount, chunk.size);
+        refreshAppendDepth();
+        if (appendBuffer.size() == options.pageEntries) sealAppendBuffer();
+        ++counters.operations;
+        ++counters.balanceChecks;
+    }
+
+    std::string snapshotAppend() {
+        sealAppendBuffer();
+        balanceAppendTail();
+        // Once a leaf is published it is immutable and can be reused by every
+        // later append snapshot; only new leaves and the compact upper levels
+        // are written again.
+        for (auto& leaf : appendLeaves) leaf = persist(leaf);
+        root = persist(appendRoot());
+        return root.hash;
+    }
+
+    ManifestChunk appendAt(std::uint64_t index) const {
+        for (const auto& leaf : appendLeaves) {
+            if (index < leaf.summary.chunkCount)
+                return load(leaf)->chunks[static_cast<std::size_t>(index)];
+            index -= leaf.summary.chunkCount;
+        }
+        if (index < appendBuffer.size()) return unpackAppendChunk(appendBuffer[static_cast<std::size_t>(index)]);
+        throw std::out_of_range("manifest chunk index out of range");
+    }
+
+    void walkAppend(const std::function<void(const ManifestChunk&)>& visitor) const {
+        for (const auto& leaf : appendLeaves) {
+            const auto node = load(leaf);
+            for (const auto& chunk : node->chunks) visitor(chunk);
+        }
+        for (const auto& chunk : appendBuffer) visitor(unpackAppendChunk(chunk));
     }
 
     std::string encode(const Node& node) const {
@@ -392,6 +581,7 @@ struct FileManifest::Impl {
     }
 
     void apply(std::uint64_t index, Edit kind, const ManifestChunk& chunk = {}) {
+        materializeAppend();
         if (index > root.summary.chunkCount ||
             (kind != Edit::Insert && index == root.summary.chunkCount))
             throw std::out_of_range("manifest chunk index out of range");
@@ -441,10 +631,13 @@ FileManifest::FileManifest(std::string root, ManifestOptions options, std::strin
 FileManifest::~FileManifest() = default;
 FileManifest::FileManifest(FileManifest&&) noexcept = default;
 FileManifest& FileManifest::operator=(FileManifest&&) noexcept = default;
-ManifestSummary FileManifest::summary() const { return impl_->root.summary; }
+ManifestSummary FileManifest::summary() const {
+    return impl_->appendMode ? impl_->appendSummary : impl_->root.summary;
+}
 ManifestStats FileManifest::stats() const { return impl_->counters; }
 ManifestChunk FileManifest::at(std::uint64_t index) const {
     if (index >= summary().chunkCount) throw std::out_of_range("manifest chunk index out of range");
+    if (impl_->appendMode) return impl_->appendAt(index);
     auto value = impl_->root;
     auto node = impl_->load(value);
     while (!node->leaf) {
@@ -455,17 +648,27 @@ ManifestChunk FileManifest::at(std::uint64_t index) const {
     }
     return node->chunks[static_cast<std::size_t>(index)];
 }
+void FileManifest::append(const ManifestChunk& c) { impl_->append(c); }
 void FileManifest::insert(std::uint64_t i, const ManifestChunk& c) { impl_->apply(i, Impl::Edit::Insert, c); }
 void FileManifest::erase(std::uint64_t i) { impl_->apply(i, Impl::Edit::Erase); }
 void FileManifest::update(std::uint64_t i, const ManifestChunk& c) { impl_->apply(i, Impl::Edit::Update, c); }
 void FileManifest::forEach(const std::function<void(const ManifestChunk&)>& visitor) const {
+    if (impl_->appendMode) {
+        impl_->walkAppend(visitor);
+        return;
+    }
     impl_->walk(impl_->root, visitor);
 }
 std::string FileManifest::snapshot() {
+    if (impl_->appendMode) return impl_->snapshotAppend();
     impl_->root = impl_->persist(impl_->root);
     return impl_->root.hash;
 }
-void FileManifest::rebalanceInternal() { impl_->rebuild(); }
-void FileManifest::validate() const { impl_->validateNode(impl_->root, true); }
+void FileManifest::rebalanceInternal() { impl_->materializeAppend(); impl_->rebuild(); }
+void FileManifest::validate() const {
+    auto* mutableImpl = const_cast<Impl*>(impl_.get());
+    mutableImpl->materializeAppend();
+    mutableImpl->validateNode(mutableImpl->root, true);
+}
 
 }  // namespace chunking

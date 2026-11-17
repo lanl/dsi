@@ -12,7 +12,7 @@
 #   clean  remove objects and the binary
 
 CXX      ?= clang++
-CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra
+CXXFLAGS ?= -std=c++17 -O3 -Wall -Wextra -mcpu=apple-m2 -Ofast -flto -ffast-math
 LIBS      =
 
 OBJS := sha256.o manifest.o shared_existence_cache.o chunking.o main.o

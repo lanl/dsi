@@ -11,7 +11,7 @@ unchanged.
 ```text
 chunk_root/
   dsi_vcs_chunks/<chunk SHA-256>        actual file bytes
-  dsi_vcs_manifests_cpp/<page SHA-256>  packed manifest objects
+  dsi_vcs_manifests/<page SHA-256>  packed manifest objects
 
 file-version metadata -> manifest root -> internal pages -> leaf pages
                                                             |
@@ -33,11 +33,11 @@ this standalone C++ implementation does not modify the Python database.
 
 Let `B = MANIFEST_PAGE_ENTRIES`, default 4,096. Options allow 4 through 65,536.
 
-| Rule | Leaves | Internal pages |
-| --- | --- | --- |
+| Rule                       | Leaves                         | Internal pages                 |
+| -------------------------- | ------------------------------ | ------------------------------ |
 | Minimum non-root occupancy | `ceil(B/2)` chunk references | `ceil(B/2)` child references |
-| Split threshold | `2B` references | `2B` children |
-| Split result | Two consecutive halves | Two consecutive halves |
+| Split threshold            | `2B` references              | `2B` children                |
+| Split result               | Two consecutive halves         | Two consecutive halves         |
 
 Insert a reference into its existing leaf. Split only when the threshold is
 reached, and propagate any resulting parent split toward the root. Root splitting
@@ -178,11 +178,11 @@ The legacy `--store` output and `--rebuild` chunk-list mode remain available.
 
 Pages use big-endian integers and the version magic `DSIMCP01`:
 
-| Component | Fields | Bytes |
-| --- | --- | --- |
-| Header | Magic, B, kind, entry count, chunk count, byte count, min depth, max depth | 41 |
-| Leaf entry | Raw SHA-256, byte length | 40 |
-| Internal entry | Raw child SHA-256, chunk count, byte count, min depth, max depth | 56 |
+| Component      | Fields                                                                     | Bytes |
+| -------------- | -------------------------------------------------------------------------- | ----- |
+| Header         | Magic, B, kind, entry count, chunk count, byte count, min depth, max depth | 41    |
+| Leaf entry     | Raw SHA-256, byte length                                                   | 40    |
+| Internal entry | Raw child SHA-256, chunk count, byte count, min depth, max depth           | 56    |
 
 Each individual object file is named by the SHA-256 of its complete contents.
 The format has its own directory and is not interchangeable with Python's

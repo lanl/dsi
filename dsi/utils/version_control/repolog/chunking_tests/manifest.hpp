@@ -9,7 +9,7 @@
 namespace chunking {
 
 inline constexpr std::size_t MANIFEST_PAGE_ENTRIES = 4096;
-inline constexpr const char* MANIFEST_STORAGE_DIR = "dsi_vcs_manifests_cpp";
+inline constexpr const char* MANIFEST_STORAGE_DIR = "dsi_vcs_manifests";
 
 struct ManifestChunk {
     std::string hash;
@@ -55,6 +55,10 @@ public:
     ManifestSummary summary() const;
     ManifestStats stats() const;
     ManifestChunk at(std::uint64_t index) const;
+    // Fast path for a newly discovered suffix. Chunks are buffered into
+    // page-sized leaves and only the upper hierarchy is built at snapshot.
+    // insert/update/erase retain the copy-on-write random-edit implementation.
+    void append(const ManifestChunk& chunk);
     void insert(std::uint64_t index, const ManifestChunk& chunk);
     void erase(std::uint64_t index);
     void update(std::uint64_t index, const ManifestChunk& chunk);

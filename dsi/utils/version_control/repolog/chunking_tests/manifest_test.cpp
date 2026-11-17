@@ -285,6 +285,15 @@ void storageRoundTrip() {
                                        result.fileHashes.at(relative), output.string()), "manifest restore failed");
         require(read(output / relative) == expected, "restored bytes differ");
     };
+    const auto appendedBytes = initial + std::string(512 * 1024 + 9, 'b');
+    write(source, appendedBytes);
+    const auto appended = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
+    checkRestore(appended, appendedBytes, "appended");
+    FileManifest appendedManifest(repo.string(), {}, appended.manifestRoots.at(relative));
+    std::vector<ManifestChunk> appendedExpected;
+    chunkFileStream(source.string(), [](const std::string&) { return false; },
+                    [&](const Chunk& chunk) { appendedExpected.push_back({chunk.sha256, chunk.size}); });
+    require(values(appendedManifest) == appendedExpected, "append fast path changed chunk order");
     const auto edited = initial.substr(0, 33) + "INSERTED" + initial.substr(33);
     write(source, edited);
     auto second = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
@@ -358,6 +367,37 @@ void streamingSequenceMatching() {
     require(read(dir.path / "added" / file.relativePath) == prefix + original,
             "inserted file bytes differ");
 }
+
+void streamingAppendBuilder() {
+    Temporary dir;
+    const auto options = small();
+    FileManifest tree(dir.path.string(), options);
+    std::vector<ManifestChunk> expected;
+    for (unsigned i = 0; i < 25; ++i) {
+        tree.append(entry(i));
+        expected.push_back(entry(i));
+        require(tree.summary().chunkCount == expected.size(), "append summary lost a chunk");
+        if (i % 3 == 2) {
+            const auto root = tree.snapshot();
+            FileManifest published(dir.path.string(), options, root);
+            compare(published, expected);
+        }
+    }
+    const auto base = tree.snapshot();
+    const auto oldLeaves = leafHashes(dir.path, base);
+    FileManifest appended(dir.path.string(), options, base);
+    for (unsigned i = 25; i < 33; ++i) {
+        appended.append(entry(i));
+        expected.push_back(entry(i));
+    }
+    const auto root = appended.snapshot();
+    FileManifest published(dir.path.string(), options, root);
+    compare(published, expected);
+    const auto newLeaves = leafHashes(dir.path, root);
+    require(newLeaves.size() >= oldLeaves.size(), "append unexpectedly dropped old leaves");
+    require(std::equal(oldLeaves.begin(), oldLeaves.end(), newLeaves.begin()),
+            "append rewrote immutable prefix leaves");
+}
 }  // namespace
 
 int main() {
@@ -369,6 +409,7 @@ int main() {
         validationAndCorruption(); std::cout << "PASS invalid operations, overflow, missing/corrupt objects\n";
         storageRoundTrip(); std::cout << "PASS chunk store integration and historical restoration\n";
         streamingSequenceMatching(); std::cout << "PASS automatic insertion/deletion matching and parallel storage\n";
+        streamingAppendBuilder(); std::cout << "PASS streaming append construction and leaf reuse\n";
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "FAIL " << e.what() << '\n';

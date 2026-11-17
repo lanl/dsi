@@ -1,26 +1,3 @@
-// chunking.cpp -- faithful C++ port of repolog/chunking.py (file-only storage).
-//
-// What is ported (and what is deliberately dropped):
-//   * RollingHash, _build_gear_table/GEAR_TABLE/GEAR_TABLE_LS, _make_spread_mask,
-//     _validate_parameters, _gear_update, _find_fastcdc_cut, iter_file_fastcdc,
-//     chunk_file_fastcdc, chunk_file, chunk_file_rolling_hash
-//       -> ported bit-for-bit (Python arbitrary-precision int arithmetic is
-//          emulated with unsigned __int128 / uint64 exactly where it matters).
-//   * store_chunks_for_snapshot / rebuild_file_from_chunks
-//       -> ported with ALL SQL-database logic removed (no conn, no INSERT/
-//          executemany/pending_rows, no chunk_store SELECT). Chunk payloads
-//          persist as files under <chunk_root>/dsi_vcs_chunks/<sha256>, exactly
-//          like the Python's blob half of the writer (mkstemp + chmod 0644 +
-//          fsync + os.replace). The ordered chunk-hash list argument to
-//          rebuild() remains available for legacy callers. New callers receive
-//          an immutable manifest root and stream reconstruction from that root.
-//   * NPY_MAGIC / SQLITE_MAGIC magic detection (_has_npy_magic, is_sqlite_file)
-//       -> dropped per the task; chunk_file always routes to FastCDC.
-//   * CHUNK_INSERT_BATCH_SIZE -> SQL-only constant, dropped.
-//
-// SHA-256 is never hand-rolled here: sha256.hpp delegates to CommonCrypto
-// (Apple default) or OpenSSL (-DUSE_OPENSSL).
-
 #include "chunking.hpp"
 #include "manifest.hpp"
 #include "shared_existence_cache.hpp"
@@ -52,18 +29,22 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+// ---------------------------------------------------------------------------
+// IMPORTANT: Using traditional UNIX fork to parallelize instead of MPI. 
+// fork(), exec() are Low-level OS system call, so it is expected to be faster.
+// Additionally, doing an assumption that, this program will run on 
+// end-user single physical machine.
+// Future TODO: add an additional backend that will use MPI for scale (multi-node).
+// ---------------------------------------------------------------------------
 namespace chunking {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Parameters (chunking.py module constants)
-// ---------------------------------------------------------------------------
 constexpr std::uint64_t kUint64Mask = ~(std::uint64_t)0;
 
-constexpr std::size_t kMinChunk   = (std::size_t)1 << 20;   // 1 MB
-constexpr std::size_t kAvgChunk   = (std::size_t)8 << 20;   // 8 MB
-constexpr std::size_t kMaxChunk   = (std::size_t)64 << 20;  // 64 MB
+constexpr std::size_t kMinChunk   = (std::size_t)8 << 10;   // 8 KB
+constexpr std::size_t kAvgChunk   = (std::size_t)64 << 10;   // 64 KB
+constexpr std::size_t kMaxChunk   = (std::size_t)128 << 10;  // 128 KB
 constexpr std::uint64_t kMask     = kAvgChunk - 1;           // AVG_CHUNK - 1
 
 constexpr int               kNormalizationLevel = 2;
@@ -1446,9 +1427,13 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         Sha256Ctx h;
         std::size_t count = 0;
         const auto base = baseManifestRoots.find(fileRel);
-        FileManifest manifest(chunkRoot, {}, base == baseManifestRoots.end() ? "" : base->second);
+        const bool hasBaseManifest = base != baseManifestRoots.end();
+        FileManifest manifest(chunkRoot, {}, hasBaseManifest ? base->second : "");
         std::deque<ManifestChunk> pending;
         std::uint64_t position = 0;
+        const std::uint64_t inheritedChunkCount = manifest.summary().chunkCount;
+        bool exactInheritedPrefix = hasBaseManifest;
+        bool appendingNewSuffix = false;
         constexpr std::size_t lookahead = 64;
         std::uint64_t checkpointOperations = 0;
 
@@ -1459,9 +1444,19 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         auto reconcile = [&] {
             const auto countBefore = manifest.summary().chunkCount;
             const auto next = pending.front();
-            if (position < countBefore && manifest.at(position) == next) {
+            // A byte-for-byte unchanged inherited prefix followed by a new
+            // suffix is common for log/checkpoint files. Once the prefix is
+            // exhausted, append immutable leaves instead of applying one
+            // copy-on-write insertion per suffix chunk.
+            if (appendingNewSuffix ||
+                (exactInheritedPrefix && position == inheritedChunkCount)) {
+                manifest.append(next);
+                appendingNewSuffix = true;
+                ++position;
+            } else if (position < countBefore && manifest.at(position) == next) {
                 ++position;
             } else {
+                exactInheritedPrefix = false;
                 std::size_t oldMatch = lookahead, newMatch = lookahead;
                 for (std::size_t i = 1; i < lookahead && i < countBefore - position; ++i) {
                     if (manifest.at(position + i) == next) { oldMatch = i; break; }
@@ -1500,6 +1495,16 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                 remember(chunk.sha256, true);
             }
             res.chunkHashes.insert(chunk.sha256);
+            if (!hasBaseManifest) {
+                // Initial imports are an ordered stream. Bypass reconciliation
+                // and the random-edit copy-on-write path entirely.
+                manifest.append({chunk.sha256, static_cast<std::uint64_t>(chunk.size)});
+                if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
+                    manifest.snapshot();
+                    checkpointOperations = manifest.stats().operations;
+                }
+                return;
+            }
             pending.push_back({chunk.sha256, static_cast<std::uint64_t>(chunk.size)});
             if (pending.size() >= lookahead) reconcile();
         };
@@ -1517,12 +1522,14 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                             body);
         }
 
-        while (!pending.empty()) reconcile();
-        while (manifest.summary().chunkCount > position) {
-            manifest.erase(position);
-            if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
-                manifest.snapshot();
-                checkpointOperations = manifest.stats().operations;
+        if (hasBaseManifest) {
+            while (!pending.empty()) reconcile();
+            while (manifest.summary().chunkCount > position) {
+                manifest.erase(position);
+                if (manifest.stats().operations - checkpointOperations >= 2 * MANIFEST_PAGE_ENTRIES) {
+                    manifest.snapshot();
+                    checkpointOperations = manifest.stats().operations;
+                }
             }
         }
 
