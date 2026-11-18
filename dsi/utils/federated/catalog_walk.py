@@ -3,7 +3,8 @@ import os
 import pandas as pd
 
 from dsi.dsi import DSI
-from dsi.utils.federation_utils import csv_to_list_of_dicts
+from dsi.utils.acquisition.utils import create_hashed_folder_from_path, csv_to_list_of_dicts
+from dsi.utils.data_acquisition import pull_data
 
 
 def filter_by_field_map(df, field_map, fields):
@@ -74,21 +75,19 @@ def walk_hpc_catalog(entry, workspace_folder, fields, schema_crosswalk, log_fn=p
                f"{entry['location_type']}:{entry['location']}:{entry['path']}. Skipping.")
         return None, {}
 
-    from dsi.utils.federated.federate_datasets import pull_data
     try:
-        db_info, _ = pull_data(
+        _, db_download_folder = create_hashed_folder_from_path(entry["path"], workspace_folder)
+        local_path = pull_data(
             location_type=entry["location_type"],
-            location=entry["location"],
-            path=entry["path"],
-            abs_path_workspace_folder=workspace_folder,
+            remote_location=entry["location"],
+            remote_path=entry["path"],
+            download_location=db_download_folder,
             username="",
-            internal_use=True,
         )
     except Exception as e:
         log_fn(f"scout_fetch WARNING: failed to pull {entry['location_type']}:{entry['location']}:{entry['path']}: {e}")
         return None, {}
 
-    local_path = db_info.get("local_path") if db_info else None
     if not local_path or not os.path.exists(local_path):
         log_fn(f"scout_fetch WARNING: could not retrieve {entry['location_type']}:{entry['location']}:{entry['path']}.")
         return None, {}

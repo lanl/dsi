@@ -7,7 +7,7 @@ import tempfile
 import pandas as pd
 
 from dsi.dsi import DSI
-from dsi.utils.dsi_utils import ingest_or_overwrite_table
+from dsi.utils.utils import ingest_or_overwrite_table
 from dsi.utils.federated.catalog_walk import walk_hpc_catalog
 from dsi.utils.federated.source_entry import build_source_entry, webserver_backend_names
 from dsi.utils.webserver_query import query_webserver
