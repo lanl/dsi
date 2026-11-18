@@ -1,6 +1,8 @@
-# `chunking_tests` — C++ FastCDC, packed storage, and manifests
+# `svman-core` — C++ FastCDC, packed storage, and manifests
 
-This directory contains the C++17 DSI-VCS implementation of FastCDC file
+**svman:** **Secured Version MANager**.
+
+This directory contains the C++17 svman implementation of FastCDC file
 chunking, SHA-256 addressing, repository-wide payload deduplication, immutable
 packfiles, and persistent per-file manifests. SQL and Python storage/database
 behavior are outside this implementation.
@@ -12,7 +14,7 @@ process count but can produce a different layout than sequential chunking.
 ## Build and test
 
 ```sh
-cd chunking_tests
+cd svman-core
 make            # CommonCrypto on macOS
 make OPENSSL=1  # OpenSSL backend
 make test       # chunking, manifest, cache, and worker-result tests
@@ -21,12 +23,12 @@ make test       # chunking, manifest, cache, and worker-result tests
 Useful CLI modes:
 
 ```sh
-./chunking_test --selftest <bytes>
-./chunking_test --gen <size> <path>
-./chunking_test --dump <fastcdc|rolling|parallel> <path> [processes]
-./chunking_test --meta
-./chunking_test --store-manifest <root> <absolute-path> <relative-path> [base-root]
-./chunking_test --rebuild-manifest <root> <relative-path> <root-hash> <file-hash> <out-dir>
+./svman-core --selftest <bytes>
+./svman-core --gen <size> <path>
+./svman-core --dump <fastcdc|rolling|parallel> <path> [processes]
+./svman-core --meta
+./svman-core --store-manifest <root> <absolute-path> <relative-path> [base-root]
+./svman-core --rebuild-manifest <root> <relative-path> <root-hash> <file-hash> <out-dir>
 ```
 
 ## Storage model

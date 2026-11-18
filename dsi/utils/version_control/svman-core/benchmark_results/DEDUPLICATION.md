@@ -157,7 +157,7 @@ byte-level SHA-256. Dataset generation and validation are outside store timings.
 
 ## Reproduce
 
-From `dsi/utils/version_control/repolog/chunking_tests`:
+From `dsi/utils/version_control/svman-core`:
 
 ```sh
 make -j4 benchmark

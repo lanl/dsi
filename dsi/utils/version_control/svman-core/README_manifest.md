@@ -1,7 +1,7 @@
-# DSI-VCS C++ persistent manifests
+# svman C++ persistent manifests
 
 `manifest.hpp` and `manifest.cpp` implement an immutable ordered tree of chunk
-references for one file version. Payload bytes live in DSI-VCS packs;
+references for one file version. Payload bytes live in svman packs;
 `chunking.cpp` owns pack publication, snapshot reconciliation, reconstruction,
 and repacking.
 

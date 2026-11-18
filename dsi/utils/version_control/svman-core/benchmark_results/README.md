@@ -13,7 +13,7 @@ initial and final version restoration at every size. Initial 4 GB storage took
 
 ## Reproduce
 
-From `dsi/utils/version_control/repolog/chunking_tests`:
+From `dsi/utils/version_control/svman-core`:
 
 ```sh
 make -j4 benchmark

@@ -1,4 +1,4 @@
-# DSI-VCS: parallel chunking and file manifests
+# svman: parallel chunking and file manifests
 
 **Worker assignment.** The native parallel store divides a nonempty file into consecutive **64 MiB units**, with a possibly shorter final unit. Unit `u` starts at byte `u × 64 MiB`. With `P` workers, worker `w` handles units `w, w+P, w+2P, …`; two workers therefore receive even- and odd-numbered units. Worker count is capped by unit count. Each worker receives the filename once, then offsets and lengths, reading into a private reusable buffer. The parent dispatches its next assigned unit as soon as it replies, without waiting for earlier units.
 

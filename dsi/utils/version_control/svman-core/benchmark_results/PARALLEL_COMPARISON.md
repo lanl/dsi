@@ -91,7 +91,7 @@ restored and verified by byte-level SHA-256 outside the timings.
 
 ## Reproduce the after run
 
-From `dsi/utils/version_control/repolog/chunking_tests`:
+From `dsi/utils/version_control/svman-core`:
 
 ```sh
 make -B -j4 benchmark

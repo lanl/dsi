@@ -18,10 +18,10 @@ Usage:
 
 CLI equivalence with the C++ binary:
 
-    ./chunking_test --gen   <size> <path>      -> pycheck.py gen <size> <path>
-    ./chunking_test --dump  fastcdc <path>     -> pycheck.py fastcdc <path>
-    ./chunking_test --dump  rolling <path>     -> pycheck.py rolling <path>
-    ./chunking_test --meta                     -> pycheck.py meta
+    ./svman-core --gen   <size> <path>      -> pycheck.py gen <size> <path>
+    ./svman-core --dump  fastcdc <path>     -> pycheck.py fastcdc <path>
+    ./svman-core --dump  rolling <path>     -> pycheck.py rolling <path>
+    ./svman-core --meta                     -> pycheck.py meta
 
 The synthetic file recipe is the same on both sides:
   block j = sha256(j as 8-byte little-endian u64); file = concat blocks,

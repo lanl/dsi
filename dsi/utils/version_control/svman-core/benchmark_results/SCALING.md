@@ -86,7 +86,7 @@ statistically established optimum process count.
 
 ## Reproduce only the new measurements
 
-From `dsi/utils/version_control/repolog/chunking_tests`, build with
+From `dsi/utils/version_control/svman-core`, build with
 `make -B -j4 benchmark`. Run each command sequentially to avoid resource
 contention between benchmark jobs; choose output names that do not exist.
 

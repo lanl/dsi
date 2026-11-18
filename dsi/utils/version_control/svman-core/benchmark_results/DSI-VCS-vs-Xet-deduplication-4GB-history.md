@@ -1,4 +1,4 @@
-# DSI-VCS vs Xet: deduplication across 19 versions
+# svman vs Xet: deduplication across 19 versions
 
 A **4 GB initial file** is followed by **18 consecutive edited versions**. At the beginning, middle and end, the workload applies 64 KiB and 128 MiB remove/add/update operations. Each tool retains all versions in one local repository, without garbage collection, using one process and three fresh-store trials. The charts reuse the saved November 12, 2026 results.
 
@@ -16,7 +16,7 @@ After version 19, logical history totals **75.5972 GB**:
 
 | Tool | Stored history (GB) | Storage saved |
 | --- | ---: | ---: |
-| DSI-VCS | 5.0337 | 93.3414% |
+| svman | 5.0337 | 93.3414% |
 | Xet | 4.8209 | 93.6229% |
 
 Xet stores **0.2128 GB less**, a **0.2815 percentage-point** advantage in savings. These are whole-repository savings, including native packing and metadata effects.

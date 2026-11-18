@@ -17,12 +17,12 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import dsi.utils.version_control.chunking_tests.pycheck as pycheck  # noqa: E402  (build_package lives there)
+import pycheck  # noqa: E402  (build_package lives there)
 
 
 def run_cpp(*args) -> str:
     out = subprocess.run(
-        [os.path.join(HERE, "chunking_test"), *args],
+        [os.path.join(HERE, "svman-core"), *args],
         check=True, capture_output=True, text=True)
     return out.stdout.strip()
 
@@ -65,7 +65,7 @@ def main(path: str, rel: str) -> int:
 
     # C++ reconstruction is driven exclusively by its persisted manifest.
     code = subprocess.run(
-        [os.path.join(HERE, "chunking_test"), "--rebuild-manifest", cc_root,
+        [os.path.join(HERE, "svman-core"), "--rebuild-manifest", cc_root,
          rel, cc_root_hash, cc_sha, "/tmp/cc_rebuild_from_manifest"],
         capture_output=True, text=True)
     repo = os.path.join("/tmp/cc_rebuild_from_manifest", rel)

@@ -1,4 +1,4 @@
-# Makefile for chunking_tests -- C++ port of repolog/chunking.py.
+# Makefile for svman-core -- C++ port of repolog/chunking.py.
 #
 # Default (Apple) links the OS's CommonCrypto for SHA-256 -- no extra deps.
 # Use `make OPENSSL=1` to build against OpenSSL instead (pkg-config openssl).
@@ -16,7 +16,7 @@ CXXFLAGS ?= -std=c++17 -O3 -Wall -Wextra -mcpu=apple-m2 -Ofast -flto -ffast-math
 LIBS      =
 
 OBJS := sha256.o manifest.o shared_existence_cache.o chunking.o main.o
-BIN  := chunking_test
+BIN  := svman-core
 MANIFEST_BIN := manifest_test
 CACHE_BIN := shared_cache_test
 RESULTS_BIN := worker_results_test

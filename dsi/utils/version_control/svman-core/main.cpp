@@ -1,12 +1,12 @@
 // main.cpp -- self-test + CLI helpers for the C++ FastCDC chunker port.
 //
 // Modes:
-//   chunking_test                       run the built-in self-test suite
-//   chunking_test --gen <size> <path>   write a deterministic synthetic file
-//   chunking_test --dump <mode> <path> [processes]
+//   svman-core                       run the built-in self-test suite
+//   svman-core --gen <size> <path>   write a deterministic synthetic file
+//   svman-core --dump <mode> <path> [processes]
 //                                       print "<size> <sha256>" per chunk
 //                                       (processes applies to parallel mode)
-//   chunking_test --meta                print AVERAGE_BITS / masks / gear
+//   svman-core --meta                print AVERAGE_BITS / masks / gear
 //                                       tables, for diffing against pycheck.py
 //
 // The synthetic file format is shared with pycheck.py so the Python original
