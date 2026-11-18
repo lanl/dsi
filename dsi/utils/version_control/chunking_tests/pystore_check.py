@@ -17,7 +17,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import pycheck  # noqa: E402  (build_package lives there)
+import dsi.utils.version_control.chunking_tests.pycheck as pycheck  # noqa: E402  (build_package lives there)
 
 
 def run_cpp(*args) -> str:
