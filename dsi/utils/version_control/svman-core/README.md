@@ -17,6 +17,7 @@ process count but can produce a different layout than sequential chunking.
 cd svman-core
 make            # CommonCrypto on macOS
 make OPENSSL=1  # OpenSSL backend
+make release    # svman-core only; excludes test binaries
 make test       # chunking, manifest, cache, and worker-result tests
 ```
 
@@ -356,6 +357,4 @@ randomized edits, bulk replacement/leaf reuse, manifest-page mark-and-sweep,
 malformed pages, packed locations, pack-GC integration, and historical
 restoration.
 
-```sh
-make manifest-test
-```
+Run the complete suite, including manifest tests, with `make test`.

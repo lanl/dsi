@@ -5,8 +5,8 @@
 #
 # Targets:
 #   all    build chunking, manifest, shared-cache and worker-result test binaries
-#   test   runs per-file rules; see below
-#   manifest-test   run only manifest tests
+#   release  build only the svman-core release executable
+#   test   build and run the complete test suite, including manifest tests
 #   benchmark       build ./manifest_benchmark (run explicitly)
 #   run    alias for test
 #   clean  remove objects and the binary
@@ -21,13 +21,16 @@ MANIFEST_BIN := manifest_test
 CACHE_BIN := shared_cache_test
 RESULTS_BIN := worker_results_test
 BENCHMARK_BIN := manifest_benchmark
+TEST_BINS := $(MANIFEST_BIN) $(CACHE_BIN) $(RESULTS_BIN)
 
 ifeq ($(OPENSSL),1)
   CXXFLAGS += -DUSE_OPENSSL $(shell pkg-config --cflags openssl)
   LIBS     += $(shell pkg-config --libs openssl)
 endif
 
-all: $(BIN) $(MANIFEST_BIN) $(CACHE_BIN) $(RESULTS_BIN)
+all: release $(TEST_BINS)
+
+release: $(BIN)
 
 $(BIN): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
@@ -60,18 +63,15 @@ $(BENCHMARK_BIN): sha256.o manifest.o shared_existence_cache.o chunking.o manife
 
 benchmark: $(BENCHMARK_BIN)
 
-test: $(BIN) $(MANIFEST_BIN) $(CACHE_BIN) $(RESULTS_BIN)
+test: release $(TEST_BINS)
 	./$(BIN)
 	./$(MANIFEST_BIN)
 	./$(CACHE_BIN)
 	./$(RESULTS_BIN)
-
-manifest-test: $(MANIFEST_BIN)
-	./$(MANIFEST_BIN)
 
 run: test
 
 clean:
 	rm -f $(OBJS) $(BIN) manifest_test.o $(MANIFEST_BIN) manifest_benchmark.o $(BENCHMARK_BIN) shared_cache_test.o $(CACHE_BIN) worker_results_test.o $(RESULTS_BIN)
 
-.PHONY: all test manifest-test benchmark run clean
+.PHONY: all release test benchmark run clean
