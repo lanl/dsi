@@ -415,6 +415,53 @@ void streamingAppendBuilder() {
     require(std::equal(oldLeaves.begin(), oldLeaves.end(), newLeaves.begin()),
             "append rewrote immutable prefix leaves");
 }
+
+void bulkReplacementAndLeafReuse() {
+    Temporary dir;
+    const auto options = small();
+    FileManifest source(dir.path.string(), options);
+    std::vector<ManifestChunk> expected;
+    for (unsigned i = 0; i < 40; ++i) {
+        source.append(entry(i));
+        expected.push_back(entry(i));
+    }
+    const auto base = source.snapshot();
+    const auto oldLeaves = leafHashes(dir.path, base);
+    require(oldLeaves.size() >= 8, "bulk splice fixture has too few leaves");
+
+    FileManifest edited(dir.path.string(), options, base);
+    std::vector<ManifestChunk> replacement;
+    for (unsigned i = 0; i < 8; ++i) replacement.push_back(entry(1000 + i));
+    edited.replaceRange(8, 8, replacement);
+    expected.erase(expected.begin() + 8, expected.begin() + 16);
+    expected.insert(expected.begin() + 8, replacement.begin(), replacement.end());
+    compare(edited, expected);
+    const auto changed = edited.snapshot();
+    const auto newLeaves = leafHashes(dir.path, changed);
+    require(newLeaves.size() == oldLeaves.size(), "equal-size bulk replacement changed leaf count");
+    require(newLeaves.at(0) == oldLeaves.at(0) && newLeaves.at(1) == oldLeaves.at(1),
+            "bulk replacement rewrote unchanged prefix leaves");
+    require(std::equal(oldLeaves.begin() + 4, oldLeaves.end(), newLeaves.begin() + 4),
+            "bulk replacement rewrote unchanged suffix leaves");
+
+    const auto retained = FileManifest::garbageCollectPages(dir.path.string(), {changed}, options);
+    require(retained.deletedPages > 0, "manifest GC did not remove obsolete pages");
+    require(retained.reachablePages >= newLeaves.size(), "manifest GC did not mark published pages");
+    FileManifest afterGc(dir.path.string(), options, changed);
+    compare(afterGc, expected);
+
+    FileManifest resized(dir.path.string(), options, changed);
+    resized.replaceRange(3, 27, {});
+    expected.erase(expected.begin() + 3, expected.begin() + 30);
+    compare(resized, expected);
+    const auto resizedRoot = resized.snapshot();
+    FileManifest restored(dir.path.string(), options, resizedRoot);
+    compare(restored, expected);
+    mustThrow([&] { resized.replaceRange(resized.summary().chunkCount + 1, 0, {}); },
+              "out-of-range bulk insertion accepted");
+    mustThrow([&] { resized.replaceRange(0, resized.summary().chunkCount + 1, {}); },
+              "out-of-range bulk erase accepted");
+}
 }  // namespace
 
 int main() {
@@ -427,6 +474,7 @@ int main() {
         storageRoundTrip(); std::cout << "PASS chunk store integration and historical restoration\n";
         streamingSequenceMatching(); std::cout << "PASS automatic insertion/deletion matching and parallel storage\n";
         streamingAppendBuilder(); std::cout << "PASS streaming append construction and leaf reuse\n";
+        bulkReplacementAndLeafReuse(); std::cout << "PASS bulk replacement, history, and leaf reuse\n";
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "FAIL " << e.what() << '\n';

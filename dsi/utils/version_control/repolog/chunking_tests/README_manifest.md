@@ -67,10 +67,20 @@ generic threshold, and merge/redistribute below minimum occupancy. An internal
 root with one child collapses. A depth-difference safeguard can rebuild internal
 levels while retaining leaves.
 
-Automatic snapshot reconciliation rechunks the complete file and uses bounded
-64-entry lookahead to match old/new reference sequences. Local edits normally
-retain a suffix of old pages. Repeated patterns or changes outside that window
-can reduce sharing but cannot change reconstructed bytes.
+`replaceRange(index, eraseCount, replacement)` is the bulk update operation used
+by automatic snapshot reconciliation. It reuses complete immutable leaves before
+and after the changed range, rebuilds only the edited boundary region, then
+rebuilds the compact internal hierarchy. If a rebuilt boundary would be
+underfull, it locally incorporates one adjacent leaf and repartitions that small
+region to preserve occupancy.
+
+Automatic snapshot reconciliation still rechunks the complete input file, but
+it no longer uses bounded lookahead. It builds a digest-to-old-position anchor
+index, confirms an anchor with up to three consecutive matching chunks, and
+uses `replaceRange` for each unmatched span. Consequently a 128 MiB insertion
+or deletion can rejoin a reused suffix beyond the old 64-chunk window without
+performing one copy-on-write manifest edit per shifted chunk. If no confirmed
+anchor exists, the remaining suffix is replaced as one bulk span.
 
 ## Roots and reconstruction
 
@@ -80,7 +90,7 @@ manifest.append({chunkHash, logicalBytes, packId, packOffset, storedBytes});
 const std::string root = manifest.snapshot();
 
 chunking::FileManifest next(chunkRoot, {}, root);
-next.insert(index, replacement);
+next.replaceRange(index, eraseCount, replacementChunks);
 const std::string nextRoot = next.snapshot();
 ```
 
@@ -112,12 +122,36 @@ completed metadata migration, and no readers using old roots. Provide every
 retained root if future global deduplication must recognize its payloads. The
 current implementation creates at most one replacement pack per call.
 
+### Unreferenced manifest-page GC
+
+`FileManifest::garbageCollectPages(chunkRoot, liveRoots, options)` performs
+mark-and-sweep collection of manifest objects. It traverses every page reachable
+from each supplied root hash, marks those content-addressed page objects, then
+deletes only 64-hex-name page files not in the mark set. Shared leaves and
+internal pages remain because they are marked once and retained for every root
+that reaches them. Temporary/non-content-addressed files are ignored.
+
+```cpp
+const chunking::ManifestGcResult gc =
+    chunking::FileManifest::garbageCollectPages(chunkRoot, retainedRoots);
+// gc.reachablePages and gc.deletedPages report the completed pass.
+```
+
+`liveRoots` must contain **every** retained version/branch root, and `options`
+must match the pages' `ManifestOptions` (the default is correct for default
+pages). This is intentionally an explicit maintenance operation: manifest pages
+cannot discover root references held in external version metadata. Run it only
+while manifest publishers and version-root metadata updates are quiescent;
+otherwise a newly published but not-yet-registered root could be collected.
+
 ## Complexity and assumptions
 
 - Appending `C` references creates `O(C / B)` leaves and a small fan-out `B`
   internal hierarchy.
 - A known-position edit in height `h` touches `O(h)` pages and has `O(Bh)`
-  encoding/hashing work when published.
+  encoding/hashing work when published. A bulk replacement additionally copies
+  its replacement references and a bounded number of boundary leaves, while
+  retaining all complete outside leaves by hash.
 - Reconstruction visits `O(C)` references and reads reconstructed bytes.
 - Snapshotting retains logical chunk metadata; parallel payload buffering stays
   bounded even though metadata remains `O(chunk count)`.
@@ -127,8 +161,9 @@ current implementation creates at most one replacement pack per call.
 ## Tests
 
 `manifest_test.cpp` covers split/merge behavior, root collapse, persistence,
-randomized edits, malformed pages, packed locations, GC integration, and
-historical restoration.
+randomized edits, bulk replacement/leaf reuse, manifest-page mark-and-sweep,
+malformed pages, packed locations, pack-GC integration, and historical
+restoration.
 
 ```sh
 make manifest-test

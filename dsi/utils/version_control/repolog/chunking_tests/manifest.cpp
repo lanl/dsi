@@ -11,6 +11,7 @@
 #include <list>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <fcntl.h>
@@ -257,6 +258,15 @@ struct FileManifest::Impl {
         }
         const auto node = load(value);
         for (const auto& child : node->children) collectLeaves(child, leaves);
+    }
+
+    void collectReachable(const Link& value, std::unordered_set<std::string>& pages) const {
+        if (value.hash.empty())
+            throw std::logic_error("cannot collect reachability from an unpublished manifest page");
+        if (!pages.insert(value.hash).second) return;
+        const auto node = load(value);
+        if (!node->leaf)
+            for (const auto& child : node->children) collectReachable(child, pages);
     }
 
     void beginAppend() {
@@ -635,6 +645,149 @@ struct FileManifest::Impl {
         ++counters.internalRebuilds;
     }
 
+    void rebuildFromLeaves(std::vector<Link> leaves) {
+        if (leaves.empty()) {
+            root = link(std::make_shared<Node>());
+            return;
+        }
+        while (leaves.size() > 1) {
+            const auto groups = (leaves.size() + options.pageEntries - 1) / options.pageEntries;
+            const auto each = leaves.size() / groups;
+            const auto extra = leaves.size() % groups;
+            std::vector<Link> next;
+            next.reserve(groups);
+            std::size_t start = 0;
+            for (std::size_t i = 0; i < groups; ++i) {
+                const auto count = each + (i < extra ? 1 : 0);
+                auto node = std::make_shared<Node>();
+                node->leaf = false;
+                node->children.assign(leaves.begin() + static_cast<std::ptrdiff_t>(start),
+                                      leaves.begin() + static_cast<std::ptrdiff_t>(start + count));
+                next.push_back(link(std::move(node)));
+                start += count;
+            }
+            leaves = std::move(next);
+        }
+        root = std::move(leaves.front());
+    }
+
+    void replaceRange(std::uint64_t index, std::uint64_t eraseCount,
+                      const std::vector<ManifestChunk>& replacement) {
+        materializeAppend();
+        const auto total = root.summary.chunkCount;
+        if (index > total || eraseCount > total - index)
+            throw std::out_of_range("manifest replacement range out of bounds");
+        for (const auto& chunk : replacement) {
+            checkHash(chunk.hash);
+            if (!chunk.size) throw std::invalid_argument("manifest replacement chunk size must be positive");
+        }
+        if (!eraseCount && replacement.empty()) return;
+
+        std::vector<Link> leaves;
+        collectLeaves(root, leaves);
+        if (leaves.empty()) {
+            if (index != 0 || eraseCount != 0)
+                throw std::logic_error("empty manifest replacement range is inconsistent");
+            std::vector<ManifestChunk> middle = replacement;
+            if (!middle.empty()) {
+                const auto groups = (middle.size() + options.pageEntries - 1) / options.pageEntries;
+                const auto each = middle.size() / groups;
+                const auto extra = middle.size() % groups;
+                std::vector<Link> created;
+                created.reserve(groups);
+                std::size_t start = 0;
+                for (std::size_t i = 0; i < groups; ++i) {
+                    const auto count = each + (i < extra ? 1 : 0);
+                    auto leaf = std::make_shared<Node>();
+                    leaf->chunks.assign(middle.begin() + static_cast<std::ptrdiff_t>(start),
+                                        middle.begin() + static_cast<std::ptrdiff_t>(start + count));
+                    created.push_back(link(std::move(leaf)));
+                    start += count;
+                }
+                rebuildFromLeaves(std::move(created));
+            }
+            ++counters.operations;
+            ++counters.balanceChecks;
+            return;
+        }
+
+        std::vector<std::uint64_t> starts;
+        starts.reserve(leaves.size());
+        std::uint64_t offset = 0;
+        for (const auto& leaf : leaves) {
+            starts.push_back(offset);
+            offset = checkedAdd(offset, leaf.summary.chunkCount);
+        }
+
+        auto leafAt = [&](std::uint64_t position) {
+            // At EOF, attach an insertion to the previous leaf.  This keeps
+            // the untouched right-hand leaves reusable for boundary inserts.
+            if (position == total) return leaves.size() - 1;
+            const auto it = std::upper_bound(starts.begin(), starts.end(), position);
+            return static_cast<std::size_t>(std::distance(starts.begin(), it) - 1);
+        };
+
+        const auto first = leafAt(index);
+        const auto end = checkedAdd(index, eraseCount);
+        const auto last = eraseCount ? leafAt(end - 1) : first;
+        const auto firstNode = load(leaves[first]);
+        const auto lastNode = load(leaves[last]);
+        if (!firstNode->leaf || !lastNode->leaf)
+            throw std::logic_error("manifest leaf collection returned an internal node");
+
+        const auto prefixCount = static_cast<std::size_t>(index - starts[first]);
+        const auto suffixStart = static_cast<std::size_t>(end - starts[last]);
+        std::vector<ManifestChunk> middle;
+        middle.reserve(prefixCount + replacement.size() + (lastNode->chunks.size() - suffixStart));
+        middle.insert(middle.end(), firstNode->chunks.begin(),
+                      firstNode->chunks.begin() + static_cast<std::ptrdiff_t>(prefixCount));
+        middle.insert(middle.end(), replacement.begin(), replacement.end());
+        middle.insert(middle.end(), lastNode->chunks.begin() + static_cast<std::ptrdiff_t>(suffixStart),
+                      lastNode->chunks.end());
+
+        std::size_t before = first;
+        std::size_t after = last + 1;
+        // The persistent tree requires every non-root leaf to be at least
+        // half full.  Borrow one adjacent immutable leaf only when the edited
+        // boundary is too small, then repartition that small local region.
+        if (middle.size() < low() && before) {
+            const auto previous = load(leaves[before - 1]);
+            if (!previous->leaf) throw std::logic_error("manifest predecessor is not a leaf");
+            middle.insert(middle.begin(), previous->chunks.begin(), previous->chunks.end());
+            --before;
+        }
+        if (middle.size() < low() && after < leaves.size()) {
+            const auto following = load(leaves[after]);
+            if (!following->leaf) throw std::logic_error("manifest successor is not a leaf");
+            middle.insert(middle.end(), following->chunks.begin(), following->chunks.end());
+            ++after;
+        }
+
+        std::vector<Link> next;
+        next.reserve(before + after - last + 2);
+        next.insert(next.end(), leaves.begin(), leaves.begin() + static_cast<std::ptrdiff_t>(before));
+        if (!middle.empty()) {
+            // Spread the boundary data evenly.  Besides satisfying occupancy,
+            // this avoids a repeated one-chunk edit ever copying a whole page.
+            const auto groups = (middle.size() + options.pageEntries - 1) / options.pageEntries;
+            const auto each = middle.size() / groups;
+            const auto extra = middle.size() % groups;
+            std::size_t start = 0;
+            for (std::size_t i = 0; i < groups; ++i) {
+                const auto count = each + (i < extra ? 1 : 0);
+                auto leaf = std::make_shared<Node>();
+                leaf->chunks.assign(middle.begin() + static_cast<std::ptrdiff_t>(start),
+                                    middle.begin() + static_cast<std::ptrdiff_t>(start + count));
+                next.push_back(link(std::move(leaf)));
+                start += count;
+            }
+        }
+        next.insert(next.end(), leaves.begin() + static_cast<std::ptrdiff_t>(after), leaves.end());
+        rebuildFromLeaves(std::move(next));
+        ++counters.operations;
+        ++counters.balanceChecks;
+    }
+
     void apply(std::uint64_t index, Edit kind, const ManifestChunk& chunk = {}) {
         materializeAppend();
         if (index > root.summary.chunkCount ||
@@ -707,6 +860,10 @@ void FileManifest::append(const ManifestChunk& c) { impl_->append(c); }
 void FileManifest::insert(std::uint64_t i, const ManifestChunk& c) { impl_->apply(i, Impl::Edit::Insert, c); }
 void FileManifest::erase(std::uint64_t i) { impl_->apply(i, Impl::Edit::Erase); }
 void FileManifest::update(std::uint64_t i, const ManifestChunk& c) { impl_->apply(i, Impl::Edit::Update, c); }
+void FileManifest::replaceRange(std::uint64_t i, std::uint64_t n,
+                                const std::vector<ManifestChunk>& replacement) {
+    impl_->replaceRange(i, n, replacement);
+}
 void FileManifest::forEach(const std::function<void(const ManifestChunk&)>& visitor) const {
     if (impl_->appendMode) {
         impl_->walkAppend(visitor);
@@ -724,6 +881,47 @@ void FileManifest::validate() const {
     auto* mutableImpl = const_cast<Impl*>(impl_.get());
     mutableImpl->materializeAppend();
     mutableImpl->validateNode(mutableImpl->root, true);
+}
+
+ManifestGcResult FileManifest::garbageCollectPages(
+    const std::string& chunkRoot, const std::vector<std::string>& liveRoots,
+    ManifestOptions options) {
+    std::unordered_set<std::string> reachable;
+    for (const auto& rootHash : liveRoots) {
+        checkHash(rootHash);
+        FileManifest manifest(chunkRoot, options, rootHash);
+        manifest.impl_->collectReachable(manifest.impl_->root, reachable);
+    }
+
+    ManifestGcResult result;
+    result.reachablePages = reachable.size();
+    const auto directory = std::filesystem::path(chunkRoot) / MANIFEST_STORAGE_DIR;
+    std::error_code error;
+    if (!std::filesystem::exists(directory, error)) {
+        if (error) throw std::runtime_error("checking manifest directory failed: " + error.message());
+        return result;
+    }
+    if (!std::filesystem::is_directory(directory, error))
+        throw std::runtime_error("manifest storage path is not a directory: " + directory.string());
+
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        if (!entry.is_regular_file()) continue;
+        const auto name = entry.path().filename().string();
+        try {
+            checkHash(name);
+        } catch (const std::invalid_argument&) {
+            // Temporary/incomplete files are not content-addressed manifest
+            // objects and are deliberately left for their owning publisher.
+            continue;
+        }
+        if (reachable.count(name)) continue;
+        if (!std::filesystem::remove(entry.path(), error)) {
+            if (error) throw std::runtime_error("removing unreachable manifest page failed: " + error.message());
+            continue;
+        }
+        ++result.deletedPages;
+    }
+    return result;
 }
 
 }  // namespace chunking

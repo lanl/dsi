@@ -1793,44 +1793,75 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         const auto base = baseManifestRoots.find(fileRel);
         const bool hasBaseManifest = base != baseManifestRoots.end();
         FileManifest manifest(chunkRoot, {}, hasBaseManifest ? base->second : "");
-        std::deque<ManifestChunk> pending;
-        std::uint64_t position = 0;
-        const std::uint64_t inheritedChunkCount = manifest.summary().chunkCount;
-        bool exactInheritedPrefix = hasBaseManifest;
-        bool appendingNewSuffix = false;
-        constexpr std::size_t lookahead = 64;
-        auto reconcile = [&] {
-            const auto countBefore = manifest.summary().chunkCount;
-            const auto next = pending.front();
-            if (appendingNewSuffix || (exactInheritedPrefix && position == inheritedChunkCount)) {
-                manifest.append(next); appendingNewSuffix = true; ++position;
-            } else if (position < countBefore && manifest.at(position) == next) {
-                ++position;
-            } else {
-                exactInheritedPrefix = false;
-                std::size_t oldMatch = lookahead, newMatch = lookahead;
-                for (std::size_t i = 1; i < lookahead && i < countBefore - position; ++i)
-                    if (manifest.at(position + i) == next) { oldMatch = i; break; }
-                if (position < countBefore) {
-                    const auto old = manifest.at(position);
-                    for (std::size_t i = 1; i < pending.size(); ++i)
-                        if (pending[i] == old) { newMatch = i; break; }
+        if (!hasBaseManifest) {
+            for (const auto& chunk : file.chunks) manifest.append(chunk);
+        } else {
+            // Build an unbounded anchor index once.  A content-defined stream
+            // normally realigns after an edit, but that realignment may be far
+            // beyond the old 64-chunk lookahead (e.g. a 128 MiB deletion).
+            // Indexing the old logical sequence turns that search into hash
+            // lookups instead of repeatedly probing manifest pages.
+            std::vector<ManifestChunk> oldChunks;
+            oldChunks.reserve(static_cast<std::size_t>(manifest.summary().chunkCount));
+            manifest.forEach([&](const ManifestChunk& chunk) { oldChunks.push_back(chunk); });
+            std::unordered_map<std::string, std::vector<std::size_t>> anchors;
+            anchors.reserve(oldChunks.size());
+            for (std::size_t i = 0; i < oldChunks.size(); ++i)
+                anchors[oldChunks[i].hash].push_back(i);
+
+            constexpr std::size_t anchorConfirmation = 3;
+            auto findAnchor = [&](std::size_t oldStart, std::size_t newStart,
+                                  std::size_t& oldMatch, std::size_t& newMatch) {
+                for (std::size_t candidateNew = newStart; candidateNew < file.chunks.size(); ++candidateNew) {
+                    const auto found = anchors.find(file.chunks[candidateNew].hash);
+                    if (found == anchors.end()) continue;
+                    for (const auto candidateOld : found->second) {
+                        if (candidateOld < oldStart || oldChunks[candidateOld] != file.chunks[candidateNew])
+                            continue;
+                        std::size_t run = 0;
+                        while (run < anchorConfirmation && candidateOld + run < oldChunks.size() &&
+                               candidateNew + run < file.chunks.size() &&
+                               oldChunks[candidateOld + run] == file.chunks[candidateNew + run])
+                            ++run;
+                        // A short sequence prevents repeated data from choosing
+                        // an incidental single-chunk anchor.  At EOF, the
+                        // available matching suffix is sufficient evidence.
+                        if (run == anchorConfirmation ||
+                            (run && (candidateOld + run == oldChunks.size() ||
+                                     candidateNew + run == file.chunks.size()))) {
+                            oldMatch = candidateOld;
+                            newMatch = candidateNew;
+                            return true;
+                        }
+                    }
                 }
-                if (oldMatch < lookahead && oldMatch <= newMatch)
-                    for (std::size_t i = 0; i < oldMatch; ++i) manifest.erase(position);
-                else if (newMatch < lookahead || position == countBefore) manifest.insert(position, next);
-                else manifest.update(position, next);
-                ++position;
+                return false;
+            };
+
+            std::size_t oldPosition = 0, newPosition = 0, manifestPosition = 0;
+            while (oldPosition < oldChunks.size() && newPosition < file.chunks.size()) {
+                if (oldChunks[oldPosition] == file.chunks[newPosition]) {
+                    ++oldPosition;
+                    ++newPosition;
+                    ++manifestPosition;
+                    continue;
+                }
+
+                std::size_t oldMatch = oldChunks.size(), newMatch = file.chunks.size();
+                findAnchor(oldPosition, newPosition, oldMatch, newMatch);
+                std::vector<ManifestChunk> replacement(
+                    file.chunks.begin() + static_cast<std::ptrdiff_t>(newPosition),
+                    file.chunks.begin() + static_cast<std::ptrdiff_t>(newMatch));
+                manifest.replaceRange(manifestPosition, oldMatch - oldPosition, replacement);
+                manifestPosition += replacement.size();
+                oldPosition = oldMatch;
+                newPosition = newMatch;
             }
-            pending.pop_front();
-        };
-        for (const auto& chunk : file.chunks) {
-            if (!hasBaseManifest) manifest.append(chunk);
-            else { pending.push_back(chunk); if (pending.size() >= lookahead) reconcile(); }
-        }
-        if (hasBaseManifest) {
-            while (!pending.empty()) reconcile();
-            while (manifest.summary().chunkCount > position) manifest.erase(position);
+            if (oldPosition < oldChunks.size() || newPosition < file.chunks.size()) {
+                std::vector<ManifestChunk> replacement(
+                    file.chunks.begin() + static_cast<std::ptrdiff_t>(newPosition), file.chunks.end());
+                manifest.replaceRange(manifestPosition, oldChunks.size() - oldPosition, replacement);
+            }
         }
         res.fileHashes[fileRel] = file.fileHash;
         res.chunkLength[fileRel] = file.chunks.size();

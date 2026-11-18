@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace chunking {
 
@@ -46,6 +47,14 @@ struct ManifestStats {
     std::uint64_t pageReads = 0, pageWrites = 0, internalRebuilds = 0;
 };
 
+// Result of an explicit mark-and-sweep pass over immutable manifest pages.
+// The caller supplies every retained snapshot root; pages reachable from any
+// supplied root are retained, including shared leaves and internal pages.
+struct ManifestGcResult {
+    std::size_t reachablePages = 0;
+    std::size_t deletedPages = 0;
+};
+
 // Immutable on disk; only changed paths are copied in the working tree.
 // Call snapshot() to publish dirty pages and persist the returned root in the
 // caller's version metadata. Old roots remain readable across edits/branches.
@@ -69,6 +78,12 @@ public:
     void insert(std::uint64_t index, const ManifestChunk& chunk);
     void erase(std::uint64_t index);
     void update(std::uint64_t index, const ManifestChunk& chunk);
+    // Replace eraseCount chunks at index with replacement as one copy-on-write
+    // operation.  Complete immutable leaves outside the edited boundary are
+    // retained by reference; only the boundary leaves and upper hierarchy are
+    // rebuilt.
+    void replaceRange(std::uint64_t index, std::uint64_t eraseCount,
+                      const std::vector<ManifestChunk>& replacement);
     void forEach(const std::function<void(const ManifestChunk&)>& visitor) const;
     std::string snapshot();
 
@@ -77,6 +92,14 @@ public:
     void rebalanceInternal();
     // Expensive diagnostics, intentionally separate from per-operation checks.
     void validate() const;
+
+    // Delete content-addressed manifest objects that are unreachable from
+    // liveRoots. The caller must provide the complete retained-root set and
+    // run this while manifest publishers and root-metadata updates are
+    // quiescent; a page cannot identify external root references by itself.
+    static ManifestGcResult garbageCollectPages(const std::string& chunkRoot,
+                                                const std::vector<std::string>& liveRoots,
+                                                ManifestOptions options = {});
 
 private:
     struct Impl;
