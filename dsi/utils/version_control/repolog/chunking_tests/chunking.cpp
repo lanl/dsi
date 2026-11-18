@@ -397,14 +397,6 @@ void mkdirP(const std::string& dir) {
     }
 }
 
-std::string dirNameOf(const std::string& path) {
-    const std::size_t slash = path.find_last_of('/');
-    if (slash == std::string::npos) {
-        return std::string();  // no directory component
-    }
-    return path.substr(0, slash);
-}
-
 bool pathExists(const std::string& path) {
     struct ::stat st {};
     return ::stat(path.c_str(), &st) == 0;
@@ -1980,58 +1972,6 @@ bool rebuildFileFromManifest(const std::string& chunkRoot,
         const int synced = ::fsync(directoryFd);
         ::close(directoryFd);
         return synced == 0;
-    } catch (const std::exception&) {
-        return false;
-    }
-}
-
-bool rebuildFileFromChunks(const std::string& chunkRoot,
-                           const std::string& relativePath,
-                           const std::string& commitHash,
-                           const std::string& fileHash,
-                           const std::string& outputPath,
-                           const std::vector<std::string>& orderedChunkHashes) {
-    (void)commitHash;  // no DB to filter on; kept for signature parity.
-    const std::string chunkDir = chunkRoot + "/" + kChunkStorageDir;
-
-    try {
-        // Verify the order of chunk digests matches the file hash first.
-        Sha256Ctx chunkHashDigest;
-        for (const std::string& hash : orderedChunkHashes) {
-            chunkHashDigest.update(hash);
-        }
-        if (chunkHashDigest.hexdigest() != fileHash) {
-            return false;
-        }
-
-        const std::string target = outputPath + "/" + relativePath;
-        const std::string targetDir = dirNameOf(target);
-        if (!targetDir.empty()) mkdirP(targetDir);
-
-        std::ofstream out(target, std::ios::binary | std::ios::trunc);
-        if (!out) return false;
-
-        PackRepository repository(chunkRoot);
-        for (const std::string& hash : orderedChunkHashes) {
-            ManifestChunk chunk{hash, 0};
-            if (const auto location = repository.lookup(hash)) {
-                chunk.size = location->storedSize;
-                chunk.packId = location->packId;
-                chunk.packOffset = location->offset;
-                chunk.storedSize = location->storedSize;
-            } else {
-                const std::string chunkPath = chunkDir + "/" + hash;
-                if (!pathExists(chunkPath)) return false;
-                struct stat info {};
-                if (::stat(chunkPath.c_str(), &info) != 0 || info.st_size < 0) return false;
-                chunk.size = static_cast<std::uint64_t>(info.st_size);
-            }
-            std::string content = readPackedPayload(chunkRoot, chunk);
-            if (sha256Hex(content) != hash) return false;
-            out.write(content.data(), (std::streamsize)content.size());
-            if (!out) return false;
-        }
-        return out.good();
     } catch (const std::exception&) {
         return false;
     }

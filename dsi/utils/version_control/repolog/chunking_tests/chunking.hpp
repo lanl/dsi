@@ -221,26 +221,12 @@ PackGcResult garbageCollectPacks(
     const std::unordered_map<std::string, std::string>& liveManifestRoots);
 
 // Stream a file version directly from its manifest root; no complete chunk list
-// or commit ancestry lookup is required. The legacy vector overload remains.
+// or commit ancestry lookup is required.
 bool rebuildFileFromManifest(const std::string& chunkRoot,
                              const std::string& relativePath,
                              const std::string& manifestRoot,
                              const std::string& fileHash,
                              const std::string& outputPath);
-
-// rebuildFileFromChunks():
-//   verify the ordered chunk digests reproduce `fileHash`, then concatenate the
-//   packed (or legacy loose) payloads from the on-disk store into
-//   <output_path>/<relative_path>.
-// The ordered chunk list stands in for the rows the original read from the now
-// removed `chunk_store` SQL table. Returns false on any mismatch / missing blob.
-// `commitHash` is kept for signature parity (unused: no DB to filter on).
-bool rebuildFileFromChunks(const std::string& chunkRoot,
-                           const std::string& relativePath,
-                           const std::string& commitHash,
-                           const std::string& fileHash,
-                           const std::string& outputPath,
-                           const std::vector<std::string>& orderedChunkHashes);
 
 // -------------------------------------------------------------------------
 // Diagnostics -- exposes the internal parameter tables so the cross-check

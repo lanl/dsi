@@ -97,6 +97,9 @@ public:
     // liveRoots. The caller must provide the complete retained-root set and
     // run this while manifest publishers and root-metadata updates are
     // quiescent; a page cannot identify external root references by itself.
+    // call this manually after each commits. From the chunk caller, it may not have all file and manifest 
+    // roots in the repository, so it cannot be called automatically after each commit.
+    // also call chunking::garbageCollectPacks() to reclaim unreachable pack payloads.
     static ManifestGcResult garbageCollectPages(const std::string& chunkRoot,
                                                 const std::vector<std::string>& liveRoots,
                                                 ManifestOptions options = {});

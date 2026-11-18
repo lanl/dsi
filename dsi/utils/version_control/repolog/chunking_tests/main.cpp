@@ -26,7 +26,6 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <unordered_set>
 #include <sys/stat.h>
@@ -579,17 +578,8 @@ int runSelfTest(std::uint64_t mainSize) {
         });
         check(packsOk, "store: packed chunk locations are published with valid ranges");
 
-        // Rebuild with the exact ordered chunk hashes (DB-row stand-in).
-        std::vector<std::string> ordered;
-        for (const chunking::Chunk& c : mainChunks) ordered.push_back(c.sha256);
-        const std::string rebuilt =
-            work + "/out/data/nested/test_bytes.bin";
-        check(chunking::rebuildFileFromChunks(
-                  chunkRoot, "data/nested/test_bytes.bin", "commitABC",
-                  res.fileHashes.at("data/nested/test_bytes.bin"), work + "/out",
-                  ordered),
-              "rebuild: correct hashes rebuild");
-        check(filesEqual(rebuilt, fMain), "rebuild: bytes match the original");
+        // A manifest carries the complete ordered chunk sequence and streams
+        // the file version without a DB lookup or an external chunk list.
         check(chunking::rebuildFileFromManifest(
                   chunkRoot, entry.relativePath, res.manifestRoots.at(entry.relativePath),
                   res.fileHashes.at(entry.relativePath), work + "/manifest-out"),
@@ -598,21 +588,20 @@ int runSelfTest(std::uint64_t mainSize) {
               "manifest: reconstructed bytes match the original");
 
         // Wrong file hash -> rejected before any output is written.
-        check(!chunking::rebuildFileFromChunks(
-                  chunkRoot, "data/nested/test_bytes.bin", "commitABC",
-                  std::string(64, '0'), work + "/out", ordered),
-              "rebuild: wrong file_hash returns false");
+        check(!chunking::rebuildFileFromManifest(
+                  chunkRoot, entry.relativePath, res.manifestRoots.at(entry.relativePath),
+                  std::string(64, '0'), work + "/wrong-hash-out"),
+              "manifest: wrong file_hash returns false");
 
         // Missing pack -> false.
         const auto firstPacked = packedManifest.at(0);
         const std::string removed = chunkRoot + "/dsi_vcs_packs/packs/" + firstPacked.packId + ".pack";
         const std::string backup = removed + ".bak";
         std::filesystem::rename(removed, backup);
-        check(!chunking::rebuildFileFromChunks(
-                  chunkRoot, "data/nested/test_bytes.bin", "commitABC",
-                  res.fileHashes.at("data/nested/test_bytes.bin"),
-                  work + "/out", ordered),
-              "rebuild: missing pack returns false");
+        check(!chunking::rebuildFileFromManifest(
+                  chunkRoot, entry.relativePath, res.manifestRoots.at(entry.relativePath),
+                  res.fileHashes.at(entry.relativePath), work + "/missing-pack-out"),
+              "manifest: missing pack returns false");
         std::filesystem::rename(backup, removed);
 
         // Second snapshot: everything dedups (first-occurrence / existence
@@ -733,21 +722,6 @@ int main(int argc, char** argv) {
                 std::printf("%d\n", ok ? 0 : 1);
                 return ok ? 0 : 3;
             }
-            if (mode == "--rebuild" && argc == 7) {
-                // usage: --rebuild <chunkRoot> <relPath> <fileHash> <outDir>
-                //        <hash,hash,...>   (ordered chunk hashes, the
-                //        DB-row stand-in)
-                std::vector<std::string> hashes;
-                std::string token;
-                std::istringstream list(argv[6]);
-                while (std::getline(list, token, ',')) {
-                    if (!token.empty()) hashes.push_back(token);
-                }
-                const bool ok = chunking::rebuildFileFromChunks(
-                    argv[2], argv[3], "UPDATE", argv[4], argv[5], hashes);
-                std::printf("%d\n", ok ? 0 : 1);
-                return ok ? 0 : 3;
-            }
             std::fprintf(stderr,
                          "usage:\n"
                          "  %s\n"
@@ -756,11 +730,10 @@ int main(int argc, char** argv) {
                          "  %s --dump <fastcdc|rolling|parallel> <path> [processes]\n"
                          "  %s --meta\n"
                          "  %s --store <chunkRoot> <absPath> <relativePath>\n"
-                         "  %s --rebuild <chunkRoot> <relPath> <fileHash> <outDir> <hash,hash,...>\n"
                          "  %s --store-manifest <chunkRoot> <absPath> <relPath> [baseRoot]\n"
                          "  %s --rebuild-manifest <chunkRoot> <relPath> <root> <fileHash> <outDir>\n",
                          argv[0], argv[0], argv[0], argv[0], argv[0], argv[0],
-                         argv[0], argv[0], argv[0]);
+                         argv[0], argv[0]);
             return 2;
         }
         return runSelfTest(20u * 1024 * 1024 + 4567);  // default main file size

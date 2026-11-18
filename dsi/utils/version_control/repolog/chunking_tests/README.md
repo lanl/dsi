@@ -181,13 +181,13 @@ at most one replacement pack per call and does not delete old packs.
 See [README_manifest.md](README_manifest.md) for manifest-v2 format, page
 rules, copy-on-write behavior, and leaf/pack independence.
 
-| File | Responsibility |
-| --- | --- |
-| `chunking.hpp/.cpp` | FastCDC, pack transactions, snapshot/rebuild, GC |
-| `manifest.hpp/.cpp` | Immutable manifest-v2 pages and tree updates |
-| `shared_existence_cache.hpp/.cpp` | Shared positive cache and HLL hints |
-| `sha256.hpp/.cpp` | CommonCrypto/OpenSSL SHA-256 wrapper |
-| `main.cpp` | CLI and integration self-tests |
-| `manifest_test.cpp` | Tree, storage, GC, and restoration tests |
-| `shared_cache_test.cpp` | Cache, concurrency, and recovery tests |
-| `worker_results.hpp` / `worker_results_test.cpp` | Worker-result collection/tests |
+| File                                                 | Responsibility                                   |
+| ---------------------------------------------------- | ------------------------------------------------ |
+| `chunking.hpp/.cpp`                                | FastCDC, pack transactions, snapshot/rebuild, GC |
+| `manifest.hpp/.cpp`                                | Immutable manifest-v2 pages and tree updates     |
+| `shared_existence_cache.hpp/.cpp`                  | Shared positive cache and HLL hints              |
+| `sha256.hpp/.cpp`                                  | CommonCrypto/OpenSSL SHA-256 wrapper             |
+| `main.cpp`                                         | CLI and integration self-tests                   |
+| `manifest_test.cpp`                                | Tree, storage, GC, and restoration tests         |
+| `shared_cache_test.cpp`                            | Cache, concurrency, and recovery tests           |
+| `worker_results.hpp` / `worker_results_test.cpp` | Worker-result collection/tests                   |
