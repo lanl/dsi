@@ -51,6 +51,14 @@ Initialize dsi-vcs in the current directory:
 dsi-vcs init
 ```
 
+### Older repositories
+
+New commits use the native svman-core extension and `sha256-merkle-v2`.
+Existing `sha256-merkle-v1` commits remain readable from their SQLite chunk
+records and loose chunk files. Their commit IDs and history are preserved.
+When a new v2 commit inherits files from a v1 commit, it stores those files
+using the native format while leaving the v1 commit unchanged.
+
 ### Stage Files for Commit
 
 **Add files/directories:**

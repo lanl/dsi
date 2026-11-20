@@ -294,7 +294,7 @@ void storageRoundTrip() {
             "compacted manifest restore failed");
     require(read(dir.path / "compacted" / relative) == initial,
             "compacted manifest restored wrong bytes");
-    auto same = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
+    auto same = storeChunksForSnapshot(repo.string(), {file}, 0, first.manifestRoots);
     require(same.manifestRoots == first.manifestRoots, "unchanged file did not reuse root");
     auto checkRestore = [&](const StoreResult& result, const std::string& expected, const std::string& name) {
         const auto output = dir.path / name;
@@ -304,7 +304,7 @@ void storageRoundTrip() {
     };
     const auto appendedBytes = initial + std::string(512 * 1024 + 9, 'b');
     write(source, appendedBytes);
-    const auto appended = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
+    const auto appended = storeChunksForSnapshot(repo.string(), {file}, 0, first.manifestRoots);
     checkRestore(appended, appendedBytes, "appended");
     FileManifest appendedManifest(repo.string(), {}, appended.manifestRoots.at(relative));
     std::vector<ManifestChunk> appendedExpected;
@@ -313,13 +313,13 @@ void storageRoundTrip() {
     require(values(appendedManifest) == appendedExpected, "append fast path changed chunk order");
     const auto edited = initial.substr(0, 33) + "INSERTED" + initial.substr(33);
     write(source, edited);
-    auto second = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
+    auto second = storeChunksForSnapshot(repo.string(), {file}, 0, first.manifestRoots);
     write(source, "");
-    auto empty = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, second.manifestRoots);
+    auto empty = storeChunksForSnapshot(repo.string(), {file}, 0, second.manifestRoots);
     checkRestore(first, initial, "old");
     checkRestore(second, edited, "new");
     checkRestore(empty, "", "empty");
-    auto parallel = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 2, empty.manifestRoots);
+    auto parallel = storeChunksForSnapshot(repo.string(), {file}, 2, empty.manifestRoots);
     require(parallel.manifestRoots == empty.manifestRoots, "parallel manifest differs");
     require(!rebuildFileFromManifest(repo.string(), relative, first.manifestRoots.at(relative),
                                     std::string(64, '0'), (dir.path / "bad").string()), "wrong file hash accepted");
@@ -354,7 +354,7 @@ void streamingSequenceMatching() {
     require(old.summary().chunkCount > 1, "sequence fixture requires multiple chunks");
     const auto prefix = original.substr(0, static_cast<std::size_t>(old.at(0).size));
     write(source, prefix + original);
-    const auto added = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, first.manifestRoots);
+    const auto added = storeChunksForSnapshot(repo.string(), {file}, 0, first.manifestRoots);
     FileManifest inserted(repo.string(), {}, added.manifestRoots.at(file.relativePath));
     // An inserted byte sequence may change nearby FastCDC boundaries. Compare
     // with independently chunking the new file, not an assumed chunk insertion.
@@ -363,10 +363,10 @@ void streamingSequenceMatching() {
                     [&](const Chunk& chunk) { expected.push_back({chunk.sha256, chunk.size}); });
     require(values(inserted) == expected, "automatic insertion matching changed chunk order");
     write(source, original);
-    const auto deleted = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 0, added.manifestRoots);
+    const auto deleted = storeChunksForSnapshot(repo.string(), {file}, 0, added.manifestRoots);
     require(deleted.manifestRoots == first.manifestRoots,
             "automatic deletion matching failed to recover original manifest");
-    const auto parallel = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 2, first.manifestRoots);
+    const auto parallel = storeChunksForSnapshot(repo.string(), {file}, 2, first.manifestRoots);
     ParallelOptions options;
     options.processes = 2;
     std::vector<ManifestChunk> processExpected;
@@ -375,7 +375,7 @@ void streamingSequenceMatching() {
     }
     FileManifest processManifest(repo.string(), {}, parallel.manifestRoots.at(file.relativePath));
     require(values(processManifest) == processExpected, "parallel manifest differs from process layout");
-    const auto parallelAgain = storeChunksForSnapshot(repo.string(), {file}, "UPDATE", 3, parallel.manifestRoots);
+    const auto parallelAgain = storeChunksForSnapshot(repo.string(), {file}, 3, parallel.manifestRoots);
     require(parallelAgain.manifestRoots == parallel.manifestRoots, "parallel manifest changed with worker count");
     require(rebuildFileFromManifest(repo.string(), file.relativePath,
                                     added.manifestRoots.at(file.relativePath),

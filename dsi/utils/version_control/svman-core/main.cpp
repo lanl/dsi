@@ -245,7 +245,7 @@ void testProcessChunking(const std::string& work) {
     auto verifyStore = [&](const std::string& bytes) {
         const auto root = work + "/direct-store-" + std::to_string(fixture++);
         const chunking::FileEntry file{path, "input.bin", "file"};
-        const auto stored = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 2);
+        const auto stored = chunking::storeChunksForSnapshot(root, {file}, 2);
         const auto ranges = referenceProcessRanges(bytes);
         chunking::FileManifest manifest(root, {}, stored.manifestRoots.at(file.relativePath));
         std::unordered_set<std::string> hashes, packs;
@@ -369,7 +369,7 @@ void testProcessChunking(const std::string& work) {
 
         const auto root = work + "/parallel-repo";
         const chunking::FileEntry file{path, "parallel.bin", "file"};
-        const auto stored = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 2);
+        const auto stored = chunking::storeChunksForSnapshot(root, {file}, 2);
         std::unordered_map<std::string, std::filesystem::file_time_type> modified;
         chunking::FileManifest storedManifest(root, {}, stored.manifestRoots.at(file.relativePath));
         storedManifest.forEach([&](const chunking::ManifestChunk& chunk) {
@@ -380,7 +380,7 @@ void testProcessChunking(const std::string& work) {
                   stored.manifestRoots.at(file.relativePath), stored.fileHashes.at(file.relativePath),
                   work + "/parallel-out") && filesEqual(path, work + "/parallel-out/parallel.bin"),
               "multiprocess store + manifest rebuild preserves every byte");
-        const auto again = chunking::storeChunksForSnapshot(root, {file}, "UPDATE", 3, stored.manifestRoots);
+        const auto again = chunking::storeChunksForSnapshot(root, {file}, 3, stored.manifestRoots);
         check(sameStore(stored, again), "process count does not change stored chunks or manifest");
         bool unchanged = true;
         for (const auto& item : modified)
@@ -390,7 +390,7 @@ void testProcessChunking(const std::string& work) {
 
         // An independent packed store remains usable after a separate store.
         const auto brokenRoot = work + "/broken-parallel-repo";
-        const auto recovered = chunking::storeChunksForSnapshot(brokenRoot, {file}, "UPDATE", 2);
+        const auto recovered = chunking::storeChunksForSnapshot(brokenRoot, {file}, 2);
         check(chunking::rebuildFileFromManifest(brokenRoot, file.relativePath,
                   recovered.manifestRoots.at(file.relativePath), recovered.fileHashes.at(file.relativePath),
                   work + "/broken-parallel-out") && filesEqual(path, work + "/broken-parallel-out/parallel.bin"),
@@ -607,7 +607,7 @@ int runSelfTest(std::uint64_t mainSize) {
         // Second snapshot: everything dedups (first-occurrence / existence
         // cache path), and results stay stable.
         const auto res2 = chunking::storeChunksForSnapshot(
-            chunkRoot, entries, "UPDATE", 0, res.manifestRoots);
+            chunkRoot, entries, 0, res.manifestRoots);
         check(sameStore(res2, res), "store: second snapshot is stable & dedup'd");
 
         // A non-"file" entry is skipped entirely.
@@ -712,7 +712,7 @@ int main(int argc, char** argv) {
                 chunking::FileEntry entry{argv[3], argv[4], "file"};
                 std::unordered_map<std::string, std::string> base;
                 if (argc == 6) base[argv[4]] = argv[5];
-                const auto result = chunking::storeChunksForSnapshot(argv[2], {entry}, "UPDATE", 0, base);
+                const auto result = chunking::storeChunksForSnapshot(argv[2], {entry}, 0, base);
                 std::printf("%s\n%s\n%zu\n", result.manifestRoots.at(argv[4]).c_str(),
                             result.fileHashes.at(argv[4]).c_str(), result.chunkLength.at(argv[4]));
                 return 0;

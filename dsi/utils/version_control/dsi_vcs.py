@@ -49,10 +49,8 @@ from .repolog.merkle import HASH_ALGORITHM, build_merkle_tree, commit_hash as me
 from .repolog.repository_log import RepositoryLog
 from .repolog.chunking import (
     CHUNK_STORAGE_DIR,
-    manifest_from_legacy_chunk_store,
-    rebuild_file_from_chunks,
-    store_chunks_for_snapshot,
 )
+from .storage_backend import rebuild_file, store_snapshot
 
 def snapshot_target(snapshot_path: str, relative_path: str) -> str:
     target = os.path.abspath(os.path.join(snapshot_path, relative_path))
@@ -80,7 +78,8 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
         return False
 
     file_rows = conn.execute(
-        "SELECT mn.relative_path, mn.content_hash_sha256 FROM merkle_nodes mn JOIN versions v "
+        "SELECT mn.relative_path, mn.content_hash_sha256, mn.manifest_hash" \
+        " FROM merkle_nodes mn JOIN versions v "
         "ON mn.version_id=v.id WHERE v.commit_hash=? AND mn.file_type='file' "
         "ORDER BY mn.relative_path",
         (commit_hash,),
@@ -104,9 +103,9 @@ def rebuild_tree_from_chunks(conn, commit_hash: str, chunk_root: str, target_tre
                 print(f"---> access denied: {rel_path}")
             access_checked[rel_path] = metadata
         if access_checked[rel_path] is not None:
-            if not rebuild_file_from_chunks(
+            if not rebuild_file(
                 conn, chunk_root, rel_path, commit_hash,
-                file_row["content_hash_sha256"], target_tree,
+                file_row["content_hash_sha256"], file_row["manifest_hash"], target_tree,
             ):
                 print(f"---> Error occurred while rebuilding chunks for: {rel_path}")
                 return False
@@ -292,7 +291,6 @@ class Version:
         Stage one or more files/directories for the next commit.
         Directories are expanded recursively into staging log records.
         Paths whose pending action is already add are not appended again.
-        Set verbose to print the full list of staged paths.
         paths should be a list of relative paths to root_folder.
         """
         # print(f"Staging {len(paths)} path(s) for commit…")
@@ -716,17 +714,11 @@ class Version:
         for path, node in parent_nodes.items():
             if node["file_type"] != "file":
                 continue
-            manifest_hash = node["manifest_hash"] or manifest_from_legacy_chunk_store(
-                conn, snapshots_root, path, parent_commit_hash,
-            )
+            manifest_hash = node["manifest_hash"]
             if manifest_hash:
                 manifest_roots[path] = manifest_hash
-            else:
-                sys.exit(f"Missing manifest for inherited file: {path}")
-        new_hashes, _chunk_hashes, new_lengths = store_chunks_for_snapshot(
-            conn, snapshots_root, changed_entries,
-            manifest_roots=manifest_roots,
-        )
+        new_hashes, new_lengths = store_snapshot(snapshots_root, entries, manifest_roots)
+
         file_hashes.update(new_hashes)
         chunk_length.update(new_lengths)
         for entry in changed_entries:
@@ -1071,36 +1063,39 @@ class Version:
             second_file = file_entry2["absolute_path"]
             current_branch_name = self._get_latest_branch_name(conn)
             f1_hash = f2_hash = None
+            f1_manifest = f2_manifest = None
             if commit1 == "working tree":
                 commit1 = self._get_tracked_commit_of_branch(conn, current_branch_name)
             if commit1 != "latest":
                 rows = conn.execute(
-                    "SELECT content_hash_sha256 "
+                    "SELECT content_hash_sha256, manifest_hash "
                     "FROM merkle_nodes, versions "
                     "WHERE merkle_nodes.version_id = versions.id AND versions.root_folder = ? AND versions.commit_hash LIKE ? "
                     "AND merkle_nodes.relative_path = ?",
                     (self.root_folder, commit1 + "%", file_entry1["relative_path"]),
                 ).fetchone()
                 f1_hash = rows['content_hash_sha256'] if rows else None
-            
+                f1_manifest = rows['manifest_hash'] if rows else None
+                
             if commit2 == "working tree":
                 commit2 = self._get_tracked_commit_of_branch(conn, current_branch_name)
             if commit2 != "latest":
                 rows = conn.execute(
-                    "SELECT content_hash_sha256 "
+                    "SELECT content_hash_sha256, manifest_hash "
                     "FROM merkle_nodes, versions "
                     "WHERE merkle_nodes.version_id = versions.id AND versions.root_folder = ? AND versions.commit_hash LIKE ? "
                     "AND merkle_nodes.relative_path = ?",
                     (self.root_folder, commit2 + "%", file_entry2["relative_path"]),
                 ).fetchone()
                 f2_hash = rows['content_hash_sha256'] if rows else None
+                f2_manifest = rows['manifest_hash'] if rows else None
             compare_latest = False
             if commit2 == "latest" and \
-                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry1["relative_path"], commit1, f1_hash, tmpdir) is True:
+                rebuild_file(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry1["relative_path"], commit1, f1_hash, f1_manifest, tmpdir) is True:
                 first_file = os.path.join(tmpdir, file_entry1["relative_path"])
                 compare_latest = True
             if commit1 == "latest" and \
-                rebuild_file_from_chunks(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry2["relative_path"], commit2, f2_hash, tmpdir) is True:
+                rebuild_file(conn, os.path.join(self.root_folder, SNAPSHOTS_DIR), file_entry2["relative_path"], commit2, f2_hash, f2_manifest, tmpdir) is True:
                 second_file = os.path.join(tmpdir, file_entry2["relative_path"])
                 compare_latest = True
             

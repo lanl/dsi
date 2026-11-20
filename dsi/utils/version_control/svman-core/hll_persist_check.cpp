@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     entries.push_back(e);
 
     const chunking::StoreResult res =
-        chunking::storeChunksForSnapshot(work, entries, "UPDATE", 0);
+        chunking::storeChunksForSnapshot(work, entries, 0);
 
     const std::string statePath =
         work + "/dsi_vcs_chunks/seen_hyperloglog.bin";

@@ -1,11 +1,12 @@
-# `svman-core` — C++ FastCDC, packed storage, and manifests
+# `svman-core` — C++ chunking, packed storage, and manifests
 
 **svman:** **Secured Version MANager**.
 
 This directory contains the C++17 svman implementation of FastCDC file
 chunking, SHA-256 addressing, repository-wide payload deduplication, immutable
-packfiles, and persistent per-file manifests. SQL and Python storage/database
-behavior are outside this implementation.
+packfiles, and persistent per-file manifests.
+
+The svman-core is meant to be location agnostic, it can be run from any location (either locally or on a remote cluster). All relevant location paths (chunk location, manifest location) should be provided. Any SQL and Python storage/database behavior are outside this implementation. Also, any file permission based security checks are not implemented here intentionally to make the execution faster and security checks are relegated to the caller. Merkle Leaf is hashed with manifest root, therefore any tempering with the manifest will be rejected by the caller.
 
 The sequential chunker follows the Python FastCDC boundary rules. The parallel
 API uses independent `kMaxChunk` work units, so it is deterministic for a given
@@ -104,7 +105,7 @@ chunking::FileEntry file{inputPath, "data/input.bin", "file"};
 auto first = chunking::storeChunksForSnapshot(repositoryRoot, {file});
 
 auto next = chunking::storeChunksForSnapshot(
-    repositoryRoot, {file}, "UPDATE", 1, first.manifestRoots);
+    repositoryRoot, {file}, 1, first.manifestRoots);
 
 bool restored = chunking::rebuildFileFromManifest(
     repositoryRoot, file.relativePath,
@@ -232,8 +233,8 @@ complete encoded page. Pages use big-endian format magic `DSIMCP02`:
 | Component      | Fields                                                                          | Bytes |
 | -------------- | ------------------------------------------------------------------------------- | ----: |
 | Header         | magic, `B`, kind, entry count, subtree chunk count, byte count, min/max depth |    41 |
-| Leaf entry     | chunk SHA-256, logical length, pack SHA-256 ID, offset, stored length          |    88 |
-| Internal entry | child SHA-256, subtree chunk count, byte count, min/max depth                  |    56 |
+| Leaf entry     | chunk SHA-256, logical length, pack SHA-256 ID, offset, stored length           |    88 |
+| Internal entry | child SHA-256, subtree chunk count, byte count, min/max depth                   |    56 |
 
 `stored length` currently equals logical length because payloads are not
 compressed. Keeping it explicit permits independent validation of the physical

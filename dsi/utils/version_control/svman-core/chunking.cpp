@@ -1661,10 +1661,9 @@ std::vector<Chunk> chunkFileParallel(const std::string& path,
 // ===========================================================================
 StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                                    const std::vector<FileEntry>& entries,
-                                   const std::string& pendingCommit,
                                    std::size_t threads,
-                                   const std::unordered_map<std::string, std::string>& baseManifestRoots) {
-    (void)pendingCommit;  // SQL-only parameter, kept for signature parity.
+                                   const std::unordered_map<std::string, std::string>& baseManifestRoots,
+                                   bool reuseLegacyLooseChunks) {
 
     const std::string chunkDir = chunkRoot + "/" + kChunkStorageDir;
     mkdirP(chunkDir);
@@ -1672,7 +1671,8 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
 
     StoreResult res;
     ExistenceCache cache([&](const std::string& digest) {
-        return repository.lookup(digest).has_value() || pathExists(chunkDir + "/" + digest);
+        return repository.lookup(digest).has_value() ||
+               (reuseLegacyLooseChunks && pathExists(chunkDir + "/" + digest));
     });
 
     // Persistence: reload the HyperLogLog sketch saved by the previous
@@ -1687,7 +1687,7 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
         // The index fallback keeps dedup correct after a crash between the
         // index transaction and a caller's manifest-root commit.
         return cache.get(digest) || repository.lookup(digest).has_value() ||
-               pathExists(chunkDir + "/" + digest);
+               (reuseLegacyLooseChunks && pathExists(chunkDir + "/" + digest));
     };
 
     struct RecordedFile {
@@ -1720,7 +1720,7 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                 stored.packId = pending->second.packId;
                 stored.packOffset = pending->second.offset;
                 stored.storedSize = pending->second.storedSize;
-            } else if (pathExists(chunkDir + "/" + chunk.sha256)) {
+            } else if (reuseLegacyLooseChunks && pathExists(chunkDir + "/" + chunk.sha256)) {
                 // Read-only compatibility with repositories produced by the
                 // former loose-object writer. New payloads are never loose.
             } else {
@@ -1751,7 +1751,7 @@ StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
             for (auto& chunk : chunks) {
                 const bool alreadyStaged = proposed.find(chunk.sha256) != proposed.end();
                 if (!alreadyStaged && !chunkExists(chunk.sha256) &&
-                    !pathExists(chunkDir + "/" + chunk.sha256)) {
+                    !(reuseLegacyLooseChunks && pathExists(chunkDir + "/" + chunk.sha256))) {
                     chunk.data.emplace(chunk.size, '\0');
                     readFileRange(source.fd, reinterpret_cast<std::uint8_t*>(chunk.data->data()),
                                   chunk.size, static_cast<std::size_t>(offset));

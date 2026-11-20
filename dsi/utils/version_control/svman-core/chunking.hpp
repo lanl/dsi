@@ -208,9 +208,9 @@ std::vector<Chunk> chunkFileParallel(const std::string& path,
 // use FileManifest directly without scanning a complete file (see manifest.hpp).
 StoreResult storeChunksForSnapshot(const std::string& chunkRoot,
                                    const std::vector<FileEntry>& entries,
-                                   const std::string& pendingCommit = "UPDATE",
                                    std::size_t threads = 0,
-                                   const std::unordered_map<std::string, std::string>& baseManifestRoots = {});
+                                   const std::unordered_map<std::string, std::string>& baseManifestRoots = {},
+                                   bool reuseLegacyLooseChunks = true);
 
 // Repack the chunks reachable from the supplied manifest roots into fresh
 // immutable pack(s), atomically swap the repository hash index, and return

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core[setuptools]>=1.0.3", "nanobind>=3.1"]
+build-backend = "scikit_build_core.setuptools.build_meta"
 
 [project]
 name="dsi-workflow"
@@ -26,6 +26,11 @@ version = {attr = "dsi._version.__version__"}
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.scikit-build]
+cmake.source-dir = "dsi/utils/version_control/svman-core"
+sdist.inclusion-mode = "explicit"
+sdist.include = ["dsi/utils/version_control/svman-core/*.cpp", "dsi/utils/version_control/svman-core/*.hpp"]
 
 [project.scripts]
 dsi = "dsi.cli:main"

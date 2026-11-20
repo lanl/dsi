@@ -1,12 +1,11 @@
 import hashlib
 import mmap
 import os
-import shutil
 import tempfile
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, Iterator
-from .manifest import ManifestBuilder, iter_manifest_chunks
+from .log_record import _utcnow
 from .content_chunking.npy_chunking import (
     NPY_MAGIC, NpyFormatError, chunk_npy_file, iter_npy_file,
 )
@@ -32,6 +31,7 @@ MAX_CHUNK = 64 * 1024 * 1024     # 64 MB
 
 MASK = AVG_CHUNK - 1      # AVG_CHUNK must be power of 2
 CHUNK_STORAGE_DIR = "dsi_vcs_chunks"
+CHUNK_INSERT_BATCH_SIZE = 1000
 CHUNK_EXISTENCE_CACHE_SIZE = 8192
 
 class RollingHash:
@@ -341,6 +341,55 @@ def chunk_file(path, *, streaming=False, needs_data: Callable[[str], bool] | Non
     format chunkers validate their layout before yielding any payloads.
     """
     path = Path(path)
+    f_suffix = path.suffix.lower()
+
+    if (f_suffix == ".npy" and _has_npy_magic(path)):
+        try:
+            if streaming:
+                return iter_npy_file(path, needs_data=needs_data)
+            return chunk_npy_file(path)
+        except NpyFormatError:
+            pass
+
+    if (f_suffix in {".db", ".sqlite", ".sqlite3"} and is_sqlite_file(path)):
+        try:
+            if streaming:
+                return iter_sqlite_file(path, needs_data=needs_data)
+            return chunk_sqlite_file(path)
+        except SQLiteFormatError:
+            pass
+
+    if f_suffix == ".csv":
+        try:
+            if streaming:
+                return iter_csv_file(path, needs_data=needs_data)
+            return chunk_csv_file(path)
+        except CSVFormatError:
+            pass
+
+    if f_suffix == ".xlsx":
+        try:
+            if streaming:
+                return iter_xlsx_file(path, needs_data=needs_data)
+            return chunk_xlsx_file(path)
+        except XLSXFormatError:
+            pass
+
+    if f_suffix == ".json":
+        try:
+            if streaming:
+                return iter_json_file(path, needs_data=needs_data)
+            return chunk_json_file(path)
+        except JSONFormatError:
+            pass
+
+    if f_suffix == ".xml":
+        try:
+            if streaming:
+                return iter_xml_file(path, needs_data=needs_data)
+            return chunk_xml_file(path)
+        except XMLFormatError:
+            pass
 
     return iter_file_fastcdc(path, needs_data=needs_data) if streaming else chunk_file_fastcdc(path)
 
@@ -390,55 +439,20 @@ def chunk_file_rolling_hash(path):
 
     return chunks
 
-# ─────────────────────────── CHUNK AND MANIFEST STORAGE ────────────────────
-def manifest_from_legacy_chunk_store(conn, chunk_root: str, relative_path: str, commit_hash: str) -> str | None:
-    """Build a manifest for an old full-row snapshot during repository migration.
-
-    New commits never read or write ``chunk_store``.  This bridge lets a
-    repository created by an older release restore or advance one of its
-    existing commits without duplicating chunk payload files.
-    """
-    try:
-        exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunk_store'"
-        ).fetchone()
-        if exists is None:
-            return None
-        rows = conn.execute(
-            "SELECT chunk_hash, chunk_size FROM chunk_store "
-            "WHERE commit_hash LIKE ? AND relative_file_path=? ORDER BY chunk_index",
-            (commit_hash + "%", relative_path),
-        ).fetchall()
-    except Exception:
-        return None
-
-    manifest = ManifestBuilder(chunk_root)
-    for row in rows:
-        manifest.add(row["chunk_hash"], row["chunk_size"])
-    return manifest.finish().object_hash
-
-
-def store_chunks_for_snapshot(
-    conn,
-    chunk_root: str,
-    entries: list[dict[str, Any]],
-    *,
-    pending_commit="UPDATE",
-    manifest_roots: dict[str, str] | None = None,
-) -> tuple[dict[str, str], set, dict[str, int]]:
-    """Store missing payloads and write immutable packed manifests.
-
-    ``conn`` and ``pending_commit`` remain accepted for caller compatibility;
-    chunk membership is intentionally no longer persisted in ``chunk_store``.
-    The caller receives each file's manifest root through ``manifest_roots``.
-    """
+# ─────────────────────────── CHUNK-BASED STORAGE ───────────────────────────
+def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any]], *, pending_commit="UPDATE") -> tuple[dict[str, str], set, dict[str, int]]:
     chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
     os.makedirs(chunk_dir, exist_ok=True)
     file_hashes = {}
     chunk_length = {}
     chunk_hashes = set()
+    pending_rows = []
     existence_cache = OrderedDict()
-    manifest_roots = manifest_roots if manifest_roots is not None else {}
+    insert_sql = (
+        "INSERT INTO chunk_store "
+        "(chunk_hash, chunk_size, created_at, relative_file_path, chunk_index, commit_hash) "
+        "VALUES (?, ?, ?, ?, ?, ?)"
+    )
 
     def remember_exists(digest, exists):
         existence_cache[digest] = exists
@@ -464,11 +478,10 @@ def store_chunks_for_snapshot(
             continue
 
         h = hashlib.sha256()
-        manifest = ManifestBuilder(chunk_root)
         all_chunks = chunk_file(file_path, streaming=True, needs_data=needs_data)
         count = 0
         try:
-            for chunk in all_chunks:
+            for i, chunk in enumerate(all_chunks):
                 count += 1
                 chunk_path = os.path.join(chunk_dir, chunk['sha256'])
                 h.update(chunk['sha256'].encode('utf-8'))
@@ -491,7 +504,12 @@ def store_chunks_for_snapshot(
                             os.close(fd)
                         if os.path.exists(temp_path):
                             os.unlink(temp_path)
-                manifest.add(chunk['sha256'], chunk['size'])
+                pending_rows.append(
+                    (chunk['sha256'], chunk['size'], _utcnow(), entry['relative_path'], i, pending_commit)
+                )
+                if len(pending_rows) >= CHUNK_INSERT_BATCH_SIZE:
+                    conn.executemany(insert_sql, pending_rows)
+                    pending_rows.clear()
                 chunk_hashes.add(chunk['sha256'])
         finally:
             # Release the source mapping even if writing or SQL insertion fails.
@@ -500,40 +518,36 @@ def store_chunks_for_snapshot(
                 close()
         file_hashes[entry['relative_path']] = h.hexdigest()
         chunk_length[entry['relative_path']] = count
-        manifest_roots[entry['relative_path']] = manifest.finish().object_hash
+    if pending_rows:
+        conn.executemany(insert_sql, pending_rows)
     return file_hashes, chunk_hashes, chunk_length
 
 def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_hash: str, file_hash: str, output_path: str) -> bool:
     chunk_dir = os.path.join(chunk_root, CHUNK_STORAGE_DIR)
-    try:
-        row = conn.execute(
-            "SELECT mn.manifest_hash FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
-            "WHERE v.commit_hash LIKE ? AND mn.relative_path=? AND mn.file_type='file'",
-            (commit_hash + "%", relative_path),
-        ).fetchone()
-    except Exception:
-        row = None
-    manifest_hash = row["manifest_hash"] if row is not None else None
-    if not manifest_hash:
-        manifest_hash = manifest_from_legacy_chunk_store(
-            conn, chunk_root, relative_path, commit_hash,
-        )
-    if not manifest_hash:
-        return False
+    rows = conn.execute(
+        "SELECT chunk_hash, chunk_size FROM chunk_store WHERE relative_file_path = ? AND commit_hash LIKE ? ORDER BY chunk_index",
+        (relative_path, commit_hash + "%")
+    ).fetchall()
+    chunk_hashes = [row['chunk_hash'] for row in rows]
+
     chunk_hash_digest = hashlib.sha256()
+    for chunk_hash in chunk_hashes:
+        chunk_hash_digest.update(chunk_hash.encode('utf-8'))
+    if chunk_hash_digest.hexdigest() != file_hash:
+        return False
+
     try:
-        for chunk_hash, _chunk_size in iter_manifest_chunks(chunk_root, manifest_hash):
-            chunk_hash_digest.update(chunk_hash.encode('utf-8'))
-        if chunk_hash_digest.hexdigest() != file_hash:
-            return False
         os.makedirs(os.path.dirname(os.path.join(output_path, relative_path)), exist_ok=True)
         with open(os.path.join(output_path, relative_path), "wb") as out_file:
-            for chunk_hash, _chunk_size in iter_manifest_chunks(chunk_root, manifest_hash):
+            for chunk_hash in chunk_hashes:
                 chunk_path = os.path.join(chunk_dir, chunk_hash)
+                # print(f"===={chunk_path}====")
                 if not os.path.exists(chunk_path):
                     return False
                 with open(chunk_path, "rb") as in_file:
-                    shutil.copyfileobj(in_file, out_file)
+                    content = in_file.read()
+                    out_file.write(content)
+                    # print(content)
         return True
     except Exception:
         return False

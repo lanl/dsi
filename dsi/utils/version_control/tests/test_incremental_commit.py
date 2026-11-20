@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import sqlite3
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -11,7 +13,7 @@ import pytest
 from dsi.utils.version_control import dsi_vcs, vcs_metadata_helper as metadata
 from dsi.utils.version_control.dsi_vcs import Version
 from dsi.utils.version_control.repolog import chunking
-from dsi.utils.version_control.repolog.manifest import iter_manifest_chunks
+from dsi.utils.version_control.storage_backend import rebuild_file
 from dsi.utils.version_control.vcs_db import DB_NAME, SNAPSHOTS_DIR
 
 
@@ -31,19 +33,14 @@ def latest(root):
 def content(root, commit, path):
     with db(root) as conn:
         row = conn.execute(
-            "SELECT mn.manifest_hash FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
+            "SELECT mn.content_hash_sha256 FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
             "WHERE v.commit_hash=? AND mn.relative_path=? AND mn.file_type='file'",
             (commit, path),
         ).fetchone()
-    assert row is not None and row["manifest_hash"]
-    return b"".join(
-        (
-            root / SNAPSHOTS_DIR / chunking.CHUNK_STORAGE_DIR / chunk_hash
-        ).read_bytes()
-        for chunk_hash, _chunk_size in iter_manifest_chunks(
-            str(root / SNAPSHOTS_DIR), row["manifest_hash"]
-        )
-    )
+        assert row is not None
+        with tempfile.TemporaryDirectory() as out:
+            assert rebuild_file(conn, str(root / SNAPSHOTS_DIR), path, commit, row["content_hash_sha256"], out)
+            return Path(out, path).read_bytes()
 
 
 def test_stage_all_reuses_unchanged_content_and_metadata(tmp_path, monkeypatch):
@@ -54,13 +51,14 @@ def test_stage_all_reuses_unchanged_content_and_metadata(tmp_path, monkeypatch):
     repo.cmd_commit("initial")
     first = latest(tmp_path)
     collect = Mock(wraps=dsi_vcs.collect_metadata)
-    chunks = Mock(wraps=chunking.chunk_file)
+    chunks = Mock(wraps=dsi_vcs.store_snapshot)
     monkeypatch.setattr(dsi_vcs, "collect_metadata", collect)
-    monkeypatch.setattr(chunking, "chunk_file", chunks)
+    monkeypatch.setattr(dsi_vcs, "store_snapshot", chunks)
     repo.cmd_add(["."])
     repo.cmd_commit("unchanged")
     second = latest(tmp_path)
-    assert collect.call_count == chunks.call_count == 0
+    assert collect.call_count == 0
+    assert not chunks.call_args.args[1]
     assert first["root_tree_hash"] == second["root_tree_hash"]
     assert first["commit_hash"] != second["commit_hash"]
     for i in range(20):
@@ -79,13 +77,14 @@ def test_one_change_only_processes_one_file_and_preserves_unstaged_state(
     (tmp_path / "b").write_text("unstaged edit")
     (tmp_path / "c").unlink()
     collect = Mock(wraps=dsi_vcs.collect_metadata)
-    chunks = Mock(wraps=chunking.chunk_file)
+    chunks = Mock(wraps=dsi_vcs.store_snapshot)
     monkeypatch.setattr(dsi_vcs, "collect_metadata", collect)
-    monkeypatch.setattr(chunking, "chunk_file", chunks)
+    monkeypatch.setattr(dsi_vcs, "store_snapshot", chunks)
     repo.cmd_add(["a"])
     repo.cmd_commit("one change")
     version = latest(tmp_path)
     assert collect.call_count == chunks.call_count == 1
+    assert len(chunks.call_args.args[1]) == 1
     assert version["file_count"] == 3
     assert content(tmp_path, version["commit_hash"], "a") == b"changed"
     assert content(tmp_path, version["commit_hash"], "b") == b"b"
@@ -358,14 +357,14 @@ def test_source_mutation_during_chunking_rolls_back(tmp_path, monkeypatch):
     before = latest(tmp_path)
     path.write_bytes(b"new")
     repo.cmd_add(["a"])
-    store = dsi_vcs.store_chunks_for_snapshot
+    store = dsi_vcs.store_snapshot
 
     def changing_source(*args, **kwargs):
         result = store(*args, **kwargs)
         path.write_bytes(b"changed during commit")
         return result
 
-    monkeypatch.setattr(dsi_vcs, "store_chunks_for_snapshot", changing_source)
+    monkeypatch.setattr(dsi_vcs, "store_snapshot", changing_source)
     with pytest.raises(SystemExit, match="File changed while committing"):
         repo.cmd_commit("racy")
     assert latest(tmp_path)["commit_hash"] == before["commit_hash"]
@@ -448,12 +447,13 @@ def test_rehash_bypasses_fingerprint_cache(tmp_path, monkeypatch):
     repo.cmd_commit("initial")
     first = latest(tmp_path)
     collect = Mock(wraps=dsi_vcs.collect_metadata)
-    chunks = Mock(wraps=chunking.chunk_file)
+    chunks = Mock(wraps=dsi_vcs.store_snapshot)
     monkeypatch.setattr(dsi_vcs, "collect_metadata", collect)
-    monkeypatch.setattr(chunking, "chunk_file", chunks)
+    monkeypatch.setattr(dsi_vcs, "store_snapshot", chunks)
     repo.cmd_add(["."])
     repo.cmd_commit("verify", rehash=True)
     assert collect.call_count == chunks.call_count == 1
+    assert len(chunks.call_args.args[1]) == 1
     assert latest(tmp_path)["root_tree_hash"] == first["root_tree_hash"]
 
 
