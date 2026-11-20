@@ -1,25 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.2] - 2026-10-23
 
 ### Performance
 
 - Batch chunk-reference inserts in groups of up to 1,000 within the existing
-  commit transaction. Cache up to 8,192 chunk-existence results per storage call,
-  updating the cache after successful writes to avoid repeated filesystem checks
-  and payload copies for duplicates without retaining an unbounded index.
+  commit transaction. Cache up to 8,192 chunk-existence.
 - Reuse the shared mmap chunk streamer for numeric NPY files, preserving header
   and array-aligned boundaries, hashes, and duplicate-payload avoidance.
 - Stream CSV, SQLite (`.db`, `.sqlite`, `.sqlite3`), JSON, XLSX, and XML chunk
-  payloads and check for existing hashes before copying their mmap data. Retain
-  only byte ranges and format metadata while planning chunks; validate formats
-  before storing references so unsupported inputs still fall back to FastCDC.
-- Parse XML directly from its mmap buffer instead of copying the whole document
-  for Expat, and scan CSV quote parity without copying record slices.
+  payloads and check for existing hashes before copying their mmap data. 
 - Check chunk hashes against existing storage before copying mmap payloads for
-  FastCDC and numeric NPY files. Duplicate chunks retain their references without
-  allocating payload bytes. Stream numeric NPY chunks instead of retaining the
-  entire file's chunks, preserving existing boundaries, hashes, and storage format.
+  FastCDC and numeric NPY files. 
 - Roll two bytes per FastCDC iteration using a shifted Gear table and boundary
   mask, checking both byte positions and retaining existing chunk boundaries.
 - Use read-only mmap for generic FastCDC chunking, hashing memoryviews directly
