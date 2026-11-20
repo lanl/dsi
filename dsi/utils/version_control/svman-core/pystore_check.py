@@ -15,9 +15,9 @@ import sqlite3
 import subprocess
 import sys
 
+from dsi.utils.version_control.repolog import chunking as mod
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-import pycheck  # noqa: E402  (build_package lives there)
 
 
 def run_cpp(*args) -> str:
@@ -28,8 +28,6 @@ def run_cpp(*args) -> str:
 
 
 def main(path: str, rel: str) -> int:
-    mod = pycheck.build_package(os.path.join(HERE, "..", "chunking.py"))
-
     # ---- real Python store (SQL side active, in-memory) ------------------
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row

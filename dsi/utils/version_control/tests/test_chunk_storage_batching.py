@@ -1,7 +1,7 @@
 """Packed manifest publication, payload deduplication, and commit rollback."""
 
 import builtins
-import hashlib
+from dsi.utils.version_control.storage_backend import sha256
 from pathlib import Path
 
 import pytest
@@ -47,7 +47,7 @@ def test_manifests_cover_files_and_preserve_chunk_order(tmp_path):
                 str(tmp_path), manifest_roots[path.name]
             )
         ]
-        assert hashlib.sha256("".join(hashes_from_manifest).encode()).hexdigest() == file_hashes[path.name]
+        assert sha256("".join(hashes_from_manifest).encode()).hexdigest() == file_hashes[path.name]
 
 
 def test_empty_files_get_an_empty_manifest_and_nonfiles_are_skipped(tmp_path):
@@ -58,7 +58,7 @@ def test_empty_files_get_an_empty_manifest_and_nonfiles_are_skipped(tmp_path):
     hashes, chunks, lengths = chunking.store_chunks_for_snapshot(
         None, str(tmp_path), [directory, entry(path)], manifest_roots=manifest_roots,
     )
-    assert hashes == {path.name: hashlib.sha256().hexdigest()}
+    assert hashes == {path.name: sha256().hexdigest()}
     assert chunks == set()
     assert lengths == {path.name: 0}
     assert list(iter_manifest_chunks(str(tmp_path), manifest_roots[path.name])) == []
@@ -82,7 +82,7 @@ def test_existence_cache_reuses_existing_and_just_written_chunks_across_files(tm
     a, b = b"a" * 8, b"b" * 8
     chunk_dir = tmp_path / chunking.CHUNK_STORAGE_DIR
     chunk_dir.mkdir()
-    (chunk_dir / hashlib.sha256(a).hexdigest()).write_bytes(a)
+    (chunk_dir / sha256(a).hexdigest()).write_bytes(a)
     paths = [tmp_path / f"file-{i}.bin" for i in range(2)]
     for path in paths:
         path.write_bytes(a + b + a + b)
@@ -96,7 +96,7 @@ def test_existence_cache_reuses_existing_and_just_written_chunks_across_files(tm
     monkeypatch.setattr(chunking, "bytes", copy, raising=False)
     manifest_roots = {}
     chunking.store_chunks_for_snapshot(None, str(tmp_path), [entry(p) for p in paths], manifest_roots=manifest_roots)
-    assert lookups == [hashlib.sha256(a).hexdigest(), hashlib.sha256(b).hexdigest()]
+    assert lookups == [sha256(a).hexdigest(), sha256(b).hexdigest()]
     assert copies == [8]
     assert manifest_roots[paths[0].name] == manifest_roots[paths[1].name]
 
@@ -106,7 +106,7 @@ def test_existence_cache_is_bounded_and_updates_recency(tmp_path, monkeypatch):
     chunk_dir = tmp_path / chunking.CHUNK_STORAGE_DIR
     chunk_dir.mkdir()
     payloads = [b"a" * 8, b"b" * 8, b"c" * 8]
-    hashes = [hashlib.sha256(p).hexdigest() for p in payloads]
+    hashes = [sha256(p).hexdigest() for p in payloads]
     for digest, payload in zip(hashes, payloads):
         (chunk_dir / digest).write_bytes(payload)
     path = tmp_path / "file.bin"
@@ -120,7 +120,7 @@ def test_existence_cache_does_not_survive_storage_calls(tmp_path, monkeypatch):
     path = tmp_path / "file.bin"
     path.write_bytes(b"a" * 8)
     chunk_dir = tmp_path / chunking.CHUNK_STORAGE_DIR
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = sha256(path.read_bytes()).hexdigest()
     lookups = track_chunk_lookups(monkeypatch, chunk_dir)
     chunking.store_chunks_for_snapshot(None, str(tmp_path), [entry(path)])
     (chunk_dir / digest).unlink()

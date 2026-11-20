@@ -1,4 +1,4 @@
-import hashlib
+from dsi.utils.version_control.storage_backend import sha256
 import json
 import os
 from typing import Any, Optional
@@ -12,7 +12,7 @@ def _canonical_json(data: dict[str, Any]) -> bytes:
 
 
 def hash_payload(data: dict[str, Any]) -> str:
-    return hashlib.sha256(_canonical_json(data)).hexdigest()
+    return sha256(_canonical_json(data)).hexdigest()
 
 def compute_record_hash(
     metadata_payload: dict[str, Any],
@@ -24,7 +24,7 @@ def compute_record_hash(
 
 
 def sha256_file(path: str, chunk_size: int = 1 << 20) -> Optional[str]:
-    h = hashlib.sha256()
+    h = sha256()
     try:
         with open(path, "rb") as f:
             while chunk := f.read(chunk_size):

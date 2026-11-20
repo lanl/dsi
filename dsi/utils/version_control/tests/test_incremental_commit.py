@@ -1,6 +1,6 @@
 """Regression coverage for incremental snapshots, authorization, and log recovery."""
 
-import hashlib
+from dsi.utils.version_control.storage_backend import sha256
 import json
 import os
 import sqlite3
@@ -310,7 +310,7 @@ def test_streamed_fastcdc_preserves_original_boundaries(tmp_path, monkeypatch):
     ]:
         monkeypatch.setattr(chunking, name, value)
     data = b"".join(
-        hashlib.sha256(i.to_bytes(4, "little")).digest() for i in range(2048)
+        sha256(i.to_bytes(4, "little")).digest() for i in range(2048)
     )
     path = tmp_path / "data.bin"
     path.write_bytes(data)
@@ -332,7 +332,7 @@ def test_streamed_fastcdc_preserves_original_boundaries(tmp_path, monkeypatch):
         3062,
     ]
     assert b"".join(c["data"] for c in chunks) == data
-    assert all(c["sha256"] == hashlib.sha256(c["data"]).hexdigest() for c in chunks)
+    assert all(c["sha256"] == sha256(c["data"]).hexdigest() for c in chunks)
 
 
 def test_unchanged_read_only_file_can_be_reused_when_staging_all(tmp_path):

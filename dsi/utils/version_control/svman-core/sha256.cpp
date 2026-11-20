@@ -90,7 +90,7 @@ std::array<std::uint8_t, 32> Sha256Ctx::rawdigest() const {
     EVP_MD_CTX* c = EVP_MD_CTX_new();
     if (c == nullptr) throw std::runtime_error("EVP_MD_CTX_new failed");
     std::uint8_t out[32];
-    std::size_t  n = 0;
+    unsigned int n = 0;
     bool ok = (EVP_MD_CTX_copy_ex(c, ctx_) == 1) &&
               (EVP_DigestFinal_ex(c, out, &n) == 1);
     EVP_MD_CTX_free(c);

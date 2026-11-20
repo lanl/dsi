@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
+from dsi.utils.version_control.storage_backend import sha256
 import mmap
 import os
 from typing import Callable, Iterable, Iterator
@@ -38,7 +38,7 @@ def _iter_ranges(path, ranges, needs_data):
             for start, end, metadata in ranges:
                 view = memoryview(mapped)[start:end]
                 try:
-                    digest = hashlib.sha256(view).hexdigest()
+                    digest = sha256(view).hexdigest()
                     chunk = {
                         "sha256": digest,
                         "size": len(view),

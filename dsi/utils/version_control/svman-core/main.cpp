@@ -6,11 +6,9 @@
 //   svman-core --dump <mode> <path> [processes]
 //                                       print "<size> <sha256>" per chunk
 //                                       (processes applies to parallel mode)
-//   svman-core --meta                print AVERAGE_BITS / masks / gear
-//                                       tables, for diffing against pycheck.py
+//   svman-core --meta                print AVERAGE_BITS / masks / gear tables
 //
-// The synthetic file format is shared with pycheck.py so the Python original
-// and this port can be diffed byte-for-byte over identical inputs:
+// The synthetic file format is a deterministic stream:
 //
 //     byte stream = for j = 0, 1, 2, ...: sha256(j as 8-byte little-endian u64)
 //                   concatenated, truncated to the requested size.
@@ -47,7 +45,7 @@ void check(bool ok, const std::string& what) {
     if (!ok) ++gFailures;
 }
 
-// Deterministic pseudo-random byte stream shared with pycheck.py.
+// Deterministic pseudo-random byte stream.
 std::array<std::uint8_t, 32> streamBlock(std::uint64_t index) {
     const std::uint8_t ctr[8] = {
         (std::uint8_t)(index >> 0),  (std::uint8_t)(index >> 8),
@@ -451,8 +449,7 @@ int runSelfTest(std::uint64_t mainSize) {
     }
 
     // ------------------------------------------------------------------
-    // Synthetic files (same recipe as pycheck.py, so the Python original can
-    // be diffed against every result printed here).
+    // Synthetic files for the chunker tests.
     // ------------------------------------------------------------------
     const std::string tmpBase = [] {
         std::string base = "/tmp";

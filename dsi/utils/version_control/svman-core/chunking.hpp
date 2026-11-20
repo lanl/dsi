@@ -229,9 +229,8 @@ bool rebuildFileFromManifest(const std::string& chunkRoot,
                              const std::string& outputPath);
 
 // -------------------------------------------------------------------------
-// Diagnostics -- exposes the internal parameter tables so the cross-check
-// harness (pycheck.py) can diff them against the Python original's
-// GEAR_TABLE / GEAR_TABLE_LS / STRICT_MASK / EAGER_MASK / AVERAGE_BITS.
+// Diagnostics -- exposes the internal parameter tables for comparison with
+// the Python original's GEAR_TABLE / GEAR_TABLE_LS / masks / AVERAGE_BITS.
 // Not part of the chunking logic itself.
 // -------------------------------------------------------------------------
 struct ChunkerDiagnostics {

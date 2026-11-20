@@ -4,11 +4,36 @@
 #include <nanobind/stl/vector.h>
 
 #include "chunking.hpp"
+#include "sha256.hpp"
 
 namespace nb = nanobind;
 
+namespace {
+void update_sha256(chunking::Sha256Ctx &ctx, nb::handle data) {
+    Py_buffer view{};
+    if (PyObject_GetBuffer(data.ptr(), &view, PyBUF_CONTIG_RO) != 0)
+        throw nb::python_error();
+    try {
+        ctx.update(view.buf, static_cast<std::size_t>(view.len));
+    } catch (...) {
+        PyBuffer_Release(&view);
+        throw;
+    }
+    PyBuffer_Release(&view);
+}
+}
+
 NB_MODULE(_svman_core, m) {
     m.doc() = "Native snapshot storage for dsi-vcs.";
+
+    nb::class_<chunking::Sha256Ctx>(m, "Sha256")
+        .def(nb::init<>())
+        .def("update", &update_sha256, nb::arg("data"))
+        .def("hexdigest", &chunking::Sha256Ctx::hexdigest)
+        .def("digest", [](const chunking::Sha256Ctx &ctx) {
+            const auto digest = ctx.rawdigest();
+            return nb::bytes(reinterpret_cast<const char *>(digest.data()), digest.size());
+        });
 
     nb::class_<chunking::FileEntry>(m, "FileEntry")
         .def(nb::init<>())

@@ -1,4 +1,4 @@
-import hashlib
+from dsi.utils.version_control.storage_backend import sha256
 import mmap
 import os
 import tempfile
@@ -298,7 +298,7 @@ def iter_file_fastcdc(
 
                 view = memoryview(mapped_file)[position:position + chunk_size]
                 try:
-                    digest = hashlib.sha256(view).hexdigest()
+                    digest = sha256(view).hexdigest()
                     chunk = {
                         "sha256": digest,
                         "size": chunk_size,
@@ -418,7 +418,7 @@ def chunk_file_rolling_hash(path):
 
             # CDC boundary
             if ((h & MASK) == 0) or size >= MAX_CHUNK:
-                digest = hashlib.sha256(current).hexdigest()
+                digest = sha256(current).hexdigest()
 
                 chunks.append({
                     "sha256": digest,
@@ -430,7 +430,7 @@ def chunk_file_rolling_hash(path):
 
     # Final chunk
     if current:
-        digest = hashlib.sha256(current).hexdigest()
+        digest = sha256(current).hexdigest()
         chunks.append({
             "sha256": digest,
             "size": len(current),
@@ -477,7 +477,7 @@ def store_chunks_for_snapshot(conn, chunk_root: str, entries: list[dict[str, Any
         if entry.get('file_type') != 'file':
             continue
 
-        h = hashlib.sha256()
+        h = sha256()
         all_chunks = chunk_file(file_path, streaming=True, needs_data=needs_data)
         count = 0
         try:
@@ -530,7 +530,7 @@ def rebuild_file_from_chunks(conn, chunk_root: str, relative_path: str, commit_h
     ).fetchall()
     chunk_hashes = [row['chunk_hash'] for row in rows]
 
-    chunk_hash_digest = hashlib.sha256()
+    chunk_hash_digest = sha256()
     for chunk_hash in chunk_hashes:
         chunk_hash_digest.update(chunk_hash.encode('utf-8'))
     if chunk_hash_digest.hexdigest() != file_hash:

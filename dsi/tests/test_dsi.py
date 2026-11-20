@@ -5,7 +5,7 @@ from contextlib import redirect_stdout
 import textwrap
 from pandas import DataFrame
 from collections import OrderedDict
-import hashlib
+from dsi.utils.version_control.storage_backend import sha256
 import random
 import pytest
 
@@ -906,7 +906,7 @@ def test_overwrite_schema_sqlite_backend():
     test.write(filename="new_erd.png", writer_name="ER_Diagram")
 
     def file_hash(path):
-        sha = hashlib.sha256()
+        sha = sha256()
         with open(path, "rb") as f:
             sha.update(f.read())
         return sha.hexdigest()
@@ -1775,7 +1775,7 @@ def test_overwrite_schema_duckdb_backend():
     test.write(filename="new_erd.png", writer_name="ER_Diagram")
 
     def file_hash(path):
-        sha = hashlib.sha256()
+        sha = sha256()
         with open(path, "rb") as f:
             sha.update(f.read())
         return sha.hexdigest()
