@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.0.3] - 2026-11-20
+
+### Added
+
+- The entire chunking module is converted to C++ and named **svman-core** (Secured Version MANager).
+- Added manifest and packfile to manage chunks. Removed chunk_store table. Details [here](dsi/utils/version_control/svman-core/README.md).
+- A persistent repository wide chunk caching using HyperLogLog and LRU Cache.
+- Optional parallel chunking with multithreading.
+- Gerbage collection in svman-core. Merge manifests and packfiles with unused chunks.
+- Using **nanobind** to integrate svman-core with dsi-vcs python frontend.
+- Additional tests for manifest, packfile, and python bindings.
+- Parallel sha256 esitmation in C++ and utilized the new sha256 functions projectwise.
+- New methods to calculate deduplication ratio.
+
+### Fixed
+
+- Fixed handling commits created with older dsi-vcs version.
+- Managed deleted files that are not staged and were committed before.
+- Utilized file stat fingerprint to check file modification (stored separately from file metadata).
+
+### Performance
+
+- Significant performance improvement over python based implementation.
+- Better accelerated parallel performance compared to **Xet**.
+
 ## [1.0.2] - 2026-10-23
 
 ### Performance
