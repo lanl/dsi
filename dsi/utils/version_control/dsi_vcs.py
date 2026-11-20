@@ -304,11 +304,35 @@ class Version:
         pending = None
         seen_paths = set()
         walked_dirs = set()
+        committed_lstat = {}
+        conn = open_db(self.root_folder)
+        try:
+            branch_name = self._get_latest_branch_name(conn)
+            commit_hash = self._get_tracked_commit_of_branch(conn, branch_name) if branch_name else None
+            if commit_hash:
+                committed_lstat = {
+                    row["relative_path"]: row["stat_fingerprint"]
+                    for row in conn.execute(
+                        "SELECT mn.relative_path, mn.stat_fingerprint FROM merkle_nodes mn "
+                        "JOIN versions v ON v.id=mn.version_id "
+                        "WHERE v.root_folder=? AND v.commit_hash=?",
+                        (self.root_folder, commit_hash),
+                    )
+                }
+        finally:
+            conn.close()
+
         # These caches live for one traversal, so later commands resolve any
         # changed symlink targets afresh.
         real_root = os.path.realpath(self.root_folder)
         parent_cache = {}
         txn_id = f"staging-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+
+        def needs_staging(abs_path: str, rel_path: str) -> bool:
+            stored = committed_lstat.get(rel_path)
+            if stored is None:
+                return True
+            return stored != stat_fingerprint(abs_path)
 
         def stage_path(abs_path: str):
             nonlocal staged, pending
@@ -320,6 +344,8 @@ class Version:
                 abs_path, rel_path=rel_path, real_root=real_root,
                 parent_cache=parent_cache,
             ):
+                if not needs_staging(abs_path, rel_path):
+                    return
                 if pending is None:
                     pending = self._load_pending_stage_entries()
                 if rel_path in pending and pending[rel_path][1] == "add":
@@ -584,20 +610,20 @@ class Version:
         conn.close()
         print(f"Merged branch '{branch_name}' into {child_commit_hash[:12]}")
 
-    def cmd_commit(self, message: str = "", *, rehash: bool = False):
+    def cmd_commit(self, message: str = ""):
         db_path = os.path.join(self.root_folder, SNAPSHOTS_DIR, DB_NAME)
         if not os.path.isfile(db_path):
             sys.exit("No dsi-vcs repo found. Run 'init' first.")
 
         conn = open_db(self.root_folder)
         try:
-            self._commit_staged(conn, message, rehash=rehash)
+            self._commit_staged(conn, message)
         finally:
             # Closing also rolls back failed commits; pending log records remain
             # recoverable because their SQL checkpoint was not advanced.
             conn.close()
 
-    def _commit_staged(self, conn, message, *, rehash=False):
+    def _commit_staged(self, conn, message):
         cur = conn.cursor()
 
         # ── Load staged paths from the repository log ─────────────────────────
@@ -673,8 +699,6 @@ class Version:
                 fingerprint = stat_fingerprint(abs_path)
             except OSError as error:
                 sys.exit(f"Cannot commit {path}: {error}")
-            if not rehash and path in reused_paths and old_node["stat_fingerprint"] == fingerprint:
-                continue
             if check_metadata_access(old_meta, "write", identity) is None:
                 sys.exit(f"Write access denied: {path}")
             temp_meta = collect_metadata(abs_path, self.root_folder, name_cache=name_cache)
@@ -701,6 +725,9 @@ class Version:
                         reused_paths.discard(descendant)
                         changed_paths.add(descendant)
 
+        updated_entries = list()
+        for entry in changed_entries:
+            updated_entries.append(entries_by_path[entry["relative_path"]])
         entries = list(entries_by_path.values())
 
         total_bytes = sum(e.get("_st_size") or 0 for e in entries if e.get("file_type") == "file")
@@ -717,7 +744,7 @@ class Version:
             manifest_hash = node["manifest_hash"]
             if manifest_hash:
                 manifest_roots[path] = manifest_hash
-        new_hashes, new_lengths = store_snapshot(snapshots_root, entries, manifest_roots)
+        new_hashes, new_lengths = store_snapshot(snapshots_root, updated_entries, manifest_roots)
 
         file_hashes.update(new_hashes)
         chunk_length.update(new_lengths)

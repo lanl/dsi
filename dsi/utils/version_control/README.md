@@ -136,7 +136,6 @@ staged metadata and content, bypass the cache:
 
 ```bash
 dsi-vcs add .
-dsi-vcs commit --rehash "Verify staged content"
 ```
 
 Existing databases migrate automatically on open. The first staged commit for

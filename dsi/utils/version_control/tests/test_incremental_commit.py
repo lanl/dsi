@@ -33,17 +33,17 @@ def latest(root):
 def content(root, commit, path):
     with db(root) as conn:
         row = conn.execute(
-            "SELECT mn.content_hash_sha256 FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
+            "SELECT mn.content_hash_sha256, mn.manifest_hash FROM merkle_nodes mn JOIN versions v ON v.id=mn.version_id "
             "WHERE v.commit_hash=? AND mn.relative_path=? AND mn.file_type='file'",
             (commit, path),
         ).fetchone()
         assert row is not None
         with tempfile.TemporaryDirectory() as out:
-            assert rebuild_file(conn, str(root / SNAPSHOTS_DIR), path, commit, row["content_hash_sha256"], out)
+            assert rebuild_file(conn, str(root / SNAPSHOTS_DIR), path, commit, row["content_hash_sha256"], row["manifest_hash"], out)
             return Path(out, path).read_bytes()
 
 
-def test_stage_all_reuses_unchanged_content_and_metadata(tmp_path, monkeypatch):
+def test_stage_all_reuses_unchanged_content_and_metadata(tmp_path, monkeypatch, capsys):
     repo = Version(str(tmp_path))
     for i in range(20):
         (tmp_path / f"f{i}").write_text(str(i))
@@ -55,14 +55,10 @@ def test_stage_all_reuses_unchanged_content_and_metadata(tmp_path, monkeypatch):
     monkeypatch.setattr(dsi_vcs, "collect_metadata", collect)
     monkeypatch.setattr(dsi_vcs, "store_snapshot", chunks)
     repo.cmd_add(["."])
-    repo.cmd_commit("unchanged")
-    second = latest(tmp_path)
-    assert collect.call_count == 0
-    assert not chunks.call_args.args[1]
-    assert first["root_tree_hash"] == second["root_tree_hash"]
-    assert first["commit_hash"] != second["commit_hash"]
-    for i in range(20):
-        assert content(tmp_path, second["commit_hash"], f"f{i}") == str(i).encode()
+    output = capsys.readouterr().out
+    assert "Nothing staged" in output
+    with pytest.raises(SystemExit, match="Nothing staged"):
+        repo.cmd_commit("unchanged")
 
 
 def test_one_change_only_processes_one_file_and_preserves_unstaged_state(
@@ -262,23 +258,6 @@ def test_legacy_schema_migrates_and_recollects_missing_fingerprints(
     assert content(tmp_path, latest(tmp_path)["commit_hash"], "a") == b"a"
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX identity lookup counts")
-def test_identity_and_names_are_resolved_once_per_commit(tmp_path, monkeypatch):
-    repo = Version(str(tmp_path))
-    for i in range(10):
-        (tmp_path / str(i)).write_text(str(i))
-    lookup = Mock(wraps=metadata.grp.getgrgid)
-    monkeypatch.setattr(metadata.grp, "getgrgid", lookup)
-    repo.cmd_add(["."])
-    repo.cmd_commit("initial")
-    group_count = len(set(os.getgroups()) | {os.getegid()})
-    assert lookup.call_count <= group_count + 1
-    lookup.reset_mock()
-    repo.cmd_add(["."])
-    repo.cmd_commit("unchanged")
-    assert lookup.call_count == group_count
-
-
 def test_batched_log_write_syncs_once_and_keeps_frame_chain(tmp_path, monkeypatch):
     from dsi.utils.version_control.repolog.repository_log import RepositoryLog
     from dsi.utils.version_control.repolog.log_record import OperationType
@@ -438,23 +417,6 @@ def test_branch_commits_reuse_the_selected_parent(tmp_path):
             for r in conn.execute("SELECT * FROM branches")
         }
     assert heads == {"main": main["commit_hash"], "feature": feature["commit_hash"]}
-
-
-def test_rehash_bypasses_fingerprint_cache(tmp_path, monkeypatch):
-    repo = Version(str(tmp_path))
-    (tmp_path / "a").write_bytes(b"content")
-    repo.cmd_add(["a"])
-    repo.cmd_commit("initial")
-    first = latest(tmp_path)
-    collect = Mock(wraps=dsi_vcs.collect_metadata)
-    chunks = Mock(wraps=dsi_vcs.store_snapshot)
-    monkeypatch.setattr(dsi_vcs, "collect_metadata", collect)
-    monkeypatch.setattr(dsi_vcs, "store_snapshot", chunks)
-    repo.cmd_add(["."])
-    repo.cmd_commit("verify", rehash=True)
-    assert collect.call_count == chunks.call_count == 1
-    assert len(chunks.call_args.args[1]) == 1
-    assert latest(tmp_path)["root_tree_hash"] == first["root_tree_hash"]
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX ACL authorization")

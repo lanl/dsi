@@ -55,8 +55,7 @@ A denied change aborts the transaction and preserves staging.
 
 Fingerprints include device, inode, mode, ownership, link count, size, and
 nanosecond mtime/ctime, excluding atime. Source changes during metadata/content
-collection abort the commit. `commit --rehash` bypasses fingerprint reuse for
-staged paths when timestamps are unreliable or a refresh is desired.
+collection abort the commit.
 
 Schema migration adds fingerprints and a SQL log checkpoint automatically.
 Older staged paths are refreshed on first use. The checkpoint advances in the
@@ -71,7 +70,7 @@ unstaged/missing files, restored mtimes, mode changes, nested/empty directories,
 directory unstaging/deletion, permission denial, restart checkpoints, a failure
 after appending a commit marker, legacy schema migration, identity lookup counts,
 batched frame integrity, original FastCDC boundaries, source mutation during
-chunking, restored nested content, branch parent reuse, rehash, and ACL/mode rules.
+chunking, restored nested content, branch parent reuse, and ACL/mode rules.
 
 Three existing tests in `test_vcs.py` fail on both implementations when the
 original checkout is run with a CLI-equivalent working directory:
