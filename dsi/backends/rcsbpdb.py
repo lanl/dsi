@@ -146,12 +146,10 @@ class RCSBPDB(Webserver):
     def __init__(
         self,
         url: str | None = None,
-        identifiers: builtins.list[str] | None = None,
-        params: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """Open and validate an RCSB connection with an empty cache."""
-        if identifiers or params:
+        if kwargs.get("identifiers") or kwargs.get("params"):
             raise ValueError(
                 "RCSBPDB initialization does not retrieve artifacts. "
                 "Create the backend first, then call query_artifacts({...})."
@@ -1076,19 +1074,6 @@ class RCSBPDB(Webserver):
 
         return pd.DataFrame(table)
 
-    def _parse_find_query(self, query: str):
-        operators = ["~~", ">=", "<=", "!=", "==", ">", "<", "=", "~"]
-
-        for op in operators:
-            pattern = rf"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*{re.escape(op)}\s*(.+?)\s*$"
-            match = re.match(pattern, query)
-
-            if match:
-                column_name = match.group(1)
-                value = match.group(2).strip().strip("'").strip('"')
-                return column_name, op, value
-
-        return None
 
     def _apply_pandas_filter(self, df, column, operator, value):
         """Apply comparison filter using pandas."""
@@ -1186,7 +1171,7 @@ class RCSBPDB(Webserver):
     def get_tables(self):
         return self.tables
 
-    def get_schema(self, table_name: str | None = None) -> str:
+    def get_schema(self) -> str:
         """Describe supported RCSBPDB queries and their return types."""
         return """
 RCSBPDB webserver query schema
@@ -1326,11 +1311,17 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
         else:
             table_name, rows, schema = self._query_discovery(params)
 
-        return self.process_artifacts(
-            table_name=table_name,
-            rows=rows,
-            schema=schema,
-        )
+        # Store this one query result as a column-oriented ordered table.
+        table = self._rows_to_table(rows or [], schema)
+        self._cache[table_name] = table
+        self.tables = self._cache
+        self.schemas[table_name] = schema
+        self._loaded = True
+
+        # Return the user-facing result as one DataFrame.
+        dataframe = pd.DataFrame(table)
+        dataframe.attrs["table_name"] = table_name
+        return dataframe
 
 
     def notebook(self, **kwargs):
@@ -1339,65 +1330,10 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
         """
         raise NotImplementedError("Notebook generation is not supported for the rcsbpdb backend.")
 
-    def process_artifacts(
-        self,
-        table_name: str | None = None,
-        rows: list[dict[str, Any]] | None = None,
-        schema: list[str] | None = None,
-        **kwargs,
-    ):
-        """Append one column-oriented OrderedDict table and return its DataFrame."""
-        # DSI writers call process_artifacts() with no arguments to obtain
-        # the tables already stored in the backend cache.
-        if table_name is None and rows is None and schema is None:
-            self.tables = self._cache
-            return self._cache
+    def process_artifacts(self):
+        """Return cached tables for DSI writers and processing."""
+        return self._cache
 
-        # query_artifacts() must provide the information needed to append
-        # one new DataFrame result to the cache.
-        if not table_name or schema is None:
-            raise ValueError(
-                "process_artifacts() requires table_name, rows, and schema "
-                "from query_artifacts()."
-            )
-
-        table = self._rows_to_table(rows or [], schema)
-        self._cache[table_name] = table
-        self.tables = self._cache
-        self.schemas[table_name] = schema
-        self._loaded = True
-
-        dataframe = pd.DataFrame(table)
-        dataframe.attrs["table_name"] = table_name
-        return dataframe
-
-
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
-
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
 
     def find(self, query_object, **kwargs):
         """
@@ -1539,36 +1475,34 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
 
         return matches
 
-    def find_relation(self, query, relation=None, **kwargs):
-        """Return ValueObjects for relational filters over already-cached tables."""
-        if relation is None:
-            if not isinstance(query, str):
-                raise TypeError(
-                    "find_relation() expects a relational query string or "
-                    "a column name with a relation."
-                )
+    def find_relation(self, column_name, relation, **kwargs):
+        """Return ValueObjects for relational filters over cached tables.
 
-            parsed = self._parse_find_query(query)
-            if parsed is None:
-                raise ValueError(
-                    "Could not parse relational query. Use query_artifacts({...}) "
-                    "for a new RCSBPDB API retrieval."
-                )
+        Parameters
+        ----------
+        column_name : str
+            Name of the column to filter.
 
-            column_name, operator, value = parsed
-            relation = f"{operator} {value}"
-        else:
-            if not isinstance(query, str) or not isinstance(relation, str):
-                raise TypeError(
-                    "find_relation() expects a string column name and relation."
-                )
-            column_name = query
+        relation : str
+            Comparison operator and value, for example ``"> 5"`` or
+            ``"= 1CBS"``.
+
+        Returns
+        -------
+        list
+            A list of matching DSI ValueObjects.
+        """
+        if not isinstance(column_name, str) or not isinstance(relation, str):
+            raise TypeError(
+                "find_relation() expects a string column name and relation."
+            )
 
         operator, value = self._parse_relation(relation)
         matches = []
 
         for table_name in self.list(collection=True):
             dataframe = self.get_table(table_name, dict_return=False)
+
             if dataframe.empty or column_name not in dataframe.columns:
                 continue
 

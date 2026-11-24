@@ -245,6 +245,69 @@ def test_query_artifacts_relational_string_uses_find_relation(backend):
     assert matches[0].type == "relation"
     assert matches[0].t_name == "pdb_datasets_hemoglobin"
 
+@pytest.mark.parametrize(
+    ("query", "expected_ids"),
+    [
+        ("dataset_id = 1CBS", {"1CBS"}),
+        ("dataset_id == 4HHB", {"4HHB"}),
+        ("dataset_id != 1CBS", {"4HHB"}),
+        ("dataset_id ~ 1CB", {"1CBS"}),
+        ("dataset_id ~~ 4HH", {"4HHB"}),
+        ("dataset_id = DOES_NOT_EXIST", set()),
+    ],
+)
+def test_query_artifacts_relational_parser_with_cached_data(
+    backend,
+    query,
+    expected_ids,
+):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+
+    matches = backend.query_artifacts(query)
+
+    actual_ids = {
+        match.value[match.c_name.index("dataset_id")]
+        for match in matches
+    }
+
+    assert actual_ids == expected_ids
+    assert all(match.type == "relation" for match in matches)
+
+@pytest.mark.parametrize(
+    ("query", "expected_values"),
+    [
+        ("score > 5", [10]),
+        ("score >= 5", [5, 10]),
+        ("score < 5", [1]),
+        ("score <= 5", [1, 5]),
+        ("score (1,5)", [1, 5]),
+    ],
+)
+
+def test_query_artifacts_relational_parser_with_numeric_values(
+    backend,
+    query,
+    expected_values,
+):
+    table_name = "test_numeric_values"
+
+    backend._cache[table_name] = OrderedDict(
+        [
+            ("score", [1, 5, 10]),
+        ]
+    )
+    backend.schemas[table_name] = ["score"]
+
+    matches = backend.query_artifacts(query)
+
+    actual_values = [
+        match.value[match.c_name.index("score")]
+        for match in matches
+    ]
+
+    assert actual_values == expected_values
+    assert all(match.type == "relation" for match in matches)
+
 
 def test_find_relation_only_filters_cache_and_returns_valueobjects(backend, monkeypatch):
     backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
@@ -268,12 +331,15 @@ def test_find_relation_returns_empty_list_when_no_cached_rows_match(backend):
     assert backend.find_relation("dataset_id", "= DOES_NOT_EXIST") == []
 
 
-def test_find_relation_rejects_old_api_retrieval_inputs(backend):
-    with pytest.raises(ValueError, match="Could not parse relational query"):
-        backend.find_relation("1CBS")
+def test_find_relation_requires_column_and_relation(backend):
+    with pytest.raises(TypeError):
+        backend.find_relation("dataset_id = 1CBS")
 
-    with pytest.raises(TypeError, match="expects a relational query"):
-        backend.find_relation({"keywords": "hemoglobin"})
+    with pytest.raises(
+        TypeError,
+        match="expects a string column name and relation",
+    ):
+        backend.find_relation({"keywords": "hemoglobin"}, "= 1CBS")
 
 
 def test_display_list_and_summary_use_cached_tables(backend):
@@ -382,6 +448,3 @@ def test_read_only_and_unsupported_operations(backend):
 
     with pytest.raises(NotImplementedError):
         backend.notebook()
-
-    with pytest.raises(NotImplementedError):
-        backend.search({"pdb_id": "1CBS"})
