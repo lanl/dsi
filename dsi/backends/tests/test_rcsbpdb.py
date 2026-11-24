@@ -1,15 +1,4 @@
-"""
-RCSBPDB Backend Function Tests
-
-Tests RCSBPDB backend methods directly without Terminal integration.
-
-Run from the repository root with:
-python -m pytest -s dsi/backends/tests/test_rcsbpdb.py
-
-The RCSBPDB backend fixtures are shared across tests wherever possible to avoid
-repeated backend initialization and repeated mocked RCSB API calls. Tests that
-close, reload, or otherwise mutate a backend use dedicated fixtures.
-"""
+"""Tests for the RCSBPDB query_artifacts webserver user API."""
 
 from collections import OrderedDict
 
@@ -17,33 +6,18 @@ import pandas as pd
 import pytest
 import requests
 
-from dsi.backends.rcsbpdb import RCSBPDB, FileResource, RCSBPDBResolution
-
-TEST_DOIS = [
-    "10.2210/pdb1cbs/pdb",
-    "10.2210/pdb4hhb/pdb",
-]
-
-TEST_PDB_IDS = ["1CBS", "4HHB"]
+from dsi.backends.rcsbpdb import FileResource, RCSBPDB, RCSBPDBResolution
 
 
-# =============================================================================
-# Test fixtures and API mocks
-# =============================================================================
+TEST_DOIS = ["10.2210/pdb1cbs/pdb", "10.2210/pdb4hhb/pdb"]
+
 
 def sample_entry_metadata(pdb_id="1CBS", title=None):
     """Small RCSB Data API-like entry payload."""
     title = title or f"Sample structure {pdb_id}"
-
     return {
-        "struct": {
-            "title": title,
-        },
-        "exptl": [
-            {
-                "method": "X-RAY DIFFRACTION",
-            }
-        ],
+        "struct": {"title": title},
+        "exptl": [{"method": "X-RAY DIFFRACTION"}],
         "struct_keywords": {
             "pdbx_keywords": "DNA BINDING PROTEIN",
             "text": "sample keywords",
@@ -52,33 +26,29 @@ def sample_entry_metadata(pdb_id="1CBS", title=None):
             "initial_release_date": "1994-01-31T00:00:00+0000",
             "revision_date": "2020-07-29T00:00:00+0000",
         },
-        "citation": [
-            {
-                "pdbx_database_id_DOI": f"10.2210/pdb{pdb_id.lower()}/pdb",
-            }
-        ],
+        "citation": [{"pdbx_database_id_DOI": f"10.2210/pdb{pdb_id.lower()}/pdb"}],
         "rcsb_primary_citation": {
             "pdbx_database_id_DOI": f"10.2210/pdb{pdb_id.lower()}/pdb",
             "rcsb_authors": ["Example Author"],
         },
-        "pdbx_struct_assembly": [
-            {
-                "id": "1",
-            }
-        ],
+        "pdbx_struct_assembly": [{"id": "1"}],
     }
 
 
 def mock_request(self, endpoint, params=None):
     """Mock RCSB Data API GET helper."""
     pdb_id = endpoint.rstrip("/").split("/")[-1].upper()
-
-    if pdb_id == "1CBS":
-        return sample_entry_metadata("1CBS", "CRYSTAL STRUCTURE OF A DNA-BINDING PROTEIN")
-    if pdb_id == "4HHB":
-        return sample_entry_metadata("4HHB", "THE CRYSTAL STRUCTURE OF HUMAN DEOXYHAEMOGLOBIN")
-    if pdb_id == "2XYZ":
-        return sample_entry_metadata("2XYZ", "MOCK SEARCH RESULT STRUCTURE")
+    entries = {
+        "1CBS": sample_entry_metadata(
+            "1CBS", "CRYSTAL STRUCTURE OF A DNA-BINDING PROTEIN"
+        ),
+        "4HHB": sample_entry_metadata(
+            "4HHB", "THE CRYSTAL STRUCTURE OF HUMAN DEOXYHAEMOGLOBIN"
+        ),
+        "2XYZ": sample_entry_metadata("2XYZ", "MOCK SEARCH RESULT STRUCTURE"),
+    }
+    if pdb_id in entries:
+        return entries[pdb_id]
 
     response = requests.Response()
     response.status_code = 404
@@ -87,202 +57,79 @@ def mock_request(self, endpoint, params=None):
 
 def mock_post_json(self, endpoint, payload):
     """Mock RCSB Search API POST helper."""
-    return {
-        "result_set": [
-            {"identifier": "1CBS"},
-            {"identifier": "4HHB"},
-        ]
-    }
+    return {"result_set": [{"identifier": "1CBS"}, {"identifier": "4HHB"}]}
 
 
 def mock_url_exists(self, url):
-    """Pretend all generated resource URLs exist."""
     return True, 200, "application/octet-stream"
 
 
-@pytest.fixture(scope="session", autouse=True)
-def mocked_rcsb():
-    """Patch network helpers once so tests are deterministic and offline."""
-    monkeypatch = pytest.MonkeyPatch()
+@pytest.fixture(autouse=True)
+def mocked_rcsb(monkeypatch):
+    """Keep all tests deterministic and offline."""
     monkeypatch.setattr(RCSBPDB, "_request", mock_request)
     monkeypatch.setattr(RCSBPDB, "_post_json", mock_post_json)
     monkeypatch.setattr(RCSBPDB, "_url_exists", mock_url_exists)
 
-    yield
-
-    monkeypatch.undo()
-
-
-@pytest.fixture(scope="session")
-def loaded_backend(mocked_rcsb):
-    """Shared loaded backend for non-destructive tests."""
-    instance = RCSBPDB(
-        identifiers=TEST_DOIS,
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    yield instance
-
-    if instance._loaded:
-        instance.close()
-
-
-@pytest.fixture(scope="session")
-def keyword_backend(mocked_rcsb):
-    """Shared backend loaded through keyword search."""
-    instance = RCSBPDB(
-        params={"keywords": "hemoglobin", "limit": 2},
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    yield instance
-
-    if instance._loaded:
-        instance.close()
-
-
-@pytest.fixture(scope="session")
-def invalid_backend(mocked_rcsb):
-    """Shared backend with one invalid identifier."""
-    instance = RCSBPDB(
-        identifiers=["not-a-pdb-id"],
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    yield instance
-
-    if instance._loaded:
-        instance.close()
-
-
-@pytest.fixture(scope="session")
-def empty_backend(mocked_rcsb):
-    """Shared unloaded backend for non-mutating helper tests."""
-    instance = RCSBPDB(
-        auto_load=False,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    yield instance
-
-    if instance._loaded:
-        instance.close()
-
 
 @pytest.fixture
-def mutable_backend(mocked_rcsb):
-    """Fresh backend for tests that intentionally mutate loaded state."""
+def backend():
+    """Fresh, connected-but-empty RCSBPDB backend."""
     instance = RCSBPDB(
-        auto_load=False,
         validate_on_init=False,
         validate_resource_urls=False,
     )
-
     yield instance
+    instance.close()
 
-    if instance._loaded:
+
+# ---------------------------------------------------------------------------
+# Initialization and helper behavior
+# ---------------------------------------------------------------------------
+
+def test_initialization_creates_empty_ordered_cache(backend):
+    assert backend._loaded is True
+    assert isinstance(backend._cache, OrderedDict)
+    assert backend._cache == OrderedDict()
+    assert backend.tables is backend._cache
+    assert backend.list(collection=True) == []
+
+
+def test_initialization_rejects_load_time_params():
+    with pytest.raises(ValueError, match="does not retrieve artifacts"):
+        RCSBPDB(
+            params={"keywords": "hemoglobin"},
+            validate_on_init=False,
+        )
+
+
+def test_initialization_rejects_load_time_identifiers():
+    with pytest.raises(ValueError, match="does not retrieve artifacts"):
+        RCSBPDB(
+            identifiers=["1CBS"],
+            validate_on_init=False,
+        )
+
+
+def test_only_validate_still_creates_session_and_cache():
+    instance = RCSBPDB(only_validate=True)
+    try:
+        assert hasattr(instance, "session")
+        assert isinstance(instance._cache, OrderedDict)
+        assert instance._cache == OrderedDict()
+    finally:
         instance.close()
 
 
-@pytest.fixture
-def api_backend(mocked_rcsb):
-    """Fresh backend for API-backed find_relation tests that reload state."""
-    instance = RCSBPDB(
-        auto_load=False,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
-
-    yield instance
-
-    if instance._loaded:
-        instance.close()
-
-
-# =============================================================================
-# 1) Identifier normalization and classification
-# =============================================================================
-
-def test_rcsbpdb_normalize_doi():
-    assert RCSBPDB.normalize_doi("https://doi.org/10.2210/pdb1cbs/pdb") == "10.2210/pdb1cbs/pdb"
-    assert RCSBPDB.normalize_doi("doi:10.2210/pdb4hhb/pdb") == "10.2210/pdb4hhb/pdb"
-    assert RCSBPDB.normalize_doi("no doi here") is None
-    assert RCSBPDB.normalize_doi(None) is None
-
-
-def test_rcsbpdb_normalize_pdb_id():
-    assert RCSBPDB.normalize_pdb_id("1cbs") == "1CBS"
-    assert RCSBPDB.normalize_pdb_id("4HHB") == "4HHB"
-    assert RCSBPDB.normalize_pdb_id("not-a-pdb-id") is None
-    assert RCSBPDB.normalize_pdb_id(None) is None
-
-
-def test_rcsbpdb_classify_identifier():
-    assert RCSBPDB.classify_identifier("10.2210/pdb1cbs/pdb") == "rcsbpdb_doi"
+def test_normalization_and_identifier_classification():
+    assert RCSBPDB.normalize_doi("doi:10.2210/pdb1cbs/pdb") == "10.2210/pdb1cbs/pdb"
+    assert RCSBPDB.normalize_pdb_id("4hhb") == "4HHB"
     assert RCSBPDB.classify_identifier("1CBS") == "pdb_id"
+    assert RCSBPDB.classify_identifier("10.2210/pdb1cbs/pdb") == "rcsbpdb_doi"
     assert RCSBPDB.classify_identifier("not-a-pdb-id") == "other"
 
 
-def test_rcsbpdb_extract_pdb_id_from_doi():
-    assert RCSBPDB.extract_pdb_id_from_doi("10.2210/pdb1cbs/pdb") == "1CBS"
-    assert RCSBPDB.extract_pdb_id_from_doi("10.1234/example") is None
-
-
-def test_rcsbpdb_get_file_ext():
-    assert RCSBPDB.get_file_ext("file.csv") == "csv"
-    assert RCSBPDB.get_file_ext("https://example.org/file.cif.gz?download=1") == "cif.gz"
-    assert RCSBPDB.get_file_ext("no_extension") is None
-    assert RCSBPDB.get_file_ext(None) is None
-
-
-def test_rcsbpdb_classify_usability():
-    assert RCSBPDB.classify_usability(["csv"]) == "tabular_or_easy_parse"
-    assert RCSBPDB.classify_usability(["cif.gz"]) == "scientific_structured"
-    assert RCSBPDB.classify_usability(["zip"]) == "archive_only"
-    assert RCSBPDB.classify_usability(["abc"]) == "other_format"
-    assert RCSBPDB.classify_usability([]) == "lookup_failed"
-
-
-# =============================================================================
-# 2) Basic Backend Initialization
-# =============================================================================
-
-def test_rcsbpdb_initialization_no_auto_load(empty_backend):
-    assert empty_backend._loaded is True
-    assert empty_backend.list(True) == []
-
-    datasets_schema = empty_backend.get_schema("datasets")
-    resources_schema = empty_backend.get_schema("resources")
-    errors_schema = empty_backend.get_schema("errors")
-
-    assert isinstance(datasets_schema, str)
-    assert isinstance(resources_schema, str)
-    assert isinstance(errors_schema, str)
-
-    assert "CREATE TABLE datasets" in datasets_schema
-    assert "CREATE TABLE resources" in resources_schema
-    assert "CREATE TABLE errors" in errors_schema
-
-
-def test_rcsbpdb_initialization_with_identifiers(loaded_backend):
-    assert loaded_backend._loaded is True
-    assert "datasets" in loaded_backend.list(True)
-    assert "resources" in loaded_backend.list(True)
-
-    datasets = loaded_backend.get_table("datasets")
-    assert isinstance(datasets, pd.DataFrame)
-    assert len(datasets) == 2
-    assert set(datasets["dataset_id"]) == {"1CBS", "4HHB"}
-
-
-def test_rcsbpdb_validate_connection(mocked_rcsb):
+def test_validate_connection(backend):
     class FakeResponse:
         def raise_for_status(self):
             return None
@@ -292,682 +139,249 @@ def test_rcsbpdb_validate_connection(mocked_rcsb):
             return FakeResponse()
 
         def close(self):
-            pass
+            return None
 
-    backend = RCSBPDB(
-        auto_load=False,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
     backend.session = FakeSession()
-
     assert backend.validate_connection() is True
-    backend.close()
 
 
-# =============================================================================
-# 3) Data Loading and Structure
-# =============================================================================
+def test_get_schema_describes_webserver_queries(backend):
+    schema = backend.get_schema()
+    assert "Tier 1" in schema
+    assert "Tier 2" in schema
+    assert "pandas DataFrame" in schema
+    assert "OrderedDict" in schema
+    assert "pdb_id" in schema
 
-def test_rcsbpdb_load_initial_data(loaded_backend):
-    assert loaded_backend._loaded is True
-    assert isinstance(loaded_backend.tables, OrderedDict)
-    assert "datasets" in loaded_backend.tables
-    assert "resources" in loaded_backend.tables
 
-    dataset_cols = list(loaded_backend.tables["datasets"].keys())
-    assert dataset_cols == RCSBPDB.DATASET_SCHEMA
+# ---------------------------------------------------------------------------
+# Tiered remote retrieval through query_artifacts
+# ---------------------------------------------------------------------------
 
-    resource_cols = list(loaded_backend.tables["resources"].keys())
-    assert resource_cols == RCSBPDB.RESOURCE_SCHEMA
-
-
-def test_rcsbpdb_process_artifacts(mutable_backend):
-    mutable_backend.raw_results = [
-        mutable_backend.lookup_identifier("10.2210/pdb1cbs/pdb"),
-        mutable_backend.lookup_identifier("not-a-pdb-id"),
-    ]
-
-    tables = mutable_backend.process_artifacts()
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-    assert "resources" in tables
-    assert "errors" in tables
-
-    datasets = mutable_backend.get_table("datasets")
-    errors = mutable_backend.get_table("errors")
-
-    assert len(datasets) == 1
-    assert len(errors) == 1
-    assert errors.iloc[0]["status"] == "skipped"
-
-
-def test_rcsbpdb_extract_tables_success_and_error(empty_backend):
-    results = [
-        empty_backend.lookup_identifier("1CBS"),
-        empty_backend.lookup_identifier("bad-id"),
-    ]
-
-    tables = empty_backend._extract_tables(results)
-
-    assert set(tables.keys()) == {"datasets", "resources", "errors"}
-    assert len(tables["datasets"]) == 1
-    assert len(tables["resources"]) >= 1
-    assert len(tables["errors"]) == 1
-
-    assert tables["datasets"][0]["dataset_id"] == "1CBS"
-    assert tables["errors"][0]["status"] == "skipped"
-
-
-def test_rcsbpdb_build_file_resources(empty_backend):
-    resources = empty_backend._build_file_resources("1CBS", sample_entry_metadata("1CBS"))
-
-    assert isinstance(resources, list)
-    assert len(resources) >= 8
-    assert all(isinstance(resource, FileResource) for resource in resources)
-
-    labels = {resource.label for resource in resources}
-    assert "1cbs.cif" in labels
-    assert "1cbs.cif.gz" in labels
-    assert "1cbs.pdb" in labels
-    assert "1cbs-assembly1.cif.gz" in labels
-
-
-# =============================================================================
-# 4) Table Accessors
-# =============================================================================
-
-def test_rcsbpdb_get_table_dataframe(loaded_backend):
-    datasets = loaded_backend.get_table("datasets")
-    assert isinstance(datasets, pd.DataFrame)
-    assert not datasets.empty
-    assert "dataset_id" in datasets.columns
-    assert "title" in datasets.columns
-
-
-def test_rcsbpdb_get_table_dict_return(loaded_backend):
-    datasets = loaded_backend.get_table("datasets", dict_return=True)
-    assert isinstance(datasets, OrderedDict)
-    assert "dataset_id" in datasets
-    assert datasets["dataset_id"] == ["1CBS", "4HHB"]
-
-
-def test_rcsbpdb_get_empty_table_returns_dataframe_with_schema(empty_backend):
-    datasets = empty_backend.get_table("datasets")
-
-    assert isinstance(datasets, pd.DataFrame)
-    assert datasets.empty
-    assert list(datasets.columns) == RCSBPDB.DATASET_SCHEMA
-
-
-def test_rcsbpdb_get_tables(loaded_backend):
-    tables = loaded_backend.get_tables()
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-    assert "resources" in tables
-
-
-def test_rcsbpdb_get_schema(empty_backend):
-    full_schema = empty_backend.get_schema()
-    dataset_schema = empty_backend.get_schema("dataset")
-    resource_schema = empty_backend.get_schema("resource")
-    error_schema = empty_backend.get_schema("error")
-
-    assert isinstance(full_schema, str)
-    assert isinstance(dataset_schema, str)
-    assert isinstance(resource_schema, str)
-    assert isinstance(error_schema, str)
-
-    assert "CREATE TABLE datasets" in full_schema
-    assert "CREATE TABLE resources" in full_schema
-    assert "CREATE TABLE errors" in full_schema
-
-    assert "CREATE TABLE datasets" in dataset_schema
-    assert "dataset_id" in dataset_schema
-    assert "doi" in dataset_schema
-
-    assert "CREATE TABLE resources" in resource_schema
-    assert "resource_id" in resource_schema
-    assert "download_url" in resource_schema
-
-    assert "CREATE TABLE errors" in error_schema
-    assert "identifier" in error_schema
-    assert "status" in error_schema
-
-
-def test_rcsbpdb_table_name_resolution(empty_backend):
-    assert empty_backend._resolve_table_name("dataset") == "datasets"
-    assert empty_backend._resolve_table_name("datasets") == "datasets"
-    assert empty_backend._resolve_table_name("resource") == "resources"
-    assert empty_backend._resolve_table_name("error") == "errors"
-    assert empty_backend._resolve_table_name("custom") == "custom"
-    assert empty_backend._resolve_table_name(None) is None
-
-
-# =============================================================================
-# 5) Search API / Param Loading
-# =============================================================================
-
-def test_rcsbpdb_build_search_query_keywords(empty_backend):
-    query = empty_backend._build_search_query({"keywords": "hemoglobin"})
-
-    assert query["type"] == "terminal"
-    assert query["service"] == "full_text"
-    assert query["parameters"]["value"] == "hemoglobin"
-
-
-def test_rcsbpdb_build_search_query_multiple_nodes(empty_backend):
-    query = empty_backend._build_search_query(
-        {
-            "keywords": "hemoglobin",
-            "authors": "Perutz",
-            "experimental_method": "X-RAY DIFFRACTION",
-        }
-    )
-
-    assert query["type"] == "group"
-    assert query["logical_operator"] == "and"
-    assert len(query["nodes"]) == 3
-
-
-def test_rcsbpdb_build_search_query_empty(empty_backend):
-    assert empty_backend._build_search_query({}) is None
-
-
-def test_rcsbpdb_validate_params_accepts_supported_keys(empty_backend):
-    empty_backend._validate_params(
-        {
-            "keywords": "hemoglobin",
-            "authors": "Perutz",
-            "experimental_method": "X-RAY DIFFRACTION",
-            "limit": 5,
-            "start": 0,
-        }
-    )
-
-
-def test_rcsbpdb_validate_params_rejects_unsupported_keys(empty_backend):
-    with pytest.raises(ValueError):
-        empty_backend._validate_params({"bad_param": "x"})
-
-
-def test_rcsbpdb_extract_identifiers_from_params(empty_backend):
-    identifiers = empty_backend._extract_identifiers_from_params(
-        {
-            "identifiers": ["1CBS"],
-            "pdb_id": "4HHB",
-            "doi": "10.2210/pdb2xyz/pdb",
-        }
-    )
-
-    assert identifiers == ["1CBS", "4HHB", "10.2210/pdb2xyz/pdb"]
-
-
-def test_rcsbpdb_search_rcsb(empty_backend):
-    pdb_ids = empty_backend._search_rcsb({"keywords": "hemoglobin", "limit": 5})
-
-    assert pdb_ids == ["1CBS", "4HHB"]
-    assert empty_backend.last_search_response is not None
-
-
-def test_rcsbpdb_load_from_params_keyword_search(mutable_backend):
-    mutable_backend._load_from_params({"keywords": "hemoglobin", "limit": 5})
-
-    assert mutable_backend.identifiers == ["1CBS", "4HHB"]
-    assert "datasets" in mutable_backend.list(True)
-    assert "resources" in mutable_backend.list(True)
-
-    datasets = mutable_backend.get_table("datasets")
-    assert len(datasets) == 2
-
-
-def test_rcsbpdb_load_from_params_identifier_alias(mutable_backend):
-    mutable_backend._load_from_params({"pdb_id": "1CBS"})
-
-    datasets = mutable_backend.get_table("datasets")
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "1CBS"
-
-
-def test_rcsbpdb_init_with_params(keyword_backend):
-    assert keyword_backend._loaded is True
-    assert "datasets" in keyword_backend.list(True)
-
-    datasets = keyword_backend.get_table("datasets")
-    assert len(datasets) == 2
-
-
-# =============================================================================
-# 6) Lookup Operations
-# =============================================================================
-
-def test_rcsbpdb_lookup_identifier_doi(empty_backend):
-    result = empty_backend.lookup_identifier("10.2210/pdb1cbs/pdb")
-
-    assert isinstance(result, RCSBPDBResolution)
-    assert result.status == "ok"
-    assert result.record_id == "1CBS"
-    assert result.doi == "10.2210/pdb1cbs/pdb"
-    assert result.repo == "rcsbpdb"
-    assert result.metadata_url.endswith("/entry/1CBS")
-    assert result.landing_page_url.endswith("/structure/1CBS")
-
-
-def test_rcsbpdb_lookup_identifier_pdb_id(empty_backend):
-    result = empty_backend.lookup_identifier("4hhb")
-
-    assert result.status == "ok"
-    assert result.record_id == "4HHB"
-    assert result.doi == "10.2210/pdb4hhb/pdb"
-
-
-def test_rcsbpdb_lookup_identifier_invalid(empty_backend):
-    result = empty_backend.lookup_identifier("not-a-pdb-id")
-
-    assert result.status == "skipped"
-    assert result.repo == "other"
-    assert result.endpoint_used is None
-    assert result.notes
-
-
-def test_rcsbpdb_lookup_rcsbpdb_http_error(empty_backend):
-    result = empty_backend.lookup_rcsbpdb(
-        pdb_id="9ZZZ",
-        original_identifier="9ZZZ",
-    )
-
-    assert result.status == "http_error_404"
-    assert "RCSB entry metadata request failed." in result.notes
-
-
-def test_rcsbpdb_direct_pdb_id(loaded_backend):
-    datasets = loaded_backend.get_table("datasets")
-
-    one_cbs = datasets[datasets["dataset_id"] == "1CBS"]
-    assert len(one_cbs) == 1
-    assert one_cbs.iloc[0]["doi"] == "10.2210/pdb1cbs/pdb"
-
-
-def test_rcsbpdb_errors_table_for_invalid_identifier(invalid_backend):
-    errors = invalid_backend.get_table("errors")
-
-    assert isinstance(errors, pd.DataFrame)
-    assert len(errors) == 1
-    assert errors.iloc[0]["status"] == "skipped"
-
-
-# =============================================================================
-# 7) Find Operations
-# =============================================================================
-
-def test_rcsbpdb_find_searches_table_column_and_cell_values(loaded_backend):
-    matches = loaded_backend.find("1CBS")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert any(match.type == "row" for match in matches)
-    assert any(match.t_name == "datasets" for match in matches)
-
-
-def test_rcsbpdb_find_missing_value_returns_empty_list(loaded_backend):
-    matches = loaded_backend.find("definitely-not-present-value")
-
-    assert isinstance(matches, list)
-    assert matches == []
-
-
-def test_rcsbpdb_find_table(loaded_backend):
-    matches = loaded_backend.find_table("data")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert any(match.t_name == "datasets" for match in matches)
-
-    dataset_match = next(match for match in matches if match.t_name == "datasets")
-    assert dataset_match.type == "table"
-    assert "dataset_id" in dataset_match.c_name
-    assert isinstance(dataset_match.value, OrderedDict)
-
-
-def test_rcsbpdb_find_column(loaded_backend):
-    matches = loaded_backend.find_column("title")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert any("title" in match.c_name for match in matches)
-
-    title_match = next(match for match in matches if "title" in match.c_name)
-    assert title_match.type == "column"
-    assert isinstance(title_match.value, list)
-    assert len(title_match.value) == 2
-
-
-def test_rcsbpdb_find_cell_matches_value(loaded_backend):
-    matches = loaded_backend.find_cell("1CBS")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert all(match.type == "row" for match in matches)
-
-    dataset_matches = [
-        match for match in matches
-        if match.t_name == "datasets"
-    ]
-
-    assert len(dataset_matches) >= 1
-    assert any(
-        match.value["dataset_id"] == "1CBS"
-        for match in dataset_matches
-    )
-
-def test_rcsbpdb_find_cell_cell_type_support(loaded_backend):
-    matches = loaded_backend.find_cell("1CBS", row=False)
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert all(match.type == "cell" for match in matches)
-
-    dataset_matches = [
-        match for match in matches
-        if match.t_name == "datasets"
-    ]
-
-    assert len(dataset_matches) >= 1
-    assert any(
-        match.c_name == ["dataset_id"] and match.value == "1CBS"
-        for match in dataset_matches
-    )
-
-def test_rcsbpdb_find_relation_condition_string(loaded_backend):
-    matches = loaded_backend.find_relation("dataset_id = 1CBS")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-
-    dataset_matches = [
-        match for match in matches
-        if match.t_name == "datasets"
-    ]
-
-    assert len(dataset_matches) == 1
-    assert dataset_matches[0].type == "relation"
-
-    dataset_idx = dataset_matches[0].c_name.index("dataset_id")
-    assert dataset_matches[0].value[dataset_idx] == "1CBS"
-
-
-def test_rcsbpdb_find_relation_condition_split_args(loaded_backend):
-    matches = loaded_backend.find_relation("dataset_id", "= 1CBS")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-
-    dataset_matches = [
-        match for match in matches
-        if match.t_name == "datasets"
-    ]
-
-    assert len(dataset_matches) == 1
-    assert dataset_matches[0].type == "relation"
-
-    dataset_idx = dataset_matches[0].c_name.index("dataset_id")
-    assert dataset_matches[0].value[dataset_idx] == "1CBS"
-
-
-def test_rcsbpdb_find_relation_contains(loaded_backend):
-    matches = loaded_backend.find_relation("title", "~~ structure")
-
-    assert isinstance(matches, list)
-    assert len(matches) >= 1
-    assert all(match.t_name == "datasets" for match in matches)
-
-    assert any(
-        "STRUCTURE" in match.value[match.c_name.index("title")].upper()
-        for match in matches
-    )
-
-
-def test_rcsbpdb_find_relation_numeric_condition(loaded_backend):
-    matches = loaded_backend.find_relation("resource_count", "> 0")
-
-    assert isinstance(matches, list)
-    assert len(matches) == 2
-    assert all(match.t_name == "datasets" for match in matches)
-
-
-def test_rcsbpdb_find_relation_pdb_id(api_backend):
-    tables = api_backend.find_relation("1CBS")
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-    assert "resources" in tables
-
-    datasets = api_backend.get_table("datasets")
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "1CBS"
-
-
-def test_rcsbpdb_find_relation_doi(api_backend):
-    tables = api_backend.find_relation("10.2210/pdb1cbs/pdb")
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = api_backend.get_table("datasets")
-    assert len(datasets) == 1
-    assert datasets.iloc[0]["dataset_id"] == "1CBS"
-
-
-def test_rcsbpdb_find_relation_keyword_string(api_backend):
-    tables = api_backend.find_relation("hemoglobin", limit=2)
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = api_backend.get_table("datasets")
-    assert len(datasets) == 2
-
-
-def test_rcsbpdb_find_relation_dict_query(api_backend):
-    tables = api_backend.find_relation({"keywords": "hemoglobin", "limit": 2})
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = api_backend.get_table("datasets")
-    assert len(datasets) == 2
-
-
-def test_rcsbpdb_find_relation_list_input(api_backend):
-    tables = api_backend.find_relation(["1CBS", "4HHB"])
-
-    assert isinstance(tables, OrderedDict)
-    assert "datasets" in tables
-
-    datasets = api_backend.get_table("datasets")
-    assert len(datasets) == 2
-    assert set(datasets["dataset_id"]) == {"1CBS", "4HHB"}
-
-
-def test_rcsbpdb_find_relation_none_returns_tables(api_backend):
-    assert api_backend.find_relation(None) == api_backend.tables
-
-
-def test_rcsbpdb_find_relation_invalid_type_raises(api_backend):
-    with pytest.raises(TypeError):
-        api_backend.find_relation(123)
-
-
-# =============================================================================
-# 8) URL Validation
-# =============================================================================
-
-class FakeResponse:
-    def __init__(self, status_code=200, content_type="application/octet-stream"):
-        self.status_code = status_code
-        self.headers = {"content-type": content_type}
-
-    def close(self):
-        pass
-
-
-class FakeSession:
-    def head(self, url, allow_redirects=True, timeout=60, verify=True):
-        return FakeResponse(200)
-
-    def get(self, url, stream=True, allow_redirects=True, timeout=60, verify=True):
-        return FakeResponse(200)
-
-    def close(self):
-        pass
-
-
-def test_rcsbpdb_validate_urls(mutable_backend):
-    mutable_backend.identifiers = ["1CBS"]
-    mutable_backend._load_initial_data()
-    mutable_backend.session = FakeSession()
-
-    results = mutable_backend.validate_urls("resources")
-
-    assert isinstance(results, list)
-    assert len(results) >= 1
-    assert all("is_valid" in row for row in results)
-    assert all("method_used" in row for row in results)
-    assert all(row["is_valid"] is True for row in results)
-
-
-# =============================================================================
-# 9) List, Summary, Display, and Counts
-# =============================================================================
-
-def test_rcsbpdb_list_collection_true(loaded_backend):
-    table_names = loaded_backend.list(collection=True)
-
-    assert isinstance(table_names, list)
-    assert "datasets" in table_names
-    assert "resources" in table_names
-
-
-def test_rcsbpdb_list_print_mode_returns_none(loaded_backend):
-    result = loaded_backend.list()
-
-    assert result is None
-
-
-def test_rcsbpdb_num_tables(loaded_backend):
-    count = loaded_backend.num_tables()
-
-    assert isinstance(count, int)
-    assert count >= 2
-
-
-def test_rcsbpdb_summary_all(loaded_backend):
-    summary = loaded_backend.summary()
-
-    assert isinstance(summary, list)
-    assert len(summary) > 1
-    assert isinstance(summary[0], list)
-
-    for summary_df in summary[1:]:
-        assert isinstance(summary_df, pd.DataFrame)
-        assert "column" in summary_df.columns
-        assert "type" in summary_df.columns
-        assert "unique" in summary_df.columns
-
-
-def test_rcsbpdb_summary_single_table(loaded_backend):
-    summary = loaded_backend.summary("datasets")
-
-    assert isinstance(summary, pd.DataFrame)
-    assert "column" in summary.columns
-    assert "type" in summary.columns
-    assert "unique" in summary.columns
-    assert "dataset_id" in set(summary["column"])
-
-
-def test_rcsbpdb_display_returns_dataframe(loaded_backend):
-    result = loaded_backend.display("datasets", num_rows=1)
+def test_query_artifacts_discovery_returns_one_dataframe_and_caches_it(backend):
+    result = backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
 
     assert isinstance(result, pd.DataFrame)
-    assert len(result) == 1
+    assert list(result.columns) == RCSBPDB.DATASET_SCHEMA
+    assert set(result["dataset_id"]) == {"1CBS", "4HHB"}
+    assert result.attrs["table_name"] == "pdb_datasets_hemoglobin"
+    assert list(backend._cache) == ["pdb_datasets_hemoglobin"]
+    assert isinstance(backend._cache["pdb_datasets_hemoglobin"], OrderedDict)
+    assert backend.get_table("pdb_datasets_hemoglobin").equals(result)
+    assert result["resource_count"].isna().all()
 
-def test_rcsbpdb_display_cols(loaded_backend):
-    result = loaded_backend.display(
-        "datasets",
-        num_rows=2,
+
+def test_query_artifacts_selected_entry_returns_resources_and_retains_discovery(backend):
+    discovery = backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+    resources = backend.query_artifacts({"pdb_id": "4HHB"})
+
+    assert isinstance(resources, pd.DataFrame)
+    assert list(resources.columns) == RCSBPDB.RESOURCE_SCHEMA
+    assert not resources.empty
+    assert set(resources["dataset_id"]) == {"4HHB"}
+    assert resources.attrs["table_name"] == "pdb_resources_4hhb"
+    assert list(backend._cache) == [
+        discovery.attrs["table_name"],
+        resources.attrs["table_name"],
+    ]
+    assert backend.get_table(discovery.attrs["table_name"]).equals(discovery)
+    assert backend.get_table(resources.attrs["table_name"]).equals(resources)
+
+
+def test_query_artifacts_accepts_doi_and_identifier_list(backend):
+    one_entry = backend.query_artifacts({"doi": "10.2210/pdb1cbs/pdb"})
+    many_entries = backend.query_artifacts({"identifiers": TEST_DOIS})
+
+    assert set(one_entry["dataset_id"]) == {"1CBS"}
+    assert set(many_entries["dataset_id"]) == {"1CBS", "4HHB"}
+    assert one_entry.attrs["table_name"] == "pdb_resources_1cbs"
+    assert many_entries.attrs["table_name"] == "pdb_resources_1cbs_4hhb"
+
+
+def test_query_artifacts_invalid_identifier_returns_one_errors_dataframe(backend):
+    result = backend.query_artifacts({"pdb_id": "not-a-pdb-id"})
+
+    assert isinstance(result, pd.DataFrame)
+    assert list(result.columns) == RCSBPDB.ERROR_SCHEMA
+    assert len(result) == 1
+    assert result.iloc[0]["status"] == "skipped"
+    assert result.attrs["table_name"].endswith("_errors")
+    assert result.attrs["table_name"] in backend._cache
+
+
+def test_query_artifacts_rejects_invalid_dictionary_input(backend):
+    with pytest.raises(ValueError, match="Unsupported rcsbpdb search params"):
+        backend.query_artifacts({"not_supported": "value"})
+
+
+def test_query_artifacts_rejects_empty_or_non_query_input(backend):
+    with pytest.raises(ValueError, match="dictionary of parameters"):
+        backend.query_artifacts("")
+
+    with pytest.raises(ValueError, match="dictionary of parameters"):
+        backend.query_artifacts(["1CBS"])
+
+
+# ---------------------------------------------------------------------------
+# Cached-data query behavior and exploration helpers
+# ---------------------------------------------------------------------------
+
+def test_query_artifacts_simple_string_uses_find_cell(backend):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+    matches = backend.query_artifacts("1CBS")
+
+    assert isinstance(matches, list)
+    assert matches
+    assert all(match.type == "row" for match in matches)
+    assert any(match.t_name == "pdb_datasets_hemoglobin" for match in matches)
+
+
+def test_query_artifacts_relational_string_uses_find_relation(backend):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+    matches = backend.query_artifacts("dataset_id = 1CBS")
+
+    assert isinstance(matches, list)
+    assert len(matches) == 1
+    assert matches[0].type == "relation"
+    assert matches[0].t_name == "pdb_datasets_hemoglobin"
+
+
+def test_find_relation_only_filters_cache_and_returns_valueobjects(backend, monkeypatch):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("find_relation() must not perform remote API retrieval")
+
+    monkeypatch.setattr(backend, "_post_json", fail_if_called)
+    monkeypatch.setattr(backend, "_request", fail_if_called)
+
+    matches = backend.find_relation("dataset_id", "= 1CBS")
+
+    assert isinstance(matches, list)
+    assert len(matches) == 1
+    assert matches[0].type == "relation"
+    assert matches[0].value[matches[0].c_name.index("dataset_id")] == "1CBS"
+
+
+def test_find_relation_returns_empty_list_when_no_cached_rows_match(backend):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+    assert backend.find_relation("dataset_id", "= DOES_NOT_EXIST") == []
+
+
+def test_find_relation_rejects_old_api_retrieval_inputs(backend):
+    with pytest.raises(ValueError, match="Could not parse relational query"):
+        backend.find_relation("1CBS")
+
+    with pytest.raises(TypeError, match="expects a relational query"):
+        backend.find_relation({"keywords": "hemoglobin"})
+
+
+def test_display_list_and_summary_use_cached_tables(backend):
+    datasets = backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+    resources = backend.query_artifacts({"pdb_id": "1CBS"})
+
+    assert backend.list(collection=True) == [
+        datasets.attrs["table_name"],
+        resources.attrs["table_name"],
+    ]
+
+    displayed = backend.display(
+        datasets.attrs["table_name"],
         display_cols=["dataset_id", "title"],
     )
 
-    assert isinstance(result, pd.DataFrame)
-    assert list(result.columns) == ["dataset_id", "title"]
+    assert list(displayed.columns) == ["dataset_id", "title"]
+    assert displayed.attrs["max_rows"] == len(datasets)
 
-def test_rcsbpdb_display_requires_table_name(loaded_backend):
-    with pytest.raises(TypeError):
-        loaded_backend.display()
+    summary = backend.summary(datasets.attrs["table_name"])
 
-def test_rcsbpdb_display_missing_table_raises_value_error(empty_backend):
-    with pytest.raises(ValueError):
-        empty_backend.display("missing_table")
+    assert isinstance(summary, pd.DataFrame)
+    assert "dataset_id" in set(summary["column"])
+
+def test_process_artifacts_without_arguments_returns_cache(backend):
+    result = backend.query_artifacts({"pdb_id": "1CBS"})
+
+    cached_tables = backend.process_artifacts()
+
+    assert cached_tables is backend._cache
+    assert list(cached_tables) == [result.attrs["table_name"]]
 
 
-def test_rcsbpdb_display_missing_column_raises_value_error(loaded_backend):
-    with pytest.raises(ValueError):
-        loaded_backend.display("datasets", display_cols=["missing_column"])
+def test_validate_urls_uses_selected_resource_table(backend, monkeypatch):
+    resources = backend.query_artifacts({"pdb_id": "1CBS"})
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-type": "application/octet-stream"}
+
+        def close(self):
+            return None
+
+    class FakeSession:
+        def head(self, *args, **kwargs):
+            return FakeResponse()
+
+        def get(self, *args, **kwargs):
+            return FakeResponse()
+
+        def close(self):
+            return None
+
+    backend.session = FakeSession()
+    checks = backend.validate_urls(resources.attrs["table_name"])
+    assert len(checks) == len(resources)
+    assert all(check["is_valid"] for check in checks)
 
 
-# =============================================================================
-# 10) Mutating Helpers and Lifecycle
-# =============================================================================
+# ---------------------------------------------------------------------------
+# Existing lookup, resource, and lifecycle behavior
+# ---------------------------------------------------------------------------
 
-def test_rcsbpdb_close(mocked_rcsb):
-    backend = RCSBPDB(
-        identifiers=["1CBS"],
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    )
+def test_lookup_identifier_can_skip_or_include_resources(backend):
+    discovery_result = backend.lookup_identifier("1CBS", include_resources=False)
+    selected_result = backend.lookup_identifier("1CBS", include_resources=True)
 
-    assert backend._loaded is True
-    assert backend.list(True)
+    assert isinstance(discovery_result, RCSBPDBResolution)
+    assert discovery_result.status == "ok"
+    assert discovery_result.resources_loaded is False
+    assert discovery_result.files == []
+    assert selected_result.resources_loaded is True
+    assert len(selected_result.files) >= 8
 
+
+def test_build_file_resources(backend):
+    resources = backend._build_file_resources("1CBS", sample_entry_metadata("1CBS"))
+    assert resources
+    assert all(isinstance(resource, FileResource) for resource in resources)
+    assert {resource.label for resource in resources} >= {"1cbs.cif", "1cbs.pdb"}
+
+
+def test_close_resets_ordered_cache(backend):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
     backend.close()
 
     assert backend._loaded is False
-    assert backend.tables == {}
+    assert backend._cache == OrderedDict()
+    assert backend.tables is backend._cache
     assert backend.raw_results == []
-    assert backend.last_search_response is None
-    assert backend.identifiers == []
     assert backend.params == {}
+    assert backend.identifiers == []
 
 
-def test_rcsbpdb_context_manager(mocked_rcsb):
-    with RCSBPDB(
-        identifiers=["1CBS"],
-        auto_load=True,
-        validate_on_init=False,
-        validate_resource_urls=False,
-    ) as backend:
-        assert "datasets" in backend.list(True)
+def test_context_manager_closes_backend():
+    with RCSBPDB(validate_on_init=False, validate_resource_urls=False) as instance:
+        instance.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+        assert instance.list(collection=True)
 
-    assert backend._loaded is False
+    assert instance._loaded is False
 
 
-# =============================================================================
-# 11) Read-only / unsupported operations
-# =============================================================================
-
-def test_rcsbpdb_ingest_artifacts_read_only(empty_backend):
+def test_read_only_and_unsupported_operations(backend):
     with pytest.raises(NotImplementedError):
-        empty_backend.ingest_artifacts({})
+        backend.ingest_artifacts({})
 
-
-def test_rcsbpdb_query_artifacts_not_implemented(empty_backend):
     with pytest.raises(NotImplementedError):
-        empty_backend.query_artifacts("10.2210/pdb1cbs/pdb")
+        backend.notebook()
 
-
-def test_rcsbpdb_notebook_not_implemented(empty_backend):
     with pytest.raises(NotImplementedError):
-        empty_backend.notebook()
+        backend.search({"pdb_id": "1CBS"})

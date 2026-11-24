@@ -25,13 +25,28 @@ def download_file(url: str, output_path: Path) -> None:
 def main():
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={"keywords": "genomics", "limit": 5},
         silence_messages=True,
     )
 
-    print("\nLoaded RCSBPDB backend using keyword search.")
+    datasets_df = dsi.query(
+        {"keywords": "hemoglobin", "limit": 5},
+        collection=True,
+    )
 
-    resources_df = dsi.get_table("resources", collection=True)
+    if datasets_df.empty:
+        print("\nNo PDB datasets were returned.")
+        dsi.close()
+        return
+
+    selected_pdb_id = datasets_df.iloc[0]["dataset_id"]
+
+    resources_df = dsi.query(
+        {"pdb_id": selected_pdb_id},
+        collection=True,
+    )
+
+    print(f"\nRetrieved resources for PDB entry: {selected_pdb_id}")
+    print(f"Cached table: {resources_df.attrs['table_name']}")
 
     target_format = "pdb.gz"
 
@@ -49,7 +64,11 @@ def main():
         "resource_type",
         "download_url",
     ]
-    existing_columns = [col for col in columns if col in filtered_resources.columns]
+    existing_columns = [
+        column
+        for column in columns
+        if column in filtered_resources.columns
+    ]
 
     print("\nMatching resources:")
     print(filtered_resources[existing_columns])

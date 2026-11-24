@@ -1,69 +1,13 @@
+"""RCSBPDB Webserver Backend for DSI.
+
+Read-only, metadata-first access to public RCSB Protein Data Bank records.
+
+The backend opens and validates an API connection at initialization. Users then
+retrieve remote data explicitly through ``query_artifacts()``. Dictionary
+queries return exactly one pandas DataFrame and append its ordered table to the
+in-memory cache. String queries explore tables that are already cached.
 """
-RCSBPDB Webserver Backend for DSI
 
-Read-only metadata-first backend that retrieves rcsb pdb metadata
-and exposes it as in-memory DSI tables.
-
-
-Access modes
-------------
-1. Identifier-driven mode
-   - DOI input, e.g. "10.2210/pdb1cbs/pdb"
-   - PDB ID input, e.g. "1CBS"
-
-2. Query-driven mode, closer to NDP
-   - params={"keywords": "hemoglobin", "limit": 5}
-   - find_relation({"keywords": "hemoglobin", "limit": 5})
-   - find_relation("hemoglobin")
-
-DOI behavior
-------------
-RCSB-style DOI input is supported through identifiers or params.
-Only DOIs of the form 10.2210/pdbXXXX/pdb are converted directly into PDB IDs.
-General publication DOI search is not currently supported.
-
-REST flow
----------
-RCSB Search API -> PDB IDs -> RCSB Data API -> normalized DSI tables
-
-Tables
-------
-- datasets
-- resources
-- errors
-
-Tier mapping
-------------
-self.tables["datasets"] = Tier 1 datasets
-self.tables["resources"] = Tier 2 normalized resources
-self.tables["errors"] = failed/skipped lookups
-
-Current scope
--------------
-- Metadata-first
-- Read-only
-- REST APIs only
-- Exposes mmCIF download URLs
-- Does not parse raw mmCIF content yet
-
-**identifiers**
-
-- __init__()
-- _load_initial_data()
-- lookup_identifier()
-- lookup_rcsbpdb()
-- _request()
-- GET https://data.rcsb.org/rest/v1/core/entry/{pdb_id}
-
-**params**
-
-- __init__()
-- _load_from_params()
-- _search_rcsb()
-- _build_search_query()
-- _post_json()
-- POST https://search.rcsb.org/rcsbsearch/v2/query
-"""
 
 from __future__ import annotations
 
@@ -81,7 +25,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from dsi.backends.webserver import Webserver
-
 
 
 @dataclass
@@ -115,6 +58,7 @@ class RCSBPDBResolution:
     landing_page_url: str | None = None
     query_source: str | None = None
     files: list[FileResource] = field(default_factory=list)
+    resources_loaded: bool = False
     raw_metadata: dict[str, Any] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
@@ -206,29 +150,30 @@ class RCSBPDB(Webserver):
         params: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
-        """
-        Initialize rcsbpdb backend and optionally load data from RCSB APIs.
-        """
-        self.url = (url or self.DATA_CORE_URL).rstrip("/")
-        self.identifiers = list(dict.fromkeys(identifiers or []))
-        self.params = params or {}
-        self.validate_error_msg = None
+        """Open and validate an RCSB connection with an empty cache."""
+        if identifiers or params:
+            raise ValueError(
+                "RCSBPDB initialization does not retrieve artifacts. "
+                "Create the backend first, then call query_artifacts({...})."
+            )
 
-        # skip data retrieval if only checking connection to rcsbpdb
-        if kwargs.get("only_validate", False):
-            return
+        self.url = (url or self.DATA_CORE_URL).rstrip("/")
+        self.identifiers: list[str] = []
+        self.params: dict[str, Any] = {}
+        self.validate_error_msg = None
 
         self.timeout = kwargs.get("timeout", 60)
         self.verify = kwargs.get("verify_ssl", kwargs.get("verify", True))
         self.validate_resource_urls = kwargs.get("validate_resource_urls", True)
         self.retries = kwargs.get("retries", 3)
         self.validate_on_init = kwargs.get("validate_on_init", True)
-        self.auto_load = kwargs.get("auto_load", True)
         self.kwargs = kwargs
-
         self.session = self._create_session(retries=self.retries)
 
-        self.tables: dict[str, list[dict[str, Any]]] = {}
+        # Cache values are column-oriented OrderedDict tables. The existing
+        # exploratory helpers use self.tables, so retain it as an alias.
+        self._cache: OrderedDict[str, OrderedDict[str, list[Any]]] = OrderedDict()
+        self.tables = self._cache
         self.schemas: dict[str, list[str]] = {
             "datasets": self.DATASET_SCHEMA,
             "resources": self.RESOURCE_SCHEMA,
@@ -239,26 +184,19 @@ class RCSBPDB(Webserver):
         self.last_search_response: dict[str, Any] | None = None
         self._loaded = False
 
-        if self.validate_on_init and not self.validate_connection():
-            self._loaded = False
-            raise ConnectionError(self.validate_error_msg or "Validating RCSBPDB connection failed.")
-
-        if self.auto_load:
-            try:
-                if self.identifiers:
-                    self._load_initial_data()
-                elif self.params:
-                    self._load_from_params(self.params)
-                else:
-                    self.process_artifacts()
-
-                self._loaded = True
-
-            except Exception as exc:
-                self._loaded = False
-                raise RuntimeError(f"Failed to load initial rcsbpdb data: {exc}") from exc
-        else:
+        # list_backends() uses only_validate=True and validates separately.
+        # Session and cache setup must still be available in that case.
+        if kwargs.get("only_validate", False):
             self._loaded = True
+            return
+
+        if self.validate_on_init and not self.validate_connection():
+            raise ConnectionError(
+                self.validate_error_msg or "Validating RCSBPDB connection failed."
+            )
+
+        self._loaded = True
+
 
     # ------------------------------------------------------------------
     # HTTP/session helpers
@@ -466,27 +404,81 @@ class RCSBPDB(Webserver):
 
         return list(dict.fromkeys(identifiers))
     
-    def _load_from_params(self, params: dict[str, Any]) -> None:
-        self._validate_params(params)
+    @staticmethod
+    def _cache_token(value: Any) -> str:
+        """Create a readable token that is safe to use in a cache-table name."""
+        token = re.sub(r"[^a-z0-9]+", "_", str(value).lower()).strip("_")
+        return token[:60] or "query"
 
-        identifiers = self._extract_identifiers_from_params(params)
+    def _discovery_table_name(self, params: dict[str, Any]) -> str:
+        for key in ("keywords", "authors", "experimental_method"):
+            if params.get(key):
+                return f"pdb_datasets_{self._cache_token(params[key])}"
+        return "pdb_datasets_query"
 
-        if identifiers:
-            self.identifiers = identifiers
-            self.raw_results = [
-                self.lookup_identifier(identifier, query_source="params")
-                for identifier in self.identifiers
-            ]
-            self.process_artifacts()
-            return
-
-        pdb_ids = self._search_rcsb(params)
-        self.identifiers = pdb_ids
-        self.raw_results = [
-            self.lookup_identifier(pdb_id, query_source="params")
-            for pdb_id in self.identifiers
+    def _resource_table_name(self, results: list[RCSBPDBResolution]) -> str:
+        pdb_ids = [
+            str(result.record_id).lower()
+            for result in results
+            if result.record_id
         ]
-        self.process_artifacts()
+        return f"pdb_resources_{'_'.join(pdb_ids)}" if pdb_ids else "pdb_resources_query"
+
+    @staticmethod
+    def _error_table_name(table_name: str) -> str:
+        return f"{table_name}_errors"
+
+    def _query_discovery(
+        self,
+        params: dict[str, Any],
+    ) -> tuple[str, list[dict[str, Any]], list[str]]:
+        """Tier 1: return high-level metadata for matching PDB entries."""
+        pdb_ids = self._search_rcsb(params)
+        results = [
+            self.lookup_identifier(
+                pdb_id,
+                query_source="query_artifacts.discovery",
+                include_resources=False,
+            )
+            for pdb_id in pdb_ids
+        ]
+
+        self.identifiers = pdb_ids
+        self.params = dict(params)
+        self.raw_results.extend(results)
+        extracted = self._extract_tables(results)
+        table_name = self._discovery_table_name(params)
+
+        if extracted["datasets"] or not extracted["errors"]:
+            return table_name, extracted["datasets"], self.DATASET_SCHEMA
+
+        return self._error_table_name(table_name), extracted["errors"], self.ERROR_SCHEMA
+
+    def _query_selected_entries(
+        self,
+        identifiers: list[str],
+    ) -> tuple[str, list[dict[str, Any]], list[str]]:
+        """Tier 2: return resource/file pointers for selected PDB entries."""
+        results = [
+            self.lookup_identifier(
+                identifier,
+                query_source="query_artifacts.selected_entry",
+                include_resources=True,
+            )
+            for identifier in identifiers
+        ]
+
+        self.identifiers = list(identifiers)
+        self.params = {"identifiers": list(identifiers)}
+        self.raw_results.extend(results)
+        extracted = self._extract_tables(results)
+        table_name = self._resource_table_name(results)
+
+        if extracted["resources"] or not extracted["errors"]:
+            return table_name, extracted["resources"], self.RESOURCE_SCHEMA
+
+        return self._error_table_name(table_name), extracted["errors"], self.ERROR_SCHEMA
+
 
     def _search_rcsb(self, params: dict[str, Any]) -> builtins.list[str]:
         """
@@ -596,7 +588,9 @@ class RCSBPDB(Webserver):
         self,
         identifier: str,
         query_source: str | None = None,
+        include_resources: bool = True,
     ) -> RCSBPDBResolution:
+        """Resolve a PDB ID or RCSB DOI to normalized entry metadata."""
         kind = self.classify_identifier(identifier)
 
         if kind == "rcsbpdb_doi":
@@ -607,6 +601,7 @@ class RCSBPDB(Webserver):
                 original_identifier=identifier,
                 doi=doi,
                 query_source=query_source or "identifier",
+                include_resources=include_resources,
             )
 
         if kind == "pdb_id":
@@ -616,6 +611,7 @@ class RCSBPDB(Webserver):
                 original_identifier=identifier,
                 doi=None,
                 query_source=query_source or "identifier",
+                include_resources=include_resources,
             )
 
         return RCSBPDBResolution(
@@ -625,8 +621,9 @@ class RCSBPDB(Webserver):
             endpoint_used=None,
             status="skipped",
             query_source=query_source,
-            notes=["Identifier did not match a rcsbpdb DOI or 4-character PDB ID."],
+            notes=["Identifier did not match an RCSBPDB DOI or 4-character PDB ID."],
         )
+
 
     def _url_exists(self, url: str):
         try:
@@ -833,7 +830,9 @@ class RCSBPDB(Webserver):
         original_identifier: str,
         doi: str | None = None,
         query_source: str | None = None,
+        include_resources: bool = True,
     ) -> RCSBPDBResolution:
+        """Retrieve one RCSB entry and optionally build its resource pointers."""
         result = RCSBPDBResolution(
             original_identifier=original_identifier,
             normalized_identifier=doi or pdb_id or str(original_identifier),
@@ -842,6 +841,7 @@ class RCSBPDB(Webserver):
             endpoint_variables={"pdb_id": pdb_id},
             doi=doi,
             query_source=query_source,
+            resources_loaded=include_resources,
         )
 
         if not pdb_id:
@@ -849,14 +849,11 @@ class RCSBPDB(Webserver):
             return result
 
         meta_url = self.ENDPOINTS["entry"].format(pdb_id=pdb_id)
-        landing_url = self.ENDPOINTS["entry_landing"].format(pdb_id=pdb_id)
-
         result.metadata_url = meta_url
-        result.landing_page_url = landing_url
-        
+        result.landing_page_url = self.ENDPOINTS["entry_landing"].format(pdb_id=pdb_id)
+
         try:
             meta = self._request(meta_url)
-
             result.status = "ok"
             result.title = meta.get("struct", {}).get("title")
             result.record_id = pdb_id
@@ -875,7 +872,8 @@ class RCSBPDB(Webserver):
                 "full_metadata": meta,
             }
 
-            result.files = self._build_file_resources(pdb_id, meta)
+            if include_resources:
+                result.files = self._build_file_resources(pdb_id, meta)
 
             return result
 
@@ -883,26 +881,21 @@ class RCSBPDB(Webserver):
             result.status = f"http_error_{getattr(exc.response, 'status_code', 'unknown')}"
             result.notes.append("RCSB entry metadata request failed.")
             return result
-
         except requests.RequestException as exc:
             result.status = "request_failed"
-            result.notes.append(f"rcsbpdb request error: {exc!s}")
+            result.notes.append(f"RCSBPDB request error: {exc!s}")
             return result
-
         except Exception as exc:
             result.status = "parse_failed"
-            result.notes.append(f"rcsbpdb parsing error: {exc!s}")
+            result.notes.append(f"RCSBPDB parsing error: {exc!s}")
             return result
+
 
     # ------------------------------------------------------------------
     # Loading and normalization
     # ------------------------------------------------------------------
-    def _load_initial_data(self) -> None:
-        self.raw_results = [
-            self.lookup_identifier(identifier, query_source="identifier")
-            for identifier in self.identifiers
-        ]
-        self.process_artifacts()
+
+
 
     def _extract_tables(self, results: builtins.list[RCSBPDBResolution]) -> dict[str, builtins.list[dict[str, Any]]]:
         datasets: list[dict[str, Any]] = []
@@ -939,7 +932,9 @@ class RCSBPDB(Webserver):
                     "experimental_method": self._extract_experimental_method(res.raw_metadata),
                     "release_date": self._extract_release_date(res.raw_metadata),
                     "revision_date": self._extract_revision_date(res.raw_metadata),
-                    "resource_count": len(res.files),
+                    "resource_count": (
+                        len(res.files) if res.resources_loaded else None
+                    ),
                     "raw_metadata": self._json_or_none(res.raw_metadata),
                     "notes": " | ".join(res.notes) if res.notes else None,
                 }
@@ -1191,57 +1186,37 @@ class RCSBPDB(Webserver):
     def get_tables(self):
         return self.tables
 
-    def get_schema(self, table_name: str | None = None):
-        """
-        Return SQL-style CREATE TABLE schema text.
+    def get_schema(self, table_name: str | None = None) -> str:
+        """Describe supported RCSBPDB queries and their return types."""
+        return """
+RCSBPDB webserver query schema
 
-        Parameters
-        ----------
-        table_name : str or None
-            If provided, return schema text for one table.
-            If None, return schema text for all loaded/known tables.
-        """
-        table_names = [self._resolve_table_name(table_name)] if table_name else list(self.schemas.keys())
-        schema_lines = []
+Initialization
+--------------
+RCSBPDB() validates the RCSB connection and creates an empty OrderedDict cache.
+Initialization never retrieves artifacts.
 
-        for name in table_names:
-            if name not in self.schemas:
-                raise ValueError(
-                    f"Table '{table_name}' not found. Available tables: {list(self.schemas.keys())}"
-                )
+Cached-data exploration
+-----------------------
+query_artifacts("text") returns ValueObjects from find_cell().
+query_artifacts("column = value") returns ValueObjects from find_relation().
 
-            table = self.tables.get(name, OrderedDict())
-            cols = []
+Tier 1: dataset discovery
+-------------------------
+Input:  {"keywords": "...", "limit": 10}
+Optional filters: keywords, authors, experimental_method, limit, start,
+return_type.
+Return: one pandas DataFrame containing matching high-level PDB datasets.
+Cache:  one ordered table named pdb_datasets_<query>.
 
-            for col_name in self.schemas[name]:
-                dtype = "TEXT"
+Tier 2: selected PDB entry
+--------------------------
+Input:  {"pdb_id": "4HHB"}, {"doi": "10.2210/pdb4hhb/pdb"}, or
+        {"identifiers": ["1CBS", "4HHB"]}.
+Return: one pandas DataFrame containing downloadable resource/file pointers.
+Cache:  one ordered table named pdb_resources_<pdb_id>.
+""".strip()
 
-                values = table.get(col_name, []) if isinstance(table, dict) else []
-
-                for value in values:
-                    if value is None:
-                        continue
-
-                    if isinstance(value, bool):
-                        dtype = "BOOLEAN"
-                    elif isinstance(value, int):
-                        dtype = "INTEGER"
-                    elif isinstance(value, float):
-                        dtype = "REAL"
-
-                    break
-
-                cols.append(f"    {col_name} {dtype}")
-
-            create_stmt = (
-                f"CREATE TABLE {name} (\n"
-                + ",\n".join(cols)
-                + "\n);"
-            )
-
-            schema_lines.append(create_stmt)
-
-        return "\n\n".join(schema_lines)
 
     def num_tables(self):
         table_count = len(self.tables)
@@ -1316,7 +1291,47 @@ class RCSBPDB(Webserver):
         raise NotImplementedError("rcsbpdb backend is read-only.")
 
     def query_artifacts(self, query, **kwargs):
-        raise NotImplementedError("query() is not implemented for RCSBPDB because it is not a SQL backend.")
+        """Retrieve one remote table or explore data already stored in cache.
+
+        A dictionary performs a tiered RCSB API retrieval and returns exactly
+        one DataFrame. A string performs a local cache search and returns a
+        list of ValueObjects through find_cell() or find_relation().
+        """
+        if not (
+            isinstance(query, dict)
+            or (isinstance(query, str) and query.strip())
+        ):
+            raise ValueError(
+                "Input query must be a dictionary of parameters or a nonempty string."
+            )
+
+        if isinstance(query, str):
+            operators = ["==", "!=", ">=", "<=", "=", "<", ">", "~", "~~"]
+
+            if not any(operator in query for operator in operators) and not re.search(
+                r"\([^)]*\)",
+                query,
+            ):
+                return self.find_cell(query, row=True)
+
+            column_name, relation = self.check_relational_query(query, operators)
+            return self.find_relation(column_name, relation)
+
+        params = dict(query)
+        self._validate_params(params)
+        identifiers = self._extract_identifiers_from_params(params)
+
+        if identifiers:
+            table_name, rows, schema = self._query_selected_entries(identifiers)
+        else:
+            table_name, rows, schema = self._query_discovery(params)
+
+        return self.process_artifacts(
+            table_name=table_name,
+            rows=rows,
+            schema=schema,
+        )
+
 
     def notebook(self, **kwargs):
         """
@@ -1324,22 +1339,66 @@ class RCSBPDB(Webserver):
         """
         raise NotImplementedError("Notebook generation is not supported for the rcsbpdb backend.")
 
-    def process_artifacts(self, **kwargs):
-        extracted = self._extract_tables(self.raw_results)
-        self.tables = OrderedDict()
+    def process_artifacts(
+        self,
+        table_name: str | None = None,
+        rows: list[dict[str, Any]] | None = None,
+        schema: list[str] | None = None,
+        **kwargs,
+    ):
+        """Append one column-oriented OrderedDict table and return its DataFrame."""
+        # DSI writers call process_artifacts() with no arguments to obtain
+        # the tables already stored in the backend cache.
+        if table_name is None and rows is None and schema is None:
+            self.tables = self._cache
+            return self._cache
 
-        for table_name, rows in extracted.items():
-            schema = self.schemas[table_name]
-            table = self._rows_to_table(rows, schema)
+        # query_artifacts() must provide the information needed to append
+        # one new DataFrame result to the cache.
+        if not table_name or schema is None:
+            raise ValueError(
+                "process_artifacts() requires table_name, rows, and schema "
+                "from query_artifacts()."
+            )
 
-            self.tables[table_name] = table
-            self.schemas[table_name] = schema
-
+        table = self._rows_to_table(rows or [], schema)
+        self._cache[table_name] = table
+        self.tables = self._cache
+        self.schemas[table_name] = schema
         self._loaded = True
-        return self.tables
+
+        dataframe = pd.DataFrame(table)
+        dataframe.attrs["table_name"] = table_name
+        return dataframe
 
 
-    ## DEPRECATING SOON
+    def search(self, params, download=False):
+        """
+        Retrieves metadata or data for entries in a specified dataset.
+
+        Parameters
+        ----------
+        `params` : dict
+            Identifies the dataset and, optionally, a specific entry.
+            For example, {"database_id": 1} retrieves metadata for all entries
+            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
+            data for a specific entry (if supported).
+
+        `download` : bool, optional, default=False
+            If True, downloads specified data to a local directory.
+            If False, returns dataset's entry metadata when no entry is specified, or references to a specified entry's data for separate download.
+
+        Returns
+        -------
+        pandas.DataFrame or list of pandas.DataFrame
+            Metadata for a dataset's entries or data references for a specified entry.
+            Returns a list of DataFrames when the metadata spans multiple tables.
+
+        None
+            If no metadata found or data directly downloaded with (download=True)
+        """
+        raise NotImplementedError
+
     def find(self, query_object, **kwargs):
         """
         Searches for all instances of query_object across all loaded tables.
@@ -1354,7 +1413,6 @@ class RCSBPDB(Webserver):
             + self.find_cell(query_object)
         )
 
-    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         if not isinstance(query_object, str):
             raise TypeError("find_table() ERROR: query_object must be a string")
@@ -1373,7 +1431,6 @@ class RCSBPDB(Webserver):
 
         return matches
 
-    ## DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         if not isinstance(query_object, str):
             raise TypeError("find_column() ERROR: query_object must be a string")
@@ -1483,133 +1540,64 @@ class RCSBPDB(Webserver):
         return matches
 
     def find_relation(self, query, relation=None, **kwargs):
-        """
-        Supports both NDP-style condition queries and RCSBPDB API-backed lookup/search.
+        """Return ValueObjects for relational filters over already-cached tables."""
+        if relation is None:
+            if not isinstance(query, str):
+                raise TypeError(
+                    "find_relation() expects a relational query string or "
+                    "a column name with a relation."
+                )
 
-        Examples:
-            find_relation("resource_count", "> 8")
-            find_relation("dataset_id", "= 1CBS")
-            find_relation("title", "~~ structure")
-            find_relation("resource_count > 8")
-            find_relation("1CBS")
-            find_relation("10.2210/pdb1cbs/pdb")
-            find_relation("hemoglobin", limit=2)
-            find_relation({"keywords": "hemoglobin", "limit": 2})
-            find_relation(["1CBS", "4HHB"])
-        """
-        if query is None:
-            return self.tables
+            parsed = self._parse_find_query(query)
+            if parsed is None:
+                raise ValueError(
+                    "Could not parse relational query. Use query_artifacts({...}) "
+                    "for a new RCSBPDB API retrieval."
+                )
 
-        try:
-            # find_relation("dataset_id", "= 1CBS")
-            if relation is not None:
-                operator, value = self._parse_relation(relation)
-                matches = []
+            column_name, operator, value = parsed
+            relation = f"{operator} {value}"
+        else:
+            if not isinstance(query, str) or not isinstance(relation, str):
+                raise TypeError(
+                    "find_relation() expects a string column name and relation."
+                )
+            column_name = query
 
-                for table_name in self.list(collection=True):
-                    df = self.get_table(table_name, dict_return=False)
+        operator, value = self._parse_relation(relation)
+        matches = []
 
-                    if df.empty or query not in df.columns:
-                        continue
+        for table_name in self.list(collection=True):
+            dataframe = self.get_table(table_name, dict_return=False)
+            if dataframe.empty or column_name not in dataframe.columns:
+                continue
 
-                    if operator in {">", "<", ">=", "<=", "range"}:
-                        df[query] = pd.to_numeric(df[query], errors="coerce")
-                        df = df.dropna(subset=[query])
+            if operator in {">", "<", ">=", "<=", "range"}:
+                dataframe = dataframe.copy()
+                dataframe[column_name] = pd.to_numeric(
+                    dataframe[column_name],
+                    errors="coerce",
+                )
+                dataframe = dataframe.dropna(subset=[column_name])
 
-                    filtered = self._apply_pandas_filter(df, query, operator, value)
+            filtered = self._apply_pandas_filter(
+                dataframe,
+                column_name,
+                operator,
+                value,
+            )
 
-                    for idx, row in filtered.iterrows():
-                        vo = self.ValueObject()
-                        vo.t_name = table_name
-                        vo.c_name = list(df.columns)
-                        vo.row_num = int(idx) + 1
-                        vo.value = row.tolist()
-                        vo.type = "relation"
-                        matches.append(vo)
+            for index, row in filtered.iterrows():
+                value_object = self.ValueObject()
+                value_object.t_name = table_name
+                value_object.c_name = list(dataframe.columns)
+                value_object.row_num = int(index) + 1
+                value_object.value = row.tolist()
+                value_object.type = "relation"
+                matches.append(value_object)
 
-                return matches
+        return matches
 
-            # One-string condition:
-            # find_relation("dataset_id = 1CBS")
-            if isinstance(query, str):
-                parsed = self._parse_find_query(query)
-
-                if parsed is not None:
-                    column_name, op, target_value = parsed
-                    operator, value = self._parse_relation(f"{op} {target_value}")
-                    matches = []
-
-                    for table_name in self.list(collection=True):
-                        df = self.get_table(table_name, dict_return=False)
-
-                        if df.empty or column_name not in df.columns:
-                            continue
-
-                        if operator in {">", "<", ">=", "<=", "range"}:
-                            df[column_name] = pd.to_numeric(
-                                df[column_name],
-                                errors="coerce",
-                            )
-                            df = df.dropna(subset=[column_name])
-
-                        filtered = self._apply_pandas_filter(
-                            df,
-                            column_name,
-                            operator,
-                            value,
-                        )
-
-                        for idx, row in filtered.iterrows():
-                            vo = self.ValueObject()
-                            vo.t_name = table_name
-                            vo.c_name = list(df.columns)
-                            vo.row_num = int(idx) + 1
-                            vo.value = row.tolist()
-                            vo.type = "relation"
-                            matches.append(vo)
-
-                    return matches
-
-            # API-backed query path:
-            # find_relation({"keywords": "hemoglobin", "limit": 2})
-            if isinstance(query, dict):
-                self.params = query
-                self._load_from_params(query)
-                self._loaded = True
-                return self.tables
-
-            # API-backed list path:
-            # find_relation(["1CBS", "4HHB"])
-            if isinstance(query, list):
-                self.identifiers = query
-                self._load_initial_data()
-                self._loaded = True
-                return self.tables
-
-            # API-backed string path:
-            # find_relation("1CBS")
-            # find_relation("10.2210/pdb1cbs/pdb")
-            # find_relation("hemoglobin", limit=2)
-            if isinstance(query, str):
-                kind = self.classify_identifier(query)
-
-                if kind in {"rcsbpdb_doi", "pdb_id"}:
-                    self.identifiers = [query]
-                    self._load_initial_data()
-                else:
-                    query_params = {"keywords": query}
-                    query_params.update(kwargs)
-                    self.params = query_params
-                    self._load_from_params(self.params)
-
-                self._loaded = True
-                return self.tables
-
-        except Exception:
-            self._loaded = False
-            raise
-
-        raise TypeError("find_relation() expects None, str, list, or dict.")
     
     def list(self, collection=False, **kwargs):
         table_names = list(self.tables.keys())
@@ -1650,6 +1638,8 @@ class RCSBPDB(Webserver):
         if df.empty:
             raise ValueError(f"Table '{resolved}' is empty.")
 
+        max_rows = len(df)
+
         if display_cols is not None:
             missing_cols = [col for col in display_cols if col not in df.columns]
 
@@ -1664,7 +1654,8 @@ class RCSBPDB(Webserver):
         if num_rows:
             df = df.head(num_rows)
 
-        return df
+        df.attrs["max_rows"] = max_rows
+        return df.astype(object).where(df.notna(), None)
 
 
     def summary(self, table_name=None, *args, **kwargs):
@@ -1768,18 +1759,23 @@ class RCSBPDB(Webserver):
         return [table_names] + summary_tables
 
     def close(self):
-        """
-        Resets backend state, clears loaded rcsbpdb data, and releases HTTP resources.
-        """
+        """Release HTTP resources and clear the ordered in-memory cache."""
         if hasattr(self, "session"):
             self.session.close()
 
-        self.tables = {}
+        self._cache = OrderedDict()
+        self.tables = self._cache
+        self.schemas = {
+            "datasets": self.DATASET_SCHEMA,
+            "resources": self.RESOURCE_SCHEMA,
+            "errors": self.ERROR_SCHEMA,
+        }
         self.raw_results = []
         self.last_search_response = None
         self.identifiers = []
         self.params = {}
         self._loaded = False
+
 
     def __enter__(self):
         return self

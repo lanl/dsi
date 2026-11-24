@@ -1,17 +1,19 @@
-
-## 1.load_basic.py
-
 from dsi.dsi import DSI
 
 
 def main():
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={"keywords": "genomics", "limit": 5},
         silence_messages=True,
     )
 
-    print("\nLoaded RCSBPDB backend using keyword search.")
+    datasets_df = dsi.query(
+        {"keywords": "genomics", "limit": 5},
+        collection=True,
+    )
+
+    print("\nRetrieved RCSBPDB dataset-discovery results.")
+    print(f"Cached table: {datasets_df.attrs['table_name']}")
 
     print("\nAvailable tables:")
     dsi.list()

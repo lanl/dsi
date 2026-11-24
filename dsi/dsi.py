@@ -171,7 +171,15 @@ class DSI:
                     query_params = kwargs.pop("params", {})
                 elif backend_name.lower() == "rcsbpdb":
                     backend_name = "RCSBPDB"
-                    query_params = kwargs.pop("params", {})
+
+                    if "params" in kwargs or "identifiers" in kwargs:
+                        raise ValueError(
+                            "RCSBPDB does not retrieve data during DSI initialization. "
+                            "Create DSI first, then call "
+                            "dsi.query({...}, collection=True)."
+                        )
+
+                    query_params = None
                 elif backend_name.lower() == "zenodo":
                     backend_name = "Zenodo"
                     query_params = kwargs.pop("params", {})

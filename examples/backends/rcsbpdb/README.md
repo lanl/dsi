@@ -15,7 +15,7 @@ Useful RCSB PDB resources:
 <details>
 <summary><b>API Reference (for developers)</b></summary>
 
-The backend uses the RCSB Search API to discover PDB entries and the RCSB Data API to retrieve metadata for each resolved PDB ID.
+The backend uses the RCSB Search API to discover PDB entries and the RCSB Data API to retrieve metadata for a selected PDB entry.
 
 - Search API endpoint: `https://search.rcsb.org/rcsbsearch/v2/query`
 - Data API base URL: `https://data.rcsb.org/rest/v1/core`
@@ -24,14 +24,21 @@ The backend uses the RCSB Search API to discover PDB entries and the RCSB Data A
 - Search request method: `POST`
 - Entry metadata request method: `GET`
 
-Search-driven workflow:
+Tiered workflow:
 
 ```text
-Search parameters
+DSI initialization
+    -> validates API connection and creates an empty cache
+
+Tier 1 dictionary query
     -> RCSB Search API
-    -> PDB IDs
+    -> matching PDB IDs
+    -> one dataset-discovery DataFrame and one cached table
+
+Tier 2 dictionary query
+    -> selected PDB ID or DOI
     -> RCSB Data API
-    -> datasets, resources, and errors tables
+    -> one resource-pointer DataFrame and one cached table
 ```
 
 </details>
@@ -42,26 +49,47 @@ Search parameters
 
 ### Initialize the Backend
 
+Initialization does not retrieve remote data. It only validates the RCSB connection and creates an empty cache.
+
 ```python
 from dsi.dsi import DSI
 
 dsi = DSI(
     backend_name="RCSBPDB",
-    params={"keywords": "hemoglobin", "limit": 5}
+    silence_messages=True,
 )
+```
+
+### Discover Datasets (Tier 1)
+
+```python
+datasets_df = dsi.query(
+    {"keywords": "hemoglobin", "limit": 5},
+    collection=True,
+)
+
+datasets_table = datasets_df.attrs["table_name"]
+print(datasets_df.head())
+```
+
+### Retrieve Resources for a Selected Entry (Tier 2)
+
+```python
+selected_pdb_id = datasets_df.iloc[0]["dataset_id"]
+
+resources_df = dsi.query(
+    {"pdb_id": selected_pdb_id},
+    collection=True,
+)
+
+resources_table = resources_df.attrs["table_name"]
+print(resources_df.head())
 ```
 
 ### List Available Tables
 
 ```python
 dsi.list()
-```
-
-### Access a Table
-
-```python
-datasets_df = dsi.get_table("datasets", collection=True)
-print(datasets_df.head())
 ```
 
 ### Close the Backend
@@ -74,76 +102,76 @@ dsi.close()
 
 ## Supported Search and Lookup Parameters
 
-The backend supports a single `params` interface.
+RCSBPDB accepts dictionary parameters through `dsi.query(..., collection=True)`, not through `DSI(...)` initialization. Every dictionary query returns exactly one Pandas DataFrame and appends exactly one ordered table to the backend cache.
 
 ### Keyword Search
 
-Search RCSB PDB metadata using a full-text keyword and limit the number of returned entries.
+Search RCSB PDB metadata using a full-text keyword and limit the number of returned entries. This is a Tier 1 discovery query.
 
 ```python
-dsi = DSI(
-    backend_name="RCSBPDB",
-    params={"keywords": "genomics", "limit": 10}
+datasets_df = dsi.query(
+    {"keywords": "genomics", "limit": 10},
+    collection=True,
 )
 ```
 
 ### Author Search
 
-Search for structures associated with a specific primary-citation author.
+Search for structures associated with a specific primary-citation author. This is a Tier 1 discovery query.
 
 ```python
-dsi = DSI(
-    backend_name="RCSBPDB",
-    params={"authors": "Kleywegt", "limit": 10}
+datasets_df = dsi.query(
+    {"authors": "Kleywegt", "limit": 10},
+    collection=True,
 )
 ```
 
 ### Experimental Method Search
 
-Filter structures by an exact experimental method.
+Filter structures by an exact experimental method. This is a Tier 1 discovery query.
 
 ```python
-dsi = DSI(
-    backend_name="RCSBPDB",
-    params={"experimental_method": "X-RAY DIFFRACTION", "limit": 10}
+datasets_df = dsi.query(
+    {"experimental_method": "X-RAY DIFFRACTION", "limit": 10},
+    collection=True,
 )
 ```
 
 ### PDB ID Lookup
 
-Retrieve metadata and available resources for a specific four-character PDB ID.
+Retrieve downloadable resource pointers for a specific four-character PDB ID. This is a Tier 2 query.
 
 ```python
-dsi = DSI(
-    backend_name="RCSBPDB",
-    params={"pdb_id": "1CBS"}
+resources_df = dsi.query(
+    {"pdb_id": "1CBS"},
+    collection=True,
 )
 ```
 
 ### DOI Lookup
 
-Resolve an RCSB-style DOI to its PDB ID and retrieve the corresponding structure metadata.
+Resolve an RCSB-style DOI to its PDB ID and retrieve downloadable resource pointers. This is a Tier 2 query.
 
 ```python
-dsi = DSI(
-    backend_name="RCSBPDB",
-    params={"DOI": "10.2210/pdb1cbs/pdb"}
+resources_df = dsi.query(
+    {"DOI": "10.2210/pdb1cbs/pdb"},
+    collection=True,
 )
 ```
 
 ### Multiple Identifiers
 
-Retrieve multiple structures in one request using a combination of PDB IDs and RCSB-style DOIs.
+Retrieve resource pointers for multiple structures using a combination of PDB IDs and RCSB-style DOIs.
 
 ```python
-dsi = DSI(
-    backend_name="RCSBPDB",
-    params={
+resources_df = dsi.query(
+    {
         "identifiers": [
             "1CBS",
-            "10.2210/pdb4hhb/pdb"
+            "10.2210/pdb4hhb/pdb",
         ]
-    }
+    },
+    collection=True,
 )
 ```
 
@@ -151,163 +179,137 @@ dsi = DSI(
 
 ## Supported Parameters
 
-The backend supports the following parameters through the unified `params` interface.
+The backend supports the following parameters through dictionary queries.
 
 | Parameter | Description |
-|------------|------------|
+|------------|-------------|
 | keywords | Full-text search |
 | authors | Author search |
 | experimental_method | Experimental method search |
-| pdb_id/ pdbID/ pdbId/ PDB_ID/ pdbid/ PDBID | PDB ID lookup |
-| doi/ DOI | DOI lookup |
+| pdb_id / pdbID / pdbId / PDB_ID / pdbid / PDBID | PDB ID lookup |
+| doi / DOI | DOI lookup |
 | identifiers | Multiple PDB IDs and/or DOIs |
-| limit | Maximum number of results |
+| limit | Maximum number of Tier 1 discovery results |
+| start | Starting offset for Tier 1 discovery results |
+| return_type | RCSB Search API result type; defaults to `entry` |
 
 ---
 
 ## Tables
 
-The backend returns three DSI tables:
+Each dictionary query returns one DataFrame and adds one table to the cache. Table names are dynamic and are available through `result_df.attrs["table_name"]`.
 
-1. `datasets`
-2. `resources`
-3. `errors`
+Typical names are:
+
+1. `pdb_datasets_<query>` for Tier 1 dataset discovery.
+2. `pdb_resources_<pdb_id>` for Tier 2 selected-entry resources.
+3. `pdb_resources_query_errors` or `pdb_datasets_<query>_errors` when a query produces only errors.
 
 ---
 
-### datasets (Tier 1)
+### Dataset Discovery (Tier 1)
 
-The `datasets` table contains one row per resolved RCSB PDB dataset.
+A Tier 1 DataFrame contains one row per matching RCSB PDB entry. Its table name begins with `pdb_datasets_`.
 
-Table fields are a subset of the following properties:
-
-| Column              | Description                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| dataset_id          | PDB ID                                                                                    |
-| doi                 | DOI if available                                                                          |
-| title               | Structure title                                                                           |
-| description         | Structure description                                                                     |
-| landing_page        | RCSB structure URL                                                                        |
-| metadata_url        | API metadata URL                                                                          |
-| experimental_method | Experimental method                                                                       |
-| release_date        | Initial release date                                                                      |
-| revision_date       | Latest revision date                                                                      |
-| resource_count      | Number of associated resource entries                                                     |
-| raw_metadata        | Curated metadata plus full API response                                                   |
-| notes               | Additional messages for skipped or failed lookups; typically empty for successful entries |
-
+| Column | Description |
+| --- | --- |
+| dataset_id | PDB ID |
+| doi | DOI if available |
+| title | Structure title |
+| description | Structure description |
+| landing_page | RCSB structure URL |
+| metadata_url | API metadata URL |
+| experimental_method | Experimental method |
+| release_date | Initial release date |
+| revision_date | Latest revision date |
+| resource_count | Not loaded during Tier 1 discovery |
+| raw_metadata | Curated metadata plus full API response |
+| notes | Additional messages for skipped or failed lookups |
 
 Example:
 
 ```python
-datasets_df = dsi.get_table("datasets", collection=True)
+datasets_df = dsi.query(
+    {"keywords": "hemoglobin", "limit": 5},
+    collection=True,
+)
 
 print(
     datasets_df[
-        [
-            "dataset_id",
-            "title",
-            "experimental_method",
-            "resource_count"
-        ]
+        ["dataset_id", "title", "experimental_method", "resource_count"]
     ]
 )
 ```
 
 ---
 
-### resources (Tier 2)
+### Resource Pointers (Tier 2)
 
-The `resources` table contains downloadable file-based or file-specific metadata associated with each dataset. Each row corresponds to a single downloadable resource. The backend does not download files automatically during metadata retrieval; it follows a search-then-retrieval workflow.
+A Tier 2 DataFrame contains downloadable file-based metadata for selected PDB entries. Its table name begins with `pdb_resources_`. The backend does not download files automatically.
 
-Table fields are a subset of the following properties:
-
-| Column            | Description                |
-| ----------------- | -------------------------- |
-| resource_id       | Unique resource identifier |
-| dataset_id        | Associated PDB ID          |
-| name              | Resource file name         |
-| download_url      | Download URL               |
-| format            | File format                |
-| resource_type     | Resource description       |
-| source            | Resource source category   |
-| raw_metadata      | Resource metadata          |
+| Column | Description |
+| --- | --- |
+| resource_id | Unique resource identifier |
+| dataset_id | Associated PDB ID |
+| name | Resource file name |
+| download_url | Download URL |
+| format | File format |
+| resource_type | Resource description |
+| source | Resource source category |
+| raw_metadata | Resource metadata |
 
 Example:
 
 ```python
-resources_df = dsi.get_table("resources", collection=True)
+resources_df = dsi.query(
+    {"pdb_id": "1CBS"},
+    collection=True,
+)
 
 print(
     resources_df[
-        [
-            "dataset_id",
-            "name",
-            "format",
-            "download_url"
-        ]
+        ["dataset_id", "name", "format", "download_url"]
     ]
 )
 ```
 
-#### Relationship Between Tables
+#### Relationship Between Results
 
-The relationship is:
-
-```text
-datasets.dataset_id
-          |
-          |
-          V
-resources.dataset_id
-```
-
-The `dataset_id` field acts like a primary-key/foreign-key relationship.
-
-A single dataset can have many associated resources.
-
-Example:
+The shared field is:
 
 ```text
-datasets
----------
-1CBS
-
-resources
----------
-1CBS -> mmCIF
-1CBS -> PDB
-1CBS -> XML
-1CBS -> Assembly CIF
-1CBS -> Validation Report
-...
+dataset discovery dataset_id
+             |
+             v
+resource pointer dataset_id
 ```
+
+A selected dataset can have many resource-pointer rows.
 
 ---
 
-### errors
+### Error Results
 
-The `errors` table stores failed, skipped, or unresolved lookups.
+If a dictionary query has no successful result, `query_artifacts()` returns and caches one error DataFrame. Its table name ends with `_errors`.
 
-Table fields are a subset of the following properties:
+| Column | Description |
+| --- | --- |
+| identifier | Original input |
+| normalized_identifier | Normalized value |
+| repo | Repository |
+| status | Error status |
+| endpoint_used | API endpoint |
+| endpoint_variables | Endpoint parameters |
+| notes | Error details |
 
-| Column                | Description         |
-| --------------------- | ------------------- |
-| identifier            | Original input      |
-| normalized_identifier | Normalized value    |
-| repo                  | Repository          |
-| status                | Error status        |
-| endpoint_used         | API endpoint        |
-| endpoint_variables    | Endpoint parameters |
-| notes                 | Error details       |
+Example:
 
-If no lookup errors occur, the `errors` table may contain a single blank placeholder row so the table schema can be written safely during SQLite processing.
-
-Example error row:
-
-| identifier | status | notes |
-|------------|--------|-------|
-| NOT_A_PDB_ID | skipped | Identifier did not match a supported DOI or 4-character PDB ID |
+```python
+errors_df = dsi.query(
+    {"identifiers": ["NOT_A_PDB_ID"]},
+    collection=True,
+)
+```
 
 ---
 
@@ -317,46 +319,45 @@ The backend stores metadata at two levels.
 
 ### Curated Metadata
 
-Frequently used metadata fields are extracted into table columns for:
+Frequently used metadata fields are extracted into DataFrame columns for:
 
-* filtering
-* searching
-* summarization
-* reporting
-* table joins
+- filtering
+- searching
+- summarization
+- reporting
+- selection of a PDB entry for Tier 2 retrieval
 
-These fields appear directly in:
-
-* datasets
-* resources
-* errors
+These fields appear in the returned discovery, resource, or error DataFrame.
 
 ---
 
 ### Full Metadata
 
-The complete RCSB Data API response is preserved in the `raw_metadata` field.
+The complete RCSB Data API response is preserved in the `raw_metadata` field when it is available.
 
 Example:
 
 ```python
-datasets_df = dsi.get_table("datasets", collection=True)
+datasets_df = dsi.query(
+    {"keywords": "hemoglobin", "limit": 5},
+    collection=True,
+)
 
 full_metadata = datasets_df.iloc[0]["raw_metadata"]
 ```
 
 This ensures:
 
-* no metadata loss
-* future compatibility
-* access to the original API metadata
-* support for advanced workflows
+- no metadata loss
+- future compatibility
+- access to the original API metadata
+- support for advanced workflows
 
 ---
 
 ## Common DSI Operations
 
-### List Tables
+### List Cached Tables
 
 ```python
 dsi.list()
@@ -368,107 +369,80 @@ dsi.list()
 dsi.summary()
 ```
 
-### Retrieve a Table
+### Retrieve a Cached Table
 
 ```python
-datasets_df = dsi.get_table("datasets", collection=True)
+datasets_df = dsi.query(
+    {"keywords": "hemoglobin", "limit": 5},
+    collection=True,
+)
+
+datasets_table = datasets_df.attrs["table_name"]
+cached_df = dsi.get_table(datasets_table, collection=True)
 ```
 
-### Search Loaded Row Data
+### Search Cached Row Data
+
+Use a nonempty string query after data has been cached.
 
 ```python
-dsi.search("X-RAY")
+dsi.query("X-RAY")
 ```
 
-### Find Rows by Column Condition
+### Find Cached Rows by Column Condition
 
 ```python
-dsi.find("doi = 10.2210/pdb4hhb/pdb")
+dsi.query("doi = 10.2210/pdb4hhb/pdb")
 ```
 
 ---
 
 ## Example Scripts
 
-The following example scripts demonstrate common workflows.
+The following example scripts demonstrate the tiered query workflow.
 
 ### 1.load_basic.py
 
-Initialize the RCSBPDB backend using a keyword search and demonstrate the core DSI inspection utilities:
+Initialize the empty RCSBPDB backend, run a Tier 1 keyword discovery query, and demonstrate the core DSI inspection utilities:
 
+- `dsi.query({...}, collection=True)`
 - `dsi.list()`
 - `dsi.summary()`
 
-This example provides a quick overview of the available tables and their contents.
-
 ### 2.list_tables.py
 
-Retrieve the curated DSI tables using `get_table()` and display them as Pandas DataFrames.
-
-This example demonstrates:
-
-- Accessing the `datasets` table
-- Accessing the `resources` table
-- Accessing the `errors` table
-- Viewing selected metadata fields in a tabular format
+Run a Tier 1 dataset-discovery query, choose one returned PDB ID, then run a Tier 2 resource query. The example displays selected columns from both returned DataFrames.
 
 ### 3.filter_data.py
 
-Filter the Tier 2 `resources` table by file format and use the associated `download_url` values to download matching files.
-
-This example demonstrates:
-
-- Resource-level filtering
-- Accessing downloadable file metadata
-- Using `download_url` paths
-- Downloading selected resources to a local directory
+Run a discovery query, select an entry, retrieve Tier 2 resources, filter them by file format, and use their `download_url` values to download selected files.
 
 ### 4.get_columns.py
 
-Read PDB IDs and DOIs from a CSV file, retrieve metadata, display selected dataset and resource information, export results to CSV, and store the loaded tables in SQLite.
-
-This example demonstrates:
-
-- CSV-driven identifier input
-- PDB ID and DOI resolution
-- DSI `find()`
-- DSI `search()`
-- DSI `display()`
-- Dataset metadata retrieval
-- Resource metadata and download path retrieval
-- Resource count summaries by dataset
-- DSI `write()` export to CSV
-- DSI `process("sqlite", "data.db")` storage workflow
+Read PDB IDs and DOIs from a CSV file, run a Tier 2 resource query, inspect cached data using `dsi.query()` string searches, export the returned resource table to CSV, and store cached results in SQLite.
 
 The script creates `pdb_inputs.csv` if it does not already exist.
 
 Expected output files:
 
 - `pdb_inputs.csv`
-- `datasets.csv`
+- `resources.csv`
 - `data.db`
 
 ### 5.error_handling.py
 
-Load a mixture of valid and invalid identifiers to demonstrate how failed or skipped lookups are represented in the `errors` table.
-
-This example demonstrates:
-
-- Valid PDB ID lookup
-- Invalid identifier handling
-- Accessing the `errors` table
-- Interpreting `status` and `notes` values for skipped records
+Run an invalid identifier query to demonstrate the single returned and cached error table, then use a string relation query to find skipped records.
 
 ---
 
 ## Notes
 
-* The backend is metadata-first and read-only.
-* The `datasets` table is the Tier 1 table.
-* The `resources` table is the Tier 2 table.
-* Multiple resource rows may exist for a single dataset.
-* Resource rows describe downloadable file-based or file-specific metadata associated with each dataset. Files are not downloaded automatically during metadata retrieval; use the `download_url` values for explicit download workflows.
-* Full API metadata is preserved in the `raw_metadata` field.
-* If no lookup errors occur, the `errors` table may be empty or may contain a single blank placeholder row for SQLite compatibility.
-* RCSB-style DOI values are automatically converted into PDB IDs when possible.
-* Curated tables provide simplified access while preserving the complete original metadata.
+- The backend is metadata-first and read-only.
+- `DSI(backend_name="RCSBPDB")` validates the remote connection and creates an empty `OrderedDict` cache; it never retrieves remote records.
+- A dictionary query returns one Pandas DataFrame and appends one ordered table to the cache.
+- Tier 1 discovery returns high-level dataset metadata. Tier 2 selection returns downloadable resource pointers.
+- Cache table names are dynamic; get them from `result_df.attrs["table_name"]` or `dsi.list(collection=True)`.
+- Resource rows describe downloadable file-based or file-specific metadata. Files are not downloaded automatically; use `download_url` values for explicit download workflows.
+- Full API metadata is preserved in the `raw_metadata` field when available.
+- RCSB-style DOI values are automatically converted into PDB IDs when possible.
+- String queries explore data already cached locally; they do not make a new remote RCSB API request.

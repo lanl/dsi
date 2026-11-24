@@ -20,7 +20,7 @@ def create_sample_csv(input_file: Path) -> None:
 def main():
     base_dir = Path(__file__).resolve().parent
     input_file = base_dir / "pdb_inputs.csv"
-    output_csv = base_dir / "datasets.csv"
+    output_csv = base_dir / "resources.csv"
     output_db = base_dir / "data.db"
 
     if not input_file.exists():
@@ -40,20 +40,33 @@ def main():
 
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={"identifiers": identifiers},
         silence_messages=True,
     )
 
-    print("\nFind one loaded DOI:")
-    dsi.find("doi = 10.2210/pdb4hhb/pdb")
+    resources_df = dsi.query(
+        {"identifiers": identifiers},
+        collection=True,
+    )
+    resources_table = resources_df.attrs["table_name"]
 
-    print("\nSearch loaded row data:")
-    dsi.find("experimental_method ~~ X-RAY")
+    print(f"\nCached resource table: {resources_table}")
 
-    print("\nDisplay selected dataset columns:")
-    dsi.display("datasets", display_cols=["title", "description"])
+    print("\nFind cached rows for PDB entry 4HHB:")
+    dsi.query("4HHB")
 
-    resources_df = dsi.get_table("resources", collection=True)
+    print("\nSearch cached resource rows by file format:")
+    dsi.query("format ~~ PDB")
+
+    print("\nDisplay selected resource columns:")
+    dsi.display(
+        resources_table,
+        display_cols=[
+            "dataset_id",
+            "name",
+            "format",
+            "download_url",
+        ],
+    )
 
     print("\nAssociated resource metadata and paths:")
     resource_columns = [
@@ -65,7 +78,9 @@ def main():
         "download_url",
     ]
     existing_resource_columns = [
-        col for col in resource_columns if col in resources_df.columns
+        column
+        for column in resource_columns
+        if column in resources_df.columns
     ]
 
     with pd.option_context(
@@ -87,9 +102,9 @@ def main():
     if output_csv.exists():
         output_csv.unlink()
 
-    print("\nExport datasets table to CSV:")
-    dsi.write(str(output_csv), "CSV", table_name="datasets")
-    print(f"Stored datasets table in: {output_csv}")
+    print("\nExport resource table to CSV:")
+    dsi.write(str(output_csv), "CSV", table_name=resources_table)
+    print(f"Stored resource data in: {output_csv}")
 
     exported_df = pd.read_csv(output_csv)
 
@@ -100,7 +115,7 @@ def main():
     if output_db.exists():
         output_db.unlink()
 
-    print("\nStore results in SQLite:")
+    print("\nStore cached results in SQLite:")
     dsi.process("sqlite", str(output_db))
     print(f"Stored results in: {output_db}")
 

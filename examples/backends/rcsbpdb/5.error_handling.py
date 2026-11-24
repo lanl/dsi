@@ -6,21 +6,20 @@ from dsi.dsi import DSI
 def main():
     dsi = DSI(
         backend_name="RCSBPDB",
-        params={
-            "identifiers": [
-                "1CBS",
-                "NOT_A_PDB_ID",
-            ]
-        },
         silence_messages=True,
     )
 
-    print("\nLoaded one valid PDB ID and one invalid identifier.")
+    errors_df = dsi.query(
+        {"identifiers": ["NOT_A_PDB_ID"]},
+        collection=True,
+    )
+    errors_table = errors_df.attrs["table_name"]
+
+    print("\nRetrieved an error table for an invalid PDB identifier.")
+    print(f"Cached table: {errors_table}")
 
     print("\nAvailable tables:")
     dsi.list()
-
-    errors_df = dsi.get_table("errors", collection=True)
 
     print("\nErrors table:")
     with pd.option_context(
@@ -33,8 +32,8 @@ def main():
     ):
         print(errors_df)
 
-    print("\nFind skipped records:")
-    dsi.find("status = skipped")
+    print("\nFind skipped records in cached error data:")
+    dsi.query("status = skipped")
 
     dsi.close()
 
