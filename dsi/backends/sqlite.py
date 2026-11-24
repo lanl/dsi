@@ -5,6 +5,7 @@ from datetime import datetime
 import textwrap
 import pandas as pd
 from sqlglot import parse_one, exp
+import os
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -52,6 +53,13 @@ class Sqlite(Filesystem):
                                 "ROW", "ROWS", "SAVEPOINT", "SELECT", "SET", "TABLE", "TEMP", "TEMPORARY", "THEN", "TIES", "TO", "TRANSACTION", 
                                 "TRIGGER", "UNBOUNDED", "UNION", "UNIQUE", "UPDATE", "USING", "VACUUM", "VALUES", "VIEW", "VIRTUAL", "WHEN", 
                                 "WHERE", "WINDOW", "WITH", "WITHOUT"]
+
+
+
+    def validate_connection(self):
+        if os.path.getsize(self.filename) > 100:
+            return True
+        return False
 
 
 

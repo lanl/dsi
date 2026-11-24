@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 import pandas as pd
 from sqlglot import parse_one, exp
+import os
 
 from collections import OrderedDict
 from dsi.backends.filesystem import Filesystem
@@ -40,6 +41,13 @@ class DuckDB(Filesystem):
         keywords_df = self.cur.execute("SELECT * FROM duckdb_keywords();").fetchdf()
         filtered_df = keywords_df[keywords_df['keyword_category'] != 'unreserved']
         self.duckdb_keywords = filtered_df["keyword_name"].tolist()
+
+
+
+    def validate_connection(self):
+        if os.path.getsize(self.filename) > 13000:
+            return True
+        return False
 
 
 
