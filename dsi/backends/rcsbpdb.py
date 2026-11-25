@@ -14,8 +14,8 @@ from __future__ import annotations
 import builtins
 import json
 import re
+import warnings
 from collections import OrderedDict
-from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Any, ClassVar
 
@@ -88,6 +88,7 @@ class RCSBPDB(Webserver):
     DOI_REGEX = re.compile(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.IGNORECASE)
     RCSBPDB_DOI_REGEX = re.compile(r"10\.2210/pdb([a-z0-9]{4})/pdb", re.IGNORECASE)
     PDB_ID_REGEX = re.compile(r"^[A-Za-z0-9]{4}$")
+    REQUEST_TIMEOUT = 60
 
     DATASET_SCHEMA: ClassVar[list[str]] = [
         "dataset_id",
@@ -145,7 +146,6 @@ class RCSBPDB(Webserver):
 
     def __init__(
         self,
-        url: str | None = None,
         **kwargs,
     ) -> None:
         """Open and validate an RCSB connection with an empty cache."""
@@ -155,31 +155,16 @@ class RCSBPDB(Webserver):
                 "Create the backend first, then call query_artifacts({...})."
             )
 
-        self.url = (url or self.DATA_CORE_URL).rstrip("/")
-        self.identifiers: list[str] = []
-        self.params: dict[str, Any] = {}
+        if "url" in kwargs:
+            raise ValueError("RCSBPDB uses the fixed RCSB API endpoints; url is not supported.")
+
         self.validate_error_msg = None
+        self.verify = kwargs.get("verify", True)
+        self.session = self._create_session(retries=kwargs.get("retries", 3))
 
-        self.timeout = kwargs.get("timeout", 60)
-        self.verify = kwargs.get("verify_ssl", kwargs.get("verify", True))
-        self.validate_resource_urls = kwargs.get("validate_resource_urls", True)
-        self.retries = kwargs.get("retries", 3)
-        self.validate_on_init = kwargs.get("validate_on_init", True)
-        self.kwargs = kwargs
-        self.session = self._create_session(retries=self.retries)
-
-        # Cache values are column-oriented OrderedDict tables. The existing
-        # exploratory helpers use self.tables, so retain it as an alias.
+        # Each cached table is an ordered mapping of column names to values.
         self._cache: OrderedDict[str, OrderedDict[str, list[Any]]] = OrderedDict()
-        self.tables = self._cache
-        self.schemas: dict[str, list[str]] = {
-            "datasets": self.DATASET_SCHEMA,
-            "resources": self.RESOURCE_SCHEMA,
-            "errors": self.ERROR_SCHEMA,
-        }
 
-        self.raw_results: list[RCSBPDBResolution] = []
-        self.last_search_response: dict[str, Any] | None = None
         self._loaded = False
 
         # list_backends() uses only_validate=True and validates separately.
@@ -188,7 +173,7 @@ class RCSBPDB(Webserver):
             self._loaded = True
             return
 
-        if self.validate_on_init and not self.validate_connection():
+        if kwargs.get("validate_on_init", True) and not self.validate_connection():
             raise ConnectionError(
                 self.validate_error_msg or "Validating RCSBPDB connection failed."
             )
@@ -237,7 +222,7 @@ class RCSBPDB(Webserver):
 
             response = self.session.get(
                 test_url,
-                timeout=self.timeout,
+                timeout=self.REQUEST_TIMEOUT,
                 verify=self.verify,
             )
             response.raise_for_status()
@@ -254,7 +239,7 @@ class RCSBPDB(Webserver):
         response = self.session.get(
             endpoint,
             params=params,
-            timeout=self.timeout,
+            timeout=self.REQUEST_TIMEOUT,
             verify=self.verify,
         )
         response.raise_for_status()
@@ -271,7 +256,7 @@ class RCSBPDB(Webserver):
         response = self.session.post(
             endpoint,
             json=payload,
-            timeout=self.timeout,
+            timeout=self.REQUEST_TIMEOUT,
             verify=self.verify,
         )
         response.raise_for_status()
@@ -326,41 +311,6 @@ class RCSBPDB(Webserver):
     def extract_pdb_id_from_doi(cls, doi: str) -> str | None:
         match = cls.RCSBPDB_DOI_REGEX.search(doi)
         return match.group(1).upper() if match else None
-
-    @staticmethod
-    def get_file_ext(name_or_url: str | None) -> str | None:
-        if not isinstance(name_or_url, str) or "." not in name_or_url:
-            return None
-
-        tail = name_or_url.split("?")[0].split("/")[-1].lower()
-        parts = tail.split(".")
-
-        if len(parts) >= 3 and parts[-1] == "gz":
-            return ".".join(parts[-2:])
-
-        return parts[-1]
-
-    @staticmethod
-    def classify_usability(exts: Iterable[str | None]) -> str:
-        """
-        Classify resource usability based on file extensions.
-        """
-        ext_set = {e.lower() for e in exts if e}
-
-        if not ext_set:
-            return "lookup_failed"
-
-        tabular = {"csv", "tsv", "xlsx", "xls", "json", "xml", "txt", "parquet"}
-        scientific = {"cif", "cif.gz", "nc", "h5", "hdf5", "cdf"}
-        archive_only = {"zip", "tar", "tar.gz", "gz"}
-
-        if ext_set & tabular:
-            return "tabular_or_easy_parse"
-        if ext_set & scientific:
-            return "scientific_structured"
-        if ext_set <= archive_only:
-            return "archive_only"
-        return "other_format"
 
     # ------------------------------------------------------------------
     # Query-driven Search API support
@@ -422,10 +372,6 @@ class RCSBPDB(Webserver):
         ]
         return f"pdb_resources_{'_'.join(pdb_ids)}" if pdb_ids else "pdb_resources_query"
 
-    @staticmethod
-    def _error_table_name(table_name: str) -> str:
-        return f"{table_name}_errors"
-
     def _query_discovery(
         self,
         params: dict[str, Any],
@@ -441,16 +387,21 @@ class RCSBPDB(Webserver):
             for pdb_id in pdb_ids
         ]
 
-        self.identifiers = pdb_ids
-        self.params = dict(params)
-        self.raw_results.extend(results)
         extracted = self._extract_tables(results)
         table_name = self._discovery_table_name(params)
 
         if extracted["datasets"] or not extracted["errors"]:
+            if extracted["datasets"] and extracted["errors"]:
+                warnings.warn(
+                    "Some PDB entries could not be retrieved: "
+                    + ", ".join(str(error["identifier"]) for error in extracted["errors"])
+                    + ". Query each identifier separately to inspect its error.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             return table_name, extracted["datasets"], self.DATASET_SCHEMA
 
-        return self._error_table_name(table_name), extracted["errors"], self.ERROR_SCHEMA
+        return f"{table_name}_errors", extracted["errors"], self.ERROR_SCHEMA
 
     def _query_selected_entries(
         self,
@@ -466,17 +417,21 @@ class RCSBPDB(Webserver):
             for identifier in identifiers
         ]
 
-        self.identifiers = list(identifiers)
-        self.params = {"identifiers": list(identifiers)}
-        self.raw_results.extend(results)
         extracted = self._extract_tables(results)
         table_name = self._resource_table_name(results)
 
         if extracted["resources"] or not extracted["errors"]:
+            if extracted["resources"] and extracted["errors"]:
+                warnings.warn(
+                    "Some PDB entries could not be retrieved: "
+                    + ", ".join(str(error["identifier"]) for error in extracted["errors"])
+                    + ". Query each identifier separately to inspect its error.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             return table_name, extracted["resources"], self.RESOURCE_SCHEMA
 
-        return self._error_table_name(table_name), extracted["errors"], self.ERROR_SCHEMA
-
+        return f"{table_name}_errors", extracted["errors"], self.ERROR_SCHEMA
 
     def _search_rcsb(self, params: dict[str, Any]) -> builtins.list[str]:
         """
@@ -504,7 +459,6 @@ class RCSBPDB(Webserver):
         }
 
         data = self._post_json(self.ENDPOINTS["search"], payload)
-        self.last_search_response = data
 
         result_set = data.get("result_set", [])
         identifiers = []
@@ -620,65 +574,6 @@ class RCSBPDB(Webserver):
             status="skipped",
             query_source=query_source,
             notes=["Identifier did not match an RCSBPDB DOI or 4-character PDB ID."],
-        )
-
-
-    def _url_exists(self, url: str):
-        try:
-            response = self.session.head(
-                url,
-                allow_redirects=True,
-                timeout=self.timeout,
-                verify=self.verify,
-            )
-
-            if response.status_code == 405:
-                response = self.session.get(
-                    url,
-                    stream=True,
-                    allow_redirects=True,
-                    timeout=self.timeout,
-                    verify=self.verify,
-                )
-
-            exists = 200 <= response.status_code < 400
-            status_code = response.status_code
-            content_type = response.headers.get("content-type")
-            response.close()
-
-            return exists, status_code, content_type
-
-        except Exception:
-            return None, None, None
-
-    def _make_resource(
-        self,
-        pdb_id: str,
-        label: str,
-        url: str,
-        extension: str,
-        source: str,
-        format_hint: str,
-    ) -> FileResource | None:
-        exists = None
-        status_code = None
-        content_type = None
-
-        if self.validate_resource_urls:
-            exists, status_code, content_type = self._url_exists(url)
-
-            if exists is False:
-                return None
-
-        return FileResource(
-            label=label,
-            url=url,
-            extension=extension,
-            source=source,
-            format_hint=format_hint,
-            exists=exists,
-            status_code=status_code,
-            content_type=content_type,
         )
 
     def _build_file_resources(self, pdb_id: str, meta: dict[str, Any]) -> builtins.list[FileResource]:
@@ -808,17 +703,15 @@ class RCSBPDB(Webserver):
         resources = []
 
         for label, url, extension, source, format_hint in candidates:
-            resource = self._make_resource(
-                pdb_id=pdb_id_upper,
-                label=label,
-                url=url,
-                extension=extension,
-                source=source,
-                format_hint=format_hint,
+            resources.append(
+                FileResource(
+                    label=label,
+                    url=url,
+                    extension=extension,
+                    source=source,
+                    format_hint=format_hint,
+                )
             )
-
-            if resource is not None:
-                resources.append(resource)
 
         return resources
 
@@ -953,13 +846,10 @@ class RCSBPDB(Webserver):
                 )
 
         return {
-            "datasets": self._apply_schema(datasets, self.DATASET_SCHEMA),
-            "resources": self._apply_schema(resources, self.RESOURCE_SCHEMA),
-            "errors": self._apply_schema(errors, self.ERROR_SCHEMA),
+            "datasets": datasets,
+            "resources": resources,
+            "errors": errors,
         }
-
-    def _apply_schema(self, rows: builtins.list[dict[str, Any]], schema: builtins.list[str]) -> builtins.list[dict[str, Any]]:
-        return [{column: row.get(column) for column in schema} for row in rows]
 
     def _rows_to_table(self, rows: builtins.list[dict[str, Any]], schema: builtins.list[str]):
         table = OrderedDict()
@@ -1057,21 +947,16 @@ class RCSBPDB(Webserver):
     # ------------------------------------------------------------------
     
     def get_table(self, table_name: str, dict_return=False):
+        """Return a cached table as a DataFrame or ordered dictionary."""
         resolved = self._resolve_table_name(table_name)
-
-        if resolved not in self.schemas:
+        if resolved not in self._cache:
             raise ValueError(
-                f"Table '{table_name}' not found. Available tables: {list(self.schemas.keys())}"
+                f"Table '{table_name}' not found in the cache. "
+                f"Available tables: {list(self._cache.keys())}"
             )
-
-        table = self.tables.get(resolved, OrderedDict())
-
+        table = self._cache[resolved]
         if dict_return:
             return table
-
-        if not table:
-            return pd.DataFrame(columns=self.schemas.get(resolved, []))
-
         return pd.DataFrame(table)
 
 
@@ -1159,7 +1044,10 @@ class RCSBPDB(Webserver):
             value_str.startswith('"')
             and value_str.endswith('"')
         ):
+            quote = value_str[0]
             value_str = value_str[1:-1]
+            if quote == "'":
+                value_str = value_str.replace("''", "'")
 
         try:
             if "." not in value_str:
@@ -1167,9 +1055,6 @@ class RCSBPDB(Webserver):
             return float(value_str)
         except ValueError:
             return value_str
-
-    def get_tables(self):
-        return self.tables
 
     def get_schema(self) -> str:
         """Describe supported RCSBPDB queries and their return types."""
@@ -1179,42 +1064,57 @@ RCSBPDB webserver query schema
 Initialization
 --------------
 RCSBPDB() validates the RCSB connection and creates an empty OrderedDict cache.
-Initialization never retrieves artifacts.
+Initialization does not search for PDB entries or retrieve resource tables.
+Connection validation does make a request to the RCSB Data API.
+
+Each dictionary query returns one pandas DataFrame and saves one ordered
+column-oriented table in the cache. The result's attrs['table_name'] gives the
+cached table name. Repeating a query with the same table name replaces that
+table; tables with other names remain available. Use list(), get_table(),
+display(), and summary() to explore cached tables.
 
 Cached-data exploration
 -----------------------
-query_artifacts("text") returns ValueObjects from find_cell().
-query_artifacts("column = value") returns ValueObjects from find_relation().
+query_artifacts("text") searches cached rows and returns a list of DSI
+ValueObjects. query_artifacts("column = value") filters cached rows using
+find_relation() and also returns a list of ValueObjects. These string queries
+do not search the remote RCSB API.
 
 Tier 1: dataset discovery
 -------------------------
-Input:  {"keywords": "...", "limit": 10}
-Optional filters: keywords, authors, experimental_method, limit, start,
-return_type.
-Return: one pandas DataFrame containing matching high-level PDB datasets.
-Cache:  one ordered table named pdb_datasets_<query>.
+Example: query_artifacts({"keywords": "hemoglobin", "limit": 5})
+Search filters include keywords, authors, and experimental_method. limit and
+start control pagination; return_type is passed to the RCSB Search API.
+Returns one DataFrame of high-level entries, with columns such as dataset_id,
+doi, title, experimental_method and release_date. Resource pointers are not
+loaded at this tier, so resource_count is not populated. The table name is
+pdb_datasets_<query token>. Select dataset_id to retrieve its resources.
 
 Tier 2: selected PDB entry
 --------------------------
-Input:  {"pdb_id": "4HHB"}, {"doi": "10.2210/pdb4hhb/pdb"}, or
-        {"identifiers": ["1CBS", "4HHB"]}.
-Return: one pandas DataFrame containing downloadable resource/file pointers.
-Cache:  one ordered table named pdb_resources_<pdb_id>.
+Examples: {"pdb_id": "4HHB"}, {"doi": "10.2210/pdb4hhb/pdb"}, or
+          {"identifiers": ["1CBS", "4HHB"]}.
+Returns one DataFrame of resource metadata and download URLs, including
+dataset_id, name, format, resource_type and download_url. The query does not
+download files. Resource URLs are unverified candidates and may not exist;
+call validate_urls(result.attrs['table_name']) to check them explicitly.
+Cache names start with pdb_resources_ and include resolved PDB IDs.
+If there are errors and no successful rows, an error table is returned instead.
+For mixed successful and failed lookups, the successful table is returned and
+a warning identifies failed entries. Query them individually for error details.
 """.strip()
 
 
     def num_tables(self):
-        table_count = len(self.tables)
+        table_count = len(self._cache)
 
         if table_count != 1:
             print(f"Database now has {table_count} tables")
         else:
             print(f"Database now has {table_count} table")
 
-        return table_count
-
-
-    def validate_urls(self, table_name: str = "resources", url_column: str = "download_url", **kwargs):
+    def validate_urls(self, table_name: str, url_column: str = "download_url", **kwargs):
+        """Check URLs in a named cached table; queries do not check them."""
         rows = self.get_table(table_name)
         results = []
 
@@ -1232,18 +1132,19 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
                     response = self.session.head(
                         url,
                         allow_redirects=True,
-                        timeout=self.timeout,
+                        timeout=self.REQUEST_TIMEOUT,
                         verify=self.verify,
                     )
                     status_code = response.status_code
                     method_used = "HEAD"
 
                     if not (200 <= status_code < 400):
+                        response.close()
                         response = self.session.get(
                             url,
                             stream=True,
                             allow_redirects=True,
-                            timeout=self.timeout,
+                            timeout=self.REQUEST_TIMEOUT,
                             verify=self.verify,
                         )
                         status_code = response.status_code
@@ -1297,10 +1198,18 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
                 r"\([^)]*\)",
                 query,
             ):
-                return self.find_cell(query, row=True)
+                matches = self.find_cell(query, row=True)
+            else:
+                column_name, relation = self.check_relational_query(
+                    query,
+                    operators,
+                )
+                matches = self.find_relation(column_name, relation)
 
-            column_name, relation = self.check_relational_query(query, operators)
-            return self.find_relation(column_name, relation)
+            if not matches:
+                print(f"WARNING: No cached values matched the query: {query}")
+
+            return matches
 
         params = dict(query)
         self._validate_params(params)
@@ -1314,8 +1223,6 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
         # Store this one query result as a column-oriented ordered table.
         table = self._rows_to_table(rows or [], schema)
         self._cache[table_name] = table
-        self.tables = self._cache
-        self.schemas[table_name] = schema
         self._loaded = True
 
         # Return the user-facing result as one DataFrame.
@@ -1334,7 +1241,7 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
         """Return cached tables for DSI writers and processing."""
         return self._cache
 
-
+    # DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """
         Searches for all instances of query_object across all loaded tables.
@@ -1349,13 +1256,14 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
             + self.find_cell(query_object)
         )
 
+    # DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         if not isinstance(query_object, str):
             raise TypeError("find_table() ERROR: query_object must be a string")
 
         matches = []
 
-        for table_name, table_data in self.tables.items():
+        for table_name, table_data in self._cache.items():
             if query_object in table_name.lower():
                 val = self.ValueObject()
                 val.t_name = table_name
@@ -1367,13 +1275,14 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
 
         return matches
 
+    # DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         if not isinstance(query_object, str):
             raise TypeError("find_column() ERROR: query_object must be a string")
 
         matches = []
 
-        for table_name, table_data in self.tables.items():
+        for table_name, table_data in self._cache.items():
             for col_name, col_data in table_data.items():
                 if query_object in col_name.lower():
                     val = self.ValueObject()
@@ -1386,61 +1295,78 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
 
         return matches
 
-    def find_cell(self, query_object, row=True, **kwargs):
+    def find_cell(self, query_object, row=False, **kwargs):
         """
-        Finds all cells that match the given query_object.
+        Search cached tables for matching cell values.
 
         Parameters
         ----------
         query_object : Any
-            Value to search for.
-        row : bool, optional
-            If True, return full matching rows.
-            If False, return individual matching cells.
+            Value to search for in the cached tables.
 
-        Matching behavior:
-        - Exact match for all data types
-        - Case-insensitive partial match for strings
-        - String representation match for complex objects
+        row : bool, optional
+            If False, return matching individual cells.
+            If True, return the complete row containing each match.
+
+        Returns
+        -------
+        list
+            A list of DSI ValueObjects. An empty list is returned if there
+            are no matches.
+
+        Notes
+        -----
+        String matching is case-insensitive and supports partial matches.
+        Row numbers start at 1, consistent with SQLite's ValueObjects.
         """
         matches = []
-        seen_rows = set()
 
-        is_str_query = isinstance(query_object, str)
-        query_lower = query_object.lower() if is_str_query else None
+        is_string_query = isinstance(query_object, str)
+        query_lower = query_object.lower() if is_string_query else None
 
-        for table_name, table_data in self.tables.items():
+        for table_name, table_data in self._cache.items():
             if not table_data:
                 continue
 
-            cols = list(table_data.keys())
-            df = pd.DataFrame(table_data)
+            dataframe = pd.DataFrame(table_data)
 
-            if df.empty:
+            if dataframe.empty:
                 continue
 
-            for row_idx, row_data in df.iterrows():
+            columns = list(dataframe.columns)
+
+            for row_index, row_data in dataframe.iterrows():
                 row_matched = False
 
-                for col in cols:
-                    cell = row_data[col]
+                for column in columns:
+                    cell = row_data[column]
                     match = False
 
-                    if (
-                        (pd.isna(cell) and pd.isna(query_object))
-                        or query_object == cell
-                        or (
-                            is_str_query
-                            and isinstance(cell, str)
-                            and query_lower in cell.lower()
-                        )
-                    ):
-                        match = True
-                    elif is_str_query and isinstance(cell, (dict, list, tuple)):
-                        cell_str = str(cell).lower()
+                    # Handle missing scalar values without applying pd.isna()
+                    # as a Boolean to a list or dictionary.
+                    if pd.api.types.is_scalar(cell):
+                        cell_is_missing = bool(pd.isna(cell))
+                    else:
+                        cell_is_missing = False
 
-                        if query_lower in cell_str:
-                            match = True
+                    if pd.api.types.is_scalar(query_object):
+                        query_is_missing = bool(pd.isna(query_object))
+                    else:
+                        query_is_missing = False
+
+                    if cell_is_missing or query_is_missing:
+                        match = cell_is_missing and query_is_missing
+
+                    elif is_string_query and isinstance(cell, str):
+                        match = query_lower in cell.lower()
+
+                    elif is_string_query and isinstance(cell, (dict, list, tuple)):
+                        match = query_lower in str(cell).lower()
+
+                    elif pd.api.types.is_scalar(cell) and pd.api.types.is_scalar(
+                        query_object
+                    ):
+                        match = bool(cell == query_object)
 
                     if not match:
                         continue
@@ -1449,29 +1375,22 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
                         row_matched = True
                         break
 
-                    val = self.ValueObject()
-                    val.t_name = table_name
-                    val.c_name = [col]
-                    val.row_num = int(row_idx)
-                    val.value = cell
-                    val.type = "cell"
-                    matches.append(val)
+                    value_object = self.ValueObject()
+                    value_object.t_name = table_name
+                    value_object.c_name = [column]
+                    value_object.row_num = int(row_index) + 1
+                    value_object.value = cell
+                    value_object.type = "cell"
+                    matches.append(value_object)
 
                 if row and row_matched:
-                    key = (table_name, int(row_idx))
-
-                    if key in seen_rows:
-                        continue
-
-                    seen_rows.add(key)
-
-                    val = self.ValueObject()
-                    val.t_name = table_name
-                    val.c_name = cols
-                    val.row_num = int(row_idx)
-                    val.value = row_data.to_dict()
-                    val.type = "row"
-                    matches.append(val)
+                    value_object = self.ValueObject()
+                    value_object.t_name = table_name
+                    value_object.c_name = columns
+                    value_object.row_num = int(row_index) + 1
+                    value_object.value = row_data.tolist()
+                    value_object.type = "row"
+                    matches.append(value_object)
 
         return matches
 
@@ -1506,22 +1425,27 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
             if dataframe.empty or column_name not in dataframe.columns:
                 continue
 
+            # Numeric ordering and range comparisons require numeric values.
+            # Equality, inequality, and text matching must preserve text
+            # columns such as PDB IDs.
+            filter_data = dataframe
             if operator in {">", "<", ">=", "<=", "range"}:
-                dataframe = dataframe.copy()
-                dataframe[column_name] = pd.to_numeric(
-                    dataframe[column_name],
+                filter_data = dataframe.copy()
+                filter_data[column_name] = pd.to_numeric(
+                    filter_data[column_name],
                     errors="coerce",
                 )
-                dataframe = dataframe.dropna(subset=[column_name])
+                filter_data = filter_data.dropna(subset=[column_name])
 
             filtered = self._apply_pandas_filter(
-                dataframe,
+                filter_data,
                 column_name,
                 operator,
                 value,
             )
 
-            for index, row in filtered.iterrows():
+            for index in filtered.index:
+                row = dataframe.loc[index]
                 value_object = self.ValueObject()
                 value_object.t_name = table_name
                 value_object.c_name = list(dataframe.columns)
@@ -1534,7 +1458,7 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
 
     
     def list(self, collection=False, **kwargs):
-        table_names = list(self.tables.keys())
+        table_names = list(self._cache.keys())
 
         if collection:
             return table_names
@@ -1561,7 +1485,7 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
         """
         resolved = self._resolve_table_name(table_name)
 
-        if resolved not in self.schemas:
+        if resolved not in self._cache:
             raise ValueError(
                 f"display() could not find table '{table_name}'. "
                 f"Available tables: {self.list(True)}"
@@ -1698,16 +1622,6 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
             self.session.close()
 
         self._cache = OrderedDict()
-        self.tables = self._cache
-        self.schemas = {
-            "datasets": self.DATASET_SCHEMA,
-            "resources": self.RESOURCE_SCHEMA,
-            "errors": self.ERROR_SCHEMA,
-        }
-        self.raw_results = []
-        self.last_search_response = None
-        self.identifiers = []
-        self.params = {}
         self._loaded = False
 
 
@@ -1716,4 +1630,3 @@ Cache:  one ordered table named pdb_resources_<pdb_id>.
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
-        

@@ -60,16 +60,11 @@ def mock_post_json(self, endpoint, payload):
     return {"result_set": [{"identifier": "1CBS"}, {"identifier": "4HHB"}]}
 
 
-def mock_url_exists(self, url):
-    return True, 200, "application/octet-stream"
-
-
 @pytest.fixture(autouse=True)
 def mocked_rcsb(monkeypatch):
     """Keep all tests deterministic and offline."""
     monkeypatch.setattr(RCSBPDB, "_request", mock_request)
     monkeypatch.setattr(RCSBPDB, "_post_json", mock_post_json)
-    monkeypatch.setattr(RCSBPDB, "_url_exists", mock_url_exists)
 
 
 @pytest.fixture
@@ -77,7 +72,6 @@ def backend():
     """Fresh, connected-but-empty RCSBPDB backend."""
     instance = RCSBPDB(
         validate_on_init=False,
-        validate_resource_urls=False,
     )
     yield instance
     instance.close()
@@ -91,7 +85,6 @@ def test_initialization_creates_empty_ordered_cache(backend):
     assert backend._loaded is True
     assert isinstance(backend._cache, OrderedDict)
     assert backend._cache == OrderedDict()
-    assert backend.tables is backend._cache
     assert backend.list(collection=True) == []
 
 
@@ -235,6 +228,52 @@ def test_query_artifacts_simple_string_uses_find_cell(backend):
     assert all(match.type == "row" for match in matches)
     assert any(match.t_name == "pdb_datasets_hemoglobin" for match in matches)
 
+def test_find_cell_returns_sqlite_style_cell_valueobject(backend):
+    backend._cache["sample"] = OrderedDict(
+        [
+            ("dataset_id", ["1CBS", "4HHB"]),
+            ("title", ["First structure", "Second structure"]),
+        ]
+    )
+
+    matches = backend.find_cell("1CBS")
+
+    assert len(matches) == 1
+
+    match = matches[0]
+    assert match.t_name == "sample"
+    assert match.c_name == ["dataset_id"]
+    assert match.value == "1CBS"
+    assert match.row_num == 1
+    assert match.type == "cell"
+
+def test_find_cell_returns_sqlite_style_row_valueobject(backend):
+    backend._cache["sample"] = OrderedDict(
+        [
+            ("dataset_id", ["1CBS", "4HHB"]),
+            ("title", ["First structure", "Second structure"]),
+        ]
+    )
+
+    matches = backend.find_cell("1CBS", row=True)
+
+    assert len(matches) == 1
+
+    match = matches[0]
+    assert match.t_name == "sample"
+    assert match.c_name == ["dataset_id", "title"]
+    assert match.value == ["1CBS", "First structure"]
+    assert match.row_num == 1
+    assert match.type == "row"
+
+def test_find_cell_returns_empty_list_for_no_match(backend):
+    backend._cache["sample"] = OrderedDict(
+        [
+            ("dataset_id", ["1CBS", "4HHB"]),
+        ]
+    )
+
+    assert backend.find_cell("NOT_PRESENT") == []
 
 def test_query_artifacts_relational_string_uses_find_relation(backend):
     backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
@@ -296,7 +335,6 @@ def test_query_artifacts_relational_parser_with_numeric_values(
             ("score", [1, 5, 10]),
         ]
     )
-    backend.schemas[table_name] = ["score"]
 
     matches = backend.query_artifacts(query)
 
@@ -372,6 +410,24 @@ def test_process_artifacts_without_arguments_returns_cache(backend):
     assert cached_tables is backend._cache
     assert list(cached_tables) == [result.attrs["table_name"]]
 
+def test_query_artifacts_warns_and_returns_empty_list_for_no_match(
+    backend,
+    capsys,
+):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+
+    result = backend.query_artifacts("THIS_VALUE_SHOULD_NOT_EXIST")
+
+    assert result == []
+    assert "WARNING" in capsys.readouterr().out
+
+def test_query_artifacts_warns_for_relational_no_match(backend, capsys):
+    backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+
+    result = backend.query_artifacts("dataset_id = DOES_NOT_EXIST")
+
+    assert result == []
+    assert "WARNING" in capsys.readouterr().out
 
 def test_validate_urls_uses_selected_resource_table(backend, monkeypatch):
     resources = backend.query_artifacts({"pdb_id": "1CBS"})
@@ -399,6 +455,69 @@ def test_validate_urls_uses_selected_resource_table(backend, monkeypatch):
     assert all(check["is_valid"] for check in checks)
 
 
+def test_resource_query_does_not_validate_candidate_urls(backend, monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("Tier 2 must not validate each resource URL")
+
+    monkeypatch.setattr(backend.session, "head", fail_if_called)
+    monkeypatch.setattr(backend.session, "get", fail_if_called)
+    resources = backend.query_artifacts({"pdb_id": "1CBS"})
+    assert not resources.empty
+    assert resources["download_url"].notna().all()
+
+
+def test_mixed_identifier_query_warns_and_returns_successful_resources(backend):
+    with pytest.warns(UserWarning, match="NOT_A_PDB_ID"):
+        result = backend.query_artifacts({"identifiers": ["1CBS", "NOT_A_PDB_ID"]})
+    assert isinstance(result, pd.DataFrame)
+    assert set(result["dataset_id"]) == {"1CBS"}
+    assert result.attrs["table_name"] in backend._cache
+
+
+def test_relation_decodes_sql_style_escaped_apostrophe(backend):
+    backend._cache["sample"] = OrderedDict([("title", ["O'Brien", "Other"])])
+    matches = backend.find_relation("title", "= 'O''Brien'")
+    assert len(matches) == 1
+    assert matches[0].value == ["O'Brien"]
+
+
+def test_sqlite_matching_row_contract(backend, tmp_path):
+    from dsi.backends.sqlite import Sqlite
+
+    table = OrderedDict([("name", ["alpha", "beta"]), ("score", [1, 2])])
+    backend._cache["sample"] = table
+    sqlite = Sqlite(str(tmp_path / "contract.db"))
+    try:
+        sqlite.ingest_artifacts(OrderedDict([("sample", table)]))
+        for row in (False, True):
+            pdb_match = backend.find_cell("alpha", row=row)[0]
+            sqlite_match = sqlite.find_cell("alpha", row=row)[0]
+            for attribute in ("t_name", "c_name", "value", "row_num", "type"):
+                assert getattr(pdb_match, attribute) == getattr(sqlite_match, attribute)
+        assert isinstance(sqlite.get_table("sample"), pd.DataFrame)
+        assert isinstance(backend.get_table("sample"), pd.DataFrame)
+        assert isinstance(sqlite.process_artifacts(), OrderedDict)
+        assert isinstance(backend.process_artifacts(), OrderedDict)
+        assert sqlite.num_tables() is None
+        assert backend.num_tables() is None
+    finally:
+        sqlite.close()
+
+
+def test_num_tables_prints_and_returns_none(backend, capsys):
+    backend.query_artifacts({"pdb_id": "1CBS"})
+    assert backend.num_tables() is None
+    assert "1 table" in capsys.readouterr().out
+
+
+def test_numeric_relation_preserves_original_row_values(backend):
+    backend._cache["sample"] = OrderedDict([("score", ["10", "2"])])
+    matches = backend.find_relation("score", "> 5")
+    assert len(matches) == 1
+    assert matches[0].value == ["10"]
+    assert matches[0].row_num == 1
+
+
 # ---------------------------------------------------------------------------
 # Existing lookup, resource, and lifecycle behavior
 # ---------------------------------------------------------------------------
@@ -424,18 +543,17 @@ def test_build_file_resources(backend):
 
 def test_close_resets_ordered_cache(backend):
     backend.query_artifacts({"keywords": "hemoglobin", "limit": 2})
+
+    assert backend._cache
+
     backend.close()
 
     assert backend._loaded is False
     assert backend._cache == OrderedDict()
-    assert backend.tables is backend._cache
-    assert backend.raw_results == []
-    assert backend.params == {}
-    assert backend.identifiers == []
 
 
 def test_context_manager_closes_backend():
-    with RCSBPDB(validate_on_init=False, validate_resource_urls=False) as instance:
+    with RCSBPDB(validate_on_init=False) as instance:
         instance.query_artifacts({"keywords": "hemoglobin", "limit": 2})
         assert instance.list(collection=True)
 
