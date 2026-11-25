@@ -571,7 +571,12 @@ class Sync:
             self.t.dsi_tables.append("filesystem")
 
             # Database movement
-            for dbname in db_list:
+            for index, dbname in enumerate(db_list):
+                # windows scp must first close project db before moving it
+                if os.name == "nt" and index == 0:
+                    fnull = open(os.devnull, 'w')
+                    with redirect_stdout(fnull):
+                        self.t.unload_module('backend', self.backend_name, 'back-write')
                 cmd = ["scp", "-p", dbname, os.path.join(self.remote_location, dbname)]
                 if self.verbose:
                     print()
