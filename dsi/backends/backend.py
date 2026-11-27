@@ -70,6 +70,7 @@ class Backend(ABC):
     def close(self):
         pass
 
+    operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~", "("]
 
     class ValueObject:
         """
@@ -141,7 +142,7 @@ class Backend(ABC):
         return parts
 
 
-    def check_relational_query(self, query, operators):
+    def check_relational_query(self, query):
         def is_literal(s):
             return s.startswith("'") and s.endswith("'")
         def wrap_in_quotes(value):
@@ -153,7 +154,7 @@ class Backend(ABC):
             raise ValueError("Could not identify the operator in `query`. The operator cannot be nested in double quotes")
         elif len(result) == 2:
             raise ValueError("Input must include a column, operator, and value. Operator cannot be enclosed in quotes.")
-        elif len(result) == 3 and not is_literal(result[2]) and any(op in result[2] for op in operators):
+        elif len(result) == 3 and not is_literal(result[2]) and any(op in result[2] for op in self.operators):
             extra = "or partial match [~,~~]. If matching value has an operator in it, make sure to wrap all in single quotes."
             raise ValueError(f"Only one operation allowed. Inequality [<,>,<=,>=,!=], equality [=,==], range [()], {extra}")
         elif len(result) == 3 and result[2].startswith('"') and result[2].endswith('"'):

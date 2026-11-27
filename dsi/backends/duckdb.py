@@ -409,13 +409,12 @@ class DuckDB(Filesystem):
 
         check_sql_result = self.check_sql(query, "duckdb")
         if isinstance(check_sql_result, bool) and not check_sql_result:
-            operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~"]
             # if no operators, fall back to find_cell
-            if not any(op in query for op in operators) and not re.search(r"\([^)]*\)", query):
+            if not any(op in query for op in self.operators) and not re.search(r"\([^)]*\)", query):
                 return self.find_cell(query, row=True)
 
             # if operator, then do find_relation
-            column_name, relation = self.check_relational_query(query, operators)
+            column_name, relation = self.check_relational_query(query)
             return self.find_relation(column_name, relation, original_query=query)
         elif isinstance(check_sql_result, tuple) and not check_sql_result[0]:
             raise ValueError(check_sql_result[1])
