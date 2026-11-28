@@ -70,7 +70,7 @@ class Backend(ABC):
     def close(self):
         pass
 
-    operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~", "("]
+    operators = ['==', '!=', '>=', '<=', '=', '<', '>', "~", "~~"]
 
     class ValueObject:
         """
