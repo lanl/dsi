@@ -1164,17 +1164,6 @@ def test_terminal_display_and_schema_ndp(ndp_terminal):
     assert "CREATE TABLE" in schema
 
 
-def test_terminal_find_methods_ndp(ndp_terminal):
-    """Test Terminal find methods with NDP."""
-    assert isinstance(ndp_terminal.find("climate"), list)
-
-    tables = ndp_terminal.find_table("datasets")
-    assert isinstance(tables, list)
-    assert len(tables) > 0
-
-    assert isinstance(ndp_terminal.find_column("title"), list)
-    assert isinstance(ndp_terminal.find_cell("climate"), list)
-
 
 @pytest.mark.parametrize(
     "relation",

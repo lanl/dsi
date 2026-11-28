@@ -54,28 +54,6 @@ except ImportError:
 from dsi.backends.webserver import Webserver
 
 
-class ValueObject:
-    """
-    Container for search results returned by find* methods.
-    """
-
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
-    def to_dict(self):
-        return {
-            "t_name": self.t_name,
-            "c_name": self.c_name,
-            "row_num": self.row_num,
-            "value": self.value,
-            "type": self.type,
-        }
-
-
 class TruststoreAdapter(HTTPAdapter):
     """
     Optional TLS adapter for environments that prefer OS trust stores.
@@ -435,35 +413,7 @@ class Zenodo(Webserver):
     # Find/search methods
     # ------------------------------------------------------------------
 
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
-
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
-
-
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """
         Search table names, column names, and cell values.
@@ -479,7 +429,7 @@ class Zenodo(Webserver):
             + self.find_cell(query_object, **kwargs)
         )
 
-
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         """
         Search input across table names.
@@ -496,7 +446,7 @@ class Zenodo(Webserver):
 
         for table_name, table_data in self._cache.items():
             if query in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.row_num = None
@@ -506,7 +456,7 @@ class Zenodo(Webserver):
 
         return matches
 
-
+    ## DEPRECATING SOON
     def find_column(self, query_object, range=False, **kwargs):
         """
         Search input across column names.
@@ -524,7 +474,7 @@ class Zenodo(Webserver):
         for table_name, table_data in self._cache.items():
             for col_name, col_data in table_data.items():
                 if query in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.row_num = None
@@ -600,7 +550,7 @@ class Zenodo(Webserver):
                         row_matched = True
                         break
 
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col]
                     val.row_num = int(row_idx)
@@ -737,12 +687,12 @@ class Zenodo(Webserver):
                     filtered = self._apply_pandas_filter(df, query, operator, value)
 
                     for idx, row in filtered.iterrows():
-                        vo = ValueObject()
+                        vo = self.ValueObject()
                         vo.t_name = table_name
                         vo.c_name = list(df.columns)
                         vo.row_num = int(idx) + 1
                         vo.value = row.tolist()
-                        vo.type = "cell"
+                        vo.type = "relation"
                         matches.append(vo)
 
                 return matches
@@ -778,12 +728,12 @@ class Zenodo(Webserver):
                         )
 
                         for idx, row in filtered.iterrows():
-                            vo = ValueObject()
+                            vo = self.ValueObject()
                             vo.t_name = table_name
                             vo.c_name = list(df.columns)
                             vo.row_num = int(idx) + 1
                             vo.value = row.tolist()
-                            vo.type = "cell"
+                            vo.type = "relation"
                             matches.append(vo)
 
                     return matches
@@ -1340,9 +1290,8 @@ class Zenodo(Webserver):
     # Find helper methods
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _row_to_value_object(table_name, row_num, row, value_type="row"):
-        val = ValueObject()
+    def _row_to_value_object(self, table_name, row_num, row, value_type="row"):
+        val = self.ValueObject()
         val.t_name = table_name
         val.c_name = list(row.keys())
         val.row_num = row_num

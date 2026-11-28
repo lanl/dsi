@@ -18,33 +18,6 @@ from dsi.backends.webserver import Webserver
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
-class ValueObject:
-    """
-    Container for search results returned by find* methods
-
-    Attributes
-    ----------
-    t_name : str
-        Table name
-    c_name : list
-        Column name(s)
-    row_num : int or None
-        Row index (if applicable)
-    value : any
-        Matched value
-    type : str
-        {'table', 'column', 'cell'}
-    """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
-
 
 # ----------------------------------------------------------------------
 # NDP Backend (Webserver - Read only)
@@ -866,10 +839,7 @@ class NDP(Webserver):
         Find rows where column matches relation (e.g., 'num_resources > 5').
         """
         if not self._loaded:
-            raise RuntimeError(
-                "find_relation() ERROR: Cannot search an empty backend. "
-                "Ensure data is loaded first."
-            )
+            raise RuntimeError("find_relation() ERROR: Cannot search an empty backend. Ensure data is loaded first.")
         
         operator, value = self._parse_relation(relation)
         matches = []
@@ -890,12 +860,12 @@ class NDP(Webserver):
             
             # Convert to ValueObjects
             for idx, row in filtered.iterrows():
-                vo = ValueObject()
+                vo = self.ValueObject()
                 vo.t_name = table_name
                 vo.c_name = list(df.columns)
                 vo.row_num = int(idx) + 1
                 vo.value = row.tolist()
-                vo.type = "cell"
+                vo.type = "relation"
                 matches.append(vo)
         
         return matches
@@ -1061,34 +1031,8 @@ class NDP(Webserver):
     # ----------------------------------------------------------------------
     # Search/Find Methods
     # ----------------------------------------------------------------------
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
 
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
-
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """
         Searches for all instances of query_object across all tables.
@@ -1134,6 +1078,7 @@ class NDP(Webserver):
         )
 
 
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         """
         Finds all tables whose names contain the given query_object.
@@ -1174,7 +1119,7 @@ class NDP(Webserver):
 
         for table_name, table_data in self._cache.items():
             if query_object in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.value = table_data
@@ -1185,6 +1130,7 @@ class NDP(Webserver):
         return matches
 
 
+    ## DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         """
         Finds all columns whose names contain the given query_object.
@@ -1227,7 +1173,7 @@ class NDP(Webserver):
             for col_name, col_data in table_data.items():
 
                 if query_object in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.value = col_data
@@ -1238,7 +1184,7 @@ class NDP(Webserver):
         return matches
 
 
-    def find_cell(self, query_object, **kwargs):
+    def find_cell(self, query_object, row=False, **kwargs):
         """
         Finds all cells that match the given query_object.
         
@@ -1272,9 +1218,9 @@ class NDP(Webserver):
             cols = list(table_data.keys())
             df = pd.DataFrame(table_data)  # Convert to DataFrame for easier access
 
-            for row_idx, row in df.iterrows():
+            for row_idx, row_val in df.iterrows():
                 for col in cols:
-                    cell = row[col]
+                    cell = row_val[col]
 
                     match = False
 
@@ -1293,12 +1239,20 @@ class NDP(Webserver):
                             match = True
 
                     if match:
-                        val = ValueObject()
-                        val.t_name = table_name
-                        val.c_name = cols
-                        val.row_num = row_idx
-                        val.value = row.tolist()
-                        val.type = "cell"
+                        if row:
+                            val = self.ValueObject()
+                            val.t_name = table_name
+                            val.c_name = cols
+                            val.row_num = row_idx
+                            val.value = row_val.tolist()
+                            val.type = "row"
+                        else:
+                            val = self.ValueObject()
+                            val.t_name = table_name
+                            val.c_name = [col]
+                            val.row_num = row_idx
+                            val.value = cell
+                            val.type = "cell"
 
                         matches.append(val)
 

@@ -568,45 +568,112 @@ class DSI:
             raise RuntimeError("ERROR: Cannot query() until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot query() on an empty backend. Please ensure there is data in it.")
-        if self.read_only_flag and collection and update:
-            print("query() WARNING: The returned collection object will include an extra DSI metadata column")
-        
+        if self.read_only_flag and update:
+            backend_name = self.main_backend_obj.__class__.__name__
+            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
+
         output = None
         try:
             f = io.StringIO()
             with redirect_stdout(f):
-                df = self.t.artifact_handler(interaction_type='query', query=statement, **kwargs)
+                query_data = self.t.artifact_handler(interaction_type='query', query=statement, **kwargs)
             output = f.getvalue()
         except Exception as e:
             new_args = (f"query() ERROR: {e}",) + e.args[1:]
             raise type(e)(*new_args) from None
 
-        if df is None:
-            return
-        
-        if df.empty:
-            msg = output if output else "WARNING: input query returned no data. Please check again."
-            logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
-            return df
-        if not collection:
-            print(f"Printing the result of the query: {statement}")
-            headers = df.columns.tolist()
-            rows = df.values.tolist()
-            clean_rows = [
-                [None if isinstance(x, float) and math.isnan(x) else x for x in row]
-                for row in rows
-            ]
-            self.t.table_print_helper(headers, clean_rows, len(clean_rows))
-            print()
-        else:
-            msg = f"Storing the result of the query: {statement} as a collection"
+        # this is warning output check
+        if output and "WARNING" in output:
+            warn_msg = output[output.find("WARNING"):]            
+            msg = "\n" + warn_msg.replace("database", "backend")
             logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
-            if update:
-                df.insert(0, "dsi_table_name", df.attrs["table_name"])
-                msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
-                logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
-            return df
+            if isinstance(query_data, pd.DataFrame) and query_data.empty:
+                return query_data
+            return None
+
+        # if user does SQL update/alter query, it returns None
+        if query_data is None:
+            return
+
+        # query_artifacts --> whether sql or dictionary input, both return a df
+        if isinstance(query_data, pd.DataFrame):
+            # COMMENTING OUT BECAUSE IT IS APPLIED ABOVE
+            # if query_output.empty:
+            #     msg = output if output else "WARNING: input query returned no data. Please check again."
+            #     logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+            #     return query_output
+            if not collection:
+                print(f"Printing the result of the query: {statement}")
+                headers = query_data.columns.tolist()
+                rows = query_data.values.tolist()
+                clean_rows = [
+                    [None if isinstance(x, float) and math.isnan(x) else x for x in row]
+                    for row in rows
+                ]
+                self.t.table_print_helper(headers, clean_rows, len(clean_rows))
+                print()
+            else:
+                msg = f"Storing the result of the query: {statement} as a collection"
+                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+    
+                if update:
+                    query_data.insert(0, "dsi_table_name", query_data.attrs["table_name"])
+                    msg2 = "Note: Includes 'dsi_table_name' column for dsi.update(); DO NOT modify. Drop if not updating data."
+                    logger.log(logging.INFO, msg2) if self.silence_messages else print(msg2)
+                return query_data
+
+        # find_cell and find_relation both return a list of ValueObjects
+        elif isinstance(query_data, list):
+            if query_data[0].type == "relation":
+                table_name = None
+                output_df = None
+                row_list = [f.row_num for f in query_data]
+                for val in query_data:
+                    if table_name is None:
+                        table_name = val.t_name
+                        output_df = pd.DataFrame([val.value], columns=val.c_name)
+                    else:
+                        output_df.loc[len(output_df)] = val.value
+        
+                if not collection:
+                    print(f'\nTable: {table_name}')
+                    if output_df is not None:
+                        self.t.table_print_helper(output_df.columns.tolist(), output_df.values.tolist(), output_df.shape[0])
+                    print()
+                else:
+                    if update and output_df is not None:
+                        output_df.insert(0, "dsi_row_index", row_list)
+                        output_df.insert(0, "dsi_table_name", table_name)
+                        first_msg = "Note: Output includes 2 'dsi_' columns required for dsi.update(). DO NOT modify if updating;"
+                        msg = first_msg + " keep any extra rows blank. Drop if not updating.\n"
+                        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+                    return output_df
+
+            elif query_data[0].type in ["row", "cell"]:
+                if not collection:
+                    print()
+                    for val in query_data or []:
+                        print(f"Table: {val.t_name}")
+                        print(f"  - Columns: {val.c_name}")
+                        print(f"  - Row Number: {val.row_num}")
+                        print(f"  - Data: {val.value}\n")
+                else:
+                    output_dict = {}
+                    for val in query_data or []:
+                        if val.t_name not in output_dict:
+                            output_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
+                        else:
+                            output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
+                    
+                    return list(output_dict.values())
+
+            # should realistically never run
+            else:
+                raise ValueError("Query returns incorrect DSI type")
+
+        else:
+            raise TypeError("DSI Backend returned a type that cannot be parsed", type(query_data))
 
 
 
@@ -635,8 +702,9 @@ class DSI:
             raise RuntimeError("ERROR: Cannot get a table of data until all associated data is loaded after a complex schema")
         if not self.t.valid_backend(self.main_backend_obj):
             raise RuntimeError("ERROR: Cannot get a table of data from an empty backend. Please ensure there is data in it.")
-        if self.read_only_flag and collection and update:
-            print("get_table() WARNING: The returned collection object will include an extra DSI metadata column")
+        if self.read_only_flag and update:
+            backend_name = self.main_backend_obj.__class__.__name__
+            raise RuntimeError(f"{backend_name} is a read-only backend. Data cannot be updated.")
         
         output = None
         try:
@@ -674,7 +742,7 @@ class DSI:
             return df
 
 
-
+    # DEPRECATED SOON
     def find(self, query, collection = False, update = False):
         """
         Finds all rows in the table where a column-level condition (e.g., "age > 4") is satisfied.
@@ -776,7 +844,7 @@ class DSI:
             return output_df
 
 
-
+    # DEPRECATED SOON
     def search(self, query, collection = False):
         """
         Finds all rows across all tables in the active backend where `query` can be found.
@@ -799,78 +867,39 @@ class DSI:
         query = query.replace("\\'", "'") if isinstance(query, str) and "\\'" in query else query
         query = query.replace('\\"', '"') if isinstance(query, str) and '\\"' in query else query
 
-        fnull = open(os.devnull, 'w')
-        default_search = True
-        try:
-            try:
-                # if a backend's search() is implemented, it must have a check that input is a dict
-                search_result = self.t.search(query)
-            except (AttributeError, NotImplementedError):
-                val = f"'{query}'" if isinstance(query, str) else query
-                msg = f"Searching for all instances of {val} in the active backend"
-                logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
+        val = f"'{query}'" if isinstance(query, str) else query
+        msg = f"Searching for all instances of {val} in the active backend"
+        logger.log(logging.INFO, msg) if self.silence_messages else print(msg)
 
-                with redirect_stdout(fnull):
-                    find_cell = self.t.find_cell(query, row=True)
-                    find_table = self.t.find_table(query)
-                    find_col = self.t.find_column(query)
-                default_search = False
+        fnull = open(os.devnull, 'w')
+        try:
+            with redirect_stdout(fnull):
+                find_cell = self.t.find_cell(query, row=True)
         except Exception as e:
             if e.args:
                 e.args = (f'search() ERROR: {str(e.args[0])}',) + e.args[1:]
             raise
-
-        if default_search:
-            if search_result is None: # eventually remove this check if adding download=True here because it will be None then
-                print("WARNING: Input search params were not found in this backend")
-                return
-            if not collection:
-                if isinstance(search_result, list):
-                    print(f"\nMetadata for {next(iter(query))} is represented by {len(search_result)} tables")
-                    for tbl in search_result:
-                        self.t.table_print_helper(tbl.columns.tolist(), tbl.values.tolist(), tbl.shape[0])
-                        print()
-                else:
-                    print(f"\nMetadata for {next(iter(query))}:")
-                    self.t.table_print_helper(search_result.columns.tolist(), search_result.values.tolist(), search_result.shape[0])
-                    print()
-            else:
-                msg = f"Return object for search() is a list of {len(search_result)} pandas.DataFrame"
-                logger.log(logging.INFO, msg) if isinstance(search_result, list) and self.silence_messages else print(msg)
-                return search_result
+        
+        if find_cell is None:
+            print(f"WARNING: {val} was not found in this backend\n")
+            return
+        if not collection:
+            print()
+            for val in find_cell or []:
+                print(f"Table: {val.t_name}")
+                print(f"  - Columns: {val.c_name}")
+                print(f"  - Row Number: {val.row_num}")
+                print(f"  - Data: {val.value}\n")
         else:
-            if find_cell is None and find_col is None and find_table is None:
-                print(f"WARNING: {val} was not found in this backend\n")
-                return
-            if not collection:
-                print()
-                for val in find_table or []:
-                    print(f"Found Table: '{val.t_name}' in database\n")
-                for val in find_col or []:
-                    print(f"Found Column '{val.c_name[0]}' in Table: '{val.t_name}' in database\n")
-                for val in find_cell or []:
-                    print(f"Table: {val.t_name}")
-                    print(f"  - Columns: {val.c_name}")
-                    print(f"  - Row Number: {val.row_num}")
-                    print(f"  - Data: {val.value}\n")
-            else:
-                # ADD CHECKER IF VALUE OBJECT IS A TABLE THEN JUST MAKE MINI DATAFRAME FOR TABLES AND SIMILARLY FOR COL MATCH
-                output_dict = {}
-                for val in find_table or []:
-                    if 'table_match' not in output_dict:
-                        output_dict['table_match'] = pd.DataFrame(columns=['table_name'])
-                    output_dict['table_match'].loc[len(output_dict['table_match'])] = val.t_name
-                for val in find_col or []:
-                    if 'col_match' not in output_dict:
-                        output_dict['col_match'] = pd.DataFrame(columns=['table_name', 'column_name'])
-                    output_dict['col_match'].loc[len(output_dict['col_match'])] = [val.t_name, val.c_name[0]]
-                for val in find_cell or []:
-                    if val.t_name not in output_dict:
-                        output_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
-                    else:
-                        output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
-                
-                return list(output_dict.values())
+            # ADD CHECKER IF VALUE OBJECT IS A TABLE THEN JUST MAKE MINI DATAFRAME FOR TABLES AND SIMILARLY FOR COL MATCH
+            output_dict = {}
+            for val in find_cell or []:
+                if val.t_name not in output_dict:
+                    output_dict[val.t_name] = pd.DataFrame([val.value], columns=val.c_name)
+                else:
+                    output_dict[val.t_name].loc[len(output_dict[val.t_name])] = val.value
+            
+            return list(output_dict.values())
 
 
 

@@ -10,9 +10,10 @@ from importlib import import_module
 from importlib.machinery import SourceFileLoader
 from itertools import product
 from pathlib import Path
-
 import pandas as pd
 from packaging import version
+
+from dsi.backends.backend import Backend
 
 # temporary check since pandas 3.0+ has unstable releases
 if version.parse(pd.__version__) >= version.parse("3.0.0"):
@@ -105,6 +106,8 @@ class Terminal:
                 level=logging.INFO                                  # Minimum log level to capture
             )
 
+
+
     def list_available_modules(self, mod_type):
         """
         List available DSI modules of an arbitrary module type.
@@ -121,6 +124,8 @@ class Terminal:
             # In the next line, both "class" and VALID_MODULES refer to DSI modules.
             class_collector.extend([x for x in dir(classlist) if x in self.VALID_MODULES])
         return (class_collector)
+
+
 
     def load_module(self, mod_type, mod_name, mod_function, **kwargs):
         """
@@ -307,6 +312,8 @@ class Terminal:
                 self.logger.error("Plugin/Backend not found in VALID_PLUGINS/VALID_BACKENDS")
             raise NotImplementedError('Hint: Did you declare your Plugin/Backend in VALID_PLUGINS/VALID_BACKENDS?')
 
+
+
     def unload_module(self, mod_type, mod_name, mod_function):
         """
         Unloads a specific DSI module from the active_modules collection.
@@ -350,6 +357,8 @@ class Terminal:
             if self.debug_level != 0:
                 self.logger.warning(f"{mod_name} {mod_function} {mod_type} could not be found in active_modules. No action taken.")
 
+
+
     def add_external_python_module(self, mod_type, mod_name, mod_path):
         """
         Adds an external, meaning not from the DSI repo, Python module to the module_collection.
@@ -363,6 +372,8 @@ class Terminal:
         self.module_collection[mod_type][mod_name] = mod
         self.VALID_MODULES.append(mod_name)
 
+
+
     def list_loaded_modules(self):
         """
         List DSI modules which have already been loaded.
@@ -370,6 +381,8 @@ class Terminal:
         These Plugins and Backends are active or ready to execute a post-processing task.
         """
         return (self.active_modules)
+
+
 
     def transload(self, **kwargs):
         """
@@ -416,6 +429,8 @@ class Terminal:
             print(f"WARNING: These writers were not transloaded: {unused_writers}")
         else:
             self.active_modules["writer"] = []
+
+
 
     def artifact_handler(self, interaction_type, query = None, **kwargs):
         """
@@ -559,8 +574,16 @@ class Terminal:
             end = datetime.now(UTC)
             if self.debug_level != 0:
                 self.logger.info(f"Runtime: {end-start}")
-            if interaction_type in ['query'] and query_data is not None:
-                return query_data
+            if interaction_type in ['query']:
+                # query can return df/dict (from normal query), list of ValueObjects (from find_relation/find_cell), None (sql update query)
+                is_other_query_return = isinstance(query_data, list) and all(isinstance(x, Backend.ValueObject) for x in query_data)
+                if query_data is None or isinstance(query_data, (pd.DataFrame, OrderedDict)) or is_other_query_return:
+                    return query_data
+                else:
+                    msg = "Query returned an unexpected data type. Please check the backend's query_artifacts() implementation."
+                    if self.debug_level != 0:
+                        self.logger.error(msg)
+                    raise TypeError(msg)
         else:
             not_run_msg = None
             if backread_active:
@@ -570,6 +593,8 @@ class Terminal:
             if self.debug_level != 0:
                 self.logger.error(not_run_msg)
             raise NotImplementedError(not_run_msg)
+
+
 
     def get_table(self, table_name, dict_return = False):
         """
@@ -610,6 +635,8 @@ class Terminal:
         if output is not None and isinstance(output, (pd.DataFrame, OrderedDict)):
             return output
 
+
+
     def get_schema(self):
         """
         Returns the first loaded database's structural schema as several CREATE TABLE statements.
@@ -639,60 +666,9 @@ class Terminal:
 
         return output
 
-    def search(self, params, download=False):
-        """
-        **Only for Webserver backends**
-        
-        Retrieves metadata or data for entries in a specified collection/dataset/database.
 
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
 
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for the matching entries, including data references where applicable. 
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data downloaded (download=True) then returns None
-        """
-        if self.debug_level != 0:
-            self.logger.info("-------------------------------------")
-            self.logger.error("Searching for a collection's metadata in the first loaded backend")
-        if len(self.loaded_backends) == 0:
-            if self.debug_level != 0:
-                self.logger.error("Need to load a valid backend to be able to search across a collection's metadata")
-            raise NotImplementedError("Need to load a valid backend to be able to search across a collection's metadata")
-        backend = self.loaded_backends[0]
-        if not self.valid_backend(backend):
-            if self.debug_level != 0:
-                self.logger.error("First loaded backend needs to have data to search across a collection's metadata")
-            raise RuntimeError("First loaded backend needs to have data to search across a collection's metadata")
-        start = datetime.now(UTC)
-
-        search_output = backend.search(params, download)
-        if not isinstance(search_output, (list, pd.DataFrame)):
-            if self.debug_level != 0:
-                self.logger.error("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
-            raise TypeError("Search result was not a pandas.DataFrame or a list of pandas.DataFrame")
-
-        end = datetime.now(UTC)
-        if self.debug_level != 0:
-            self.logger.info(f"Runtime: {end-start}")
-
-        return search_output
-
+    ## DEPRECATING SOON - USE QUERY INSTEAD
     def find(self, query_object):
         """
         Find all instances of `query_object` across all tables, columns, and cells in the first loaded backend.
@@ -722,6 +698,9 @@ class Terminal:
         return_object = backend.find(query_object)
         return self.find_helper(query_object, return_object, start, "")
 
+
+
+    ## DEPRECATING SOON - USE QUERY INSTEAD
     def find_table(self, query_object):
         """
         Find all tables whose name matches `query_object` in the first loaded backend.
@@ -751,6 +730,9 @@ class Terminal:
         return_object = backend.find_table(query_object)
         return self.find_helper(query_object, return_object, start, "table ")
 
+
+
+    ## DEPRECATING SOON - USE QUERY INSTEAD
     def find_column(self, query_object, range = False):
         """
         Find all columns whose name matches `query_object` in the first loaded backend.
@@ -785,6 +767,9 @@ class Terminal:
         return_object = backend.find_column(query_object, range=range)
         return self.find_helper(query_object, return_object, start, "column ")
 
+
+
+    ## Deprecating soon -- backend function still exists, but is within query_artifacts now
     def find_cell(self, query_object, row = False):
         """
         Find all cells that match the `query_object` in the first loaded backend.
@@ -819,6 +804,9 @@ class Terminal:
         return_object = backend.find_cell(query_object, row=row)
         return self.find_helper(query_object, return_object, start, "cell ")
 
+
+
+    ## DEPRECATING SOON -- ALL FIND FUNCTIONS DEPRECATED OR WITHIN QUERY NOW
     # Internal function to return found objects or print errors.
     def find_helper(self, query_object, return_object, start, find_type):
         """
@@ -838,6 +826,9 @@ class Terminal:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
 
+
+
+    ## Deprecating soon -- backend function still exists, but is within query_artifacts now
     def find_relation(self, query_object):
         """
         Finds all rows in the first table of the first loaded backend that satisfy a column-level condition.
@@ -950,6 +941,8 @@ class Terminal:
             self.logger.info(f"Runtime: {end-start}")
         return return_object
 
+
+
     def overwrite_table(self, table_name, collection, backup = False):
         """
         Overwrites specified table(s) in the first loaded backend with the provided Pandas DataFrame(s).
@@ -1030,6 +1023,8 @@ class Terminal:
         if self.debug_level != 0:
             self.logger.info(f"Runtime: {end-start}")
 
+
+
     def list(self, collection = False):
         """
         Prints/Returns a list of all tables and their dimensions from the first loaded backend
@@ -1060,6 +1055,8 @@ class Terminal:
 
         if collection:
             return table_list
+
+
 
     def summary(self, table_name = None, collection = False):
         """
@@ -1121,6 +1118,8 @@ class Terminal:
         else:
             raise ValueError("Returned object from the first loaded backend's summary() is incorrectly structured")
 
+
+
     def num_tables(self, **kwargs):
         """
         Prints number of tables in the first loaded backend
@@ -1146,6 +1145,8 @@ class Terminal:
             self.logger.info(f"Runtime: {end-start}")
 
         return count
+
+
 
     def display(self, table_name, num_rows = 25, display_cols = None):
         """
@@ -1243,6 +1244,8 @@ class Terminal:
                 self.logger.info(f"Runtime: {end-start}")
             return self.active_metadata
 
+
+
     def update_abstraction(self, table_name, table_data):
         """
         Updates the DSI abstraction, by creating/overwriting the specified table_name with the input table_data
@@ -1271,6 +1274,8 @@ class Terminal:
             self.active_metadata[table_name] = table_data
         elif isinstance(table_data, pd.DataFrame):
             self.active_metadata[table_name] = OrderedDict(table_data.to_dict(orient='list'))
+
+
 
     def close(self):
         """
@@ -1302,6 +1307,8 @@ class Terminal:
             self.active_modules[func] = []
             self.loaded_backends = []
 
+
+
     # Internal function to identify if an input file is a DSI-compatible backend
     def identify_backend(self, filename):
         if not os.path.exists(filename) or not os.path.isfile(filename):
@@ -1321,18 +1328,9 @@ class Terminal:
             raise
         return None
 
-    # Internal function to return input string as either int, float or still a string
-    def check_type(self, text):
-        try:
-            _ = int(text)
-            return int(text)
-        except ValueError:
-            try:
-                _ = float(text)
-                return float(text)
-            except ValueError:
-                return text
 
+
+    # DEPRECATING SOON -- IS DEFINED IN BACKEND.PY NOW
     # helper function to manually parse relation input to see if its valid
     def manual_string_parsing(self, query):
         # splits on double quotes not within any single quotes
@@ -1375,7 +1373,9 @@ class Terminal:
             parts.append(buffer.strip())
 
         return parts
-    
+
+
+
     def table_print_helper(self, headers, rows, max_rows, num_rows=25, max_col_width=50):
         """
         Print table with:
@@ -1445,33 +1445,7 @@ class Terminal:
                 print(f"  ... showing {num_rows} of {max_rows} rows")
                 break
 
-    # # Internal function used to manually print a table cleanly
-    # def table_print_helper(self, headers, rows, max_rows, num_rows=25):
-    #     # Determine max width for each column
-    #     col_widths = [
-    #         max(
-    #             len(str(h)),
-    #             max((len(str(r[i])) for r in rows if i < len(r)), default=0)
-    #         )
-    #         for i, h in enumerate(headers)
-    #     ]
 
-    #     # Print header
-    #     header_row = " | ".join(f"{headers[i]:<{col_widths[i]}}" for i in range(len(headers)))
-    #     print("\n" + header_row)
-    #     print("-" * len(header_row))
-
-    #     # Print each row
-    #     count = 0
-    #     for row in rows:
-    #         print(" | ".join(
-    #             f"{str(row[i]):<{col_widths[i]}}" for i in range(len(headers)) if i < len(row)
-    #         ))
-
-    #         count += 1
-    #         if count == num_rows:
-    #             print(f"  ... showing {num_rows} of {max_rows} rows")
-    #             break
 
     # Internal function used to get line numbers from return statements - SHOULD NOT be called by users
     def trace_function(self, frame, event, arg):
@@ -1481,6 +1455,8 @@ class Terminal:
             return_line_number = frame.f_lineno # Get line number
             original_file = frame.f_code.co_filename # Get file name
         return self.trace_function
+
+
 
     # Internal function used to check if a backend has data
     def valid_backend(self, backend):
@@ -1517,6 +1493,8 @@ class Terminal:
                     self.logger.warning(f"{backend.__class__.__name__} backend connection failed")
                 return False
         return True
+
+
 
     # Internal function that returns if a user can create a file/db in a specified location
     def can_create_file_here(self, dir = "."):

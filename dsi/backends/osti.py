@@ -15,32 +15,6 @@ from dsi.backends.webserver import Webserver
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ----------------------------------------------------------------------
-# Value Object (used for search results)
-# ----------------------------------------------------------------------
-class ValueObject:
-    """
-    Container for search results returned by find* methods
-
-    Attributes
-    ----------
-    t_name : str
-        Table name
-    c_name : list
-        Column name(s)
-    row_num : int or None
-        Row index (if applicable)
-    value : any
-        Matched value
-    type : str
-        {'table', 'column', 'cell'}
-    """
-    def __init__(self):
-        self.t_name = ""
-        self.c_name = []
-        self.row_num = None
-        self.value = None
-        self.type = ""
 
 # ---------------------------------------------------------
 # OSTI Backend (Webserver - read only)
@@ -715,34 +689,8 @@ class OSTI(Webserver):
     # ----------------------------------------------------------------------
     # Search/Find Methods
     # ----------------------------------------------------------------------
-    def search(self, params, download=False):
-        """
-        Retrieves metadata or data for entries in a specified dataset.
 
-        Parameters
-        ----------
-        `params` : dict
-            Identifies the dataset and, optionally, a specific entry.
-            For example, {"database_id": 1} retrieves metadata for all entries
-            in the dataset, while {"database_id": 1, "entry_id": 1} retrieves
-            data for a specific entry (if supported).
-
-        `download` : bool, optional, default=False
-            If True, downloads specified data to a local directory.
-            If False, returns dataset's entry metadata when no entry is specified, 
-            or references to a specified entry's data for separate download.
-
-        Returns
-        -------
-        pandas.DataFrame or list of pandas.DataFrame
-            Metadata for a dataset's entries or data references for a specified entry.
-            Returns a list of DataFrames when the metadata spans multiple tables.
-
-        None
-            If no metadata found or data directly downloaded with (download=True)
-        """
-        raise NotImplementedError
-
+    ## DEPRECATING SOON
     def find(self, query_object, **kwargs):
         """
         Searches for all instances of `query_object` across the table, column, and cell levels.
@@ -777,6 +725,7 @@ class OSTI(Webserver):
         )
 
 
+    ## DEPRECATING SOON
     def find_table(self, query_object, **kwargs):
         """
         Finds all tables whose names contain the given query_object. Search is case-insensitive.
@@ -803,7 +752,7 @@ class OSTI(Webserver):
 
         for table_name, table_data in self._cache.items():
             if query_object.lower() in table_name.lower():
-                val = ValueObject()
+                val = self.ValueObject()
                 val.t_name = table_name
                 val.c_name = list(table_data.keys())
                 val.value = table_data
@@ -813,6 +762,7 @@ class OSTI(Webserver):
         return matches
 
 
+    ## DEPRECATING SOON
     def find_column(self, query_object, **kwargs):
         """
         Finds all columns whose names contain the given query_object. Search is case-insensitive.
@@ -840,7 +790,7 @@ class OSTI(Webserver):
         for table_name, table_data in self._cache.items():
             for col_name, col_data in table_data.items():
                 if query_object.lower() in col_name.lower():
-                    val = ValueObject()
+                    val = self.ValueObject()
                     val.t_name = table_name
                     val.c_name = [col_name]
                     val.value = col_data
@@ -920,7 +870,7 @@ class OSTI(Webserver):
                         match = True
 
                     if match:
-                        val = ValueObject()
+                        val = self.ValueObject()
                         val.t_name = table_name
                         val.row_num = row_idx
 
@@ -962,17 +912,12 @@ class OSTI(Webserver):
             - type : 'relation'
         """
         if not self._loaded or "records" not in self._cache:
-            raise RuntimeError(
-                "find_relation() ERROR: Cannot search an empty backend."
-            )
+            raise RuntimeError("find_relation() ERROR: Cannot search an empty backend.")
 
         df = pd.DataFrame(self._cache["records"])
 
         if column_name not in df.columns:
-            return (
-                f"'{column_name}' is not a column in this database. "
-                "Ensure the column is written first."
-            )
+            print(f"WARNING: '{column_name}' is not a column in this database. Ensure the column is written first.")
 
         operator, value = self._parse_relation(relation)
 
@@ -984,15 +929,12 @@ class OSTI(Webserver):
         )
 
         if filtered.empty:
-            return (
-                f"Could not find any rows where "
-                f" {column_name} {relation}  in this database."
-            )
+            print(f"WARNING: Could not find any rows where {column_name} {relation} in this database.")
 
         matches = []
 
         for idx, row in filtered.iterrows():
-            val = ValueObject()
+            val = self.ValueObject()
             val.t_name = "records"
             val.c_name = list(df.columns)
             val.row_num = int(idx) + 1
